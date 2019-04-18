@@ -1,0 +1,117 @@
+package table
+
+import (
+	"fmt"
+	"testing"
+
+	ydb "github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
+)
+
+func TestResultAny(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		columns []Column
+		values  []ydb.Value
+	}{
+		{
+			columns: []Column{
+				{"column0", ydb.Optional(ydb.TypeUint32)},
+			},
+			values: []ydb.Value{
+				//ydb.OptionalValue(ydb.Uint32Value(42)),
+				ydb.OptionalValue(ydb.Uint32Value(43)),
+				ydb.NullValue(ydb.TypeUint32),
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			res := NewResult(
+				NewResultSet(
+					WithColumns(test.columns...),
+					WithValues(test.values...),
+				),
+			)
+			for res.NextSet() {
+				for res.NextRow() {
+					res.NextItem()
+					if res.IsOptional() {
+						res.Unwrap()
+					}
+					x := res.Any()
+					fmt.Printf("%v(%s,%s)\n", x, res.Path(), res.Type())
+				}
+			}
+			if err := res.Err(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+type resultSetDesc Ydb.ResultSet
+
+type ResultSetOption func(*resultSetDesc)
+
+func WithColumns(cs ...Column) ResultSetOption {
+	return func(r *resultSetDesc) {
+		for _, c := range cs {
+			r.Columns = append(r.Columns, &Ydb.Column{
+				Name: c.Name,
+				Type: internal.TypeToYDB(c.Type),
+			})
+		}
+	}
+}
+
+func WithValues(vs ...ydb.Value) ResultSetOption {
+	return func(r *resultSetDesc) {
+		n := len(r.Columns)
+		if n == 0 {
+			panic("empty columns")
+		}
+		if len(vs)%n != 0 {
+			panic("malformed values set")
+		}
+		var row *Ydb.Value
+		for i, v := range vs {
+			j := i % n
+			if j == 0 && i > 0 {
+				r.Rows = append(r.Rows, row)
+			}
+			if j == 0 {
+				row = &Ydb.Value{
+					Items: make([]*Ydb.Value, n),
+				}
+			}
+			tv := internal.ValueToYDB(v)
+			act := internal.TypeFromYDB(tv.Type)
+			exp := internal.TypeFromYDB(r.Columns[j].Type)
+			if !internal.TypesEqual(act, exp) {
+				panic(fmt.Sprintf(
+					"unexpected type for #%d column: %s; want %s",
+					j, act, exp,
+				))
+			}
+			row.Items[j] = tv.Value
+		}
+		if row != nil {
+			r.Rows = append(r.Rows, row)
+		}
+	}
+}
+
+func NewResultSet(opts ...ResultSetOption) *Ydb.ResultSet {
+	var d resultSetDesc
+	for _, opt := range opts {
+		opt(&d)
+	}
+	return (*Ydb.ResultSet)(&d)
+}
+
+func NewResult(sets ...*Ydb.ResultSet) *Result {
+	return &Result{
+		sets: sets,
+	}
+}
