@@ -72,6 +72,11 @@ The straightforward example of querying data may looks similar to this:
 			res.NextItem()
 			age := res.OUint64()
 
+			// Note that any value getter (such that OUTF8() and OUint64()
+			// above) may fail the result scanning. When this happens, getter 
+			// function returns zero value of requested type and marks result 
+			// scanning as failed, preventing any further scanning. In this 
+			// case res.Err() will return the cause of fail.
 			if res.Err() == nil {
 				users = append(users, user{
 					id:  id,
