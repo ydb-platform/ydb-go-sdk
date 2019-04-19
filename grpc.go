@@ -28,7 +28,7 @@ func (it IssueIterator) Len() int {
 
 func (it IssueIterator) Get(i int) (issue Issue, nested IssueIterator) {
 	x := it[i]
-	if xs := x.IssueMessage; len(xs) > 0 {
+	if xs := x.Issues; len(xs) > 0 {
 		nested = IssueIterator(xs)
 	}
 	return Issue{
@@ -121,7 +121,7 @@ func dumpIssues(buf *bytes.Buffer, ms []*Ydb_Issue.IssueMessage) {
 			buf.WriteByte(' ')
 		}
 		buf.WriteString(strings.TrimSuffix(*m.Message, "."))
-		dumpIssues(buf, m.IssueMessage)
+		dumpIssues(buf, m.Issues)
 		buf.WriteByte('}')
 	}
 }
