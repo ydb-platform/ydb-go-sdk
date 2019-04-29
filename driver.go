@@ -16,15 +16,18 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
-const (
+var (
+	// DefaultDiscoveryInterval contains default duration between discovery
+	// requests made by driver.
 	DefaultDiscoveryInterval = time.Minute
 )
 
+// ErrClosed is returned when operation requested on a closed driver.
 var ErrClosed = errors.New("driver closed")
 
+// Driver is an interface of YDB driver.
 type Driver interface {
 	Call(context.Context, internal.Operation) error
 	StreamRead(context.Context, internal.StreamOperation) error
@@ -46,11 +49,6 @@ type AuthTokenCredentials struct {
 // Token implements Credentials.
 func (a AuthTokenCredentials) Token(_ context.Context) (string, error) {
 	return a.AuthToken, nil
-}
-
-type DiscoveryConfig struct {
-	Interval time.Duration
-	Timer    timeutil.Timer
 }
 
 // DriverConfig contains driver configuration options.
@@ -180,10 +178,13 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	if err != nil {
 		return nil, err
 	}
-	curr, err = clusterUpsert(ctx, c, curr, nil)
-	if err != nil {
-		return nil, err
+	// Sort current list of endpoints to prevent additional sorting withing
+	// background discovery below.
+	sortEndpoints(curr)
+	for _, e := range curr {
+		c.Upsert(ctx, e)
 	}
+
 	driver := &driver{
 		cluster:        c,
 		meta:           m,
@@ -195,35 +196,26 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 		driver.explorer = repeater{
 			Interval: config.DiscoveryInterval,
 			Task: func(ctx context.Context) {
-				// TODO: log add error.
 				next, err := discover(ctx)
 				if err != nil {
 					return
 				}
-				sortEndpoints(curr)
+				// NOTE: curr endpoints must be sorted here.
 				sortEndpoints(next)
 				diffEndpoints(curr, next,
 					func(i, j int) { // equal
-						// do nothing.
+						// Endpoints are equal but we still need to update meta
+						// data such that load factor and other.
+						c.Upsert(ctx, next[j])
 					},
 					func(i, j int) { // add
-						// do nothing.
+						c.Upsert(ctx, next[j])
 					},
 					func(i, j int) { // del
-						e := curr[i]
-						addr := connAddr{
-							addr: e.Addr,
-							port: e.Port,
-						}
-						if !c.Remove(addr) {
-							panic("ydb: driver can not delete endpoint")
-						}
+						c.Remove(ctx, curr[i])
 					},
 				)
-				curr, err = clusterUpsert(ctx, c, next, curr[:0])
-				if err != nil {
-					// log error
-				}
+				curr = next
 			},
 		}
 		driver.explorer.Start()
@@ -241,20 +233,6 @@ func (d *Dialer) grpcDialOptions() (opts []grpc.DialOption) {
 		grpc.WithInsecure(),
 		grpc.WithBlock(),
 	)
-}
-
-// clusterUpsert calls Upsert() on given cluster with given context append
-// every successful endpoint to dst slice.
-// It returns resulting dst slice and a last error if and only if dst is empty.
-func clusterUpsert(ctx context.Context, c *cluster, src, dst []Endpoint) ([]Endpoint, error) {
-	var err error
-	for _, e := range src {
-		err = c.Upsert(ctx, e)
-		if err == nil {
-			dst = append(dst, e)
-		}
-	}
-	return dst, err
 }
 
 type driver struct {

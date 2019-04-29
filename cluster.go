@@ -97,13 +97,13 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 	}
 }
 
-func (c *cluster) Upsert(ctx context.Context, e Endpoint) (err error) {
+func (c *cluster) Upsert(ctx context.Context, e Endpoint) {
 	c.init()
 
 	c.up.Lock()
 	defer c.up.Unlock()
 	if c.closed {
-		return ErrClosed
+		return
 	}
 
 	c.mu.RLock()
@@ -120,10 +120,17 @@ func (c *cluster) Upsert(ctx context.Context, e Endpoint) (err error) {
 	addr := connAddr{e.Addr, e.Port}
 	x, has := c.index[addr]
 	if !has {
+		var err error
 		conn, err = c.dial(ctx, e.Addr, e.Port)
 		if err != nil {
-			return err
+			// Current implementation just gives up on first dial error.
+			// But further versions may try to reestablish connection in
+			// background. Thats why we silently return here.
+			//
+			// TODO(kamardin): redial in background.
+			return
 		}
+		// NOTE: x will be stored below.
 		x.index = next
 	}
 	if min = c.lmin; len(c.index) == 0 || e.LoadFactor < min {
@@ -140,7 +147,7 @@ func (c *cluster) Upsert(ctx context.Context, e Endpoint) (err error) {
 		rebuild = true
 	}
 	if !rebuild {
-		return nil
+		return
 	}
 
 	c.lmin = min
@@ -158,8 +165,6 @@ func (c *cluster) Upsert(ctx context.Context, e Endpoint) (err error) {
 	if wait != nil {
 		close(wait)
 	}
-
-	return nil
 }
 
 // c.up must be held.
@@ -182,15 +187,16 @@ func (c *cluster) spread(f func(float32) int32) []int {
 	return genBelt(index, dist)
 }
 
-func (c *cluster) Remove(addr connAddr) bool {
+func (c *cluster) Remove(_ context.Context, e Endpoint) {
 	c.up.Lock()
 	defer c.up.Unlock()
 	if c.closed {
-		return false
+		return
 	}
-	e, ok := c.index[addr]
+	addr := connAddr{e.Addr, e.Port}
+	x, ok := c.index[addr]
 	if !ok {
-		return false
+		return
 	}
 
 	c.mu.RLock()
@@ -198,7 +204,7 @@ func (c *cluster) Remove(addr connAddr) bool {
 	next := c.conns[n-1]
 	c.mu.RUnlock()
 
-	load := e.load
+	load := x.load
 	var (
 		min     float32
 		max     float32
@@ -214,14 +220,14 @@ func (c *cluster) Remove(addr connAddr) bool {
 	delete(c.index, addr)
 	if next.addr != addr {
 		nx := c.index[next.addr]
-		nx.index = e.index
+		nx.index = x.index
 		c.index[next.addr] = nx
 	}
 
 	if !inspect {
 		var def bool
-		for _, e := range c.index {
-			load := e.load
+		for _, x := range c.index {
+			load := x.load
 			if !def {
 				min = load
 				max = load
@@ -241,12 +247,10 @@ func (c *cluster) Remove(addr connAddr) bool {
 	belt := c.distribute()
 
 	c.mu.Lock()
-	c.conns[e.index], c.conns[n-1] = c.conns[n-1], nil
+	c.conns[x.index], c.conns[n-1] = c.conns[n-1], nil
 	c.conns = c.conns[:n-1]
 	c.belt = belt
 	c.mu.Unlock()
-
-	return true
 }
 
 // c.mu read lock must be held.

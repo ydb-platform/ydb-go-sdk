@@ -42,7 +42,7 @@ func TestClusterBalance(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		add    []Endpoint
-		del    []string
+		del    []Endpoint
 		repeat int
 		exp    map[string]int
 		err    bool
@@ -90,7 +90,9 @@ func TestClusterBalance(t *testing.T) {
 				{Addr: "bar", LoadFactor: 1},
 				{Addr: "baz", LoadFactor: 1},
 			},
-			del:    []string{"foo"},
+			del: []Endpoint{
+				{Addr: "foo"},
+			},
 			repeat: 1000,
 			exp: map[string]int{
 				"bar": 500,
@@ -103,7 +105,9 @@ func TestClusterBalance(t *testing.T) {
 				{Addr: "bar", LoadFactor: 0.25},
 				{Addr: "baz", LoadFactor: 0.25},
 			},
-			del:    []string{"foo"},
+			del: []Endpoint{
+				{Addr: "foo"},
+			},
 			repeat: 1000,
 			exp: map[string]int{
 				"bar": 500,
@@ -116,7 +120,9 @@ func TestClusterBalance(t *testing.T) {
 				{Addr: "bar", LoadFactor: 0.75},
 				{Addr: "baz", LoadFactor: 0.25},
 			},
-			del:    []string{"bar"},
+			del: []Endpoint{
+				{Addr: "bar"},
+			},
 			repeat: 1000,
 			exp: map[string]int{
 				"foo": 250,
@@ -129,7 +135,9 @@ func TestClusterBalance(t *testing.T) {
 				{Addr: "bar", LoadFactor: 0},
 				{Addr: "baz", LoadFactor: 0},
 			},
-			del:    []string{"baz"},
+			del: []Endpoint{
+				{Addr: "baz"},
+			},
 			repeat: 1000,
 			exp: map[string]int{
 				"foo": 500,
@@ -142,7 +150,11 @@ func TestClusterBalance(t *testing.T) {
 				{Addr: "bar", LoadFactor: 0},
 				{Addr: "baz", LoadFactor: 0},
 			},
-			del:    []string{"baz", "foo", "bar"},
+			del: []Endpoint{
+				{Addr: "foo"},
+				{Addr: "bar"},
+				{Addr: "baz"},
+			},
 			repeat: 1,
 			err:    true,
 		},
@@ -167,14 +179,10 @@ func TestClusterBalance(t *testing.T) {
 				},
 			}
 			for _, e := range test.add {
-				if err := c.Upsert(context.Background(), e); err != nil {
-					t.Fatal(err)
-				}
+				c.Upsert(context.Background(), e)
 			}
-			for _, x := range test.del {
-				if !c.Remove(maddr[x].addr) {
-					t.Fatalf("can not delete endpoint %q", x)
-				}
+			for _, e := range test.del {
+				c.Remove(context.Background(), e)
 			}
 
 			// Prepare canceled context to not stuck on awaiting non-existing
