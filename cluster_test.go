@@ -6,11 +6,52 @@ import (
 	"time"
 )
 
+type stubBalancer struct {
+	OnNext   func() *conn
+	OnInsert func(*conn, connInfo) balancerElement
+	OnUpdate func(balancerElement, connInfo)
+	OnRemove func(balancerElement)
+}
+
+func (s stubBalancer) Next() *conn {
+	if f := s.OnNext; f != nil {
+		return f()
+	}
+	return nil
+}
+func (s stubBalancer) Insert(c *conn, i connInfo) balancerElement {
+	if f := s.OnInsert; f != nil {
+		return f(c, i)
+	}
+	return nil
+}
+func (s stubBalancer) Update(el balancerElement, i connInfo) {
+	if f := s.OnUpdate; f != nil {
+		f(el, i)
+	}
+}
+func (s stubBalancer) Remove(el balancerElement) {
+	if f := s.OnRemove; f != nil {
+		f(el)
+	}
+}
+
 func TestClusterAwait(t *testing.T) {
 	const timeout = 100 * time.Millisecond
+
+	var connToReturn *conn
 	c := &cluster{
 		dial: func(context.Context, string, int) (*conn, error) {
 			return new(conn), nil
+		},
+		balancer: stubBalancer{
+			OnInsert: func(c *conn, _ connInfo) balancerElement {
+				connToReturn = c
+				return nil
+			},
+			OnNext: func() *conn {
+				return connToReturn
+			},
 		},
 	}
 	get := func() (<-chan error, context.CancelFunc) {
@@ -33,194 +74,8 @@ func TestClusterAwait(t *testing.T) {
 
 		assertNoRecv(t, timeout, got)
 
-		c.Upsert(context.Background(), Endpoint{})
+		c.Insert(context.Background(), Endpoint{})
 		assertRecvError(t, timeout, got, nil)
-	}
-}
-
-func TestClusterBalance(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		add    []Endpoint
-		del    []Endpoint
-		repeat int
-		exp    map[string]int
-		err    bool
-	}{
-		{
-			add: []Endpoint{
-				{Addr: "foo"},
-				{Addr: "bar"},
-			},
-			repeat: 1000,
-			exp: map[string]int{
-				"foo": 500,
-				"bar": 500,
-			},
-		},
-		{
-			add: []Endpoint{
-				{Addr: "foo", LoadFactor: 0.25},
-				{Addr: "bar", LoadFactor: 1},
-				{Addr: "baz", LoadFactor: 1},
-			},
-			repeat: 1000,
-			exp: map[string]int{
-				"foo": 500,
-				"bar": 250,
-				"baz": 250,
-			},
-		},
-		{
-			add: []Endpoint{
-				{Addr: "foo", LoadFactor: 1},
-				{Addr: "bar", LoadFactor: 0.25},
-				{Addr: "baz", LoadFactor: 0.25},
-			},
-			repeat: 1000,
-			exp: map[string]int{
-				"foo": 200,
-				"bar": 400,
-				"baz": 400,
-			},
-		},
-		{
-			add: []Endpoint{
-				{Addr: "foo", LoadFactor: 0.25},
-				{Addr: "bar", LoadFactor: 1},
-				{Addr: "baz", LoadFactor: 1},
-			},
-			del: []Endpoint{
-				{Addr: "foo"},
-			},
-			repeat: 1000,
-			exp: map[string]int{
-				"bar": 500,
-				"baz": 500,
-			},
-		},
-		{
-			add: []Endpoint{
-				{Addr: "foo", LoadFactor: 1},
-				{Addr: "bar", LoadFactor: 0.25},
-				{Addr: "baz", LoadFactor: 0.25},
-			},
-			del: []Endpoint{
-				{Addr: "foo"},
-			},
-			repeat: 1000,
-			exp: map[string]int{
-				"bar": 500,
-				"baz": 500,
-			},
-		},
-		{
-			add: []Endpoint{
-				{Addr: "foo", LoadFactor: 1},
-				{Addr: "bar", LoadFactor: 0.75},
-				{Addr: "baz", LoadFactor: 0.25},
-			},
-			del: []Endpoint{
-				{Addr: "bar"},
-			},
-			repeat: 1000,
-			exp: map[string]int{
-				"foo": 250,
-				"baz": 750,
-			},
-		},
-		{
-			add: []Endpoint{
-				{Addr: "foo", LoadFactor: 0},
-				{Addr: "bar", LoadFactor: 0},
-				{Addr: "baz", LoadFactor: 0},
-			},
-			del: []Endpoint{
-				{Addr: "baz"},
-			},
-			repeat: 1000,
-			exp: map[string]int{
-				"foo": 500,
-				"bar": 500,
-			},
-		},
-		{
-			add: []Endpoint{
-				{Addr: "foo", LoadFactor: 0},
-				{Addr: "bar", LoadFactor: 0},
-				{Addr: "baz", LoadFactor: 0},
-			},
-			del: []Endpoint{
-				{Addr: "foo"},
-				{Addr: "bar"},
-				{Addr: "baz"},
-			},
-			repeat: 1,
-			err:    true,
-		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			var (
-				mconn = map[*conn]string{} // conn to addr mapping for easy matching.
-				maddr = map[string]*conn{} // addr to conn mapping.
-			)
-			c := &cluster{
-				dial: func(_ context.Context, host string, port int) (*conn, error) {
-					addr := connAddr{
-						addr: host,
-						port: port,
-					}
-					c := &conn{
-						addr: addr,
-					}
-					mconn[c] = host
-					maddr[host] = c
-					return c, nil
-				},
-			}
-			for _, e := range test.add {
-				c.Upsert(context.Background(), e)
-			}
-			for _, e := range test.del {
-				c.Remove(context.Background(), e)
-			}
-
-			// Prepare canceled context to not stuck on awaiting non-existing
-			// connection.
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-
-			dist := map[string]int{}
-			for i := 0; i < test.repeat; i++ {
-				conn, err := c.Get(ctx)
-				if test.err {
-					if err != nil {
-						break
-					}
-					t.Fatalf("unexpected nil error")
-				} else if err != nil {
-					t.Fatal(err)
-				}
-				addr, has := mconn[conn]
-				if !has {
-					t.Fatalf("received unknown conn")
-				}
-				dist[addr]++
-			}
-
-			for host, exp := range test.exp {
-				if act := dist[host]; act != exp {
-					t.Errorf(
-						"unexpected distribution for host %q: %v; want %v",
-						host, act, exp,
-					)
-				}
-				delete(dist, host)
-			}
-			for host := range dist {
-				t.Fatalf("unexpected host in distribution: %q", host)
-			}
-		})
 	}
 }
 

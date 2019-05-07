@@ -1,35 +1,57 @@
 package ydb
 
 import (
-	"container/heap"
 	"context"
-	"math"
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
+// balancerElement is an interface that holds some balancer specific data.
+type balancerElement interface {
+}
+
+// connInfo contains connection runtime stats.
+type connInfo struct {
+	loadFactor float32
+}
+
+// connEntry represents inserted into the cluster connection.
 type connEntry struct {
-	index int
-	load  float32
+	conn   *conn
+	info   connInfo
+	handle balancerElement
+}
+
+// balancer is an interface that implements particular load-balancing
+// algorithm.
+//
+// balancer methods called synchronized. That is, implementations must not
+// provide additional goroutine safety.
+type balancer interface {
+	// Next returns next connection for request.
+	// Next MUST not return nil if it has at least one connection.
+	Next() *conn
+
+	// Insert inserts new connection.
+	Insert(*conn, connInfo) balancerElement
+
+	// Update updates previously inserted connection.
+	Update(balancerElement, connInfo)
+
+	// Remove removes previously inserted connection.
+	Remove(balancerElement)
 }
 
 type cluster struct {
-	dial func(context.Context, string, int) (*conn, error)
+	dial     func(context.Context, string, int) (*conn, error)
+	balancer balancer
 
+	mu     sync.RWMutex
 	once   sync.Once
-	up     sync.Mutex
-	closed bool
 	index  map[connAddr]connEntry
-	lmin   float32
-	lmax   float32
-
-	mu    sync.RWMutex
-	conns []*conn
-	belt  []int
-	next  int32
-	wait  chan struct{}
+	wait   chan struct{}
+	closed bool
 }
 
 func (c *cluster) init() {
@@ -56,37 +78,41 @@ func (c *cluster) Close() (err error) {
 	wait := c.wait
 	c.wait = nil
 
-	conns := c.conns
-	c.conns = nil
+	index := c.index
 	c.index = nil
+
 	c.mu.Unlock()
 
 	if wait != nil {
 		close(wait)
 	}
-	for _, c := range conns {
-		c.conn.Close()
+	for _, entry := range index {
+		entry.conn.conn.Close()
 	}
 
 	return
 }
 
+// Get returns next available connection.
+// It returns error on given context cancelation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 	for {
 		c.mu.RLock()
 		closed := c.closed
 		wait := c.await()
-		if n := len(c.conns); n > 0 {
-			d := int(atomic.AddInt32(&c.next, 1)) % len(c.belt)
-			i := c.belt[d]
-			conn = c.conns[i]
-		}
+		size := len(c.index)
+		conn = c.balancer.Next()
 		c.mu.RUnlock()
-		if conn != nil {
-			return conn, nil
-		}
 		if closed {
 			return nil, ErrClosed
+		}
+		switch {
+		case size == 0 && conn != nil:
+			panic("ydb: driver: empty balancer has returned non-nil conn")
+		case size != 0 && conn == nil:
+			panic("ydb: driver: non-empty balancer has returned nil conn")
+		case conn != nil:
+			return conn, nil
 		}
 		select {
 		case <-wait():
@@ -97,66 +123,45 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 	}
 }
 
-func (c *cluster) Upsert(ctx context.Context, e Endpoint) {
+// Insert inserts new connection into the cluster.
+func (c *cluster) Insert(ctx context.Context, e Endpoint) {
 	c.init()
 
-	c.up.Lock()
-	defer c.up.Unlock()
-	if c.closed {
+	// Dial not under the mutex.
+	conn, err := c.dial(ctx, e.Addr, e.Port)
+	if err != nil {
+		// Current implementation just gives up on first dial error.
+		// But further versions may try to reestablish connection in
+		// background. Thats why we silently return here.
+		//
+		// TODO(kamardin): redial in background. After that Insert(), Remove()
+		// and Update() may panic while performing operations on non-existing
+		// endpoint.
 		return
 	}
 
-	c.mu.RLock()
-	next := len(c.conns)
-	c.mu.RUnlock()
-
-	var (
-		rebuild bool
-
-		min  float32
-		max  float32
-		conn *conn
-	)
 	addr := connAddr{e.Addr, e.Port}
-	x, has := c.index[addr]
-	if !has {
-		var err error
-		conn, err = c.dial(ctx, e.Addr, e.Port)
-		if err != nil {
-			// Current implementation just gives up on first dial error.
-			// But further versions may try to reestablish connection in
-			// background. Thats why we silently return here.
-			//
-			// TODO(kamardin): redial in background.
-			return
-		}
-		// NOTE: x will be stored below.
-		x.index = next
+	info := connInfo{
+		loadFactor: e.LoadFactor,
 	}
-	if min = c.lmin; len(c.index) == 0 || e.LoadFactor < min {
-		min = e.LoadFactor
-		rebuild = true
-	}
-	if max = c.lmax; len(c.index) == 0 || e.LoadFactor > max {
-		max = e.LoadFactor
-		rebuild = true
-	}
-	if !has || x.load != e.LoadFactor {
-		x.load = e.LoadFactor
-		c.index[addr] = x
-		rebuild = true
-	}
-	if !rebuild {
-		return
-	}
-
-	c.lmin = min
-	c.lmax = max
-	belt := c.distribute()
 
 	c.mu.Lock()
-	c.conns = append(c.conns, conn)
-	c.belt = belt
+	if c.closed {
+		c.mu.Unlock()
+		return
+	}
+
+	_, has := c.index[addr]
+	if has {
+		c.mu.Unlock()
+		return
+	}
+	entry := connEntry{
+		conn:   conn,
+		info:   info,
+		handle: c.balancer.Insert(conn, info),
+	}
+	c.index[addr] = entry
 
 	wait := c.wait
 	c.wait = nil
@@ -167,90 +172,52 @@ func (c *cluster) Upsert(ctx context.Context, e Endpoint) {
 	}
 }
 
-// c.up must be held.
-func (c *cluster) distribute() []int {
-	return c.spread(distribution(
-		c.lmin, int32(len(c.conns)),
-		c.lmax, 1,
-	))
-}
-
-// c.up must be held.
-func (c *cluster) spread(f func(float32) int32) []int {
-	dist := make([]int32, 0, len(c.index))
-	index := make([]int, 0, len(c.index))
-	for _, x := range c.index {
-		d := f(x.load)
-		dist = append(dist, d)
-		index = append(index, x.index)
+// Update updates existing connection's runtime stats such that load factor and
+// others.
+func (c *cluster) Update(ctx context.Context, e Endpoint) {
+	addr := connAddr{e.Addr, e.Port}
+	info := connInfo{
+		loadFactor: e.LoadFactor,
 	}
-	return genBelt(index, dist)
-}
 
-func (c *cluster) Remove(_ context.Context, e Endpoint) {
-	c.up.Lock()
-	defer c.up.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.closed {
 		return
 	}
+
+	entry, has := c.index[addr]
+	if !has {
+		return
+	}
+	entry.info = info
+	c.index[addr] = entry
+
+	c.balancer.Update(entry.handle, info)
+}
+
+// Remove removes and closes previously inserted connection.
+func (c *cluster) Remove(_ context.Context, e Endpoint) {
 	addr := connAddr{e.Addr, e.Port}
-	x, ok := c.index[addr]
-	if !ok {
+
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
 		return
 	}
 
-	c.mu.RLock()
-	n := len(c.conns)
-	next := c.conns[n-1]
-	c.mu.RUnlock()
-
-	load := x.load
-	var (
-		min     float32
-		max     float32
-		inspect bool
-	)
-	if min = c.lmin; load == min {
-		inspect = true
+	entry, has := c.index[addr]
+	if !has {
+		c.mu.Unlock()
+		return
 	}
-	if max = c.lmax; load == max {
-		inspect = true
-	}
-
 	delete(c.index, addr)
-	if next.addr != addr {
-		nx := c.index[next.addr]
-		nx.index = x.index
-		c.index[next.addr] = nx
-	}
 
-	if !inspect {
-		var def bool
-		for _, x := range c.index {
-			load := x.load
-			if !def {
-				min = load
-				max = load
-				def = true
-			}
-			if load < min {
-				min = load
-			}
-			if load > max {
-				max = load
-			}
-		}
-		c.lmin = min
-		c.lmax = max
-	}
+	c.balancer.Remove(entry.handle)
 
-	belt := c.distribute()
-
-	c.mu.Lock()
-	c.conns[x.index], c.conns[n-1] = c.conns[n-1], nil
-	c.conns = c.conns[:n-1]
-	c.belt = belt
 	c.mu.Unlock()
+
+	entry.conn.conn.Close()
 }
 
 // c.mu read lock must be held.
@@ -276,79 +243,6 @@ func (c *cluster) await() func() <-chan struct{} {
 
 		return wait
 	}
-}
-
-func distribution(x1 float32, y1 int32, x2 float32, y2 int32) (f func(float32) int32) {
-	if x1 == x2 {
-		f = func(float32) int32 { return 1 }
-	} else {
-		a := float32(y2-y1) / (x2 - x1)
-		b := float32(y1) - a*x1
-		f = func(x float32) int32 {
-			return int32(math.Round(float64(a*x + b)))
-		}
-	}
-	return f
-}
-
-type distItem struct {
-	i   int
-	stp float64
-	val float64
-}
-
-// newDistItem creates new distribution item.
-// w must be greater than zero.
-func newDistItem(i int, w int32) *distItem {
-	stp := 1 / float64(w)
-	return &distItem{
-		i:   i,
-		stp: stp,
-		val: stp,
-	}
-}
-
-func (x *distItem) tick() bool {
-	x.val += x.stp
-	return x.val <= 1
-}
-
-func (x *distItem) index() int {
-	return x.i
-}
-
-type distItemsHeap []*distItem
-
-func (h distItemsHeap) Len() int           { return len(h) }
-func (h distItemsHeap) Less(i, j int) bool { return h[i].val < h[j].val }
-func (h distItemsHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-
-func (h *distItemsHeap) Push(x interface{}) {
-	*h = append(*h, x.(*distItem))
-}
-
-func (h *distItemsHeap) Pop() interface{} {
-	p := *h
-	n := len(p)
-	x := p[n-1]
-	*h = p[:n-1]
-	return x
-}
-
-func genBelt(index []int, weight []int32) (r []int) {
-	h := make(distItemsHeap, len(weight))
-	for i, w := range weight {
-		h[i] = newDistItem(index[i], w)
-	}
-	heap.Init(&h)
-	for len(h) > 0 {
-		x := heap.Pop(&h).(*distItem)
-		r = append(r, x.index())
-		if x.tick() {
-			heap.Push(&h, x)
-		}
-	}
-	return
 }
 
 func compareEndpoints(a, b Endpoint) int {

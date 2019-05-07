@@ -11,6 +11,9 @@ type DriverTrace struct {
 	DialStart func(DialStartInfo)
 	DialDone  func(DialDoneInfo)
 
+	GetConnStart func(GetConnStartInfo)
+	GetConnDone  func(GetConnDoneInfo)
+
 	DiscoveryStart func(DiscoveryStartInfo)
 	DiscoveryDone  func(DiscoveryDoneInfo)
 
@@ -41,6 +44,30 @@ func (d DriverTrace) dialDone(ctx context.Context, addr string, err error) {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).DialDone; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) getConnStart(ctx context.Context) {
+	x := GetConnStartInfo{
+		Context: ctx,
+	}
+	if f := d.GetConnStart; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).GetConnStart; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) getConnDone(ctx context.Context, addr string, err error) {
+	x := GetConnDoneInfo{
+		Context: ctx,
+		Address: addr,
+		Error:   err,
+	}
+	if f := d.GetConnDone; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).GetConnDone; f != nil {
 		f(x)
 	}
 }
@@ -122,6 +149,14 @@ type (
 		Address string
 		Error   error
 	}
+	GetConnStartInfo struct {
+		Context context.Context
+	}
+	GetConnDoneInfo struct {
+		Context context.Context
+		Address string
+		Error   error
+	}
 	DiscoveryStartInfo struct {
 		Context context.Context
 	}
@@ -172,6 +207,28 @@ func composeDriverTrace(a, b DriverTrace) (c DriverTrace) {
 		c.DialDone = func(info DialDoneInfo) {
 			a.DialDone(info)
 			b.DialDone(info)
+		}
+	}
+	switch {
+	case a.GetConnStart == nil:
+		c.GetConnStart = b.GetConnStart
+	case b.GetConnStart == nil:
+		c.GetConnStart = a.GetConnStart
+	default:
+		c.GetConnStart = func(info GetConnStartInfo) {
+			a.GetConnStart(info)
+			b.GetConnStart(info)
+		}
+	}
+	switch {
+	case a.GetConnDone == nil:
+		c.GetConnDone = b.GetConnDone
+	case b.GetConnDone == nil:
+		c.GetConnDone = a.GetConnDone
+	default:
+		c.GetConnDone = func(info GetConnDoneInfo) {
+			a.GetConnDone(info)
+			b.GetConnDone(info)
 		}
 	}
 	switch {

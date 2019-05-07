@@ -22,6 +22,9 @@ var (
 	// DefaultDiscoveryInterval contains default duration between discovery
 	// requests made by driver.
 	DefaultDiscoveryInterval = time.Minute
+
+	// DefaultBalancingMethod contains driver's default balancing algorithm.
+	DefaultBalancingMethod = BalancingRoundRobin
 )
 
 // ErrClosed is returned when operation requested on a closed driver.
@@ -51,6 +54,20 @@ func (a AuthTokenCredentials) Token(_ context.Context) (string, error) {
 	return a.AuthToken, nil
 }
 
+// BalancingMethod encodes balancing method for driver configuration.
+type BalancingMethod uint
+
+const (
+	BalancingUnknown BalancingMethod = iota
+	BalancingRoundRobin
+)
+
+var balancers = map[BalancingMethod]func() balancer{
+	BalancingRoundRobin: func() balancer {
+		return new(roundRobin)
+	},
+}
+
 // DriverConfig contains driver configuration options.
 type DriverConfig struct {
 	// Database is a required database name.
@@ -78,6 +95,11 @@ type DriverConfig struct {
 	// If DiscoveryInterval is zero then the DefaultDiscoveryInterval is used.
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval time.Duration
+
+	// BalancingMethod is an algorithm used by the driver for endpoint
+	// selection.
+	// If BalancingMethod is zero then the DefaultBalancingMethod is used.
+	BalancingMethod BalancingMethod
 }
 
 func (d *DriverConfig) withDefaults() (c DriverConfig) {
@@ -86,6 +108,9 @@ func (d *DriverConfig) withDefaults() (c DriverConfig) {
 	}
 	if c.DiscoveryInterval == 0 {
 		c.DiscoveryInterval = DefaultDiscoveryInterval
+	}
+	if c.BalancingMethod == 0 {
+		c.BalancingMethod = DefaultBalancingMethod
 	}
 	return c
 }
@@ -151,7 +176,8 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	}
 
 	c := &cluster{
-		dial: dial,
+		dial:     dial,
+		balancer: balancers[config.BalancingMethod](),
 	}
 	m := newMeta(config.Database, config.Credentials)
 
@@ -182,7 +208,7 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	// background discovery below.
 	sortEndpoints(curr)
 	for _, e := range curr {
-		c.Upsert(ctx, e)
+		c.Insert(ctx, e)
 	}
 
 	driver := &driver{
@@ -203,15 +229,15 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 				// NOTE: curr endpoints must be sorted here.
 				sortEndpoints(next)
 				diffEndpoints(curr, next,
-					func(i, j int) { // equal
+					func(i, j int) {
 						// Endpoints are equal but we still need to update meta
-						// data such that load factor and other.
-						c.Upsert(ctx, next[j])
+						// data such that load factor and others.
+						c.Update(ctx, next[j])
 					},
-					func(i, j int) { // add
-						c.Upsert(ctx, next[j])
+					func(i, j int) {
+						c.Insert(ctx, next[j])
 					},
-					func(i, j int) { // del
+					func(i, j int) {
 						c.Remove(ctx, curr[i])
 					},
 				)
@@ -257,15 +283,25 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer cancel()
 	}
+	d.trace.getConnStart(ctx)
 	conn, err := d.cluster.Get(ctx)
+	d.trace.getConnDone(ctx, conn.addr.String(), err)
 	if err != nil {
 		return err
 	}
 	method, req, res := internal.Unwrap(op)
-	return (grpcCaller{
+	err = (grpcCaller{
 		meta:  d.meta,
 		trace: d.trace,
 	}).call(ctx, conn, method, req, res)
+	if err == ctx.Err() {
+		// Client deadline error.
+	} else if terr, ok := err.(*TransportError); ok {
+		// Is transport error.
+		// TODO
+		panic(terr)
+	}
+	return err
 }
 
 func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) error {
