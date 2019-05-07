@@ -294,13 +294,6 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 		meta:  d.meta,
 		trace: d.trace,
 	}).call(ctx, conn, method, req, res)
-	if err == ctx.Err() {
-		// Client deadline error.
-	} else if terr, ok := err.(*TransportError); ok {
-		// Is transport error.
-		// TODO
-		panic(terr)
-	}
 	return err
 }
 
