@@ -387,7 +387,7 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 
 // StreamReadTable reads table at given path with given options.
 func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...ReadTableOption) (r *Result, err error) {
-	var res Ydb_Table.ReadTableResult
+	var resp Ydb_Table.ReadTableResponse
 	req := Ydb_Table.ReadTableRequest{
 		SessionId: s.ID,
 		Path:      path,
@@ -404,7 +404,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 		ce = new(error)
 	)
 	err = s.c.Driver.StreamRead(ctx, internal.WrapStreamOperation(
-		Ydb_Table_V1.StreamReadTable, &req, &res,
+		Ydb_Table_V1.StreamReadTable, &req, &resp,
 		func(err error) {
 			if err != io.EOF {
 				*ce = err
@@ -415,7 +415,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 			}
 			select {
 			case <-ctx.Done():
-			case ch <- res.ResultSet:
+			case ch <- resp.Result.ResultSet:
 			}
 		},
 	))

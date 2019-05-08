@@ -314,6 +314,9 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 }
 
 func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) error {
+	// Remember raw context to pass it for the tracing functions.
+	rawctx := ctx
+
 	if t := d.streamTimeout; t > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t)
@@ -329,14 +332,14 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) er
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	d.trace.getConnStart(ctx)
+	d.trace.getConnStart(rawctx)
 	conn, err := d.cluster.Get(ctx)
-	d.trace.getConnDone(ctx, conn.addr.String(), err)
+	d.trace.getConnDone(rawctx, conn.addr.String(), err)
 	if err != nil {
 		return err
 	}
 
-	method, req, res, process := internal.UnwrapStreamOperation(op)
+	method, req, resp, process := internal.UnwrapStreamOperation(op)
 	desc := grpc.StreamDesc{
 		StreamName:    path.Base(method),
 		ServerStreams: true,
@@ -354,7 +357,17 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) er
 
 	go func() {
 		for err := (error)(nil); err == nil; {
-			err = s.RecvMsg(res)
+			err = s.RecvMsg(resp)
+			if err != nil {
+				err = mapGRPCError(err)
+			} else {
+				if s := resp.GetStatus(); s != Ydb.StatusIds_SUCCESS {
+					err = &OpError{
+						Reason: statusCode(s),
+						issues: resp.GetIssues(),
+					}
+				}
+			}
 			process(err)
 		}
 	}()
