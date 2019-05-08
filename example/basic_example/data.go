@@ -148,9 +148,10 @@ func getEpisodesData() ydb.Value {
 	)
 }
 
+const DateISO8601 = "2006-01-02"
+
 func days(date string) uint32 {
-	const ISO8601 = "2006-01-02"
-	t, err := time.Parse(ISO8601, date)
+	t, err := time.Parse(DateISO8601, date)
 	if err != nil {
 		panic(err)
 	}

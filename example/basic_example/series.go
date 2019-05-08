@@ -151,7 +151,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 
 	err = readTable(ctx, &sp, path.Join(
 		config.Database,
-		prefix, "series",
+		prefix, "episodes",
 	))
 	if err != nil {
 		return fmt.Errorf("read table error: %v", err)
@@ -165,10 +165,8 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 	err = table.Retry(ctx, sp,
 		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
 			res, err = s.StreamReadTable(ctx, path,
-				table.ReadOrdered(),
-				table.ReadColumn("series_id"),
 				table.ReadColumn("title"),
-				table.ReadColumn("release_date"),
+				table.ReadColumn("air_date"),
 			)
 			return
 		}),
@@ -176,19 +174,19 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 	if err != nil {
 		return err
 	}
+	log.Printf("\n> read_table:")
 	// TODO(kamardin): truncated flag.
-	for res.NextSet() {
+	for res.NextStreamSet(ctx) {
 		for res.NextRow() {
 			res.NextItem()
-			id := res.Uint64()
+			title := res.OUTF8()
 
+			var t ydb.Time
 			res.NextItem()
-			title := res.UTF8()
+			date := res.OUint64()
+			t.FromDate(uint32(date))
 
-			res.NextItem()
-			date := res.String()
-
-			log.Printf("\n> read_table: %d %s %d", id, title, date)
+			log.Printf(">   %s %s", time.Time(t).Format(DateISO8601), title)
 		}
 	}
 	if err := res.Err(); err != nil {

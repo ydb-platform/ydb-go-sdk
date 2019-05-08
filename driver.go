@@ -344,7 +344,9 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) er
 		StreamName:    path.Base(method),
 		ServerStreams: true,
 	}
-	s, err := grpc.NewClientStream(ctx, &desc, conn.conn, method)
+	s, err := grpc.NewClientStream(ctx, &desc, conn.conn, method,
+		grpc.MaxCallRecvMsgSize(50*1024*1024), // 50MB
+	)
 	if err != nil {
 		return mapGRPCError(err)
 	}
@@ -379,10 +381,11 @@ func invoke(
 	ctx context.Context, conn *grpc.ClientConn,
 	resp *Ydb_Operations.GetOperationResponse,
 	method string, req, res proto.Message,
+	opts ...grpc.CallOption,
 ) (
 	err error,
 ) {
-	err = grpc.Invoke(ctx, method, req, resp, conn)
+	err = grpc.Invoke(ctx, method, req, resp, conn, opts...)
 	op := resp.Operation
 	switch {
 	case err != nil:
