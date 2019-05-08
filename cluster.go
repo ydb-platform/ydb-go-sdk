@@ -11,7 +11,8 @@ import (
 type balancerElement interface {
 }
 
-// connInfo contains connection runtime stats.
+// connInfo contains connection "static" stats – e.g. such that obtained from
+// discovery routine.
 type connInfo struct {
 	loadFactor float32
 }
@@ -303,4 +304,34 @@ func diffslice(a, b int, cmp func(i, j int) int, eq, add, del func(i, j int)) {
 	for ; j < b; j++ {
 		add(i, j)
 	}
+}
+
+type connListElement struct {
+	index int
+	conn  *conn
+	info  connInfo
+}
+
+type connList []*connListElement
+
+func (cs *connList) Insert(conn *conn, info connInfo) *connListElement {
+	e := &connListElement{
+		index: len(*cs),
+		conn:  conn,
+		info:  info,
+	}
+	*cs = append(*cs, e)
+	return e
+}
+
+func (cs *connList) Remove(x *connListElement) {
+	list := *cs
+	var (
+		n    = len(list)
+		last = list[n-1]
+	)
+	last.index = x.index
+	list[x.index], list[n-1] = list[n-1], nil
+	list = list[:n-1]
+	*cs = list
 }

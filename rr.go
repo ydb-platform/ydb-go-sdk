@@ -6,12 +6,6 @@ import (
 	"sync/atomic"
 )
 
-type rrEntry struct {
-	index int
-	conn  *conn
-	info  connInfo
-}
-
 // roundRobin is an implementation of weighted round-robin balancing algorithm.
 //
 // It relies on connection's load factor (usually obtained by discovery
@@ -22,7 +16,7 @@ type roundRobin struct {
 	max   float32
 	belt  []int
 	next  int32
-	conns []*rrEntry
+	conns connList
 }
 
 func (r *roundRobin) Next() *conn {
@@ -35,36 +29,23 @@ func (r *roundRobin) Next() *conn {
 }
 
 func (r *roundRobin) Insert(conn *conn, info connInfo) balancerElement {
-	e := &rrEntry{
-		index: len(r.conns),
-		conn:  conn,
-		info:  info,
-	}
-	r.conns = append(r.conns, e)
+	e := r.conns.Insert(conn, info)
 	r.updateMinMax(info)
 	r.belt = r.distribute()
 	return e
 }
 
 func (r *roundRobin) Update(el balancerElement, info connInfo) {
-	e := el.(*rrEntry)
+	e := el.(*connListElement)
 	e.info = info
 	r.updateMinMax(info)
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Remove(el balancerElement) {
-	n := len(r.conns)
-	last := r.conns[n-1]
-
-	x := el.(*rrEntry)
-	if last != x {
-		last.index = x.index
-	}
-	r.conns[x.index], r.conns[n-1] = r.conns[n-1], nil
-	r.conns = r.conns[:n-1]
-
-	r.inspectMinMax(x.info)
+func (r *roundRobin) Remove(x balancerElement) {
+	el := x.(*connListElement)
+	r.conns.Remove(el)
+	r.inspectMinMax(el.info)
 	r.belt = r.distribute()
 }
 

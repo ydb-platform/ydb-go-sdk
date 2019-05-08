@@ -3,8 +3,11 @@ package ydb
 import (
 	"context"
 
+	"google.golang.org/grpc/metadata"
+
 	discovery "github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/Ydb_Discovery_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Discovery"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
 )
 
 type Endpoint struct {
@@ -19,13 +22,25 @@ type discoveryClient struct {
 }
 
 func (d *discoveryClient) Discover(ctx context.Context, database string) ([]Endpoint, error) {
-	var res Ydb_Discovery.ListEndpointsResult
+	var (
+		resp Ydb_Operations.GetOperationResponse
+		res  Ydb_Discovery.ListEndpointsResult
+	)
 	req := Ydb_Discovery.ListEndpointsRequest{
 		Database: database,
 	}
-	err := (grpcCaller{
-		meta: d.meta,
-	}).call(ctx, d.conn, discovery.ListEndpoints, &req, &res)
+	// Get credentials (token actually) for the request.
+	md, err := d.meta.md(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(md) > 0 {
+		ctx = metadata.NewOutgoingContext(ctx, md)
+	}
+	err = invoke(
+		ctx, d.conn.conn, &resp,
+		discovery.ListEndpoints, &req, &res,
+	)
 	if err != nil {
 		return nil, err
 	}

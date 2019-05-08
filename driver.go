@@ -278,22 +278,38 @@ func (d *driver) Close() error {
 }
 
 func (d *driver) Call(ctx context.Context, op internal.Operation) error {
+	// Remember raw context to pass it for the tracing functions.
+	rawctx := ctx
+
 	if t := d.requestTimeout; t > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer cancel()
 	}
-	d.trace.getConnStart(ctx)
-	conn, err := d.cluster.Get(ctx)
-	d.trace.getConnDone(ctx, conn.addr.String(), err)
+
+	// Get credentials (token actually) for the request.
+	md, err := d.meta.md(ctx)
 	if err != nil {
 		return err
 	}
+	if len(md) > 0 {
+		ctx = metadata.NewOutgoingContext(ctx, md)
+	}
+
+	d.trace.getConnStart(rawctx)
+	conn, err := d.cluster.Get(ctx)
+	d.trace.getConnDone(rawctx, conn.addr.String(), err)
+	if err != nil {
+		return err
+	}
+
+	var resp Ydb_Operations.GetOperationResponse
 	method, req, res := internal.Unwrap(op)
-	err = (grpcCaller{
-		meta:  d.meta,
-		trace: d.trace,
-	}).call(ctx, conn, method, req, res)
+
+	d.trace.operationStart(rawctx, conn, method)
+	err = invoke(ctx, conn.conn, &resp, method, req, res)
+	d.trace.operationDone(rawctx, conn, method, resp, err)
+
 	return err
 }
 
@@ -303,39 +319,24 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) er
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer cancel()
 	}
-	conn, err := d.cluster.Get(ctx)
+
+	// Get credentials (token actually) for the request.
+	md, err := d.meta.md(ctx)
 	if err != nil {
 		return err
 	}
-	method, req, res, processor := internal.UnwrapStreamOperation(op)
-	return (grpcCaller{
-		meta:  d.meta,
-		trace: d.trace,
-	}).streamRead(
-		ctx, conn, method,
-		req, res, processor,
-	)
-}
-
-func Dial(ctx context.Context, addr string, c *DriverConfig) (Driver, error) {
-	d := Dialer{
-		DriverConfig: c,
+	if len(md) > 0 {
+		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
-	return d.Dial(ctx, addr)
-}
 
-type grpcCaller struct {
-	meta  *meta
-	opts  []grpc.CallOption
-	trace DriverTrace
-}
+	d.trace.getConnStart(ctx)
+	conn, err := d.cluster.Get(ctx)
+	d.trace.getConnDone(ctx, conn.addr.String(), err)
+	if err != nil {
+		return err
+	}
 
-func (g grpcCaller) streamRead(
-	ctx context.Context, conn *conn, method string,
-	req, res proto.Message, process func(error),
-) (
-	err error,
-) {
+	method, req, res, process := internal.UnwrapStreamOperation(op)
 	desc := grpc.StreamDesc{
 		StreamName:    path.Base(method),
 		ServerStreams: true,
@@ -350,44 +351,41 @@ func (g grpcCaller) streamRead(
 	if err := s.CloseSend(); err != nil {
 		return mapGRPCError(err)
 	}
+
 	go func() {
 		for err := (error)(nil); err == nil; {
 			err = s.RecvMsg(res)
 			process(err)
 		}
 	}()
+
 	return nil
 }
 
-func (g grpcCaller) call(ctx context.Context, conn *conn, method string, req, res proto.Message) (err error) {
-	var resp Ydb_Operations.GetOperationResponse
-
-	g.trace.operationStart(ctx, conn, method)
-	defer func(ctx context.Context) {
-		g.trace.operationDone(ctx, conn, method, resp, err)
-	}(ctx)
-
-	md, err := g.meta.md(ctx)
-	if err != nil {
-		return err
-	}
-	if len(md) > 0 {
-		ctx = metadata.NewOutgoingContext(ctx, md)
-	}
-	err = grpc.Invoke(ctx, method, req, &resp, conn.conn)
-	if err != nil {
-		return mapGRPCError(err)
-	}
+func invoke(
+	ctx context.Context, conn *grpc.ClientConn,
+	resp *Ydb_Operations.GetOperationResponse,
+	method string, req, res proto.Message,
+) (
+	err error,
+) {
+	err = grpc.Invoke(ctx, method, req, resp, conn)
 	op := resp.Operation
-	if !op.Ready {
-		// TODO: implement awaiting.
-		return ErrOperationNotReady
-	}
-	if op.Status != Ydb.StatusIds_SUCCESS {
-		return &OpError{
+	switch {
+	case err != nil:
+		err = mapGRPCError(err)
+
+	case !op.Ready:
+		err = ErrOperationNotReady
+
+	case op.Status != Ydb.StatusIds_SUCCESS:
+		err = &OpError{
 			Reason: statusCode(op.Status),
 			issues: op.Issues,
 		}
+	}
+	if err != nil {
+		return err
 	}
 	if res == nil {
 		// NOTE: YDB API at this moment supports extension of its protocol by
@@ -397,6 +395,13 @@ func (g grpcCaller) call(ctx context.Context, conn *conn, method string, req, re
 		return nil
 	}
 	return proto.Unmarshal(op.Result.Value, res)
+}
+
+func Dial(ctx context.Context, addr string, c *DriverConfig) (Driver, error) {
+	d := Dialer{
+		DriverConfig: c,
+	}
+	return d.Dial(ctx, addr)
 }
 
 func mapGRPCError(err error) error {
