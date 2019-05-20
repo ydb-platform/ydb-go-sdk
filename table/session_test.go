@@ -25,6 +25,99 @@ func (p *SessionPool) debug() {
 	fmt.Printf("<-> tail\n")
 }
 
+// TestSessionPoolTouchWaitQueueOverflow tests that Get() call will block
+// as many callers as it possible to number of touched sessions while
+// sessions being touched by a background routine.
+func TestSessionPoolTouchWaitQueueOverflow(t *testing.T) {
+	timerCh := make(chan time.Time)
+	cleanupTimer := timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
+		return timetest.Timer{Ch: timerCh}
+	})
+	defer cleanupTimer()
+
+	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
+	defer cleanupNow()
+
+	keepalive := make(chan struct{})
+	client := &Client{
+		Driver: &testutil.Driver{
+			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
+				switch m {
+				case testutil.TableCreateSession:
+					return nil
+				case testutil.TableKeepAlive:
+					keepalive <- struct{}{}
+				default:
+					t.Fatalf("unexpected operation: %s", m)
+				}
+				return nil
+			},
+		},
+	}
+	p := &SessionPool{
+		SizeLimit:          2,
+		KeepAliveBatchSize: 2,
+		IdleThreshold:      time.Minute,
+		Builder:            client,
+	}
+
+	// Create two sessions.
+	s1 := mustGetSession(t, p)
+	s2 := mustGetSession(t, p)
+	mustPutSession(t, p, s1)
+	mustPutSession(t, p, s2)
+
+	shiftTime(time.Hour)
+	timerCh <- timeutil.Now()
+
+	var (
+		get = make(chan struct{})
+		got = make(chan struct{})
+		gtx = WithSessionPoolTrace(context.Background(), SessionPoolTrace{
+			GetStart: func(SessionPoolGetStartInfo) {
+				get <- struct{}{}
+			},
+		})
+	)
+	go func() {
+		if _, err := p.Get(gtx); err != nil {
+			t.Fatal(err)
+		}
+		got <- struct{}{}
+	}()
+	go func() {
+		if _, err := p.Get(gtx); err != nil {
+			t.Fatal(err)
+		}
+		got <- struct{}{}
+	}()
+
+	// Await for both goroutines locked on Get() call.
+	<-get
+	<-get
+
+	<-keepalive // Release KeepAlive() on first session.
+	<-got       // Await first touched session returned by Get().
+
+	{
+		// Call Get() with already canceled context. Receiving context.Canceled
+		// error means that we are still wait for touched session. Which is
+		// unexpected – we can not touch more sessions than we created; that
+		// is, we created two sessions and already awaiting for both – third
+		// session will not appear, thus we should not await for more touched
+		// sessions.
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := p.Get(ctx)
+		if err == context.Canceled {
+			t.Fatalf("unexpected await for touched session")
+		}
+	}
+
+	<-keepalive // Release KeepAlive() on second session.
+	<-got       // Await second touched session returned by Get().
+}
+
 // TestSessionPoolGetDisconnected tests case when session successfully created,
 // but after that connection become broken and cant be reestablished.
 func TestSessionPoolGetDisconnected(t *testing.T) {

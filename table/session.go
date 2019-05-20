@@ -341,6 +341,8 @@ func (p *SessionPool) keeper() {
 				// Note that we do not change p.waitn here because it prevents
 				// waiters overflow – we do not want to block more waiters than
 				// sessions we could touch per one iteration.
+				//
+				// The p.waitn counter will be set to zero below.
 			default:
 				// Need to push back session into list in order, to prevent
 				// shuffling of sessions order.
@@ -377,6 +379,7 @@ func (p *SessionPool) keeper() {
 		}
 
 		p.touching = false
+		p.waitn = 0
 
 		if s, _, touched := p.peekFront(); s == nil {
 			// No sessions to check. Let the Put() caller to wake up
@@ -471,7 +474,6 @@ func (p *SessionPool) waitqRemoveFront() chan<- *Session {
 		return nil
 	}
 	pch := p.waitq.Remove(el).(*chan *Session)
-	p.waitn--
 	return *pch
 }
 
