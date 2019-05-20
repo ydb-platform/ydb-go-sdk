@@ -6,6 +6,7 @@ import (
 	"net"
 	"path"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -16,6 +17,8 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/stats"
+	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
 var (
@@ -138,28 +141,26 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 		trace  = config.Trace
 	)
 	dial := func(ctx context.Context, host string, port int) (*conn, error) {
+		rawctx := ctx
+		if d.Timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, d.Timeout)
+			defer cancel()
+		}
 		addr := connAddr{
 			addr: host,
 			port: port,
 		}
 		s := addr.String()
+		trace.dialStart(rawctx, s)
 
-		trace.dialStart(ctx, s)
+		cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
 
-		subctx := ctx
-		if d.Timeout > 0 {
-			var cancel context.CancelFunc
-			subctx, cancel = context.WithTimeout(ctx, d.Timeout)
-			defer cancel()
+		trace.dialDone(rawctx, s, err)
+		if err != nil {
+			return nil, err
 		}
-		gc, err := grpc.DialContext(subctx, s, d.grpcDialOptions()...)
-
-		trace.dialDone(ctx, s, err)
-
-		return &conn{
-			conn: gc,
-			addr: addr,
-		}, err
+		return newConn(cc, addr), nil
 	}
 
 	host, prt, err := net.SplitHostPort(addr)
@@ -306,11 +307,26 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 	var resp Ydb_Operations.GetOperationResponse
 	method, req, res := internal.Unwrap(op)
 
+	start := timeutil.Now()
+	conn.runtime.operationStart(start)
 	d.trace.operationStart(rawctx, conn, method)
+
 	err = invoke(ctx, conn.conn, &resp, method, req, res)
+
+	conn.runtime.operationDone(start, timeutil.Now(), clientErrorOrNil(err))
 	d.trace.operationDone(rawctx, conn, method, resp, err)
 
 	return err
+}
+
+func clientErrorOrNil(err error) error {
+	if err == context.Canceled || err == context.DeadlineExceeded {
+		return err
+	}
+	if _, ok := err.(*TransportError); ok {
+		return err
+	}
+	return nil
 }
 
 func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) error {
@@ -446,6 +462,78 @@ func (c connAddr) String() string {
 type conn struct {
 	conn *grpc.ClientConn
 	addr connAddr
+
+	runtime connRuntime
+}
+
+func newConn(cc *grpc.ClientConn, addr connAddr) *conn {
+	const (
+		statsDuration = time.Minute
+		statsBuckets  = 12
+	)
+	return &conn{
+		conn: cc,
+		addr: addr,
+		runtime: connRuntime{
+			reqTime: stats.NewSeries(statsDuration, statsBuckets),
+			reqRate: stats.NewSeries(statsDuration, statsBuckets),
+			errRate: stats.NewSeries(statsDuration, statsBuckets),
+		},
+	}
+}
+
+type connRuntime struct {
+	mu         sync.RWMutex
+	reqCount   int64
+	reqSuccess int64
+	reqFailed  int64
+	reqTime    *stats.Series
+	reqRate    *stats.Series
+	errRate    *stats.Series
+}
+
+type connRuntimeStats struct {
+	ReqPending   int64
+	ReqPerMinute float64
+	ErrPerMinute float64
+	AvgReqTime   float64
+}
+
+func (c *connRuntime) stats(now time.Time) connRuntimeStats {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	r := connRuntimeStats{
+		ReqPending:   c.reqCount - (c.reqSuccess + c.reqFailed),
+		ReqPerMinute: c.reqRate.SumPer(now, time.Minute),
+		ErrPerMinute: c.errRate.SumPer(now, time.Minute),
+	}
+	if rtSum, rtCnt := c.reqTime.Get(now); rtCnt > 0 {
+		r.AvgReqTime = rtSum / float64(rtCnt)
+	}
+
+	return r
+}
+
+func (c *connRuntime) operationStart(start time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.reqCount++
+	c.reqRate.Add(start, 1)
+}
+
+func (c *connRuntime) operationDone(start, end time.Time, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if err != nil {
+		c.reqFailed++
+		c.errRate.Add(end, 1)
+	} else {
+		c.reqSuccess++
+	}
+	c.reqTime.Add(end, float64(end.Sub(start)))
 }
 
 // withContextDialer is an adapter to allow the use of normal go-world net dial
