@@ -324,7 +324,10 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 }
 
 func clientErrorOrNil(err error) error {
-	if err == context.Canceled || err == context.DeadlineExceeded {
+	if err == context.DeadlineExceeded {
+		// Note that we do not use here context.Canceled error due to
+		// cancelation may occur by custom application logic and does not
+		// relate to quality of connection.
 		return err
 	}
 	if _, ok := err.(*TransportError); ok {
