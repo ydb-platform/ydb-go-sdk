@@ -299,7 +299,7 @@ func put(x *big.Int, p []byte) {
 	}
 }
 
-func append(x *big.Int, p []byte) []byte {
+func Append(p []byte, x *big.Int) []byte {
 	n := len(p)
 	p = ensure(p, size(x))
 	put(x, p[n:])

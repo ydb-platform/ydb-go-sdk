@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
 type criterion interface {
@@ -15,6 +17,7 @@ type connRuntimeCriterion struct {
 }
 
 func (t connRuntimeCriterion) Best(c1, c2 *conn) *conn {
+	now := timeutil.Now()
 	s1 := c1.runtime.stats(now)
 	s2 := c2.runtime.stats(now)
 
@@ -39,8 +42,8 @@ func (t connRuntimeCriterion) Best(c1, c2 *conn) *conn {
 				f2 = 0
 			}
 		} else {
-			f1 = s1.ReqPending
-			f2 = s2.ReqPending
+			f1 = float64(s1.ReqPending)
+			f2 = float64(s2.ReqPending)
 		}
 	}
 	if f1 < f2 {

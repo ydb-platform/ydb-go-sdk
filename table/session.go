@@ -3,6 +3,7 @@ package table
 import (
 	"container/list"
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -10,10 +11,16 @@ import (
 )
 
 var (
-	DefaultSessionPoolKeepAliveTimeout   = 500 * time.Millisecond
-	DefaultSessionPoolDeleteTimeout      = 500 * time.Millisecond
-	DefaultSessionPoolIdleThreshold      = 5 * time.Second
-	DefaultSessionPoolKeepAliveBatchSize = 50
+	DefaultSessionPoolKeepAliveTimeout = 500 * time.Millisecond
+	DefaultSessionPoolDeleteTimeout    = 500 * time.Millisecond
+	DefaultSessionPoolIdleThreshold    = 5 * time.Second
+	DefaultSessionPoolSizeLimit        = 50
+)
+
+var (
+	// ErrSessionPoolClosed is returned by a SessionPool instance to indicate
+	// that pool is closed and not able to complete requested operation.
+	ErrSessionPoolClosed = errors.New("ydb: table: session pool is closed")
 )
 
 // SessionBuilder is the interface that holds logic of creating or deleting
@@ -25,150 +32,218 @@ type SessionBuilder interface {
 // SessionPool is a set of Session instances that may be reused.
 // A SessionPool is safe for use by multiple goroutines simultaneously.
 type SessionPool struct {
+	// Trace is an optional session lifetime tracing options.
+	Trace SessionPoolTrace
+
 	// Builder holds an object capable for creating and deleting sessions.
 	// It must not be nil.
 	Builder SessionBuilder
 
 	// SizeLimit is an upper bound of pooled sessions.
-	// If SizeLimit is zero then no sessions will be reused. That is, with zero
-	// SizeLimit SessionPool becomes noop proxy for Builder methods.
-	// If SizeLimit is negative, then there is no size limit.
+	// If SizeLimit is less than or equal to zero then the
+	// DefaultSessionPoolSizeLimit variable is used as a limit.
 	SizeLimit int
 
-	// Trace is an optional session lifetime tracing options.
-	Trace SessionPoolTrace
+	// IdleLimit is an upper bound of pooled sessions without any activity
+	// within.
+	//IdleLimit int
 
 	// IdleThreshold is a maximum duration between any activity within session.
 	// If this threshold reached, KeepAlive() method will be called on idle session.
 	// If IdleThreshold is zero then there is no idle limit.
 	IdleThreshold time.Duration
 
-	// If KeepAliveBatchSize is zero then the default value of
-	// DefaultSessionPoolKeepAliveBatchSize session per tick is used.
-	// If KeepAliveBatchSize is negative, then there is no batch limit. That
-	// is, any number of session may be touched per single tick.
+	// KeepAliveBatchSize is a maximum number sessions taken from the pool to
+	// prepare KeepAlive() call on them in background.
+	// If KeepAliveBatchSize is less than or equal to zero, then there is no
+	// batch limit.
 	KeepAliveBatchSize int
 
 	// KeepAliveTimeout limits maximum time spent on KeepAlive request for
 	// KeepAliveBatchSize number of sessions.
-	// If KeepAliveTimeout is zero then the DefaultSessionPoolKeepAliveTimeout
-	// is used.
-	// If KeepAliveTimeout is negative, then no timeout is used. Note that this
-	// may lead to deadlocks if Get() or Take() methods called with background
-	// or non-cancelable contexts.
+	// If KeepAliveTimeout is less than or equal to zero then the
+	// DefaultSessionPoolKeepAliveTimeout is used.
 	KeepAliveTimeout time.Duration
 
 	// DeleteTimeout limits maximum time spent on Delete request for
 	// KeepAliveBatchSize number of sessions.
-	// If DeleteTimeout is zero then the DefaultSessionPoolDeleteTimeout is
-	// used.
-	// If DeleteTimeout is negative, then no timeout is used. Note that this
-	// may lead to deadlocks if Get() or Take() methods called with background
-	// or non-cancelable contexts.
+	// If DeleteTimeout is less than or equal to zero then the
+	// DefaultSessionPoolDeleteTimeout is used.
 	DeleteTimeout time.Duration
 
-	mu         sync.Mutex
-	idle       *list.List // list<*Session>
-	waitq      *list.List // list<*chan *Session>
-	waitn      int        // Current number of waiters (even removed from waitq).
-	waitm      int        // Maximum number of waiters in the waitq.
-	index      map[*Session]sessionInfo
-	stopKeeper chan struct{}
-	doneKeeper chan struct{}
-	wakeKeeper chan struct{} // Set by keeper.
-	touching   bool
-	stopping   bool
-
+	mu           sync.Mutex
+	initOnce     sync.Once
+	created      int        // Number of created sessions.
+	limit        int        // Upper bound for pool size.
+	idle         *list.List // list<*Session>
+	waitq        *list.List // list<*chan *Session>
+	index        map[*Session]sessionInfo
+	wakeKeeper   chan struct{} // Set by keeper.
+	stopKeeper   chan struct{}
+	doneKeeper   chan struct{}
 	doneTouching chan struct{}
+	touching     bool
+	closed       bool
 }
 
-// p.mu must be held.
 func (p *SessionPool) init() {
-	if p.idle == nil {
+	p.initOnce.Do(func() {
 		p.idle = list.New()
 		p.index = make(map[*Session]sessionInfo)
 
-		p.waitq = list.New()
-		p.waitm = p.KeepAliveBatchSize
-		if p.waitm <= 0 {
-			p.waitm = DefaultSessionPoolKeepAliveBatchSize
+		p.limit = p.SizeLimit
+		if p.limit <= 0 {
+			p.limit = DefaultSessionPoolSizeLimit
 		}
+		p.waitq = list.New()
 
 		if p.IdleThreshold != 0 {
 			p.stopKeeper = make(chan struct{})
 			p.doneKeeper = make(chan struct{})
-			// TODO: keeper mutates many variables even after stop.
 			go p.keeper()
 		}
-	}
+	})
 }
 
 // Get returns first idle session from the SessionPool and removes it from
 // there. If no items stored in SessionPool it creates new one by calling
 // Builder.CreateSession() method and returns it.
 func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
+	p.init()
+
 	p.traceGetStart(ctx)
 	defer func() {
 		p.traceGetDone(ctx, s, err)
 	}()
 
-	var ch *chan *Session
-	p.mu.Lock()
-	s = p.front()
-	if s == nil && p.touching && p.waitn < p.waitm {
-		// Try to wait for a touched session instead of creating new one.
-		//
-		// This should be done only if number of currently waiting goroutines
-		// are less than maximum amount of touched session. That is, we want to
-		// be fair here and not to lock more goroutines than we could ship
-		// session to.
-		ch = getWaitCh()
-		p.waitq.PushBack(ch)
-		p.waitn++
-	}
-	p.mu.Unlock()
-	if ch != nil {
+	const maxAttempts = 100
+	for i := 0; s == nil && err == nil && i < maxAttempts; i++ {
+		var (
+			ch *chan *Session
+			el *list.Element // Element in the wait queue.
+		)
+		p.mu.Lock()
+		if p.closed {
+			return nil, ErrSessionPoolClosed
+		}
+		s = p.front()
+		switch {
+		case s == nil && p.created < p.limit:
+			// Can create new session without awaiting for reused one.
+			// Note that we must not increase p.n counter until successful session
+			// creation – in other way we will block some getter awaing on reused
+			// session which creation was actually failed here.
+			//
+			// But on the other side, this behavior is racy – there is a
+			// probability of creation of multiple session here (for the first time
+			// of pool usage, thus it is rare). We deal well with this race in the
+			// Put() implementation.
+			p.mu.Unlock()
+
+			s, err = p.Builder.CreateSession(ctx)
+			if err != nil {
+				return
+			}
+
+			p.mu.Lock()
+			if p.created == p.limit {
+				p.mu.Unlock()
+				// We lost the race – pool is full now and session can not be reused.
+				p.closeSession(ctx, s)
+				s = nil
+				p.mu.Lock()
+			} else {
+				p.created++
+				s.OnClose(func() {
+					p.mu.Lock()
+					if !p.closed {
+						p.created--
+						p.notify(nil)
+					}
+					p.mu.Unlock()
+				})
+			}
+		case s == nil && p.created == p.limit:
+			// Try to wait for a touched session instead of creating new one.
+			//
+			// This should be done only if number of currently waiting goroutines
+			// are less than maximum amount of touched session. That is, we want to
+			// be fair here and not to lock more goroutines than we could ship
+			// session to.
+			ch = getWaitCh()
+			el = p.waitq.PushBack(ch)
+		}
+		p.mu.Unlock()
+
+		if ch == nil {
+			continue
+		}
+		p.traceWaitStart(ctx)
+		var ok bool
 		select {
-		case s = <-*ch:
-			// Put only filled channel to pool. That is, we need to avoid races
-			// on filling reused channel for the next waiter. That is, someone
-			// may take this channel in further Get() and receive our session.
-			// This seems okay but breaks wait order and is not fair.
-			putWaitCh(ch)
+		case s, ok = <-*ch:
+			// Note that race may occur and some goroutine may try to write
+			// session into channel after it was enqueued but before it being
+			// read here. In that case we will receive nil here and will retry.
+			//
+			// The same path will work when some session become deleted - the
+			// nil value will be sent into the channel.
+			if ok {
+				// Put only filled and not closed channel back to the pool.
+				// That is, we need to avoid races on filling reused channel
+				// for the next waiter – session could be lost for a long time.
+				putWaitCh(ch)
+			}
 
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			p.mu.Lock()
+			// Note that el can be already removed here while we were moving
+			// from reading from ch to this case. This does not make any
+			// difference – channel will be closed by notifying goroutine.
+			p.waitq.Remove(el)
+			p.mu.Unlock()
+			err = ctx.Err()
 		}
+		p.traceWaitDone(ctx, s, err)
 	}
-	if s != nil {
-		return s, nil
-	}
-	// Out of luck. Probably someone else received touched session or no
-	// session touched at all. Create new session.
-	return p.Builder.CreateSession(ctx)
+
+	return s, err
 }
 
 // Put returns session to the SessionPool for further reuse.
-// If s can not be reused, Put() calls s.Delete(ctx) and returns the result.
+// If pool is already closed Put() calls s.Close(ctx) and returns
+// ErrSessionPoolClosed.
 //
 // Note that Put() must be called only once after being created or received by
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
-func (p *SessionPool) Put(ctx context.Context, s *Session) (reused bool, err error) {
+func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
+	p.init()
+
 	p.tracePutStart(ctx, s)
 	defer func() {
 		p.tracePutDone(ctx, s, err)
 	}()
+
 	p.mu.Lock()
-	p.init()
-	if p.SizeLimit < 0 || p.idle.Len() < p.SizeLimit {
-		p.pushBack(s, timeutil.Now())
-		reused = true
+	switch {
+	case p.closed:
+		err = ErrSessionPoolClosed
+
+	case p.idle.Len() >= p.limit:
+		panic("ydb: table: Put() on full session pool")
+
+	default:
+		if !p.notify(s) {
+			p.pushBack(s, timeutil.Now())
+		}
 	}
 	p.mu.Unlock()
-	if !reused {
-		err = s.Delete(ctx)
+
+	if err != nil {
+		p.closeSession(ctx, s)
 	}
+
 	return
 }
 
@@ -180,12 +255,18 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (reused bool, err err
 // idle. When Session becomes active, one should call Take() to stop KeepAlive
 // tracking (simultaneous use of Session is prohibited).
 func (p *SessionPool) Take(ctx context.Context, s *Session) (has bool, err error) {
+	p.init()
+
 	p.traceTakeStart(ctx, s)
 	defer func() {
 		p.traceTakeDone(ctx, s, has)
 	}()
 
 	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return false, ErrSessionPoolClosed
+	}
 	for has = p.take(s); !has && p.touching; has = p.take(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
@@ -208,21 +289,21 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (has bool, err error
 // Reset deletes all stored sessions inside SessionPool.
 // It also stops all underlying timers and goroutines.
 // It returns first error occured during stale sessions deletion.
-// Note that even on error it calls Delete() on each session.
-func (p *SessionPool) Reset(ctx context.Context) (err error) {
-	p.traceResetStart(ctx)
+// Note that even on error it calls Close() on each session.
+func (p *SessionPool) Close(ctx context.Context) (err error) {
+	p.init()
+
+	p.traceCloseStart(ctx)
 	defer func() {
-		p.traceResetDone(ctx, err)
+		p.traceCloseDone(ctx, err)
 	}()
 
 	p.mu.Lock()
-	idle := p.idle
-	waitq := p.waitq
-	if idle == nil || p.stopping {
+	if p.closed {
 		p.mu.Unlock()
 		return
 	}
-	p.stopping = true
+	p.closed = true
 
 	doneKeeper := p.doneKeeper
 	if p.stopKeeper != nil {
@@ -235,7 +316,8 @@ func (p *SessionPool) Reset(ctx context.Context) (err error) {
 	}
 
 	p.mu.Lock()
-	p.stopping = false
+	idle := p.idle
+	waitq := p.waitq
 	p.stopKeeper = nil
 	p.doneKeeper = nil
 	p.wakeKeeper = nil
@@ -245,32 +327,15 @@ func (p *SessionPool) Reset(ctx context.Context) (err error) {
 	p.mu.Unlock()
 
 	for el := waitq.Front(); el != nil; el = el.Next() {
-		if ch, ok := el.Value.(*chan *Session); ok {
-			select {
-			case *ch <- nil:
-			default:
-			}
-		}
+		ch := el.Value.(*chan *Session)
+		close(*ch)
 	}
-
-	var firstErr error
 	for e := idle.Front(); e != nil; e = e.Next() {
-		err := e.Value.(*Session).Delete(ctx)
-		if firstErr == nil && err != nil {
-			firstErr = err
-		}
+		s := e.Value.(*Session)
+		p.closeSession(ctx, s)
 	}
-	return firstErr
-}
 
-var noopCancel = func() {}
-
-func contextTimeout(t time.Duration) (context.Context, context.CancelFunc) {
-	ctx := context.Background()
-	if t < 0 {
-		return ctx, noopCancel
-	}
-	return context.WithTimeout(ctx, t)
+	return nil
 }
 
 func (p *SessionPool) keeper() {
@@ -285,12 +350,8 @@ func (p *SessionPool) keeper() {
 	)
 
 	touchTimeout := p.KeepAliveTimeout
-	if touchTimeout == 0 {
+	if touchTimeout <= 0 {
 		touchTimeout = DefaultSessionPoolKeepAliveTimeout
-	}
-	deleteTimeout := p.DeleteTimeout
-	if deleteTimeout == 0 {
-		deleteTimeout = DefaultSessionPoolDeleteTimeout
 	}
 
 	for {
@@ -313,7 +374,11 @@ func (p *SessionPool) keeper() {
 		p.mu.Lock()
 		{
 			p.touching = true
-			n := batchLimit(p.KeepAliveBatchSize, p.idle.Len()) // Iterate over n most idle items.
+			// Iterate over n most idle items.
+			n := p.KeepAliveBatchSize
+			if n <= 0 {
+				n = p.idle.Len()
+			}
 			for i := 0; i < n; i++ {
 				s, el, touched := p.peekFront()
 				if s == nil || now.Sub(touched) < p.IdleThreshold {
@@ -325,25 +390,20 @@ func (p *SessionPool) keeper() {
 		}
 		p.mu.Unlock()
 
-		keepctx, cancel := contextTimeout(touchTimeout)
-		var (
-			mark *list.Element // Element in the list to insert touched sessions after.
-		)
+		var mark *list.Element // Element in the list to insert touched sessions after.
 		for i, s := range toTouch {
 			toTouch[i] = nil
-			if err := s.KeepAlive(keepctx); err != nil {
+
+			ctx, cancel := contextTimeout(touchTimeout)
+			err := s.KeepAlive(ctx)
+			cancel()
+			if err != nil {
 				toDelete = append(toDelete, s)
 				continue
 			}
+
 			p.mu.Lock()
-			select {
-			case p.waitqRemoveFront() <- s:
-				// Note that we do not change p.waitn here because it prevents
-				// waiters overflow – we do not want to block more waiters than
-				// sessions we could touch per one iteration.
-				//
-				// The p.waitn counter will be set to zero below.
-			default:
+			if !p.notify(s) {
 				// Need to push back session into list in order, to prevent
 				// shuffling of sessions order.
 				//
@@ -357,29 +417,12 @@ func (p *SessionPool) keeper() {
 			}
 			p.mu.Unlock()
 		}
-		cancel()
 
 		var (
 			sleep bool
 			delay time.Duration
 		)
 		p.mu.Lock()
-
-		// Drain waitq. Notify remaining waiters with nil session to signal
-		// that touching is done.
-		for {
-			ch := p.waitqRemoveFront()
-			if ch == nil {
-				break
-			}
-			select {
-			case ch <- nil:
-			default:
-			}
-		}
-
-		p.touching = false
-		p.waitn = 0
 
 		if s, _, touched := p.peekFront(); s == nil {
 			// No sessions to check. Let the Put() caller to wake up
@@ -394,6 +437,7 @@ func (p *SessionPool) keeper() {
 		// Takers notification broadcast channel.
 		doneTouching := p.doneTouching
 		p.doneTouching = nil
+		p.touching = false
 
 		p.mu.Unlock()
 
@@ -403,29 +447,35 @@ func (p *SessionPool) keeper() {
 		if !sleep {
 			timer.Reset(delay)
 		}
-		if len(toDelete) == 0 {
-			continue
+		for i, s := range toDelete {
+			toDelete[i] = nil
+			p.closeSession(context.Background(), s)
 		}
-		delctx, cancel := contextTimeout(deleteTimeout)
-		for _, s := range toDelete {
-			s.Delete(delctx)
-		}
-		cancel()
 	}
 }
 
-var waitChPool sync.Pool
+var (
+	waitChPool        sync.Pool
+	testHookGetWaitCh func() // nil except some tests.
+)
 
 // getWaitCh returns pointer to a channel of sessions.
-// Note that returning a pointer reduces allocations on sync.Pool usage.
+//
+// Note that returning a pointer reduces allocations on sync.Pool usage –
+// sync.Pool.Get() returns empty interface, which leads to allocation for
+// non-pointer values.
 func getWaitCh() *chan *Session {
-	ch, ok := waitChPool.Get().(chan *Session)
+	if testHookGetWaitCh != nil {
+		testHookGetWaitCh()
+	}
+	p, ok := waitChPool.Get().(*chan *Session)
 	if !ok {
 		// NOTE: MUST NOT be buffered.
 		// In other case we could cork an already no-owned channel.
-		ch = make(chan *Session)
+		ch := make(chan *Session)
+		p = &ch
 	}
-	return &ch
+	return p
 }
 
 // putWaitCh receives pointer to a channel and makes it available for further
@@ -468,13 +518,42 @@ func (p *SessionPool) touchCond() <-chan struct{} {
 }
 
 // p.mu must be held.
-func (p *SessionPool) waitqRemoveFront() chan<- *Session {
-	el := p.waitq.Front()
-	if el == nil {
-		return nil
+func (p *SessionPool) notify(s *Session) (notified bool) {
+	for el := p.waitq.Front(); el != nil; el = p.waitq.Front() {
+		// Some goroutine is waiting for a session.
+		//
+		// It could be in this states:
+		//   1) Reached the select code and awaiting for a value in channel.
+		//   2) Reached the select code but already in branch of context
+		//   cancelation. In this case it is locked on p.mu.Lock().
+		//   3) Not reached the select code and thus not reading yet from the
+		//   channel.
+		//
+		// For cases (2) and (3) we close the channel to signal that goroutine
+		// missed something and may want to retry (especially for case (3)).
+		//
+		// After that we taking a next waiter and repeat the same.
+		ch := p.waitq.Remove(el).(*chan *Session)
+		select {
+		case *ch <- s:
+			// Case (1).
+			return true
+		default:
+			// Case (2) or (3).
+			close(*ch)
+		}
 	}
-	pch := p.waitq.Remove(el).(*chan *Session)
-	return *pch
+	return false
+}
+
+func (p *SessionPool) closeSession(ctx context.Context, s *Session) {
+	deleteTimeout := p.DeleteTimeout
+	if deleteTimeout <= 0 {
+		deleteTimeout = DefaultSessionPoolDeleteTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, deleteTimeout)
+	defer cancel()
+	s.Close(ctx)
 }
 
 // p.mu must be held.
@@ -535,7 +614,7 @@ func (p *SessionPool) pushBackInOrderAfter(s *Session, now time.Time, mark *list
 // p.mu must be held.
 func (p *SessionPool) handlePush(s *Session, now time.Time, el *list.Element) {
 	if _, has := p.index[s]; has {
-		panic("ydb: table: trying to store already present in pool session")
+		panic("ydb: table: trying to store already present session")
 	}
 	p.index[s] = sessionInfo{
 		element: el,
@@ -568,6 +647,30 @@ func (p *SessionPool) traceGetDone(ctx context.Context, s *Session, err error) {
 		a(x)
 	}
 	if b := ContextSessionPoolTrace(ctx).GetDone; b != nil {
+		b(x)
+	}
+}
+func (p *SessionPool) traceWaitStart(ctx context.Context) {
+	x := SessionPoolWaitStartInfo{
+		Context: ctx,
+	}
+	if a := p.Trace.WaitStart; a != nil {
+		a(x)
+	}
+	if b := ContextSessionPoolTrace(ctx).WaitStart; b != nil {
+		b(x)
+	}
+}
+func (p *SessionPool) traceWaitDone(ctx context.Context, s *Session, err error) {
+	x := SessionPoolWaitDoneInfo{
+		Context: ctx,
+		Session: s,
+		Error:   err,
+	}
+	if a := p.Trace.WaitDone; a != nil {
+		a(x)
+	}
+	if b := ContextSessionPoolTrace(ctx).WaitDone; b != nil {
 		b(x)
 	}
 }
@@ -621,41 +724,41 @@ func (p *SessionPool) tracePutDone(ctx context.Context, s *Session, err error) {
 		b(x)
 	}
 }
-func (p *SessionPool) traceResetStart(ctx context.Context) {
-	x := SessionPoolResetStartInfo{
+func (p *SessionPool) traceCloseStart(ctx context.Context) {
+	x := SessionPoolCloseStartInfo{
 		Context: ctx,
 	}
-	if a := p.Trace.ResetStart; a != nil {
+	if a := p.Trace.CloseStart; a != nil {
 		a(x)
 	}
-	if b := ContextSessionPoolTrace(ctx).ResetStart; b != nil {
+	if b := ContextSessionPoolTrace(ctx).CloseStart; b != nil {
 		b(x)
 	}
 }
-func (p *SessionPool) traceResetDone(ctx context.Context, err error) {
-	x := SessionPoolResetDoneInfo{
+func (p *SessionPool) traceCloseDone(ctx context.Context, err error) {
+	x := SessionPoolCloseDoneInfo{
 		Context: ctx,
 		Error:   err,
 	}
-	if a := p.Trace.ResetDone; a != nil {
+	if a := p.Trace.CloseDone; a != nil {
 		a(x)
 	}
-	if b := ContextSessionPoolTrace(ctx).ResetDone; b != nil {
+	if b := ContextSessionPoolTrace(ctx).CloseDone; b != nil {
 		b(x)
 	}
+}
+
+var noopCancel = func() {}
+
+func contextTimeout(t time.Duration) (context.Context, context.CancelFunc) {
+	ctx := context.Background()
+	if t < 0 {
+		return ctx, noopCancel
+	}
+	return context.WithTimeout(ctx, t)
 }
 
 type sessionInfo struct {
 	element *list.Element
 	touched time.Time
-}
-
-func batchLimit(n, total int) int {
-	if n == 0 {
-		return 1
-	}
-	if n < 0 {
-		return total
-	}
-	return n
 }

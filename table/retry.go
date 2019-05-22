@@ -14,12 +14,12 @@ type SessionProvider interface {
 
 	// Put takes no longer needed session for reuse or deletion depending on
 	// implementation.
-	Put(context.Context, *Session) (reused bool, err error)
+	Put(context.Context, *Session) (err error)
 }
 
 type SessionProviderFunc struct {
 	OnGet func(context.Context) (*Session, error)
-	OnPut func(context.Context, *Session) (bool, error)
+	OnPut func(context.Context, *Session) error
 }
 
 func (f SessionProviderFunc) Get(ctx context.Context) (*Session, error) {
@@ -29,9 +29,9 @@ func (f SessionProviderFunc) Get(ctx context.Context) (*Session, error) {
 	return f.OnGet(ctx)
 }
 
-func (f SessionProviderFunc) Put(ctx context.Context, s *Session) (bool, error) {
+func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
 	if f.OnPut == nil {
-		return false, errSessionOverflow
+		return errSessionOverflow
 	}
 	return f.OnPut(ctx, s)
 }
@@ -122,7 +122,7 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 			return err
 		}
 		if m.MustDeleteSession() {
-			defer s.Delete(ctx)
+			defer s.Close(ctx)
 			s = nil
 		}
 		if m.MustBackoff() {
@@ -155,13 +155,13 @@ func (s *singleSession) Get(context.Context) (*Session, error) {
 	return s.s, nil
 }
 
-func (s *singleSession) Put(_ context.Context, x *Session) (bool, error) {
+func (s *singleSession) Put(_ context.Context, x *Session) error {
 	if x != s.s {
-		return false, errUnexpectedSession
+		return errUnexpectedSession
 	}
 	if !s.empty {
-		return false, errSessionOverflow
+		return errSessionOverflow
 	}
 	s.empty = false
-	return true, nil
+	return nil
 }

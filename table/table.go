@@ -45,17 +45,18 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		},
 	}
 	runtime.SetFinalizer(s, func(s *Session) {
-		go s.Delete(context.Background())
+		go s.Close(context.Background())
 	})
 	return
 }
 
 // Session represents a single table API session.
+//
 // Session methods are not goroutine safe. Simultaneous execution of requests
 // are forbidden within a single session.
 //
-// Note that after Session is no longer needed one should destroy it with
-// appropriate Client instance's DeleteSession() call.
+// Note that after Session is no longer needed it should be destroyed by
+// Close() call.
 type Session struct {
 	ID string
 
@@ -75,12 +76,7 @@ func (s *Session) OnClose(cb func()) {
 	s.onClose = append(s.onClose, cb)
 }
 
-func (s *Session) Close() error {
-	return s.Delete(context.Background())
-}
-
-// Delete destroys session.
-func (s *Session) Delete(ctx context.Context) (err error) {
+func (s *Session) Close(ctx context.Context) (err error) {
 	if s.closed {
 		return nil
 	}

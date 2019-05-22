@@ -319,12 +319,14 @@ func composeClientTrace(a, b ClientTrace) (c ClientTrace) {
 type SessionPoolTrace struct {
 	GetStart   func(SessionPoolGetStartInfo)
 	GetDone    func(SessionPoolGetDoneInfo)
+	WaitStart  func(SessionPoolWaitStartInfo)
+	WaitDone   func(SessionPoolWaitDoneInfo)
 	TakeStart  func(SessionPoolTakeStartInfo)
 	TakeDone   func(SessionPoolTakeDoneInfo)
 	PutStart   func(SessionPoolPutStartInfo)
 	PutDone    func(SessionPoolPutDoneInfo)
-	ResetStart func(SessionPoolResetStartInfo)
-	ResetDone  func(SessionPoolResetDoneInfo)
+	CloseStart func(SessionPoolCloseStartInfo)
+	CloseDone  func(SessionPoolCloseDoneInfo)
 }
 
 type (
@@ -332,6 +334,14 @@ type (
 		Context context.Context
 	}
 	SessionPoolGetDoneInfo struct {
+		Context context.Context
+		Session *Session
+		Error   error
+	}
+	SessionPoolWaitStartInfo struct {
+		Context context.Context
+	}
+	SessionPoolWaitDoneInfo struct {
 		Context context.Context
 		Session *Session
 		Error   error
@@ -354,10 +364,10 @@ type (
 		Session *Session
 		Error   error
 	}
-	SessionPoolResetStartInfo struct {
+	SessionPoolCloseStartInfo struct {
 		Context context.Context
 	}
-	SessionPoolResetDoneInfo struct {
+	SessionPoolCloseDoneInfo struct {
 		Context context.Context
 		Error   error
 	}
@@ -400,6 +410,28 @@ func composeSessionPoolTrace(a, b SessionPoolTrace) (c SessionPoolTrace) {
 		c.GetDone = func(info SessionPoolGetDoneInfo) {
 			a.GetDone(info)
 			b.GetDone(info)
+		}
+	}
+	switch {
+	case a.WaitStart == nil:
+		c.WaitStart = b.WaitStart
+	case b.WaitStart == nil:
+		c.WaitStart = a.WaitStart
+	default:
+		c.WaitStart = func(info SessionPoolWaitStartInfo) {
+			a.WaitStart(info)
+			b.WaitStart(info)
+		}
+	}
+	switch {
+	case a.WaitDone == nil:
+		c.WaitDone = b.WaitDone
+	case b.WaitDone == nil:
+		c.WaitDone = a.WaitDone
+	default:
+		c.WaitDone = func(info SessionPoolWaitDoneInfo) {
+			a.WaitDone(info)
+			b.WaitDone(info)
 		}
 	}
 	switch {
@@ -447,25 +479,25 @@ func composeSessionPoolTrace(a, b SessionPoolTrace) (c SessionPoolTrace) {
 		}
 	}
 	switch {
-	case a.ResetStart == nil:
-		c.ResetStart = b.ResetStart
-	case b.ResetStart == nil:
-		c.ResetStart = a.ResetStart
+	case a.CloseStart == nil:
+		c.CloseStart = b.CloseStart
+	case b.CloseStart == nil:
+		c.CloseStart = a.CloseStart
 	default:
-		c.ResetStart = func(info SessionPoolResetStartInfo) {
-			a.ResetStart(info)
-			b.ResetStart(info)
+		c.CloseStart = func(info SessionPoolCloseStartInfo) {
+			a.CloseStart(info)
+			b.CloseStart(info)
 		}
 	}
 	switch {
-	case a.ResetDone == nil:
-		c.ResetDone = b.ResetDone
-	case b.ResetDone == nil:
-		c.ResetDone = a.ResetDone
+	case a.CloseDone == nil:
+		c.CloseDone = b.CloseDone
+	case b.CloseDone == nil:
+		c.CloseDone = a.CloseDone
 	default:
-		c.ResetDone = func(info SessionPoolResetDoneInfo) {
-			a.ResetDone(info)
-			b.ResetDone(info)
+		c.CloseDone = func(info SessionPoolCloseDoneInfo) {
+			a.CloseDone(info)
+			b.CloseDone(info)
 		}
 	}
 	return

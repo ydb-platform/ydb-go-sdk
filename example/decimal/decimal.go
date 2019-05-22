@@ -49,7 +49,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	if err != nil {
 		return err
 	}
-	defer session.Delete(context.Background())
+	defer session.Close(context.Background())
 
 	var (
 		tablePathPrefix = path.Join(config.Database, prefix)

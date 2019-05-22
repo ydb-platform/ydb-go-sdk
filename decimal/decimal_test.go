@@ -40,7 +40,7 @@ func TestFromBytes(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			x := FromBytes(test.bts, test.precision, test.scale)
-			p := Append(x, nil)
+			p := Append(nil, x)
 			y := FromBytes(p, test.precision, test.scale)
 			if x.Cmp(y) != 0 {
 				t.Errorf(

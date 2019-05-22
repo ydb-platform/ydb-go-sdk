@@ -164,9 +164,9 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 				defer func() { i++ }()
 				return sessions[i], nil
 			},
-			OnPut: func(_ context.Context, s *Session) (bool, error) {
+			OnPut: func(_ context.Context, s *Session) error {
 				reused[s] = true
-				return false, nil
+				return nil
 			},
 		},
 	}

@@ -194,7 +194,7 @@ type Driver struct {
 }
 
 func (d *Driver) Close() error {
-	d.c.pool.Reset(context.Background())
+	d.c.pool.Close(context.Background())
 	return d.c.client.Driver.Close()
 }
 

@@ -15,107 +15,382 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil/timetest"
 )
 
-func (p *SessionPool) debug() {
-	fmt.Printf("head ")
-	for el := p.idle.Front(); el != nil; el = el.Next() {
-		s := el.Value.(*Session)
-		x := p.index[s]
-		fmt.Printf("<-> %s(%d) ", s.ID, x.touched.Unix())
+func TestSessionPoolCloseWhenWaiting(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		racy bool
+	}{
+		{
+			name: "normal",
+			racy: false,
+		},
+		{
+			name: "racy",
+			racy: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			p := &SessionPool{
+				SizeLimit: 1,
+				Builder: &StubBuilder{
+					T:     t,
+					Limit: 1,
+				},
+			}
+
+			mustGetSession(t, p)
+
+			var (
+				get  = make(chan struct{})
+				wait = make(chan struct{})
+				got  = make(chan error)
+			)
+			go func() {
+				_, err := p.Get(WithSessionPoolTrace(context.Background(), SessionPoolTrace{
+					GetStart: func(SessionPoolGetStartInfo) {
+						get <- struct{}{}
+					},
+					WaitStart: func(SessionPoolWaitStartInfo) {
+						wait <- struct{}{}
+					},
+				}))
+				got <- err
+			}()
+
+			regwait := whenWantWaitCh()
+			<-get     // Await for getter blocked on awaiting session.
+			<-regwait // Let the getter register itself in the wait queue.
+
+			if test.racy {
+				// We testing the case, when session consumer registered
+				// himself in the wait queue, but not ready to receive the
+				// session when session arrives (that is, stucked between
+				// pushing channel in the list and reading from the channel).
+				p.Close(context.Background())
+				<-wait
+			} else {
+				// We testing the normal case, when session consumer registered
+				// himself in the wait queue and successfully blocked on
+				// reading from signaling channel.
+				<-wait
+				// Let the waiting goroutine to block on reading from channel.
+				runtime.Gosched()
+				p.Close(context.Background())
+			}
+
+			const timeout = time.Second
+			select {
+			case err := <-got:
+				if err != ErrSessionPoolClosed {
+					t.Fatalf(
+						"unexpected error: %v; want %v",
+						err, ErrSessionPoolClosed,
+					)
+				}
+			case <-time.After(timeout):
+				t.Fatalf("no result after %s", timeout)
+			}
+		})
 	}
-	fmt.Printf("<-> tail\n")
+
 }
 
-// TestSessionPoolTouchWaitQueueOverflow tests that Get() call will block
-// as many callers as it possible to number of touched sessions while
-// sessions being touched by a background routine.
-func TestSessionPoolTouchWaitQueueOverflow(t *testing.T) {
-	timerCh := make(chan time.Time)
-	cleanupTimer := timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
-		return timetest.Timer{Ch: timerCh}
-	})
-	defer cleanupTimer()
+func TestSessionPoolClose(t *testing.T) {
+	p := &SessionPool{
+		SizeLimit: 2,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 2,
+		},
+	}
 
-	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
-	defer cleanupNow()
+	s1 := mustGetSession(t, p)
+	s2 := mustGetSession(t, p)
 
-	keepalive := make(chan struct{})
-	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				switch m {
-				case testutil.TableCreateSession:
-					return nil
-				case testutil.TableKeepAlive:
-					keepalive <- struct{}{}
-				default:
-					t.Fatalf("unexpected operation: %s", m)
+	var (
+		closed1 bool
+		closed2 bool
+	)
+	s1.OnClose(func() { closed1 = true })
+	s2.OnClose(func() { closed2 = true })
+
+	mustPutSession(t, p, s1)
+
+	p.Close(context.Background())
+
+	if !closed1 {
+		t.Fatalf("session was not closed")
+	}
+	if closed2 {
+		t.Fatalf("unexpected session close")
+	}
+
+	err := p.Put(context.Background(), s2)
+	if err != ErrSessionPoolClosed {
+		t.Errorf(
+			"unexpected Put() error: %v; want %v",
+			err, ErrSessionPoolClosed,
+		)
+	}
+	if !closed2 {
+		t.Fatalf("session was not closed")
+	}
+}
+
+func TestSessionPoolDeleteReleaseWait(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		racy bool
+	}{
+		{
+			name: "normal",
+			racy: false,
+		},
+		{
+			name: "racy",
+			racy: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			p := &SessionPool{
+				SizeLimit: 1,
+				Builder: &StubBuilder{
+					T:     t,
+					Limit: 2,
+				},
+			}
+			s := mustGetSession(t, p)
+			var (
+				get  = make(chan struct{})
+				wait = make(chan struct{})
+				got  = make(chan struct{})
+			)
+			go func() {
+				defer func() {
+					close(got)
+				}()
+				p.Get(WithSessionPoolTrace(context.Background(), SessionPoolTrace{
+					GetStart: func(SessionPoolGetStartInfo) {
+						get <- struct{}{}
+					},
+					WaitStart: func(SessionPoolWaitStartInfo) {
+						wait <- struct{}{}
+					},
+				}))
+			}()
+
+			regwait := whenWantWaitCh()
+			<-get     // Await for getter blocked on awaiting session.
+			<-regwait // Let the getter register itself in the wait queue.
+
+			if test.racy {
+				// We testing the case, when session consumer registered
+				// himself in the wait queue, but not ready to receive the
+				// session when session arrives (that is, stucked between
+				// pushing channel in the list and reading from the channel).
+				s.Close(context.Background())
+				<-wait
+			} else {
+				// We testing the normal case, when session consumer registered
+				// himself in the wait queue and successfully blocked on
+				// reading from signaling channel.
+				<-wait
+				// Let the waiting goroutine to block on reading from channel.
+				runtime.Gosched()
+				s.Close(context.Background())
+			}
+
+			const timeout = time.Second
+			select {
+			case <-got:
+			case <-time.After(timeout):
+				t.Fatalf("no get after %s", timeout)
+			}
+		})
+	}
+}
+
+func TestSessionPoolRacyGet(t *testing.T) {
+	type createReq struct {
+		release chan struct{}
+		session *Session
+	}
+	create := make(chan createReq)
+	p := &SessionPool{
+		SizeLimit: 1,
+		Builder: &StubBuilder{
+			Limit: 2,
+			OnCreateSession: func(ctx context.Context) (*Session, error) {
+				req := createReq{
+					release: make(chan struct{}),
+					session: simpleSession(),
 				}
-				return nil
+				create <- req
+				<-req.release
+				return req.session, nil
 			},
 		},
 	}
-	p := &SessionPool{
-		SizeLimit:          2,
-		KeepAliveBatchSize: 2,
-		IdleThreshold:      time.Minute,
-		Builder:            client,
-	}
-
-	// Create two sessions.
-	s1 := mustGetSession(t, p)
-	s2 := mustGetSession(t, p)
-	mustPutSession(t, p, s1)
-	mustPutSession(t, p, s2)
-
-	shiftTime(time.Hour)
-	timerCh <- timeutil.Now()
-
 	var (
-		get = make(chan struct{})
-		got = make(chan struct{})
-		gtx = WithSessionPoolTrace(context.Background(), SessionPoolTrace{
-			GetStart: func(SessionPoolGetStartInfo) {
-				get <- struct{}{}
-			},
-		})
+		expSession *Session
+		done       = make(chan struct{}, 2)
 	)
-	go func() {
-		if _, err := p.Get(gtx); err != nil {
-			t.Fatal(err)
-		}
-		got <- struct{}{}
-	}()
-	go func() {
-		if _, err := p.Get(gtx); err != nil {
-			t.Fatal(err)
-		}
-		got <- struct{}{}
-	}()
-
-	// Await for both goroutines locked on Get() call.
-	<-get
-	<-get
-
-	<-keepalive // Release KeepAlive() on first session.
-	<-got       // Await first touched session returned by Get().
-
-	{
-		// Call Get() with already canceled context. Receiving context.Canceled
-		// error means that we are still wait for touched session. Which is
-		// unexpected – we can not touch more sessions than we created; that
-		// is, we created two sessions and already awaiting for both – third
-		// session will not appear, thus we should not await for more touched
-		// sessions.
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		_, err := p.Get(ctx)
-		if err == context.Canceled {
-			t.Fatalf("unexpected await for touched session")
-		}
+	for i := 0; i < 2; i++ {
+		go func() {
+			defer func() {
+				done <- struct{}{}
+			}()
+			s, err := p.Get(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s != expSession {
+				t.Fatalf("unexpected session: %v; want %v", s, expSession)
+			}
+			mustPutSession(t, p, s)
+		}()
 	}
 
-	<-keepalive // Release KeepAlive() on second session.
-	<-got       // Await second touched session returned by Get().
+	// Wait for both requests are created.
+	r1 := <-create
+	r2 := <-create
+
+	// Release the first create session request.
+	// Created session must be stored in the pool.
+	expSession = r1.session
+	expSession.OnClose(func() {
+		t.Fatalf("unexpected first session close")
+	})
+	close(r1.release)
+
+	// Wait for r1's session will be stored in the pool.
+	<-done
+
+	// Ensure that session is in the pool.
+	s := mustGetSession(t, p)
+	mustPutSession(t, p, s)
+
+	// Release the second create session request.
+	// Created session must deleted immediately because there is no more space
+	// in the pool.
+	deleted := make(chan struct{})
+	r2.session.OnClose(func() {
+		close(deleted)
+	})
+	close(r2.release)
+
+	const timeout = time.Second
+	select {
+	case <-deleted:
+	case <-time.After(timeout):
+		t.Fatalf("no session delete after %s", timeout)
+	}
+}
+
+func TestSessionPoolPutInFull(t *testing.T) {
+	p := &SessionPool{
+		SizeLimit: 1,
+	}
+	p.Put(context.Background(), simpleSession())
+
+	defer func() {
+		if thePanic := recover(); thePanic == nil {
+			t.Fatalf("no panic")
+		}
+	}()
+	p.Put(context.Background(), simpleSession())
+}
+
+func TestSessionPoolSizeLimitOverflow(t *testing.T) {
+	type sessionAndError struct {
+		session *Session
+		err     error
+	}
+	for _, test := range []struct {
+		name string
+		racy bool
+	}{
+		{
+			name: "normal",
+			racy: false,
+		},
+		{
+			name: "racy",
+			racy: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			p := &SessionPool{
+				SizeLimit: 1,
+				Builder: &StubBuilder{
+					T:     t,
+					Limit: 1,
+				},
+			}
+			s := mustGetSession(t, p)
+			{
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				if _, err := p.Get(ctx); err != context.Canceled {
+					t.Fatalf(
+						"unexpected error: %v; want %v",
+						err, context.Canceled,
+					)
+				}
+			}
+			var (
+				get  = make(chan struct{})
+				wait = make(chan struct{})
+				got  = make(chan sessionAndError)
+			)
+			go func() {
+				ctx := WithSessionPoolTrace(context.Background(), SessionPoolTrace{
+					GetStart: func(SessionPoolGetStartInfo) {
+						get <- struct{}{}
+					},
+					WaitStart: func(SessionPoolWaitStartInfo) {
+						wait <- struct{}{}
+					},
+				})
+				s, err := p.Get(ctx)
+				got <- sessionAndError{s, err}
+			}()
+
+			regwait := whenWantWaitCh()
+			<-get     // Await for getter blocked on awaiting session.
+			<-regwait // Let the getter register itself in the wait queue.
+
+			if test.racy {
+				// We testing the case, when session consumer registered
+				// himself in the wait queue, but not ready to receive the
+				// session when session arrives (that is, stucked between
+				// pushing channel in the list and reading from the channel).
+				p.Put(context.Background(), s)
+				<-wait
+			} else {
+				// We testing the normal case, when session consumer registered
+				// himself in the wait queue and successfully blocked on
+				// reading from signaling channel.
+				<-wait
+				// Let the waiting goroutine to block on reading from channel.
+				runtime.Gosched()
+				p.Put(context.Background(), s)
+			}
+
+			const timeout = time.Second
+			select {
+			case se := <-got:
+				if se.err != nil {
+					t.Fatal(se.err)
+				}
+				if se.session != s {
+					t.Fatalf("unexpected session")
+				}
+			case <-time.After(timeout):
+				t.Fatalf("no session after %s", timeout)
+			}
+		})
+	}
 }
 
 // TestSessionPoolGetDisconnected tests case when session successfully created,
@@ -211,6 +486,22 @@ func TestSessionPoolGetPut(t *testing.T) {
 		created int
 		deleted int
 	)
+	assertCreated := func(exp int) {
+		if act := created; act != exp {
+			t.Errorf(
+				"unexpected number of created sessions: %v; want %v",
+				act, exp,
+			)
+		}
+	}
+	assertDeleted := func(exp int) {
+		if act := deleted; act != exp {
+			t.Errorf(
+				"unexpected number of deleted sessions: %v; want %v",
+				act, exp,
+			)
+		}
+	}
 	client := &Client{
 		Driver: &testutil.Driver{
 			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
@@ -231,33 +522,20 @@ func TestSessionPoolGetPut(t *testing.T) {
 		Builder:   client,
 	}
 
-	s1 := mustGetSession(t, p)
-	s2 := mustGetSession(t, p)
-	s3 := mustGetSession(t, p)
-	if act, exp := created, 3; act != exp {
-		t.Errorf(
-			"unexpected created sessions: %v; want %v",
-			act, exp,
-		)
-	}
+	s := mustGetSession(t, p)
+	assertCreated(1)
 
-	mustPutSession(t, p, s1)
-	if deleted > 0 {
-		t.Errorf("unexpected deletion")
-	}
-	mustPutSession(t, p, s2)
-	mustPutSession(t, p, s3)
-	if act, exp := deleted, 2; act != exp {
-		t.Errorf(
-			"unexpected deleted sessions: %v; want %v",
-			act, exp,
-		)
-	}
+	mustPutSession(t, p, s)
+	assertDeleted(0)
 
 	mustGetSession(t, p)
-	if created > 3 {
-		t.Errorf("unexpected creation")
-	}
+	assertCreated(1)
+
+	s.Close(context.Background())
+	assertDeleted(1)
+
+	mustGetSession(t, p)
+	assertCreated(2)
 }
 
 func TestSessionPoolDisableKeepAlive(t *testing.T) {
@@ -347,10 +625,9 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 	defer cleanup()
 
 	p := &SessionPool{
-		SizeLimit:          -1,
-		KeepAliveBatchSize: -1,
-		Builder:            client,
-		IdleThreshold:      idleThreshold,
+		SizeLimit:     2,
+		Builder:       client,
+		IdleThreshold: idleThreshold,
 	}
 
 	s1 := mustGetSession(t, p)
@@ -358,8 +635,7 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 
 	// Put both session at the absolutely same time.
 	// That is, both sessions must be keepalived by a single tick (due to
-	// KeepAliveBatchSize equal for -1, that is batch any number of sessions
-	// per tick).
+	// KeepAliveBatchSize is unlimited).
 	mustPutSession(t, p, s1)
 	mustPutSession(t, p, s2)
 
@@ -436,10 +712,9 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 
 	idleThreshold := 4 * time.Second
 	p := &SessionPool{
-		SizeLimit:          -1,
-		KeepAliveBatchSize: -1,
-		Builder:            client,
-		IdleThreshold:      idleThreshold,
+		SizeLimit:     2,
+		Builder:       client,
+		IdleThreshold: idleThreshold,
 	}
 
 	s1 := mustGetSession(t, p)
@@ -499,12 +774,21 @@ func TestSessionPoolDoublePut(t *testing.T) {
 			t.Fatalf("no panic")
 		}
 	}()
-	if ok, err := p.Put(ctx, s); !ok || err != nil {
-		t.Fatalf("unexpected Put() fail: %t %v", ok, err)
+	if err := p.Put(ctx, s); err != nil {
+		t.Fatalf("unexpected Put() error: %v", err)
 	}
-	if ok, err := p.Put(ctx, s); ok && err == nil {
+	if err := p.Put(ctx, s); err == nil {
 		// Must panic before this line.
 		t.Fatalf("unexpected Put() success")
+	}
+}
+
+func TestSessionPoolReuseWaitChannel(t *testing.T) {
+	ch1 := getWaitCh()
+	putWaitCh(ch1)
+	ch2 := getWaitCh()
+	if ch1 != ch2 {
+		t.Errorf("unexpected reused channel")
 	}
 }
 
@@ -531,8 +815,7 @@ func mustGetSession(t *testing.T, p *SessionPool) *Session {
 }
 
 func mustPutSession(t *testing.T, p *SessionPool, s *Session) {
-	_, err := p.Put(context.Background(), s)
-	if err != nil {
+	if err := p.Put(context.Background(), s); err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
 }
@@ -547,4 +830,65 @@ func mustTakeSession(t *testing.T, p *SessionPool, s *Session) {
 func caller() string {
 	_, file, line, _ := runtime.Caller(2)
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
+}
+
+func simpleSession() *Session {
+	return &Session{
+		c: Client{
+			Driver: &testutil.Driver{
+				OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
+					return nil
+				},
+			},
+		},
+	}
+}
+
+type StubBuilder struct {
+	OnCreateSession func(ctx context.Context) (*Session, error)
+	Limit           int
+	T               *testing.T
+
+	mu     sync.Mutex
+	actual int
+}
+
+func (s *StubBuilder) CreateSession(ctx context.Context) (*Session, error) {
+	s.mu.Lock()
+	if s.Limit > 0 && s.actual == s.Limit {
+		if s.T != nil {
+			s.T.Errorf("create session limit overflow")
+		}
+		return nil, fmt.Errorf("stub builder: limit overflow")
+	}
+	s.actual++
+	s.mu.Unlock()
+
+	if f := s.OnCreateSession; f != nil {
+		return f(ctx)
+	}
+
+	return simpleSession(), nil
+}
+
+func (p *SessionPool) debug() {
+	fmt.Printf("head ")
+	for el := p.idle.Front(); el != nil; el = el.Next() {
+		s := el.Value.(*Session)
+		x := p.index[s]
+		fmt.Printf("<-> %s(%d) ", s.ID, x.touched.Unix())
+	}
+	fmt.Printf("<-> tail\n")
+}
+
+func whenWantWaitCh() <-chan struct{} {
+	var (
+		prev = testHookGetWaitCh
+		ch   = make(chan struct{})
+	)
+	testHookGetWaitCh = func() {
+		testHookGetWaitCh = prev
+		close(ch)
+	}
+	return ch
 }

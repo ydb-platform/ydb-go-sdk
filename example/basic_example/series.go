@@ -95,12 +95,10 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 		Driver: driver,
 	}
 	sp := table.SessionPool{
-		SizeLimit:          -1,
-		KeepAliveBatchSize: -1,
-		IdleThreshold:      time.Second,
-		Builder:            &tableClient,
+		IdleThreshold: time.Second,
+		Builder:       &tableClient,
 	}
-	defer sp.Reset(ctx)
+	defer sp.Close(ctx)
 
 	err = cleanupDatabase(ctx, driver, &sp, config.Database)
 	if err != nil {

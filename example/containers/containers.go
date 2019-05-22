@@ -59,7 +59,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	if err != nil {
 		return err
 	}
-	defer session.Delete(context.Background())
+	defer session.Close(context.Background())
 
 	tx, err := session.BeginTransaction(ctx, table.TxSettings(
 		table.WithSerializableReadWrite(),

@@ -50,10 +50,7 @@ func (c *conn) takeSession(ctx context.Context) bool {
 }
 
 func (c *conn) putSession(ctx context.Context) {
-	reused, err := c.pool.Put(ctx, c.session)
-	if !reused {
-		panic("ydbsql: could not push session back to the pool")
-	}
+	err := c.pool.Put(ctx, c.session)
 	if err != nil {
 		panic(fmt.Sprintf("ydbsql: put session error: %v", err))
 	}
@@ -194,7 +191,7 @@ func (c *conn) Close() error {
 	if !c.takeSession(ctx) {
 		return driver.ErrBadConn
 	}
-	err := c.session.Delete(ctx)
+	err := c.session.Close(ctx)
 	return mapBadSession(err)
 }
 
@@ -253,6 +250,25 @@ type TxDoer struct {
 // Do starts a transaction and calls f with it. If f() call returns a retryable
 // error, it repeats it accordingly to retry configuration that TxDoer's DB
 // driver holds.
+//
+// Note that callers should mutate state outside of f carefully and keeping in
+// mind that f could be called again even if no error returned – transaction
+// commitment can be failed:
+//
+//   var results []int
+//   ydbsql.DoTx(ctx, db, TxOperationFunc(func(ctx context.Context, tx *sql.Tx) error {
+//       // Reset resulting slice to prevent duplicates when retry occured.
+//       results = results[:0]
+//
+//       rows, err := tx.QueryContext(...)
+//       if err != nil {
+//           // handle error
+//       }
+//       for rows.Next() {
+//           results = append(results, ...)
+//       }
+//       return rows.Err()
+//   }))
 func (td TxDoer) Do(ctx context.Context, f TxOperationFunc) error {
 	d := td.DB.Driver().(*Driver)
 	return d.c.retry.do(ctx, func(ctx context.Context) error {
