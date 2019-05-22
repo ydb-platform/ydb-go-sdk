@@ -1,12 +1,9 @@
 package ydb
 
 import (
-	"math"
 	"math/rand"
 	"sync"
 	"time"
-
-	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
 type criterion interface {
@@ -17,23 +14,22 @@ type connRuntimeCriterion struct {
 }
 
 func (t connRuntimeCriterion) Best(c1, c2 *conn) *conn {
-	now := timeutil.Now()
-	s1 := c1.runtime.stats(now)
-	s2 := c2.runtime.stats(now)
+	s1 := c1.runtime.stats()
+	s2 := c2.runtime.stats()
 
 	var (
 		f1 float64
 		f2 float64
 	)
-	if s1.ReqPerMinute > 0 {
-		f1 = s1.ErrPerMinute / s1.ReqPerMinute
+	if s1.OpPerMinute > 0 {
+		f1 = s1.ErrPerMinute / s1.OpPerMinute
 	}
-	if s2.ReqPerMinute > 0 {
-		f2 = s2.ErrPerMinute / s2.ReqPerMinute
+	if s2.OpPerMinute > 0 {
+		f2 = s2.ErrPerMinute / s2.OpPerMinute
 	}
 	if f1 == f2 {
-		t := s1.AvgReqTime - s2.AvgReqTime
-		if time.Duration(math.Abs(t)) > time.Second {
+		t := s1.AvgOpTime - s2.AvgOpTime
+		if absDuration(t) > time.Second {
 			if t < 0 {
 				f1 = 0
 				f2 = 1
@@ -42,8 +38,8 @@ func (t connRuntimeCriterion) Best(c1, c2 *conn) *conn {
 				f2 = 0
 			}
 		} else {
-			f1 = float64(s1.ReqPending)
-			f2 = float64(s2.ReqPending)
+			f1 = float64(s1.OpPending())
+			f2 = float64(s2.OpPending())
 		}
 	}
 	if f1 < f2 {
@@ -143,4 +139,10 @@ func (s *lockedSource) Seed(seed int64) {
 	s.mu.Lock()
 	s.src.Seed(seed)
 	s.mu.Unlock()
+}
+
+func absDuration(d time.Duration) time.Duration {
+	x := int64(d)
+	m := x >> 63
+	return time.Duration(x ^ m - m)
 }

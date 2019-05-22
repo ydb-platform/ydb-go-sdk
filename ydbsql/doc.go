@@ -73,5 +73,10 @@ is just a shortcut) for this purpose:
 			// handle error
 		}
 	}
+
+Note that database/sql package reuses sql.Conn instances which are wrappers
+around ydb/table.Session instances in case of ydbsql. It could be reasonable to
+increase the number of reused sessions via database/sql.DB.SetMaxIdleConns()
+call.
 */
 package ydbsql

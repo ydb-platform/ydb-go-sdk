@@ -63,11 +63,15 @@ type BalancingMethod uint
 const (
 	BalancingUnknown BalancingMethod = iota
 	BalancingRoundRobin
+	BalancingP2C
 )
 
 var balancers = map[BalancingMethod]func() balancer{
 	BalancingRoundRobin: func() balancer {
 		return new(roundRobin)
+	},
+	BalancingP2C: func() balancer {
+		return new(p2c)
 	},
 }
 
@@ -475,41 +479,59 @@ func newConn(cc *grpc.ClientConn, addr connAddr) *conn {
 		conn: cc,
 		addr: addr,
 		runtime: connRuntime{
-			reqTime: stats.NewSeries(statsDuration, statsBuckets),
-			reqRate: stats.NewSeries(statsDuration, statsBuckets),
+			opTime:  stats.NewSeries(statsDuration, statsBuckets),
+			opRate:  stats.NewSeries(statsDuration, statsBuckets),
 			errRate: stats.NewSeries(statsDuration, statsBuckets),
 		},
 	}
 }
 
 type connRuntime struct {
-	mu         sync.RWMutex
-	reqCount   int64
-	reqSuccess int64
-	reqFailed  int64
-	reqTime    *stats.Series
-	reqRate    *stats.Series
-	errRate    *stats.Series
+	mu        sync.Mutex
+	opStarted uint64
+	opSucceed uint64
+	opFailed  uint64
+	opTime    *stats.Series
+	opRate    *stats.Series
+	errRate   *stats.Series
 }
 
-type connRuntimeStats struct {
-	ReqPending   int64
-	ReqPerMinute float64
+type ConnStats struct {
+	OpStarted    uint64
+	OpFailed     uint64
+	OpSucceed    uint64
+	OpPerMinute  float64
 	ErrPerMinute float64
-	AvgReqTime   float64
+	AvgOpTime    time.Duration
 }
 
-func (c *connRuntime) stats(now time.Time) connRuntimeStats {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+func ReadConnStats(d Driver, f func(Endpoint, ConnStats)) {
+	x, ok := d.(*driver)
+	if !ok {
+		return
+	}
+	x.cluster.Stats(f)
+}
 
-	r := connRuntimeStats{
-		ReqPending:   c.reqCount - (c.reqSuccess + c.reqFailed),
-		ReqPerMinute: c.reqRate.SumPer(now, time.Minute),
+func (c ConnStats) OpPending() uint64 {
+	return c.OpStarted - (c.OpFailed + c.OpSucceed)
+}
+
+func (c *connRuntime) stats() ConnStats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := timeutil.Now()
+
+	r := ConnStats{
+		OpStarted:    c.opStarted,
+		OpSucceed:    c.opSucceed,
+		OpFailed:     c.opFailed,
+		OpPerMinute:  c.opRate.SumPer(now, time.Minute),
 		ErrPerMinute: c.errRate.SumPer(now, time.Minute),
 	}
-	if rtSum, rtCnt := c.reqTime.Get(now); rtCnt > 0 {
-		r.AvgReqTime = rtSum / float64(rtCnt)
+	if rtSum, rtCnt := c.opTime.Get(now); rtCnt > 0 {
+		r.AvgOpTime = time.Duration(rtSum / float64(rtCnt))
 	}
 
 	return r
@@ -519,8 +541,8 @@ func (c *connRuntime) operationStart(start time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.reqCount++
-	c.reqRate.Add(start, 1)
+	c.opStarted++
+	c.opRate.Add(start, 1)
 }
 
 func (c *connRuntime) operationDone(start, end time.Time, err error) {
@@ -528,12 +550,12 @@ func (c *connRuntime) operationDone(start, end time.Time, err error) {
 	defer c.mu.Unlock()
 
 	if err != nil {
-		c.reqFailed++
+		c.opFailed++
 		c.errRate.Add(end, 1)
 	} else {
-		c.reqSuccess++
+		c.opSucceed++
 	}
-	c.reqTime.Add(end, float64(end.Sub(start)))
+	c.opTime.Add(end, float64(end.Sub(start)))
 }
 
 // withContextDialer is an adapter to allow the use of normal go-world net dial

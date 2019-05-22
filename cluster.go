@@ -221,6 +221,21 @@ func (c *cluster) Remove(_ context.Context, e Endpoint) {
 	entry.conn.conn.Close()
 }
 
+func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	for addr, entry := range c.index {
+		e := Endpoint{
+			Addr:       addr.addr,
+			Port:       addr.port,
+			LoadFactor: entry.info.loadFactor,
+		}
+		s := entry.conn.runtime.stats()
+		it(e, s)
+	}
+}
+
 // c.mu read lock must be held.
 func (c *cluster) await() func() <-chan struct{} {
 	prev := c.wait
