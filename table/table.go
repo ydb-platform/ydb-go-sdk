@@ -206,6 +206,7 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 type Statement struct {
 	session *Session
 	query   *DataQuery
+	qhash   queryHash
 	params  map[string]*Ydb.Type
 }
 
@@ -217,7 +218,11 @@ func (s *Statement) Execute(
 ) (
 	txr *Transaction, r *Result, err error,
 ) {
-	return s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
+	txr, r, err = s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
+	if ydb.IsOpError(err, ydb.StatusNotFound) {
+		s.session.qcache.Remove(s.qhash)
+	}
+	return
 }
 
 func (s *Statement) NumInput() int {
@@ -259,6 +264,7 @@ func (s *Session) Prepare(
 	stmt = &Statement{
 		session: s,
 		query:   q,
+		qhash:   cacheKey,
 		params:  res.ParametersTypes,
 	}
 	s.qcache.Add(cacheKey, stmt)

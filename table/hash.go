@@ -13,7 +13,9 @@ type queryHasher struct {
 	bts []byte
 }
 
-func (h *queryHasher) hash(s string) (r [4]uint64) {
+type queryHash [4]uint64
+
+func (h *queryHasher) hash(s string) (r queryHash) {
 	if h.sha == nil {
 		h.sha = sha256.New()
 	}

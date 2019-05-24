@@ -32,13 +32,20 @@ func (c *Cache) Add(key, value interface{}) {
 }
 
 func (c *Cache) Get(key interface{}) (interface{}, bool) {
-	c.init()
 	el, has := c.index[key]
 	if !has {
 		return nil, false
 	}
 	c.list.MoveToFront(el)
 	return el.Value.(*entry).value, true
+}
+
+func (c *Cache) Remove(key interface{}) (interface{}, bool) {
+	el, has := c.index[key]
+	if !has {
+		return nil, false
+	}
+	return c.list.Remove(el).(*entry).value, true
 }
 
 func (c *Cache) Size() int {

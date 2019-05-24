@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCache(t *testing.T) {
+func TestCacheAddGet(t *testing.T) {
 	c := Cache{
 		MaxSize: 100,
 	}
@@ -30,6 +30,33 @@ func TestCache(t *testing.T) {
 			t.Errorf("unexpected #%dth value: %v; want %v", i, x, p.value)
 		case i < bound && ok:
 			t.Errorf("unexpected hit for #%dth entry", i)
+		}
+	}
+}
+
+func TestCacheAddRemove(t *testing.T) {
+	var (
+		rands = randStr()
+		key   = rands()
+		val   = rands()
+	)
+	c := Cache{
+		MaxSize: 1,
+	}
+	c.Add(key, val)
+	{
+		act, ok := c.Remove(key)
+		if !ok || act != val {
+			t.Errorf(
+				"unexpected Remove(): %q %t; want %q %t",
+				act, ok, val, true,
+			)
+		}
+	}
+	{
+		act, ok := c.Remove(rands())
+		if ok {
+			t.Errorf("unexpected Remove(): %q %v", act, ok)
 		}
 	}
 }
