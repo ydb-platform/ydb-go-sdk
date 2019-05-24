@@ -43,7 +43,7 @@ The straightforward example of querying data may looks similar to this:
 	// additional calls. Notice the "_" unused variable – it stands for created
 	// transaction during execution, but as said above, transaction is commited
 	// for us and we do not want to do anything with it.
-	_, res, err := s.ExecuteDataQuery(ctx, txc,
+	_, res, err := s.Execute(ctx, txc,
 		table.TextDataQuery(
 			`DECLARE $id AS "Utf8"; SELECT * FROM users WHERE user_id=$id`,
 		),

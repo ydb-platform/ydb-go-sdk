@@ -20,7 +20,7 @@ import (
 // Use NextSet(), NextRow() and NextItem() to advance through the result sets,
 // its rows and row's items.
 //
-//     res, err := s.ExecuteDataQuery("SELECT ...")
+//     res, err := s.Execute(ctx, txc, "SELECT ...")
 //     defer res.Close()
 //     for res.NextSet() {
 //         for res.NextRow() {
