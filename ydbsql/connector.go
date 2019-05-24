@@ -92,9 +92,17 @@ func Connector(opts ...ConnectorOption) driver.Connector {
 			DriverConfig: new(ydb.DriverConfig),
 		},
 		retry: retryer{
-			MaxRetries:   ydb.DefaultMaxRetries,
-			RetryChecker: ydb.DefaultRetryChecker,
-			Backoff:      ydb.DefaultBackoff,
+			MaxRetries: ydb.DefaultMaxRetries,
+			Backoff:    ydb.DefaultBackoff,
+			RetryChecker: ydb.RetryChecker{
+				// NOTE: we do not want to retry not found prepared statement
+				// errors.
+				//
+				// In other case we would just burn the CPU looping up to max
+				// retry attempts times – we do not making and Prepare() calls
+				// in the retry callbacks.
+				RetryNotFound: false,
+			},
 		},
 	}
 	for _, opt := range opts {

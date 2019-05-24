@@ -71,7 +71,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	}
 	s, err := c.session.Prepare(ctx, query)
 	if err != nil {
-		return nil, mapBadSession(err)
+		return nil, mapBadSessionError(err)
 	}
 	return &stmt{
 		conn: c,
@@ -121,7 +121,7 @@ func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx
 	}
 	c.tx, err = c.session.BeginTransaction(ctx, table.TxSettings(isolation))
 	if err != nil {
-		return nil, mapBadSession(err)
+		return nil, mapBadSessionError(err)
 	}
 	c.txc = table.TxControl(table.WithTx(c.tx))
 	return c, nil
@@ -183,7 +183,7 @@ func (c *conn) Ping(ctx context.Context) error {
 		return driver.ErrBadConn
 	}
 	err := c.session.KeepAlive(ctx)
-	return mapBadSession(err)
+	return mapBadSessionError(err)
 }
 
 func (c *conn) Close() error {
@@ -192,7 +192,7 @@ func (c *conn) Close() error {
 		return driver.ErrBadConn
 	}
 	err := c.session.Close(ctx)
-	return mapBadSession(err)
+	return mapBadSessionError(err)
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
@@ -230,6 +230,9 @@ func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec
 		_, res, err = exec.do(ctx, tx, c.session, params)
 	} else {
 		// Direct call – retry on errors.
+		//
+		// NOTE: we do not retrying not found errors here. That is, not found
+		// prepared statements are immediately break retry a loop.
 		err = c.retry.do(ctx, func(ctx context.Context) (e error) {
 			_, res, e = exec.do(ctx, tx, c.session, params)
 			return e
@@ -254,7 +257,7 @@ func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec
 
 		return nil, err
 	}
-	return res, mapBadSession(err)
+	return res, mapOpError(err)
 }
 
 type TxOperationFunc func(context.Context, *sql.Tx) error
@@ -504,7 +507,26 @@ type result struct{}
 func (r result) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (r result) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
-func mapBadSession(err error) error {
+func mapOpError(err error) error {
+	switch {
+	case ydb.IsOpError(err, ydb.StatusBadSession):
+		return driver.ErrBadConn
+
+	case ydb.IsOpError(err, ydb.StatusNotFound):
+		// NOTE: if prepared statement is not found, the easy solution is just
+		// to drop the sql.Conn (which mapping of table.Session) with all its
+		// cached queries.
+		//
+		// That is, it could be pretty messy to deal with database/sql prepare
+		// logic which happens for all sql.Conn instances implicitly.
+		return driver.ErrBadConn
+
+	default:
+		return err
+	}
+}
+
+func mapBadSessionError(err error) error {
 	if ydb.IsOpError(err, ydb.StatusBadSession) {
 		return driver.ErrBadConn
 	}
