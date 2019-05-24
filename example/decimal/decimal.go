@@ -64,13 +64,13 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 		return err
 	}
 
-	write, err := session.PrepareDataQuery(ctx, render(writeQuery, templateConfig{
+	write, err := session.Prepare(ctx, render(writeQuery, templateConfig{
 		TablePathPrefix: tablePathPrefix,
 	}))
 	if err != nil {
 		return err
 	}
-	read, err := session.PrepareDataQuery(ctx, render(readQuery, templateConfig{
+	read, err := session.Prepare(ctx, render(readQuery, templateConfig{
 		TablePathPrefix: tablePathPrefix,
 	}))
 	if err != nil {
@@ -87,7 +87,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	x := big.NewInt(42 * 1000000000)
 	x.Mul(x, big.NewInt(2))
 
-	_, _, err = session.ExecuteDataQuery(ctx, txc, write, table.NewQueryParameters(
+	_, _, err = write.Execute(ctx, txc, table.NewQueryParameters(
 		table.ValueParam("$decimals",
 			ydb.ListValue(
 				ydb.StructValue(
@@ -104,7 +104,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 		return err
 	}
 
-	_, res, err := session.ExecuteDataQuery(ctx, txc, read, nil)
+	_, res, err := read.Execute(ctx, txc, nil)
 	if err != nil {
 		return err
 	}

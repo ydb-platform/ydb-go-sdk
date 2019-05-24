@@ -259,8 +259,7 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 	var res *table.Result
 	err = table.Retry(ctx, sp,
 		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
-			_, res, err = s.ExecuteDataQuery(ctx, readTx,
-				table.TextDataQuery(query),
+			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$seriesID", ydb.Uint64Value(1)),
 				),
@@ -312,13 +311,13 @@ func fillTablesWithData(ctx context.Context, sp *table.SessionPool, prefix strin
 	)
 	return table.Retry(ctx, sp,
 		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
-			query, err := s.PrepareDataQuery(ctx, render(fill, templateConfig{
+			stmt, err := s.Prepare(ctx, render(fill, templateConfig{
 				TablePathPrefix: prefix,
 			}))
 			if err != nil {
 				return err
 			}
-			_, _, err = s.ExecuteDataQuery(ctx, writeTx, query, table.NewQueryParameters(
+			_, _, err = stmt.Execute(ctx, writeTx, table.NewQueryParameters(
 				table.ValueParam("$seriesData", getSeriesData()),
 				table.ValueParam("$seasonsData", getSeasonsData()),
 				table.ValueParam("$episodesData", getEpisodesData()),

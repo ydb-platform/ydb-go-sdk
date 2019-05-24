@@ -184,8 +184,8 @@ type DataQueryExplanation struct {
 	Plan string
 }
 
-// ExplainDataQuery explains data query text.
-func (s *Session) ExplainDataQuery(ctx context.Context, query string) (exp DataQueryExplanation, err error) {
+// Explain explains data query represented by text.
+func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExplanation, err error) {
 	var res Ydb_Table.ExplainQueryResult
 	req := Ydb_Table.ExplainDataQueryRequest{
 		SessionId: s.ID,
@@ -201,9 +201,39 @@ func (s *Session) ExplainDataQuery(ctx context.Context, query string) (exp DataQ
 	}, nil
 }
 
-// PrepareDataQuery prepares data query within given session.
-func (s *Session) PrepareDataQuery(ctx context.Context, query string) (q *DataQuery, err error) {
-	var cached bool
+// Statement is a prepared statement. Like a single Session, it is not safe for
+// concurrent use by multiple goroutines.
+type Statement struct {
+	session *Session
+	query   *DataQuery
+	params  map[string]*Ydb.Type
+}
+
+// Execute executes prepared data query.
+func (s *Statement) Execute(
+	ctx context.Context, tx *TransactionControl,
+	params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (
+	txr *Transaction, r *Result, err error,
+) {
+	return s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
+}
+
+func (s *Statement) NumInput() int {
+	return len(s.params)
+}
+
+// Prepare prepares data query within session s.
+func (s *Session) Prepare(
+	ctx context.Context, query string,
+) (
+	stmt *Statement, err error,
+) {
+	var (
+		cached bool
+		q      *DataQuery
+	)
 	s.c.tracePrepareDataQueryStart(ctx, s, query)
 	defer func() {
 		s.c.tracePrepareDataQueryDone(ctx, s, query, q, cached, err)
@@ -212,7 +242,7 @@ func (s *Session) PrepareDataQuery(ctx context.Context, query string) (q *DataQu
 	cacheKey := s.qhash.hash(query)
 	v, cached := s.qcache.Get(cacheKey)
 	if cached {
-		return v.(*DataQuery), nil
+		return v.(*Statement), nil
 	}
 
 	var res Ydb_Table.PrepareQueryResult
@@ -222,21 +252,36 @@ func (s *Session) PrepareDataQuery(ctx context.Context, query string) (q *DataQu
 	}
 	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.PrepareDataQuery, &req, &res))
 	if err != nil {
-		return q, err
+		return nil, err
 	}
 	q = new(DataQuery)
-	q.initPrepared(res.QueryId, res.ParametersTypes)
-	s.qcache.Add(cacheKey, q)
+	q.initPrepared(res.QueryId)
+	stmt = &Statement{
+		session: s,
+		query:   q,
+		params:  res.ParametersTypes,
+	}
+	s.qcache.Add(cacheKey, stmt)
 
-	return q, nil
+	return stmt, nil
 }
 
-// ExecuteDataQuery executes data query. It may execute raw text query or query
+// Execute executes given data query represented by text.
+func (s *Session) Execute(
+	ctx context.Context, tx *TransactionControl,
+	query string, params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (
+	txr *Transaction, r *Result, err error,
+) {
+	q := new(DataQuery)
+	q.initFromText(query)
+	return s.executeDataQuery(ctx, tx, q, params, opts...)
+}
+
+// executeDataQuery executes data query. It may execute raw text query or query
 // prepared before.
-//
-// Note that for prepared queries Session must be the same as the one that was
-// used to PrepareDataQuery().
-func (s *Session) ExecuteDataQuery(
+func (s *Session) executeDataQuery(
 	ctx context.Context, tx *TransactionControl,
 	query *DataQuery, params *QueryParameters,
 	opts ...ExecuteDataQueryOption,
@@ -458,16 +503,31 @@ type Transaction struct {
 	c  *TransactionControl
 }
 
-// ExecuteDataQuery executes query within transaction tx.
-func (tx *Transaction) ExecuteDataQuery(
-	ctx context.Context, query *DataQuery, params *QueryParameters,
+// Execute executes query represented by text within transaction tx.
+func (tx *Transaction) Execute(
+	ctx context.Context,
+	query string, params *QueryParameters,
 	opts ...ExecuteDataQueryOption,
 ) (r *Result, err error) {
+	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
+	return
+}
+
+// Execute executes prepared statement stmt within transaction tx.
+func (tx *Transaction) ExecuteStatement(
+	ctx context.Context,
+	stmt *Statement, params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (r *Result, err error) {
+	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
+	return
+}
+
+func (tx *Transaction) txc() *TransactionControl {
 	if tx.c == nil {
 		tx.c = TxControl(WithTx(tx))
 	}
-	_, r, err = tx.s.ExecuteDataQuery(ctx, tx.c, query, params, opts...)
-	return
+	return tx.c
 }
 
 // Commit commits specified active transaction.
@@ -725,14 +785,6 @@ type DataQuery struct {
 	query    Ydb_Table.Query
 	queryID  Ydb_Table.Query_Id
 	queryYQL Ydb_Table.Query_YqlText
-
-	params map[string]*Ydb.Type
-}
-
-func TextDataQuery(s string) *DataQuery {
-	q := new(DataQuery)
-	q.initFromText(s)
-	return q
 }
 
 func (q *DataQuery) String() string {
@@ -751,21 +803,16 @@ func (q *DataQuery) YQL() string {
 	return q.queryYQL.YqlText
 }
 
-func (q *DataQuery) NumInput() int {
-	return len(q.params)
-}
-
 func (q *DataQuery) initFromText(s string) {
 	q.queryID = Ydb_Table.Query_Id{} // Reset id field.
 	q.queryYQL.YqlText = s
 	q.query.Query = &q.queryYQL
 }
 
-func (q *DataQuery) initPrepared(id string, params map[string]*Ydb.Type) {
+func (q *DataQuery) initPrepared(id string) {
 	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
 	q.queryID.Id = id
 	q.query.Query = &q.queryID
-	q.params = params
 }
 
 type QueryParameters struct {

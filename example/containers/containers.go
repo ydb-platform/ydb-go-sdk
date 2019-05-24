@@ -69,7 +69,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	}
 	defer tx.Rollback(context.Background())
 
-	res, err := tx.ExecuteDataQuery(ctx, table.TextDataQuery(render(query, nil)), nil)
+	res, err := tx.Execute(ctx, render(query, nil), nil)
 	if err != nil {
 		return err
 	}

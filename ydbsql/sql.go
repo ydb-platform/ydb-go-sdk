@@ -69,13 +69,13 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
-	q, err := c.session.PrepareDataQuery(ctx, query)
+	s, err := c.session.Prepare(ctx, query)
 	if err != nil {
 		return nil, mapBadSession(err)
 	}
 	return &stmt{
-		conn:  c,
-		query: q,
+		conn: c,
+		stmt: s,
 	}, nil
 }
 
@@ -154,7 +154,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if txc == nil {
 		txc = defaultTxControl
 	}
-	_, err := c.exec(ctx, txc, table.TextDataQuery(query), params(args))
+	_, err := c.exec(ctx, txc, exec{text: query}, params(args))
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if txc == nil {
 		txc = defaultTxControl
 	}
-	res, err := c.exec(ctx, txc, table.TextDataQuery(query), params(args))
+	res, err := c.exec(ctx, txc, exec{text: query}, params(args))
 	if err != nil {
 		return nil, err
 	}
@@ -203,38 +203,56 @@ func (c *conn) Begin() (driver.Tx, error) {
 	return nil, ErrDeprecated
 }
 
-func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, query *table.DataQuery, params *table.QueryParameters) (res *table.Result, err error) {
+// exec is a helper struct for generalization of data query execution.
+type exec struct {
+	stmt *table.Statement
+	text string
+}
+
+func (r exec) do(
+	ctx context.Context, tx *table.TransactionControl,
+	session *table.Session, params *table.QueryParameters,
+) (
+	*table.Transaction, *table.Result, error,
+) {
+	if r.stmt != nil {
+		return r.stmt.Execute(ctx, tx, params)
+	}
+	return session.Execute(ctx, tx, r.text, params)
+}
+
+func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec, params *table.QueryParameters) (res *table.Result, err error) {
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
 	if c.tx != nil {
 		// Under transaction. No need to retry nested calls.
-		_, res, err = c.session.ExecuteDataQuery(ctx, tx, query, params)
+		_, res, err = exec.do(ctx, tx, c.session, params)
 	} else {
 		// Direct call – retry on errors.
 		err = c.retry.do(ctx, func(ctx context.Context) (e error) {
-			_, res, e = c.session.ExecuteDataQuery(ctx, tx, query, params)
+			_, res, e = exec.do(ctx, tx, c.session, params)
 			return e
 		})
-		if isContextError(err) {
-			// TODO(kamardin): reuse this conn's session as we doing inside ydb/table.
-			//                 Check that it does not brake things inside database/sql.
+	}
+	if isContextError(err) {
+		// TODO(kamardin): reuse this conn's session as we doing inside ydb/table.
+		//                 Check that it does not brake things inside database/sql.
 
-			// Client gone. Can not use this conn anymore – started operation
-			// may not be finished.
-			//
-			// NOTE: we check this only at direct Query()/Exec() branch – it is
-			// not possible to leave transaction without committing or rolling
-			// it back (state of session is always known while in tx).
+		// Client gone. Can not use this conn anymore – started operation
+		// may not be finished.
+		//
+		// NOTE: we check this only at direct Query()/Exec() branch – it is
+		// not possible to leave transaction without committing or rolling
+		// it back (state of session is always known while in tx).
 
-			// NOTE: we can not return ErrBadConn right here because we do not
-			// know the state of started operation. Instead, we mark this
-			// connection bad and it will be closed after ResetSession() call
-			// by database/sql.
-			c.bad = true
+		// NOTE: we can not return ErrBadConn right here because we do not
+		// know the state of started operation. Instead, we mark this
+		// connection bad and it will be closed after ResetSession() call
+		// by database/sql.
+		c.bad = true
 
-			return nil, err
-		}
+		return nil, err
 	}
 	return res, mapBadSession(err)
 }
@@ -309,12 +327,12 @@ func nameIsolationLevel(x sql.IsolationLevel) string {
 }
 
 type stmt struct {
-	conn  *conn
-	query *table.DataQuery
+	conn *conn
+	stmt *table.Statement
 }
 
 func (s *stmt) NumInput() int {
-	return s.query.NumInput()
+	return s.stmt.NumInput()
 }
 
 func (s *stmt) Close() error {
@@ -338,7 +356,7 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	if txc == nil {
 		txc = defaultTxControl
 	}
-	_, err := s.conn.exec(ctx, txc, s.query, params(args))
+	_, err := s.conn.exec(ctx, txc, exec{stmt: s.stmt}, params(args))
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +368,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 	if txc == nil {
 		txc = defaultTxControl
 	}
-	res, err := s.conn.exec(ctx, txc, s.query, params(args))
+	res, err := s.conn.exec(ctx, txc, exec{stmt: s.stmt}, params(args))
 	if err != nil {
 		return nil, err
 	}
