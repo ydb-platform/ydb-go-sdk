@@ -9,7 +9,9 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/Ydb_Table_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/draft/Ydb_Experimental_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Experimental"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/cache/lru"
 )
@@ -476,6 +478,20 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 		setChCancel: cancel,
 	}
 	return r, nil
+}
+
+// UploadRows uploads given list of ydb struct values to the table.
+// NOTE: this is experimental feature.
+func (s *Session) UploadRows(ctx context.Context, table string, rows ydb.Value) error {
+	var res Ydb_Experimental.UploadRowsResult
+	req := Ydb_Experimental.UploadRowsRequest{
+		Table: table,
+		Rows:  internal.ValueToYDB(rows),
+	}
+	return s.c.Driver.Call(ctx, internal.Wrap(
+		Ydb_Experimental_V1.UploadRows,
+		&req, &res,
+	))
 }
 
 // BeginTransaction begins new transaction within given session with given
