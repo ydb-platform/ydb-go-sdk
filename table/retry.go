@@ -72,6 +72,12 @@ type Retryer struct {
 	MaxRetries int
 
 	// RetryChecker contains options of mapping errors to retry mode.
+	//
+	// Note that if RetryChecker's RetryNotFound field is set to true, creation
+	// of prepared statements must always be included in the Operation logic.
+	// Otherwise when prepared statement become removed by any reason from the
+	// server, Retryer will just repeat MaxRetries times reception of statement
+	// not found error.
 	RetryChecker ydb.RetryChecker
 
 	// Backoff is a selected backoff policy.
