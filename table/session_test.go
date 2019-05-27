@@ -15,6 +15,85 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil/timetest"
 )
 
+func TestSessionPoolKeeperWake(t *testing.T) {
+	var (
+		timerOnce    sync.Once
+		timerCh      = make(chan time.Time)
+		timerCreated = make(chan struct{})
+		timerReset   = make(chan time.Duration)
+	)
+	cleanupTimer := timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
+		var success bool
+		timerOnce.Do(func() {
+			success = true
+		})
+		if !success {
+			t.Fatalf("timeutil.NewTimer() is called more than once")
+			return nil
+		}
+		close(timerCreated)
+		return timetest.Timer{
+			Ch: timerCh,
+			OnReset: func(d time.Duration) bool {
+				timerReset <- d
+				return true
+			},
+		}
+	})
+	defer cleanupTimer()
+
+	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
+	defer cleanupNow()
+
+	var (
+		keepalive = make(chan struct{})
+	)
+	client := &Client{
+		Driver: &testutil.Driver{
+			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
+				switch m {
+				case testutil.TableCreateSession:
+					return nil
+
+				case testutil.TableKeepAlive:
+					keepalive <- struct{}{}
+
+				default:
+					t.Fatalf("unexpected operation: %s", m)
+				}
+				return nil
+			},
+		},
+	}
+	p := &SessionPool{
+		SizeLimit:     1,
+		IdleThreshold: time.Hour,
+		Builder:       client,
+	}
+
+	s := mustGetSession(t, p)
+
+	// Wait for keeper goroutine become initialized.
+	<-timerCreated
+
+	// Trigger keepalive timer event.
+	// NOTE: code below would blocked if KeepAlive() call will happen for this
+	// event.
+	done := p.touchCond()
+	shiftTime(p.IdleThreshold)
+	timerCh <- timeutil.Now()
+	<-done
+
+	// Return session to wake up the keeper.
+	mustPutSession(t, p, s)
+	<-timerReset
+
+	// Trigger timer event and expect keepalive to be prepared.
+	shiftTime(p.IdleThreshold)
+	timerCh <- timeutil.Now()
+	<-keepalive
+}
+
 func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 	for _, test := range []struct {
 		name string

@@ -344,8 +344,7 @@ func (p *SessionPool) keeper() {
 		toTouch  []*Session // Cached for reuse.
 		toDelete []*Session // Cached for reuse.
 
-		wake chan struct{}
-
+		wake  = make(chan struct{})
 		timer = timeutil.NewTimer(p.IdleThreshold)
 	)
 
