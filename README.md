@@ -107,9 +107,12 @@ reduce boilerplate overhead for such cases `ydb` provides generic retry logic:
 	// Retry() will call given OperationFunc with the following invariants:
 	//  - previous operation failed with retriable error;
 	//  - number of retries is under the limit (default to 10, see table.Repeater docs);
+	//
+	// Note that in case of prepared statements call to Prepare() must be made
+	// inside the Operation body.
 	err = table.Retry(ctx, sp,
 		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
-			res, err = s.ExecuteDataQuery(...)
+			res, err = s.Execute(...)
 			return
 		}),
 	)
