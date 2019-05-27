@@ -317,13 +317,13 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 
 	err = invoke(ctx, conn.conn, &resp, method, req, res)
 
-	conn.runtime.operationDone(start, timeutil.Now(), clientErrorOrNil(err))
+	conn.runtime.operationDone(start, timeutil.Now(), transportErrorOrNil(err))
 	d.trace.operationDone(rawctx, conn, method, resp, err)
 
 	return err
 }
 
-func clientErrorOrNil(err error) error {
+func transportErrorOrNil(err error) error {
 	if err == context.DeadlineExceeded {
 		// Note that we do not use here context.Canceled error due to
 		// cancelation may occur by custom application logic and does not
