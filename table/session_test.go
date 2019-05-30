@@ -10,37 +10,147 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/testutil"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil/timetest"
 )
 
-func TestSessionPoolKeeperWake(t *testing.T) {
-	var (
-		timerOnce    sync.Once
-		timerCh      = make(chan time.Time)
-		timerCreated = make(chan struct{})
-		timerReset   = make(chan time.Duration)
-	)
-	cleanupTimer := timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
-		var success bool
-		timerOnce.Do(func() {
-			success = true
-		})
-		if !success {
-			t.Fatalf("timeutil.NewTimer() is called more than once")
-			return nil
-		}
-		close(timerCreated)
-		return timetest.Timer{
-			Ch: timerCh,
-			OnReset: func(d time.Duration) bool {
-				timerReset <- d
-				return true
+func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
+
+	keepalive := make(chan struct{})
+	p := &SessionPool{
+		SizeLimit:         1,
+		BusyCheckInterval: time.Hour,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 2,
+			Handler: methodHandlers{
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					keepalive <- struct{}{}
+					r := testutil.TableKeepAliveResult{res}
+					r.SetSessionStatus(Ydb_Table.KeepAliveResult_SESSION_STATUS_READY)
+					return nil
+				},
+				testutil.TableDeleteSession: okHandler,
 			},
-		}
+		},
+	}
+
+	closed := make(chan struct{})
+	s1 := mustGetSession(t, p)
+	s1.OnClose(func() {
+		close(closed)
 	})
-	defer cleanupTimer()
+	p.PutBusy(context.Background(), s1)
+
+	<-timer.Created
+	<-timer.Reset
+
+	// Create the second session making first session redundant.
+	//
+	// Note that we do not put it back – we will check that Get() is still
+	// blocked after s1 closed and no additional session is created.
+	mustGetSession(t, p)
+
+	// Trigger busy checker iteration.
+	// This will make s1 ready, but since s2 is already created, busy checker
+	// must delete s1.
+	timer.C <- time.Unix(0, 0)
+	<-keepalive
+	<-closed
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := p.Get(ctx)
+	if exp := context.Canceled; err != exp {
+		t.Fatalf("unexpected Get() error: %v; want %v", err, exp)
+	}
+}
+
+func TestSessionPoolBusyChecker(t *testing.T) {
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
+
+	keepalive := make(chan chan bool)
+	p := &SessionPool{
+		SizeLimit:         2,
+		BusyCheckInterval: time.Hour,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 2,
+			Handler: methodHandlers{
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					ch := make(chan bool)
+					keepalive <- ch
+					ready := <-ch
+
+					var status Ydb_Table.KeepAliveResult_SessionStatus
+					if ready {
+						status = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY
+					} else {
+						status = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY
+					}
+					r := testutil.TableKeepAliveResult{res}
+					r.SetSessionStatus(status)
+
+					return nil
+				},
+			},
+		},
+	}
+
+	s1 := mustGetSession(t, p)
+	p.PutBusy(context.Background(), s1)
+
+	s2 := mustGetSession(t, p)
+	mustPutSession(t, p, s2)
+
+	<-timer.Created
+	<-timer.Reset
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	{
+		timer.C <- time.Unix(0, 0) // Trigger busy checker iteration.
+		res := <-keepalive
+		res <- false // Session is not ready yet.
+		<-timer.Reset
+
+		act, err := p.Get(ctx)
+		if err != nil {
+			t.Fatalf("unexpected Get() error: %v", err)
+		}
+		if act != s2 {
+			t.Fatalf("unexpected session")
+		}
+	}
+	{
+		timer.C <- time.Unix(0, 0) // Trigger busy checker iteration.
+		res := <-keepalive
+		res <- true // Session is ready now.
+
+		// Burn one busy checker iteration to be sure that session has been
+		// returned.
+		timer.C <- time.Unix(0, 0)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		act, err := p.Get(ctx)
+		if err != nil {
+			t.Fatalf("unexpected Get() error: %v", err)
+		}
+		if act != s1 {
+			t.Fatalf("unexpected session")
+		}
+	}
+}
+
+func TestSessionPoolKeeperWake(t *testing.T) {
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
 
 	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
 	defer cleanupNow()
@@ -48,49 +158,41 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 	var (
 		keepalive = make(chan struct{})
 	)
-	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				switch m {
-				case testutil.TableCreateSession:
-					return nil
-
-				case testutil.TableKeepAlive:
-					keepalive <- struct{}{}
-
-				default:
-					t.Fatalf("unexpected operation: %s", m)
-				}
-				return nil
-			},
-		},
-	}
 	p := &SessionPool{
 		SizeLimit:     1,
 		IdleThreshold: time.Hour,
-		Builder:       client,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 1,
+			Handler: methodHandlers{
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					keepalive <- struct{}{}
+					return nil
+				},
+			},
+		},
 	}
 
 	s := mustGetSession(t, p)
 
 	// Wait for keeper goroutine become initialized.
-	<-timerCreated
+	<-timer.Created
 
 	// Trigger keepalive timer event.
 	// NOTE: code below would blocked if KeepAlive() call will happen for this
 	// event.
 	done := p.touchCond()
 	shiftTime(p.IdleThreshold)
-	timerCh <- timeutil.Now()
+	timer.C <- timeutil.Now()
 	<-done
 
 	// Return session to wake up the keeper.
 	mustPutSession(t, p, s)
-	<-timerReset
+	<-timer.Reset
 
 	// Trigger timer event and expect keepalive to be prepared.
 	shiftTime(p.IdleThreshold)
-	timerCh <- timeutil.Now()
+	timer.C <- timeutil.Now()
 	<-keepalive
 }
 
@@ -176,42 +278,53 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 
 func TestSessionPoolClose(t *testing.T) {
 	p := &SessionPool{
-		SizeLimit: 2,
+		SizeLimit:         3,
+		IdleThreshold:     time.Hour,
+		BusyCheckInterval: time.Hour,
 		Builder: &StubBuilder{
 			T:     t,
-			Limit: 2,
+			Limit: 3,
 		},
 	}
 
 	s1 := mustGetSession(t, p)
 	s2 := mustGetSession(t, p)
+	s3 := mustGetSession(t, p)
 
 	var (
 		closed1 bool
 		closed2 bool
+		closed3 bool
 	)
 	s1.OnClose(func() { closed1 = true })
 	s2.OnClose(func() { closed2 = true })
+	s3.OnClose(func() { closed3 = true })
 
 	mustPutSession(t, p, s1)
+	if err := p.PutBusy(context.Background(), s2); err != nil {
+		t.Fatal(err)
+	}
 
 	p.Close(context.Background())
 
 	if !closed1 {
 		t.Fatalf("session was not closed")
 	}
-	if closed2 {
+	if !closed2 {
+		t.Fatalf("session was not closed")
+	}
+	if closed3 {
 		t.Fatalf("unexpected session close")
 	}
 
-	err := p.Put(context.Background(), s2)
+	err := p.Put(context.Background(), s3)
 	if err != ErrSessionPoolClosed {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
 			err, ErrSessionPoolClosed,
 		)
 	}
-	if !closed2 {
+	if !closed3 {
 		t.Fatalf("session was not closed")
 	}
 }
@@ -369,8 +482,13 @@ func TestSessionPoolRacyGet(t *testing.T) {
 func TestSessionPoolPutInFull(t *testing.T) {
 	p := &SessionPool{
 		SizeLimit: 1,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 1,
+		},
 	}
-	p.Put(context.Background(), simpleSession())
+	s := mustGetSession(t, p)
+	p.Put(context.Background(), s)
 
 	defer func() {
 		if thePanic := recover(); thePanic == nil {
@@ -832,34 +950,23 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 }
 
 func TestSessionPoolDoublePut(t *testing.T) {
-	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				return nil
-			},
+	p := &SessionPool{
+		SizeLimit: 2, // Skip panic on full pool.
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 1,
 		},
 	}
-	p := &SessionPool{
-		SizeLimit: 2,
-		Builder:   client,
-	}
-	ctx := context.Background()
-	s, err := p.Get(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	s := mustGetSession(t, p)
+	mustPutSession(t, p, s)
+
 	defer func() {
 		if thePanic := recover(); thePanic == nil {
 			t.Fatalf("no panic")
 		}
 	}()
-	if err := p.Put(ctx, s); err != nil {
-		t.Fatalf("unexpected Put() error: %v", err)
-	}
-	if err := p.Put(ctx, s); err == nil {
-		// Must panic before this line.
-		t.Fatalf("unexpected Put() success")
-	}
+	p.Put(context.Background(), s)
 }
 
 func TestSessionPoolReuseWaitChannel(t *testing.T) {
@@ -911,12 +1018,32 @@ func caller() string {
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
 }
 
+type (
+	methodHandler  func(req, res interface{}) error
+	methodHandlers map[testutil.MethodCode]methodHandler
+)
+
+var okHandler = func(req, res interface{}) error {
+	return nil
+}
+
 func simpleSession() *Session {
+	return newSession(nil, nil)
+}
+
+func newSession(t *testing.T, h methodHandlers) *Session {
 	return &Session{
 		c: Client{
 			Driver: &testutil.Driver{
 				OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-					return nil
+					if h == nil {
+						return nil
+					}
+					f := h[m]
+					if f == nil {
+						t.Fatalf("unexpected operation: %s", m)
+					}
+					return f(req, res)
 				},
 			},
 		},
@@ -925,6 +1052,7 @@ func simpleSession() *Session {
 
 type StubBuilder struct {
 	OnCreateSession func(ctx context.Context) (*Session, error)
+	Handler         methodHandlers
 	Limit           int
 	T               *testing.T
 
@@ -947,7 +1075,7 @@ func (s *StubBuilder) CreateSession(ctx context.Context) (*Session, error) {
 		return f(ctx)
 	}
 
-	return simpleSession(), nil
+	return newSession(s.T, s.Handler), nil
 }
 
 func (p *SessionPool) debug() {

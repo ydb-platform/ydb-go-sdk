@@ -1,6 +1,7 @@
 package timeutil
 
 import (
+	"math"
 	"time"
 )
 
@@ -29,6 +30,15 @@ func NewTimer(d time.Duration) Timer {
 		return f(d)
 	}
 	return timeTimer{time.NewTimer(d)}
+}
+
+// NewStoppedTimer creates a new stopped Timer.
+func NewStoppedTimer() Timer {
+	t := NewTimer(time.Duration(math.MaxInt64))
+	if !t.Stop() {
+		panic("ydb: timeutil: can not created stopped timer")
+	}
+	return t
 }
 
 // AfterFunc waits for the duration to elapse and then calls f

@@ -2,6 +2,7 @@ package table
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	ydb "github.com/yandex-cloud/ydb-go-sdk"
@@ -14,15 +15,19 @@ func TestResultAny(t *testing.T) {
 		name    string
 		columns []Column
 		values  []ydb.Value
+		exp     []interface{}
 	}{
 		{
 			columns: []Column{
 				{"column0", ydb.Optional(ydb.TypeUint32)},
 			},
 			values: []ydb.Value{
-				//ydb.OptionalValue(ydb.Uint32Value(42)),
 				ydb.OptionalValue(ydb.Uint32Value(43)),
 				ydb.NullValue(ydb.TypeUint32),
+			},
+			exp: []interface{}{
+				uint32(43),
+				nil,
 			},
 		},
 	} {
@@ -33,14 +38,21 @@ func TestResultAny(t *testing.T) {
 					WithValues(test.values...),
 				),
 			)
+			var i int
 			for res.NextSet() {
 				for res.NextRow() {
 					res.NextItem()
 					if res.IsOptional() {
 						res.Unwrap()
 					}
-					x := res.Any()
-					fmt.Printf("%v(%s,%s)\n", x, res.Path(), res.Type())
+					act := res.Any()
+					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
+						t.Errorf(
+							"unexpected Any() result: %[1]v (%[1]T); want %[2]v (%[2]T)",
+							act, exp,
+						)
+					}
+					i++
 				}
 			}
 			if err := res.Err(); err != nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/Ydb_Table_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -106,6 +107,14 @@ type TableCreateSessionResult struct {
 
 func (t TableCreateSessionResult) SetSessionID(id string) {
 	setField("SessionId", t.R, id)
+}
+
+type TableKeepAliveResult struct {
+	R interface{}
+}
+
+func (t TableKeepAliveResult) SetSessionStatus(s Ydb_Table.KeepAliveResult_SessionStatus) {
+	setField("SessionStatus", t.R, s)
 }
 
 type Driver struct {

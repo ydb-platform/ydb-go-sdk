@@ -12,6 +12,18 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 )
 
+type SessionStatus uint
+
+const (
+	SessionStatusUnknown SessionStatus = iota
+	SessionReady
+	SessionBusy
+)
+
+type SessionInfo struct {
+	Status SessionStatus
+}
+
 type Column struct {
 	Name string
 	Type ydb.Type

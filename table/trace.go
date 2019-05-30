@@ -43,9 +43,10 @@ type (
 		Session *Session
 	}
 	KeepAliveDoneInfo struct {
-		Context context.Context
-		Session *Session
-		Error   error
+		Context     context.Context
+		Session     *Session
+		SessionInfo SessionInfo
+		Error       error
 	}
 	DeleteSessionStartInfo struct {
 		Context context.Context

@@ -98,15 +98,28 @@ func (s *Session) Close(ctx context.Context) (err error) {
 }
 
 // KeepAlive keeps idle session alive.
-func (s *Session) KeepAlive(ctx context.Context) (err error) {
+func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 	s.c.traceKeepAliveStart(ctx, s)
 	defer func() {
-		s.c.traceKeepAliveDone(ctx, s, err)
+		s.c.traceKeepAliveDone(ctx, s, info, err)
 	}()
+	var res Ydb_Table.KeepAliveResult
 	req := Ydb_Table.KeepAliveRequest{
 		SessionId: s.ID,
 	}
-	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.KeepAlive, &req, nil))
+	err = s.c.Driver.Call(ctx, internal.Wrap(
+		Ydb_Table_V1.KeepAlive, &req, &res,
+	))
+	if err != nil {
+		return
+	}
+	switch res.SessionStatus {
+	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
+		info.Status = SessionReady
+	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
+		info.Status = SessionBusy
+	}
+	return
 }
 
 // CreateTable creates table at given path with given options.
@@ -614,11 +627,12 @@ func (t *Client) traceKeepAliveStart(ctx context.Context, s *Session) {
 		b(x)
 	}
 }
-func (t *Client) traceKeepAliveDone(ctx context.Context, s *Session, err error) {
+func (t *Client) traceKeepAliveDone(ctx context.Context, s *Session, info SessionInfo, err error) {
 	x := KeepAliveDoneInfo{
-		Context: ctx,
-		Session: s,
-		Error:   err,
+		Context:     ctx,
+		Session:     s,
+		SessionInfo: info,
+		Error:       err,
 	}
 	if a := t.Trace.KeepAliveDone; a != nil {
 		a(x)

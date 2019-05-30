@@ -50,6 +50,9 @@ func (c *conn) takeSession(ctx context.Context) bool {
 }
 
 func (c *conn) putSession(ctx context.Context) {
+	// TODO(kamardin): fix session pool overflow here.
+	//                 simplest solution is to set max int value to the inner
+	//                 session pool.
 	err := c.pool.Put(ctx, c.session)
 	if err != nil {
 		panic(fmt.Sprintf("ydbsql: put session error: %v", err))
@@ -182,7 +185,7 @@ func (c *conn) Ping(ctx context.Context) error {
 	if !c.takeSession(ctx) {
 		return driver.ErrBadConn
 	}
-	err := c.session.KeepAlive(ctx)
+	_, err := c.session.KeepAlive(ctx)
 	return mapBadSessionError(err)
 }
 

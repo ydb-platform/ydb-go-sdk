@@ -172,7 +172,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	if err := c.init(ctx); err != nil {
 		return nil, err
 	}
-	s, err := c.client.CreateSession(ctx)
+	s, err := c.pool.Create(ctx)
 	if err != nil {
 		return nil, err
 	}
