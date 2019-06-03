@@ -30,7 +30,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 					backoff <- ch
 					return ch
 				}),
-				SessionProvider: SingleSession(nil),
+				SessionProvider: SingleSession(simpleSession()),
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -206,7 +206,7 @@ func TestRetryerImmediateReturn(t *testing.T) {
 			r := Retryer{
 				MaxRetries:      1e6,
 				RetryChecker:    ydb.DefaultRetryChecker,
-				SessionProvider: SingleSession(new(Session)),
+				SessionProvider: SingleSession(simpleSession()),
 			}
 			err := r.Do(
 				context.Background(),

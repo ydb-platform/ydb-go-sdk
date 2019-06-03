@@ -16,6 +16,51 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil/timetest"
 )
 
+func TestSessionPoolTakeBusy(t *testing.T) {
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
+
+	keepalive := make(chan struct{})
+	p := &SessionPool{
+		SizeLimit:         1,
+		BusyCheckInterval: time.Hour,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 1,
+			Handler: methodHandlers{
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					keepalive <- struct{}{}
+					r := testutil.TableKeepAliveResult{res}
+					r.SetSessionStatus(Ydb_Table.KeepAliveResult_SESSION_STATUS_READY)
+					return nil
+				},
+				testutil.TableDeleteSession: okHandler,
+			},
+		},
+	}
+
+	s1 := mustCreateSession(t, p)
+
+	<-timer.Created
+
+	mustPutSession(t, p, s1)
+	mustTakeSession(t, p, s1)
+	mustPutBusySession(t, p, s1)
+
+	<-timer.Reset
+	timer.C <- timeutil.Now()
+	<-keepalive
+
+	// Burn one busy checker iteration to be sure that session has been
+	// returned.
+	timer.C <- time.Unix(0, 0)
+
+	s2 := mustCreateSession(t, p)
+	if s2 != s1 {
+		t.Fatalf("ready session is not reused")
+	}
+}
+
 func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
@@ -992,6 +1037,14 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 	}
 }
 
+func mustCreateSession(t *testing.T, p *SessionPool) *Session {
+	s, err := p.Create(context.Background())
+	if err != nil {
+		t.Fatalf("%s: %v", caller(), err)
+	}
+	return s
+}
+
 func mustGetSession(t *testing.T, p *SessionPool) *Session {
 	s, err := p.Get(context.Background())
 	if err != nil {
@@ -1002,6 +1055,12 @@ func mustGetSession(t *testing.T, p *SessionPool) *Session {
 
 func mustPutSession(t *testing.T, p *SessionPool, s *Session) {
 	if err := p.Put(context.Background(), s); err != nil {
+		t.Fatalf("%s: %v", caller(), err)
+	}
+}
+
+func mustPutBusySession(t *testing.T, p *SessionPool, s *Session) {
+	if err := p.PutBusy(context.Background(), s); err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
 }

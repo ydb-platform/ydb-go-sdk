@@ -15,11 +15,16 @@ type SessionProvider interface {
 	// Put takes no longer needed session for reuse or deletion depending on
 	// implementation.
 	Put(context.Context, *Session) (err error)
+
+	// PutBusy takes session with not yet completed operation inside.
+	// It gives full ownership of s to session provider.
+	PutBusy(context.Context, *Session) (err error)
 }
 
 type SessionProviderFunc struct {
-	OnGet func(context.Context) (*Session, error)
-	OnPut func(context.Context, *Session) error
+	OnGet     func(context.Context) (*Session, error)
+	OnPut     func(context.Context, *Session) error
+	OnPutBusy func(context.Context, *Session) error
 }
 
 func (f SessionProviderFunc) Get(ctx context.Context) (*Session, error) {
@@ -34,6 +39,13 @@ func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
 		return errSessionOverflow
 	}
 	return f.OnPut(ctx, s)
+}
+
+func (f SessionProviderFunc) PutBusy(ctx context.Context, s *Session) error {
+	if f.OnPutBusy == nil {
+		return s.Close(ctx)
+	}
+	return f.OnPutBusy(ctx, s)
 }
 
 // SingleSession returns SessionProvider that uses only given session durting
@@ -124,12 +136,18 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 		if err = op.Do(ctx, s); err == nil {
 			return nil
 		}
-		if m = r.RetryChecker.Check(err); !m.Retriable() {
-			return err
-		}
-		if m.MustDeleteSession() {
+		m = r.RetryChecker.Check(err)
+		switch {
+		case m.MustDeleteSession():
 			defer s.Close(ctx)
 			s = nil
+
+		case ydb.IsBusyAfter(err):
+			r.SessionProvider.PutBusy(ctx, s)
+			s = nil
+		}
+		if !m.Retriable() {
+			return err
 		}
 		if m.MustBackoff() {
 			if e := ydb.WaitBackoff(ctx, r.Backoff, i); e != nil {
@@ -170,4 +188,14 @@ func (s *singleSession) Put(_ context.Context, x *Session) error {
 	}
 	s.empty = false
 	return nil
+}
+
+func (s *singleSession) PutBusy(ctx context.Context, x *Session) error {
+	if x != s.s {
+		return errUnexpectedSession
+	}
+	if !s.empty {
+		return errSessionOverflow
+	}
+	return x.Close(ctx)
 }

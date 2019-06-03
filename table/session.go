@@ -22,6 +22,10 @@ var (
 	// ErrSessionPoolClosed is returned by a SessionPool instance to indicate
 	// that pool is closed and not able to complete requested operation.
 	ErrSessionPoolClosed = errors.New("ydb: table: session pool is closed")
+
+	// ErrSessionPoolOverflow is returned by a SessionPool instance to indicate
+	// that the pool is full and requested operation is not able to complete.
+	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
 )
 
 // SessionBuilder is the interface that holds logic of creating or deleting
@@ -82,6 +86,7 @@ type SessionPool struct {
 	index    map[*Session]sessionInfo
 	limit    int        // Upper bound for pool size.
 	idle     *list.List // list<*Session>
+	ready    *list.List // list<*Session>
 	waitq    *list.List // list<*chan *Session>
 
 	keeperWake chan struct{} // Set by keeper.
@@ -103,6 +108,7 @@ func (p *SessionPool) init() {
 		p.index = make(map[*Session]sessionInfo)
 
 		p.idle = list.New()
+		p.ready = list.New()
 		p.waitq = list.New()
 
 		p.limit = p.SizeLimit
@@ -124,6 +130,39 @@ func (p *SessionPool) init() {
 			go p.busyChecker()
 		}
 	})
+}
+
+// p.mu must NOT be held.
+func (p *SessionPool) create(ctx context.Context) (s *Session, err error) {
+	s, err = p.Builder.CreateSession(ctx)
+	if err != nil {
+		return
+	}
+
+	p.mu.Lock()
+	enoughSpace := len(p.index) < p.limit
+	if enoughSpace {
+		p.index[s] = sessionInfo{}
+		s.OnClose(func() {
+			p.mu.Lock()
+			_, has := p.index[s]
+			if !p.closed && has {
+				delete(p.index, s)
+				p.notify(nil)
+			}
+			p.mu.Unlock()
+		})
+	}
+	p.mu.Unlock()
+
+	if !enoughSpace {
+		// We lost the race – pool is full now and session can not be reused.
+		p.closeSession(ctx, s)
+		s = nil
+		err = ErrSessionPoolOverflow
+	}
+
+	return
 }
 
 // Get returns first idle session from the SessionPool and removes it from
@@ -162,30 +201,16 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			// Put() implementation.
 			p.mu.Unlock()
 
-			s, err = p.Builder.CreateSession(ctx)
+			s, err = p.create(ctx)
+			if err == ErrSessionPoolOverflow {
+				err = nil
+			}
 			if err != nil {
-				return
+				return nil, err
 			}
 
 			p.mu.Lock()
-			if len(p.index) == p.limit {
-				p.mu.Unlock()
-				// We lost the race – pool is full now and session can not be reused.
-				p.closeSession(ctx, s)
-				s = nil
-				p.mu.Lock()
-			} else {
-				p.index[s] = sessionInfo{}
-				s.OnClose(func() {
-					p.mu.Lock()
-					_, has := p.index[s]
-					if !p.closed && has {
-						delete(p.index, s)
-						p.notify(nil)
-					}
-					p.mu.Unlock()
-				})
-			}
+
 		case s == nil && len(p.index) == p.limit:
 			// Try to wait for a touched session instead of creating new one.
 			//
@@ -275,7 +300,8 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 // error received. That is, session may be still in request processing state
 // and is not able to process further requests.
 //
-// Given session may be reused or may become closed in the future.
+// Given session may be reused or may be closed in the future. That is, calling
+// PutBusy() gives complete ownership of s to the pool.
 func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	p.init()
 
@@ -291,7 +317,7 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	if !has {
 		panic("ydb: table: PutBusy() unknown session")
 	}
-	if info.element != nil {
+	if info.idle != nil {
 		panic("ydb: table: PutBusy() idle session")
 	}
 	delete(p.index, s)
@@ -314,18 +340,22 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 // Take removes session s from the pool and ensures that s will not be returned
 // by other Take() or Get() calls.
 //
-// The intended way of Take() use is to create Session somehow from outside
-// the SessionPool and put it in to prepare KeepAlive tracking when Session is
-// idle. When Session becomes active, one should call Take() to stop KeepAlive
-// tracking (simultaneous use of Session is prohibited).
+// The intended way of Take() use is to create session by calling Create() and
+// Put() it later to prepare KeepAlive tracking when session is idle. When
+// Session becomes active, one should call Take() to stop KeepAlive tracking
+// (simultaneous use of Session is prohibited).
 //
-// DEPRECATED. Will be removed in furhter updates.
-func (p *SessionPool) Take(ctx context.Context, s *Session) (has bool, err error) {
+// After session returned to the pool by calling PutBusy() it can not be taken
+// by Take() any more. That is, semantically PutBusy() is the same as session's
+// Close().
+//
+// It is assumed that Take() callers never call Get() method.
+func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err error) {
 	p.init()
 
 	p.traceTakeStart(ctx, s)
 	defer func() {
-		p.traceTakeDone(ctx, s, has)
+		p.traceTakeDone(ctx, s, took)
 	}()
 
 	p.mu.Lock()
@@ -333,7 +363,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (has bool, err error
 		p.mu.Unlock()
 		return false, ErrSessionPoolClosed
 	}
-	for has = p.takeIdle(s); !has && p.touching; has = p.takeIdle(s) {
+	for took = p.takeIdle(s); !took && p.touching; took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
 
@@ -349,22 +379,36 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (has bool, err error
 	}
 	p.mu.Unlock()
 
-	return has, nil
+	return took, nil
 }
 
-// DEPRECATED. Will be removed in furhter updates.
+// Create creates new session and returns it.
+// The intended way of Create() usage relates to Take() method.
 func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 	p.init()
 
-	s, err = p.Builder.CreateSession(ctx)
-	if err != nil {
-		return
-	}
-
 	p.mu.Lock()
-	p.index[s] = sessionInfo{}
+	if p.ready.Len() > 0 {
+		s = p.ready.Remove(p.ready.Front()).(*Session)
+	}
 	p.mu.Unlock()
 
+	if s == nil {
+		return p.create(ctx)
+	}
+
+	took, err := p.Take(ctx, s)
+	if err != nil {
+		p.mu.Lock()
+		if !p.closed {
+			p.ready.PushBack(s)
+		}
+		p.mu.Unlock()
+		return nil, err
+	}
+	if !took {
+		panic("ydb: table: inconsistent session pool usage")
+	}
 	return s, nil
 }
 
@@ -409,6 +453,7 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	idle := p.idle
 	waitq := p.waitq
 	p.idle = nil
+	p.ready = nil
 	p.waitq = nil
 	p.index = nil
 	p.mu.Unlock()
@@ -432,12 +477,13 @@ func (p *SessionPool) busyChecker() {
 
 		active = false
 		timer  = timeutil.NewStoppedTimer()
+		ctx    = context.Background()
 	)
 	for {
 		select {
 		case <-p.busyCheckerStop:
 			for _, s := range toCheck {
-				p.closeSession(context.Background(), s)
+				p.closeSession(ctx, s)
 			}
 			return
 
@@ -454,33 +500,29 @@ func (p *SessionPool) busyChecker() {
 		}
 		for i := 0; i < len(toCheck); {
 			s := toCheck[i]
-			info, err := p.keepAliveSession(context.Background(), s)
-			if err == nil && info.Status != SessionReady {
-				i++
-				continue
-			}
+			info, err := p.keepAliveSession(ctx, s)
+			if err != nil || info.Status == SessionReady {
+				n := len(toCheck)
+				toCheck[i] = toCheck[n-1]
+				toCheck[n-1] = nil
+				toCheck = toCheck[:n-1]
 
-			n := len(toCheck)
-			toCheck[i] = toCheck[n-1]
-			toCheck[n-1] = nil
-			toCheck = toCheck[:n-1]
-
-			if err != nil {
-				p.closeSession(context.Background(), s)
-				continue
-			}
-
-			p.mu.Lock()
-			enoughSpace := !p.closed && len(p.index) < p.limit
-			if enoughSpace {
-				p.index[s] = sessionInfo{}
-				if !p.notify(s) {
-					p.pushBack(s, timeutil.Now())
+				p.mu.Lock()
+				enoughSpace := !p.closed && len(p.index) < p.limit
+				reuse := enoughSpace && err == nil
+				if reuse {
+					p.index[s] = sessionInfo{}
+					if !p.notify(s) {
+						p.pushBack(s, timeutil.Now())
+						p.ready.PushBack(s)
+					}
 				}
-			}
-			p.mu.Unlock()
-			if !enoughSpace {
-				p.closeSession(context.Background(), s)
+				p.mu.Unlock()
+				if !reuse {
+					p.closeSession(ctx, s)
+				}
+			} else {
+				i++
 			}
 		}
 		if len(toCheck) > 0 {
@@ -638,7 +680,7 @@ func (p *SessionPool) peekFirstIdle() (s *Session, touched time.Time) {
 	}
 	s = el.Value.(*Session)
 	info, has := p.index[s]
-	if !has || el != info.element {
+	if !has || el != info.idle {
 		panic("ydb: table: inconsistent session pool index")
 	}
 	return s, info.touched
@@ -714,11 +756,13 @@ func (p *SessionPool) keepAliveSession(ctx context.Context, s *Session) (Session
 // p.mu must be held.
 func (p *SessionPool) removeIdle(s *Session) {
 	info, has := p.index[s]
-	if !has || info.element == nil {
+	if !has || info.idle == nil {
 		panic("ydb: table: inconsistent session pool index")
 	}
-	p.idle.Remove(info.element)
-	info.element = nil
+
+	p.idle.Remove(info.idle)
+	info.idle = nil
+
 	p.index[s] = info
 }
 
@@ -728,7 +772,7 @@ func (p *SessionPool) takeIdle(s *Session) (ok bool) {
 	if !has {
 		panic("ydb: table: unknown session")
 	}
-	if info.element == nil {
+	if info.idle == nil {
 		// Session s is not idle.
 		return false
 	}
@@ -737,10 +781,8 @@ func (p *SessionPool) takeIdle(s *Session) (ok bool) {
 }
 
 // p.mu must be held.
-func (p *SessionPool) pushBack(s *Session, now time.Time) (el *list.Element) {
-	el = p.idle.PushBack(s)
-	p.handlePush(s, now, el)
-	return el
+func (p *SessionPool) pushBack(s *Session, now time.Time) {
+	p.handlePush(s, now, p.idle.PushBack(s))
 }
 
 // p.mu must be held.
@@ -782,12 +824,12 @@ func (p *SessionPool) handlePush(s *Session, now time.Time, el *list.Element) {
 	if !has {
 		panic("ydb: table: trying to store session created outside of the pool")
 	}
-	if info.element != nil {
+	if info.idle != nil {
 		panic("ydb: table: inconsistent session pool index")
 	}
 
 	info.touched = now
-	info.element = el
+	info.idle = el
 	p.index[s] = info
 
 	p.wakeUpKeeper()
@@ -924,6 +966,6 @@ func (p *SessionPool) traceCloseDone(ctx context.Context, err error) {
 }
 
 type sessionInfo struct {
-	element *list.Element
+	idle    *list.Element
 	touched time.Time
 }

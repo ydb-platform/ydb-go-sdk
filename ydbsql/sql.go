@@ -17,6 +17,7 @@ var (
 	ErrUnsupported         = errors.New("ydbsql: not supported")
 	ErrActiveTransaction   = errors.New("ydbsql: can not begin tx within active tx")
 	ErrNoActiveTransaction = errors.New("ydbsql: no active tx to work with")
+	ErrSessionBusy         = errors.New("ydbsql: session is busy")
 )
 
 var defaultTxControl = table.TxControl(
@@ -29,7 +30,7 @@ var defaultTxControl = table.TxControl(
 // conn is a connection to the ydb.
 type conn struct {
 	idle bool
-	bad  bool
+	busy bool
 
 	retry   *retryer
 	session *table.Session
@@ -50,9 +51,6 @@ func (c *conn) takeSession(ctx context.Context) bool {
 }
 
 func (c *conn) putSession(ctx context.Context) {
-	// TODO(kamardin): fix session pool overflow here.
-	//                 simplest solution is to set max int value to the inner
-	//                 session pool.
 	err := c.pool.Put(ctx, c.session)
 	if err != nil {
 		panic(fmt.Sprintf("ydbsql: put session error: %v", err))
@@ -61,7 +59,8 @@ func (c *conn) putSession(ctx context.Context) {
 }
 
 func (c *conn) ResetSession(ctx context.Context) error {
-	if c.bad {
+	if c.busy {
+		c.pool.PutBusy(ctx, c.session)
 		return driver.ErrBadConn
 	}
 	c.putSession(ctx)
@@ -136,20 +135,44 @@ func (c *conn) Rollback() error {
 	if c.tx == nil {
 		return ErrNoActiveTransaction
 	}
-	err := c.tx.Rollback(context.Background())
+
+	tx := c.tx
 	c.tx = nil
 	c.txc = nil
-	return err
+
+	if c.busy {
+		// We don't try to rollback tx here after previous operation was not
+		// completed – session is probably still in busy state.
+		//
+		// Do not return driver.ErrBadConn here – we want this conn's session
+		// to be reused after c.ResetSession() call. Bad conn error will force
+		// database/sql to close this session without calling ResetSession().
+		return ErrSessionBusy
+	}
+
+	return tx.Rollback(context.Background())
 }
 
 func (c *conn) Commit() error {
 	if c.tx == nil {
 		return ErrNoActiveTransaction
 	}
-	err := c.tx.Commit(context.Background())
+
+	tx := c.tx
 	c.tx = nil
 	c.txc = nil
-	return err
+
+	if c.busy {
+		// We don't try to rollback tx here after previous operation was not
+		// completed – session is probably still in busy state.
+		//
+		// Do not return driver.ErrBadConn here – we want this conn's session
+		// to be reused after c.ResetSession() call. Bad conn error will force
+		// database/sql to close this session without calling ResetSession().
+		return ErrSessionBusy
+	}
+
+	return tx.Commit(context.Background())
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
@@ -190,6 +213,11 @@ func (c *conn) Ping(ctx context.Context) error {
 }
 
 func (c *conn) Close() error {
+	if c.busy {
+		// NOTE: do not close the session – it is already returned to the pool
+		// by PutBusy() call.
+		return nil
+	}
 	ctx := context.Background()
 	if !c.takeSession(ctx) {
 		return driver.ErrBadConn
@@ -241,23 +269,15 @@ func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec
 			return e
 		})
 	}
-	if isContextError(err) {
-		// TODO(kamardin): reuse this conn's session as we doing inside ydb/table.
-		//                 Check that it does not brake things inside database/sql.
-
-		// Client gone. Can not use this conn anymore – started operation
-		// may not be finished.
+	if ydb.IsBusyAfter(err) {
+		// Can not use this conn anymore – started operation may not be
+		// finished.
 		//
-		// NOTE: we check this only at direct Query()/Exec() branch – it is
-		// not possible to leave transaction without committing or rolling
-		// it back (state of session is always known while in tx).
-
 		// NOTE: we can not return ErrBadConn right here because we do not
 		// know the state of started operation. Instead, we mark this
-		// connection bad and it will be closed after ResetSession() call
+		// connection busy and it will be closed after ResetSession() call
 		// by database/sql.
-		c.bad = true
-
+		c.busy = true
 		return nil, err
 	}
 	return res, mapOpError(err)
@@ -534,8 +554,4 @@ func mapBadSessionError(err error) error {
 		return driver.ErrBadConn
 	}
 	return err
-}
-
-func isContextError(err error) bool {
-	return err == context.Canceled || err == context.DeadlineExceeded
 }

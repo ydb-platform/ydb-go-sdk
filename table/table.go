@@ -558,13 +558,6 @@ func (tx *Transaction) ExecuteStatement(
 	return
 }
 
-func (tx *Transaction) txc() *TransactionControl {
-	if tx.c == nil {
-		tx.c = TxControl(WithTx(tx))
-	}
-	return tx.c
-}
-
 // Commit commits specified active transaction.
 func (tx *Transaction) Commit(ctx context.Context) (err error) {
 	tx.s.c.traceCommitTransactionStart(ctx, tx)
@@ -589,6 +582,13 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 		TxId:      tx.id,
 	}
 	return tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.RollbackTransaction, &req, nil))
+}
+
+func (tx *Transaction) txc() *TransactionControl {
+	if tx.c == nil {
+		tx.c = TxControl(WithTx(tx))
+	}
+	return tx.c
 }
 
 func (t *Client) traceCreateSessionStart(ctx context.Context) {

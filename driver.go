@@ -317,20 +317,30 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 
 	err = invoke(ctx, conn.conn, &resp, method, req, res)
 
-	conn.runtime.operationDone(start, timeutil.Now(), transportErrorOrNil(err))
+	conn.runtime.operationDone(
+		start, timeutil.Now(),
+		errIf(IsBusyAfter(err), err),
+	)
 	d.trace.operationDone(rawctx, conn, method, resp, err)
 
 	return err
 }
 
-func transportErrorOrNil(err error) error {
-	if err == context.DeadlineExceeded {
-		// Note that we do not use here context.Canceled error due to
-		// cancelation may occur by custom application logic and does not
-		// relate to quality of connection.
-		return err
-	}
+func IsBusyAfter(err error) bool {
 	if _, ok := err.(*TransportError); ok {
+		return true
+	}
+	if err == context.DeadlineExceeded {
+		return true
+	}
+	if err == context.Canceled {
+		return true
+	}
+	return false
+}
+
+func errIf(cond bool, err error) error {
+	if cond {
 		return err
 	}
 	return nil

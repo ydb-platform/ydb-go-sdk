@@ -11,7 +11,8 @@ import (
 )
 
 var (
-	DefaultIdleThreshold = 5 * time.Second
+	DefaultIdleThreshold        = 5 * time.Second
+	DefaultSessionPoolSizeLimit = 1 << 16
 )
 
 type ConnectorOption func(*connector)
@@ -63,6 +64,12 @@ func WithSessionPoolTrace(t table.SessionPoolTrace) ConnectorOption {
 func WithSessionPoolIdleThreshold(d time.Duration) ConnectorOption {
 	return func(c *connector) {
 		c.pool.IdleThreshold = d
+	}
+}
+
+func WithSessionPoolBusyCheckInterval(d time.Duration) ConnectorOption {
+	return func(c *connector) {
+		c.pool.BusyCheckInterval = d
 	}
 }
 
@@ -148,8 +155,16 @@ func (c *connector) prepare(dial func(context.Context) (*table.Client, error)) {
 				return
 			}
 			c.pool.Builder = c.client
-			c.pool.SizeLimit = -1
-			c.pool.KeepAliveBatchSize = -1
+
+			// Setup some more on less generic reasonable pool limit to prevent
+			// session overflow on the YDB servers.
+			//
+			// Note that it must be controlled from outside by making
+			// database/sql.DB.SetMaxIdleConns() call. Unfortunatly, we can not
+			// receive that limit here and we do not want to force user to
+			// configure it twice (and pass it as an option to connector).
+			c.pool.SizeLimit = DefaultSessionPoolSizeLimit
+
 			if c.pool.IdleThreshold == 0 {
 				c.pool.IdleThreshold = DefaultIdleThreshold
 			}
