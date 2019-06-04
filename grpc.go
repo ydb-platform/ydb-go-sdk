@@ -78,7 +78,7 @@ func (e *OpError) Error() string {
 		return e.Reason.String()
 	}
 	var buf bytes.Buffer
-	buf.WriteString("rpc call error: ")
+	buf.WriteString("operation error: ")
 	buf.WriteString(e.Reason.String())
 	if len(e.issues) > 0 {
 		buf.WriteByte(':')
