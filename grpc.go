@@ -47,7 +47,7 @@ type TransportError struct {
 func (t *TransportError) Error() string {
 	s := "transport error: " + t.Reason.String()
 	if t.message != "" {
-		s += ": " + t.message
+		s += ": [" + t.message + "]"
 	}
 	return s
 }
