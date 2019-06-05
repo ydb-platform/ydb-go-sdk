@@ -509,6 +509,7 @@ func (p *SessionPool) busyChecker() {
 				active = true
 				timer.Reset(p.BusyCheckInterval)
 			}
+			p.traceBusyCheckStart(ctx, s)
 			continue
 		}
 		for i := 0; i < len(toCheck); {
@@ -519,6 +520,8 @@ func (p *SessionPool) busyChecker() {
 				toCheck[i] = toCheck[n-1]
 				toCheck[n-1] = nil
 				toCheck = toCheck[:n-1]
+
+				p.traceBusyCheckDone(ctx, s, err)
 
 				p.mu.Lock()
 				enoughSpace := !p.closed && len(p.index) < p.limit
@@ -901,6 +904,31 @@ func (p *SessionPool) traceWaitDone(ctx context.Context, s *Session, err error) 
 		a(x)
 	}
 	if b := ContextSessionPoolTrace(ctx).WaitDone; b != nil {
+		b(x)
+	}
+}
+func (p *SessionPool) traceBusyCheckStart(ctx context.Context, s *Session) {
+	x := SessionPoolBusyCheckStartInfo{
+		Context: ctx,
+		Session: s,
+	}
+	if a := p.Trace.BusyCheckStart; a != nil {
+		a(x)
+	}
+	if b := ContextSessionPoolTrace(ctx).BusyCheckStart; b != nil {
+		b(x)
+	}
+}
+func (p *SessionPool) traceBusyCheckDone(ctx context.Context, s *Session, err error) {
+	x := SessionPoolBusyCheckDoneInfo{
+		Context: ctx,
+		Session: s,
+		Error:   err,
+	}
+	if a := p.Trace.BusyCheckDone; a != nil {
+		a(x)
+	}
+	if b := ContextSessionPoolTrace(ctx).BusyCheckDone; b != nil {
 		b(x)
 	}
 }

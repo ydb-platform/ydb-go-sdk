@@ -318,16 +318,18 @@ func composeClientTrace(a, b ClientTrace) (c ClientTrace) {
 
 // SessionPoolTrace contains options for tracing session pool activity.
 type SessionPoolTrace struct {
-	GetStart   func(SessionPoolGetStartInfo)
-	GetDone    func(SessionPoolGetDoneInfo)
-	WaitStart  func(SessionPoolWaitStartInfo)
-	WaitDone   func(SessionPoolWaitDoneInfo)
-	TakeStart  func(SessionPoolTakeStartInfo)
-	TakeDone   func(SessionPoolTakeDoneInfo)
-	PutStart   func(SessionPoolPutStartInfo)
-	PutDone    func(SessionPoolPutDoneInfo)
-	CloseStart func(SessionPoolCloseStartInfo)
-	CloseDone  func(SessionPoolCloseDoneInfo)
+	GetStart       func(SessionPoolGetStartInfo)
+	GetDone        func(SessionPoolGetDoneInfo)
+	WaitStart      func(SessionPoolWaitStartInfo)
+	WaitDone       func(SessionPoolWaitDoneInfo)
+	BusyCheckStart func(SessionPoolBusyCheckStartInfo)
+	BusyCheckDone  func(SessionPoolBusyCheckDoneInfo)
+	TakeStart      func(SessionPoolTakeStartInfo)
+	TakeDone       func(SessionPoolTakeDoneInfo)
+	PutStart       func(SessionPoolPutStartInfo)
+	PutDone        func(SessionPoolPutDoneInfo)
+	CloseStart     func(SessionPoolCloseStartInfo)
+	CloseDone      func(SessionPoolCloseDoneInfo)
 }
 
 type (
@@ -343,6 +345,15 @@ type (
 		Context context.Context
 	}
 	SessionPoolWaitDoneInfo struct {
+		Context context.Context
+		Session *Session
+		Error   error
+	}
+	SessionPoolBusyCheckStartInfo struct {
+		Context context.Context
+		Session *Session
+	}
+	SessionPoolBusyCheckDoneInfo struct {
 		Context context.Context
 		Session *Session
 		Error   error
@@ -433,6 +444,28 @@ func composeSessionPoolTrace(a, b SessionPoolTrace) (c SessionPoolTrace) {
 		c.WaitDone = func(info SessionPoolWaitDoneInfo) {
 			a.WaitDone(info)
 			b.WaitDone(info)
+		}
+	}
+	switch {
+	case a.BusyCheckStart == nil:
+		c.BusyCheckStart = b.BusyCheckStart
+	case b.BusyCheckStart == nil:
+		c.BusyCheckStart = a.BusyCheckStart
+	default:
+		c.BusyCheckStart = func(info SessionPoolBusyCheckStartInfo) {
+			a.BusyCheckStart(info)
+			b.BusyCheckStart(info)
+		}
+	}
+	switch {
+	case a.BusyCheckDone == nil:
+		c.BusyCheckDone = b.BusyCheckDone
+	case b.BusyCheckDone == nil:
+		c.BusyCheckDone = a.BusyCheckDone
+	default:
+		c.BusyCheckDone = func(info SessionPoolBusyCheckDoneInfo) {
+			a.BusyCheckDone(info)
+			b.BusyCheckDone(info)
 		}
 	}
 	switch {
