@@ -11,7 +11,7 @@ import (
 type SingleTimer struct {
 	once    sync.Once
 	C       chan time.Time
-	Created chan struct{}
+	Created chan time.Duration
 	Reset   chan time.Duration
 	Cleanup func()
 }
@@ -19,7 +19,7 @@ type SingleTimer struct {
 func StubSingleTimer(t *testing.T) *SingleTimer {
 	s := &SingleTimer{
 		C:       make(chan time.Time),
-		Created: make(chan struct{}),
+		Created: make(chan time.Duration, 1),
 		Reset:   make(chan time.Duration),
 	}
 	s.Cleanup = timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
@@ -31,7 +31,7 @@ func StubSingleTimer(t *testing.T) *SingleTimer {
 			t.Fatalf("timeutil.NewTimer() is called more than once")
 			return nil
 		}
-		close(s.Created)
+		s.Created <- d
 		return Timer{
 			Ch: s.C,
 			OnReset: func(d time.Duration) bool {

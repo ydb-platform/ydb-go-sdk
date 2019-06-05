@@ -24,6 +24,7 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 	p := &SessionPool{
 		SizeLimit:         1,
 		BusyCheckInterval: time.Hour,
+		IdleThreshold:     -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
@@ -69,6 +70,7 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 	p := &SessionPool{
 		SizeLimit:         1,
 		BusyCheckInterval: time.Hour,
+		IdleThreshold:     -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
@@ -123,6 +125,7 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 	p := &SessionPool{
 		SizeLimit:         2,
 		BusyCheckInterval: time.Hour,
+		IdleThreshold:     -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
@@ -204,8 +207,9 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 		keepalive = make(chan struct{})
 	)
 	p := &SessionPool{
-		SizeLimit:     1,
-		IdleThreshold: time.Hour,
+		SizeLimit:         1,
+		IdleThreshold:     time.Hour,
+		BusyCheckInterval: -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
@@ -651,27 +655,23 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 		connected = make(chan struct{})
 		keepalive = make(chan struct{})
 	)
-	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				switch m {
-				case testutil.TableCreateSession:
-					return nil
-				case testutil.TableKeepAlive:
+	p := &SessionPool{
+		SizeLimit:         1,
+		IdleThreshold:     time.Hour,
+		BusyCheckInterval: -1,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 1,
+			Handler: methodHandlers{
+				testutil.TableKeepAlive: func(req, res interface{}) error {
 					keepalive <- struct{}{}
 					// Here we emulating blocked connection initialization.
 					<-connected
-				default:
-					t.Fatalf("unexpected operation: %s", m)
-				}
-				return nil
+					return nil
+				},
+				testutil.TableDeleteSession: okHandler,
 			},
 		},
-	}
-	p := &SessionPool{
-		SizeLimit:     1,
-		IdleThreshold: time.Hour,
-		Builder:       client,
 	}
 
 	touched := p.touchCond()
@@ -744,24 +744,20 @@ func TestSessionPoolGetPut(t *testing.T) {
 			)
 		}
 	}
-	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				switch m {
-				case testutil.TableCreateSession:
-					created++
-				case testutil.TableDeleteSession:
-					deleted++
-				default:
-					t.Errorf("unexpected operation: %s", m)
-				}
-				return nil
-			},
-		},
-	}
 	p := &SessionPool{
 		SizeLimit: 1,
-		Builder:   client,
+		Builder: &StubBuilder{
+			Handler: methodHandlers{
+				testutil.TableCreateSession: func(req, res interface{}) error {
+					created++
+					return nil
+				},
+				testutil.TableDeleteSession: func(req, res interface{}) error {
+					deleted++
+					return nil
+				},
+			},
+		},
 	}
 
 	s := mustGetSession(t, p)
@@ -780,96 +776,59 @@ func TestSessionPoolGetPut(t *testing.T) {
 	assertCreated(2)
 }
 
-func TestSessionPoolDisableKeepAlive(t *testing.T) {
-	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				switch m {
-				case testutil.TableCreateSession:
-					// OK
-				default:
-					t.Errorf("unexpected operation: %s", m)
-				}
-				return nil
-			},
-		},
-	}
+func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
+
 	p := &SessionPool{
-		SizeLimit: 1,
-		Builder:   client,
+		SizeLimit:         1,
+		IdleThreshold:     -1,
+		BusyCheckInterval: -1,
+		Builder: &StubBuilder{
+			T:       t,
+			Limit:   1,
+			Handler: methodHandlers{},
+		},
 	}
 
 	s := mustGetSession(t, p)
 	mustPutSession(t, p, s)
-	time.Sleep(time.Second * 1)
+
+	const timeout = time.Second
+	select {
+	case <-timer.Created:
+		t.Fatalf("unexpected created timer")
+	case <-time.After(timeout):
+	}
 }
 
 func TestSessionPoolKeepAlive(t *testing.T) {
-	var (
-		keepAlive uint32
-		create    uint32
-	)
-	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				switch m {
-				case testutil.TableCreateSession:
-					i := atomic.AddUint32(&create, 1)
-
-					r := testutil.TableCreateSessionResult{res}
-					r.SetSessionID(fmt.Sprintf(
-						"session-%d", i,
-					))
-				case testutil.TableKeepAlive:
-					atomic.AddUint32(&keepAlive, 1)
-				default:
-					t.Errorf("unexpected operation: %s", m)
-				}
-				return nil
-			},
-		},
-	}
-
-	idleThreshold := 4 * time.Second
-
-	var (
-		timerC       = make(chan time.Time)
-		timerReset   = make(chan time.Duration, 1)
-		newTimerDone = make(chan struct{})
-
-		timerOnce sync.Once
-		interval  time.Duration
-	)
-	cleanup := timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
-		timerOnce.Do(func() {
-			r = timetest.Timer{
-				Ch: timerC,
-				OnReset: func(d time.Duration) bool {
-					select {
-					case timerReset <- d:
-					default:
-						t.Fatal("timer.Reset() blocked")
-					}
-					return true
-				},
-			}
-			interval = d
-			close(newTimerDone)
-		})
-		if r == nil {
-			t.Fatal("NewTimer() called twice")
-		}
-		return r
-	})
-	defer cleanup()
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
 
 	shiftTime, cleanup := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
 	defer cleanup()
 
+	var (
+		idleThreshold = 4 * time.Second
+
+		keepAliveCount uint32
+	)
 	p := &SessionPool{
-		SizeLimit:     2,
-		Builder:       client,
-		IdleThreshold: idleThreshold,
+		SizeLimit:         2,
+		IdleThreshold:     idleThreshold,
+		BusyCheckInterval: -1,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 2,
+			Handler: methodHandlers{
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					atomic.AddUint32(&keepAliveCount, 1)
+					return nil
+				},
+				testutil.TableDeleteSession: okHandler,
+			},
+		},
 	}
 
 	s1 := mustGetSession(t, p)
@@ -881,8 +840,7 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 	mustPutSession(t, p, s1)
 	mustPutSession(t, p, s2)
 
-	<-newTimerDone
-
+	interval := <-timer.Created
 	if interval != idleThreshold {
 		t.Fatalf(
 			"unexpected ticker duration: %s; want %s",
@@ -892,9 +850,9 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 
 	// Emulate first simple tick event. We expect two sessions be keepalived.
 	shiftTime(idleThreshold)
-	timerC <- timeutil.Now()
-	mustResetTimer(t, timerReset, idleThreshold)
-	if !atomic.CompareAndSwapUint32(&keepAlive, 2, 0) {
+	timer.C <- timeutil.Now()
+	mustResetTimer(t, timer.Reset, idleThreshold)
+	if !atomic.CompareAndSwapUint32(&keepAliveCount, 2, 0) {
 		t.Fatal("unexpected number of keepalives")
 	}
 
@@ -908,64 +866,49 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 	// We expect here next tick to be registered after half of a idleThreshold.
 	// That is, x was touched half of idleThreshold ago, so we need to wait for
 	// the second half until we must touch it.
-	timerC <- timeutil.Now()
-	mustResetTimer(t, timerReset, idleThreshold/2)
+	timer.C <- timeutil.Now()
+	mustResetTimer(t, timer.Reset, idleThreshold/2)
 }
 
 func TestSessionPoolKeepAliveOrdering(t *testing.T) {
-	var (
-		keepalive = make(chan chan<- struct{})
-
-		id uint32
-	)
-	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				switch m {
-				case testutil.TableCreateSession:
-					i := atomic.AddUint32(&id, 1)
-					r := testutil.TableCreateSessionResult{res}
-					r.SetSessionID(fmt.Sprintf(
-						"session-%d", i,
-					))
-				case testutil.TableKeepAlive:
-					done := make(chan struct{})
-					keepalive <- done
-					<-done
-
-				default:
-					t.Errorf("unexpected operation: %s", m)
-				}
-				return nil
-			},
-		},
-	}
-
-	var (
-		timerC = make(chan time.Time)
-	)
-	cleanup := timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
-		return timetest.Timer{Ch: timerC}
-	})
-	defer cleanup()
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
 
 	shiftTime, cleanup := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
 	defer cleanup()
 
-	idleThreshold := 4 * time.Second
+	var (
+		idleThreshold = 4 * time.Second
+		keepalive     = make(chan chan<- struct{})
+	)
 	p := &SessionPool{
-		SizeLimit:     2,
-		Builder:       client,
-		IdleThreshold: idleThreshold,
+		SizeLimit:         2,
+		IdleThreshold:     idleThreshold,
+		BusyCheckInterval: -1,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 2,
+			Handler: methodHandlers{
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					done := make(chan struct{})
+					keepalive <- done
+					<-done
+					return nil
+				},
+				testutil.TableDeleteSession: okHandler,
+			},
+		},
 	}
 
 	s1 := mustGetSession(t, p)
 	s2 := mustGetSession(t, p)
 
+	<-timer.Created
+
 	// Put s1 to a pull. Shift time that pool need to keepalive s1.
 	mustPutSession(t, p, s1)
 	shiftTime(idleThreshold)
-	timerC <- timeutil.Now()
+	timer.C <- timeutil.Now()
 
 	// Await for keepalive request came in.
 	var releaseKeepAlive chan<- struct{}
@@ -1111,9 +1054,10 @@ func newSession(t *testing.T, h methodHandlers) *Session {
 
 type StubBuilder struct {
 	OnCreateSession func(ctx context.Context) (*Session, error)
-	Handler         methodHandlers
-	Limit           int
-	T               *testing.T
+
+	Handler methodHandlers
+	Limit   int
+	T       *testing.T
 
 	mu     sync.Mutex
 	actual int
@@ -1134,7 +1078,22 @@ func (s *StubBuilder) CreateSession(ctx context.Context) (*Session, error) {
 		return f(ctx)
 	}
 
-	return newSession(s.T, s.Handler), nil
+	if s.Handler == nil || s.Handler[testutil.TableCreateSession] == nil {
+		return newSession(s.T, s.Handler), nil
+	}
+	var (
+		req Ydb_Table.CreateSessionRequest
+		res Ydb_Table.CreateSessionResult
+	)
+	err := s.Handler[testutil.TableCreateSession](&req, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	r := newSession(s.T, s.Handler)
+	r.ID = res.SessionId
+
+	return r, nil
 }
 
 func (p *SessionPool) debug() {
