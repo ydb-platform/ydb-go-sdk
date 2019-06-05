@@ -54,12 +54,18 @@ type SessionPool struct {
 	//IdleLimit int
 
 	// IdleThreshold is a maximum duration between any activity within session.
-	// If this threshold reached, KeepAlive() method will be called on idle session.
-	// If IdleThreshold is zero then there is no idle limit.
+	// If this threshold reached, KeepAlive() method will be called on idle
+	// session.
+	//
+	// If IdleThreshold is less than zero then there is no idle limit.
+	// If IdleThreshold is zero, then the DefaultSessionPoolIdleThreshold value
+	// is used.
 	IdleThreshold time.Duration
 
 	// BusyCheckInterval is an interval between busy sessions status checks.
-	// If BusyCheckInterval is less than or equal to zero, then the
+	// If BusyCheckInterval is less than zero then there busy checking is
+	// disabled.
+	// If BusyCheckInterval is equal to zero, then the
 	// DefaultSessionPoolBusyCheckInterval value is used.
 	BusyCheckInterval time.Duration
 
@@ -116,10 +122,17 @@ func (p *SessionPool) init() {
 			p.limit = DefaultSessionPoolSizeLimit
 		}
 
+		if p.IdleThreshold == 0 {
+			p.IdleThreshold = DefaultSessionPoolIdleThreshold
+		}
 		if p.IdleThreshold > 0 {
 			p.keeperStop = make(chan struct{})
 			p.keeperDone = make(chan struct{})
 			go p.keeper()
+		}
+
+		if p.BusyCheckInterval == 0 {
+			p.BusyCheckInterval = DefaultSessionPoolBusyCheckInterval
 		}
 		if p.BusyCheckInterval > 0 {
 			p.busyCheckerStop = make(chan struct{})
