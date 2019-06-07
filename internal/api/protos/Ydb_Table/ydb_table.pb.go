@@ -195,7 +195,7 @@ func (m *CreateSessionResponse) GetOperation() *Ydb_Operations.Operation {
 }
 
 type CreateSessionResult struct {
-	// Session identificator
+	// Session identifier
 	SessionId            string   `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -236,7 +236,7 @@ func (m *CreateSessionResult) GetSessionId() string {
 
 // Delete session with given id string
 type DeleteSessionRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId            string                          `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	OperationParams      *Ydb_Operations.OperationParams `protobuf:"bytes,2,opt,name=operation_params,json=operationParams,proto3" json:"operation_params,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                        `json:"-"`
@@ -1130,7 +1130,7 @@ func (m *ColumnMeta) GetType() *Ydb.Type {
 }
 
 type CreateTableRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Full path
 	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
@@ -1263,7 +1263,7 @@ func (m *CreateTableResponse) GetOperation() *Ydb_Operations.Operation {
 
 // Drop table with given path
 type DropTableRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Full path
 	Path                 string                          `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
@@ -1360,7 +1360,7 @@ func (m *DropTableResponse) GetOperation() *Ydb_Operations.Operation {
 
 // Alter table with given path
 type AlterTableRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Full path
 	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
@@ -1475,7 +1475,7 @@ func (m *AlterTableResponse) GetOperation() *Ydb_Operations.Operation {
 
 // Copy table with given path
 type CopyTableRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Copy from path
 	SourcePath string `protobuf:"bytes,2,opt,name=source_path,json=sourcePath,proto3" json:"source_path,omitempty"`
@@ -1640,7 +1640,7 @@ func (m *CopyTableItem) GetOmitIndexes() bool {
 // Creates consistent copy of given tables.
 type CopyTablesRequest struct {
 	OperationParams *Ydb_Operations.OperationParams `protobuf:"bytes,1,opt,name=operation_params,json=operationParams,proto3" json:"operation_params,omitempty"`
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Source and destination paths which describe copies
 	Tables               []*CopyTableItem `protobuf:"bytes,3,rep,name=tables,proto3" json:"tables,omitempty"`
@@ -1736,7 +1736,7 @@ func (m *CopyTablesResponse) GetOperation() *Ydb_Operations.Operation {
 
 // Describe table with given path
 type DescribeTableRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Full path
 	Path            string                          `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
@@ -2527,7 +2527,7 @@ func (m *QueryCachePolicy) GetKeepInCache() bool {
 }
 
 type ExecuteDataQueryRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string              `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	TxControl *TransactionControl `protobuf:"bytes,2,opt,name=tx_control,json=txControl,proto3" json:"tx_control,omitempty"`
 	Query     *Query              `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
@@ -2655,7 +2655,7 @@ func (m *ExecuteDataQueryResponse) GetOperation() *Ydb_Operations.Operation {
 }
 
 type ExecuteSchemeQueryRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// SQL text
 	YqlText              string                          `protobuf:"bytes,2,opt,name=yql_text,json=yqlText,proto3" json:"yql_text,omitempty"`
@@ -2752,7 +2752,7 @@ func (m *ExecuteSchemeQueryResponse) GetOperation() *Ydb_Operations.Operation {
 
 // Holds transaction id
 type TransactionMeta struct {
-	// Transaction identificator
+	// Transaction identifier
 	Id                   string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -2793,7 +2793,7 @@ func (m *TransactionMeta) GetId() string {
 
 // Holds query id and type of parameters
 type QueryMeta struct {
-	// Query identificator
+	// Query identifier
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Type of parameters
 	ParametersTypes      map[string]*Ydb.Type `protobuf:"bytes,2,rep,name=parameters_types,json=parametersTypes,proto3" json:"parameters_types,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
@@ -2845,9 +2845,9 @@ func (m *QueryMeta) GetParametersTypes() map[string]*Ydb.Type {
 type ExecuteQueryResult struct {
 	// Result rets (for each table)
 	ResultSets []*Ydb.ResultSet `protobuf:"bytes,1,rep,name=result_sets,json=resultSets,proto3" json:"result_sets,omitempty"`
-	// Transaction metainformation
+	// Transaction metadata
 	TxMeta *TransactionMeta `protobuf:"bytes,2,opt,name=tx_meta,json=txMeta,proto3" json:"tx_meta,omitempty"`
-	// Query metainformation
+	// Query metadata
 	QueryMeta *QueryMeta `protobuf:"bytes,3,opt,name=query_meta,json=queryMeta,proto3" json:"query_meta,omitempty"`
 	// Query execution statistics
 	QueryStats           *Ydb_TableStats.QueryStats `protobuf:"bytes,4,opt,name=query_stats,json=queryStats,proto3" json:"query_stats,omitempty"`
@@ -2911,7 +2911,7 @@ func (m *ExecuteQueryResult) GetQueryStats() *Ydb_TableStats.QueryStats {
 
 // Explain data query
 type ExplainDataQueryRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// SQL text to explain
 	YqlText              string                          `protobuf:"bytes,2,opt,name=yql_text,json=yqlText,proto3" json:"yql_text,omitempty"`
@@ -3056,7 +3056,7 @@ func (m *ExplainQueryResult) GetQueryPlan() string {
 
 // Prepare given program to execute
 type PrepareDataQueryRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// SQL text
 	YqlText              string                          `protobuf:"bytes,2,opt,name=yql_text,json=yqlText,proto3" json:"yql_text,omitempty"`
@@ -3203,7 +3203,7 @@ func (m *PrepareQueryResult) GetParametersTypes() map[string]*Ydb.Type {
 
 // Keep session alive
 type KeepAliveRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId            string                          `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	OperationParams      *Ydb_Operations.OperationParams `protobuf:"bytes,2,opt,name=operation_params,json=operationParams,proto3" json:"operation_params,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                        `json:"-"`
@@ -3330,7 +3330,7 @@ func (m *KeepAliveResult) GetSessionStatus() KeepAliveResult_SessionStatus {
 
 // Begin transaction on given session with given settings
 type BeginTransactionRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId            string                          `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	TxSettings           *TransactionSettings            `protobuf:"bytes,2,opt,name=tx_settings,json=txSettings,proto3" json:"tx_settings,omitempty"`
 	OperationParams      *Ydb_Operations.OperationParams `protobuf:"bytes,3,opt,name=operation_params,json=operationParams,proto3" json:"operation_params,omitempty"`
@@ -3466,9 +3466,9 @@ func (m *BeginTransactionResult) GetTxMeta() *TransactionMeta {
 
 // Commit transaction with given session and tx id
 type CommitTransactionRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	// Transaction identificator
+	// Transaction identifier
 	TxId                 string                          `protobuf:"bytes,2,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 	OperationParams      *Ydb_Operations.OperationParams `protobuf:"bytes,3,opt,name=operation_params,json=operationParams,proto3" json:"operation_params,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                        `json:"-"`
@@ -3563,9 +3563,9 @@ func (m *CommitTransactionResponse) GetOperation() *Ydb_Operations.Operation {
 
 // Rollback transaction with given session and tx id
 type RollbackTransactionRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	// Transaction identificator
+	// Transaction identifier
 	TxId                 string                          `protobuf:"bytes,2,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 	OperationParams      *Ydb_Operations.OperationParams `protobuf:"bytes,3,opt,name=operation_params,json=operationParams,proto3" json:"operation_params,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                        `json:"-"`
@@ -4492,7 +4492,7 @@ func _KeyRange_OneofSizer(msg proto.Message) (n int) {
 
 // Request to read table (without SQL)
 type ReadTableRequest struct {
-	// Session identificator
+	// Session identifier
 	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	// Path to table to read
 	Path string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
