@@ -26,6 +26,10 @@ var (
 	// ErrSessionPoolOverflow is returned by a SessionPool instance to indicate
 	// that the pool is full and requested operation is not able to complete.
 	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
+
+	// ErrSessionPoolOverflow is returned by a SessionPool instance to indicate
+	// that requested session does not exist within the pool.
+	ErrUnkownSession = errors.New("ydb: table: unknown session")
 )
 
 // SessionBuilder is the interface that holds logic of creating or deleting
@@ -158,12 +162,22 @@ func (p *SessionPool) create(ctx context.Context) (s *Session, err error) {
 		p.index[s] = sessionInfo{}
 		s.OnClose(func() {
 			p.mu.Lock()
-			_, has := p.index[s]
-			if !p.closed && has {
-				delete(p.index, s)
-				p.notify(nil)
+			defer p.mu.Unlock()
+
+			info, has := p.index[s]
+			if p.closed || !has {
+				return
 			}
-			p.mu.Unlock()
+
+			delete(p.index, s)
+			p.notify(nil)
+
+			if info.idle != nil {
+				panic("ydb: table: session closed while still in idle pool")
+			}
+			if info.ready != nil {
+				p.ready.Remove(info.ready)
+			}
 		})
 	}
 	p.mu.Unlock()
@@ -296,7 +310,7 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 
 	default:
 		if !p.notify(s) {
-			p.pushBack(s, timeutil.Now())
+			p.pushIdle(s, timeutil.Now())
 		}
 	}
 	p.mu.Unlock()
@@ -376,7 +390,8 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 		p.mu.Unlock()
 		return false, ErrSessionPoolClosed
 	}
-	for took = p.takeIdle(s); !took && p.touching; took = p.takeIdle(s) {
+	var has bool
+	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
 
@@ -392,7 +407,11 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 	}
 	p.mu.Unlock()
 
-	return took, nil
+	if !has {
+		err = ErrUnkownSession
+	}
+
+	return took, err
 }
 
 // Create creates new session and returns it.
@@ -536,8 +555,8 @@ func (p *SessionPool) busyChecker() {
 				if reuse {
 					p.index[s] = sessionInfo{}
 					if !p.notify(s) {
-						p.pushBack(s, timeutil.Now())
-						p.ready.PushBack(s)
+						p.pushIdle(s, timeutil.Now())
+						p.pushReady(s)
 					}
 				}
 				p.mu.Unlock()
@@ -624,7 +643,7 @@ func (p *SessionPool) keeper() {
 				// then may interrupt next keep alive iteration earlier and
 				// prevent our session S0 being touched:
 				// time.Since(S1) < threshold but time.Since(S0) > threshold.
-				mark = p.pushBackInOrderAfter(s, now, mark)
+				mark = p.pushIdleInOrderAfter(s, now, mark)
 			}
 			p.mu.Unlock()
 		}
@@ -787,31 +806,47 @@ func (p *SessionPool) removeIdle(s *Session) {
 
 	p.idle.Remove(info.idle)
 	info.idle = nil
-
 	p.index[s] = info
 }
 
 // p.mu must be held.
-func (p *SessionPool) takeIdle(s *Session) (ok bool) {
-	info, has := p.index[s]
+func (p *SessionPool) takeIdle(s *Session) (has, took bool) {
+	var info sessionInfo
+	info, has = p.index[s]
 	if !has {
-		panic("ydb: table: unknown session")
+		// Could not be strict here and panic – session may become deleted by
+		// keeper().
+		return
 	}
 	if info.idle == nil {
 		// Session s is not idle.
-		return false
+		return
 	}
+	took = true
 	p.removeIdle(s)
-	return true
+	return
 }
 
 // p.mu must be held.
-func (p *SessionPool) pushBack(s *Session, now time.Time) {
+func (p *SessionPool) pushIdle(s *Session, now time.Time) {
 	p.handlePush(s, now, p.idle.PushBack(s))
 }
 
 // p.mu must be held.
-func (p *SessionPool) pushBackInOrder(s *Session, now time.Time) (el *list.Element) {
+func (p *SessionPool) pushReady(s *Session) {
+	info, has := p.index[s]
+	if !has {
+		panic("ydb: table: trying to store session created outside of the pool")
+	}
+	if info.ready != nil {
+		panic("ydb: table: inconsistent session pool index")
+	}
+	info.ready = p.ready.PushBack(s)
+	p.index[s] = info
+}
+
+// p.mu must be held.
+func (p *SessionPool) pushIdleInOrder(s *Session, now time.Time) (el *list.Element) {
 	var prev *list.Element
 	for prev = p.idle.Back(); prev != nil; prev = prev.Prev() {
 		s := prev.Value.(*Session)
@@ -830,7 +865,7 @@ func (p *SessionPool) pushBackInOrder(s *Session, now time.Time) (el *list.Eleme
 }
 
 // p.mu must be held.
-func (p *SessionPool) pushBackInOrderAfter(s *Session, now time.Time, mark *list.Element) *list.Element {
+func (p *SessionPool) pushIdleInOrderAfter(s *Session, now time.Time, mark *list.Element) *list.Element {
 	if mark != nil {
 		n := p.idle.Len()
 		el := p.idle.InsertAfter(s, mark)
@@ -840,7 +875,7 @@ func (p *SessionPool) pushBackInOrderAfter(s *Session, now time.Time, mark *list
 			return el
 		}
 	}
-	return p.pushBackInOrder(s, now)
+	return p.pushIdleInOrder(s, now)
 }
 
 // p.mu must be held.
@@ -1018,5 +1053,6 @@ func (p *SessionPool) traceCloseDone(ctx context.Context, err error) {
 
 type sessionInfo struct {
 	idle    *list.Element
+	ready   *list.Element
 	touched time.Time
 }
