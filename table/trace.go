@@ -356,6 +356,7 @@ type (
 	SessionPoolBusyCheckDoneInfo struct {
 		Context context.Context
 		Session *Session
+		Reused  bool
 		Error   error
 	}
 	SessionPoolTakeStartInfo struct {

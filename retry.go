@@ -39,7 +39,7 @@ const (
 	RetryDeleteSession
 )
 
-func (m RetryMode) Retriable() bool         { return m != 0 }
+func (m RetryMode) Retriable() bool         { return m&RetryAvailable != 0 }
 func (m RetryMode) MustDeleteSession() bool { return m&RetryDeleteSession != 0 }
 func (m RetryMode) MustBackoff() bool       { return m&RetryBackoff != 0 }
 

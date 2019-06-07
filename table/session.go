@@ -504,12 +504,21 @@ func (p *SessionPool) busyChecker() {
 			active = false
 
 		case s := <-p.busyCheck:
+			p.traceBusyCheckStart(ctx, s)
+
+			if len(toCheck) == p.limit {
+				// Do not check more sessions than pool's capacity.
+				p.closeSession(ctx, s)
+				p.traceBusyCheckDone(ctx, s, false, nil)
+				continue
+			}
+
 			toCheck = append(toCheck, s)
 			if !active {
 				active = true
 				timer.Reset(p.BusyCheckInterval)
 			}
-			p.traceBusyCheckStart(ctx, s)
+
 			continue
 		}
 		for i := 0; i < len(toCheck); {
@@ -520,8 +529,6 @@ func (p *SessionPool) busyChecker() {
 				toCheck[i] = toCheck[n-1]
 				toCheck[n-1] = nil
 				toCheck = toCheck[:n-1]
-
-				p.traceBusyCheckDone(ctx, s, err)
 
 				p.mu.Lock()
 				enoughSpace := !p.closed && len(p.index) < p.limit
@@ -537,6 +544,8 @@ func (p *SessionPool) busyChecker() {
 				if !reuse {
 					p.closeSession(ctx, s)
 				}
+
+				p.traceBusyCheckDone(ctx, s, reuse, err)
 			} else {
 				i++
 			}
@@ -919,10 +928,11 @@ func (p *SessionPool) traceBusyCheckStart(ctx context.Context, s *Session) {
 		b(x)
 	}
 }
-func (p *SessionPool) traceBusyCheckDone(ctx context.Context, s *Session, err error) {
+func (p *SessionPool) traceBusyCheckDone(ctx context.Context, s *Session, reused bool, err error) {
 	x := SessionPoolBusyCheckDoneInfo{
 		Context: ctx,
 		Session: s,
+		Reused:  reused,
 		Error:   err,
 	}
 	if a := p.Trace.BusyCheckDone; a != nil {

@@ -81,7 +81,7 @@ var codeToString = map[MethodCode]string{
 	TableStreamReadTable:      lastSegment(Ydb_Table_V1.StreamReadTable),
 }
 
-func setField(name string, dst interface{}, value interface{}) {
+func setField(name string, dst, value interface{}) {
 	x := reflect.ValueOf(dst).Elem()
 	t := x.Type()
 	f, ok := t.FieldByName(name)
@@ -101,6 +101,45 @@ func setField(name string, dst interface{}, value interface{}) {
 	x.FieldByName(f.Name).Set(v)
 }
 
+func getField(name string, src, dst interface{}) bool {
+	var fn func(x reflect.Value, seg ...string) bool
+	fn = func(x reflect.Value, seg ...string) bool {
+		if x.Kind() == reflect.Ptr {
+			x = x.Elem()
+		}
+		t := x.Type()
+		f, ok := t.FieldByName(seg[0])
+		if !ok {
+			return false
+		}
+		fv := x.FieldByName(seg[0])
+		if fv.Kind() == reflect.Ptr && fv.IsNil() {
+			return false
+		}
+		if len(seg) > 1 {
+			return fn(fv.Elem(), seg[1:]...)
+		}
+
+		v := reflect.ValueOf(dst)
+		if v.Type().Kind() != reflect.Ptr {
+			panic(fmt.Sprintf(
+				"ydb/testutil: destination value must be a pointer",
+			))
+		}
+		if v.Type().Elem().Kind() != fv.Type().Kind() {
+			panic(fmt.Sprintf(
+				"ydb/testutil: struct %s field %q is type of %s, not %s",
+				t, name, f.Type, v.Type(),
+			))
+		}
+
+		v.Elem().Set(fv)
+
+		return true
+	}
+	return fn(reflect.ValueOf(src).Elem(), strings.Split(name, ".")...)
+}
+
 type TableCreateSessionResult struct {
 	R interface{}
 }
@@ -113,8 +152,48 @@ type TableKeepAliveResult struct {
 	R interface{}
 }
 
-func (t TableKeepAliveResult) SetSessionStatus(s Ydb_Table.KeepAliveResult_SessionStatus) {
-	setField("SessionStatus", t.R, s)
+func (t TableKeepAliveResult) SetSessionStatus(ready bool) {
+	var status Ydb_Table.KeepAliveResult_SessionStatus
+	if ready {
+		status = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY
+	} else {
+		status = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY
+	}
+	setField("SessionStatus", t.R, status)
+}
+
+type TableBeginTransactionResult struct {
+	R interface{}
+}
+
+func (t TableBeginTransactionResult) SetTransactionID(id string) {
+	setField("TxMeta", t.R, &Ydb_Table.TransactionMeta{
+		Id: id,
+	})
+}
+
+type TableExecuteDataQueryResult struct {
+	R interface{}
+}
+
+func (t TableExecuteDataQueryResult) SetTransactionID(id string) {
+	setField("TxMeta", t.R, &Ydb_Table.TransactionMeta{
+		Id: id,
+	})
+}
+
+type TableExecuteDataQueryRequest struct {
+	R interface{}
+}
+
+func (t TableExecuteDataQueryRequest) SessionID() (id string) {
+	getField("SessionId", t.R, &id)
+	return
+}
+
+func (t TableExecuteDataQueryRequest) TransactionID() (id string, ok bool) {
+	ok = getField("TxControl.TxSelector.TxId", t.R, &id)
+	return
 }
 
 type Driver struct {

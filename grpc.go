@@ -45,9 +45,9 @@ type TransportError struct {
 }
 
 func (t *TransportError) Error() string {
-	s := "transport error: " + t.Reason.String()
+	s := "ydb: transport error: " + t.Reason.String()
 	if t.message != "" {
-		s += ": [" + t.message + "]"
+		s += ": " + t.message
 	}
 	return s
 }
@@ -78,7 +78,7 @@ func (e *OpError) Error() string {
 		return e.Reason.String()
 	}
 	var buf bytes.Buffer
-	buf.WriteString("operation error: ")
+	buf.WriteString("ydb: operation error: ")
 	buf.WriteString(e.Reason.String())
 	if len(e.issues) > 0 {
 		buf.WriteByte(':')

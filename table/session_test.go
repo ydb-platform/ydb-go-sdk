@@ -32,13 +32,14 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 				testutil.TableKeepAlive: func(req, res interface{}) error {
 					keepalive <- struct{}{}
 					r := testutil.TableKeepAliveResult{res}
-					r.SetSessionStatus(Ydb_Table.KeepAliveResult_SESSION_STATUS_READY)
+					r.SetSessionStatus(true)
 					return nil
 				},
 				testutil.TableDeleteSession: okHandler,
 			},
 		},
 	}
+	defer p.Close(context.Background())
 
 	s1 := mustCreateSession(t, p)
 
@@ -78,13 +79,14 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 				testutil.TableKeepAlive: func(req, res interface{}) error {
 					keepalive <- struct{}{}
 					r := testutil.TableKeepAliveResult{res}
-					r.SetSessionStatus(Ydb_Table.KeepAliveResult_SESSION_STATUS_READY)
+					r.SetSessionStatus(true)
 					return nil
 				},
 				testutil.TableDeleteSession: okHandler,
 			},
 		},
 	}
+	defer p.Close(context.Background())
 
 	closed := make(chan struct{})
 	s1 := mustGetSession(t, p)
@@ -135,20 +137,15 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 					keepalive <- ch
 					ready := <-ch
 
-					var status Ydb_Table.KeepAliveResult_SessionStatus
-					if ready {
-						status = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY
-					} else {
-						status = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY
-					}
 					r := testutil.TableKeepAliveResult{res}
-					r.SetSessionStatus(status)
+					r.SetSessionStatus(ready)
 
 					return nil
 				},
 			},
 		},
 	}
+	defer p.Close(context.Background())
 
 	s1 := mustGetSession(t, p)
 	p.PutBusy(context.Background(), s1)
@@ -218,9 +215,11 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 					keepalive <- struct{}{}
 					return nil
 				},
+				testutil.TableDeleteSession: okHandler,
 			},
 		},
 	}
+	defer p.Close(context.Background())
 
 	s := mustGetSession(t, p)
 
@@ -243,6 +242,7 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 	shiftTime(p.IdleThreshold)
 	timer.C <- timeutil.Now()
 	<-keepalive
+	<-timer.Reset
 }
 
 func TestSessionPoolCloseWhenWaiting(t *testing.T) {
@@ -267,6 +267,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 					Limit: 1,
 				},
 			}
+			defer p.Close(context.Background())
 
 			mustGetSession(t, p)
 
@@ -335,6 +336,7 @@ func TestSessionPoolClose(t *testing.T) {
 			Limit: 3,
 		},
 	}
+	defer p.Close(context.Background())
 
 	s1 := mustGetSession(t, p)
 	s2 := mustGetSession(t, p)
@@ -400,6 +402,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 					Limit: 2,
 				},
 			}
+			defer p.Close(context.Background())
 			s := mustGetSession(t, p)
 			var (
 				get  = make(chan struct{})
@@ -458,7 +461,9 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	}
 	create := make(chan createReq)
 	p := &SessionPool{
-		SizeLimit: 1,
+		SizeLimit:         1,
+		IdleThreshold:     -1,
+		BusyCheckInterval: -1,
 		Builder: &StubBuilder{
 			Limit: 2,
 			OnCreateSession: func(ctx context.Context) (*Session, error) {
@@ -523,6 +528,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	const timeout = time.Second
 	select {
 	case <-deleted:
+		<-done
 	case <-time.After(timeout):
 		t.Fatalf("no session delete after %s", timeout)
 	}
@@ -530,12 +536,15 @@ func TestSessionPoolRacyGet(t *testing.T) {
 
 func TestSessionPoolPutInFull(t *testing.T) {
 	p := &SessionPool{
-		SizeLimit: 1,
+		SizeLimit:         1,
+		IdleThreshold:     -1,
+		BusyCheckInterval: -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
 		},
 	}
+
 	s := mustGetSession(t, p)
 	p.Put(context.Background(), s)
 
@@ -573,6 +582,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 					Limit: 1,
 				},
 			}
+			defer p.Close(context.Background())
 			s := mustGetSession(t, p)
 			{
 				ctx, cancel := context.WithCancel(context.Background())
@@ -642,17 +652,14 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 // TestSessionPoolGetDisconnected tests case when session successfully created,
 // but after that connection become broken and cant be reestablished.
 func TestSessionPoolGetDisconnected(t *testing.T) {
-	timerCh := make(chan time.Time)
-	cleanupTimer := timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
-		return timetest.Timer{Ch: timerCh}
-	})
-	defer cleanupTimer()
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
 
 	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
 	defer cleanupNow()
 
 	var (
-		connected = make(chan struct{})
+		release   = make(chan struct{})
 		keepalive = make(chan struct{})
 	)
 	p := &SessionPool{
@@ -666,22 +673,25 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 				testutil.TableKeepAlive: func(req, res interface{}) error {
 					keepalive <- struct{}{}
 					// Here we emulating blocked connection initialization.
-					<-connected
+					<-release
 					return nil
 				},
 				testutil.TableDeleteSession: okHandler,
 			},
 		},
 	}
+	defer p.Close(context.Background())
 
 	touched := p.touchCond()
 
 	s := mustGetSession(t, p)
 	mustPutSession(t, p, s)
 
+	<-timer.Created
+
 	// Trigger next KeepAlive iteration.
 	shiftTime(p.IdleThreshold)
-	timerCh <- timeutil.Now()
+	timer.C <- timeutil.Now()
 	<-keepalive
 
 	// Here we are in touching state. That is, there are no session in the pool
@@ -700,15 +710,16 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 	}
 
 	// Release session s – connection established.
-	connected <- struct{}{}
+	release <- struct{}{}
 	<-touched // Wait until first keep alive loop finished.
 
 	mustTakeSession(t, p, s)
 	mustPutSession(t, p, s)
+	<-timer.Reset
 
 	// Trigger next KeepAlive iteration.
 	shiftTime(p.IdleThreshold)
-	timerCh <- timeutil.Now()
+	timer.C <- timeutil.Now()
 	<-keepalive
 
 	ctx2, cancel := context.WithCancel(context.Background())
@@ -721,6 +732,10 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 	if took {
 		t.Fatalf("unexpected take over session")
 	}
+
+	// Release session s to not block on defer p.Close().
+	release <- struct{}{}
+	<-timer.Reset
 }
 
 func TestSessionPoolGetPut(t *testing.T) {
@@ -759,6 +774,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 			},
 		},
 	}
+	defer p.Close(context.Background())
 
 	s := mustGetSession(t, p)
 	assertCreated(1)
@@ -830,6 +846,7 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 			},
 		},
 	}
+	defer p.Close(context.Background())
 
 	s1 := mustGetSession(t, p)
 	s2 := mustGetSession(t, p)
@@ -899,6 +916,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 			},
 		},
 	}
+	defer p.Close(context.Background())
 
 	s1 := mustGetSession(t, p)
 	s2 := mustGetSession(t, p)
@@ -931,6 +949,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 	close(releaseKeepAlive)
 	// Wait for touching routine exits.
 	<-touchDone
+	<-timer.Reset
 
 	if x1 := mustGetSession(t, p); x1 != s1 {
 		t.Errorf("reordering of sessions did not occur")
@@ -939,7 +958,9 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 
 func TestSessionPoolDoublePut(t *testing.T) {
 	p := &SessionPool{
-		SizeLimit: 2, // Skip panic on full pool.
+		SizeLimit:         2, // Skip panic on full pool.
+		IdleThreshold:     -1,
+		BusyCheckInterval: -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,

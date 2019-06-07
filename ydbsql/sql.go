@@ -32,11 +32,11 @@ type conn struct {
 	idle bool
 	busy bool
 
-	retry   *retryer
-	session *table.Session
-	pool    *table.SessionPool
-	tx      *table.Transaction
-	txc     *table.TransactionControl
+	retryConfig *RetryConfig
+	session     *table.Session
+	pool        *table.SessionPool
+	tx          *table.Transaction
+	txc         *table.TransactionControl
 }
 
 func (c *conn) takeSession(ctx context.Context) bool {
@@ -51,6 +51,9 @@ func (c *conn) takeSession(ctx context.Context) bool {
 }
 
 func (c *conn) putSession(ctx context.Context) {
+	if c.idle {
+		return
+	}
 	err := c.pool.Put(ctx, c.session)
 	if err != nil {
 		panic(fmt.Sprintf("ydbsql: put session error: %v", err))
@@ -73,6 +76,9 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	}
 	s, err := c.session.Prepare(ctx, query)
 	if err != nil {
+		if ydb.IsBusyAfter(err) {
+			c.busy = true
+		}
 		return nil, mapBadSessionError(err)
 	}
 	return &stmt{
@@ -123,6 +129,9 @@ func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx
 	}
 	c.tx, err = c.session.BeginTransaction(ctx, table.TxSettings(isolation))
 	if err != nil {
+		if ydb.IsBusyAfter(err) {
+			c.busy = true
+		}
 		return nil, mapBadSessionError(err)
 	}
 	c.txc = table.TxControl(table.WithTx(c.tx))
@@ -264,7 +273,7 @@ func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec
 		//
 		// NOTE: we do not retrying not found errors here. That is, not found
 		// prepared statements are immediately break retry a loop.
-		err = c.retry.do(ctx, func(ctx context.Context) (e error) {
+		err = retry(ctx, c.retryConfig, func(ctx context.Context) (e error) {
 			_, res, e = exec.do(ctx, tx, c.session, params)
 			return e
 		})
@@ -289,6 +298,9 @@ type TxOperationFunc func(context.Context, *sql.Tx) error
 type TxDoer struct {
 	DB      *sql.DB
 	Options *sql.TxOptions
+
+	// RetryConfig allows to override retry parameters from DB.
+	RetryConfig *RetryConfig
 }
 
 // Do starts a transaction and calls f with it. If f() call returns a retryable
@@ -313,19 +325,48 @@ type TxDoer struct {
 //       }
 //       return rows.Err()
 //   }))
-func (td TxDoer) Do(ctx context.Context, f TxOperationFunc) error {
-	d := td.DB.Driver().(*Driver)
-	return d.c.retry.do(ctx, func(ctx context.Context) error {
-		tx, err := td.DB.BeginTx(ctx, td.Options)
-		if err != nil {
+func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
+	rc := d.RetryConfig
+	if rc == nil {
+		driver := d.DB.Driver().(*Driver)
+		rc = &driver.c.retryConfig
+	}
+	for i := 0; i <= rc.MaxRetries; i++ {
+		if err = d.do(ctx, f); err == nil {
+			return
+		}
+		if err == driver.ErrBadConn {
+			// ErrBadConn returned by us to indicate that conn's underlying
+			// session must be closed. Thus we could retry whole transaction.
+			continue
+		}
+		// NOTE: not checking ydb.IsBusyAfter() here because it is checked
+		// inside conn.exec() method.
+		m := rc.RetryChecker.Check(err)
+		if !m.Retriable() {
 			return err
 		}
-		defer tx.Rollback()
-		if err := f(ctx, tx); err != nil {
-			return err
+		if m.MustBackoff() {
+			if e := ydb.WaitBackoff(ctx, rc.Backoff, i); e != nil {
+				// Return original error to make it possible to lay on for the
+				// client.
+				return err
+			}
 		}
-		return tx.Commit()
-	})
+	}
+	return
+}
+
+func (d TxDoer) do(ctx context.Context, f TxOperationFunc) error {
+	tx, err := d.DB.BeginTx(ctx, d.Options)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := f(ctx, tx); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // DoTx is a shortcut for calling Do(ctx, f) on initialized TxDoer with DB

@@ -77,6 +77,8 @@ is just a shortcut) for this purpose:
 Note that database/sql package reuses sql.Conn instances which are wrappers
 around ydb/table.Session instances in case of ydbsql. It could be reasonable to
 increase the number of reused sessions via database/sql.DB.SetMaxIdleConns()
-and database/sql.DB.SetMaxOpenConns() calls.
+and database/sql.DB.SetMaxOpenConns() calls. If doing so, it is also highly
+recommended to setup inner session pool's size limit to the same value by
+passing WithSessionPoolSizeLimit() option to the Connector() function.
 */
 package ydbsql

@@ -12,11 +12,18 @@ import (
 
 var (
 	DefaultIdleThreshold        = 5 * time.Second
-	DefaultSessionPoolSizeLimit = 1 << 16
+	DefaultSessionPoolSizeLimit = 1 << 12
 )
 
 type ConnectorOption func(*connector)
 
+func WithDialer(d ydb.Dialer) ConnectorOption {
+	return func(c *connector) {
+		c.dialer = d
+	}
+}
+
+// NOTE: must be called after all other options.
 func WithClient(client *table.Client) ConnectorOption {
 	return func(c *connector) {
 		c.prepare(func(_ context.Context) (*table.Client, error) {
@@ -76,20 +83,14 @@ func WithSessionPoolBusyCheckInterval(d time.Duration) ConnectorOption {
 func WithMaxRetries(n int) ConnectorOption {
 	return func(c *connector) {
 		if n >= 0 {
-			c.retry.MaxRetries = n
+			c.retryConfig.MaxRetries = n
 		}
-	}
-}
-
-func WithRetryChecker(r ydb.RetryChecker) ConnectorOption {
-	return func(c *connector) {
-		c.retry.RetryChecker = r
 	}
 }
 
 func WithRetryBackoff(b ydb.Backoff) ConnectorOption {
 	return func(c *connector) {
-		c.retry.Backoff = b
+		c.retryConfig.Backoff = b
 	}
 }
 
@@ -98,7 +99,7 @@ func Connector(opts ...ConnectorOption) driver.Connector {
 		dialer: ydb.Dialer{
 			DriverConfig: new(ydb.DriverConfig),
 		},
-		retry: retryer{
+		retryConfig: RetryConfig{
 			MaxRetries: ydb.DefaultMaxRetries,
 			Backoff:    ydb.DefaultBackoff,
 			RetryChecker: ydb.RetryChecker{
@@ -131,7 +132,7 @@ type connector struct {
 	client *table.Client
 	pool   table.SessionPool // Used as a template for created connections.
 
-	retry retryer
+	retryConfig RetryConfig
 }
 
 func (c *connector) init(ctx context.Context) error {
@@ -192,9 +193,9 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, err
 	}
 	return &conn{
-		session: s,
-		pool:    &c.pool,
-		retry:   &c.retry,
+		session:     s,
+		pool:        &c.pool,
+		retryConfig: &c.retryConfig,
 	}, nil
 }
 
