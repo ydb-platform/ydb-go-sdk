@@ -20,6 +20,17 @@ const (
 	SessionBusy
 )
 
+func (s SessionStatus) String() string {
+	switch s {
+	case SessionReady:
+		return "ready"
+	case SessionBusy:
+		return "busy"
+	default:
+		return "unknown"
+	}
+}
+
 type SessionInfo struct {
 	Status SessionStatus
 }
