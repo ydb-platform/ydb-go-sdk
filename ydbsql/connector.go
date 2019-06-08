@@ -80,6 +80,12 @@ func WithSessionPoolBusyCheckInterval(d time.Duration) ConnectorOption {
 	}
 }
 
+func WithSessionPoolSizeLimit(n int) ConnectorOption {
+	return func(c *connector) {
+		c.pool.SizeLimit = n
+	}
+}
+
 func WithMaxRetries(n int) ConnectorOption {
 	return func(c *connector) {
 		if n >= 0 {
