@@ -27,9 +27,13 @@ var (
 	// that the pool is full and requested operation is not able to complete.
 	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
 
-	// ErrSessionPoolOverflow is returned by a SessionPool instance to indicate
-	// that requested session does not exist within the pool.
-	ErrUnkownSession = errors.New("ydb: table: unknown session")
+	// ErrUnknownSession is returned by a SessionPool instance to indicate that
+	// requested session does not exist within the pool.
+	ErrSessionUnknown = errors.New("ydb: table: unknown session")
+
+	// ErrNoProgress is returned by a SessionPool instance to indicate that
+	// operation could not be completed.
+	ErrNoProgress = errors.New("ydb: table: no progress")
 )
 
 // SessionBuilder is the interface that holds logic of creating or deleting
@@ -150,7 +154,7 @@ func (p *SessionPool) init() {
 }
 
 // p.mu must NOT be held.
-func (p *SessionPool) create(ctx context.Context) (s *Session, err error) {
+func (p *SessionPool) createSession(ctx context.Context) (s *Session, err error) {
 	s, err = p.Builder.CreateSession(ctx)
 	if err != nil {
 		return
@@ -228,7 +232,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			// Put() implementation.
 			p.mu.Unlock()
 
-			s, err = p.create(ctx)
+			s, err = p.createSession(ctx)
 			if err == ErrSessionPoolOverflow {
 				err = nil
 			}
@@ -281,6 +285,9 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		}
 		p.traceWaitDone(ctx, s, err)
 	}
+	if s == nil && err == nil {
+		err = ErrNoProgress
+	}
 
 	return s, err
 }
@@ -306,7 +313,7 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 		err = ErrSessionPoolClosed
 
 	case p.idle.Len() >= p.limit:
-		panic("ydb: table: Put() on full session pool")
+		panicLocked(&p.mu, "ydb: table: Put() on full session pool")
 
 	default:
 		if !p.notify(s) {
@@ -337,15 +344,15 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 		p.mu.Unlock()
 		return ErrSessionPoolClosed
 	}
-	if p.busyCheck == nil {
-		panic("ydb: table: PutBusy() session into the pool without busy checker")
-	}
 	info, has := p.index[s]
 	if !has {
-		panic("ydb: table: PutBusy() unknown session")
+		panicLocked(&p.mu, "ydb: table: PutBusy() unknown session")
 	}
 	if info.idle != nil {
-		panic("ydb: table: PutBusy() idle session")
+		panicLocked(&p.mu, "ydb: table: PutBusy() idle session")
+	}
+	if p.busyCheck == nil {
+		panicLocked(&p.mu, "ydb: table: PutBusy() session into the pool without busy checker")
 	}
 	delete(p.index, s)
 	p.notify(nil)
@@ -408,7 +415,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 	p.mu.Unlock()
 
 	if !has {
-		err = ErrUnkownSession
+		err = ErrSessionUnknown
 	}
 
 	return took, err
@@ -419,29 +426,46 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 	p.init()
 
-	p.mu.Lock()
-	if p.ready.Len() > 0 {
-		s = p.ready.Remove(p.ready.Front()).(*Session)
-	}
-	p.mu.Unlock()
-
-	if s == nil {
-		return p.create(ctx)
-	}
-
-	took, err := p.Take(ctx, s)
-	if err != nil {
+	const maxAttempts = 10
+	for i := 0; s == nil && err == nil && i < maxAttempts; i++ {
 		p.mu.Lock()
-		if !p.closed {
-			p.ready.PushBack(s)
+		if p.ready.Len() > 0 {
+			s = p.ready.Remove(p.ready.Front()).(*Session)
+			// NOTE: here is a race condition with keeper() running.
+			// Session could be deleted by some reason after we released the mutex.
+			// We are not dealing with this because even if session is not deleted
+			// by keeper() it could be staled on the server and the same user
+			// expirience will appear.
 		}
 		p.mu.Unlock()
-		return nil, err
+
+		if s == nil {
+			return p.createSession(ctx)
+		}
+
+		took, err := p.Take(ctx, s)
+		if err == ErrSessionUnknown {
+			// Race described above occured – retry.
+			s = nil
+			err = nil
+			continue
+		}
+		if err != nil {
+			p.mu.Lock()
+			if !p.closed {
+				p.ready.PushBack(s)
+			}
+			p.mu.Unlock()
+			return nil, err
+		}
+		if !took {
+			panic("ydb: table: inconsistent session pool usage")
+		}
+
+		return s, nil
 	}
-	if !took {
-		panic("ydb: table: inconsistent session pool usage")
-	}
-	return s, nil
+
+	return nil, ErrNoProgress
 }
 
 // Close deletes all stored sessions inside SessionPool.
@@ -725,7 +749,7 @@ func (p *SessionPool) peekFirstIdle() (s *Session, touched time.Time) {
 	s = el.Value.(*Session)
 	info, has := p.index[s]
 	if !has || el != info.idle {
-		panic("ydb: table: inconsistent session pool index")
+		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
 	}
 	return s, info.touched
 }
@@ -801,7 +825,7 @@ func (p *SessionPool) keepAliveSession(ctx context.Context, s *Session) (Session
 func (p *SessionPool) removeIdle(s *Session) {
 	info, has := p.index[s]
 	if !has || info.idle == nil {
-		panic("ydb: table: inconsistent session pool index")
+		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
 	}
 
 	p.idle.Remove(info.idle)
@@ -836,10 +860,10 @@ func (p *SessionPool) pushIdle(s *Session, now time.Time) {
 func (p *SessionPool) pushReady(s *Session) {
 	info, has := p.index[s]
 	if !has {
-		panic("ydb: table: trying to store session created outside of the pool")
+		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
 	}
 	if info.ready != nil {
-		panic("ydb: table: inconsistent session pool index")
+		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
 	}
 	info.ready = p.ready.PushBack(s)
 	p.index[s] = info
@@ -882,10 +906,10 @@ func (p *SessionPool) pushIdleInOrderAfter(s *Session, now time.Time, mark *list
 func (p *SessionPool) handlePush(s *Session, now time.Time, el *list.Element) {
 	info, has := p.index[s]
 	if !has {
-		panic("ydb: table: trying to store session created outside of the pool")
+		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
 	}
 	if info.idle != nil {
-		panic("ydb: table: inconsistent session pool index")
+		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
 	}
 
 	info.touched = now
@@ -1055,4 +1079,9 @@ type sessionInfo struct {
 	idle    *list.Element
 	ready   *list.Element
 	touched time.Time
+}
+
+func panicLocked(mu sync.Locker, message string) {
+	mu.Unlock()
+	panic(message)
 }
