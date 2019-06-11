@@ -28,6 +28,10 @@ var (
 
 	// DefaultBalancingMethod contains driver's default balancing algorithm.
 	DefaultBalancingMethod = BalancingRoundRobin
+
+	// DefaultContextDeadlineMapping contains driver's default behavior of how
+	// to use context's deadline value.
+	DefaultContextDeadlineMapping = ContextDeadlineOperationTimeout
 )
 
 // ErrClosed is returned when operation requested on a closed driver.
@@ -97,6 +101,28 @@ type DriverConfig struct {
 	// If StreamTimeout is zero then no timeout is used.
 	StreamTimeout time.Duration
 
+	// OperationTimeout is the maximum amount of time a YDB server will process
+	// an operation. After timeout exceeds YDB will try to cancel operation and
+	// regardless of the cancelation appropriate error will be returned to
+	// the client.
+	// If OperationTimeout is zero then no timeout is used.
+	OperationTimeout time.Duration
+
+	// OperationCancelAfter is the maximum amount of time a YDB server will process an
+	// operation. After timeout exceeds YDB will try to cancel operation and if
+	// it succeeds appropriate error will be returned to the client; otherwise
+	// processing will be continued.
+	// If OperationCancelAfter is zero then no timeout is used.
+	OperationCancelAfter time.Duration
+
+	// ContextDeadlineMapping describes how context.Context's deadline value is
+	// used for YDB operation options. That is, when neither OperationTimeout
+	// nor OperationCancelAfter defined as context's values or driver options.
+	//
+	// If ContextDeadlineMapping is zero then the DefaultContextDeadlineMapping
+	// value is used.
+	ContextDeadlineMapping ContextDeadlineMapping
+
 	// DiscoveryInterval is the frequency of background tasks of ydb endpoints
 	// discovery.
 	// If DiscoveryInterval is zero then the DefaultDiscoveryInterval is used.
@@ -118,6 +144,9 @@ func (d *DriverConfig) withDefaults() (c DriverConfig) {
 	}
 	if c.BalancingMethod == 0 {
 		c.BalancingMethod = DefaultBalancingMethod
+	}
+	if c.ContextDeadlineMapping == 0 {
+		c.ContextDeadlineMapping = DefaultContextDeadlineMapping
 	}
 	return c
 }
@@ -217,11 +246,14 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	}
 
 	driver := &driver{
-		cluster:        c,
-		meta:           m,
-		trace:          trace,
-		requestTimeout: config.RequestTimeout,
-		streamTimeout:  config.StreamTimeout,
+		cluster:                c,
+		meta:                   m,
+		trace:                  trace,
+		requestTimeout:         config.RequestTimeout,
+		streamTimeout:          config.StreamTimeout,
+		operationTimeout:       config.OperationTimeout,
+		operationCancelAfter:   config.OperationCancelAfter,
+		contextDeadlineMapping: config.ContextDeadlineMapping,
 	}
 	if config.DiscoveryInterval > 0 {
 		driver.explorer = repeater{
@@ -272,8 +304,12 @@ type driver struct {
 	trace    DriverTrace
 	explorer repeater
 
-	requestTimeout time.Duration
-	streamTimeout  time.Duration
+	requestTimeout       time.Duration
+	streamTimeout        time.Duration
+	operationTimeout     time.Duration
+	operationCancelAfter time.Duration
+
+	contextDeadlineMapping ContextDeadlineMapping
 }
 
 func (d *driver) Close() error {
@@ -290,6 +326,12 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer cancel()
+	}
+	if t := d.operationTimeout; t > 0 {
+		ctx = WithOperationTimeout(ctx, t)
+	}
+	if t := d.operationCancelAfter; t > 0 {
+		ctx = WithOperationCancelAfter(ctx, t)
 	}
 
 	// Get credentials (token actually) for the request.
@@ -310,6 +352,8 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 
 	var resp Ydb_Operations.GetOperationResponse
 	method, req, res := internal.Unwrap(op)
+
+	setOperationParams(ctx, d.contextDeadlineMapping, req)
 
 	start := timeutil.Now()
 	conn.runtime.operationStart(start)

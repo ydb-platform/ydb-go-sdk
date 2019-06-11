@@ -255,3 +255,9 @@ var fileDescriptor_1a251a79ecaf5049 = []byte{
 }
 
 const ()
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *S3ListingRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}

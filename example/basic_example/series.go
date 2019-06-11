@@ -263,9 +263,6 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 				table.NewQueryParameters(
 					table.ValueParam("$seriesID", ydb.Uint64Value(1)),
 				),
-				table.WithExecuteDataQueryOperationParams(
-					table.WithOperationModeSync(),
-				),
 				table.WithQueryCachePolicy(
 					table.WithQueryCachePolicyKeepInCache(),
 				),

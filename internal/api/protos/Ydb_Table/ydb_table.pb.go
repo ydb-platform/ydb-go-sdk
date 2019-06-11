@@ -4982,3 +4982,105 @@ var fileDescriptor_1b2e4c4d1a772d33 = []byte{
 }
 
 const ()
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *CreateSessionRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *DeleteSessionRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *CreateTableRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *DropTableRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *AlterTableRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *CopyTableRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *CopyTablesRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *DescribeTableRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *ExecuteDataQueryRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *ExecuteSchemeQueryRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *ExplainDataQueryRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *PrepareDataQueryRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *KeepAliveRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *BeginTransactionRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *CommitTransactionRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *RollbackTransactionRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *DescribeTableOptionsRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}

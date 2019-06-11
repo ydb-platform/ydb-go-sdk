@@ -741,3 +741,21 @@ var fileDescriptor_ac21a693e2c386a5 = []byte{
 }
 
 const ()
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *UploadRowsRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *ReadColumnsRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *GetShardLocationsRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}

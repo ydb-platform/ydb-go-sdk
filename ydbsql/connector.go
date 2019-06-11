@@ -32,15 +32,21 @@ func WithClient(client *table.Client) ConnectorOption {
 	}
 }
 
-func WithCredentials(creds ydb.Credentials) ConnectorOption {
-	return func(c *connector) {
-		c.dialer.DriverConfig.Credentials = creds
-	}
-}
-
 func WithEndpoint(addr string) ConnectorOption {
 	return func(c *connector) {
 		c.endpoint = addr
+	}
+}
+
+func WithDriverConfig(config ydb.DriverConfig) ConnectorOption {
+	return func(c *connector) {
+		*(c.dialer.DriverConfig) = config
+	}
+}
+
+func WithCredentials(creds ydb.Credentials) ConnectorOption {
+	return func(c *connector) {
+		c.dialer.DriverConfig.Credentials = creds
 	}
 }
 

@@ -1,14 +1,9 @@
 package table
 
 import (
-	"time"
-
-	"github.com/golang/protobuf/ptypes"
-
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 )
 
@@ -84,17 +79,6 @@ func WithProfile(opts ...ProfileOption) CreateTableOption {
 		}
 		for _, opt := range opts {
 			opt((*profile)(d.Profile))
-		}
-	}
-}
-
-func WithCreateTableOperationParams(opts ...OperationOption) CreateTableOption {
-	return func(d *createTableDesc) {
-		if d.OperationParams == nil {
-			d.OperationParams = new(Ydb_Operations.OperationParams)
-		}
-		for _, opt := range opts {
-			opt((*operationParams)(d.OperationParams))
 		}
 	}
 }
@@ -303,17 +287,6 @@ type (
 	DropTableOption func(*dropTableDesc)
 )
 
-func WithDropTableOperationParams(opts ...OperationOption) DropTableOption {
-	return func(d *dropTableDesc) {
-		if d.OperationParams == nil {
-			d.OperationParams = new(Ydb_Operations.OperationParams)
-		}
-		for _, opt := range opts {
-			opt((*operationParams)(d.OperationParams))
-		}
-	}
-}
-
 type (
 	alterTableDesc   Ydb_Table.AlterTableRequest
 	AlterTableOption func(*alterTableDesc)
@@ -334,32 +307,10 @@ func WithDropColumn(name string) AlterTableOption {
 	}
 }
 
-func WithAlterTableOperationParams(opts ...OperationOption) AlterTableOption {
-	return func(d *alterTableDesc) {
-		if d.OperationParams == nil {
-			d.OperationParams = new(Ydb_Operations.OperationParams)
-		}
-		for _, opt := range opts {
-			opt((*operationParams)(d.OperationParams))
-		}
-	}
-}
-
 type (
 	copyTableDesc   Ydb_Table.CopyTableRequest
 	CopyTableOption func(*copyTableDesc)
 )
-
-func WithCopyTableOperationParams(opts ...OperationOption) CopyTableOption {
-	return func(d *copyTableDesc) {
-		if d.OperationParams == nil {
-			d.OperationParams = new(Ydb_Operations.OperationParams)
-		}
-		for _, opt := range opts {
-			opt((*operationParams)(d.OperationParams))
-		}
-	}
-}
 
 type (
 	txDesc   Ydb_Table.TransactionSettings
@@ -524,43 +475,9 @@ type (
 )
 
 type (
-	operationParams Ydb_Operations.OperationParams
-	OperationOption func(*operationParams)
-)
-
-func WithOperationModeSync() OperationOption {
-	return func(d *operationParams) {
-		d.OperationMode = Ydb_Operations.OperationParams_SYNC
-	}
-}
-
-func WithOperationTimeout(t time.Duration) OperationOption {
-	return func(d *operationParams) {
-		d.OperationTimeout = ptypes.DurationProto(t)
-	}
-}
-
-func WithOperationCancelAfter(t time.Duration) OperationOption {
-	return func(d *operationParams) {
-		d.CancelAfter = ptypes.DurationProto(t)
-	}
-}
-
-type (
 	executeDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
 	ExecuteDataQueryOption func(*executeDataQueryDesc)
 )
-
-func WithExecuteDataQueryOperationParams(opts ...OperationOption) ExecuteDataQueryOption {
-	return func(d *executeDataQueryDesc) {
-		if d.OperationParams == nil {
-			d.OperationParams = new(Ydb_Operations.OperationParams)
-		}
-		for _, opt := range opts {
-			opt((*operationParams)(d.OperationParams))
-		}
-	}
-}
 
 type (
 	queryCachePolicy       Ydb_Table.QueryCachePolicy
@@ -600,17 +517,6 @@ type (
 	executeSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
 	ExecuteSchemeQueryOption func(*executeSchemeQueryDesc)
 )
-
-func WithExecuteSchemeQueryOperationParams(opts ...OperationOption) ExecuteSchemeQueryOption {
-	return func(d *executeSchemeQueryDesc) {
-		if d.OperationParams == nil {
-			d.OperationParams = new(Ydb_Operations.OperationParams)
-		}
-		for _, opt := range opts {
-			opt((*operationParams)(d.OperationParams))
-		}
-	}
-}
 
 type (
 	readTableDesc   Ydb_Table.ReadTableRequest

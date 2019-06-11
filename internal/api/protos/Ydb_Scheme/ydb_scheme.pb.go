@@ -1005,3 +1005,33 @@ var fileDescriptor_eeaf0ffb27b25a32 = []byte{
 }
 
 const ()
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *MakeDirectoryRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *RemoveDirectoryRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *ListDirectoryRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *DescribePathRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}
+
+// SetOperationParams implements ydb generic interface for setting
+// operation parameters inside driver implementation.
+func (m *ModifyPermissionsRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {
+	m.OperationParams = v
+}

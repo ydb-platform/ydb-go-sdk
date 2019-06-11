@@ -13,6 +13,12 @@ func Now() time.Time {
 	return time.Now()
 }
 
+// Until returns the duration until t.
+// It is shorthand for t.Sub(timeutil.Now()).
+func Until(t time.Time) time.Duration {
+	return t.Sub(Now())
+}
+
 // Timer is the interface used by node watcher to be periodically triggered to
 // prepare some action.
 type Timer interface {
