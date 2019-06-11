@@ -163,7 +163,7 @@ func operationParams(ctx context.Context, dm ContextDeadlineMapping) (p Operatio
 	{
 		p.Mode, _ = ContextOperationMode(ctx)
 	}
-	return p, p.Empty()
+	return p, !p.Empty()
 }
 
 func setOperationParams(req interface{}, params OperationParams) {

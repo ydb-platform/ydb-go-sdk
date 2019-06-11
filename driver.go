@@ -366,11 +366,17 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 
 	conn.runtime.operationDone(
 		start, timeutil.Now(),
-		errIf(IsBusyAfter(err), err),
+		errIf(isTimeoutError(err), err),
 	)
 	d.trace.operationDone(rawctx, conn, method, params, resp, err)
 
 	return err
+}
+
+func isTimeoutError(err error) bool {
+	return IsOpError(err, StatusTimeout) ||
+		IsOpError(err, StatusCancelled) ||
+		IsBusyAfter(err)
 }
 
 func IsBusyAfter(err error) bool {

@@ -150,6 +150,8 @@ const (
 	StatusAlreadyExists      = StatusCode(Ydb.StatusIds_ALREADY_EXISTS)
 	StatusNotFound           = StatusCode(Ydb.StatusIds_NOT_FOUND)
 	StatusSessionExpired     = StatusCode(Ydb.StatusIds_SESSION_EXPIRED)
+	StatusCancelled          = StatusCode(Ydb.StatusIds_CANCELLED)
+	StatusUndetermined       = StatusCode(Ydb.StatusIds_UNDETERMINED)
 )
 
 func statusCode(s Ydb.StatusIds_StatusCode) StatusCode {
@@ -182,6 +184,10 @@ func statusCode(s Ydb.StatusIds_StatusCode) StatusCode {
 		return StatusNotFound
 	case Ydb.StatusIds_SESSION_EXPIRED:
 		return StatusSessionExpired
+	case Ydb.StatusIds_CANCELLED:
+		return StatusCancelled
+	case Ydb.StatusIds_UNDETERMINED:
+		return StatusUndetermined
 	default:
 		return StatusUnknownStatus
 	}
