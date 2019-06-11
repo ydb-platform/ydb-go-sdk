@@ -353,11 +353,14 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 	var resp Ydb_Operations.GetOperationResponse
 	method, req, res := internal.Unwrap(op)
 
-	setOperationParams(ctx, d.contextDeadlineMapping, req)
+	params, ok := operationParams(ctx, d.contextDeadlineMapping)
+	if ok {
+		setOperationParams(req, params)
+	}
 
 	start := timeutil.Now()
 	conn.runtime.operationStart(start)
-	d.trace.operationStart(rawctx, conn, method)
+	d.trace.operationStart(rawctx, conn, method, params)
 
 	err = invoke(ctx, conn.conn, &resp, method, req, res)
 
@@ -365,7 +368,7 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 		start, timeutil.Now(),
 		errIf(IsBusyAfter(err), err),
 	)
-	d.trace.operationDone(rawctx, conn, method, resp, err)
+	d.trace.operationDone(rawctx, conn, method, params, resp, err)
 
 	return err
 }

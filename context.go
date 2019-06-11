@@ -124,54 +124,56 @@ func (m OperationMode) toYDB() Ydb_Operations.OperationParams_OperationMode {
 	}
 }
 
-func setOperationParams(
-	ctx context.Context, dm ContextDeadlineMapping,
-	req interface{},
-) {
+type OperationParams struct {
+	Timeout     time.Duration
+	CancelAfter time.Duration
+	Mode        OperationMode
+}
+
+func (p OperationParams) Empty() bool {
+	return p.Timeout == 0 && p.CancelAfter == 0 && p.Mode == 0
+}
+
+func (p OperationParams) toYDB() *Ydb_Operations.OperationParams {
+	if p.Empty() {
+		return nil
+	}
+	return &Ydb_Operations.OperationParams{
+		OperationMode:    p.Mode.toYDB(),
+		OperationTimeout: timeoutParam(p.Timeout),
+		CancelAfter:      timeoutParam(p.CancelAfter),
+	}
+}
+
+func operationParams(ctx context.Context, dm ContextDeadlineMapping) (p OperationParams, ok bool) {
+	d, hasDeadline := contextUntilDeadline(ctx)
+	var has bool
+	{
+		p.Timeout, has = ContextOperationTimeout(ctx)
+		if !has && hasDeadline && dm == ContextDeadlineOperationTimeout {
+			p.Timeout = d
+		}
+	}
+	{
+		p.CancelAfter, has = ContextOperationCancelAfter(ctx)
+		if !has && hasDeadline && dm == ContextDeadlineOperationCancelAfter {
+			p.CancelAfter = d
+		}
+	}
+	{
+		p.Mode, _ = ContextOperationMode(ctx)
+	}
+	return p, p.Empty()
+}
+
+func setOperationParams(req interface{}, params OperationParams) {
 	x, ok := req.(interface {
 		SetOperationParams(*Ydb_Operations.OperationParams)
 	})
 	if !ok {
 		return
 	}
-	var (
-		timeout     *duration.Duration
-		cancelAfter *duration.Duration
-		mode        Ydb_Operations.OperationParams_OperationMode
-	)
-
-	d, hasT := ContextOperationTimeout(ctx)
-	if hasT {
-		timeout = timeoutParam(d)
-	}
-
-	d, hasC := ContextOperationCancelAfter(ctx)
-	if hasC {
-		cancelAfter = timeoutParam(d)
-	}
-
-	d, hasD := contextUntilDeadline(ctx)
-	if !hasT && hasD && dm == ContextDeadlineOperationTimeout {
-		timeout = timeoutParam(d)
-	}
-	if !hasC && hasD && dm == ContextDeadlineOperationCancelAfter {
-		cancelAfter = timeoutParam(d)
-	}
-
-	if m, hasM := ContextOperationMode(ctx); hasM {
-		mode = m.toYDB()
-	}
-
-	if mode == 0 && timeout == nil && cancelAfter == nil {
-		// Avoid OperationParams allocation.
-		return
-	}
-
-	x.SetOperationParams(&Ydb_Operations.OperationParams{
-		OperationMode:    mode,
-		OperationTimeout: timeout,
-		CancelAfter:      cancelAfter,
-	})
+	x.SetOperationParams(params.toYDB())
 }
 
 func timeoutParam(d time.Duration) *duration.Duration {

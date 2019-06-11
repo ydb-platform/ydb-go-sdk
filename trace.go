@@ -95,11 +95,12 @@ func (d DriverTrace) discoveryDone(ctx context.Context, es []Endpoint, err error
 		f(x)
 	}
 }
-func (d DriverTrace) operationStart(ctx context.Context, conn *conn, method string) {
+func (d DriverTrace) operationStart(ctx context.Context, conn *conn, method string, params OperationParams) {
 	x := OperationStartInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
 		Method:  Method(method),
+		Params:  params,
 	}
 	if f := d.OperationStart; f != nil {
 		f(x)
@@ -108,11 +109,12 @@ func (d DriverTrace) operationStart(ctx context.Context, conn *conn, method stri
 		f(x)
 	}
 }
-func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method string, resp Ydb_Operations.GetOperationResponse, err error) {
+func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method string, params OperationParams, resp Ydb_Operations.GetOperationResponse, err error) {
 	x := OperationDoneInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
 		Method:  Method(method),
+		Params:  params,
 		Error:   err,
 	}
 	if op := resp.Operation; op != nil {
@@ -169,17 +171,20 @@ type (
 		Context context.Context
 		Address string
 		Method  Method
+		Params  OperationParams
 	}
 	OperationWaitInfo struct {
 		Context context.Context
 		Address string
 		Method  Method
+		Params  OperationParams
 		OpID    string
 	}
 	OperationDoneInfo struct {
 		Context context.Context
 		Address string
 		Method  Method
+		Params  OperationParams
 		OpID    string
 		Issues  IssueIterator
 		Error   error

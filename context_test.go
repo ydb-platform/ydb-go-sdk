@@ -6,19 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
-type operation struct {
-	params *Ydb_Operations.OperationParams
-}
-
-func (op *operation) SetOperationParams(p *Ydb_Operations.OperationParams) {
-	op.params = p
-}
-
-func TestSetOperationParams(t *testing.T) {
+func TestOperationParams(t *testing.T) {
 	for _, test := range []struct {
 		name       string
 		ctxTimeout time.Duration
@@ -27,26 +18,25 @@ func TestSetOperationParams(t *testing.T) {
 		opMode     OperationMode
 		ctxMapping ContextDeadlineMapping
 
-		exp *Ydb_Operations.OperationParams
+		exp OperationParams
 	}{
 		{
 			name: "nothing",
-			exp:  nil,
 		},
 		{
 			name:       "mapping timeout",
 			ctxMapping: ContextDeadlineOperationTimeout,
 			ctxTimeout: time.Second,
-			exp: &Ydb_Operations.OperationParams{
-				OperationTimeout: timeoutParam(time.Second),
+			exp: OperationParams{
+				Timeout: time.Second,
 			},
 		},
 		{
 			name:       "mapping deadline",
 			ctxMapping: ContextDeadlineOperationCancelAfter,
 			ctxTimeout: time.Second,
-			exp: &Ydb_Operations.OperationParams{
-				CancelAfter: timeoutParam(time.Second),
+			exp: OperationParams{
+				CancelAfter: time.Second,
 			},
 		},
 		{
@@ -54,8 +44,8 @@ func TestSetOperationParams(t *testing.T) {
 			ctxMapping: ContextDeadlineOperationTimeout,
 			ctxTimeout: time.Second,
 			opTimeout:  time.Hour,
-			exp: &Ydb_Operations.OperationParams{
-				OperationTimeout: timeoutParam(time.Hour),
+			exp: OperationParams{
+				Timeout: time.Hour,
 			},
 		},
 		{
@@ -63,15 +53,15 @@ func TestSetOperationParams(t *testing.T) {
 			ctxMapping: ContextDeadlineOperationCancelAfter,
 			ctxTimeout: time.Second,
 			opCancel:   time.Hour,
-			exp: &Ydb_Operations.OperationParams{
-				CancelAfter: timeoutParam(time.Hour),
+			exp: OperationParams{
+				CancelAfter: time.Hour,
 			},
 		},
 		{
 			name:   "mode",
 			opMode: OperationModeAsync,
-			exp: &Ydb_Operations.OperationParams{
-				OperationMode: (OperationModeAsync).toYDB(),
+			exp: OperationParams{
+				Mode: OperationModeAsync,
 			},
 		},
 	} {
@@ -93,10 +83,9 @@ func TestSetOperationParams(t *testing.T) {
 				ctx, _ = context.WithDeadline(ctx, timeutil.Now().Add(t))
 			}
 
-			op := new(operation)
-			setOperationParams(ctx, test.ctxMapping, op)
+			act, _ := operationParams(ctx, test.ctxMapping)
 
-			if act, exp := op.params, test.exp; !reflect.DeepEqual(act, exp) {
+			if exp := test.exp; !reflect.DeepEqual(act, exp) {
 				t.Fatalf(
 					"unexpected operation parameters: %v; want %v",
 					act, exp,
