@@ -171,21 +171,29 @@ type Dialer struct {
 	meta   *meta
 }
 
-func (d *Dialer) init() {
-	d.once.Do(func() {
-		d.config = d.DriverConfig.withDefaults()
-		d.meta = newMeta(d.config.Database, d.config.Credentials)
-	})
-}
-
 // Dial dials given addr and initializes driver instance on success.
 func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
-	d.init()
+	config := d.DriverConfig.withDefaults()
+	return (&dialer{
+		netDial: d.NetDial,
+		timeout: d.Timeout,
+		config:  config,
+		meta:    newMeta(config.Database, config.Credentials),
+	}).dial(ctx, addr)
+}
 
+// dialer is an instance holding single Dialer.Dial() configuration parameters.
+type dialer struct {
+	netDial func(context.Context, string) (net.Conn, error)
+	timeout time.Duration
+	config  DriverConfig
+	meta    *meta
+}
+
+func (d *dialer) dial(ctx context.Context, addr string) (Driver, error) {
 	cluster := cluster{
-		dial: d.dial,
+		dial: d.dialHostPort,
 	}
-
 	var explorer repeater
 	if d.config.DiscoveryInterval > 0 {
 		cluster.balancer = balancers[d.config.BalancingMethod]()
@@ -258,11 +266,11 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	}, nil
 }
 
-func (d *Dialer) dial(ctx context.Context, host string, port int) (*conn, error) {
+func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn, error) {
 	rawctx := ctx
-	if d.Timeout > 0 {
+	if d.timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, d.Timeout)
+		ctx, cancel = context.WithTimeout(ctx, d.timeout)
 		defer cancel()
 	}
 	addr := connAddr{
@@ -282,15 +290,15 @@ func (d *Dialer) dial(ctx context.Context, host string, port int) (*conn, error)
 	return newConn(cc, addr), nil
 }
 
-func (d *Dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
+func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
 	host, port, err := splitHostPort(addr)
 	if err != nil {
 		return nil, err
 	}
-	return d.dial(ctx, host, port)
+	return d.dialHostPort(ctx, host, port)
 }
 
-func (d *Dialer) discover(ctx context.Context, addr string) (endpoints []Endpoint, err error) {
+func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoint, err error) {
 	conn, err := d.dialAddr(ctx, addr)
 	if err != nil {
 		return nil, err
@@ -303,9 +311,9 @@ func (d *Dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 	}()
 
 	subctx := ctx
-	if d.Timeout > 0 {
+	if d.timeout > 0 {
 		var cancel context.CancelFunc
-		subctx, cancel = context.WithTimeout(ctx, d.Timeout)
+		subctx, cancel = context.WithTimeout(ctx, d.timeout)
 		defer cancel()
 	}
 
@@ -315,9 +323,9 @@ func (d *Dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 	}).Discover(subctx, d.config.Database)
 }
 
-func (d *Dialer) grpcDialOptions() (opts []grpc.DialOption) {
-	if d.NetDial != nil {
-		opts = append(opts, grpc.WithDialer(withContextDialer(d.NetDial)))
+func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
+	if d.netDial != nil {
+		opts = append(opts, grpc.WithDialer(withContextDialer(d.netDial)))
 	}
 	return append(opts,
 		// TODO: allow secure driver use.
