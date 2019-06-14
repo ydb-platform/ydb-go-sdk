@@ -165,101 +165,45 @@ type Dialer struct {
 	// complete.
 	// If Timeout is zero then no timeout is used.
 	Timeout time.Duration
+
+	once   sync.Once
+	config DriverConfig
+	meta   *meta
 }
 
-// Dial dials to a given addr and initializes driver instance on success.
+func (d *Dialer) init() {
+	d.once.Do(func() {
+		d.config = d.DriverConfig.withDefaults()
+		d.meta = newMeta(d.config.Database, d.config.Credentials)
+	})
+}
+
+// Dial dials given addr and initializes driver instance on success.
 func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
-	var (
-		config = d.DriverConfig.withDefaults()
-		trace  = config.Trace
-	)
-	dial := func(ctx context.Context, host string, port int) (*conn, error) {
-		rawctx := ctx
-		if d.Timeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, d.Timeout)
-			defer cancel()
-		}
-		addr := connAddr{
-			addr: host,
-			port: port,
-		}
-		s := addr.String()
-		trace.dialStart(rawctx, s)
+	d.init()
 
-		cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
+	cluster := cluster{
+		dial: d.dial,
+	}
 
-		trace.dialDone(rawctx, s, err)
+	var explorer repeater
+	if d.config.DiscoveryInterval > 0 {
+		cluster.balancer = balancers[d.config.BalancingMethod]()
+
+		curr, err := d.discover(ctx, addr)
 		if err != nil {
 			return nil, err
 		}
-		return newConn(cc, addr), nil
-	}
-
-	host, prt, err := net.SplitHostPort(addr)
-	if err != nil {
-		return nil, err
-	}
-	port, err := strconv.Atoi(prt)
-	if err != nil {
-		return nil, err
-	}
-	econn, err := dial(ctx, host, port)
-	if err != nil {
-		return nil, err
-	}
-
-	c := &cluster{
-		dial:     dial,
-		balancer: balancers[config.BalancingMethod](),
-	}
-	m := newMeta(config.Database, config.Credentials)
-
-	discover := func(ctx context.Context) (endpoints []Endpoint, err error) {
-		trace.discoveryStart(ctx)
-		defer func() {
-			trace.discoveryDone(ctx, endpoints, err)
-		}()
-
-		ds := discoveryClient{
-			conn: econn,
-			meta: m,
+		// Sort current list of endpoints to prevent additional sorting withing
+		// background discovery below.
+		sortEndpoints(curr)
+		for _, e := range curr {
+			cluster.Insert(ctx, e)
 		}
-		subctx := ctx
-		if d.Timeout > 0 {
-			var cancel context.CancelFunc
-			subctx, cancel = context.WithTimeout(ctx, d.Timeout)
-			defer cancel()
-		}
-		return ds.Discover(subctx, config.Database)
-	}
-
-	curr, err := discover(ctx)
-	if err != nil {
-		return nil, err
-	}
-	// Sort current list of endpoints to prevent additional sorting withing
-	// background discovery below.
-	sortEndpoints(curr)
-	for _, e := range curr {
-		c.Insert(ctx, e)
-	}
-
-	driver := &driver{
-		cluster:                c,
-		meta:                   m,
-		trace:                  trace,
-		requestTimeout:         config.RequestTimeout,
-		streamTimeout:          config.StreamTimeout,
-		operationTimeout:       config.OperationTimeout,
-		operationCancelAfter:   config.OperationCancelAfter,
-		contextDeadlineMapping: config.ContextDeadlineMapping,
-	}
-	if config.DiscoveryInterval > 0 {
-		driver.explorer = repeater{
-			Interval: config.DiscoveryInterval,
+		explorer = repeater{
+			Interval: d.config.DiscoveryInterval,
 			Task: func(ctx context.Context) {
-				next, err := discover(ctx)
+				next, err := d.discover(ctx, addr)
 				if err != nil {
 					return
 				}
@@ -269,22 +213,106 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 					func(i, j int) {
 						// Endpoints are equal but we still need to update meta
 						// data such that load factor and others.
-						c.Update(ctx, next[j])
+						cluster.Update(ctx, next[j])
 					},
 					func(i, j int) {
-						c.Insert(ctx, next[j])
+						cluster.Insert(ctx, next[j])
 					},
 					func(i, j int) {
-						c.Remove(ctx, curr[i])
+						cluster.Remove(ctx, curr[i])
 					},
 				)
 				curr = next
 			},
 		}
-		driver.explorer.Start()
+		explorer.Start()
+	} else {
+		var (
+			e   Endpoint
+			err error
+		)
+		e.Addr, e.Port, err = splitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		cluster.balancer = new(singleConnBalancer)
+		cluster.Insert(ctx, e)
+
+		// Ensure that endpoint is connectable.
+		_, err = cluster.Get(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &driver{
+		cluster:                &cluster,
+		explorer:               explorer,
+		meta:                   d.meta,
+		trace:                  d.config.Trace,
+		requestTimeout:         d.config.RequestTimeout,
+		streamTimeout:          d.config.StreamTimeout,
+		operationTimeout:       d.config.OperationTimeout,
+		operationCancelAfter:   d.config.OperationCancelAfter,
+		contextDeadlineMapping: d.config.ContextDeadlineMapping,
+	}, nil
+}
+
+func (d *Dialer) dial(ctx context.Context, host string, port int) (*conn, error) {
+	rawctx := ctx
+	if d.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, d.Timeout)
+		defer cancel()
+	}
+	addr := connAddr{
+		addr: host,
+		port: port,
+	}
+	s := addr.String()
+	d.config.Trace.dialStart(rawctx, s)
+
+	cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
+
+	d.config.Trace.dialDone(rawctx, s, err)
+	if err != nil {
+		return nil, err
 	}
 
-	return driver, nil
+	return newConn(cc, addr), nil
+}
+
+func (d *Dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
+	host, port, err := splitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	return d.dial(ctx, host, port)
+}
+
+func (d *Dialer) discover(ctx context.Context, addr string) (endpoints []Endpoint, err error) {
+	conn, err := d.dialAddr(ctx, addr)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.conn.Close()
+
+	d.config.Trace.discoveryStart(ctx)
+	defer func() {
+		d.config.Trace.discoveryDone(ctx, endpoints, err)
+	}()
+
+	subctx := ctx
+	if d.Timeout > 0 {
+		var cancel context.CancelFunc
+		subctx, cancel = context.WithTimeout(ctx, d.Timeout)
+		defer cancel()
+	}
+
+	return (&discoveryClient{
+		conn: conn,
+		meta: d.meta,
+	}).Discover(subctx, d.config.Database)
 }
 
 func (d *Dialer) grpcDialOptions() (opts []grpc.DialOption) {
@@ -635,4 +663,14 @@ func withContextDialer(f func(context.Context, string) (net.Conn, error)) func(s
 		defer cancel()
 		return f(ctx, addr)
 	}
+}
+
+func splitHostPort(addr string) (host string, port int, err error) {
+	var prt string
+	host, prt, err = net.SplitHostPort(addr)
+	if err != nil {
+		return
+	}
+	port, err = strconv.Atoi(prt)
+	return
 }

@@ -30,6 +30,7 @@ func main() {
 	flag.StringVar(&endpoint, "endpoint", "", "endpoint url to use")
 	flag.StringVar(&prefix, "path", "", "tables path")
 	flag.BoolVar(&trace, "trace", false, "trace driver")
+	flag.DurationVar(&config.DiscoveryInterval, "discovery", 0, "discovery interval")
 	flag.Parse()
 
 	config.Credentials = credentials()

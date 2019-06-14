@@ -7,7 +7,8 @@ import (
 	"sync"
 )
 
-// balancerElement is an interface that holds some balancer specific data.
+// balancerElement is an empty interface that holds some balancer specific
+// data.
 type balancerElement interface {
 }
 
@@ -350,3 +351,25 @@ func (cs *connList) Remove(x *connListElement) {
 	list = list[:n-1]
 	*cs = list
 }
+
+type singleConnBalancer struct {
+	conn *conn
+}
+
+func (s *singleConnBalancer) Next() *conn {
+	return s.conn
+}
+func (s *singleConnBalancer) Insert(conn *conn, _ connInfo) balancerElement {
+	if s.conn != nil {
+		panic("single conn balancer: double Insert()")
+	}
+	s.conn = conn
+	return conn
+}
+func (s *singleConnBalancer) Remove(el balancerElement) {
+	if s.conn != el.(*conn) {
+		panic("single conn balancer: Remove() unknown conn")
+	}
+	s.conn = nil
+}
+func (s *singleConnBalancer) Update(balancerElement, connInfo) {}
