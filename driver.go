@@ -165,10 +165,6 @@ type Dialer struct {
 	// complete.
 	// If Timeout is zero then no timeout is used.
 	Timeout time.Duration
-
-	once   sync.Once
-	config DriverConfig
-	meta   *meta
 }
 
 // Dial dials given addr and initializes driver instance on success.
