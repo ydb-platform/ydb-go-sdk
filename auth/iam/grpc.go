@@ -2,6 +2,7 @@ package iam
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"time"
 
@@ -12,8 +13,10 @@ import (
 )
 
 type grpcTransport struct {
-	endpoint string
-	certPool *x509.CertPool
+	endpoint           string
+	certPool           *x509.CertPool
+	insecure           bool // Only for testing.
+	insecureSkipVerify bool // Accept any TLS certificate from server.
 }
 
 func (t *grpcTransport) CreateToken(ctx context.Context, jwt string) (
@@ -43,15 +46,24 @@ func (t *grpcTransport) CreateToken(ctx context.Context, jwt string) (
 
 func (t *grpcTransport) conn(ctx context.Context) (*grpc.ClientConn, error) {
 	var opts []grpc.DialOption
-	if pool := t.certPool; pool != nil {
-		opts = []grpc.DialOption{
-			grpc.WithTransportCredentials(
-				credentials.NewClientTLSFromCert(pool, ""),
-			),
-		}
-	} else {
+	switch {
+	case t.insecure:
 		opts = []grpc.DialOption{
 			grpc.WithInsecure(),
+		}
+	case t.insecureSkipVerify:
+		opts = []grpc.DialOption{
+			grpc.WithTransportCredentials(
+				credentials.NewTLS(&tls.Config{
+					InsecureSkipVerify: true,
+				}),
+			),
+		}
+	case t.certPool != nil:
+		opts = []grpc.DialOption{
+			grpc.WithTransportCredentials(
+				credentials.NewClientTLSFromCert(t.certPool, ""),
+			),
 		}
 	}
 	return grpc.DialContext(ctx, t.endpoint, opts...)

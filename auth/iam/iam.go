@@ -41,6 +41,14 @@ type Client struct {
 	Endpoint string
 	CertPool *x509.CertPool
 
+	// If InsecureSkipVerify is true, client accepts any TLS certificate
+	// presented by the iam server and any host name in that certificate.
+	//
+	// If InsecureSkipVerify is set, then CertPool field is not used.
+	//
+	// This should be used only for testing.
+	InsecureSkipVerify bool
+
 	Key    *rsa.PrivateKey
 	KeyID  string
 	Issuer string
@@ -72,8 +80,9 @@ func (c *Client) init() (err error) {
 		}
 		if c.transport == nil {
 			c.transport = &grpcTransport{
-				endpoint: c.Endpoint,
-				certPool: c.CertPool,
+				endpoint:           c.Endpoint,
+				certPool:           c.CertPool,
+				insecureSkipVerify: c.InsecureSkipVerify,
 			}
 		}
 	})

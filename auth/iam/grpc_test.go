@@ -40,11 +40,15 @@ func TestGRPCCreateToken(t *testing.T) {
 
 	gt := grpcTransport{
 		endpoint: addr.String(),
+		insecure: true,
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	tk, e, err := gt.CreateToken(ctx, "jwt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if act, exp := e, expires; !act.Equal(exp) {
 		t.Errorf("unexpected expiration time: %v; want %v", act, exp)
 	}
