@@ -44,23 +44,6 @@ type Driver interface {
 	Close() error
 }
 
-// Credentials is an interface that contains options used to authorize a
-// client.
-type Credentials interface {
-	Token(context.Context) (string, error)
-}
-
-// AuthTokenCredentials implements Credentials interface with static
-// authorization parameters.
-type AuthTokenCredentials struct {
-	AuthToken string
-}
-
-// Token implements Credentials.
-func (a AuthTokenCredentials) Token(_ context.Context) (string, error) {
-	return a.AuthToken, nil
-}
-
 // BalancingMethod encodes balancing method for driver configuration.
 type BalancingMethod uint
 

@@ -36,7 +36,19 @@ func (m *meta) md(ctx context.Context) (md metadata.MD, err error) {
 		return m.curr, nil
 	}
 	token, err := m.credentials.Token(ctx)
-	if err != nil {
+	switch err {
+	case nil:
+		// Continue.
+
+	case ErrCredentialsDropToken:
+		md := make(metadata.MD, 1)
+		md.Set(metaDatabase, m.database)
+		return md, nil
+
+	case ErrCredentialsKeepToken:
+		return m.curr, nil
+
+	default:
 		return nil, err
 	}
 	m.mu.RLock()
