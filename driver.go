@@ -157,7 +157,11 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 		netDial: d.NetDial,
 		timeout: d.Timeout,
 		config:  config,
-		meta:    newMeta(config.Database, config.Credentials),
+		meta: &meta{
+			trace:       config.Trace,
+			database:    config.Database,
+			credentials: config.Credentials,
+		},
 	}).dial(ctx, addr)
 }
 

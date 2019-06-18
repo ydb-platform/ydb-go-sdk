@@ -22,6 +22,16 @@ const (
 	DefaultTokenTTL = time.Hour
 )
 
+// CreateTokenError contains reason of token creation failure.
+type CreateTokenError struct {
+	Reason error
+}
+
+// Error implements error interface.
+func (e *CreateTokenError) Error() string {
+	return fmt.Sprintf("iam: create token error: %v", e.Reason)
+}
+
 type transport interface {
 	CreateToken(ctx context.Context, jwt string) (token string, expires time.Time, err error)
 }
@@ -94,7 +104,9 @@ func (c *Client) Token(ctx context.Context) (token string, err error) {
 	var expires time.Time
 	token, expires, err = c.transport.CreateToken(ctx, c.jwt(now))
 	if err != nil {
-		return "", err
+		return "", &CreateTokenError{
+			Reason: err,
+		}
 	}
 	c.token = token
 	c.expires = now.Add(c.TokenTTL)

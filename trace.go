@@ -14,6 +14,9 @@ type DriverTrace struct {
 	GetConnStart func(GetConnStartInfo)
 	GetConnDone  func(GetConnDoneInfo)
 
+	GetCredentialsStart func(GetCredentialsStartInfo)
+	GetCredentialsDone  func(GetCredentialsDoneInfo)
+
 	DiscoveryStart func(DiscoveryStartInfo)
 	DiscoveryDone  func(DiscoveryDoneInfo)
 
@@ -68,6 +71,29 @@ func (d DriverTrace) getConnDone(ctx context.Context, addr string, err error) {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).GetConnDone; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) getCredentialsStart(ctx context.Context) {
+	x := GetCredentialsStartInfo{
+		Context: ctx,
+	}
+	if f := d.GetCredentialsStart; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).GetCredentialsStart; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) getCredentialsDone(ctx context.Context, err error) {
+	x := GetCredentialsDoneInfo{
+		Context: ctx,
+		Error:   err,
+	}
+	if f := d.GetCredentialsDone; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).GetCredentialsDone; f != nil {
 		f(x)
 	}
 }
@@ -159,6 +185,13 @@ type (
 		Address string
 		Error   error
 	}
+	GetCredentialsStartInfo struct {
+		Context context.Context
+	}
+	GetCredentialsDoneInfo struct {
+		Context context.Context
+		Error   error
+	}
 	DiscoveryStartInfo struct {
 		Context context.Context
 	}
@@ -234,6 +267,28 @@ func composeDriverTrace(a, b DriverTrace) (c DriverTrace) {
 		c.GetConnDone = func(info GetConnDoneInfo) {
 			a.GetConnDone(info)
 			b.GetConnDone(info)
+		}
+	}
+	switch {
+	case a.GetCredentialsStart == nil:
+		c.GetCredentialsStart = b.GetCredentialsStart
+	case b.GetCredentialsStart == nil:
+		c.GetCredentialsStart = a.GetCredentialsStart
+	default:
+		c.GetCredentialsStart = func(info GetCredentialsStartInfo) {
+			a.GetCredentialsStart(info)
+			b.GetCredentialsStart(info)
+		}
+	}
+	switch {
+	case a.GetCredentialsDone == nil:
+		c.GetCredentialsDone = b.GetCredentialsDone
+	case b.GetCredentialsDone == nil:
+		c.GetCredentialsDone = a.GetCredentialsDone
+	default:
+		c.GetCredentialsDone = func(info GetCredentialsDoneInfo) {
+			a.GetCredentialsDone(info)
+			b.GetCredentialsDone(info)
 		}
 	}
 	switch {

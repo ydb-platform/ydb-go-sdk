@@ -9,13 +9,16 @@ import (
 
 func TestMetaErrDropToken(t *testing.T) {
 	var call int
-	m := newMeta("database", CredentialsFunc(func(context.Context) (string, error) {
-		if call == 0 {
-			call++
-			return "token", nil
-		}
-		return "", ErrCredentialsDropToken
-	}))
+	m := &meta{
+		database: "database",
+		credentials: CredentialsFunc(func(context.Context) (string, error) {
+			if call == 0 {
+				call++
+				return "token", nil
+			}
+			return "", ErrCredentialsDropToken
+		}),
+	}
 
 	md1, err := m.md(context.Background())
 	if err != nil {
@@ -34,13 +37,16 @@ func TestMetaErrDropToken(t *testing.T) {
 
 func TestMetaErrKeepToken(t *testing.T) {
 	var call int
-	m := newMeta("database", CredentialsFunc(func(context.Context) (string, error) {
-		if call == 0 {
-			call++
-			return "token", nil
-		}
-		return "", ErrCredentialsKeepToken
-	}))
+	m := &meta{
+		database: "database",
+		credentials: CredentialsFunc(func(context.Context) (string, error) {
+			if call == 0 {
+				call++
+				return "token", nil
+			}
+			return "", ErrCredentialsKeepToken
+		}),
+	}
 
 	md1, err := m.md(context.Background())
 	if err != nil {
