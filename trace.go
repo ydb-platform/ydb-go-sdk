@@ -61,11 +61,13 @@ func (d DriverTrace) getConnStart(ctx context.Context) {
 		f(x)
 	}
 }
-func (d DriverTrace) getConnDone(ctx context.Context, addr string, err error) {
+func (d DriverTrace) getConnDone(ctx context.Context, conn *conn, err error) {
 	x := GetConnDoneInfo{
 		Context: ctx,
-		Address: addr,
 		Error:   err,
+	}
+	if conn != nil {
+		x.Address = conn.addr.String()
 	}
 	if f := d.GetConnDone; f != nil {
 		f(x)

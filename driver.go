@@ -364,7 +364,7 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 
 	d.trace.getConnStart(rawctx)
 	conn, err := d.cluster.Get(ctx)
-	d.trace.getConnDone(rawctx, conn.addr.String(), err)
+	d.trace.getConnDone(rawctx, conn, err)
 	if err != nil {
 		return err
 	}
@@ -439,7 +439,7 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) er
 
 	d.trace.getConnStart(rawctx)
 	conn, err := d.cluster.Get(ctx)
-	d.trace.getConnDone(rawctx, conn.addr.String(), err)
+	d.trace.getConnDone(rawctx, conn, err)
 	if err != nil {
 		return err
 	}
