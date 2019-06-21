@@ -89,6 +89,15 @@ func TestValueToString(t *testing.T) {
 				panic("whoa")
 			}),
 		},
+		{
+			value: ZeroValue(OptionalType{T: TypeBool}),
+		},
+		{
+			value: ZeroValue(ListType{T: TypeBool}),
+		},
+		{
+			value: ZeroValue(TypeUUID),
+		},
 	} {
 		t.Run("", func(t *testing.T) {
 			var buf bytes.Buffer

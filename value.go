@@ -34,6 +34,7 @@ func UUIDValue(v [16]byte) Value      { return internal.UUIDValue(v) }
 
 func VoidValue() Value            { return internal.VoidValue }
 func NullValue(t Type) Value      { return internal.NullValue(t) }
+func ZeroValue(t Type) Value      { return internal.ZeroValue(t) }
 func OptionalValue(v Value) Value { return internal.OptionalValue(v) }
 
 // DecimalValue creates decimal value of given type t and value v.

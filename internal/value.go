@@ -104,6 +104,8 @@ func valueToString(buf *bytes.Buffer, t T, v *Ydb.Value) {
 	if x, ok := primitiveFromYDB(v); ok {
 		if x != nil {
 			fmt.Fprintf(buf, "%v", x)
+		} else {
+			buf.WriteString("NULL")
 		}
 		return
 	}
@@ -557,6 +559,78 @@ func VariantValue(x V, i uint32, t T) Value {
 			},
 			VariantIndex: i,
 		},
+	}
+}
+
+func ZeroValue(t T) Value {
+	v := new(Ydb.Value)
+	switch t := t.(type) {
+	case PrimitiveType:
+		switch t {
+		case TypeBool:
+			v.Value = new(Ydb.Value_BoolValue)
+
+		case TypeInt8, TypeInt16, TypeInt32:
+			v.Value = new(Ydb.Value_Int32Value)
+
+		case
+			TypeUint8, TypeUint16, TypeUint32,
+			TypeDate, TypeDatetime:
+
+			v.Value = new(Ydb.Value_Uint32Value)
+
+		case
+			TypeInt64,
+			TypeInterval:
+
+			v.Value = new(Ydb.Value_Int64Value)
+
+		case
+			TypeUint64,
+			TypeTimestamp:
+
+			v.Value = new(Ydb.Value_Uint64Value)
+
+		case TypeFloat:
+			v.Value = new(Ydb.Value_FloatValue)
+
+		case TypeDouble:
+			v.Value = new(Ydb.Value_DoubleValue)
+
+		case
+			TypeUTF8, TypeYSON, TypeJSON,
+			TypeTzDate, TypeTzDatetime, TypeTzTimestamp:
+
+			v.Value = new(Ydb.Value_TextValue)
+
+		case TypeString:
+			v.Value = new(Ydb.Value_BytesValue)
+
+		case TypeUUID:
+			v.Value = new(Ydb.Value_Low_128)
+
+		default:
+			panic("uncovered primitive type")
+		}
+
+	case OptionalType, VoidType:
+		v.Value = new(Ydb.Value_NullFlagValue)
+
+	case ListType, TupleType, StructType, DictType:
+		// Nothing to do.
+
+	case DecimalType:
+		v.Value = new(Ydb.Value_Low_128)
+
+	case VariantType:
+		panic("do not know what to do with variant type for zero value")
+
+	default:
+		panic("uncovered type")
+	}
+	return Value{
+		t: t,
+		v: v,
 	}
 }
 
