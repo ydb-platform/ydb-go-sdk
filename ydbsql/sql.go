@@ -468,10 +468,18 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 	return &rows{res: res}, nil
 }
 
-func checkNamedValue(v *driver.NamedValue) error {
+func checkNamedValue(v *driver.NamedValue) (err error) {
 	if v.Name == "" {
 		return fmt.Errorf("ydbsql: only named parameters are supported")
 	}
+
+	if valuer, ok := v.Value.(driver.Valuer); ok {
+		v.Value, err = valuer.Value()
+		if err != nil {
+			return fmt.Errorf("ydbsql: driver.Valuer error: %v", err)
+		}
+	}
+
 	switch x := v.Value.(type) {
 	case ydb.Value:
 		// OK.
