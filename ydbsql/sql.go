@@ -87,30 +87,45 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	}, nil
 }
 
-// txIsolation maps driver transaction options to ydb transaction option.
+// txIsolationOrControl maps driver transaction options to ydb transaction option or query transaction control.
+// This caused by ydb logic that prevents start actual transaction with OnlineReadOnly mode and ReadCommitted
+// and ReadUncommitted isolation levels should use tx_control in every query request.
 // It returns error on unsupported options.
-func txIsolation(opts driver.TxOptions) (isolation table.TxOption, err error) {
+func txIsolationOrControl(opts driver.TxOptions) (isolation table.TxOption, control []table.TxControlOption, err error) {
 	level := sql.IsolationLevel(opts.Isolation)
 	switch level {
 	case sql.LevelDefault,
 		sql.LevelSerializable,
 		sql.LevelLinearizable:
 
-		return table.WithSerializableReadWrite(), nil
+		isolation = table.WithSerializableReadWrite()
+		return
 
 	case sql.LevelReadUncommitted:
 		if opts.ReadOnly {
-			return table.WithOnlineReadOnly(
-				table.WithInconsistentReads(),
-			), nil
+			control = []table.TxControlOption{
+				table.BeginTx(
+					table.WithOnlineReadOnly(
+						table.WithInconsistentReads(),
+					),
+				),
+				table.CommitTx(),
+			}
+			return
 		}
 
 	case sql.LevelReadCommitted:
 		if opts.ReadOnly {
-			return table.WithOnlineReadOnly(), nil
+			control = []table.TxControlOption{
+				table.BeginTx(
+					table.WithOnlineReadOnly(),
+				),
+				table.CommitTx(),
+			}
+			return
 		}
 	}
-	return nil, fmt.Errorf(
+	return nil, nil, fmt.Errorf(
 		"ydbsql: unsupported transaction options: isolation=%s read_only=%t",
 		nameIsolationLevel(level), opts.ReadOnly,
 	)
@@ -120,28 +135,32 @@ func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
-	if c.tx != nil {
+	if c.tx != nil || c.txc != nil {
 		return nil, ErrActiveTransaction
 	}
-	isolation, err := txIsolation(opts)
+	isolation, control, err := txIsolationOrControl(opts)
 	if err != nil {
 		return nil, err
 	}
-	c.tx, err = c.session.BeginTransaction(ctx, table.TxSettings(isolation))
-	if err != nil {
-		if ydb.IsBusyAfter(err) {
-			c.busy = true
+	if isolation != nil {
+		c.tx, err = c.session.BeginTransaction(ctx, table.TxSettings(isolation))
+		if err != nil {
+			if ydb.IsBusyAfter(err) {
+				c.busy = true
+			}
+			return nil, mapBadSessionError(err)
 		}
-		return nil, mapBadSessionError(err)
+		c.txc = table.TxControl(table.WithTx(c.tx))
+	} else {
+		c.txc = table.TxControl(control...)
 	}
-	c.txc = table.TxControl(table.WithTx(c.tx))
 	return c, nil
 }
 
 // Rollback implements driver.Tx interface.
 // Note that it is called by driver even if a user did not called it.
 func (c *conn) Rollback() error {
-	if c.tx == nil {
+	if c.tx == nil && c.txc == nil {
 		return ErrNoActiveTransaction
 	}
 
@@ -159,11 +178,14 @@ func (c *conn) Rollback() error {
 		return ErrSessionBusy
 	}
 
-	return tx.Rollback(context.Background())
+	if tx != nil {
+		return tx.Rollback(context.Background())
+	}
+	return nil
 }
 
 func (c *conn) Commit() error {
-	if c.tx == nil {
+	if c.tx == nil && c.txc == nil {
 		return ErrNoActiveTransaction
 	}
 
@@ -181,7 +203,10 @@ func (c *conn) Commit() error {
 		return ErrSessionBusy
 	}
 
-	return tx.Commit(context.Background())
+	if tx != nil {
+		return tx.Commit(context.Background())
+	}
+	return nil
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {

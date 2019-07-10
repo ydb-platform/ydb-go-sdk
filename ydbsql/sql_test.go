@@ -31,10 +31,11 @@ var (
 
 func TestIsolationMapping(t *testing.T) {
 	for _, test := range []struct {
-		name string
-		opts driver.TxOptions
-		exp  table.TxOption
-		err  bool
+		name   string
+		opts   driver.TxOptions
+		txExp  table.TxOption
+		txcExp []table.TxControlOption
+		err    bool
 	}{
 		{
 			name: "default",
@@ -42,7 +43,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelDefault),
 				ReadOnly:  false,
 			},
-			exp: table.WithSerializableReadWrite(),
+			txExp: table.WithSerializableReadWrite(),
 		},
 		{
 			name: "serializable",
@@ -50,7 +51,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSerializable),
 				ReadOnly:  false,
 			},
-			exp: table.WithSerializableReadWrite(),
+			txExp: table.WithSerializableReadWrite(),
 		},
 		{
 			name: "linearizable",
@@ -58,7 +59,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelLinearizable),
 				ReadOnly:  false,
 			},
-			exp: table.WithSerializableReadWrite(),
+			txExp: table.WithSerializableReadWrite(),
 		},
 		{
 			name: "default ro",
@@ -66,7 +67,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelDefault),
 				ReadOnly:  true,
 			},
-			exp: table.WithSerializableReadWrite(),
+			txExp: table.WithSerializableReadWrite(),
 		},
 		{
 			name: "serializable ro",
@@ -74,7 +75,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSerializable),
 				ReadOnly:  true,
 			},
-			exp: table.WithSerializableReadWrite(),
+			txExp: table.WithSerializableReadWrite(),
 		},
 		{
 			name: "linearizable ro",
@@ -82,7 +83,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelLinearizable),
 				ReadOnly:  true,
 			},
-			exp: table.WithSerializableReadWrite(),
+			txExp: table.WithSerializableReadWrite(),
 		},
 		{
 			name: "read uncommitted",
@@ -90,9 +91,14 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelReadUncommitted),
 				ReadOnly:  true,
 			},
-			exp: table.WithOnlineReadOnly(
-				table.WithInconsistentReads(),
-			),
+			txcExp: []table.TxControlOption{
+				table.BeginTx(
+					table.WithOnlineReadOnly(
+						table.WithInconsistentReads(),
+					),
+				),
+				table.CommitTx(),
+			},
 		},
 		{
 			name: "read committed",
@@ -100,11 +106,16 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelReadCommitted),
 				ReadOnly:  true,
 			},
-			exp: table.WithOnlineReadOnly(),
+			txcExp: []table.TxControlOption{
+				table.BeginTx(
+					table.WithOnlineReadOnly(),
+				),
+				table.CommitTx(),
+			},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			act, err := txIsolation(test.opts)
+			txAct, txcAct, err := txIsolationOrControl(test.opts)
 			if !test.err && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -112,10 +123,26 @@ func TestIsolationMapping(t *testing.T) {
 				t.Fatalf("expected error; got nil")
 			}
 
-			sAct := table.TxSettings(act)
-			sExp := table.TxSettings(test.exp)
+			var sAct, sExp *table.TransactionSettings
+			if txAct != nil {
+				sAct = table.TxSettings(txAct)
+			}
+			if test.txExp != nil {
+				sExp = table.TxSettings(test.txExp)
+			}
 			if !reflect.DeepEqual(sAct, sExp) {
-				t.Fatalf("unexpected settings: %+v; want %+v", sAct, sExp)
+				t.Fatalf("unexpected tx settings: %+v; want %+v", sAct, sExp)
+			}
+
+			var cAct, cExp *table.TransactionControl
+			if txcAct != nil {
+				cAct = table.TxControl(txcAct...)
+			}
+			if test.txcExp != nil {
+				cExp = table.TxControl(test.txcExp...)
+			}
+			if !reflect.DeepEqual(cAct, cExp) {
+				t.Fatalf("unexpected settings: %+v; want %+v", cAct, cExp)
 			}
 		})
 	}
