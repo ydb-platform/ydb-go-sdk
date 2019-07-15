@@ -80,7 +80,9 @@ func TestOperationParams(t *testing.T) {
 				ctx = WithOperationMode(ctx, m)
 			}
 			if t := test.ctxTimeout; t > 0 {
-				ctx, _ = context.WithDeadline(ctx, timeutil.Now().Add(t))
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(ctx, timeutil.Now().Add(t))
+				defer cancel()
 			}
 
 			act, _ := operationParams(ctx, test.ctxMapping)
