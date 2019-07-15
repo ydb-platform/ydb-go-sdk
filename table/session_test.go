@@ -31,7 +31,7 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 			Handler: methodHandlers{
 				testutil.TableKeepAlive: func(req, res interface{}) error {
 					keepalive <- struct{}{}
-					r := testutil.TableKeepAliveResult{res}
+					r := testutil.TableKeepAliveResult{R: res}
 					r.SetSessionStatus(true)
 					return nil
 				},
@@ -78,7 +78,7 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 			Handler: methodHandlers{
 				testutil.TableKeepAlive: func(req, res interface{}) error {
 					keepalive <- struct{}{}
-					r := testutil.TableKeepAliveResult{res}
+					r := testutil.TableKeepAliveResult{R: res}
 					r.SetSessionStatus(true)
 					return nil
 				},
@@ -137,7 +137,7 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 					keepalive <- ch
 					ready := <-ch
 
-					r := testutil.TableKeepAliveResult{res}
+					r := testutil.TableKeepAliveResult{R: res}
 					r.SetSessionStatus(ready)
 
 					return nil

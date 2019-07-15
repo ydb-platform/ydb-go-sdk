@@ -177,7 +177,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (Driver, error) {
 	cluster := cluster{
 		dial: d.dialHostPort,
 	}
-	var explorer repeater
+	var explorer *repeater
 	if d.config.DiscoveryInterval > 0 {
 		cluster.balancer = balancers[d.config.BalancingMethod]()
 
@@ -191,7 +191,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (Driver, error) {
 		for _, e := range curr {
 			cluster.Insert(ctx, e)
 		}
-		explorer = repeater{
+		explorer = &repeater{
 			Interval: d.config.DiscoveryInterval,
 			Task: func(ctx context.Context) {
 				next, err := d.discover(ctx, addr)
@@ -321,7 +321,7 @@ type driver struct {
 	cluster  *cluster
 	meta     *meta
 	trace    DriverTrace
-	explorer repeater
+	explorer *repeater
 
 	requestTimeout       time.Duration
 	streamTimeout        time.Duration
@@ -332,7 +332,9 @@ type driver struct {
 }
 
 func (d *driver) Close() error {
-	d.explorer.Stop()
+	if d.explorer != nil {
+		d.explorer.Stop()
+	}
 	d.cluster.Close()
 	return nil
 }
