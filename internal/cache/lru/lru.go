@@ -45,6 +45,7 @@ func (c *Cache) Remove(key interface{}) (interface{}, bool) {
 	if !has {
 		return nil, false
 	}
+	delete(c.index, key)
 	return c.list.Remove(el).(*entry).value, true
 }
 

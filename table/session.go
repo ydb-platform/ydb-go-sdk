@@ -1,1087 +1,914 @@
 package table
 
 import (
-	"container/list"
+	"bytes"
 	"context"
-	"errors"
-	"sync"
-	"time"
+	"io"
+	"runtime"
 
-	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
+	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/Ydb_Table_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/draft/Ydb_Experimental_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Experimental"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/cache/lru"
 )
 
-var (
-	DefaultSessionPoolKeepAliveTimeout  = 500 * time.Millisecond
-	DefaultSessionPoolDeleteTimeout     = 500 * time.Millisecond
-	DefaultSessionPoolIdleThreshold     = 5 * time.Second
-	DefaultSessionPoolBusyCheckInterval = 1 * time.Second
-	DefaultSessionPoolSizeLimit         = 50
-)
+// Client contains logic of creation of ydb table sessions.
+type Client struct {
+	Driver ydb.Driver
+	Trace  ClientTrace
 
-var (
-	// ErrSessionPoolClosed is returned by a SessionPool instance to indicate
-	// that pool is closed and not able to complete requested operation.
-	ErrSessionPoolClosed = errors.New("ydb: table: session pool is closed")
-
-	// ErrSessionPoolOverflow is returned by a SessionPool instance to indicate
-	// that the pool is full and requested operation is not able to complete.
-	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
-
-	// ErrUnknownSession is returned by a SessionPool instance to indicate that
-	// requested session does not exist within the pool.
-	ErrSessionUnknown = errors.New("ydb: table: unknown session")
-
-	// ErrNoProgress is returned by a SessionPool instance to indicate that
-	// operation could not be completed.
-	ErrNoProgress = errors.New("ydb: table: no progress")
-)
-
-// SessionBuilder is the interface that holds logic of creating or deleting
-// sessions.
-type SessionBuilder interface {
-	CreateSession(context.Context) (*Session, error)
+	MaxQueryCacheSize int
 }
 
-// SessionPool is a set of Session instances that may be reused.
-// A SessionPool is safe for use by multiple goroutines simultaneously.
-type SessionPool struct {
-	// Trace is an optional session lifetime tracing options.
-	Trace SessionPoolTrace
-
-	// Builder holds an object capable for creating and deleting sessions.
-	// It must not be nil.
-	Builder SessionBuilder
-
-	// SizeLimit is an upper bound of pooled sessions.
-	// If SizeLimit is less than or equal to zero then the
-	// DefaultSessionPoolSizeLimit variable is used as a limit.
-	SizeLimit int
-
-	// IdleLimit is an upper bound of pooled sessions without any activity
-	// within.
-	//IdleLimit int
-
-	// IdleThreshold is a maximum duration between any activity within session.
-	// If this threshold reached, KeepAlive() method will be called on idle
-	// session.
-	//
-	// If IdleThreshold is less than zero then there is no idle limit.
-	// If IdleThreshold is zero, then the DefaultSessionPoolIdleThreshold value
-	// is used.
-	IdleThreshold time.Duration
-
-	// BusyCheckInterval is an interval between busy sessions status checks.
-	// If BusyCheckInterval is less than zero then there busy checking is
-	// disabled.
-	// If BusyCheckInterval is equal to zero, then the
-	// DefaultSessionPoolBusyCheckInterval value is used.
-	BusyCheckInterval time.Duration
-
-	// KeepAliveBatchSize is a maximum number sessions taken from the pool to
-	// prepare KeepAlive() call on them in background.
-	// If KeepAliveBatchSize is less than or equal to zero, then there is no
-	// batch limit.
-	KeepAliveBatchSize int
-
-	// KeepAliveTimeout limits maximum time spent on KeepAlive request for
-	// KeepAliveBatchSize number of sessions.
-	// If KeepAliveTimeout is less than or equal to zero then the
-	// DefaultSessionPoolKeepAliveTimeout is used.
-	KeepAliveTimeout time.Duration
-
-	// DeleteTimeout limits maximum time spent on Delete request for
-	// KeepAliveBatchSize number of sessions.
-	// If DeleteTimeout is less than or equal to zero then the
-	// DefaultSessionPoolDeleteTimeout is used.
-	DeleteTimeout time.Duration
-
-	mu       sync.Mutex
-	initOnce sync.Once
-	index    map[*Session]sessionInfo
-	limit    int        // Upper bound for pool size.
-	idle     *list.List // list<*Session>
-	ready    *list.List // list<*Session>
-	waitq    *list.List // list<*chan *Session>
-
-	keeperWake chan struct{} // Set by keeper.
-	keeperStop chan struct{}
-	keeperDone chan struct{}
-
-	touching     bool
-	touchingDone chan struct{}
-
-	busyCheck       chan *Session
-	busyCheckerStop chan struct{}
-	busyCheckerDone chan struct{}
-
-	closed bool
-}
-
-func (p *SessionPool) init() {
-	p.initOnce.Do(func() {
-		p.index = make(map[*Session]sessionInfo)
-
-		p.idle = list.New()
-		p.ready = list.New()
-		p.waitq = list.New()
-
-		p.limit = p.SizeLimit
-		if p.limit <= 0 {
-			p.limit = DefaultSessionPoolSizeLimit
-		}
-
-		if p.IdleThreshold == 0 {
-			p.IdleThreshold = DefaultSessionPoolIdleThreshold
-		}
-		if p.IdleThreshold > 0 {
-			p.keeperStop = make(chan struct{})
-			p.keeperDone = make(chan struct{})
-			go p.keeper()
-		}
-
-		if p.BusyCheckInterval == 0 {
-			p.BusyCheckInterval = DefaultSessionPoolBusyCheckInterval
-		}
-		if p.BusyCheckInterval > 0 {
-			p.busyCheckerStop = make(chan struct{})
-			p.busyCheckerDone = make(chan struct{})
-			// NOTE: if we make this buffered we also must cork it inside
-			// Close().
-			p.busyCheck = make(chan *Session)
-			go p.busyChecker()
-		}
+// CreateSession creates new session instance.
+// Unused sessions must be destroyed.
+func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
+	c.traceCreateSessionStart(ctx)
+	defer func() {
+		c.traceCreateSessionDone(ctx, s, err)
+	}()
+	var (
+		req Ydb_Table.CreateSessionRequest
+		res Ydb_Table.CreateSessionResult
+	)
+	err = c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CreateSession, &req, &res))
+	if err != nil {
+		return nil, err
+	}
+	s = &Session{
+		ID: res.SessionId,
+		c:  *c,
+		qcache: lru.Cache{
+			MaxSize: c.MaxQueryCacheSize,
+		},
+	}
+	runtime.SetFinalizer(s, func(s *Session) {
+		go s.Close(context.Background())
 	})
+	return
 }
 
-// p.mu must NOT be held.
-func (p *SessionPool) createSession(ctx context.Context) (s *Session, err error) {
-	s, err = p.Builder.CreateSession(ctx)
+// Session represents a single table API session.
+//
+// Session methods are not goroutine safe. Simultaneous execution of requests
+// are forbidden within a single session.
+//
+// Note that after Session is no longer needed it should be destroyed by
+// Close() call.
+type Session struct {
+	ID string
+
+	c Client
+
+	qcache lru.Cache
+	qhash  queryHasher
+
+	closed  bool
+	onClose []func()
+}
+
+func (s *Session) OnClose(cb func()) {
+	if s.closed {
+		return
+	}
+	s.onClose = append(s.onClose, cb)
+}
+
+func (s *Session) Close(ctx context.Context) (err error) {
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+	s.c.traceDeleteSessionStart(ctx, s)
+	defer func() {
+		runtime.SetFinalizer(s, nil)
+		for _, cb := range s.onClose {
+			cb()
+		}
+		s.c.traceDeleteSessionDone(ctx, s, err)
+	}()
+	req := Ydb_Table.DeleteSessionRequest{
+		SessionId: s.ID,
+	}
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DeleteSession, &req, nil))
+}
+
+// KeepAlive keeps idle session alive.
+func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
+	s.c.traceKeepAliveStart(ctx, s)
+	defer func() {
+		s.c.traceKeepAliveDone(ctx, s, info, err)
+	}()
+	var res Ydb_Table.KeepAliveResult
+	req := Ydb_Table.KeepAliveRequest{
+		SessionId: s.ID,
+	}
+	err = s.c.Driver.Call(ctx, internal.Wrap(
+		Ydb_Table_V1.KeepAlive, &req, &res,
+	))
 	if err != nil {
 		return
 	}
+	switch res.SessionStatus {
+	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
+		info.Status = SessionReady
+	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
+		info.Status = SessionBusy
+	}
+	return
+}
 
-	p.mu.Lock()
-	enoughSpace := len(p.index) < p.limit
-	if enoughSpace {
-		p.index[s] = sessionInfo{}
-		s.OnClose(func() {
-			p.mu.Lock()
-			defer p.mu.Unlock()
+// CreateTable creates table at given path with given options.
+func (s *Session) CreateTable(ctx context.Context, path string, opts ...CreateTableOption) error {
+	req := Ydb_Table.CreateTableRequest{
+		SessionId: s.ID,
+		Path:      path,
+	}
+	for _, opt := range opts {
+		opt((*createTableDesc)(&req))
+	}
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CreateTable, &req, nil))
+}
 
-			info, has := p.index[s]
-			if p.closed || !has {
+// DescribeTable describes table at given path.
+func (s *Session) DescribeTable(ctx context.Context, path string) (desc Description, err error) {
+	var res Ydb_Table.DescribeTableResult
+	req := Ydb_Table.DescribeTableRequest{
+		SessionId: s.ID,
+		Path:      path,
+	}
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DescribeTable, &req, &res))
+	if err != nil {
+		return desc, err
+	}
+	cs := make([]Column, len(res.Columns))
+	for i, c := range res.Columns {
+		cs[i] = Column{
+			Name: c.Name,
+			Type: internal.TypeFromYDB(c.Type),
+		}
+	}
+	return Description{
+		Name:       res.Self.Name,
+		PrimaryKey: res.PrimaryKey,
+		Columns:    cs,
+	}, nil
+}
+
+// DropTable drops table at given path with given options.
+func (s *Session) DropTable(ctx context.Context, path string, opts ...DropTableOption) error {
+	req := Ydb_Table.DropTableRequest{
+		SessionId: s.ID,
+		Path:      path,
+	}
+	for _, opt := range opts {
+		opt((*dropTableDesc)(&req))
+	}
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DropTable, &req, nil))
+}
+
+// AlterTable modifies schema of table at given path with given options.
+func (s *Session) AlterTable(ctx context.Context, path string, opts ...AlterTableOption) error {
+	req := Ydb_Table.AlterTableRequest{
+		SessionId: s.ID,
+		Path:      path,
+	}
+	for _, opt := range opts {
+		opt((*alterTableDesc)(&req))
+	}
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.AlterTable, &req, nil))
+}
+
+// CopyTable creates copy of table at given path.
+func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...CopyTableOption) error {
+	req := Ydb_Table.CopyTableRequest{
+		SessionId:       s.ID,
+		SourcePath:      src,
+		DestinationPath: dst,
+	}
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CopyTable, &req, nil))
+}
+
+// DataQueryExplanation is a result of ExplainDataQuery call.
+type DataQueryExplanation struct {
+	AST  string
+	Plan string
+}
+
+// Explain explains data query represented by text.
+func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExplanation, err error) {
+	var res Ydb_Table.ExplainQueryResult
+	req := Ydb_Table.ExplainDataQueryRequest{
+		SessionId: s.ID,
+		YqlText:   query,
+	}
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExplainDataQuery, &req, &res))
+	if err != nil {
+		return
+	}
+	return DataQueryExplanation{
+		AST:  res.QueryAst,
+		Plan: res.QueryPlan,
+	}, nil
+}
+
+// Statement is a prepared statement. Like a single Session, it is not safe for
+// concurrent use by multiple goroutines.
+type Statement struct {
+	session *Session
+	query   *DataQuery
+	qhash   queryHash
+	params  map[string]*Ydb.Type
+}
+
+// Execute executes prepared data query.
+func (s *Statement) Execute(
+	ctx context.Context, tx *TransactionControl,
+	params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (
+	txr *Transaction, r *Result, err error,
+) {
+	txr, r, err = s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
+	if ydb.IsOpError(err, ydb.StatusNotFound) {
+		s.session.qcache.Remove(s.qhash)
+	}
+	return
+}
+
+func (s *Statement) NumInput() int {
+	return len(s.params)
+}
+
+// Prepare prepares data query within session s.
+func (s *Session) Prepare(
+	ctx context.Context, query string,
+) (
+	stmt *Statement, err error,
+) {
+	var (
+		cached bool
+		q      *DataQuery
+	)
+	s.c.tracePrepareDataQueryStart(ctx, s, query)
+	defer func() {
+		s.c.tracePrepareDataQueryDone(ctx, s, query, q, cached, err)
+	}()
+
+	cacheKey := s.qhash.hash(query)
+	v, cached := s.qcache.Get(cacheKey)
+	if cached {
+		return v.(*Statement), nil
+	}
+
+	var res Ydb_Table.PrepareQueryResult
+	req := Ydb_Table.PrepareDataQueryRequest{
+		SessionId: s.ID,
+		YqlText:   query,
+	}
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.PrepareDataQuery, &req, &res))
+	if err != nil {
+		return nil, err
+	}
+	q = new(DataQuery)
+	q.initPrepared(res.QueryId)
+	stmt = &Statement{
+		session: s,
+		query:   q,
+		qhash:   cacheKey,
+		params:  res.ParametersTypes,
+	}
+	s.qcache.Add(cacheKey, stmt)
+
+	return stmt, nil
+}
+
+// Execute executes given data query represented by text.
+func (s *Session) Execute(
+	ctx context.Context, tx *TransactionControl,
+	query string, params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (
+	txr *Transaction, r *Result, err error,
+) {
+	q := new(DataQuery)
+	q.initFromText(query)
+	return s.executeDataQuery(ctx, tx, q, params, opts...)
+}
+
+// executeDataQuery executes data query. It may execute raw text query or query
+// prepared before.
+func (s *Session) executeDataQuery(
+	ctx context.Context, tx *TransactionControl,
+	query *DataQuery, params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (
+	txr *Transaction, r *Result, err error,
+) {
+	s.c.traceExecuteDataQueryStart(ctx, s, tx, query, params)
+	defer func() {
+		s.c.traceExecuteDataQueryDone(ctx, s, tx, query, params, txr, r, err)
+	}()
+	var res Ydb_Table.ExecuteQueryResult
+	req := Ydb_Table.ExecuteDataQueryRequest{
+		SessionId:  s.ID,
+		TxControl:  &tx.desc,
+		Parameters: params.params(),
+		Query:      &query.query,
+	}
+	for _, opt := range opts {
+		opt((*executeDataQueryDesc)(&req))
+	}
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExecuteDataQuery, &req, &res))
+	if err != nil {
+		return txr, r, err
+	}
+	txr = &Transaction{
+		id: res.TxMeta.Id,
+		s:  s,
+	}
+	r = &Result{
+		sets: res.ResultSets,
+	}
+	return txr, r, nil
+}
+
+// ExecuteSchemeQuery executes scheme query.
+func (s *Session) ExecuteSchemeQuery(
+	ctx context.Context, query string,
+	opts ...ExecuteSchemeQueryOption,
+) error {
+	req := Ydb_Table.ExecuteSchemeQueryRequest{
+		SessionId: s.ID,
+		YqlText:   query,
+	}
+	for _, opt := range opts {
+		opt((*executeSchemeQueryDesc)(&req))
+	}
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExecuteSchemeQuery, &req, nil))
+}
+
+// DescribeTableOptions describes supported table options.
+func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDescription, err error) {
+	var res Ydb_Table.DescribeTableOptionsResult
+	req := Ydb_Table.DescribeTableOptionsRequest{}
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DescribeTableOptions, &req, &res))
+	if err != nil {
+		return
+	}
+	{
+		xs := make([]TableProfileDescription, len(res.TableProfilePresets))
+		for i, p := range res.TableProfilePresets {
+			xs[i] = TableProfileDescription{
+				Name:   p.Name,
+				Labels: p.Labels,
+
+				DefaultStoragePolicy:      p.DefaultStoragePolicy,
+				DefaultCompactionPolicy:   p.DefaultCompactionPolicy,
+				DefaultPartitioningPolicy: p.DefaultPartitioningPolicy,
+				DefaultExecutionPolicy:    p.DefaultExecutionPolicy,
+				DefaultReplicationPolicy:  p.DefaultReplicationPolicy,
+				DefaultCachingPolicy:      p.DefaultCachingPolicy,
+
+				AllowedStoragePolicies:      p.AllowedStoragePolicies,
+				AllowedCompactionPolicies:   p.AllowedCompactionPolicies,
+				AllowedPartitioningPolicies: p.AllowedPartitioningPolicies,
+				AllowedExecutionPolicies:    p.AllowedExecutionPolicies,
+				AllowedReplicationPolicies:  p.AllowedReplicationPolicies,
+				AllowedCachingPolicies:      p.AllowedCachingPolicies,
+			}
+		}
+		desc.TableProfilePresets = xs
+	}
+	{
+		xs := make([]StoragePolicyDescription, len(res.StoragePolicyPresets))
+		for i, p := range res.StoragePolicyPresets {
+			xs[i] = StoragePolicyDescription{
+				Name:   p.Name,
+				Labels: p.Labels,
+			}
+		}
+		desc.StoragePolicyPresets = xs
+	}
+	{
+		xs := make([]CompactionPolicyDescription, len(res.CompactionPolicyPresets))
+		for i, p := range res.CompactionPolicyPresets {
+			xs[i] = CompactionPolicyDescription{
+				Name:   p.Name,
+				Labels: p.Labels,
+			}
+		}
+		desc.CompactionPolicyPresets = xs
+	}
+	{
+		xs := make([]PartitioningPolicyDescription, len(res.PartitioningPolicyPresets))
+		for i, p := range res.PartitioningPolicyPresets {
+			xs[i] = PartitioningPolicyDescription{
+				Name:   p.Name,
+				Labels: p.Labels,
+			}
+		}
+		desc.PartitioningPolicyPresets = xs
+	}
+	{
+		xs := make([]ExecutionPolicyDescription, len(res.ExecutionPolicyPresets))
+		for i, p := range res.ExecutionPolicyPresets {
+			xs[i] = ExecutionPolicyDescription{
+				Name:   p.Name,
+				Labels: p.Labels,
+			}
+		}
+		desc.ExecutionPolicyPresets = xs
+	}
+	{
+		xs := make([]ReplicationPolicyDescription, len(res.ReplicationPolicyPresets))
+		for i, p := range res.ReplicationPolicyPresets {
+			xs[i] = ReplicationPolicyDescription{
+				Name:   p.Name,
+				Labels: p.Labels,
+			}
+		}
+		desc.ReplicationPolicyPresets = xs
+	}
+	{
+		xs := make([]CachingPolicyDescription, len(res.CachingPolicyPresets))
+		for i, p := range res.CachingPolicyPresets {
+			xs[i] = CachingPolicyDescription{
+				Name:   p.Name,
+				Labels: p.Labels,
+			}
+		}
+		desc.CachingPolicyPresets = xs
+	}
+	return desc, nil
+}
+
+// StreamReadTable reads table at given path with given options.
+func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...ReadTableOption) (r *Result, err error) {
+	var resp Ydb_Table.ReadTableResponse
+	req := Ydb_Table.ReadTableRequest{
+		SessionId: s.ID,
+		Path:      path,
+	}
+	for _, opt := range opts {
+		opt((*readTableDesc)(&req))
+	}
+
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+
+	var (
+		ch = make(chan *Ydb.ResultSet, 1)
+		ce = new(error)
+	)
+	err = s.c.Driver.StreamRead(ctx, internal.WrapStreamOperation(
+		Ydb_Table_V1.StreamReadTable, &req, &resp,
+		func(err error) {
+			if err != io.EOF {
+				*ce = err
+			}
+			if err != nil {
+				close(ch)
 				return
 			}
-
-			delete(p.index, s)
-			p.notify(nil)
-
-			if info.idle != nil {
-				panic("ydb: table: session closed while still in idle pool")
+			select {
+			case <-ctx.Done():
+			case ch <- resp.Result.ResultSet:
 			}
-			if info.ready != nil {
-				p.ready.Remove(info.ready)
-			}
-		})
-	}
-	p.mu.Unlock()
-
-	if !enoughSpace {
-		// We lost the race – pool is full now and session can not be reused.
-		p.closeSession(ctx, s)
-		s = nil
-		err = ErrSessionPoolOverflow
-	}
-
-	return
-}
-
-// Get returns first idle session from the SessionPool and removes it from
-// there. If no items stored in SessionPool it creates new one by calling
-// Builder.CreateSession() method and returns it.
-func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
-	p.init()
-
-	p.traceGetStart(ctx)
-	defer func() {
-		p.traceGetDone(ctx, s, err)
-	}()
-
-	const maxAttempts = 100
-	for i := 0; s == nil && err == nil && i < maxAttempts; i++ {
-		var (
-			ch *chan *Session
-			el *list.Element // Element in the wait queue.
-		)
-		p.mu.Lock()
-		if p.closed {
-			p.mu.Unlock()
-			return nil, ErrSessionPoolClosed
-		}
-		s = p.removeFirstIdle()
-		switch {
-		case s == nil && len(p.index) < p.limit:
-			// Can create new session without awaiting for reused one.
-			// Note that we must not increase p.n counter until successful session
-			// creation – in other way we will block some getter awaing on reused
-			// session which creation was actually failed here.
-			//
-			// But on the other side, this behavior is racy – there is a
-			// probability of creation of multiple session here (for the first time
-			// of pool usage, thus it is rare). We deal well with this race in the
-			// Put() implementation.
-			p.mu.Unlock()
-
-			s, err = p.createSession(ctx)
-			if err == ErrSessionPoolOverflow {
-				err = nil
-			}
-			if err != nil {
-				return nil, err
-			}
-
-			p.mu.Lock()
-
-		case s == nil && len(p.index) == p.limit:
-			// Try to wait for a touched session instead of creating new one.
-			//
-			// This should be done only if number of currently waiting goroutines
-			// are less than maximum amount of touched session. That is, we want to
-			// be fair here and not to lock more goroutines than we could ship
-			// session to.
-			ch = getWaitCh()
-			el = p.waitq.PushBack(ch)
-		}
-		p.mu.Unlock()
-
-		if ch == nil {
-			continue
-		}
-		p.traceWaitStart(ctx)
-		var ok bool
-		select {
-		case s, ok = <-*ch:
-			// Note that race may occur and some goroutine may try to write
-			// session into channel after it was enqueued but before it being
-			// read here. In that case we will receive nil here and will retry.
-			//
-			// The same path will work when some session become deleted - the
-			// nil value will be sent into the channel.
-			if ok {
-				// Put only filled and not closed channel back to the pool.
-				// That is, we need to avoid races on filling reused channel
-				// for the next waiter – session could be lost for a long time.
-				putWaitCh(ch)
-			}
-
-		case <-ctx.Done():
-			p.mu.Lock()
-			// Note that el can be already removed here while we were moving
-			// from reading from ch to this case. This does not make any
-			// difference – channel will be closed by notifying goroutine.
-			p.waitq.Remove(el)
-			p.mu.Unlock()
-			err = ctx.Err()
-		}
-		p.traceWaitDone(ctx, s, err)
-	}
-	if s == nil && err == nil {
-		err = ErrNoProgress
-	}
-
-	return s, err
-}
-
-// Put returns session to the SessionPool for further reuse.
-// If pool is already closed Put() calls s.Close(ctx) and returns
-// ErrSessionPoolClosed.
-//
-// Note that Put() must be called only once after being created or received by
-// Get() or Take() calls. In other way it will produce unexpected behavior or
-// panic.
-func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
-	p.init()
-
-	p.tracePutStart(ctx, s)
-	defer func() {
-		p.tracePutDone(ctx, s, err)
-	}()
-
-	p.mu.Lock()
-	switch {
-	case p.closed:
-		err = ErrSessionPoolClosed
-
-	case p.idle.Len() >= p.limit:
-		panicLocked(&p.mu, "ydb: table: Put() on full session pool")
-
-	default:
-		if !p.notify(s) {
-			p.pushIdle(s, timeutil.Now())
-		}
-	}
-	p.mu.Unlock()
-
+		},
+	))
 	if err != nil {
-		p.closeSession(ctx, s)
+		cancel()
+		return
 	}
-
-	return
+	r = &Result{
+		setCh:       ch,
+		setChErr:    ce,
+		setChCancel: cancel,
+	}
+	return r, nil
 }
 
-// PutBusy returns given session s into the pool after some operation on s was
-// canceled by the client (probably due the timeout) or after some transport
-// error received. That is, session may be still in request processing state
-// and is not able to process further requests.
-//
-// Given session may be reused or may be closed in the future. That is, calling
-// PutBusy() gives complete ownership of s to the pool.
-func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
-	p.init()
-
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return ErrSessionPoolClosed
+// UploadRows uploads given list of ydb struct values to the table.
+// NOTE: this is experimental feature.
+func (s *Session) UploadRows(ctx context.Context, table string, rows ydb.Value) error {
+	var res Ydb_Experimental.UploadRowsResult
+	req := Ydb_Experimental.UploadRowsRequest{
+		Table: table,
+		Rows:  internal.ValueToYDB(rows),
 	}
-	info, has := p.index[s]
-	if !has {
-		panicLocked(&p.mu, "ydb: table: PutBusy() unknown session")
-	}
-	if info.idle != nil {
-		panicLocked(&p.mu, "ydb: table: PutBusy() idle session")
-	}
-	if p.busyCheck == nil {
-		panicLocked(&p.mu, "ydb: table: PutBusy() session into the pool without busy checker")
-	}
-	delete(p.index, s)
-	p.notify(nil)
-	p.mu.Unlock()
-
-	select {
-	case p.busyCheck <- s:
-
-	case <-p.busyCheckerDone:
-		p.closeSession(ctx, s)
-
-	case <-ctx.Done():
-		err = ctx.Err()
-	}
-
-	return
+	return s.c.Driver.Call(ctx, internal.Wrap(
+		Ydb_Experimental_V1.UploadRows,
+		&req, &res,
+	))
 }
 
-// Take removes session s from the pool and ensures that s will not be returned
-// by other Take() or Get() calls.
-//
-// The intended way of Take() use is to create session by calling Create() and
-// Put() it later to prepare KeepAlive tracking when session is idle. When
-// Session becomes active, one should call Take() to stop KeepAlive tracking
-// (simultaneous use of Session is prohibited).
-//
-// After session returned to the pool by calling PutBusy() it can not be taken
-// by Take() any more. That is, semantically PutBusy() is the same as session's
-// Close().
-//
-// It is assumed that Take() callers never call Get() method.
-func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err error) {
-	p.init()
-
-	p.traceTakeStart(ctx, s)
+// BeginTransaction begins new transaction within given session with given
+// settings.
+func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings) (x *Transaction, err error) {
+	s.c.traceBeginTransactionStart(ctx, s)
 	defer func() {
-		p.traceTakeDone(ctx, s, took)
+		s.c.traceBeginTransactionDone(ctx, s, x, err)
 	}()
-
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return false, ErrSessionPoolClosed
+	var res Ydb_Table.BeginTransactionResult
+	req := Ydb_Table.BeginTransactionRequest{
+		SessionId:  s.ID,
+		TxSettings: &tx.settings,
 	}
-	var has bool
-	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
-		cond := p.touchCond()
-		p.mu.Unlock()
-
-		// Keepalive processing takes place right now.
-		// Try to await touched session before creation of new one.
-		select {
-		case <-cond:
-		case <-ctx.Done():
-			return false, ctx.Err()
-		}
-
-		p.mu.Lock()
-	}
-	p.mu.Unlock()
-
-	if !has {
-		err = ErrSessionUnknown
-	}
-
-	return took, err
-}
-
-// Create creates new session and returns it.
-// The intended way of Create() usage relates to Take() method.
-func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
-	p.init()
-
-	const maxAttempts = 10
-	for i := 0; s == nil && err == nil && i < maxAttempts; i++ {
-		p.mu.Lock()
-		if p.ready.Len() > 0 {
-			s = p.ready.Remove(p.ready.Front()).(*Session)
-			// NOTE: here is a race condition with keeper() running.
-			// Session could be deleted by some reason after we released the mutex.
-			// We are not dealing with this because even if session is not deleted
-			// by keeper() it could be staled on the server and the same user
-			// expirience will appear.
-		}
-		p.mu.Unlock()
-
-		if s == nil {
-			return p.createSession(ctx)
-		}
-
-		took, err := p.Take(ctx, s)
-		if err == ErrSessionUnknown {
-			// Race described above occured – retry.
-			s = nil
-			err = nil
-			continue
-		}
-		if err != nil {
-			p.mu.Lock()
-			if !p.closed {
-				p.ready.PushBack(s)
-			}
-			p.mu.Unlock()
-			return nil, err
-		}
-		if !took {
-			panic("ydb: table: inconsistent session pool usage")
-		}
-
-		return s, nil
-	}
-
-	return nil, ErrNoProgress
-}
-
-// Close deletes all stored sessions inside SessionPool.
-// It also stops all underlying timers and goroutines.
-// It returns first error occured during stale sessions deletion.
-// Note that even on error it calls Close() on each session.
-func (p *SessionPool) Close(ctx context.Context) (err error) {
-	p.init()
-
-	p.traceCloseStart(ctx)
-	defer func() {
-		p.traceCloseDone(ctx, err)
-	}()
-
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.BeginTransaction, &req, &res))
+	if err != nil {
 		return
 	}
-	p.closed = true
-
-	keeperDone := p.keeperDone
-	if ch := p.keeperStop; ch != nil {
-		close(ch)
-	}
-
-	busyCheckerDone := p.busyCheckerDone
-	if ch := p.busyCheckerStop; ch != nil {
-		close(ch)
-	}
-	p.mu.Unlock()
-
-	if keeperDone != nil {
-		<-keeperDone
-	}
-	if busyCheckerDone != nil {
-		<-busyCheckerDone
-	}
-
-	p.mu.Lock()
-	idle := p.idle
-	waitq := p.waitq
-	p.idle = nil
-	p.ready = nil
-	p.waitq = nil
-	p.index = nil
-	p.mu.Unlock()
-
-	for el := waitq.Front(); el != nil; el = el.Next() {
-		ch := el.Value.(*chan *Session)
-		close(*ch)
-	}
-	for e := idle.Front(); e != nil; e = e.Next() {
-		s := e.Value.(*Session)
-		p.closeSession(ctx, s)
-	}
-
-	return nil
+	return &Transaction{
+		id: res.TxMeta.Id,
+		s:  s,
+	}, nil
 }
 
-func (p *SessionPool) busyChecker() {
-	defer close(p.busyCheckerDone)
-	var (
-		toCheck []*Session
-
-		active = false
-		timer  = timeutil.NewStoppedTimer()
-		ctx    = context.Background()
-	)
-	for {
-		select {
-		case <-p.busyCheckerStop:
-			for _, s := range toCheck {
-				p.closeSession(ctx, s)
-			}
-			return
-
-		case <-timer.C():
-			active = false
-
-		case s := <-p.busyCheck:
-			p.traceBusyCheckStart(ctx, s)
-
-			if len(toCheck) == p.limit {
-				// Do not check more sessions than pool's capacity.
-				p.closeSession(ctx, s)
-				p.traceBusyCheckDone(ctx, s, false, nil)
-				continue
-			}
-
-			toCheck = append(toCheck, s)
-			if !active {
-				active = true
-				timer.Reset(p.BusyCheckInterval)
-			}
-
-			continue
-		}
-		for i := 0; i < len(toCheck); {
-			s := toCheck[i]
-			info, err := p.keepAliveSession(ctx, s)
-			if err != nil || info.Status == SessionReady {
-				n := len(toCheck)
-				toCheck[i] = toCheck[n-1]
-				toCheck[n-1] = nil
-				toCheck = toCheck[:n-1]
-
-				p.mu.Lock()
-				enoughSpace := !p.closed && len(p.index) < p.limit
-				reuse := enoughSpace && err == nil
-				if reuse {
-					p.index[s] = sessionInfo{}
-					if !p.notify(s) {
-						p.pushIdle(s, timeutil.Now())
-						p.pushReady(s)
-					}
-				}
-				p.mu.Unlock()
-				if !reuse {
-					p.closeSession(ctx, s)
-				}
-
-				p.traceBusyCheckDone(ctx, s, reuse, err)
-			} else {
-				i++
-			}
-		}
-		if len(toCheck) > 0 {
-			// Timer is never active here.
-			timer.Reset(p.BusyCheckInterval)
-		}
-	}
+// Transaction is a database transaction.
+// Hence session methods are not goroutine safe, Transaction is not goroutine
+// safe either.
+type Transaction struct {
+	id string
+	s  *Session
+	c  *TransactionControl
 }
 
-func (p *SessionPool) keeper() {
-	defer close(p.keeperDone)
-	var (
-		toTouch  []*Session // Cached for reuse.
-		toDelete []*Session // Cached for reuse.
-
-		wake  = make(chan struct{})
-		timer = timeutil.NewTimer(p.IdleThreshold)
-	)
-
-	for {
-		var now time.Time
-		select {
-		case now = <-timer.C():
-			// Handle tick outside select.
-			toTouch = toTouch[:0]
-			toDelete = toDelete[:0]
-
-		case <-wake:
-			wake = make(chan struct{})
-			timer.Reset(p.IdleThreshold)
-			continue
-
-		case <-p.keeperStop:
-			return
-		}
-
-		p.mu.Lock()
-		{
-			p.touching = true
-			// Iterate over n most idle items.
-			n := p.KeepAliveBatchSize
-			if n <= 0 {
-				n = p.idle.Len()
-			}
-			for i := 0; i < n; i++ {
-				s, touched := p.peekFirstIdle()
-				if s == nil || now.Sub(touched) < p.IdleThreshold {
-					break
-				}
-				p.removeIdle(s)
-				toTouch = append(toTouch, s)
-			}
-		}
-		p.mu.Unlock()
-
-		var mark *list.Element // Element in the list to insert touched sessions after.
-		for i, s := range toTouch {
-			toTouch[i] = nil
-
-			_, err := p.keepAliveSession(context.Background(), s)
-			if err != nil {
-				toDelete = append(toDelete, s)
-				continue
-			}
-
-			p.mu.Lock()
-			if !p.notify(s) {
-				// Need to push back session into list in order, to prevent
-				// shuffling of sessions order.
-				//
-				// That is, there may be a race condition, when some session S1
-				// pushed back in the list before we took the mutex. Suppose S1
-				// touched time is greater than ours `now` for S0. If so, it
-				// then may interrupt next keep alive iteration earlier and
-				// prevent our session S0 being touched:
-				// time.Since(S1) < threshold but time.Since(S0) > threshold.
-				mark = p.pushIdleInOrderAfter(s, now, mark)
-			}
-			p.mu.Unlock()
-		}
-
-		var (
-			sleep bool
-			delay time.Duration
-		)
-		p.mu.Lock()
-
-		if s, touched := p.peekFirstIdle(); s == nil {
-			// No sessions to check. Let the Put() caller to wake up
-			// keeper when session arrive.
-			sleep = true
-			p.keeperWake = wake
-		} else {
-			// NOTE: negative delay is also fine.
-			delay = p.IdleThreshold - now.Sub(touched)
-		}
-
-		// Takers notification broadcast channel.
-		touchingDone := p.touchingDone
-		p.touchingDone = nil
-		p.touching = false
-
-		p.mu.Unlock()
-
-		if touchingDone != nil {
-			close(touchingDone)
-		}
-		if !sleep {
-			timer.Reset(delay)
-		}
-		for i, s := range toDelete {
-			toDelete[i] = nil
-			p.closeSession(context.Background(), s)
-		}
-	}
-}
-
-var (
-	waitChPool        sync.Pool
-	testHookGetWaitCh func() // nil except some tests.
-)
-
-// getWaitCh returns pointer to a channel of sessions.
-//
-// Note that returning a pointer reduces allocations on sync.Pool usage –
-// sync.Pool.Get() returns empty interface, which leads to allocation for
-// non-pointer values.
-func getWaitCh() *chan *Session {
-	if testHookGetWaitCh != nil {
-		testHookGetWaitCh()
-	}
-	p, ok := waitChPool.Get().(*chan *Session)
-	if !ok {
-		// NOTE: MUST NOT be buffered.
-		// In other case we could cork an already no-owned channel.
-		ch := make(chan *Session)
-		p = &ch
-	}
-	return p
-}
-
-// putWaitCh receives pointer to a channel and makes it available for further
-// use.
-// Note that ch MUST NOT be owned by any goroutine at the call moment and ch
-// MUST NOT contain any value.
-func putWaitCh(ch *chan *Session) {
-	waitChPool.Put(ch)
-}
-
-// p.mu must be held.
-func (p *SessionPool) peekFirstIdle() (s *Session, touched time.Time) {
-	el := p.idle.Front()
-	if el == nil {
-		return
-	}
-	s = el.Value.(*Session)
-	info, has := p.index[s]
-	if !has || el != info.idle {
-		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
-	}
-	return s, info.touched
-}
-
-// p.mu must be held.
-func (p *SessionPool) removeFirstIdle() *Session {
-	s, _ := p.peekFirstIdle()
-	if s != nil {
-		p.removeIdle(s)
-	}
-	return s
-}
-
-// p.mu must be held.
-func (p *SessionPool) touchCond() <-chan struct{} {
-	if p.touchingDone == nil {
-		p.touchingDone = make(chan struct{})
-	}
-	return p.touchingDone
-}
-
-// p.mu must be held.
-func (p *SessionPool) notify(s *Session) (notified bool) {
-	for el := p.waitq.Front(); el != nil; el = p.waitq.Front() {
-		// Some goroutine is waiting for a session.
-		//
-		// It could be in this states:
-		//   1) Reached the select code and awaiting for a value in channel.
-		//   2) Reached the select code but already in branch of context
-		//   cancelation. In this case it is locked on p.mu.Lock().
-		//   3) Not reached the select code and thus not reading yet from the
-		//   channel.
-		//
-		// For cases (2) and (3) we close the channel to signal that goroutine
-		// missed something and may want to retry (especially for case (3)).
-		//
-		// After that we taking a next waiter and repeat the same.
-		ch := p.waitq.Remove(el).(*chan *Session)
-		select {
-		case *ch <- s:
-			// Case (1).
-			return true
-		default:
-			// Case (2) or (3).
-			close(*ch)
-		}
-	}
-	return false
-}
-
-// p.mu must NOT be held.
-func (p *SessionPool) closeSession(ctx context.Context, s *Session) error {
-	timeout := p.DeleteTimeout
-	if timeout <= 0 {
-		timeout = DefaultSessionPoolDeleteTimeout
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	return s.Close(ctx)
-}
-
-func (p *SessionPool) keepAliveSession(ctx context.Context, s *Session) (SessionInfo, error) {
-	timeout := p.KeepAliveTimeout
-	if timeout <= 0 {
-		timeout = DefaultSessionPoolKeepAliveTimeout
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	return s.KeepAlive(ctx)
-}
-
-// p.mu must be held.
-func (p *SessionPool) removeIdle(s *Session) {
-	info, has := p.index[s]
-	if !has || info.idle == nil {
-		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
-	}
-
-	p.idle.Remove(info.idle)
-	info.idle = nil
-	p.index[s] = info
-}
-
-// p.mu must be held.
-func (p *SessionPool) takeIdle(s *Session) (has, took bool) {
-	var info sessionInfo
-	info, has = p.index[s]
-	if !has {
-		// Could not be strict here and panic – session may become deleted by
-		// keeper().
-		return
-	}
-	if info.idle == nil {
-		// Session s is not idle.
-		return
-	}
-	took = true
-	p.removeIdle(s)
+// Execute executes query represented by text within transaction tx.
+func (tx *Transaction) Execute(
+	ctx context.Context,
+	query string, params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (r *Result, err error) {
+	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
 	return
 }
 
-// p.mu must be held.
-func (p *SessionPool) pushIdle(s *Session, now time.Time) {
-	p.handlePush(s, now, p.idle.PushBack(s))
+// Execute executes prepared statement stmt within transaction tx.
+func (tx *Transaction) ExecuteStatement(
+	ctx context.Context,
+	stmt *Statement, params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (r *Result, err error) {
+	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
+	return
 }
 
-// p.mu must be held.
-func (p *SessionPool) pushReady(s *Session) {
-	info, has := p.index[s]
-	if !has {
-		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
+// Commit commits specified active transaction.
+func (tx *Transaction) Commit(ctx context.Context) (err error) {
+	tx.s.c.traceCommitTransactionStart(ctx, tx)
+	defer func() {
+		tx.s.c.traceCommitTransactionDone(ctx, tx, err)
+	}()
+	req := Ydb_Table.CommitTransactionRequest{
+		SessionId: tx.s.ID,
+		TxId:      tx.id,
 	}
-	if info.ready != nil {
-		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
-	}
-	info.ready = p.ready.PushBack(s)
-	p.index[s] = info
+	return tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CommitTransaction, &req, nil))
 }
 
-// p.mu must be held.
-func (p *SessionPool) pushIdleInOrder(s *Session, now time.Time) (el *list.Element) {
-	var prev *list.Element
-	for prev = p.idle.Back(); prev != nil; prev = prev.Prev() {
-		s := prev.Value.(*Session)
-		t := p.index[s].touched
-		if !now.Before(t) { // now >= t
-			break
-		}
+// Rollback performs a rollback of the specified active transaction.
+func (tx *Transaction) Rollback(ctx context.Context) (err error) {
+	tx.s.c.traceRollbackTransactionStart(ctx, tx)
+	defer func() {
+		tx.s.c.traceRollbackTransactionDone(ctx, tx, err)
+	}()
+	req := Ydb_Table.RollbackTransactionRequest{
+		SessionId: tx.s.ID,
+		TxId:      tx.id,
 	}
-	if prev != nil {
-		el = p.idle.InsertAfter(s, prev)
-	} else {
-		el = p.idle.PushFront(s)
-	}
-	p.handlePush(s, now, el)
-	return el
+	return tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.RollbackTransaction, &req, nil))
 }
 
-// p.mu must be held.
-func (p *SessionPool) pushIdleInOrderAfter(s *Session, now time.Time, mark *list.Element) *list.Element {
-	if mark != nil {
-		n := p.idle.Len()
-		el := p.idle.InsertAfter(s, mark)
-		if n < p.idle.Len() {
-			// List changed, thus mark belongs to list.
-			p.handlePush(s, now, el)
-			return el
-		}
+func (tx *Transaction) txc() *TransactionControl {
+	if tx.c == nil {
+		tx.c = TxControl(WithTx(tx))
 	}
-	return p.pushIdleInOrder(s, now)
+	return tx.c
 }
 
-// p.mu must be held.
-func (p *SessionPool) handlePush(s *Session, now time.Time, el *list.Element) {
-	info, has := p.index[s]
-	if !has {
-		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
-	}
-	if info.idle != nil {
-		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
-	}
-
-	info.touched = now
-	info.idle = el
-	p.index[s] = info
-
-	p.wakeUpKeeper()
-}
-
-// p.mu must be held.
-func (p *SessionPool) wakeUpKeeper() {
-	if wake := p.keeperWake; wake != nil {
-		p.keeperWake = nil
-		close(wake)
-	}
-}
-
-func (p *SessionPool) traceGetStart(ctx context.Context) {
-	x := SessionPoolGetStartInfo{
+func (t *Client) traceCreateSessionStart(ctx context.Context) {
+	x := CreateSessionStartInfo{
 		Context: ctx,
 	}
-	if a := p.Trace.GetStart; a != nil {
+	if a := t.Trace.CreateSessionStart; a != nil {
 		a(x)
 	}
-	if b := ContextSessionPoolTrace(ctx).GetStart; b != nil {
+	if b := ContextClientTrace(ctx).CreateSessionStart; b != nil {
 		b(x)
 	}
 }
-func (p *SessionPool) traceGetDone(ctx context.Context, s *Session, err error) {
-	x := SessionPoolGetDoneInfo{
+func (t *Client) traceCreateSessionDone(ctx context.Context, s *Session, err error) {
+	x := CreateSessionDoneInfo{
 		Context: ctx,
 		Session: s,
 		Error:   err,
 	}
-	if a := p.Trace.GetDone; a != nil {
+	if a := t.Trace.CreateSessionDone; a != nil {
 		a(x)
 	}
-	if b := ContextSessionPoolTrace(ctx).GetDone; b != nil {
+	if b := ContextClientTrace(ctx).CreateSessionDone; b != nil {
 		b(x)
 	}
 }
-func (p *SessionPool) traceWaitStart(ctx context.Context) {
-	x := SessionPoolWaitStartInfo{
+func (t *Client) traceKeepAliveStart(ctx context.Context, s *Session) {
+	x := KeepAliveStartInfo{
 		Context: ctx,
+		Session: s,
 	}
-	if a := p.Trace.WaitStart; a != nil {
+	if a := t.Trace.KeepAliveStart; a != nil {
 		a(x)
 	}
-	if b := ContextSessionPoolTrace(ctx).WaitStart; b != nil {
+	if b := ContextClientTrace(ctx).KeepAliveStart; b != nil {
 		b(x)
 	}
 }
-func (p *SessionPool) traceWaitDone(ctx context.Context, s *Session, err error) {
-	x := SessionPoolWaitDoneInfo{
+func (t *Client) traceKeepAliveDone(ctx context.Context, s *Session, info SessionInfo, err error) {
+	x := KeepAliveDoneInfo{
+		Context:     ctx,
+		Session:     s,
+		SessionInfo: info,
+		Error:       err,
+	}
+	if a := t.Trace.KeepAliveDone; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).KeepAliveDone; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceDeleteSessionStart(ctx context.Context, s *Session) {
+	x := DeleteSessionStartInfo{
+		Context: ctx,
+		Session: s,
+	}
+	if a := t.Trace.DeleteSessionStart; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).DeleteSessionStart; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceDeleteSessionDone(ctx context.Context, s *Session, err error) {
+	x := DeleteSessionDoneInfo{
 		Context: ctx,
 		Session: s,
 		Error:   err,
 	}
-	if a := p.Trace.WaitDone; a != nil {
+	if a := t.Trace.DeleteSessionDone; a != nil {
 		a(x)
 	}
-	if b := ContextSessionPoolTrace(ctx).WaitDone; b != nil {
+	if b := ContextClientTrace(ctx).DeleteSessionDone; b != nil {
 		b(x)
 	}
 }
-func (p *SessionPool) traceBusyCheckStart(ctx context.Context, s *Session) {
-	x := SessionPoolBusyCheckStartInfo{
+func (t *Client) tracePrepareDataQueryStart(ctx context.Context, s *Session, query string) {
+	x := PrepareDataQueryStartInfo{
 		Context: ctx,
 		Session: s,
+		Query:   query,
 	}
-	if a := p.Trace.BusyCheckStart; a != nil {
+	if a := t.Trace.PrepareDataQueryStart; a != nil {
 		a(x)
 	}
-	if b := ContextSessionPoolTrace(ctx).BusyCheckStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceBusyCheckDone(ctx context.Context, s *Session, reused bool, err error) {
-	x := SessionPoolBusyCheckDoneInfo{
-		Context: ctx,
-		Session: s,
-		Reused:  reused,
-		Error:   err,
-	}
-	if a := p.Trace.BusyCheckDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).BusyCheckDone; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceTakeStart(ctx context.Context, s *Session) {
-	x := SessionPoolTakeStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := p.Trace.TakeStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).TakeStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceTakeDone(ctx context.Context, s *Session, took bool) {
-	x := SessionPoolTakeDoneInfo{
-		Context: ctx,
-		Session: s,
-		Took:    took,
-	}
-	if a := p.Trace.TakeDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).TakeDone; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) tracePutStart(ctx context.Context, s *Session) {
-	x := SessionPoolPutStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := p.Trace.PutStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).PutStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) tracePutDone(ctx context.Context, s *Session, err error) {
-	x := SessionPoolPutDoneInfo{
-		Context: ctx,
-		Session: s,
-		Error:   err,
-	}
-	if a := p.Trace.PutDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).PutDone; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceCloseStart(ctx context.Context) {
-	x := SessionPoolCloseStartInfo{
-		Context: ctx,
-	}
-	if a := p.Trace.CloseStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).CloseStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceCloseDone(ctx context.Context, err error) {
-	x := SessionPoolCloseDoneInfo{
-		Context: ctx,
-		Error:   err,
-	}
-	if a := p.Trace.CloseDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).CloseDone; b != nil {
+	if b := ContextClientTrace(ctx).PrepareDataQueryStart; b != nil {
 		b(x)
 	}
 }
 
-type sessionInfo struct {
-	idle    *list.Element
-	ready   *list.Element
-	touched time.Time
+func (t *Client) tracePrepareDataQueryDone(ctx context.Context, s *Session, query string, q *DataQuery, cached bool, err error) {
+	x := PrepareDataQueryDoneInfo{
+		Context: ctx,
+		Session: s,
+		Query:   query,
+		Result:  q,
+		Cached:  cached,
+		Error:   err,
+	}
+	if a := t.Trace.PrepareDataQueryDone; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).PrepareDataQueryDone; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceExecuteDataQueryStart(ctx context.Context, s *Session, tx *TransactionControl, query *DataQuery, params *QueryParameters) {
+	x := ExecuteDataQueryStartInfo{
+		Context:    ctx,
+		Session:    s,
+		TxID:       tx.id(),
+		Query:      query,
+		Parameters: params,
+	}
+	if a := t.Trace.ExecuteDataQueryStart; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).ExecuteDataQueryStart; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceExecuteDataQueryDone(ctx context.Context, s *Session, tx *TransactionControl, query *DataQuery, params *QueryParameters, txr *Transaction, r *Result, err error) {
+	x := ExecuteDataQueryDoneInfo{
+		Context:    ctx,
+		Session:    s,
+		Query:      query,
+		Parameters: params,
+		Result:     r,
+		Error:      err,
+	}
+	if txr != nil {
+		x.TxID = txr.id
+	}
+	if a := t.Trace.ExecuteDataQueryDone; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).ExecuteDataQueryDone; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceBeginTransactionStart(ctx context.Context, s *Session) {
+	x := BeginTransactionStartInfo{
+		Context: ctx,
+		Session: s,
+	}
+	if a := t.Trace.BeginTransactionStart; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).BeginTransactionStart; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceBeginTransactionDone(ctx context.Context, s *Session, tx *Transaction, err error) {
+	x := BeginTransactionDoneInfo{
+		Context: ctx,
+		Session: s,
+		Error:   err,
+	}
+	if tx != nil {
+		x.TxID = tx.id
+	}
+	if a := t.Trace.BeginTransactionDone; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).BeginTransactionDone; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceCommitTransactionStart(ctx context.Context, tx *Transaction) {
+	x := CommitTransactionStartInfo{
+		Context: ctx,
+		Session: tx.s,
+		TxID:    tx.id,
+	}
+	if a := t.Trace.CommitTransactionStart; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).CommitTransactionStart; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceCommitTransactionDone(ctx context.Context, tx *Transaction, err error) {
+	x := CommitTransactionDoneInfo{
+		Context: ctx,
+		Session: tx.s,
+		Error:   err,
+	}
+	if tx != nil {
+		x.TxID = tx.id
+	}
+	if a := t.Trace.CommitTransactionDone; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).CommitTransactionDone; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceRollbackTransactionStart(ctx context.Context, tx *Transaction) {
+	x := RollbackTransactionStartInfo{
+		Context: ctx,
+		Session: tx.s,
+		TxID:    tx.id,
+	}
+	if a := t.Trace.RollbackTransactionStart; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).RollbackTransactionStart; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceRollbackTransactionDone(ctx context.Context, tx *Transaction, err error) {
+	x := RollbackTransactionDoneInfo{
+		Context: ctx,
+		Session: tx.s,
+		Error:   err,
+	}
+	if tx != nil {
+		x.TxID = tx.id
+	}
+	if a := t.Trace.RollbackTransactionDone; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).RollbackTransactionDone; b != nil {
+		b(x)
+	}
 }
 
-func panicLocked(mu sync.Locker, message string) {
-	mu.Unlock()
-	panic(message)
+type DataQuery struct {
+	query    Ydb_Table.Query
+	queryID  Ydb_Table.Query_Id
+	queryYQL Ydb_Table.Query_YqlText
+}
+
+func (q *DataQuery) String() string {
+	var emptyID Ydb_Table.Query_Id
+	if q.queryID == emptyID {
+		return q.queryYQL.YqlText
+	}
+	return q.queryID.Id
+}
+
+func (q *DataQuery) ID() string {
+	return q.queryID.Id
+}
+
+func (q *DataQuery) YQL() string {
+	return q.queryYQL.YqlText
+}
+
+func (q *DataQuery) initFromText(s string) {
+	q.queryID = Ydb_Table.Query_Id{} // Reset id field.
+	q.queryYQL.YqlText = s
+	q.query.Query = &q.queryYQL
+}
+
+func (q *DataQuery) initPrepared(id string) {
+	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
+	q.queryID.Id = id
+	q.query.Query = &q.queryID
+}
+
+type QueryParameters struct {
+	m queryParams
+}
+
+func (q *QueryParameters) params() queryParams {
+	if q == nil {
+		return nil
+	}
+	return q.m
+}
+
+func (q *QueryParameters) Each(it func(name string, value ydb.Value)) {
+	if q == nil {
+		return
+	}
+	for key, value := range q.m {
+		it(key, internal.ValueFromYDB(
+			internal.TypeFromYDB(value.Type),
+			value.Value,
+		))
+	}
+}
+
+func (q *QueryParameters) String() string {
+	var buf bytes.Buffer
+	buf.WriteByte('(')
+	q.Each(func(name string, value ydb.Value) {
+		buf.WriteString("((")
+		buf.WriteString(name)
+		buf.WriteByte(')')
+		buf.WriteByte('(')
+		internal.WriteValueStringTo(&buf, value)
+		buf.WriteString("))")
+	})
+	buf.WriteByte(')')
+	return buf.String()
+}
+
+type queryParams map[string]*Ydb.TypedValue
+
+type ParameterOption func(queryParams)
+
+func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
+	q := &QueryParameters{
+		m: make(queryParams),
+	}
+	q.Add(opts...)
+	return q
+}
+
+func (q *QueryParameters) Add(opts ...ParameterOption) {
+	for _, opt := range opts {
+		opt(q.m)
+	}
+}
+
+func ValueParam(name string, v ydb.Value) ParameterOption {
+	return func(q queryParams) {
+		q[name] = internal.ValueToYDB(v)
+	}
 }

@@ -196,6 +196,14 @@ func (t TableExecuteDataQueryRequest) TransactionID() (id string, ok bool) {
 	return
 }
 
+type TablePrepareDataQueryResult struct {
+	R interface{}
+}
+
+func (t TablePrepareDataQueryResult) SetQueryID(id string) {
+	setField("QueryId", t.R, id)
+}
+
 type Driver struct {
 	OnCall       func(ctx context.Context, code MethodCode, req, res interface{}) error
 	OnStreamRead func(ctx context.Context, code MethodCode, req, res interface{}, process func(error)) error
