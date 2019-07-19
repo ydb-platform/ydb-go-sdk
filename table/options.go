@@ -39,6 +39,7 @@ type Description struct {
 	Name       string
 	Columns    []Column
 	PrimaryKey []string
+	KeyRanges  []KeyRange
 }
 
 type (
@@ -523,6 +524,11 @@ type (
 	ReadTableOption func(*readTableDesc)
 )
 
+type KeyRange struct {
+	From ydb.Value
+	To   ydb.Value
+}
+
 func (d *readTableDesc) initKeyRange() {
 	if d.KeyRange == nil {
 		d.KeyRange = new(Ydb_Table.KeyRange)
@@ -539,6 +545,27 @@ func ReadOrdered() ReadTableOption {
 		desc.Ordered = true
 	}
 }
+
+// ReadKeyRange returns ReadTableOption which makes ReadTable read values
+// in range [x.From, x.To).
+//
+// Both x.From and x.To may be nil.
+func ReadKeyRange(x KeyRange) ReadTableOption {
+	return func(desc *readTableDesc) {
+		desc.initKeyRange()
+		if x.From != nil {
+			desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
+				GreaterOrEqual: internal.ValueToYDB(x.From),
+			}
+		}
+		if x.To != nil {
+			desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
+				Less: internal.ValueToYDB(x.To),
+			}
+		}
+	}
+}
+
 func ReadGreater(x ydb.Value) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.initKeyRange()

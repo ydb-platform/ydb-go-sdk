@@ -145,6 +145,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string) (desc Descript
 	if err != nil {
 		return desc, err
 	}
+
 	cs := make([]Column, len(res.Columns))
 	for i, c := range res.Columns {
 		cs[i] = Column{
@@ -152,10 +153,29 @@ func (s *Session) DescribeTable(ctx context.Context, path string) (desc Descript
 			Type: internal.TypeFromYDB(c.Type),
 		}
 	}
+
+	rs := make([]KeyRange, len(res.ShardKeyBounds)+1)
+	var last ydb.Value
+	for i, b := range res.ShardKeyBounds {
+		if last != nil {
+			rs[i].From = last
+		}
+
+		bound := internal.ValueFromYDB(b.Type, b.Value)
+		rs[i].To = bound
+
+		last = bound
+	}
+	if last != nil {
+		i := len(rs) - 1
+		rs[i].From = last
+	}
+
 	return Description{
 		Name:       res.Self.Name,
 		PrimaryKey: res.PrimaryKey,
 		Columns:    cs,
+		KeyRanges:  rs,
 	}, nil
 }
 
@@ -868,7 +888,7 @@ func (q *QueryParameters) Each(it func(name string, value ydb.Value)) {
 	}
 	for key, value := range q.m {
 		it(key, internal.ValueFromYDB(
-			internal.TypeFromYDB(value.Type),
+			value.Type,
 			value.Value,
 		))
 	}

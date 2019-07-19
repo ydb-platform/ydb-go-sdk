@@ -18,6 +18,13 @@ func ValueToYDB(v V) *Ydb.TypedValue {
 	return v.toYDB()
 }
 
+func ValueFromYDB(t *Ydb.Type, v *Ydb.Value) V {
+	return Value{
+		t: TypeFromYDB(t),
+		v: v,
+	}
+}
+
 func WriteValueStringTo(buf *bytes.Buffer, v V) {
 	v.toString(buf)
 }
@@ -83,13 +90,6 @@ func primitiveFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
 type Value struct {
 	t T
 	v *Ydb.Value
-}
-
-func ValueFromYDB(t T, v *Ydb.Value) Value {
-	return Value{
-		t: t,
-		v: v,
-	}
 }
 
 func (v Value) String() string {
