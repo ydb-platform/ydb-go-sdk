@@ -133,6 +133,61 @@ and storage backend.
 For more information please see the docs of `ydb/ydbsql` package which provides
 `database/sql` driver implementation.
 
+## Generating code
+
+As you might think, there is lot of boilerplate code for scanning values from
+query result and for passing values to prepare query.
+
+There is an **experimental** tool named `ydbgen` and aimed to help with such
+similar code lines.
+
+Currently it is possible to generate such things:
+- scanning values from result into a struct
+- building query parameters from struct 
+- building ydb's struct value from struct 
+
+The very short example could be like this:
+
+```
+package somepkg
+
+//go:generate ydbgen
+
+//ydb:scan
+type User struct {
+	Name string
+	Age  int32
+}
+```
+
+After running `go generate path/to/somepkg/dir` file with suffix `_ydbgen.go`
+will be generated. It will contain method `Scan()` for `User` type, as
+requested in the *generate comment*.
+
+Generation may be configured by [struct tags](https://golang.org/ref/spec#Tag):
+
+```
+//ydb:scan
+type User struct {
+	Age int32 `ydb:"type:uint32,column:user_age"`
+}
+```
+
+Currenlty these tags are available:
+- `type`: specifies which *base type* or column type must be used for this field.
+- `conv`: specifies which conversion strategy must be used: `assert` to prepare
+  safety checks when converting types, or `unsafe`. The default value is no
+  conversion, which will fail the generation when some unsafe conversion met.
+- `column`: specifies which column name must be used for this field.
+- `pos`: specifies position of the field in the query result (used when
+  positional scanning is possible).
+
+Also the shorthand tags are possible: when using tag without `key:value` form,
+tag with `-` value is interpreted as field must be ignored; in other way it is
+interpreted as the column name.
+
+For more info please look at `ydb/examples/generation` folder.
+
 ## Examples
 
 More examples are listed in `ydb/examples` directory.
