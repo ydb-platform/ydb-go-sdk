@@ -915,7 +915,7 @@ type ParameterOption func(queryParams)
 
 func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
 	q := &QueryParameters{
-		m: make(queryParams),
+		m: make(queryParams, len(opts)),
 	}
 	q.Add(opts...)
 	return q
