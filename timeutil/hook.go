@@ -18,7 +18,7 @@ var (
 // StubTestHookTimeNow stubs all `Now()` use for ydb packages.
 //
 // It sets up current time to given now time.
-// It returns time shitfter function that shifts current time by given
+// It returns time shifter function that shifts current time by given
 // duration.
 // It returns cleanup function that MUST be called after test execution.
 //
