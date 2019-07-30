@@ -135,25 +135,26 @@ For more information please see the docs of `ydb/ydbsql` package which provides
 
 ## Generating code
 
-As you might think, there is lot of boilerplate code for scanning values from
-query result and for passing values to prepare query.
+### Overview
 
-There is an **experimental** tool named `ydbgen` and aimed to help with such
-similar code lines.
+There is lot of boilerplate code for scanning values from query result and for
+passing values to prepare query. There is an **experimental** tool named
+`ydbgen` aimed to solve this.
 
 Currently it is possible to generate such things:
-- scanning values from result into a struct
+- scanning values from result into a struct or slice of structs;
 - building query parameters from struct 
 - building ydb's struct value from struct 
+- building ydb's list value from slice of structs
 
 The very short example could be like this:
 
-```
+```go
 package somepkg
 
 //go:generate ydbgen
 
-//ydb:scan
+//ydb:gen scan
 type User struct {
 	Name string
 	Age  int32
@@ -164,27 +165,122 @@ After running `go generate path/to/somepkg/dir` file with suffix `_ydbgen.go`
 will be generated. It will contain method `Scan()` for `User` type, as
 requested in the *generate comment*.
 
-Generation may be configured by [struct tags](https://golang.org/ref/spec#Tag):
+### Configuration
 
-```
-//ydb:scan
+Generation may be configured at three levels starting from top:
+- ydbgen binary flags (package level)
+- comment markers right before generation object in form of `//ydb:set
+  [key1:value1 [... keyN:valueN]]` (type level)
+- [struct tags](https://golang.org/ref/spec#Tag) (field level)
+
+Each downstream level overrides options for its context.
+
+For example, this code will generate all possible code for `User` struct with
+field `Age` type mapped to **non-optional** type, because the lowermost
+configuration level (which is struct tag) defines non-optional `uint32` type:
+
+```go
+//go:generate ydbgen -type required
+
+//ydb:gen
+//ydb:set -type optional
 type User struct {
 	Age int32 `ydb:"type:uint32,column:user_age"`
 }
 ```
 
-Currenlty these tags are available:
-- `type`: specifies which *base type* or column type must be used for this field.
-- `conv`: specifies which conversion strategy must be used: `assert` to prepare
-  safety checks when converting types, or `unsafe`. The default value is no
-  conversion, which will fail the generation when some unsafe conversion met.
-- `column`: specifies which column name must be used for this field.
-- `pos`: specifies position of the field in the query result (used when
-  positional scanning is possible).
+#### Binary flags
+ 
+ Name   | Value      | Default | Meaning 
+--------|:----------:|:-------:|---------
+ `type` | `optional` | +       | Wraps all mapped types with optional type.
+ `type` | `required` |         | Opposite to `optional` value.
+
+#### Comment markers options
+
+Options for comment markers are similar to flags, except the form of
+serialization.
+
+#### Struct tags and values overview
+
+ Name     | Value    | Default | Meaning 
+----------|:--------:|:-------:|---------
+ `type`   | `T`      |         | Specifies which ydb primitive type must be used for this field.
+ `type`   | `T?`     |         | The same as above, but wraps T with optional type.
+ `conv`   | `safe`   | +       | Prepares only safe type conversions. Fail generation if conversion is not possible.
+ `conv`   | `unsafe` |         | Prepares unsafe type conversions too.
+ `conv`   | `assert` |         | Prepares safety assertions before type conversion.
+ `column` | `string` |         | Maps field to this column name.
 
 Also the shorthand tags are possible: when using tag without `key:value` form,
 tag with `-` value is interpreted as field must be ignored; in other way it is
 interpreted as the column name.
+
+### Customization
+
+There are few additional options existing for flexibility purposes.
+
+#### Optional Types
+
+Previously only basic Go types were mentioned as ones that able to be converted
+to ydb types. But it is possible generate code that maps defined type to YDB
+type (actually to basic Go type and then to YDB type). To make so, such type
+must provide two methods (when generation both getter and setters) – `Get() (T,
+bool)` and `Set(T)`, where `T` is a basic Go type, and `bool` is a flag that
+indicates that value defined.
+
+```go
+//go:generate ydbgen
+
+//ydb:gen
+type User struct {
+	Name OptString
+}
+
+type OptString struct {
+	Value   string
+	Defined bool
+}
+
+func (s OptString) Get() (string, bool) {
+	return s.Value, s.Defined
+}
+func (s *OptString) Set(v string) {
+	*s = OptString{
+		Value:   v,
+		Defined: true,
+	}
+}
+```
+
+There is special package called `ydb/opt` for this purposes:
+
+```go
+package main
+
+import "github.com/yandex-cloud/ydb-go-sdk/opt"
+
+//go:generate ydbgen
+
+//ydb:gen
+type User struct {
+	Name opt.String
+}
+```
+
+#### Dealing with time.Time
+
+There is additional feature that makes it easier to work with `time.Time`
+values and their conversion to YDB types:
+
+```go
+//go:generate ydbgen
+
+//ydb:gen
+type User struct {
+	Updated time.Time `ydb:"type:timestamp?"`
+}
+```
 
 For more info please look at `ydb/examples/generation` folder.
 

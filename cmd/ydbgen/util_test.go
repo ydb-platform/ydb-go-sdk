@@ -24,8 +24,12 @@ func TestCamelToSnake(t *testing.T) {
 			exp: "some_http_request",
 		},
 		{
-			in:  "AB",
-			exp: "a_b",
+			in:  "ID",
+			exp: "id",
+		},
+		{
+			in:  "HTTP",
+			exp: "http",
 		},
 		{
 			in:  "aBa",

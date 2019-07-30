@@ -7,12 +7,13 @@ package ydbtypes
 import (
 	"fmt"
 	"go/types"
+	"strings"
 
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 )
 
 func PrimitiveTypeFromString(s string) (t internal.PrimitiveType, err error) {
-	switch s {
+	switch strings.ToLower(s) {
 	case "bool":
 		t = internal.TypeBool
 	case "int8":

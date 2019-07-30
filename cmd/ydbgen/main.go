@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"container/list"
 	"flag"
 	"fmt"
@@ -29,8 +30,28 @@ func main() {
 
 	var (
 		ignorePat = flag.String("ignore", "", "regular expression to ignore files to scan")
+		typeMode  = flag.String("type", "optional", "default type mode")
+		convMode  = flag.String("conv", "safe", "default conv mode")
+		seekMode  = flag.String("seek", "column", "default seek mode")
 	)
 	flag.Parse()
+
+	var DefaultMode GenMode
+	{
+		var err error
+		DefaultMode.Type, err = ParseTypeMode(*typeMode)
+		if err != nil {
+			log.Fatal(err)
+		}
+		DefaultMode.Conv, err = ParseConvMode(*convMode)
+		if err != nil {
+			log.Fatal(err)
+		}
+		DefaultMode.Seek, err = ParseSeekMode(*seekMode)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	ignored := func(string) bool {
 		return false
@@ -77,7 +98,7 @@ func main() {
 		// ParseFile returns an *ast.File, a syntax tree.
 		f, err := parser.ParseFile(fset, file.Name(), file, parser.ParseComments)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("parse %q error: %v", file.Name(), err)
 		}
 
 		files = append(files, file)
@@ -88,35 +109,34 @@ func main() {
 	// The defaults work fine except for one setting:
 	// we must specify how to deal with imports.
 	conf := types.Config{
-		Importer: importer.ForCompiler(fset, "source", nil),
+		IgnoreFuncBodies: true,
+		Importer:         importer.ForCompiler(fset, "source", nil),
 	}
 	// Type-check the package containing only file f.
 	// Check returns a *types.Package.
 	info := types.Info{
 		// Query types information to this mapping.
 		Types: make(map[ast.Expr]types.TypeAndValue),
+		Defs:  make(map[*ast.Ident]types.Object),
+		Uses:  make(map[*ast.Ident]types.Object),
 	}
 	p, err := conf.Check(".", fset, astFiles, &info)
 	if err != nil {
-		log.Fatal(err) // type error
+		log.Fatalf("type error: %v", err)
 	}
 	pkg := Package{
 		Name: p.Name(),
 	}
+	for id, obj := range info.Uses {
+		posn := fset.Position(id.Pos())
+		log.Printf("posn: %+v %v %v", posn, id, obj)
+	}
 	for i, astFile := range astFiles {
-		type genItem struct {
-			ident      *ast.Ident
-			typeSpec   *ast.TypeSpec
-			structType *ast.StructType
-			arrayType  *ast.ArrayType
-
-			flags GenFlag
-		}
 		var (
 			depth int
 			reset int
-			items []*genItem
-			item  *genItem
+			items []*GenItem
+			item  *GenItem
 
 			astLog = func(s string, args ...interface{}) {
 				log.Print(strings.Repeat(" ", depth*4), fmt.Sprintf(s, args...))
@@ -141,10 +161,13 @@ func main() {
 			}()
 
 			switch v := n.(type) {
+			case *ast.FuncDecl:
+				return false
+
 			case *ast.Ident:
 				astLog("ident %q", v.Name)
 				if item != nil {
-					item.ident = v
+					item.Ident = v
 				}
 				return false
 
@@ -154,34 +177,34 @@ func main() {
 
 					text := strings.TrimPrefix(c.Text, "//ydb:")
 					if c.Text != text {
-						// Prepare item for furhter processing.
-						astLog("probably process next item")
-						flags, err := ParseComment(text)
-						if err != nil {
+						if item == nil {
+							item = &GenItem{
+								File: files[i],
+								Mode: DefaultMode,
+							}
+						}
+						if err := item.ParseComment(text); err != nil {
 							log.Fatalf(
 								"malformed comment string: %q: %v",
 								text, err,
 							)
 						}
-						item = &genItem{
-							flags: flags,
-						}
-						return false
 					}
 				}
+				return false
 
 			case *ast.TypeSpec:
 				if item == nil {
 					astLog("skipping type spec %q", v.Name)
 					return false
 				}
-				item.typeSpec = v
+				item.TypeSpec = v
 				reset = depth
 				astLog("processing type spec %q", v.Name)
 
 			case *ast.StructType:
 				astLog("struct %+v", v)
-				item.structType = v
+				item.StructType = v
 				items = append(items, item)
 				item = nil
 				reset = -1
@@ -193,7 +216,7 @@ func main() {
 					astLog("skipping array type")
 					return false
 				}
-				item.arrayType = v
+				item.ArrayType = v
 				items = append(items, item)
 				item = nil
 				reset = -1
@@ -208,11 +231,12 @@ func main() {
 		}
 		for _, item := range items {
 			switch {
-			case item.arrayType != nil:
+			case item.ArrayType != nil:
 				s := &Slice{
-					Name: item.ident.Name,
+					Name:  item.Ident.Name,
+					Flags: item.Flags,
 				}
-				id, ok := item.arrayType.Elt.(*ast.Ident)
+				id, ok := item.ArrayType.Elt.(*ast.Ident)
 				if !ok {
 					log.Fatalf("only type ident is expected as element of a slice")
 				}
@@ -222,20 +246,20 @@ func main() {
 
 				file.Slices = append(file.Slices, s)
 
-			case item.structType != nil:
+			case item.StructType != nil:
 				s := &Struct{
-					Name:  item.ident.Name,
-					Flags: item.flags,
+					Name:  item.Ident.Name,
+					Flags: item.Flags,
 				}
 
-				pkg.Register(item.ident.Name, s)
-				decl := info.TypeOf(item.structType).(*types.Struct)
+				pkg.Register(item.Ident.Name, s)
+				decl := info.TypeOf(item.StructType).(*types.Struct)
 
-				for i, f := range item.structType.Fields.List {
+				for i, f := range item.StructType.Fields.List {
 					var err error
 					field := &Field{
 						Name: f.Names[0].Name,
-						Type: info.TypeOf(f.Type),
+						Conv: item.Mode.Conv,
 					}
 					if err := field.ParseTags(decl.Tag(i)); err != nil {
 						log.Fatal(err)
@@ -244,18 +268,71 @@ func main() {
 						continue
 					}
 					if field.Column != "" {
-						s.SeekMode |= SeekName
+						s.SeekMode |= SeekColumn
 					} else {
 						field.Column = camelToSnake(field.Name)
 					}
 					if field.Position > 0 {
 						s.SeekMode |= SeekPosition
 					}
+
+					var typ types.Type
+					switch x := f.Type.(type) {
+					case *ast.SelectorExpr:
+						obj := info.ObjectOf(x.Sel)
+						typ = obj.Type()
+
+					case *ast.Ident, *ast.ArrayType:
+						typ = info.TypeOf(f.Type)
+
+					default:
+						log.Fatalf(
+							"unexpected field %q ast type: %T",
+							field.Name, f.Type,
+						)
+					}
+					switch x := typ.(type) {
+					case *types.Basic, *types.Slice:
+						// OK.
+						field.Type = x
+
+					case *types.Named:
+						obj := x.Obj()
+						name := strings.Join([]string{
+							obj.Pkg().Name(),
+							obj.Name(),
+						}, ".")
+						if name == "time.Time" {
+							if field.BaseType == nil {
+								log.Fatalf(
+									"%s.%s must have type tag specified (necessary for %s conversions)",
+									s.Name, field.Name, name,
+								)
+							}
+							field.Type = field.BaseType
+							field.Face = TimeFieldFace{}
+						} else {
+							t, err := checkInterface(x, s.Flags)
+							if err != nil {
+								log.Fatalf(
+									"%s.%s (%s) could not be used for generation: %v",
+									s.Name, field.Name, name, err,
+								)
+							}
+							field.Type = t
+							field.Face = DefaultFieldFace{}
+						}
+
+					default:
+						log.Fatalf("unexpected field object type: %T", x)
+					}
+
 					if field.Primitive == 0 {
 						field.Primitive, err = ydbtypes.PrimitiveTypeFromGoType(field.Type)
 						if err != nil {
 							log.Fatal(err)
 						}
+						field.Optional = item.Mode.Type == TypeOptional
 						field.BaseType = ydbtypes.GoTypeFromPrimitiveType(field.Primitive)
 					}
 					if err := field.Validate(); err != nil {
@@ -273,7 +350,7 @@ func main() {
 					})
 				}
 				if s.SeekMode == SeekUnknown {
-					s.SeekMode = SeekPosition
+					s.SeekMode = item.Mode.Seek
 				}
 
 				file.Structs = append(file.Structs, s)
@@ -296,10 +373,21 @@ func main() {
 type SeekMode uint
 
 const (
-	SeekUnknown SeekMode = 1 << iota >> 1
+	SeekUnknown SeekMode = iota
 	SeekPosition
-	SeekName
+	SeekColumn
 )
+
+func ParseSeekMode(s string) (SeekMode, error) {
+	switch s {
+	case "position":
+		return SeekPosition, nil
+	case "column":
+		return SeekColumn, nil
+	default:
+		return 0, fmt.Errorf("unknown seek mode: %q", s)
+	}
+}
 
 type Package struct {
 	Name  string
@@ -350,30 +438,104 @@ func (p *Package) Finalize() error {
 	return nil
 }
 
+type TypeMode uint
+
+const (
+	TypeModeUnknown TypeMode = iota
+	TypeRequired
+	TypeOptional
+)
+
+func ParseTypeMode(s string) (TypeMode, error) {
+	switch s {
+	case "required":
+		return TypeRequired, nil
+	case "optional":
+		return TypeOptional, nil
+	default:
+		return 0, fmt.Errorf("unknown type mode: %q", s)
+	}
+}
+
+type GenMode struct {
+	Type TypeMode
+	Seek SeekMode
+	Conv ConvMode
+}
+
+type GenItem struct {
+	File       *os.File
+	Ident      *ast.Ident
+	TypeSpec   *ast.TypeSpec
+	StructType *ast.StructType
+	ArrayType  *ast.ArrayType
+
+	Flags GenFlag
+	Mode  GenMode
+}
+
+func (g *GenItem) ParseComment(text string) (err error) {
+	prefix, text := splitPair(text, ' ')
+	switch prefix {
+	case "gen", "generate":
+		return g.parseGenFlags(text)
+	case "set":
+		return g.parseGenMode(text)
+	default:
+		return fmt.Errorf("unkown prefix: %q", prefix)
+	}
+	return nil
+}
+
+func (g *GenItem) parseGenFlags(text string) error {
+	for _, param := range strings.Split(text, ",") {
+		switch param {
+		case "":
+			g.Flags = ^GenFlag(0)
+		case "scan":
+			g.Flags |= GenScan
+		case "params":
+			g.Flags |= GenQueryParams
+		case "value":
+			g.Flags |= GenValue
+		case "type":
+			g.Flags |= GenType
+		default:
+			return fmt.Errorf("unknown generation flag: %q", param)
+		}
+	}
+	return nil
+}
+
+func (g *GenItem) parseGenMode(text string) (err error) {
+	for _, pair := range strings.Split(text, " ") {
+		key, val := splitPair(strings.TrimSpace(pair), ':')
+		switch key {
+		case "type":
+			g.Mode.Type, err = ParseTypeMode(val)
+		case "seek":
+			g.Mode.Seek, err = ParseSeekMode(val)
+		case "conv":
+			g.Mode.Conv, err = ParseConvMode(val)
+		default:
+			return fmt.Errorf("unknown option: %q", key)
+		}
+	}
+	return
+}
+
 type GenFlag uint
 
 const (
 	GenNothing GenFlag = 1 << iota >> 1
 	GenScan
 	GenQueryParams
-	GenContainer
-)
+	GenValue
+	GenType
 
-func ParseComment(text string) (flags GenFlag, err error) {
-	for _, param := range strings.Split(text, ",") {
-		switch param {
-		case "scan":
-			flags |= GenScan
-		case "params":
-			flags |= GenQueryParams
-		case "container":
-			flags |= GenContainer
-		default:
-			return 0, fmt.Errorf("unknown parameter: %q", param)
-		}
-	}
-	return flags, nil
-}
+	GenGet = GenValue | GenQueryParams
+	GenSet = GenScan
+)
 
 type File struct {
 	Name    string
@@ -395,6 +557,7 @@ type Struct struct {
 type Slice struct {
 	Name   string
 	Struct *Struct
+	Flags  GenFlag
 }
 
 type Field struct {
@@ -404,21 +567,25 @@ type Field struct {
 	Ignore   bool
 
 	Conv      ConvMode
+	Face      FieldFace
 	Type      types.Type
 	BaseType  types.Type // Type within database.
 	Primitive internal.PrimitiveType
+	Optional  bool
 }
 
 type ConvMode uint
 
 const (
-	ConvDefault = 1 << iota >> 1
+	ConvDefault = iota
 	ConvUnsafe
 	ConvAssert
 )
 
 func ParseConvMode(s string) (ConvMode, error) {
 	switch s {
+	case "safe":
+		return ConvDefault, nil
 	case "unsafe":
 		return ConvUnsafe, nil
 	case "assert":
@@ -431,7 +598,7 @@ func ParseConvMode(s string) (ConvMode, error) {
 func (f *Field) Validate() error {
 	if !types.ConvertibleTo(f.Type, f.BaseType) {
 		return fmt.Errorf(
-			"impossible conversion %q type %s to %s (ydb type %s)",
+			"field %q impossible type conversion from %s to %s (ydb type %s)",
 			f.Name, f.Type, f.BaseType, f.Primitive,
 		)
 	}
@@ -485,7 +652,7 @@ func (f *Field) ParseTags(tags string) (err error) {
 		positionGiven bool
 	)
 	for _, pair := range pairs {
-		key, value := splitPair(pair)
+		key, value := splitPair(pair, ':')
 		if value == "" {
 			if len(pairs) == 1 {
 				// Special case when only column name or ignorance sign is given.
@@ -509,6 +676,10 @@ func (f *Field) ParseTags(tags string) (err error) {
 				return
 			}
 		case "type":
+			if n := len(value); value[n-1] == '?' {
+				f.Optional = true
+				value = value[:n-1]
+			}
 			f.Primitive, err = ydbtypes.PrimitiveTypeFromString(value)
 			if err != nil {
 				return
@@ -534,8 +705,8 @@ func (f *Field) ParseTags(tags string) (err error) {
 	return
 }
 
-func splitPair(p string) (key, value string) {
-	i := strings.IndexByte(p, ':')
+func splitPair(p string, sep byte) (key, value string) {
+	i := strings.IndexByte(p, sep)
 	if i == -1 {
 		return p, ""
 	}
@@ -581,4 +752,201 @@ func isSafeConversion(t1, t2 types.Type) bool {
 		return false
 	}
 	return true
+}
+
+func checkInterface(typ *types.Named, flags GenFlag) (_ *types.Basic, err error) {
+	const (
+		setter = "Set"
+		getter = "Get"
+	)
+	var (
+		getType *types.Basic
+		setType *types.Basic
+	)
+	for i := 0; i < typ.NumMethods(); i++ {
+		m := typ.Method(i)
+		switch m.Name() {
+		case getter:
+			if flags&GenGet == 0 {
+				continue
+			}
+			flags &= ^GenGet
+
+			getType, err = resultWithFlag(m)
+			if err != nil {
+				return nil, err
+			}
+			if err = noParams(m); err != nil {
+				return nil, err
+			}
+
+		case setter:
+			if flags&GenSet == 0 {
+				continue
+			}
+			flags &= ^GenSet
+
+			setType, err = singleParam(m)
+			if err != nil {
+				return nil, err
+			}
+			if err = noResults(m); err != nil {
+				return nil, err
+			}
+			if err = pointerReceiver(m); err != nil {
+				return nil, err
+			}
+
+		default:
+			continue
+		}
+	}
+	if flags = flags & (GenGet | GenSet); flags != 0 {
+		var buf bytes.Buffer
+		if flags&GenGet != 0 {
+			fmt.Fprintf(&buf, "\n\twant %s() (T, bool)", getter)
+		}
+		if flags&GenSet != 0 {
+			fmt.Fprintf(&buf, "\n\twant %s(T)", setter)
+		}
+		return nil, fmt.Errorf("not enough methods: %s", buf.Bytes())
+	}
+	if getType != nil && setType != nil && getType != setType {
+		return nil, fmt.Errorf(
+			"getter and setter argument types are not equal: %s and %s",
+			getType, setType,
+		)
+	}
+	if getType != nil {
+		return getType, nil
+	}
+	return setType, nil
+}
+
+func singleParam(f *types.Func) (*types.Basic, error) {
+	var (
+		s = f.Type().(*types.Signature)
+		p = s.Params()
+	)
+	if n := p.Len(); n != 1 {
+		return nil, fmt.Errorf(
+			"unexpected method %q signature: have %d params; want 1",
+			f.Name(), n,
+		)
+	}
+	arg := p.At(0)
+	if b, ok := arg.Type().(*types.Basic); ok {
+		return b, nil
+	}
+	return nil, fmt.Errorf(
+		"unexpected parameter %q of method %q type: "+
+			"%s; only basic types are supported",
+		f.Name(), arg.Name(), arg.Type(),
+	)
+}
+
+func singleResult(f *types.Func) (*types.Basic, error) {
+	var (
+		s = f.Type().(*types.Signature)
+		r = s.Results()
+	)
+	if n := r.Len(); n != 1 {
+		return nil, fmt.Errorf(
+			"unexpected method %q signature: have %d results; want 1",
+			f.Name(), n,
+		)
+	}
+	res := r.At(0)
+	if b, ok := res.Type().(*types.Basic); ok {
+		return b, nil
+	}
+	return nil, fmt.Errorf(
+		"unexpected type of method %q result: "+
+			"%s; only basic types are supported",
+		f.Name(), res.Type(),
+	)
+}
+
+func resultWithFlag(f *types.Func) (*types.Basic, error) {
+	var (
+		s = f.Type().(*types.Signature)
+		r = s.Results()
+	)
+	if n := r.Len(); n != 2 {
+		return nil, fmt.Errorf(
+			"unexpected method %q signature: have %d results; want 2",
+			f.Name(), n,
+		)
+	}
+
+	res := r.At(0)
+	rb, ok := res.Type().(*types.Basic)
+	if !ok {
+		return nil, fmt.Errorf(
+			"unexpected type of method %q result value: "+
+				"%s; only basic types are supported",
+			f.Name(), res.Type(),
+		)
+	}
+
+	flag := r.At(1)
+	fb, ok := flag.Type().(*types.Basic)
+	if !ok {
+		return nil, fmt.Errorf(
+			"unexpected type of method %q result value: "+
+				"%s; only basic types are supported",
+			f.Name(), flag.Type(),
+		)
+	}
+	if fb.Kind() != types.Bool {
+		return nil, fmt.Errorf(
+			"unexpected type of method %q result flag: "+
+				"have %s; want bool",
+			f.Name(), fb.Name(),
+		)
+	}
+
+	return rb, nil
+}
+
+func noParams(f *types.Func) error {
+	var (
+		s = f.Type().(*types.Signature)
+		p = s.Params()
+	)
+	if n := p.Len(); n != 0 {
+		return fmt.Errorf(
+			"unexpected method %q signature: have %d param(s); want 0",
+			f.Name(), n,
+		)
+	}
+	return nil
+}
+
+func noResults(f *types.Func) error {
+	var (
+		s = f.Type().(*types.Signature)
+		r = s.Results()
+	)
+	if n := r.Len(); n != 0 {
+		return fmt.Errorf(
+			"unexpected method %q signature: have %d result(s); want 0",
+			f.Name(), n,
+		)
+	}
+	return nil
+}
+
+func pointerReceiver(f *types.Func) error {
+	var (
+		s = f.Type().(*types.Signature)
+		r = s.Recv()
+	)
+	if _, ptr := r.Type().(*types.Pointer); !ptr {
+		return fmt.Errorf(
+			"receiver of method %q must be a pointer",
+			f.Name(),
+		)
+	}
+	return nil
 }

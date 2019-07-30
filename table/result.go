@@ -199,7 +199,7 @@ func (r *Result) NextRow() bool {
 // Note that NextItem() differs from NextRow() and NextSet() – if it return
 // false it fails the Result such that no further operations may be processed.
 // That is, res.Err() becomes non-nil.
-func (r *Result) NextItem() bool {
+func (r *Result) NextItem() (ok bool) {
 	i := r.nextItem
 	if r.inactive() ||
 		r.set == nil ||

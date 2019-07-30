@@ -571,6 +571,8 @@ func (r *rows) Next(dst []driver.Value) error {
 		return io.EOF
 	}
 	for i := range dst {
+		// NOTE: for queries like "SELECT * FROM xxx" order of columns is
+		// undefined.
 		if !r.res.NextItem() {
 			err := r.res.Err()
 			if err == nil {

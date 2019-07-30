@@ -2,7 +2,7 @@ package tests
 
 //go:generate ydbgen -ignore "_test.go$"
 
-//ydb:scan
+//ydb:generate scan
 type ConvAssert struct {
 	Int8Int16   int16 `ydb:"type:int8,conv:assert"`
 	Int32Int64  int64 `ydb:"type:int32,conv:assert"`

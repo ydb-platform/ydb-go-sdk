@@ -47,7 +47,7 @@ func camelToSnake(s string) string {
 				lodash = false
 			}
 			write(unicode.ToLower(prev[0]))
-			if !unicode.IsUpper(c) {
+			if c > 0 && !unicode.IsUpper(c) {
 				b.WriteByte('_')
 			}
 			write(unicode.ToLower(prev[1]))

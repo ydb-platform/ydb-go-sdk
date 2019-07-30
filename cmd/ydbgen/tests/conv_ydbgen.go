@@ -10,32 +10,32 @@ import (
 )
 
 var (
-	_ strconv.Itoa
-	_ ydb.Value
-	_ table.QueryParameters
+	_ = strconv.Itoa
+	_ = ydb.StringValue
+	_ = table.NewQueryParameters
 )
 
 func (c *ConvAssert) Scan(res *table.Result) (err error) {
-	res.NextItem()
-	c.Int8Int16 = int16(res.OInt8())
+	res.SeekItem("int8_int16")
+	c.Int8Int16 = int16(res.Int8())
 
-	res.NextItem()
-	c.Int32Int64 = int64(res.OInt32())
+	res.SeekItem("int32_int64")
+	c.Int32Int64 = int64(res.Int32())
 
-	res.NextItem()
-	c.Int16Int8 = ydbConvI16ToI8(res.OInt16())
+	res.SeekItem("int16_int8")
+	c.Int16Int8 = ydbConvI16ToI8(res.Int16())
 
-	res.NextItem()
-	c.Uint64Int8 = ydbConvU64ToI8(res.OUint64())
+	res.SeekItem("uint64_int8")
+	c.Uint64Int8 = ydbConvU64ToI8(res.Uint64())
 
-	res.NextItem()
-	c.Uint32Uint = uint(res.OUint32())
+	res.SeekItem("uint32_uint")
+	c.Uint32Uint = uint(res.Uint32())
 
-	res.NextItem()
-	c.Int32Int = int(res.OInt32())
+	res.SeekItem("int32_int")
+	c.Int32Int = int(res.Int32())
 
-	res.NextItem()
-	c.Int32ToByte = ydbConvI32ToB(res.OInt32())
+	res.SeekItem("int32_to_byte")
+	c.Int32ToByte = ydbConvI32ToB(res.Int32())
 
 	return res.Err()
 }
@@ -52,16 +52,9 @@ func ydbConvI16ToI8(x int16) int8 {
 		abs = uint64(v ^ m - m)
 	}
 	if abs&mask != abs {
-		var str string
-		{
-			s, err := strconv.FormatInt(int64(x), 10)
-			if err != nil {
-				panic("ydbgen: internal: format error")
-			}
-			str = s
-		}
 		panic(
-			"ydbgen: convassert: " + str + " (type int16) overflows int8",
+			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) + 
+				" (type int16) overflows int8",
 		)
 	}
 	return int8(x)
@@ -82,16 +75,9 @@ func ydbConvI32ToB(x int32) byte {
 		abs = uint64(v ^ m - m)
 	}
 	if abs&mask != abs {
-		var str string
-		{
-			s, err := strconv.FormatInt(int64(x), 10)
-			if err != nil {
-				panic("ydbgen: internal: format error")
-			}
-			str = s
-		}
 		panic(
-			"ydbgen: convassert: " + str + " (type int32) overflows byte",
+			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) + 
+				" (type int32) overflows byte",
 		)
 	}
 	return byte(x)
@@ -104,16 +90,9 @@ func ydbConvU64ToI8(x uint64) int8 {
 	)
 	abs := uint64(x)
 	if abs&mask != abs {
-		var str string
-		{
-			s, err := strconv.FormatUint(uint64(x), 10)
-			if err != nil {
-				panic("ydbgen: internal: format error")
-			}
-			str = s
-		}
 		panic(
-			"ydbgen: convassert: " + str + " (type uint64) overflows int8",
+			"ydbgen: convassert: " + strconv.FormatUint(uint64(x), 10) + 
+				" (type uint64) overflows int8",
 		)
 	}
 	return int8(x)

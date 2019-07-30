@@ -10,16 +10,17 @@ import (
 )
 
 var (
-	_ strconv.Itoa
-	_ ydb.Value
-	_ table.QueryParameters
+	_ = strconv.Itoa
+	_ = ydb.StringValue
+	_ = table.NewQueryParameters
 )
 
 func (c *Container) StructValue() ydb.Value {
-	return ydb.StructValue(
-		ydb.StructFieldValue("string", ydb.UTF8Value(c.String)),
+	v := ydb.StructValue(
+		ydb.StructFieldValue("string", ydb.OptionalValue(ydb.UTF8Value(c.String))),
 		ydb.StructFieldValue("int_to_uint64", ydb.Uint64Value(ydbConvIToU64(c.IntToUint64))),
 	)
+	return v
 }
 
 func ydbConvIToU64(x int) uint64 { 

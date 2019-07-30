@@ -78,6 +78,9 @@ func Decimal(precision, scale uint32) Type {
 	}
 }
 
+// TODO(kamardin): rename types to consistent format like values: BoolType,
+// IntType and so on. Do not forget about code generation.
+
 // Primitive types known by YDB.
 const (
 	TypeUnknown     = internal.TypeUnknown
