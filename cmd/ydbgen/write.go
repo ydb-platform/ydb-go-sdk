@@ -326,7 +326,9 @@ func (g *Generator) generateSliceScan(bw *bufio.Writer, s *Slice) {
 		line(bw, tab(2), `var `, x, ` `, s.Struct.Name)
 		line(bw)
 		g.writeStructFieldsScan(bw, 2, x, s.Struct)
-		line(bw, tab(2), `*`, rcvr, ` = append(*`, rcvr, `, `, x, `)`)
+		line(bw, tab(2), `if `, res, `.Err() == nil {`)
+		line(bw, tab(3), `*`, rcvr, ` = append(*`, rcvr, `, `, x, `)`)
+		line(bw, tab(2), `}`)
 		line(bw, tab(1), `}`)
 	}
 	g.leaveScope()
