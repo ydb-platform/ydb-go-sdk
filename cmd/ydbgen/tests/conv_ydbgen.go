@@ -53,7 +53,7 @@ func ydbConvI16ToI8(x int16) int8 {
 	}
 	if abs&mask != abs {
 		panic(
-			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) + 
+			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) +
 				" (type int16) overflows int8",
 		)
 	}
@@ -76,7 +76,7 @@ func ydbConvI32ToB(x int32) byte {
 	}
 	if abs&mask != abs {
 		panic(
-			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) + 
+			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) +
 				" (type int32) overflows byte",
 		)
 	}
@@ -91,7 +91,7 @@ func ydbConvU64ToI8(x uint64) int8 {
 	abs := uint64(x)
 	if abs&mask != abs {
 		panic(
-			"ydbgen: convassert: " + strconv.FormatUint(uint64(x), 10) + 
+			"ydbgen: convassert: " + strconv.FormatUint(uint64(x), 10) +
 				" (type uint64) overflows int8",
 		)
 	}

@@ -180,21 +180,22 @@ field `Age` type mapped to **non-optional** type, because the lowermost
 configuration level (which is struct tag) defines non-optional `uint32` type:
 
 ```go
-//go:generate ydbgen -type required
+//go:generate ydbgen -wrap optional
 
 //ydb:gen
-//ydb:set -type optional
+//ydb:set wrap:none
 type User struct {
 	Age int32 `ydb:"type:uint32,column:user_age"`
 }
 ```
 
+
 #### Binary flags
  
- Name   | Value      | Default | Meaning 
+ Flag   | Value      | Default | Meaning 
 --------|:----------:|:-------:|---------
- `type` | `optional` | +       | Wraps all mapped types with optional type.
- `type` | `required` |         | Opposite to `optional` value.
+ `wrap` | `optional` | +       | Wraps all mapped field types with optional type if no explicit tag is specified.
+ `wrap` | `none    ` |         | No wrapping performed.
 
 #### Comment markers options
 
@@ -203,7 +204,7 @@ serialization.
 
 #### Struct tags and values overview
 
- Name     | Value    | Default | Meaning 
+ Tag      | Value    | Default | Meaning 
 ----------|:--------:|:-------:|---------
  `type`   | `T`      |         | Specifies which ydb primitive type must be used for this field.
  `type`   | `T?`     |         | The same as above, but wraps T with optional type.

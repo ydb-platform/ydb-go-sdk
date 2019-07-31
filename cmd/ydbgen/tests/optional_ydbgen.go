@@ -80,12 +80,12 @@ func (o *Optional) StructValue() ydb.Value {
 			panic("ydbgen: no value for non-optional field \"Str\"")
 		}
 	}
-	v := ydb.StructValue(
+	val := ydb.StructValue(
 		ydb.StructFieldValue("int64", Int64Value),
 		ydb.StructFieldValue("str", StrValue),
 		ydb.StructFieldValue("int32", ydb.OptionalValue(ydb.Int32Value(o.Int32))),
 	)
-	return v
+	return val
 }
 
 func (o *Optional) StructType() ydb.Type {
@@ -109,7 +109,7 @@ func ydbConvI64ToI16(x int64) int16 {
 	}
 	if abs&mask != abs {
 		panic(
-			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) + 
+			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) +
 				" (type int64) overflows int16",
 		)
 	}

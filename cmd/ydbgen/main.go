@@ -29,17 +29,21 @@ func main() {
 	log.SetPrefix("ydbgen: ")
 
 	var (
-		ignorePat = flag.String("ignore", "", "regular expression to ignore files to scan")
-		typeMode  = flag.String("type", "optional", "default type mode")
-		convMode  = flag.String("conv", "safe", "default conv mode")
-		seekMode  = flag.String("seek", "column", "default seek mode")
+		wrapMode = flag.String("wrap", "optional", "default type wrapping mode")
+		convMode = flag.String("conv", "safe", "default conv mode")
+		seekMode = flag.String("seek", "column", "default seek mode")
+
+		dir       = flag.String("dir", "", "directory to generate code for")
+		ignorePat = flag.String("ignore", "", "regular expression to ignore files in dir")
+		gentype   = flag.String("type", "", "comma-separated list of types to generate code for")
+		verbose   = flag.Bool("v", false, "print debug info")
 	)
 	flag.Parse()
 
 	var DefaultMode GenMode
 	{
 		var err error
-		DefaultMode.Type, err = ParseTypeMode(*typeMode)
+		DefaultMode.Wrap, err = ParseWrapMode(*wrapMode)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -53,25 +57,48 @@ func main() {
 		}
 	}
 
-	ignored := func(string) bool {
-		return false
+	var (
+		matches     []string
+		processFile func(string) bool
+		ignoreFile  func(string) bool
+		sourceDir   string
+
+		err error
+	)
+	if sourceDir = *dir; sourceDir != "" {
+		processFile = func(string) bool { return true }
+	} else {
+		sourceDir, err = os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+		gofile := os.Getenv("GOFILE")
+		if gofile == "" {
+			log.Fatalf("empty $GOFILE environment variable")
+		}
+		process := path.Join(sourceDir, gofile)
+		processFile = func(name string) bool {
+			return name == process
+		}
+	}
+
+	matches, err = filepath.Glob(path.Join(sourceDir, "*.go"))
+	if err != nil {
+		log.Fatal(err)
 	}
 	if *ignorePat != "" {
 		re, err := regexp.Compile(*ignorePat)
 		if err != nil {
 			log.Fatalf("compile ignore regexp error: %v", err)
 		}
-		ignored = re.MatchString
+		ignoreFile = re.MatchString
+	} else {
+		ignoreFile = func(string) bool { return false }
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
-	matches, err := filepath.Glob(path.Join(wd, "*.go"))
-	if err != nil {
-		log.Fatal(err)
+	wantType := map[string]bool{}
+	for _, t := range strings.Split(*gentype, ",") {
+		wantType[t] = true
 	}
 
 	var (
@@ -83,7 +110,7 @@ func main() {
 		if strings.HasSuffix(fpath, GeneratedFileSuffix+".go") {
 			continue
 		}
-		if ignored(fpath) {
+		if ignoreFile(fpath) {
 			continue
 		}
 
@@ -127,10 +154,6 @@ func main() {
 	pkg := Package{
 		Name: p.Name(),
 	}
-	for id, obj := range info.Uses {
-		posn := fset.Position(id.Pos())
-		log.Printf("posn: %+v %v %v", posn, id, obj)
-	}
 	for i, astFile := range astFiles {
 		var (
 			depth int
@@ -139,9 +162,14 @@ func main() {
 			item  *GenItem
 
 			astLog = func(s string, args ...interface{}) {
-				log.Print(strings.Repeat(" ", depth*4), fmt.Sprintf(s, args...))
+				if *verbose {
+					log.Print(strings.Repeat(" ", depth*4), fmt.Sprintf(s, args...))
+				}
 			}
 		)
+		if name := files[i].Name(); !processFile(name) {
+			continue
+		}
 		ast.Inspect(astFile, func(n ast.Node) (dig bool) {
 			astLog("%T", n)
 			if depth == reset && item != nil {
@@ -194,6 +222,13 @@ func main() {
 				return false
 
 			case *ast.TypeSpec:
+				if item == nil && wantType[v.Name.Name] {
+					item = &GenItem{
+						File:  files[i],
+						Mode:  DefaultMode,
+						Flags: GenAll,
+					}
+				}
 				if item == nil {
 					astLog("skipping type spec %q", v.Name)
 					return false
@@ -332,7 +367,7 @@ func main() {
 						if err != nil {
 							log.Fatal(err)
 						}
-						field.Optional = item.Mode.Type == TypeOptional
+						field.Optional = item.Mode.Wrap == WrapOptional
 						field.BaseType = ydbtypes.GoTypeFromPrimitiveType(field.Primitive)
 					}
 					if err := field.Validate(); err != nil {
@@ -438,27 +473,27 @@ func (p *Package) Finalize() error {
 	return nil
 }
 
-type TypeMode uint
+type WrapMode uint
 
 const (
-	TypeModeUnknown TypeMode = iota
-	TypeRequired
-	TypeOptional
+	WrapModeUnknown WrapMode = iota
+	WrapOptional
+	WrapNothing
 )
 
-func ParseTypeMode(s string) (TypeMode, error) {
+func ParseWrapMode(s string) (WrapMode, error) {
 	switch s {
-	case "required":
-		return TypeRequired, nil
 	case "optional":
-		return TypeOptional, nil
+		return WrapOptional, nil
+	case "none":
+		return WrapNothing, nil
 	default:
 		return 0, fmt.Errorf("unknown type mode: %q", s)
 	}
 }
 
 type GenMode struct {
-	Type TypeMode
+	Wrap WrapMode
 	Seek SeekMode
 	Conv ConvMode
 }
@@ -491,7 +526,7 @@ func (g *GenItem) parseGenFlags(text string) error {
 	for _, param := range strings.Split(text, ",") {
 		switch param {
 		case "":
-			g.Flags = ^GenFlag(0)
+			g.Flags = GenAll
 		case "scan":
 			g.Flags |= GenScan
 		case "params":
@@ -511,8 +546,8 @@ func (g *GenItem) parseGenMode(text string) (err error) {
 	for _, pair := range strings.Split(text, " ") {
 		key, val := splitPair(strings.TrimSpace(pair), ':')
 		switch key {
-		case "type":
-			g.Mode.Type, err = ParseTypeMode(val)
+		case "wrap":
+			g.Mode.Wrap, err = ParseWrapMode(val)
 		case "seek":
 			g.Mode.Seek, err = ParseSeekMode(val)
 		case "conv":
@@ -535,6 +570,8 @@ const (
 
 	GenGet = GenValue | GenQueryParams
 	GenSet = GenScan
+
+	GenAll = ^GenFlag(0)
 )
 
 type File struct {

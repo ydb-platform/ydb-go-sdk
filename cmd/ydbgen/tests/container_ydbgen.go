@@ -16,11 +16,11 @@ var (
 )
 
 func (c *Container) StructValue() ydb.Value {
-	v := ydb.StructValue(
+	val := ydb.StructValue(
 		ydb.StructFieldValue("string", ydb.OptionalValue(ydb.UTF8Value(c.String))),
 		ydb.StructFieldValue("int_to_uint64", ydb.Uint64Value(ydbConvIToU64(c.IntToUint64))),
 	)
-	return v
+	return val
 }
 
 func ydbConvIToU64(x int) uint64 { 

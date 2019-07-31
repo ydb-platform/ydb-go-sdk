@@ -159,7 +159,9 @@ func (us *Users) Scan(res *table.Result) (err error) {
 			}
 		}
 
-		*us = append(*us, x)
+		if res.Err() == nil {
+			*us = append(*us, x)
+		}
 	}
 	return res.Err()
 }
@@ -213,7 +215,7 @@ func (us Users) ListValue() ydb.Value {
 	return ydb.ListValue(values...)
 }
 
-func ydbConvU64ToU8(x uint64) uint8 {
+func ydbConvU64ToU8(x uint64) uint8 { 
 	const (
 		bits = 8
 		mask = (1 << (bits)) - 1
@@ -227,3 +229,4 @@ func ydbConvU64ToU8(x uint64) uint8 {
 	}
 	return uint8(x)
 }
+

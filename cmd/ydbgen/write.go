@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"container/list"
 	"go/types"
+	"log"
 	"os"
 	"path"
 	"sort"
@@ -189,6 +190,7 @@ func (g *Generator) Generate(pkg Package) error {
 			if s.Flags&GenType != 0 {
 				g.generateStructType(bw, s)
 			}
+			log.Printf("%s struct", s.Name)
 		}
 		for _, s := range f.Slices {
 			if s.Flags&GenScan != 0 {
@@ -200,6 +202,7 @@ func (g *Generator) Generate(pkg Package) error {
 			if s.Flags&GenValue != 0 {
 				g.generateSliceValue(bw, s)
 			}
+			log.Printf("%s slice", s.Name)
 		}
 		var templates []string
 		for name := range g.conversions {
@@ -727,7 +730,7 @@ func (t ConversionTemplate) Write(bw *bufio.Writer) {
 	line(bw, tab(2), `panic(`)
 	code(bw, tab(3), `"ydbgen: convassert: " + `)
 	format(bw, i0, 2, "x")
-	line(bw, ` + `)
+	line(bw, ` +`)
 	code(bw, tab(4), `" (type `, b0.String(), `)`)
 	line(bw, ` overflows `, b1.String(), `",`)
 	line(bw, tab(2), `)`)

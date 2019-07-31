@@ -33,7 +33,7 @@ func (t *Times) QueryParameters() *table.QueryParameters {
 	var DateValue ydb.Value
 	{
 		var x uint32
-		ok := t.Date.IsZero()
+		ok := !t.Date.IsZero()
 		if ok {
 			x = ydb.Time(t.Date).Date()
 		}
@@ -52,7 +52,7 @@ func (t *Times) StructValue() ydb.Value {
 	var DateValue ydb.Value
 	{
 		var x uint32
-		ok := t.Date.IsZero()
+		ok := !t.Date.IsZero()
 		if ok {
 			x = ydb.Time(t.Date).Date()
 		}
@@ -62,10 +62,10 @@ func (t *Times) StructValue() ydb.Value {
 			DateValue = ydb.NullValue(ydb.TypeDate)
 		}
 	}
-	v := ydb.StructValue(
+	val := ydb.StructValue(
 		ydb.StructFieldValue("date", DateValue),
 	)
-	return v
+	return val
 }
 
 func (t *Times) StructType() ydb.Type {
