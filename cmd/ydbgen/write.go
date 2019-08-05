@@ -17,7 +17,7 @@ import (
 
 const GeneratedFileSuffix = "_ydbgen"
 
-var DefaultImportDir = "a.yandex-team.ru/kikimr/public/sdk/go"
+var DefaultImportPath = "a.yandex-team.ru/kikimr/public/sdk/go"
 
 func tab(n int) string {
 	return strings.Repeat("\t", n)
@@ -45,7 +45,8 @@ func (s *scope) add(name string) {
 }
 
 type Generator struct {
-	ImportDir string
+	ImportPath string
+	Dir        string
 
 	once        sync.Once
 	conversions map[string]ConversionTemplate
@@ -90,8 +91,8 @@ func (g *Generator) init() {
 	g.once.Do(func() {
 		g.conversions = make(map[string]ConversionTemplate)
 		g.seenConv = make(map[string]bool)
-		if g.ImportDir == "" {
-			g.ImportDir = DefaultImportDir
+		if g.ImportPath == "" {
+			g.ImportPath = DefaultImportPath
 		}
 	})
 }
@@ -143,11 +144,10 @@ func (g *Generator) Generate(pkg Package) error {
 		}
 		var (
 			base = path.Base(f.Name)
-			dir  = strings.TrimSuffix(f.Name, base)
 			ext  = path.Ext(base)
 			name = strings.TrimSuffix(base, ext)
 
-			fpath = path.Join(dir, name+GeneratedFileSuffix+ext)
+			fpath = path.Join(g.Dir, name+GeneratedFileSuffix+ext)
 		)
 		file, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
@@ -167,12 +167,12 @@ func (g *Generator) Generate(pkg Package) error {
 			},
 			dep{
 				name:  "ydb",
-				path:  g.ImportDir,
+				path:  g.ImportPath,
 				ident: "StringValue",
 			},
 			dep{
 				name:  "table",
-				path:  path.Join(g.ImportDir, "ydb"),
+				path:  path.Join(g.ImportPath, "ydb"),
 				ident: "NewQueryParameters",
 			},
 		)

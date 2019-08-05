@@ -2,8 +2,6 @@ package tests
 
 import "time"
 
-//go:generate ydbgen
-
 //ydb:gen
 type Times struct {
 	Date time.Time `ydb:"type:Date?"`

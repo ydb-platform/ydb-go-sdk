@@ -6,10 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io/ioutil"
 	"log"
 	"math/bits"
 	"os"
@@ -33,10 +35,17 @@ func main() {
 		convMode = flag.String("conv", "safe", "default conv mode")
 		seekMode = flag.String("seek", "column", "default seek mode")
 
-		dir       = flag.String("dir", "", "directory to generate code for")
-		ignorePat = flag.String("ignore", "", "regular expression to ignore files in dir")
-		gentype   = flag.String("type", "", "comma-separated list of types to generate code for")
-		verbose   = flag.Bool("v", false, "print debug info")
+		dir     = flag.String("dir", "", "directory to generate code for")
+		out     = flag.String("out", "", "directory to put results to")
+		exclude = flag.String("exclude", "", "regular expression to exclude files from build")
+		gentype = flag.String("type", "", "comma-separated list of types to generate code for")
+		all     = flag.Bool("all", false, "generate code for all found types")
+
+		goroot       = flag.String("goroot", "", "replace go/build GOROOT path")
+		sourceLookup = flag.String("lookup", "", "mapping of base import path to directory in form of import:dir")
+
+		force   = flag.Bool("force", false, "ignore type errors")
+		verbose = flag.Bool("verbose", false, "print debug info")
 	)
 	flag.Parse()
 
@@ -57,43 +66,45 @@ func main() {
 		}
 	}
 
-	var (
-		matches     []string
-		processFile func(string) bool
-		ignoreFile  func(string) bool
-		sourceDir   string
-
-		err error
-	)
-	if sourceDir = *dir; sourceDir != "" {
-		processFile = func(string) bool { return true }
-	} else {
-		sourceDir, err = os.Getwd()
-		if err != nil {
-			log.Fatal(err)
-		}
-		gofile := os.Getenv("GOFILE")
-		if gofile == "" {
-			log.Fatalf("empty $GOFILE environment variable")
-		}
-		process := path.Join(sourceDir, gofile)
-		processFile = func(name string) bool {
-			return name == process
-		}
-	}
-
-	matches, err = filepath.Glob(path.Join(sourceDir, "*.go"))
+	workDir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
-	if *ignorePat != "" {
-		re, err := regexp.Compile(*ignorePat)
+	var (
+		sourceDir = *dir
+		outputDir = *out
+	)
+	for _, d := range []*string{&sourceDir, &outputDir} {
+		if *d == "" {
+			*d = "."
+		}
+		if !path.IsAbs(*d) {
+			*d = path.Join(workDir, *d)
+		}
+	}
+
+	var (
+		processFile = func(string) bool { return true }
+		excludeFile = func(string) bool { return false }
+	)
+	if gofile := os.Getenv("GOFILE"); gofile != "" && *dir == "" {
+		// Running from `go generate` and no dir is given.
+		// Thus, process only marked file.
+		want := path.Join(sourceDir, gofile)
+		processFile = func(name string) bool {
+			return name == want
+		}
+	}
+	if *exclude != "" {
+		re, err := regexp.Compile(*exclude)
 		if err != nil {
 			log.Fatalf("compile ignore regexp error: %v", err)
 		}
-		ignoreFile = re.MatchString
-	} else {
-		ignoreFile = func(string) bool { return false }
+		excludeFile = re.MatchString
+	}
+	matches, err := filepath.Glob(path.Join(sourceDir, "*.go"))
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	wantType := map[string]bool{}
@@ -110,7 +121,7 @@ func main() {
 		if strings.HasSuffix(fpath, GeneratedFileSuffix+".go") {
 			continue
 		}
-		if ignoreFile(fpath) {
+		if excludeFile(fpath) {
 			continue
 		}
 
@@ -131,6 +142,39 @@ func main() {
 		files = append(files, file)
 		astFiles = append(astFiles, f)
 	}
+	if *sourceLookup != "" {
+		// We are given some base import path to be searchable by type checker.
+		// That is, we expand default GOPATH variable with temporary directory
+		// with GOPATH friendly layout which src directory contains only base
+		// import path node which is a symbolic link to the given source base
+		// directory.
+		var paths []string
+		for _, pair := range strings.Split(*sourceLookup, ",") {
+			tmp, err := ioutil.TempDir("", "ydbgen")
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer os.RemoveAll(tmp)
+			if err := os.Mkdir(path.Join(tmp, "src"), 0700); err != nil {
+				log.Fatal(err)
+			}
+			base, dir := splitPair(strings.TrimSpace(pair), ':')
+			err = os.Symlink(dir, path.Join(tmp, "src", base))
+			if err != nil {
+				log.Fatal(err)
+			}
+			paths = append(paths, tmp)
+		}
+		if dir := os.Getenv("GOPATH"); dir != "" {
+			paths = append(paths, dir)
+		}
+		build.Default.GOPATH = strings.Join(
+			paths, string(filepath.ListSeparator),
+		)
+	}
+	if *goroot != "" {
+		build.Default.GOROOT = *goroot
+	}
 
 	// A Config controls various options of the type checker.
 	// The defaults work fine except for one setting:
@@ -138,6 +182,11 @@ func main() {
 	conf := types.Config{
 		IgnoreFuncBodies: true,
 		Importer:         importer.ForCompiler(fset, "source", nil),
+	}
+	if *force {
+		conf.Error = func(err error) {
+			log.Printf("suppressing error: %v", err)
+		}
 	}
 	// Type-check the package containing only file f.
 	// Check returns a *types.Package.
@@ -148,7 +197,7 @@ func main() {
 		Uses:  make(map[*ast.Ident]types.Object),
 	}
 	p, err := conf.Check(".", fset, astFiles, &info)
-	if err != nil {
+	if err != nil && !*force {
 		log.Fatalf("type error: %v", err)
 	}
 	pkg := Package{
@@ -222,7 +271,7 @@ func main() {
 				return false
 
 			case *ast.TypeSpec:
-				if item == nil && wantType[v.Name.Name] {
+				if item == nil && (*all || wantType[v.Name.Name]) {
 					item = &GenItem{
 						File:  files[i],
 						Mode:  DefaultMode,
@@ -399,7 +448,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	g := Generator{}
+	g := Generator{
+		Dir: outputDir,
+	}
 	if err := g.Generate(pkg); err != nil {
 		log.Fatal(err)
 	}

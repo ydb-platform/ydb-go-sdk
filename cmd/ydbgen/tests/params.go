@@ -1,7 +1,5 @@
 package tests
 
-//go:generate ydbgen -ignore "_test.go$"
-
 //ydb:generate params
 type Params struct {
 	Name          string
