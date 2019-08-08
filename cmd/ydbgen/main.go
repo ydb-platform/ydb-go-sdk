@@ -570,7 +570,6 @@ func (g *GenItem) ParseComment(text string) (err error) {
 	default:
 		return fmt.Errorf("unkown prefix: %q", prefix)
 	}
-	return nil
 }
 
 func (g *GenItem) parseGenFlags(text string) error {
