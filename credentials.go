@@ -55,7 +55,7 @@ func (DropTokenCredentials) Token(_ context.Context) (string, error) {
 
 // KeepTokenCredentials implements Credentials interface. Its Token() method
 // always returns ErrCredentialsKeepToken which in turn leads driver to use
-// previous successful result of token obtaining.
+// previous successful result of token obtaining (only if such result exists).
 type KeepTokenCredentials struct{}
 
 // Token implements Credentials.

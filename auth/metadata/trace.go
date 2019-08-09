@@ -23,14 +23,14 @@ type (
 		Network string
 		Addr    string
 		Conn    net.Conn
-		Err     error
+		Error   error
 	}
 	WriteRequestStartInfo struct {
 		Conn net.Conn
 	}
 	WriteRequestDoneInfo struct {
-		Conn net.Conn
-		Err  error
+		Conn  net.Conn
+		Error error
 	}
 	ReadResponseStartInfo struct {
 		Conn net.Conn
@@ -39,7 +39,7 @@ type (
 		Conn    net.Conn
 		Code    string
 		Expires time.Time
-		Err     error
+		Error   error
 	}
 )
 
@@ -60,7 +60,7 @@ func (c *Client) traceDialDone(network, addr string, conn net.Conn, err error) {
 		Network: network,
 		Addr:    addr,
 		Conn:    conn,
-		Err:     err,
+		Error:   err,
 	})
 }
 func (c *Client) traceWriteRequestStart(conn net.Conn) {
@@ -76,8 +76,8 @@ func (c *Client) traceWriteRequestDone(conn net.Conn, err error) {
 		return
 	}
 	c.Trace.WriteRequestDone(WriteRequestDoneInfo{
-		Conn: conn,
-		Err:  err,
+		Conn:  conn,
+		Error: err,
 	})
 }
 func (c *Client) traceReadResponseStart(conn net.Conn) {
@@ -98,6 +98,6 @@ func (c *Client) traceReadResponseDone(
 		Conn:    conn,
 		Code:    code,
 		Expires: expires,
-		Err:     err,
+		Error:   err,
 	})
 }
