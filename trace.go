@@ -87,9 +87,10 @@ func (d DriverTrace) getCredentialsStart(ctx context.Context) {
 		f(x)
 	}
 }
-func (d DriverTrace) getCredentialsDone(ctx context.Context, err error) {
+func (d DriverTrace) getCredentialsDone(ctx context.Context, token bool, err error) {
 	x := GetCredentialsDoneInfo{
 		Context: ctx,
+		Token:   token,
 		Error:   err,
 	}
 	if f := d.GetCredentialsDone; f != nil {
@@ -192,6 +193,7 @@ type (
 	}
 	GetCredentialsDoneInfo struct {
 		Context context.Context
+		Token   bool
 		Error   error
 	}
 	DiscoveryStartInfo struct {

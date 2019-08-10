@@ -31,7 +31,7 @@ func (m *meta) init() {
 	})
 }
 
-func (m *meta) md(ctx context.Context) (md metadata.MD, err error) {
+func (m *meta) md(ctx context.Context) (md metadata.MD, _ error) {
 	m.init()
 
 	if m.credentials == nil {
@@ -40,7 +40,10 @@ func (m *meta) md(ctx context.Context) (md metadata.MD, err error) {
 
 	m.trace.getCredentialsStart(ctx)
 	token, err := m.credentials.Token(ctx)
-	m.trace.getCredentialsDone(ctx, err)
+	defer func() {
+		_, withToken := md[metaTicket]
+		m.trace.getCredentialsDone(ctx, withToken, err)
+	}()
 
 	switch err {
 	case nil:

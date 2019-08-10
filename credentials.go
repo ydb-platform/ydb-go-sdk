@@ -71,7 +71,7 @@ func (m *multiCredentials) Token(ctx context.Context) (token string, err error) 
 	for _, c := range m.cs {
 		token, err = c.Token(ctx)
 		if err == nil {
-			break
+			return
 		}
 	}
 	if err == nil {
@@ -80,10 +80,11 @@ func (m *multiCredentials) Token(ctx context.Context) (token string, err error) 
 	return
 }
 
-// MultiCredentials creates Credentials which represents multiple ways of obtaining token.
-// Its Token() method proxies call to the underlying credentials in order. When
-// first successful call met, it returns. If there are no successful calls, it
-// returns last error.
+// MultiCredentials creates Credentials which represents multiple ways of
+// obtaining token.
+// Its Token() method proxies call to the underlying credentials in order.
+// When first successful call met, it returns. If there are no successful
+// calls, it returns last error.
 func MultiCredentials(cs ...Credentials) Credentials {
 	all := make([]Credentials, 0, len(cs))
 	for _, c := range cs {
