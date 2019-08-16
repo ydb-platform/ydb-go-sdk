@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/testutil"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
@@ -711,11 +712,11 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 
 	// Release session s – connection established.
 	release <- struct{}{}
+	<-timer.Reset
 	<-touched // Wait until first keep alive loop finished.
 
 	mustTakeSession(t, p, s)
 	mustPutSession(t, p, s)
-	<-timer.Reset
 
 	// Trigger next KeepAlive iteration.
 	shiftTime(p.IdleThreshold)
@@ -948,8 +949,8 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 	// with touch time lower, than list's back element (s2).
 	close(releaseKeepAlive)
 	// Wait for touching routine exits.
-	<-touchDone
 	<-timer.Reset
+	<-touchDone
 
 	if x1 := mustGetSession(t, p); x1 != s1 {
 		t.Errorf("reordering of sessions did not occur")
@@ -985,6 +986,84 @@ func TestSessionPoolReuseWaitChannel(t *testing.T) {
 	if ch1 != ch2 {
 		t.Errorf("unexpected reused channel")
 	}
+}
+
+func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
+
+	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
+	defer cleanupNow()
+
+	var (
+		keepalive           = make(chan interface{})
+		keepaliveResult     = make(chan error)
+		deleteSession       = make(chan interface{})
+		deleteSessionResult = make(chan error)
+	)
+	p := &SessionPool{
+		SizeLimit:         1,
+		IdleThreshold:     time.Second,
+		BusyCheckInterval: -1,
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 1,
+			Handler: methodHandlers{
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					keepalive <- res
+					return <-keepaliveResult
+				},
+				testutil.TableDeleteSession: func(req, res interface{}) error {
+					deleteSession <- res
+					return <-deleteSessionResult
+				},
+			},
+		},
+	}
+
+	// First Get&Put to initialize pool's timers.
+	mustPutSession(t, p, mustGetSession(t, p))
+	<-timer.Created
+
+	// Now the most interesting and delicate part: we want to emulate a race
+	// condition between awaiting the session by touchCound() call and session
+	// deletion after failed Keepalive().
+	//
+	// So first step is to force keepalive. Note that we do not send keepalive
+	// result here making Keepalive() being blocked.
+	shiftTime(5 * time.Second)
+	timer.C <- timeutil.Now()
+	<-keepalive
+
+	cond := p.touchCond()
+	assertFilled := func(want bool) {
+		const timeout = time.Millisecond
+		select {
+		case <-cond:
+			if !want {
+				t.Fatalf("unexpected cond event")
+			}
+		case <-time.After(timeout):
+			if want {
+				t.Fatalf("no cond event after %s", timeout)
+			}
+		}
+	}
+
+	// Now fail the Keepalive() call from above.
+	keepaliveResult <- &ydb.OpError{
+		Reason: ydb.StatusBadSession,
+	}
+
+	// Block the keeper()'s deletion routine.
+	// While delete is not finished cond must not be fulfilled.
+	<-deleteSession
+	assertFilled(false)
+
+	// Complete the session deletion routine. After that cond must become
+	// fulfilled.
+	deleteSessionResult <- nil
+	assertFilled(true)
 }
 
 func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {

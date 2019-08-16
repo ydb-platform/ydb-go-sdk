@@ -389,7 +389,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 
 	p.traceTakeStart(ctx, s)
 	defer func() {
-		p.traceTakeDone(ctx, s, took)
+		p.traceTakeDone(ctx, s, took, err)
 	}()
 
 	p.mu.Lock()
@@ -401,6 +401,8 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
+
+		p.traceTakeWait(ctx, s)
 
 		// Keepalive processing takes place right now.
 		// Try to await touched session before creation of new one.
@@ -695,15 +697,15 @@ func (p *SessionPool) keeper() {
 
 		p.mu.Unlock()
 
-		if touchingDone != nil {
-			close(touchingDone)
-		}
 		if !sleep {
 			timer.Reset(delay)
 		}
 		for i, s := range toDelete {
 			toDelete[i] = nil
 			p.closeSession(context.Background(), s)
+		}
+		if touchingDone != nil {
+			close(touchingDone)
 		}
 	}
 }
@@ -1013,11 +1015,24 @@ func (p *SessionPool) traceTakeStart(ctx context.Context, s *Session) {
 		b(x)
 	}
 }
-func (p *SessionPool) traceTakeDone(ctx context.Context, s *Session, took bool) {
+func (p *SessionPool) traceTakeWait(ctx context.Context, s *Session) {
+	x := SessionPoolTakeWaitInfo{
+		Context: ctx,
+		Session: s,
+	}
+	if a := p.Trace.TakeWait; a != nil {
+		a(x)
+	}
+	if b := ContextSessionPoolTrace(ctx).TakeWait; b != nil {
+		b(x)
+	}
+}
+func (p *SessionPool) traceTakeDone(ctx context.Context, s *Session, took bool, err error) {
 	x := SessionPoolTakeDoneInfo{
 		Context: ctx,
 		Session: s,
 		Took:    took,
+		Error:   err,
 	}
 	if a := p.Trace.TakeDone; a != nil {
 		a(x)

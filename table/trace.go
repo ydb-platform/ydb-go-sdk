@@ -325,6 +325,7 @@ type SessionPoolTrace struct {
 	BusyCheckStart func(SessionPoolBusyCheckStartInfo)
 	BusyCheckDone  func(SessionPoolBusyCheckDoneInfo)
 	TakeStart      func(SessionPoolTakeStartInfo)
+	TakeWait       func(SessionPoolTakeWaitInfo)
 	TakeDone       func(SessionPoolTakeDoneInfo)
 	PutStart       func(SessionPoolPutStartInfo)
 	PutDone        func(SessionPoolPutDoneInfo)
@@ -363,10 +364,15 @@ type (
 		Context context.Context
 		Session *Session
 	}
+	SessionPoolTakeWaitInfo struct {
+		Context context.Context
+		Session *Session
+	}
 	SessionPoolTakeDoneInfo struct {
 		Context context.Context
 		Session *Session
 		Took    bool
+		Error   error
 	}
 	SessionPoolPutStartInfo struct {
 		Context context.Context
@@ -478,6 +484,17 @@ func composeSessionPoolTrace(a, b SessionPoolTrace) (c SessionPoolTrace) {
 		c.TakeStart = func(info SessionPoolTakeStartInfo) {
 			a.TakeStart(info)
 			b.TakeStart(info)
+		}
+	}
+	switch {
+	case a.TakeWait == nil:
+		c.TakeWait = b.TakeWait
+	case b.TakeWait == nil:
+		c.TakeWait = a.TakeWait
+	default:
+		c.TakeWait = func(info SessionPoolTakeWaitInfo) {
+			a.TakeWait(info)
+			b.TakeWait(info)
 		}
 	}
 	switch {
