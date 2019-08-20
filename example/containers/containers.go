@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"flag"
 	"log"
 	"text/template"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
@@ -46,10 +48,18 @@ var query = template.Must(template.New("fill database").Parse(`
 	SELECT Variant(42, "2", $variantTupleType);
 `))
 
-func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig) error {
+type Command struct {
+	config func(cli.Parameters) *ydb.DriverConfig
+}
+
+func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
+	cmd.config = cli.ExportDriverConfig(flag)
+}
+
+func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	driver, err := (&ydb.Dialer{
-		DriverConfig: config,
-	}).Dial(ctx, endpoint)
+		DriverConfig: cmd.config(params),
+	}).Dial(ctx, params.Endpoint)
 	if err != nil {
 		return err
 	}

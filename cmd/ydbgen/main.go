@@ -13,7 +13,6 @@ import (
 	"go/types"
 	"io/ioutil"
 	"log"
-	"math/bits"
 	"os"
 	"path"
 	"path/filepath"
@@ -49,6 +48,7 @@ func main() {
 	)
 	flag.Parse()
 
+	// TODO(kamardin): add default GenFlags to use with `-all` flag for example.
 	var DefaultMode GenMode
 	{
 		var err error
@@ -238,7 +238,9 @@ func main() {
 			}()
 
 			switch v := n.(type) {
-			case *ast.FuncDecl:
+			case
+				*ast.FuncDecl,
+				*ast.ValueSpec:
 				return false
 
 			case *ast.Ident:
@@ -340,24 +342,18 @@ func main() {
 				decl := info.TypeOf(item.StructType).(*types.Struct)
 
 				for i, f := range item.StructType.Fields.List {
-					var err error
+					name := f.Names[0].Name
 					field := &Field{
-						Name: f.Names[0].Name,
-						Conv: item.Mode.Conv,
+						Name:     name,
+						Conv:     item.Mode.Conv,
+						Column:   camelToSnake(name),
+						Position: i,
 					}
 					if err := field.ParseTags(decl.Tag(i)); err != nil {
 						log.Fatal(err)
 					}
 					if field.Ignore {
 						continue
-					}
-					if field.Column != "" {
-						s.SeekMode |= SeekColumn
-					} else {
-						field.Column = camelToSnake(field.Name)
-					}
-					if field.Position > 0 {
-						s.SeekMode |= SeekPosition
 					}
 
 					var typ types.Type
@@ -412,6 +408,7 @@ func main() {
 					}
 
 					if field.Primitive == 0 {
+						var err error
 						field.Primitive, err = ydbtypes.PrimitiveTypeFromGoType(field.Type)
 						if err != nil {
 							log.Fatal(err)
@@ -424,9 +421,6 @@ func main() {
 					}
 
 					s.Fields = append(s.Fields, field)
-				}
-				if bits.OnesCount(uint(s.SeekMode)) > 1 {
-					log.Fatal("ambiguous fields configuration: got either column names and position indexes")
 				}
 				if s.SeekMode == SeekPosition {
 					sort.Slice(s.Fields, func(i, j int) bool {
@@ -732,6 +726,9 @@ func (f *Field) ParseTags(tags string) (err error) {
 			value = strings.Trim(value, `"`)
 			break
 		}
+	}
+	if value == "" {
+		return nil
 	}
 	pairs := strings.Split(value, ",")
 	var (

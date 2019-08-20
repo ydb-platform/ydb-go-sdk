@@ -538,7 +538,7 @@ func (g *Generator) writeStructType(bw *bufio.Writer, depth int, s *Struct) {
 
 func (g *Generator) writeStructFieldsScan(bw *bufio.Writer, depth int, rcvr string, s *Struct) {
 	for _, f := range s.Fields {
-		if s.SeekMode&SeekPosition != 0 {
+		if s.SeekMode == SeekPosition {
 			line(bw, tab(depth), `res.NextItem()`)
 		} else {
 			line(bw, tab(depth), `res.SeekItem("`, f.Column, `")`)

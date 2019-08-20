@@ -47,7 +47,10 @@ type (
 	CreateTableOption func(d *createTableDesc)
 )
 
-type profile Ydb_Table.TableProfile
+type (
+	profile       Ydb_Table.TableProfile
+	ProfileOption func(p *profile)
+)
 
 type (
 	storagePolicy      Ydb_Table.StoragePolicy
@@ -73,6 +76,51 @@ func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
 	}
 }
 
+type (
+	indexDesc   Ydb_Table.TableIndex
+	IndexOption func(d *indexDesc)
+)
+
+func WithIndex(name string, opts ...IndexOption) CreateTableOption {
+	return func(d *createTableDesc) {
+		x := &Ydb_Table.TableIndex{
+			Name: name,
+		}
+		for _, opt := range opts {
+			opt((*indexDesc)(x))
+		}
+		d.Indexes = append(d.Indexes, x)
+	}
+}
+
+func WithIndexColumns(columns ...string) IndexOption {
+	return func(d *indexDesc) {
+		d.IndexColumns = append(d.IndexColumns, columns...)
+	}
+}
+
+type IndexType interface {
+	setup(*indexDesc)
+}
+
+type globalIndex struct{}
+
+func GlobalIndex() IndexType {
+	return globalIndex{}
+}
+
+func (globalIndex) setup(d *indexDesc) {
+	d.Type = &Ydb_Table.TableIndex_GlobalIndex{
+		GlobalIndex: new(Ydb_Table.GlobalIndex),
+	}
+}
+
+func WithIndexType(t IndexType) IndexOption {
+	return func(d *indexDesc) {
+		t.setup(d)
+	}
+}
+
 func WithProfile(opts ...ProfileOption) CreateTableOption {
 	return func(d *createTableDesc) {
 		if d.Profile == nil {
@@ -83,8 +131,6 @@ func WithProfile(opts ...ProfileOption) CreateTableOption {
 		}
 	}
 }
-
-type ProfileOption func(p *profile)
 
 func WithProfilePreset(name string) ProfileOption {
 	return func(p *profile) {

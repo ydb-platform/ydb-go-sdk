@@ -3,15 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"log"
-	"net"
 	"path"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/scheme"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
@@ -72,21 +73,18 @@ SELECT
 FROM AS_TABLE($episodesData);
 `))
 
-func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig) error {
+type Command struct {
+	config func(cli.Parameters) *ydb.DriverConfig
+}
+
+func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
+	cmd.config = cli.ExportDriverConfig(flag)
+}
+
+func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	driver, err := (&ydb.Dialer{
-		DriverConfig: config,
-		NetDial: func(ctx context.Context, addr string) (net.Conn, error) {
-			var d net.Dialer
-			conn, err := d.DialContext(ctx, "tcp", addr)
-			if err == nil {
-				return conn, nil
-			}
-			log.Printf("want to dial %q", addr)
-			h, _, _ := net.SplitHostPort(addr)
-			log.Printf("stripping %q host", h)
-			return d.DialContext(ctx, "tcp", "localhost:22135")
-		},
-	}).Dial(ctx, endpoint)
+		DriverConfig: cmd.config(params),
+	}).Dial(ctx, params.Endpoint)
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
 	}
@@ -100,12 +98,14 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	}
 	defer sp.Close(ctx)
 
-	err = cleanupDatabase(ctx, driver, &sp, config.Database)
+	prefix := path.Join(params.Database, params.Path)
+
+	err = cleanupDatabase(ctx, driver, &sp, params.Database)
 	if err != nil {
 		return err
 	}
 
-	err = ensurePathExists(ctx, driver, config.Database, prefix)
+	err = ensurePathExists(ctx, driver, params.Database, prefix)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	}
 
 	err = createTables(ctx, &sp, path.Join(
-		config.Database,
+		params.Database,
 		prefix,
 	))
 	if err != nil {
@@ -124,7 +124,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	}
 
 	err = describeTable(ctx, &sp, path.Join(
-		config.Database,
+		params.Database,
 		prefix, "series",
 	))
 	if err != nil {
@@ -132,7 +132,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	}
 
 	err = fillTablesWithData(ctx, &sp, path.Join(
-		config.Database,
+		params.Database,
 		prefix,
 	))
 	if err != nil {
@@ -140,7 +140,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	}
 
 	err = selectSimple(ctx, &sp, path.Join(
-		config.Database,
+		params.Database,
 		prefix,
 	))
 	if err != nil {
@@ -148,7 +148,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	}
 
 	err = readTable(ctx, &sp, path.Join(
-		config.Database,
+		params.Database,
 		prefix, "episodes",
 	))
 	if err != nil {

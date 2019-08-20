@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"math/big"
 	"path"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/decimal"
+	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
@@ -36,10 +38,18 @@ PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 SELECT value FROM decimals;
 `))
 
-func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig) error {
+type Command struct {
+	config func(cli.Parameters) *ydb.DriverConfig
+}
+
+func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
+	cmd.config = cli.ExportDriverConfig(flag)
+}
+
+func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	driver, err := (&ydb.Dialer{
-		DriverConfig: config,
-	}).Dial(ctx, endpoint)
+		DriverConfig: cmd.config(params),
+	}).Dial(ctx, params.Endpoint)
 	if err != nil {
 		return err
 	}
@@ -52,7 +62,7 @@ func run(ctx context.Context, endpoint, prefix string, config *ydb.DriverConfig)
 	defer session.Close(context.Background())
 
 	var (
-		tablePathPrefix = path.Join(config.Database, prefix)
+		tablePathPrefix = path.Join(params.Database, params.Path)
 		tablePath       = path.Join(tablePathPrefix, "decimals")
 	)
 	err = session.CreateTable(ctx, tablePath,
