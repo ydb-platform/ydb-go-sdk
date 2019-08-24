@@ -19,7 +19,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type Entry_Type int32
 
@@ -719,112 +719,14 @@ func (m *PermissionsAction) GetChangeOwner() string {
 	return ""
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*PermissionsAction) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _PermissionsAction_OneofMarshaler, _PermissionsAction_OneofUnmarshaler, _PermissionsAction_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*PermissionsAction) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*PermissionsAction_Grant)(nil),
 		(*PermissionsAction_Revoke)(nil),
 		(*PermissionsAction_Set)(nil),
 		(*PermissionsAction_ChangeOwner)(nil),
 	}
-}
-
-func _PermissionsAction_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*PermissionsAction)
-	// action
-	switch x := m.Action.(type) {
-	case *PermissionsAction_Grant:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Grant); err != nil {
-			return err
-		}
-	case *PermissionsAction_Revoke:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Revoke); err != nil {
-			return err
-		}
-	case *PermissionsAction_Set:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Set); err != nil {
-			return err
-		}
-	case *PermissionsAction_ChangeOwner:
-		b.EncodeVarint(4<<3 | proto.WireBytes)
-		b.EncodeStringBytes(x.ChangeOwner)
-	case nil:
-	default:
-		return fmt.Errorf("PermissionsAction.Action has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _PermissionsAction_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*PermissionsAction)
-	switch tag {
-	case 1: // action.grant
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Permissions)
-		err := b.DecodeMessage(msg)
-		m.Action = &PermissionsAction_Grant{msg}
-		return true, err
-	case 2: // action.revoke
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Permissions)
-		err := b.DecodeMessage(msg)
-		m.Action = &PermissionsAction_Revoke{msg}
-		return true, err
-	case 3: // action.set
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Permissions)
-		err := b.DecodeMessage(msg)
-		m.Action = &PermissionsAction_Set{msg}
-		return true, err
-	case 4: // action.change_owner
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeStringBytes()
-		m.Action = &PermissionsAction_ChangeOwner{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _PermissionsAction_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*PermissionsAction)
-	// action
-	switch x := m.Action.(type) {
-	case *PermissionsAction_Grant:
-		s := proto.Size(x.Grant)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *PermissionsAction_Revoke:
-		s := proto.Size(x.Revoke)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *PermissionsAction_Set:
-		s := proto.Size(x.Set)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *PermissionsAction_ChangeOwner:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.ChangeOwner)))
-		n += len(x.ChangeOwner)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 // Modify permissions of given object

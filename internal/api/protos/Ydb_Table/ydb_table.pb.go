@@ -23,7 +23,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type ColumnFamilyPolicy_Compression int32
 
@@ -460,59 +460,11 @@ func (m *TableIndex) GetGlobalIndex() *GlobalIndex {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*TableIndex) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _TableIndex_OneofMarshaler, _TableIndex_OneofUnmarshaler, _TableIndex_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*TableIndex) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*TableIndex_GlobalIndex)(nil),
 	}
-}
-
-func _TableIndex_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*TableIndex)
-	// type
-	switch x := m.Type.(type) {
-	case *TableIndex_GlobalIndex:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.GlobalIndex); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("TableIndex.Type has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _TableIndex_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*TableIndex)
-	switch tag {
-	case 3: // type.global_index
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(GlobalIndex)
-		err := b.DecodeMessage(msg)
-		m.Type = &TableIndex_GlobalIndex{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _TableIndex_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*TableIndex)
-	// type
-	switch x := m.Type.(type) {
-	case *TableIndex_GlobalIndex:
-		s := proto.Size(x.GlobalIndex)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type StorageSettings struct {
@@ -887,73 +839,12 @@ func (m *PartitioningPolicy) GetExplicitPartitions() *ExplicitPartitions {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*PartitioningPolicy) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _PartitioningPolicy_OneofMarshaler, _PartitioningPolicy_OneofUnmarshaler, _PartitioningPolicy_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*PartitioningPolicy) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*PartitioningPolicy_UniformPartitions)(nil),
 		(*PartitioningPolicy_ExplicitPartitions)(nil),
 	}
-}
-
-func _PartitioningPolicy_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*PartitioningPolicy)
-	// partitions
-	switch x := m.Partitions.(type) {
-	case *PartitioningPolicy_UniformPartitions:
-		b.EncodeVarint(3<<3 | proto.WireVarint)
-		b.EncodeVarint(uint64(x.UniformPartitions))
-	case *PartitioningPolicy_ExplicitPartitions:
-		b.EncodeVarint(4<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.ExplicitPartitions); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("PartitioningPolicy.Partitions has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _PartitioningPolicy_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*PartitioningPolicy)
-	switch tag {
-	case 3: // partitions.uniform_partitions
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Partitions = &PartitioningPolicy_UniformPartitions{x}
-		return true, err
-	case 4: // partitions.explicit_partitions
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(ExplicitPartitions)
-		err := b.DecodeMessage(msg)
-		m.Partitions = &PartitioningPolicy_ExplicitPartitions{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _PartitioningPolicy_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*PartitioningPolicy)
-	// partitions
-	switch x := m.Partitions.(type) {
-	case *PartitioningPolicy_UniformPartitions:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(x.UniformPartitions))
-	case *PartitioningPolicy_ExplicitPartitions:
-		s := proto.Size(x.ExplicitPartitions)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type ExecutionPolicy struct {
@@ -2120,70 +2011,12 @@ func (m *Query) GetId() string {
 	return ""
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*Query) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _Query_OneofMarshaler, _Query_OneofUnmarshaler, _Query_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*Query) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*Query_YqlText)(nil),
 		(*Query_Id)(nil),
 	}
-}
-
-func _Query_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*Query)
-	// query
-	switch x := m.Query.(type) {
-	case *Query_YqlText:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		b.EncodeStringBytes(x.YqlText)
-	case *Query_Id:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		b.EncodeStringBytes(x.Id)
-	case nil:
-	default:
-		return fmt.Errorf("Query.Query has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _Query_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*Query)
-	switch tag {
-	case 1: // query.yql_text
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeStringBytes()
-		m.Query = &Query_YqlText{x}
-		return true, err
-	case 2: // query.id
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeStringBytes()
-		m.Query = &Query_Id{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _Query_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*Query)
-	// query
-	switch x := m.Query.(type) {
-	case *Query_YqlText:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.YqlText)))
-		n += len(x.YqlText)
-	case *Query_Id:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.Id)))
-		n += len(x.Id)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type SerializableModeSettings struct {
@@ -2373,97 +2206,13 @@ func (m *TransactionSettings) GetStaleReadOnly() *StaleModeSettings {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*TransactionSettings) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _TransactionSettings_OneofMarshaler, _TransactionSettings_OneofUnmarshaler, _TransactionSettings_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*TransactionSettings) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*TransactionSettings_SerializableReadWrite)(nil),
 		(*TransactionSettings_OnlineReadOnly)(nil),
 		(*TransactionSettings_StaleReadOnly)(nil),
 	}
-}
-
-func _TransactionSettings_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*TransactionSettings)
-	// tx_mode
-	switch x := m.TxMode.(type) {
-	case *TransactionSettings_SerializableReadWrite:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.SerializableReadWrite); err != nil {
-			return err
-		}
-	case *TransactionSettings_OnlineReadOnly:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.OnlineReadOnly); err != nil {
-			return err
-		}
-	case *TransactionSettings_StaleReadOnly:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.StaleReadOnly); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("TransactionSettings.TxMode has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _TransactionSettings_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*TransactionSettings)
-	switch tag {
-	case 1: // tx_mode.serializable_read_write
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(SerializableModeSettings)
-		err := b.DecodeMessage(msg)
-		m.TxMode = &TransactionSettings_SerializableReadWrite{msg}
-		return true, err
-	case 2: // tx_mode.online_read_only
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(OnlineModeSettings)
-		err := b.DecodeMessage(msg)
-		m.TxMode = &TransactionSettings_OnlineReadOnly{msg}
-		return true, err
-	case 3: // tx_mode.stale_read_only
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(StaleModeSettings)
-		err := b.DecodeMessage(msg)
-		m.TxMode = &TransactionSettings_StaleReadOnly{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _TransactionSettings_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*TransactionSettings)
-	// tx_mode
-	switch x := m.TxMode.(type) {
-	case *TransactionSettings_SerializableReadWrite:
-		s := proto.Size(x.SerializableReadWrite)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *TransactionSettings_OnlineReadOnly:
-		s := proto.Size(x.OnlineReadOnly)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *TransactionSettings_StaleReadOnly:
-		s := proto.Size(x.StaleReadOnly)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type TransactionControl struct {
@@ -2546,74 +2295,12 @@ func (m *TransactionControl) GetCommitTx() bool {
 	return false
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*TransactionControl) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _TransactionControl_OneofMarshaler, _TransactionControl_OneofUnmarshaler, _TransactionControl_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*TransactionControl) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*TransactionControl_TxId)(nil),
 		(*TransactionControl_BeginTx)(nil),
 	}
-}
-
-func _TransactionControl_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*TransactionControl)
-	// tx_selector
-	switch x := m.TxSelector.(type) {
-	case *TransactionControl_TxId:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		b.EncodeStringBytes(x.TxId)
-	case *TransactionControl_BeginTx:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.BeginTx); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("TransactionControl.TxSelector has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _TransactionControl_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*TransactionControl)
-	switch tag {
-	case 1: // tx_selector.tx_id
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeStringBytes()
-		m.TxSelector = &TransactionControl_TxId{x}
-		return true, err
-	case 2: // tx_selector.begin_tx
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(TransactionSettings)
-		err := b.DecodeMessage(msg)
-		m.TxSelector = &TransactionControl_BeginTx{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _TransactionControl_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*TransactionControl)
-	// tx_selector
-	switch x := m.TxSelector.(type) {
-	case *TransactionControl_TxId:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.TxId)))
-		n += len(x.TxId)
-	case *TransactionControl_BeginTx:
-		s := proto.Size(x.BeginTx)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type QueryCachePolicy struct {
@@ -4495,128 +4182,14 @@ func (m *KeyRange) GetLessOrEqual() *Ydb.TypedValue {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*KeyRange) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _KeyRange_OneofMarshaler, _KeyRange_OneofUnmarshaler, _KeyRange_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*KeyRange) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*KeyRange_Greater)(nil),
 		(*KeyRange_GreaterOrEqual)(nil),
 		(*KeyRange_Less)(nil),
 		(*KeyRange_LessOrEqual)(nil),
 	}
-}
-
-func _KeyRange_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*KeyRange)
-	// from_bound
-	switch x := m.FromBound.(type) {
-	case *KeyRange_Greater:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Greater); err != nil {
-			return err
-		}
-	case *KeyRange_GreaterOrEqual:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.GreaterOrEqual); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("KeyRange.FromBound has unexpected type %T", x)
-	}
-	// to_bound
-	switch x := m.ToBound.(type) {
-	case *KeyRange_Less:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Less); err != nil {
-			return err
-		}
-	case *KeyRange_LessOrEqual:
-		b.EncodeVarint(4<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.LessOrEqual); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("KeyRange.ToBound has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _KeyRange_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*KeyRange)
-	switch tag {
-	case 1: // from_bound.greater
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Ydb.TypedValue)
-		err := b.DecodeMessage(msg)
-		m.FromBound = &KeyRange_Greater{msg}
-		return true, err
-	case 2: // from_bound.greater_or_equal
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Ydb.TypedValue)
-		err := b.DecodeMessage(msg)
-		m.FromBound = &KeyRange_GreaterOrEqual{msg}
-		return true, err
-	case 3: // to_bound.less
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Ydb.TypedValue)
-		err := b.DecodeMessage(msg)
-		m.ToBound = &KeyRange_Less{msg}
-		return true, err
-	case 4: // to_bound.less_or_equal
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Ydb.TypedValue)
-		err := b.DecodeMessage(msg)
-		m.ToBound = &KeyRange_LessOrEqual{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _KeyRange_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*KeyRange)
-	// from_bound
-	switch x := m.FromBound.(type) {
-	case *KeyRange_Greater:
-		s := proto.Size(x.Greater)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *KeyRange_GreaterOrEqual:
-		s := proto.Size(x.GreaterOrEqual)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	// to_bound
-	switch x := m.ToBound.(type) {
-	case *KeyRange_Less:
-		s := proto.Size(x.Less)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *KeyRange_LessOrEqual:
-		s := proto.Size(x.LessOrEqual)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 // Request to read table (without SQL)

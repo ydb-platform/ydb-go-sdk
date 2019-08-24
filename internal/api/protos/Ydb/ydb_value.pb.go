@@ -19,7 +19,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type Type_PrimitiveTypeId int32
 
@@ -309,78 +309,12 @@ func (m *VariantType) GetStructItems() *StructType {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*VariantType) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _VariantType_OneofMarshaler, _VariantType_OneofUnmarshaler, _VariantType_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*VariantType) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*VariantType_TupleItems)(nil),
 		(*VariantType_StructItems)(nil),
 	}
-}
-
-func _VariantType_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*VariantType)
-	// type
-	switch x := m.Type.(type) {
-	case *VariantType_TupleItems:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.TupleItems); err != nil {
-			return err
-		}
-	case *VariantType_StructItems:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.StructItems); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("VariantType.Type has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _VariantType_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*VariantType)
-	switch tag {
-	case 1: // type.tuple_items
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(TupleType)
-		err := b.DecodeMessage(msg)
-		m.Type = &VariantType_TupleItems{msg}
-		return true, err
-	case 2: // type.struct_items
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(StructType)
-		err := b.DecodeMessage(msg)
-		m.Type = &VariantType_StructItems{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _VariantType_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*VariantType)
-	// type
-	switch x := m.Type.(type) {
-	case *VariantType_TupleItems:
-		s := proto.Size(x.TupleItems)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *VariantType_StructItems:
-		s := proto.Size(x.StructItems)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type TupleType struct {
@@ -725,9 +659,9 @@ func (m *Type) GetVoidType() _struct.NullValue {
 	return _struct.NullValue_NULL_VALUE
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*Type) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _Type_OneofMarshaler, _Type_OneofUnmarshaler, _Type_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*Type) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*Type_TypeId)(nil),
 		(*Type_DecimalType)(nil),
 		(*Type_OptionalType)(nil),
@@ -738,188 +672,6 @@ func (*Type) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, f
 		(*Type_VariantType)(nil),
 		(*Type_VoidType)(nil),
 	}
-}
-
-func _Type_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*Type)
-	// type
-	switch x := m.Type.(type) {
-	case *Type_TypeId:
-		b.EncodeVarint(1<<3 | proto.WireVarint)
-		b.EncodeVarint(uint64(x.TypeId))
-	case *Type_DecimalType:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.DecimalType); err != nil {
-			return err
-		}
-	case *Type_OptionalType:
-		b.EncodeVarint(101<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.OptionalType); err != nil {
-			return err
-		}
-	case *Type_ListType:
-		b.EncodeVarint(102<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.ListType); err != nil {
-			return err
-		}
-	case *Type_TupleType:
-		b.EncodeVarint(103<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.TupleType); err != nil {
-			return err
-		}
-	case *Type_StructType:
-		b.EncodeVarint(104<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.StructType); err != nil {
-			return err
-		}
-	case *Type_DictType:
-		b.EncodeVarint(105<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.DictType); err != nil {
-			return err
-		}
-	case *Type_VariantType:
-		b.EncodeVarint(106<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.VariantType); err != nil {
-			return err
-		}
-	case *Type_VoidType:
-		b.EncodeVarint(201<<3 | proto.WireVarint)
-		b.EncodeVarint(uint64(x.VoidType))
-	case nil:
-	default:
-		return fmt.Errorf("Type.Type has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _Type_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*Type)
-	switch tag {
-	case 1: // type.type_id
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Type = &Type_TypeId{Type_PrimitiveTypeId(x)}
-		return true, err
-	case 2: // type.decimal_type
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(DecimalType)
-		err := b.DecodeMessage(msg)
-		m.Type = &Type_DecimalType{msg}
-		return true, err
-	case 101: // type.optional_type
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(OptionalType)
-		err := b.DecodeMessage(msg)
-		m.Type = &Type_OptionalType{msg}
-		return true, err
-	case 102: // type.list_type
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(ListType)
-		err := b.DecodeMessage(msg)
-		m.Type = &Type_ListType{msg}
-		return true, err
-	case 103: // type.tuple_type
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(TupleType)
-		err := b.DecodeMessage(msg)
-		m.Type = &Type_TupleType{msg}
-		return true, err
-	case 104: // type.struct_type
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(StructType)
-		err := b.DecodeMessage(msg)
-		m.Type = &Type_StructType{msg}
-		return true, err
-	case 105: // type.dict_type
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(DictType)
-		err := b.DecodeMessage(msg)
-		m.Type = &Type_DictType{msg}
-		return true, err
-	case 106: // type.variant_type
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(VariantType)
-		err := b.DecodeMessage(msg)
-		m.Type = &Type_VariantType{msg}
-		return true, err
-	case 201: // type.void_type
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Type = &Type_VoidType{_struct.NullValue(x)}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _Type_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*Type)
-	// type
-	switch x := m.Type.(type) {
-	case *Type_TypeId:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(x.TypeId))
-	case *Type_DecimalType:
-		s := proto.Size(x.DecimalType)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Type_OptionalType:
-		s := proto.Size(x.OptionalType)
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Type_ListType:
-		s := proto.Size(x.ListType)
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Type_TupleType:
-		s := proto.Size(x.TupleType)
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Type_StructType:
-		s := proto.Size(x.StructType)
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Type_DictType:
-		s := proto.Size(x.DictType)
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Type_VariantType:
-		s := proto.Size(x.VariantType)
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Type_VoidType:
-		n += 2 // tag and wire
-		n += proto.SizeVarint(uint64(x.VoidType))
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type ValuePair struct {
@@ -1213,9 +965,9 @@ func (m *Value) GetHigh_128() uint64 {
 	return 0
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*Value) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _Value_OneofMarshaler, _Value_OneofUnmarshaler, _Value_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*Value) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*Value_BoolValue)(nil),
 		(*Value_Int32Value)(nil),
 		(*Value_Uint32Value)(nil),
@@ -1229,203 +981,6 @@ func (*Value) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, 
 		(*Value_NestedValue)(nil),
 		(*Value_Low_128)(nil),
 	}
-}
-
-func _Value_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*Value)
-	// value
-	switch x := m.Value.(type) {
-	case *Value_BoolValue:
-		t := uint64(0)
-		if x.BoolValue {
-			t = 1
-		}
-		b.EncodeVarint(1<<3 | proto.WireVarint)
-		b.EncodeVarint(t)
-	case *Value_Int32Value:
-		b.EncodeVarint(2<<3 | proto.WireFixed32)
-		b.EncodeFixed32(uint64(x.Int32Value))
-	case *Value_Uint32Value:
-		b.EncodeVarint(3<<3 | proto.WireFixed32)
-		b.EncodeFixed32(uint64(x.Uint32Value))
-	case *Value_Int64Value:
-		b.EncodeVarint(4<<3 | proto.WireFixed64)
-		b.EncodeFixed64(uint64(x.Int64Value))
-	case *Value_Uint64Value:
-		b.EncodeVarint(5<<3 | proto.WireFixed64)
-		b.EncodeFixed64(uint64(x.Uint64Value))
-	case *Value_FloatValue:
-		b.EncodeVarint(6<<3 | proto.WireFixed32)
-		b.EncodeFixed32(uint64(math.Float32bits(x.FloatValue)))
-	case *Value_DoubleValue:
-		b.EncodeVarint(7<<3 | proto.WireFixed64)
-		b.EncodeFixed64(math.Float64bits(x.DoubleValue))
-	case *Value_BytesValue:
-		b.EncodeVarint(8<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.BytesValue)
-	case *Value_TextValue:
-		b.EncodeVarint(9<<3 | proto.WireBytes)
-		b.EncodeStringBytes(x.TextValue)
-	case *Value_NullFlagValue:
-		b.EncodeVarint(10<<3 | proto.WireVarint)
-		b.EncodeVarint(uint64(x.NullFlagValue))
-	case *Value_NestedValue:
-		b.EncodeVarint(11<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.NestedValue); err != nil {
-			return err
-		}
-	case *Value_Low_128:
-		b.EncodeVarint(15<<3 | proto.WireFixed64)
-		b.EncodeFixed64(uint64(x.Low_128))
-	case nil:
-	default:
-		return fmt.Errorf("Value.Value has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _Value_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*Value)
-	switch tag {
-	case 1: // value.bool_value
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Value = &Value_BoolValue{x != 0}
-		return true, err
-	case 2: // value.int32_value
-		if wire != proto.WireFixed32 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed32()
-		m.Value = &Value_Int32Value{int32(x)}
-		return true, err
-	case 3: // value.uint32_value
-		if wire != proto.WireFixed32 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed32()
-		m.Value = &Value_Uint32Value{uint32(x)}
-		return true, err
-	case 4: // value.int64_value
-		if wire != proto.WireFixed64 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed64()
-		m.Value = &Value_Int64Value{int64(x)}
-		return true, err
-	case 5: // value.uint64_value
-		if wire != proto.WireFixed64 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed64()
-		m.Value = &Value_Uint64Value{x}
-		return true, err
-	case 6: // value.float_value
-		if wire != proto.WireFixed32 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed32()
-		m.Value = &Value_FloatValue{math.Float32frombits(uint32(x))}
-		return true, err
-	case 7: // value.double_value
-		if wire != proto.WireFixed64 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed64()
-		m.Value = &Value_DoubleValue{math.Float64frombits(x)}
-		return true, err
-	case 8: // value.bytes_value
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Value = &Value_BytesValue{x}
-		return true, err
-	case 9: // value.text_value
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeStringBytes()
-		m.Value = &Value_TextValue{x}
-		return true, err
-	case 10: // value.null_flag_value
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Value = &Value_NullFlagValue{_struct.NullValue(x)}
-		return true, err
-	case 11: // value.nested_value
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Value)
-		err := b.DecodeMessage(msg)
-		m.Value = &Value_NestedValue{msg}
-		return true, err
-	case 15: // value.low_128
-		if wire != proto.WireFixed64 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed64()
-		m.Value = &Value_Low_128{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _Value_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*Value)
-	// value
-	switch x := m.Value.(type) {
-	case *Value_BoolValue:
-		n += 1 // tag and wire
-		n += 1
-	case *Value_Int32Value:
-		n += 1 // tag and wire
-		n += 4
-	case *Value_Uint32Value:
-		n += 1 // tag and wire
-		n += 4
-	case *Value_Int64Value:
-		n += 1 // tag and wire
-		n += 8
-	case *Value_Uint64Value:
-		n += 1 // tag and wire
-		n += 8
-	case *Value_FloatValue:
-		n += 1 // tag and wire
-		n += 4
-	case *Value_DoubleValue:
-		n += 1 // tag and wire
-		n += 8
-	case *Value_BytesValue:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.BytesValue)))
-		n += len(x.BytesValue)
-	case *Value_TextValue:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(len(x.TextValue)))
-		n += len(x.TextValue)
-	case *Value_NullFlagValue:
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(x.NullFlagValue))
-	case *Value_NestedValue:
-		s := proto.Size(x.NestedValue)
-		n += 1 // tag and wire
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Value_Low_128:
-		n += 1 // tag and wire
-		n += 8
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 type TypedValue struct {
