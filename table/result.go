@@ -1478,6 +1478,15 @@ func (r *Result) Any() interface{} {
 	}
 }
 
+// Value returns current item under scan as ydb.Value type.
+func (r *Result) Value() ydb.Value {
+	if r.inactive() {
+		return nil
+	}
+	x := r.stack.current()
+	return internal.ValueFromYDB(x.t, x.v)
+}
+
 func (r *Result) AssertType(t ydb.Type) bool {
 	return r.assertCurrentTypeIs(t)
 }
