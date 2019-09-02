@@ -420,14 +420,18 @@ func errIf(cond bool, err error) error {
 	return nil
 }
 
-func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) error {
+func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) (err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawctx := ctx
 
+	var cancel context.CancelFunc
 	if t := d.streamTimeout; t > 0 {
-		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t)
-		defer cancel()
+		defer func() {
+			if err != nil {
+				cancel()
+			}
+		}()
 	}
 
 	// Get credentials (token actually) for the request.
@@ -451,6 +455,16 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) er
 		StreamName:    path.Base(method),
 		ServerStreams: true,
 	}
+
+	conn.runtime.streamStart(timeutil.Now())
+	d.trace.streamStart(rawctx, conn, method)
+	defer func() {
+		if err != nil {
+			conn.runtime.streamDone(timeutil.Now(), err)
+			d.trace.streamDone(rawctx, conn, method, err)
+		}
+	}()
+
 	s, err := grpc.NewClientStream(ctx, &desc, conn.conn, method,
 		grpc.MaxCallRecvMsgSize(50*1024*1024), // 50MB
 	)
@@ -465,8 +479,21 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) er
 	}
 
 	go func() {
-		for err := (error)(nil); err == nil; {
+		var err error
+		defer func() {
+			conn.runtime.streamDone(timeutil.Now(), err)
+			d.trace.streamDone(rawctx, conn, method, err)
+			if cancel != nil {
+				cancel()
+			}
+		}()
+		for err == nil {
+			conn.runtime.streamRecv(timeutil.Now())
+			d.trace.streamRecvStart(rawctx, conn, method)
+
 			err = s.RecvMsg(resp)
+
+			d.trace.streamRecvDone(rawctx, conn, method, resp, err)
 			if err != nil {
 				err = mapGRPCError(err)
 			} else {
@@ -643,6 +670,26 @@ func (c *connRuntime) operationDone(start, end time.Time, err error) {
 		c.opSucceed++
 	}
 	c.opTime.Add(end, float64(end.Sub(start)))
+}
+
+func (c *connRuntime) streamStart(now time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.opRate.Add(now, 1)
+}
+
+func (c *connRuntime) streamRecv(now time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.opRate.Add(now, 1)
+}
+
+func (c *connRuntime) streamDone(now time.Time, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err != nil {
+		c.errRate.Add(now, 1)
+	}
 }
 
 // withContextDialer is an adapter to allow the use of normal go-world net dial

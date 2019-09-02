@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
 )
 
@@ -23,6 +24,11 @@ type DriverTrace struct {
 	OperationStart func(OperationStartInfo)
 	OperationWait  func(OperationWaitInfo)
 	OperationDone  func(OperationDoneInfo)
+
+	StreamStart     func(StreamStartInfo)
+	StreamRecvStart func(StreamRecvStartInfo)
+	StreamRecvDone  func(StreamRecvDoneInfo)
+	StreamDone      func(StreamDoneInfo)
 }
 
 func (d DriverTrace) dialStart(ctx context.Context, addr string) {
@@ -158,6 +164,64 @@ func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method strin
 	}
 }
 
+func (d DriverTrace) streamStart(ctx context.Context, conn *conn, method string) {
+	x := StreamStartInfo{
+		Context: ctx,
+		Address: conn.addr.String(),
+		Method:  Method(method),
+	}
+	if f := d.StreamStart; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).StreamStart; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) streamDone(ctx context.Context, conn *conn, method string, err error) {
+	x := StreamDoneInfo{
+		Context: ctx,
+		Address: conn.addr.String(),
+		Method:  Method(method),
+		Error:   err,
+	}
+	if f := d.StreamDone; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).StreamDone; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) streamRecvStart(ctx context.Context, conn *conn, method string) {
+	x := StreamRecvStartInfo{
+		Context: ctx,
+		Address: conn.addr.String(),
+		Method:  Method(method),
+	}
+	if f := d.StreamRecvStart; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).StreamRecvStart; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method string, resp internal.StreamOperationResponse, err error) {
+	x := StreamRecvDoneInfo{
+		Context: ctx,
+		Address: conn.addr.String(),
+		Method:  Method(method),
+		Error:   err,
+	}
+	if resp != nil {
+		x.Issues = IssueIterator(resp.GetIssues())
+	}
+	if f := d.StreamRecvDone; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).StreamRecvDone; f != nil {
+		f(x)
+	}
+}
+
 // Method represents rpc method.
 type Method string
 
@@ -224,6 +288,29 @@ type (
 		Params  OperationParams
 		OpID    string
 		Issues  IssueIterator
+		Error   error
+	}
+	StreamStartInfo struct {
+		Context context.Context
+		Address string
+		Method  Method
+	}
+	StreamRecvStartInfo struct {
+		Context context.Context
+		Address string
+		Method  Method
+	}
+	StreamRecvDoneInfo struct {
+		Context context.Context
+		Address string
+		Method  Method
+		Issues  IssueIterator
+		Error   error
+	}
+	StreamDoneInfo struct {
+		Context context.Context
+		Address string
+		Method  Method
 		Error   error
 	}
 )
@@ -350,6 +437,51 @@ func composeDriverTrace(a, b DriverTrace) (c DriverTrace) {
 			b.OperationDone(info)
 		}
 	}
+	switch {
+	case a.StreamStart == nil:
+		c.StreamStart = b.StreamStart
+	case b.StreamStart == nil:
+		c.StreamStart = a.StreamStart
+	default:
+		c.StreamStart = func(info StreamStartInfo) {
+			a.StreamStart(info)
+			b.StreamStart(info)
+		}
+	}
+	switch {
+	case a.StreamRecvStart == nil:
+		c.StreamRecvStart = b.StreamRecvStart
+	case b.StreamRecvStart == nil:
+		c.StreamRecvStart = a.StreamRecvStart
+	default:
+		c.StreamRecvStart = func(info StreamRecvStartInfo) {
+			a.StreamRecvStart(info)
+			b.StreamRecvStart(info)
+		}
+	}
+	switch {
+	case a.StreamRecvDone == nil:
+		c.StreamRecvDone = b.StreamRecvDone
+	case b.StreamRecvDone == nil:
+		c.StreamRecvDone = a.StreamRecvDone
+	default:
+		c.StreamRecvDone = func(info StreamRecvDoneInfo) {
+			a.StreamRecvDone(info)
+			b.StreamRecvDone(info)
+		}
+	}
+	switch {
+	case a.StreamDone == nil:
+		c.StreamDone = b.StreamDone
+	case b.StreamDone == nil:
+		c.StreamDone = a.StreamDone
+	default:
+		c.StreamDone = func(info StreamDoneInfo) {
+			a.StreamDone(info)
+			b.StreamDone(info)
+		}
+	}
+
 	return
 }
 

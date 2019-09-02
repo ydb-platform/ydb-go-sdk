@@ -468,6 +468,10 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 }
 
 // StreamReadTable reads table at given path with given options.
+//
+// Note that given ctx controls the lifetime of the whole read, not only this
+// StreamReadTable() call; that is, the time until returned result is closed
+// via Close() call or fully drained by sequential NextStreamSet() calls.
 func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...ReadTableOption) (r *Result, err error) {
 	var resp Ydb_Table.ReadTableResponse
 	req := Ydb_Table.ReadTableRequest{
