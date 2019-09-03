@@ -16,11 +16,18 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal/cache/lru"
 )
 
+var DefaultMaxQueryCacheSize = 1000
+
 // Client contains logic of creation of ydb table sessions.
 type Client struct {
 	Driver ydb.Driver
 	Trace  ClientTrace
 
+	// MaxQueryCacheSize limits maximum number of queries which able to live in
+	// cache. Note that cache is not shared across sessions.
+	//
+	// If MaxQueryCacheSize is less than or equal to zero, then the
+	// DefaultMaxQueryCacheSize is used.
 	MaxQueryCacheSize int
 }
 
@@ -43,13 +50,20 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		ID: res.SessionId,
 		c:  *c,
 		qcache: lru.Cache{
-			MaxSize: c.MaxQueryCacheSize,
+			MaxSize: c.cacheSize(),
 		},
 	}
 	runtime.SetFinalizer(s, func(s *Session) {
 		go s.Close(context.Background())
 	})
 	return
+}
+
+func (c *Client) cacheSize() int {
+	if c.MaxQueryCacheSize <= 0 {
+		return DefaultMaxQueryCacheSize
+	}
+	return c.MaxQueryCacheSize
 }
 
 // Session represents a single table API session.
