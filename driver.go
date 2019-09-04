@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"path"
 	"strconv"
@@ -481,8 +482,8 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) (e
 	go func() {
 		var err error
 		defer func() {
-			conn.runtime.streamDone(timeutil.Now(), err)
-			d.trace.streamDone(rawctx, conn, method, err)
+			conn.runtime.streamDone(timeutil.Now(), hideEOF(err))
+			d.trace.streamDone(rawctx, conn, method, hideEOF(err))
 			if cancel != nil {
 				cancel()
 			}
@@ -493,7 +494,7 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) (e
 
 			err = s.RecvMsg(resp)
 
-			d.trace.streamRecvDone(rawctx, conn, method, resp, err)
+			d.trace.streamRecvDone(rawctx, conn, method, resp, hideEOF(err))
 			if err != nil {
 				err = mapGRPCError(err)
 			} else {
@@ -504,6 +505,7 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) (e
 					}
 				}
 			}
+			// NOTE: do not hide even io.EOF for this call.
 			process(err)
 		}
 	}()
@@ -713,4 +715,11 @@ func splitHostPort(addr string) (host string, port int, err error) {
 	}
 	port, err = strconv.Atoi(prt)
 	return
+}
+
+func hideEOF(err error) error {
+	if err == io.EOF {
+		return nil
+	}
+	return err
 }
