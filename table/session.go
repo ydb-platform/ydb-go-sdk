@@ -267,11 +267,29 @@ func (s *Statement) Execute(
 ) (
 	txr *Transaction, r *Result, err error,
 ) {
-	txr, r, err = s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
+	s.session.c.traceExecuteDataQueryStart(ctx, s.session, tx, s.query, params)
+	defer func() {
+		s.session.c.traceExecuteDataQueryDone(ctx, s.session, tx, s.query, params, true, txr, r, err)
+	}()
+	return s.execute(ctx, tx, params, opts...)
+}
+
+// execute executes prepared query without any tracing.
+func (s *Statement) execute(
+	ctx context.Context, tx *TransactionControl,
+	params *QueryParameters,
+	opts ...ExecuteDataQueryOption,
+) (
+	txr *Transaction, r *Result, err error,
+) {
+	_, res, err := s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
 	if ydb.IsOpError(err, ydb.StatusNotFound) {
 		s.session.qcache.Remove(s.qhash)
 	}
-	return
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.session.executeQueryResult(res)
 }
 
 func (s *Statement) NumInput() int {
@@ -294,9 +312,10 @@ func (s *Session) Prepare(
 	}()
 
 	cacheKey := s.qhash.hash(query)
-	v, cached := s.qcache.Get(cacheKey)
+	stmt, cached = s.getQueryFromCache(cacheKey)
 	if cached {
-		return v.(*Statement), nil
+		q = stmt.query
+		return stmt, nil
 	}
 
 	var res Ydb_Table.PrepareQueryResult
@@ -308,6 +327,7 @@ func (s *Session) Prepare(
 	if err != nil {
 		return nil, err
 	}
+
 	q = new(DataQuery)
 	q.initPrepared(res.QueryId)
 	stmt = &Statement{
@@ -316,9 +336,21 @@ func (s *Session) Prepare(
 		qhash:   cacheKey,
 		params:  res.ParametersTypes,
 	}
-	s.qcache.Add(cacheKey, stmt)
+	s.addQueryToCache(cacheKey, stmt)
 
 	return stmt, nil
+}
+
+func (s *Session) getQueryFromCache(key queryHash) (*Statement, bool) {
+	v, cached := s.qcache.Get(key)
+	if cached {
+		return v.(*Statement), true
+	}
+	return nil, false
+}
+
+func (s *Session) addQueryToCache(key queryHash, stmt *Statement) {
+	s.qcache.Add(key, stmt)
 }
 
 // Execute executes given data query represented by text.
@@ -331,44 +363,84 @@ func (s *Session) Execute(
 ) {
 	q := new(DataQuery)
 	q.initFromText(query)
-	return s.executeDataQuery(ctx, tx, q, params, opts...)
+
+	var cached bool
+	s.c.traceExecuteDataQueryStart(ctx, s, tx, q, params)
+	defer func() {
+		s.c.traceExecuteDataQueryDone(ctx, s, tx, q, params, cached, txr, r, err)
+	}()
+
+	cacheKey := s.qhash.hash(query)
+	stmt, cached := s.getQueryFromCache(cacheKey)
+	if cached {
+		// Supplement q with ID for tracing.
+		q.initPreparedText(query, stmt.query.ID())
+		return stmt.execute(ctx, tx, params, opts...)
+	}
+	req, res, err := s.executeDataQuery(ctx, tx, q, params, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
+	if keepInCache(req) && res.QueryMeta != nil {
+		queryID := res.QueryMeta.Id
+		// Supplement q with ID for tracing.
+		q.initPreparedText(query, queryID)
+		// Create new DataQuery instead of q above to not store the whole query
+		// string within statement.
+		subq := new(DataQuery)
+		subq.initPrepared(queryID)
+		stmt = &Statement{
+			session: s,
+			query:   subq,
+			qhash:   cacheKey,
+			params:  res.QueryMeta.ParametersTypes,
+		}
+		s.addQueryToCache(cacheKey, stmt)
+	}
+
+	return s.executeQueryResult(res)
 }
 
-// executeDataQuery executes data query. It may execute raw text query or query
-// prepared before.
+func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
+	p := req.QueryCachePolicy
+	return p != nil && p.KeepInCache
+}
+
+// executeQueryResult returns Transaction and Result built from received
+// result.
+func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (*Transaction, *Result, error) {
+	t := &Transaction{
+		id: res.TxMeta.Id,
+		s:  s,
+	}
+	r := &Result{
+		sets: res.ResultSets,
+	}
+	return t, r, nil
+}
+
+// executeDataQuery executes data query.
 func (s *Session) executeDataQuery(
 	ctx context.Context, tx *TransactionControl,
 	query *DataQuery, params *QueryParameters,
 	opts ...ExecuteDataQueryOption,
 ) (
-	txr *Transaction, r *Result, err error,
+	req *Ydb_Table.ExecuteDataQueryRequest,
+	res *Ydb_Table.ExecuteQueryResult,
+	err error,
 ) {
-	s.c.traceExecuteDataQueryStart(ctx, s, tx, query, params)
-	defer func() {
-		s.c.traceExecuteDataQueryDone(ctx, s, tx, query, params, txr, r, err)
-	}()
-	var res Ydb_Table.ExecuteQueryResult
-	req := Ydb_Table.ExecuteDataQueryRequest{
+	res = new(Ydb_Table.ExecuteQueryResult)
+	req = &Ydb_Table.ExecuteDataQueryRequest{
 		SessionId:  s.ID,
 		TxControl:  &tx.desc,
 		Parameters: params.params(),
 		Query:      &query.query,
 	}
 	for _, opt := range opts {
-		opt((*executeDataQueryDesc)(&req))
+		opt((*executeDataQueryDesc)(req))
 	}
-	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExecuteDataQuery, &req, &res))
-	if err != nil {
-		return txr, r, err
-	}
-	txr = &Transaction{
-		id: res.TxMeta.Id,
-		s:  s,
-	}
-	r = &Result{
-		sets: res.ResultSets,
-	}
-	return txr, r, nil
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExecuteDataQuery, req, res))
+	return
 }
 
 // ExecuteSchemeQuery executes scheme query.
@@ -749,12 +821,16 @@ func (t *Client) traceExecuteDataQueryStart(ctx context.Context, s *Session, tx 
 		b(x)
 	}
 }
-func (t *Client) traceExecuteDataQueryDone(ctx context.Context, s *Session, tx *TransactionControl, query *DataQuery, params *QueryParameters, txr *Transaction, r *Result, err error) {
+func (t *Client) traceExecuteDataQueryDone(
+	ctx context.Context, s *Session, tx *TransactionControl, query *DataQuery,
+	params *QueryParameters, prepared bool, txr *Transaction, r *Result, err error,
+) {
 	x := ExecuteDataQueryDoneInfo{
 		Context:    ctx,
 		Session:    s,
 		Query:      query,
 		Parameters: params,
+		Prepared:   prepared,
 		Result:     r,
 		Error:      err,
 	}
@@ -887,6 +963,16 @@ func (q *DataQuery) initPrepared(id string) {
 	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
 	q.queryID.Id = id
 	q.query.Query = &q.queryID
+}
+
+func (q *DataQuery) initPreparedText(s, id string) {
+	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
+	q.queryYQL.YqlText = s
+
+	q.queryID = Ydb_Table.Query_Id{} // Reset id field.
+	q.queryID.Id = id
+
+	q.query.Query = &q.queryID // Prefer preared query.
 }
 
 type QueryParameters struct {

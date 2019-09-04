@@ -83,6 +83,7 @@ type (
 		TxID       string
 		Query      *DataQuery
 		Parameters *QueryParameters
+		Prepared   bool
 		Result     *Result
 		Error      error
 	}
