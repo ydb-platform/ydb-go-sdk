@@ -16,12 +16,30 @@ var (
 )
 
 func (u *User) StructValue() ydb.Value {
-	val := ydb.StructValue(
-		ydb.StructFieldValue("user_id", ydb.OptionalValue(ydb.Uint64Value(u.ID))),
-		ydb.StructFieldValue("name", ydb.OptionalValue(ydb.UTF8Value(u.Name))),
-		ydb.StructFieldValue("age", ydb.OptionalValue(ydb.Uint32Value(u.Age))),
-	)
-	return val
+	var v0 ydb.Value
+	{
+		var v1 ydb.Value
+		{
+			vp0 := ydb.Uint64Value(u.ID)
+			v1 = ydb.OptionalValue(vp0)
+		}
+		var v2 ydb.Value
+		{
+			vp0 := ydb.UTF8Value(u.Name)
+			v2 = ydb.OptionalValue(vp0)
+		}
+		var v3 ydb.Value
+		{
+			vp0 := ydb.Uint32Value(u.Age)
+			v3 = ydb.OptionalValue(vp0)
+		}
+		v0 = ydb.StructValue(
+			ydb.StructFieldValue("user_id", v1),
+			ydb.StructFieldValue("name", v2),
+			ydb.StructFieldValue("age", v3),
+		)
+	}
+	return v0
 }
 
 func (s *Series) Scan(res *table.Result) (err error) {
@@ -37,8 +55,8 @@ func (s *Series) Scan(res *table.Result) (err error) {
 	res.NextItem()
 	res.Unwrap()
 	if !res.IsNull() {
-		x := res.Datetime()
-		err := (*ydb.Time)(&s.ReleaseDate).FromDatetime(x)
+		x0 := res.Datetime()
+		err := (*ydb.Time)(&s.ReleaseDate).FromDatetime(x0)
 		if err != nil {
 			panic("ydbgen: date type conversion failed: " + err.Error())
 		}
@@ -54,124 +72,257 @@ func (s *Series) Scan(res *table.Result) (err error) {
 }
 
 func (s *Series) StructValue() ydb.Value {
-	var ReleaseDateValue ydb.Value
+	var v0 ydb.Value
 	{
-		var x uint32
-		ok := !s.ReleaseDate.IsZero()
-		if ok {
-			x = ydb.Time(s.ReleaseDate).Datetime()
+		var v1 ydb.Value
+		{
+			vp0 := ydb.Uint64Value(s.ID)
+			v1 = ydb.OptionalValue(vp0)
 		}
-		if ok {
-			ReleaseDateValue = ydb.OptionalValue(ydb.DatetimeValue(x))
-		} else {
-			ReleaseDateValue = ydb.NullValue(ydb.TypeDatetime)
+		var v2 ydb.Value
+		{
+			vp0 := ydb.UTF8Value(s.Title)
+			v2 = ydb.OptionalValue(vp0)
 		}
+		var v3 ydb.Value
+		{
+			vp0 := ydb.UTF8Value(s.Info)
+			v3 = ydb.OptionalValue(vp0)
+		}
+		var v4 ydb.Value
+		{
+			var x0 uint32
+			ok0 := !s.ReleaseDate.IsZero()
+			if ok0 {
+				x0 = ydb.Time(s.ReleaseDate).Datetime()
+			}
+			if ok0 {
+				v4 = ydb.OptionalValue(ydb.DatetimeValue(x0))
+			} else {
+				v4 = ydb.NullValue(ydb.TypeDatetime)
+			}
+		}
+		var v5 ydb.Value
+		{
+			vp0 := ydb.Uint64Value(s.Views)
+			v5 = ydb.OptionalValue(vp0)
+		}
+		var v6 ydb.Value
+		{
+			vp0 := ydb.Uint64Value(s.UploadedUserID)
+			v6 = ydb.OptionalValue(vp0)
+		}
+		v0 = ydb.StructValue(
+			ydb.StructFieldValue("series_id", v1),
+			ydb.StructFieldValue("title", v2),
+			ydb.StructFieldValue("info", v3),
+			ydb.StructFieldValue("release_date", v4),
+			ydb.StructFieldValue("views", v5),
+			ydb.StructFieldValue("uploaded_user_id", v6),
+		)
 	}
-	val := ydb.StructValue(
-		ydb.StructFieldValue("series_id", ydb.OptionalValue(ydb.Uint64Value(s.ID))),
-		ydb.StructFieldValue("title", ydb.OptionalValue(ydb.UTF8Value(s.Title))),
-		ydb.StructFieldValue("info", ydb.OptionalValue(ydb.UTF8Value(s.Info))),
-		ydb.StructFieldValue("release_date", ReleaseDateValue),
-		ydb.StructFieldValue("views", ydb.OptionalValue(ydb.Uint64Value(s.Views))),
-		ydb.StructFieldValue("uploaded_user_id", ydb.OptionalValue(ydb.Uint64Value(s.UploadedUserID))),
-	)
-	return val
+	return v0
 }
 
 func (us UsersList) ListValue() ydb.Value {
-	values := make([]ydb.Value, len(us))
-	for i, u := range us {
-		values[i] = ydb.StructValue(
-			ydb.StructFieldValue("user_id", ydb.OptionalValue(ydb.Uint64Value(u.ID))),
-			ydb.StructFieldValue("name", ydb.OptionalValue(ydb.UTF8Value(u.Name))),
-			ydb.StructFieldValue("age", ydb.OptionalValue(ydb.Uint32Value(u.Age))),
-		)
+	var list0 ydb.Value
+	vs0 := make([]ydb.Value, len(us))
+	for i0, item0 := range us {
+		var v0 ydb.Value
+		{
+			var v1 ydb.Value
+			{
+				vp0 := ydb.Uint64Value(item0.ID)
+				v1 = ydb.OptionalValue(vp0)
+			}
+			var v2 ydb.Value
+			{
+				vp0 := ydb.UTF8Value(item0.Name)
+				v2 = ydb.OptionalValue(vp0)
+			}
+			var v3 ydb.Value
+			{
+				vp0 := ydb.Uint32Value(item0.Age)
+				v3 = ydb.OptionalValue(vp0)
+			}
+			v0 = ydb.StructValue(
+				ydb.StructFieldValue("user_id", v1),
+				ydb.StructFieldValue("name", v2),
+				ydb.StructFieldValue("age", v3),
+			)
+		}
+		vs0[i0] = v0
 	}
-	if len(values) == 0 {
-		return ydb.ZeroValue(
-			ydb.List(ydb.Struct(
-				ydb.StructField("user_id", ydb.Optional(ydb.TypeUint64)),
-				ydb.StructField("name", ydb.Optional(ydb.TypeUTF8)),
-				ydb.StructField("age", ydb.Optional(ydb.TypeUint32)),
-			)),
-		)
+	if len(vs0) == 0 {
+		var t1 ydb.Type
+		{
+			fs0 := make([]ydb.StructOption, 3)
+			var t2 ydb.Type
+			{
+				tp0 := ydb.TypeUint64
+				t2 = ydb.Optional(tp0)
+			}
+			fs0[0] = ydb.StructField("user_id", t2)
+			var t3 ydb.Type
+			{
+				tp0 := ydb.TypeUTF8
+				t3 = ydb.Optional(tp0)
+			}
+			fs0[1] = ydb.StructField("name", t3)
+			var t4 ydb.Type
+			{
+				tp0 := ydb.TypeUint32
+				t4 = ydb.Optional(tp0)
+			}
+			fs0[2] = ydb.StructField("age", t4)
+			t1 = ydb.Struct(fs0...)
+		}
+		t0 := ydb.List(t1)
+		list0 = ydb.ZeroValue(t0)
+	} else {
+		list0 = ydb.ListValue(vs0...)
 	}
-	return ydb.ListValue(values...)
+	return list0
 }
 
 func (ss *SeriesList) Scan(res *table.Result) (err error) {
 	for res.NextRow() {
-		var x Series
+		var x0 Series
 
 		res.NextItem()
-		x.ID = res.OUint64()
+		x0.ID = res.OUint64()
 
 		res.NextItem()
-		x.Title = res.OUTF8()
+		x0.Title = res.OUTF8()
 
 		res.NextItem()
-		x.Info = res.OUTF8()
+		x0.Info = res.OUTF8()
 
 		res.NextItem()
 		res.Unwrap()
 		if !res.IsNull() {
-			x0 := res.Datetime()
-			err := (*ydb.Time)(&x.ReleaseDate).FromDatetime(x0)
+			x1 := res.Datetime()
+			err := (*ydb.Time)(&x0.ReleaseDate).FromDatetime(x1)
 			if err != nil {
 				panic("ydbgen: date type conversion failed: " + err.Error())
 			}
 		}
 
 		res.NextItem()
-		x.Views = res.OUint64()
+		x0.Views = res.OUint64()
 
 		res.NextItem()
-		x.UploadedUserID = res.OUint64()
+		x0.UploadedUserID = res.OUint64()
 
 		if res.Err() == nil {
-			*ss = append(*ss, x)
+			*ss = append(*ss, x0)
 		}
 	}
 	return res.Err()
 }
 
 func (ss SeriesList) ListValue() ydb.Value {
-	values := make([]ydb.Value, len(ss))
-	for i, s := range ss {
-		var ReleaseDateValue ydb.Value
+	var list0 ydb.Value
+	vs0 := make([]ydb.Value, len(ss))
+	for i0, item0 := range ss {
+		var v0 ydb.Value
 		{
-			var x uint32
-			ok := !s.ReleaseDate.IsZero()
-			if ok {
-				x = ydb.Time(s.ReleaseDate).Datetime()
+			var v1 ydb.Value
+			{
+				vp0 := ydb.Uint64Value(item0.ID)
+				v1 = ydb.OptionalValue(vp0)
 			}
-			if ok {
-				ReleaseDateValue = ydb.OptionalValue(ydb.DatetimeValue(x))
-			} else {
-				ReleaseDateValue = ydb.NullValue(ydb.TypeDatetime)
+			var v2 ydb.Value
+			{
+				vp0 := ydb.UTF8Value(item0.Title)
+				v2 = ydb.OptionalValue(vp0)
 			}
+			var v3 ydb.Value
+			{
+				vp0 := ydb.UTF8Value(item0.Info)
+				v3 = ydb.OptionalValue(vp0)
+			}
+			var v4 ydb.Value
+			{
+				var x0 uint32
+				ok0 := !item0.ReleaseDate.IsZero()
+				if ok0 {
+					x0 = ydb.Time(item0.ReleaseDate).Datetime()
+				}
+				if ok0 {
+					v4 = ydb.OptionalValue(ydb.DatetimeValue(x0))
+				} else {
+					v4 = ydb.NullValue(ydb.TypeDatetime)
+				}
+			}
+			var v5 ydb.Value
+			{
+				vp0 := ydb.Uint64Value(item0.Views)
+				v5 = ydb.OptionalValue(vp0)
+			}
+			var v6 ydb.Value
+			{
+				vp0 := ydb.Uint64Value(item0.UploadedUserID)
+				v6 = ydb.OptionalValue(vp0)
+			}
+			v0 = ydb.StructValue(
+				ydb.StructFieldValue("series_id", v1),
+				ydb.StructFieldValue("title", v2),
+				ydb.StructFieldValue("info", v3),
+				ydb.StructFieldValue("release_date", v4),
+				ydb.StructFieldValue("views", v5),
+				ydb.StructFieldValue("uploaded_user_id", v6),
+			)
 		}
-		values[i] = ydb.StructValue(
-			ydb.StructFieldValue("series_id", ydb.OptionalValue(ydb.Uint64Value(s.ID))),
-			ydb.StructFieldValue("title", ydb.OptionalValue(ydb.UTF8Value(s.Title))),
-			ydb.StructFieldValue("info", ydb.OptionalValue(ydb.UTF8Value(s.Info))),
-			ydb.StructFieldValue("release_date", ReleaseDateValue),
-			ydb.StructFieldValue("views", ydb.OptionalValue(ydb.Uint64Value(s.Views))),
-			ydb.StructFieldValue("uploaded_user_id", ydb.OptionalValue(ydb.Uint64Value(s.UploadedUserID))),
-		)
+		vs0[i0] = v0
 	}
-	if len(values) == 0 {
-		return ydb.ZeroValue(
-			ydb.List(ydb.Struct(
-				ydb.StructField("series_id", ydb.Optional(ydb.TypeUint64)),
-				ydb.StructField("title", ydb.Optional(ydb.TypeUTF8)),
-				ydb.StructField("info", ydb.Optional(ydb.TypeUTF8)),
-				ydb.StructField("release_date", ydb.Optional(ydb.TypeDatetime)),
-				ydb.StructField("views", ydb.Optional(ydb.TypeUint64)),
-				ydb.StructField("uploaded_user_id", ydb.Optional(ydb.TypeUint64)),
-			)),
-		)
+	if len(vs0) == 0 {
+		var t1 ydb.Type
+		{
+			fs0 := make([]ydb.StructOption, 6)
+			var t2 ydb.Type
+			{
+				tp0 := ydb.TypeUint64
+				t2 = ydb.Optional(tp0)
+			}
+			fs0[0] = ydb.StructField("series_id", t2)
+			var t3 ydb.Type
+			{
+				tp0 := ydb.TypeUTF8
+				t3 = ydb.Optional(tp0)
+			}
+			fs0[1] = ydb.StructField("title", t3)
+			var t4 ydb.Type
+			{
+				tp0 := ydb.TypeUTF8
+				t4 = ydb.Optional(tp0)
+			}
+			fs0[2] = ydb.StructField("info", t4)
+			var t5 ydb.Type
+			{
+				tp0 := ydb.TypeDatetime
+				t5 = ydb.Optional(tp0)
+			}
+			fs0[3] = ydb.StructField("release_date", t5)
+			var t6 ydb.Type
+			{
+				tp0 := ydb.TypeUint64
+				t6 = ydb.Optional(tp0)
+			}
+			fs0[4] = ydb.StructField("views", t6)
+			var t7 ydb.Type
+			{
+				tp0 := ydb.TypeUint64
+				t7 = ydb.Optional(tp0)
+			}
+			fs0[5] = ydb.StructField("uploaded_user_id", t7)
+			t1 = ydb.Struct(fs0...)
+		}
+		t0 := ydb.List(t1)
+		list0 = ydb.ZeroValue(t0)
+	} else {
+		list0 = ydb.ListValue(vs0...)
 	}
-	return ydb.ListValue(values...)
+	return list0
 }
 

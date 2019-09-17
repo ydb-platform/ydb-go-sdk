@@ -195,7 +195,9 @@ type User struct {
  Flag   | Value      | Default | Meaning 
 --------|:----------:|:-------:|---------
  `wrap` | `optional` | +       | Wraps all mapped field types with optional type if no explicit tag is specified.
- `wrap` | `none    ` |         | No wrapping performed.
+ `wrap` | `none`     |         | No wrapping performed.
+ `seek` | `column`   | +       | Uses res.SeekItem() call to find out next field to scan.
+ `seek` | `position` |         | Uses res.NextItem() call to find out next field to scan.
 
 #### Comment markers options
 
@@ -283,7 +285,26 @@ type User struct {
 }
 ```
 
-For more info please look at `ydb/examples/generation` folder.
+#### Dealing with container types.
+
+`ydbgen` supports scanning and serializing container types such as `List<T>` or `Struct<T>`.
+
+```go
+//go:generate ydbgen
+
+//ydb:gen
+type User struct {
+	Tags []string
+}
+```
+
+Example above will interpret value for `tags` column (or 0-th item, depending
+on the `seek` mode) as `List<UTF8>`.
+
+Note that for `String` type this is neccessary to inform `ydbgen` that it is
+not a container by setting `type` field tag.
+
+> For more info please look at `ydb/examples/generation` folder.
 
 ## Examples
 

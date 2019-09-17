@@ -306,11 +306,52 @@ func main() {
 				items = append(items, item)
 				item = nil
 				reset = -1
-				return true
+				return false
 			}
 
 			return true
 		})
+
+		var fillSlice func(*ast.ArrayType, *Slice) types.Type
+		fillSlice = func(arr *ast.ArrayType, dest *Slice) (base types.Type) {
+			defer func() {
+				base = types.NewSlice(base)
+			}()
+			typ := info.TypeOf(arr.Elt)
+			switch x := typ.(type) {
+			case *types.Basic:
+				t := &TypeInfo{
+					Type: x,
+				}
+				t.Primitive, err = ydbtypes.PrimitiveTypeFromGoType(typ)
+				if err != nil {
+					log.Fatal(err)
+				}
+				t.BaseType = ydbtypes.GoTypeFromPrimitiveType(t.Primitive)
+				dest.Basic = t
+				return t.BaseType
+
+			case *types.Named:
+				pkg.Couple(x.Obj().Id(), func(x interface{}) {
+					dest.Struct = x.(*Struct)
+				})
+				return x.Underlying()
+
+			case *types.Slice:
+				t := &TypeInfo{
+					Type:      x,
+					Container: true,
+					Slice:     new(Slice),
+				}
+				b := fillSlice(arr.Elt.(*ast.ArrayType), t.Slice)
+				dest.Basic = t
+				return types.NewSlice(b)
+
+			default:
+				log.Fatalf("unsupported type for slice element: %T (%[1]s)", x)
+				return nil
+			}
+		}
 
 		file := &File{
 			Name: files[i].Name(),
@@ -322,14 +363,7 @@ func main() {
 					Name:  item.Ident.Name,
 					Flags: item.Flags,
 				}
-				id, ok := item.ArrayType.Elt.(*ast.Ident)
-				if !ok {
-					log.Fatalf("only type ident is expected as element of a slice")
-				}
-				pkg.Couple(id.Name, func(x interface{}) {
-					s.Struct = x.(*Struct)
-				})
-
+				fillSlice(item.ArrayType, s)
 				file.Slices = append(file.Slices, s)
 
 			case item.StructType != nil:
@@ -344,8 +378,10 @@ func main() {
 				for i, f := range item.StructType.Fields.List {
 					name := f.Names[0].Name
 					field := &Field{
+						TypeInfo: TypeInfo{
+							Conv: item.Mode.Conv,
+						},
 						Name:     name,
-						Conv:     item.Mode.Conv,
 						Column:   camelToSnake(name),
 						Position: i,
 					}
@@ -356,14 +392,21 @@ func main() {
 						continue
 					}
 
-					var typ types.Type
+					var (
+						typ types.Type
+						arr *ast.ArrayType
+					)
 					switch x := f.Type.(type) {
 					case *ast.SelectorExpr:
 						obj := info.ObjectOf(x.Sel)
 						typ = obj.Type()
 
-					case *ast.Ident, *ast.ArrayType:
+					case *ast.Ident:
 						typ = info.TypeOf(f.Type)
+
+					case *ast.ArrayType:
+						typ = info.TypeOf(f.Type)
+						arr = x
 
 					default:
 						log.Fatalf(
@@ -371,9 +414,18 @@ func main() {
 							field.Name, f.Type,
 						)
 					}
+
 					switch x := typ.(type) {
-					case *types.Basic, *types.Slice:
-						// OK.
+					case *types.Slice:
+						field.Type = x
+						if field.Primitive == 0 {
+							// No "type" tag specified.
+							field.Container = true
+							field.Slice = &Slice{}
+							field.BaseType = fillSlice(arr, field.Slice)
+						}
+
+					case *types.Basic:
 						field.Type = x
 
 					case *types.Named:
@@ -382,7 +434,8 @@ func main() {
 							obj.Pkg().Name(),
 							obj.Name(),
 						}, ".")
-						if name == "time.Time" {
+						switch {
+						case name == "time.Time":
 							if field.BaseType == nil {
 								log.Fatalf(
 									"%s.%s must have type tag specified (necessary for %s conversions)",
@@ -391,23 +444,25 @@ func main() {
 							}
 							field.Type = field.BaseType
 							field.Face = TimeFieldFace{}
-						} else {
+
+						default:
 							t, err := checkInterface(x, s.Flags)
 							if err != nil {
-								log.Fatalf(
-									"%s.%s (%s) could not be used for generation: %v",
-									s.Name, field.Name, name, err,
-								)
+								field.Container = true
+								pkg.Couple(obj.Name(), func(x interface{}) {
+									field.Struct = x.(*Struct)
+								})
+							} else {
+								field.Type = t
+								field.Face = DefaultFieldFace{}
 							}
-							field.Type = t
-							field.Face = DefaultFieldFace{}
 						}
 
 					default:
 						log.Fatalf("unexpected field object type: %T", x)
 					}
 
-					if field.Primitive == 0 {
+					if !field.Container && field.Primitive == 0 {
 						var err error
 						field.Primitive, err = ydbtypes.PrimitiveTypeFromGoType(field.Type)
 						if err != nil {
@@ -511,7 +566,7 @@ func (p *Package) Register(id string, x interface{}) {
 func (p *Package) Finalize() error {
 	for id, list := range p.Container {
 		return fmt.Errorf(
-			"dependency not met: %d container type(s) want type %s to be generated",
+			"type dependency not met: %d container type(s) want type %s to be generated",
 			list.Len(), id,
 		)
 	}
@@ -636,23 +691,33 @@ type Struct struct {
 }
 
 type Slice struct {
-	Name   string
+	Name  string
+	Flags GenFlag
+
+	Basic  *TypeInfo
 	Struct *Struct
-	Flags  GenFlag
+}
+
+type TypeInfo struct {
+	Conv      ConvMode
+	Face      FieldFace
+	Type      types.Type // Actual go type.
+	BaseType  types.Type // Column's go type.
+	Primitive internal.PrimitiveType
+	Optional  bool
+
+	Container bool
+	Struct    *Struct
+	Slice     *Slice
 }
 
 type Field struct {
+	TypeInfo
+
 	Name     string
 	Column   string
 	Position int
 	Ignore   bool
-
-	Conv      ConvMode
-	Face      FieldFace
-	Type      types.Type
-	BaseType  types.Type // Type within database.
-	Primitive internal.PrimitiveType
-	Optional  bool
 }
 
 type ConvMode uint
@@ -676,10 +741,28 @@ func ParseConvMode(s string) (ConvMode, error) {
 	}
 }
 
+func isAssignable(t1, t2 types.Type) bool {
+	s1, _ := t1.(*types.Slice)
+	s2, _ := t2.(*types.Slice)
+	if s1 != nil && s2 != nil {
+		return isAssignable(s1.Elem(), s2.Elem())
+	}
+	return types.AssignableTo(t1, t2)
+}
+
 func (f *Field) Validate() error {
+	if f.Container {
+		if !isAssignable(f.Type, f.BaseType) {
+			return fmt.Errorf(
+				"field %q type %s is impossible to assign to %s",
+				f.Name, f.Type, f.BaseType,
+			)
+		}
+		return nil
+	}
 	if !types.ConvertibleTo(f.Type, f.BaseType) {
 		return fmt.Errorf(
-			"field %q impossible type conversion from %s to %s (ydb type %s)",
+			"field %q impossible type conversion from %s to %s (ydb primitive type %s)",
 			f.Name, f.Type, f.BaseType, f.Primitive,
 		)
 	}

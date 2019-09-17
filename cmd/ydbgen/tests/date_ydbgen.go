@@ -19,8 +19,8 @@ func (t *Times) Scan(res *table.Result) (err error) {
 	res.SeekItem("date")
 	res.Unwrap()
 	if !res.IsNull() {
-		x := res.Date()
-		err := (*ydb.Time)(&t.Date).FromDate(x)
+		x0 := res.Date()
+		err := (*ydb.Time)(&t.Date).FromDate(x0)
 		if err != nil {
 			panic("ydbgen: date type conversion failed: " + err.Error())
 		}
@@ -30,47 +30,59 @@ func (t *Times) Scan(res *table.Result) (err error) {
 }
 
 func (t *Times) QueryParameters() *table.QueryParameters {
-	var DateValue ydb.Value
+	var v0 ydb.Value
 	{
-		var x uint32
-		ok := !t.Date.IsZero()
-		if ok {
-			x = ydb.Time(t.Date).Date()
+		var x0 uint32
+		ok0 := !t.Date.IsZero()
+		if ok0 {
+			x0 = ydb.Time(t.Date).Date()
 		}
-		if ok {
-			DateValue = ydb.OptionalValue(ydb.DateValue(x))
+		if ok0 {
+			v0 = ydb.OptionalValue(ydb.DateValue(x0))
 		} else {
-			DateValue = ydb.NullValue(ydb.TypeDate)
+			v0 = ydb.NullValue(ydb.TypeDate)
 		}
 	}
 	return table.NewQueryParameters(
-		table.ValueParam("$date", DateValue),
+		table.ValueParam("$date", v0),
 	)
 }
 
 func (t *Times) StructValue() ydb.Value {
-	var DateValue ydb.Value
+	var v0 ydb.Value
 	{
-		var x uint32
-		ok := !t.Date.IsZero()
-		if ok {
-			x = ydb.Time(t.Date).Date()
+		var v1 ydb.Value
+		{
+			var x0 uint32
+			ok0 := !t.Date.IsZero()
+			if ok0 {
+				x0 = ydb.Time(t.Date).Date()
+			}
+			if ok0 {
+				v1 = ydb.OptionalValue(ydb.DateValue(x0))
+			} else {
+				v1 = ydb.NullValue(ydb.TypeDate)
+			}
 		}
-		if ok {
-			DateValue = ydb.OptionalValue(ydb.DateValue(x))
-		} else {
-			DateValue = ydb.NullValue(ydb.TypeDate)
-		}
+		v0 = ydb.StructValue(
+			ydb.StructFieldValue("date", v1),
+		)
 	}
-	val := ydb.StructValue(
-		ydb.StructFieldValue("date", DateValue),
-	)
-	return val
+	return v0
 }
 
 func (t *Times) StructType() ydb.Type {
-	return ydb.Struct(
-		ydb.StructField("date", ydb.Optional(ydb.TypeDate)),
-	)
+	var t0 ydb.Type
+	{
+		fs0 := make([]ydb.StructOption, 1)
+		var t1 ydb.Type
+		{
+			tp0 := ydb.TypeDate
+			t1 = ydb.Optional(tp0)
+		}
+		fs0[0] = ydb.StructField("date", t1)
+		t0 = ydb.Struct(fs0...)
+	}
+	return t0
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"container/list"
+	"fmt"
 	"go/types"
 	"log"
 	"os"
@@ -64,16 +65,26 @@ func (g *Generator) leaveScope() {
 }
 
 func (g *Generator) declare(v string) string {
+	return g.doDeclare(v, false)
+}
+
+func (g *Generator) declareShort(v string) string {
+	return g.doDeclare(v, true)
+}
+
+func (g *Generator) doDeclare(v string, short bool) string {
 	var (
 		front = g.scopes.Front()
 		curr  = front.Value.(*scope)
-		x     = -1
+		x     = 0
 	)
 search:
 	for {
-		name := v
-		if x >= 0 {
-			name += strconv.Itoa(x)
+		var name string
+		if x == 0 && short {
+			name = v
+		} else {
+			name = v + strconv.Itoa(x)
 		}
 		for el := front; el != nil; el = el.Next() {
 			s := el.Value.(*scope)
@@ -234,22 +245,34 @@ func sliceReceiver(s *Slice) string {
 	return strings.ToLower(s.Name[0:1]) + "s"
 }
 
-func sliceItem(s *Slice) string {
-	return strings.ToLower(s.Name[0:1])
-}
-
 func (g *Generator) generateStructScan(bw *bufio.Writer, s *Struct) {
 	g.enterScope()
 	defer g.leaveScope()
-
 	var (
-		rcvr = g.declare(structReceiver(s))
-		res  = g.declare("res")
-		err  = g.declare("err")
+		rcvr = g.declareShort(structReceiver(s))
+		res  = g.declareShort("res")
+		err  = g.declareShort("err")
 	)
 	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
 	line(bw, `Scan(`, res, ` *table.Result) (`, err, ` error) {`)
 	g.writeStructFieldsScan(bw, 1, rcvr, s)
+	line(bw, tab(1), `return `, res, `.Err()`)
+	line(bw, `}`)
+	line(bw)
+}
+
+func (g *Generator) generateStructContainerScan(bw *bufio.Writer, s *Struct) {
+	g.enterScope()
+	defer g.leaveScope()
+
+	var (
+		rcvr = g.declareShort(structReceiver(s))
+		res  = g.declareShort("res")
+		err  = g.declareShort("err")
+	)
+	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
+	line(bw, `ScanContainer(`, res, ` *table.Result) (`, err, ` error) {`)
+	g.writeStructContainerScan(bw, 1, rcvr, s)
 	line(bw, tab(1), `return `, res, `.Err()`)
 	line(bw, `}`)
 	line(bw)
@@ -260,11 +283,12 @@ func (g *Generator) generateStructQueryParams(bw *bufio.Writer, s *Struct) {
 	defer g.leaveScope()
 
 	var (
-		rcvr = g.declare(structReceiver(s))
+		rcvr = g.declareShort(structReceiver(s))
 	)
 	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
 	line(bw, `QueryParameters() *table.QueryParameters {`)
-	writeField := g.writeStructFieldsGetters(bw, 1, rcvr, s)
+
+	writeField := g.structFieldWriter(bw, 1, rcvr, s)
 	line(bw, tab(1), `return table.NewQueryParameters(`)
 	for _, f := range s.Fields {
 		code(bw, tab(2))
@@ -281,15 +305,11 @@ func (g *Generator) generateStructValue(bw *bufio.Writer, s *Struct) {
 	g.enterScope()
 	defer g.leaveScope()
 
-	var (
-		rcvr = g.declare(structReceiver(s))
-		val  = g.declare("val")
-	)
+	rcvr := g.declareShort(structReceiver(s))
 	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
 	line(bw, `StructValue() ydb.Value {`)
-	g.writeStructValue(bw, 1, rcvr, val+" := ", s)
-	code(bw, tab(1), `return `, val)
-	line(bw)
+	val := g.assignStructValue(bw, 1, rcvr, s)
+	line(bw, tab(1), `return `, val)
 	line(bw, `}`)
 	line(bw)
 }
@@ -299,13 +319,12 @@ func (g *Generator) generateStructType(bw *bufio.Writer, s *Struct) {
 	defer g.leaveScope()
 
 	var (
-		rcvr = g.declare(structReceiver(s))
+		rcvr = g.declareShort(structReceiver(s))
 	)
 	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
 	line(bw, `StructType() ydb.Type {`)
-	code(bw, tab(1), `return `)
-	g.writeStructType(bw, 1, s)
-	line(bw)
+	typ := g.assignStructType(bw, 1, s)
+	line(bw, tab(1), `return `, typ)
 	line(bw, `}`)
 	line(bw)
 }
@@ -315,9 +334,9 @@ func (g *Generator) generateSliceScan(bw *bufio.Writer, s *Slice) {
 	defer g.leaveScope()
 
 	var (
-		rcvr = g.declare(sliceReceiver(s))
-		res  = g.declare("res")
-		err  = g.declare("err")
+		rcvr = g.declareShort(sliceReceiver(s))
+		res  = g.declareShort("res")
+		err  = g.declareShort("err")
 	)
 	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
 	line(bw, `Scan(`, res, ` *table.Result) (`, err, ` error) {`)
@@ -326,9 +345,16 @@ func (g *Generator) generateSliceScan(bw *bufio.Writer, s *Slice) {
 	{
 		line(bw, tab(1), `for `, res, `.NextRow() {`)
 		x := g.declare("x")
-		line(bw, tab(2), `var `, x, ` `, s.Struct.Name)
-		line(bw)
-		g.writeStructFieldsScan(bw, 2, x, s.Struct)
+		switch {
+		case s.Basic != nil:
+			line(bw, tab(2), `var `, x, ` `, goTypeString(s.Basic.Type))
+			g.writeScan(bw, 2, res, x, s.Basic)
+
+		case s.Struct != nil:
+			line(bw, tab(2), `var `, x, ` `, s.Struct.Name)
+			line(bw)
+			g.writeStructFieldsScan(bw, 2, x, s.Struct)
+		}
 		line(bw, tab(2), `if `, res, `.Err() == nil {`)
 		line(bw, tab(3), `*`, rcvr, ` = append(*`, rcvr, `, `, x, `)`)
 		line(bw, tab(2), `}`)
@@ -345,44 +371,60 @@ func (g *Generator) generateSliceValue(bw *bufio.Writer, s *Slice) {
 	g.enterScope()
 	defer g.leaveScope()
 
-	var (
-		rcvr   = g.declare(sliceReceiver(s))
-		values = g.declare("values")
-	)
+	rcvr := g.declareShort(sliceReceiver(s))
 	code(bw, `func (`, rcvr, ` `, s.Name+`) `)
 	line(bw, `ListValue() ydb.Value {`)
-	line(bw, tab(1), values, ` := make([]ydb.Value, len(`, rcvr, `))`)
-
-	g.enterScope()
-	{
-		var (
-			i    = g.declare("i")
-			item = g.declare(sliceItem(s))
-		)
-		line(bw, tab(1), `for `, i, `, `, item, ` := range `, rcvr, ` {`)
-		g.writeStructValue(bw, 2, item, values+"["+i+"] = ", s.Struct)
-		line(bw, tab(1), `}`)
-	}
-	g.leaveScope()
-
-	line(bw, tab(1), `if len(`, values, `) == 0 {`)
-	line(bw, tab(2), `return ydb.ZeroValue(`)
-	code(bw, tab(3), `ydb.List(`)
-	g.writeStructType(bw, 3, s.Struct)
-	line(bw, `),`)
-	line(bw, tab(2), `)`)
-	line(bw, tab(1), `}`)
-	line(bw, tab(1), `return ydb.ListValue(`, values, `...)`)
+	list := g.assignSliceValue(bw, 1, rcvr, s)
+	line(bw, tab(1), `return `, list)
 	line(bw, `}`)
 	line(bw)
 }
 
+func (g *Generator) assignSliceValue(bw *bufio.Writer, depth int, rcvr string, s *Slice) string {
+	var (
+		list   = g.declare("list")
+		values = g.declare("vs")
+	)
+
+	line(bw, tab(depth), `var `, list, ` ydb.Value`)
+	line(bw, tab(depth), values, ` := make([]ydb.Value, len(`, rcvr, `))`)
+
+	g.enterScope()
+	defer g.leaveScope()
+
+	var (
+		i    = g.declare("i")
+		item = g.declare("item")
+	)
+	line(bw, tab(depth), `for `, i, `, `, item, ` := range `, rcvr, ` {`)
+	var r string
+	switch {
+	case s.Basic != nil:
+		r = g.assignValue(bw, depth+1, item, s.Basic)
+	case s.Struct != nil:
+		r = g.assignStructValue(bw, depth+1, item, s.Struct)
+	}
+	line(bw, tab(depth+1), values, `[`, i, `] = `, r)
+	line(bw, tab(depth), `}`)
+
+	line(bw, tab(depth), `if len(`, values, `) == 0 {`)
+	t := g.assignSliceType(bw, depth+1, s)
+	line(bw, tab(depth+1), list, ` = ydb.ZeroValue(`, t, `)`)
+	line(bw, tab(depth), `} else {`)
+	line(bw, tab(depth+1), list, ` = ydb.ListValue(`, values, `...)`)
+	line(bw, tab(depth), `}`)
+
+	return list
+}
+
 func (g *Generator) generateSliceType(bw *bufio.Writer, s *Slice) {
+	g.enterScope()
+	defer g.leaveScope()
+
 	code(bw, `func (`, s.Name+`) `)
 	line(bw, `ListType() ydb.Type {`)
-	code(bw, tab(1), `return ydb.List(`)
-	g.writeStructType(bw, 1, s.Struct)
-	line(bw, `)`)
+	t := g.assignSliceType(bw, 1, s)
+	line(bw, tab(1), `return `, t)
 	line(bw, `}`)
 	line(bw)
 }
@@ -392,7 +434,7 @@ type Context struct {
 	In        string
 	Out       string
 	Predicate string
-	Field     *Field
+	Type      *TypeInfo
 	Depth     int
 }
 
@@ -405,135 +447,223 @@ type DefaultFieldFace struct{}
 
 func (DefaultFieldFace) Get(bw *bufio.Writer, c Context) {
 	code(bw, tab(c.Depth), c.Out, `, `, c.Predicate, ` := `)
-	line(bw, c.Rcvr, `.`, c.Field.Name, `.Get()`)
+	line(bw, c.Rcvr, `.Get()`)
 }
 func (DefaultFieldFace) Set(bw *bufio.Writer, c Context) {
-	line(bw, tab(c.Depth), c.Rcvr, `.`, c.Field.Name, `.Set(`, c.In, `)`)
+	line(bw, tab(c.Depth), c.Rcvr, `.Set(`, c.In, `)`)
 }
 
 type TimeFieldFace struct{}
 
 func (TimeFieldFace) Get(bw *bufio.Writer, c Context) {
-	v := c.Rcvr + "." + c.Field.Name
-	yname := ydbTypeName(c.Field.Primitive)
-	line(bw, tab(c.Depth), `var `, c.Out, ` `, c.Field.BaseType.String())
-	line(bw, tab(c.Depth), c.Predicate, ` := !`, v, `.IsZero()`)
+	yname := ydbTypeName(c.Type.Primitive)
+	line(bw, tab(c.Depth), `var `, c.Out, ` `, c.Type.BaseType.String())
+	line(bw, tab(c.Depth), c.Predicate, ` := !`, c.Rcvr, `.IsZero()`)
 	line(bw, tab(c.Depth), `if `, c.Predicate, ` {`)
-	line(bw, tab(c.Depth+1), c.Out, ` = ydb.Time(`, v, `).`, yname, `()`)
+	line(bw, tab(c.Depth+1), c.Out, ` = ydb.Time(`, c.Rcvr, `).`, yname, `()`)
 	line(bw, tab(c.Depth), `}`)
 }
 func (TimeFieldFace) Set(bw *bufio.Writer, c Context) {
-	v := c.Rcvr + "." + c.Field.Name
-	y := ydbTypeName(c.Field.Primitive)
+	y := ydbTypeName(c.Type.Primitive)
 	code(bw, tab(c.Depth), `err := `)
-	line(bw, `(*ydb.Time)(&`, v, `).From`, y, `(`, c.In, `)`)
+	line(bw, `(*ydb.Time)(&`, c.Rcvr, `).From`, y, `(`, c.In, `)`)
 	line(bw, tab(c.Depth), `if err != nil {`)
 	line(bw, tab(c.Depth+1), `panic("ydbgen: date type conversion failed: " + err.Error())`)
 	line(bw, tab(c.Depth), `}`)
 }
 
-func (g *Generator) writeFieldGetter(bw *bufio.Writer, depth int, rcvr string, f *Field) {
-	yname := ydbTypeName(f.Primitive)
-	var (
-		val = g.declare(f.Name + "Value")
-	)
+func (g *Generator) assignValue(bw *bufio.Writer, depth int, rcvr string, t *TypeInfo) string {
+	val := g.declare("v")
+
 	line(bw, tab(depth), `var `, val, ` ydb.Value`)
 	line(bw, tab(depth), `{`)
+	defer line(bw, tab(depth), `}`)
+
 	g.enterScope()
-	{
+	defer g.leaveScope()
+
+	switch {
+	case t.Face != nil:
 		var (
 			x  = g.declare("x")
 			ok = g.declare("ok")
 		)
-		f.Face.Get(bw, Context{
+		t.Face.Get(bw, Context{
 			Rcvr:      rcvr,
 			Out:       x,
 			Predicate: ok,
-			Field:     f,
+			Type:      t,
 			Depth:     depth + 1,
 		})
 		line(bw, tab(depth+1), `if `, ok, ` {`)
 		code(bw, tab(depth+2), val, ` = `)
-		if f.Optional {
+		if t.Optional {
 			code(bw, `ydb.OptionalValue(`)
 		}
-		code(bw, `ydb.`, yname, `Value(`)
-		g.convert(bw, f.Conv, x, f.Type, f.BaseType)
+		code(bw, `ydb.`, ydbTypeName(t.Primitive), `Value(`)
+		g.convert(bw, t.Conv, x, t.Type, t.BaseType)
 		code(bw, `)`)
-		if f.Optional {
+		if t.Optional {
 			code(bw, `)`)
 		}
 		line(bw)
 		line(bw, tab(depth+1), `} else {`)
-		if f.Optional {
+		if t.Optional {
 			code(bw, tab(depth+2), val, ` = `)
-			line(bw, `ydb.NullValue(ydb.Type`, yname, `)`)
+			line(bw, `ydb.NullValue(ydb.Type`, ydbTypeName(t.Primitive), `)`)
 		} else {
-			line(bw, tab(depth+2), `panic("ydbgen: no value for non-optional field \"`, f.Name, `\"")`)
+			line(bw, tab(depth+2), `panic("ydbgen: no value for non-optional type")`)
 		}
 		line(bw, tab(depth+1), `}`)
+
+	default:
+		var r string
+		switch {
+		case t.Container && t.Struct != nil:
+			r = g.assignStructValue(bw, depth+1, rcvr, t.Struct)
+
+		case t.Container && t.Slice != nil:
+			r = g.assignSliceValue(bw, depth+1, rcvr, t.Slice)
+
+		default:
+			r = g.assignPrimitiveValue(bw, depth+1, rcvr, t)
+		}
+		code(bw, tab(depth+1), val, ` = `)
+		if t.Optional {
+			code(bw, `ydb.OptionalValue(`)
+		}
+		code(bw, r)
+		if t.Optional {
+			code(bw, `)`)
+		}
+		line(bw)
 	}
-	g.leaveScope()
-	line(bw, tab(depth), `}`)
+
+	return val
 }
 
-func (g *Generator) writeStructFieldsGetters(bw *bufio.Writer, depth int, rcvr string, s *Struct) (write func(*Field)) {
-	faced := map[string]bool{}
+func (g *Generator) assignPrimitiveValue(bw *bufio.Writer, depth int, x string, t *TypeInfo) string {
+	val := g.declare("vp")
+	code(bw, tab(depth), val, ` := ydb.`, ydbTypeName(t.Primitive), `Value(`)
+	g.convert(bw, t.Conv, x, t.Type, t.BaseType)
+	line(bw, `)`)
+	return val
+}
+
+func (g *Generator) structFieldWriter(bw *bufio.Writer, depth int, rcvr string, s *Struct) (write func(*Field)) {
+	value := map[string]string{}
 	for _, f := range s.Fields {
-		if f.Face == nil {
-			continue
-		}
-		faced[f.Name] = true
-		g.writeFieldGetter(bw, depth, rcvr, f)
+		value[f.Name] = g.assignValue(bw, depth, rcvr+"."+f.Name, &f.TypeInfo)
 	}
 	return func(f *Field) {
-		yname := ydbTypeName(f.Primitive)
-		if faced[f.Name] {
-			code(bw, f.Name, `Value`)
-		} else {
-			if f.Optional {
-				code(bw, `ydb.OptionalValue(`)
-			}
-			code(bw, `ydb.`, yname)
-			code(bw, `Value(`)
-			val := rcvr + "." + f.Name
-			g.convert(bw, f.Conv, val, f.Type, f.BaseType)
-			code(bw, `)`)
-			if f.Optional {
-				code(bw, `)`)
-			}
+		val, ok := value[f.Name]
+		if !ok {
+			panic("ydbgen: unexpected field: " + f.Name)
 		}
+		code(bw, val)
 	}
 }
 
-func (g *Generator) writeStructValue(bw *bufio.Writer, depth int, rcvr, assign string, s *Struct) {
-	writeField := g.writeStructFieldsGetters(bw, depth, rcvr, s)
-	line(bw, tab(depth), assign, `ydb.StructValue(`)
+func (g *Generator) assignStructValue(bw *bufio.Writer, depth int, rcvr string, s *Struct) string {
+	val := g.declare("v")
+	line(bw, tab(depth), `var `, val, ` ydb.Value`)
+	line(bw, tab(depth), `{`)
+	defer line(bw, tab(depth), `}`)
+
+	g.enterScope()
+	defer g.leaveScope()
+
+	writeField := g.structFieldWriter(bw, depth+1, rcvr, s)
+	line(bw, tab(depth+1), val, ` = ydb.StructValue(`)
 	for _, f := range s.Fields {
-		code(bw, tab(depth+1))
+		code(bw, tab(depth+2))
 		code(bw, `ydb.StructFieldValue("`, f.Column, `", `)
 		writeField(f)
 		line(bw, `),`)
 	}
-	line(bw, tab(depth), `)`)
+	line(bw, tab(depth+1), `)`)
+
+	return val
 }
 
-func (g *Generator) writeStructType(bw *bufio.Writer, depth int, s *Struct) {
-	line(bw, `ydb.Struct(`)
-	for _, f := range s.Fields {
-		code(bw, tab(depth+1))
-		code(bw, `ydb.StructField("`, f.Column, `", `)
-		if f.Optional {
-			code(bw, `ydb.Optional(`)
-		}
-		code(bw, `ydb.Type`, ydbTypeName(f.Primitive))
-		code(bw, `)`)
-		if f.Optional {
-			code(bw, `)`)
-		}
-		line(bw, `,`)
+func (g *Generator) assignStructType(bw *bufio.Writer, depth int, s *Struct) string {
+	t := g.declare("t")
+	line(bw, tab(depth), `var `, t, ` ydb.Type`)
+	line(bw, tab(depth), `{`)
+	defer line(bw, tab(depth), `}`)
+
+	g.enterScope()
+	defer g.leaveScope()
+
+	fields := g.declare("fs")
+	size := strconv.Itoa(len(s.Fields))
+	line(bw, tab(depth+1), fields, ` := make([]ydb.StructOption, `, size, `)`)
+	for i, f := range s.Fields {
+		r := g.assignType(bw, depth+1, &f.TypeInfo)
+		id := strconv.Itoa(i)
+		code(bw, tab(depth+1), fields, `[`, id, `]`)
+		line(bw, ` = ydb.StructField("`, f.Column, `", `, r, `)`)
 	}
-	code(bw, tab(depth), `)`)
+
+	line(bw, tab(depth+1), t, ` = ydb.Struct(`, fields, `...)`)
+
+	return t
+}
+
+func (g *Generator) assignSliceType(bw *bufio.Writer, depth int, s *Slice) string {
+	t := g.declare("t")
+
+	var r string
+	switch {
+	case s.Basic != nil:
+		r = g.assignType(bw, depth, s.Basic)
+	case s.Struct != nil:
+		r = g.assignStructType(bw, depth, s.Struct)
+	}
+
+	line(bw, tab(depth), t, ` := ydb.List(`, r, `)`)
+
+	return t
+}
+
+func (g *Generator) assignType(bw *bufio.Writer, depth int, t *TypeInfo) string {
+	typ := g.declare("t")
+
+	line(bw, tab(depth), `var `, typ, ` ydb.Type`)
+	line(bw, tab(depth), `{`)
+	defer line(bw, tab(depth), `}`)
+
+	g.enterScope()
+	defer g.leaveScope()
+
+	var r string
+	switch {
+	case t.Container && t.Struct != nil:
+		r = g.assignStructType(bw, depth+1, t.Struct)
+
+	case t.Container && t.Slice != nil:
+		r = g.assignSliceType(bw, depth+1, t.Slice)
+
+	default:
+		r = g.assignPrimitiveType(bw, depth+1, t)
+	}
+	code(bw, tab(depth+1), typ, ` = `)
+	if t.Optional {
+		code(bw, `ydb.Optional(`)
+	}
+	code(bw, r)
+	if t.Optional {
+		code(bw, `)`)
+	}
+	line(bw)
+
+	return typ
+}
+
+func (g *Generator) assignPrimitiveType(bw *bufio.Writer, depth int, t *TypeInfo) string {
+	tp := g.declare("tp")
+	line(bw, tab(depth), tp, ` := ydb.Type`, ydbTypeName(t.Primitive))
+	return tp
 }
 
 func (g *Generator) writeStructFieldsScan(bw *bufio.Writer, depth int, rcvr string, s *Struct) {
@@ -544,44 +674,112 @@ func (g *Generator) writeStructFieldsScan(bw *bufio.Writer, depth int, rcvr stri
 			line(bw, tab(depth), `res.SeekItem("`, f.Column, `")`)
 		}
 
-		yname := ydbTypeName(f.Primitive)
+		g.writeScan(bw, depth, "res", rcvr+"."+f.Name, &f.TypeInfo)
 
-		if face := f.Face; face != nil {
-			if f.Optional {
-				line(bw, tab(depth), `res.Unwrap()`)
-				line(bw, tab(depth), `if !res.IsNull() {`)
-			} else {
-				line(bw, tab(depth), `{`)
-			}
-			g.enterScope()
-			{
-				var (
-					x = g.declare("x")
-				)
-				code(bw, tab(depth+1), x, ` := `)
-				val := "res." + yname + "()"
-				g.convert(bw, f.Conv, val, f.BaseType, f.Type)
-				line(bw)
-				face.Set(bw, Context{
-					Rcvr:  rcvr,
-					Field: f,
-					In:    x,
-					Depth: depth + 1,
-				})
-			}
-			g.leaveScope()
-			line(bw, tab(depth), `}`)
+		line(bw)
+	}
+}
+
+func fieldSetterFunc(s *Struct, column string) string {
+	return fmt.Sprintf("ydbgenSet%s%s", s.Name, column)
+}
+
+func (g *Generator) writeStructContainerScan(bw *bufio.Writer, depth int, rcvr string, s *Struct) {
+	g.enterScope()
+	defer g.leaveScope()
+	var (
+		i = g.declare("i")
+		n = g.declare("n")
+	)
+	line(bw, tab(depth), `for `, i, `, `, n, ` := 0, res.StructIn(); `, i, ` < `, n, `; `, i, `++ {`)
+	defer func() {
+		line(bw, tab(depth), `}`)
+		line(bw, tab(depth), `res.StructOut()`)
+	}()
+
+	line(bw, tab(depth+1), `switch res.StructField(`, i, `) {`)
+	for _, f := range s.Fields {
+		line(bw, tab(depth+1), `case "`, f.Column, `":`)
+		g.writeScan(bw, depth+2, "res", rcvr+"."+f.Name, &f.TypeInfo)
+	}
+	line(bw, tab(depth+1), `}`)
+}
+
+func (g *Generator) writeListContainerScan(bw *bufio.Writer, depth int, rcvr string, s *Slice) {
+	g.enterScope()
+	defer g.leaveScope()
+	var (
+		i  = g.declare("i")
+		n  = g.declare("n")
+		x  = g.declare("x")
+		xs = g.declare("xs")
+	)
+	line(bw, tab(depth), n, ` := res.ListIn()`)
+	if s.Struct != nil {
+		line(bw, tab(depth), xs, ` := make([]`, s.Struct.Name, `, `, n, `)`)
+	} else {
+		line(bw, tab(depth), xs, ` := make([]`, goTypeString(s.Basic.Type), `, `, n, `)`)
+	}
+	line(bw, tab(depth), `for `, i, ` := 0; `, i, ` < `, n, `; `, i, `++ {`)
+	defer func() {
+		line(bw, tab(depth), `}`)
+		line(bw, tab(depth), rcvr, ` = `, xs)
+		line(bw, tab(depth), `res.ListOut()`)
+	}()
+
+	line(bw, tab(depth+1), `res.ListItem(`, i, `)`)
+	if s.Struct != nil {
+		line(bw, tab(depth+1), `var `, x, ` `, s.Struct.Name)
+		g.writeStructContainerScan(bw, depth+1, x, s.Struct)
+	} else {
+		line(bw, tab(depth+1), `var `, x, ` `, goTypeString(s.Basic.Type))
+		g.writeScan(bw, depth+1, "res", x, s.Basic)
+	}
+	line(bw, tab(depth+1), xs, `[`, i, `] = `, x)
+}
+
+func (g *Generator) writeScan(bw *bufio.Writer, depth int, res, rcvr string, t *TypeInfo) {
+	switch {
+	case t.Face != nil:
+		if t.Optional {
+			line(bw, tab(depth), res, `.Unwrap()`)
+			line(bw, tab(depth), `if !`, res, `.IsNull() {`)
 		} else {
-			code(bw, tab(depth), rcvr, ".", f.Name, " = ")
-			val := "res."
-			if f.Optional {
-				val += "O"
-			}
-			val += yname + "()"
-			g.convert(bw, f.Conv, val, f.BaseType, f.Type)
-			line(bw)
+			line(bw, tab(depth), `{`)
 		}
+		g.enterScope()
+		{
+			var (
+				x = g.declare("x")
+			)
+			code(bw, tab(depth+1), x, ` := `)
+			val := res + "." + ydbTypeName(t.Primitive) + "()"
+			g.convert(bw, t.Conv, val, t.BaseType, t.Type)
+			line(bw)
+			t.Face.Set(bw, Context{
+				Rcvr:  rcvr,
+				Type:  t,
+				In:    x,
+				Depth: depth + 1,
+			})
+		}
+		g.leaveScope()
+		line(bw, tab(depth), `}`)
 
+	case t.Container && t.Struct != nil:
+		g.writeStructContainerScan(bw, depth, rcvr, t.Struct)
+
+	case t.Container && t.Slice != nil:
+		g.writeListContainerScan(bw, depth, rcvr, t.Slice)
+
+	default:
+		code(bw, tab(depth), rcvr, " = ")
+		val := res + "."
+		if t.Optional {
+			val += "O"
+		}
+		val += ydbTypeName(t.Primitive) + "()"
+		g.convert(bw, t.Conv, val, t.BaseType, t.Type)
 		line(bw)
 	}
 }
@@ -803,6 +1001,15 @@ func ydbTypeName(t internal.PrimitiveType) string {
 		return "JSON"
 	case internal.TypeUUID:
 		return "UUID"
+
+	default:
+		panic("ydbgen: unexpected primitive type")
 	}
 	return t.String()
+}
+
+func goTypeString(t types.Type) string {
+	return types.TypeString(t, func(p *types.Package) string {
+		return ""
+	})
 }

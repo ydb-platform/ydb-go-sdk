@@ -595,6 +595,7 @@ const (
 )
 
 var primitiveString = [...]string{
+	TypeUnknown:     "<unknown>",
 	TypeBool:        "Bool",
 	TypeInt8:        "Int8",
 	TypeUint8:       "Uint8",

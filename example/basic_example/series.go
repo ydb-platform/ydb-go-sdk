@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"strings"
 	"text/template"
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/scheme"
+	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
@@ -98,57 +97,45 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	defer sp.Close(ctx)
 
+	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database)
+	if err != nil {
+		return err
+	}
+	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	if err != nil {
+		return err
+	}
+
 	prefix := path.Join(params.Database, params.Path)
-
-	err = cleanupDatabase(ctx, driver, &sp, params.Database)
-	if err != nil {
-		return err
-	}
-
-	err = ensurePathExists(ctx, driver, params.Database, prefix)
-	if err != nil {
-		return err
-	}
 
 	err = describeTableOptions(ctx, &sp)
 	if err != nil {
 		return fmt.Errorf("describe table options error: %v", err)
 	}
 
-	err = createTables(ctx, &sp, path.Join(
-		params.Database,
-		prefix,
-	))
+	err = createTables(ctx, &sp, prefix)
 	if err != nil {
 		return fmt.Errorf("create tables error: %v", err)
 	}
 
 	err = describeTable(ctx, &sp, path.Join(
-		params.Database,
 		prefix, "series",
 	))
 	if err != nil {
 		return fmt.Errorf("describe table error: %v", err)
 	}
 
-	err = fillTablesWithData(ctx, &sp, path.Join(
-		params.Database,
-		prefix,
-	))
+	err = fillTablesWithData(ctx, &sp, prefix)
 	if err != nil {
 		return fmt.Errorf("fill tables with data error: %v", err)
 	}
 
-	err = selectSimple(ctx, &sp, path.Join(
-		params.Database,
-		prefix,
-	))
+	err = selectSimple(ctx, &sp, prefix)
 	if err != nil {
 		return fmt.Errorf("select simple error: %v", err)
 	}
 
 	err = readTable(ctx, &sp, path.Join(
-		params.Database,
 		prefix, "episodes",
 	))
 	if err != nil {
@@ -390,94 +377,6 @@ func describeTable(ctx context.Context, sp *table.SessionPool, path string) (err
 			return nil
 		}),
 	)
-	return nil
-}
-
-func cleanupDatabase(ctx context.Context, d ydb.Driver, sp *table.SessionPool, database string) error {
-	s := scheme.Client{
-		Driver: d,
-	}
-	var list func(int, string) error
-	list = func(i int, p string) error {
-		dir, err := s.ListDirectory(ctx, p)
-		if err != nil {
-			return err
-		}
-		log.Println(strings.Repeat(" ", i*2), "inspecting", dir.Name, dir.Type)
-		for _, c := range dir.Children {
-			pt := path.Join(p, c.Name)
-			switch c.Type {
-			case scheme.EntryDirectory:
-				if err := list(i+1, pt); err != nil {
-					return err
-				}
-				log.Println(strings.Repeat(" ", i*2), "removing", c.Type, pt)
-				if err := s.RemoveDirectory(ctx, pt); err != nil {
-					return err
-				}
-
-			case scheme.EntryTable:
-				s, err := sp.Get(ctx)
-				if err != nil {
-					return err
-				}
-				defer sp.Put(ctx, s)
-				log.Println(strings.Repeat(" ", i*2), "dropping", c.Type, pt)
-				if err := s.DropTable(ctx, pt); err != nil {
-					return err
-				}
-
-			default:
-				log.Println(strings.Repeat(" ", i*2), "skipping", c.Type, pt)
-			}
-		}
-		return nil
-	}
-	return list(0, database)
-}
-
-func ensurePathExists(ctx context.Context, d ydb.Driver, database, path string) error {
-	s := scheme.Client{
-		Driver: d,
-	}
-
-	database = strings.TrimSuffix(database, "/")
-	path = strings.Trim(path, "/")
-	full := database + "/" + path
-
-	for i := 0; i < len(path); i++ {
-		x := strings.IndexByte(path[i:], '/')
-		if x == -1 {
-			x = len(path[i:])
-		}
-		i += x
-		sub := full[:len(database)+1+i]
-		info, err := s.DescribePath(ctx, sub)
-		operr, ok := err.(*ydb.OpError)
-		if ok && operr.Reason == ydb.StatusSchemeError {
-			log.Printf("creating %q", sub)
-			err = s.MakeDirectory(ctx, sub)
-		}
-		if err != nil {
-			return err
-		}
-		if ok {
-			continue
-		}
-		log.Printf("exists %q", sub)
-		switch info.Type {
-		case
-			scheme.EntryDatabase,
-			scheme.EntryDirectory:
-			// OK
-		default:
-			return fmt.Errorf(
-				"entry %q exists but it is a %s",
-				sub, info.Type,
-			)
-		}
-	}
-
 	return nil
 }
 

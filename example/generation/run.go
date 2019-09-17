@@ -9,6 +9,7 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
+	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 	"github.com/yandex-cloud/ydb-go-sdk/opt"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
@@ -49,14 +50,27 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	prefix := path.Join(params.Database, params.Path)
 
-	err = session.CreateTable(ctx, path.Join(prefix, "users"),
-		table.WithColumn("id", ydb.Optional(ydb.TypeUint64)),
-		table.WithColumn("username", ydb.Optional(ydb.TypeUTF8)),
-		table.WithColumn("mode", ydb.Optional(ydb.TypeUint64)),
-		table.WithColumn("magic", ydb.Optional(ydb.TypeUint32)),
-		table.WithColumn("score", ydb.Optional(ydb.TypeInt64)),
-		table.WithColumn("updated", ydb.Optional(ydb.TypeTimestamp)),
-		table.WithPrimaryKeyColumn("id"),
+	err = ydbutil.CleanupDatabase(ctx, driver, table.SingleSession(session), params.Database)
+	if err != nil {
+		return err
+	}
+	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	if err != nil {
+		return err
+	}
+
+	err = table.Retry(ctx, table.SingleSession(session),
+		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
+			return s.CreateTable(ctx, path.Join(prefix, "users"),
+				table.WithColumn("id", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("username", ydb.Optional(ydb.TypeUTF8)),
+				table.WithColumn("mode", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("magic", ydb.Optional(ydb.TypeUint32)),
+				table.WithColumn("score", ydb.Optional(ydb.TypeInt64)),
+				table.WithColumn("updated", ydb.Optional(ydb.TypeTimestamp)),
+				table.WithPrimaryKeyColumn("id"),
+			)
+		}),
 	)
 	if err != nil {
 		return err
@@ -113,6 +127,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		user := User{
 			ID:       3,
 			Username: "Elliot",
+			Magic:    1,
 			Score:    opt.OInt64(43),
 			Updated:  time.Now(),
 		}
@@ -145,6 +160,38 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		}
 		for _, user := range users {
 			log.Printf("> user %+v", user)
+		}
+	}
+	{
+		const query = `
+			SELECT 
+				magic, 
+				LIST(username)
+			FROM
+				users
+			GROUP BY 
+				magic;`
+
+		stmt, err := session.Prepare(ctx, withPragma(prefix, query))
+		if err != nil {
+			return err
+		}
+		_, res, err := stmt.Execute(ctx, roTX, nil)
+		if err != nil {
+			return err
+		}
+
+		res.NextSet()
+
+		var list MagicUsersList
+		if err := (&list).Scan(res); err != nil {
+			return err
+		}
+		for _, m := range list {
+			log.Printf("> magic: %d", m.Magic)
+			for _, user := range m.Users {
+				log.Printf("  > user %+v", user)
+			}
 		}
 	}
 
