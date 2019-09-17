@@ -328,6 +328,7 @@ func (m *ListDirectoryResponse) GetOperation() *Ydb_Operations.Operation {
 }
 
 type Permissions struct {
+	// SID (Security ID) of user or group
 	Subject              string   `protobuf:"bytes,1,opt,name=subject,proto3" json:"subject,omitempty"`
 	PermissionNames      []string `protobuf:"bytes,2,rep,name=permission_names,json=permissionNames,proto3" json:"permission_names,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -375,7 +376,9 @@ func (m *Permissions) GetPermissionNames() []string {
 }
 
 type Entry struct {
-	Name                 string         `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Name of scheme entry (dir2 of /dir1/dir2)
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// SID (Security ID) of user or group
 	Owner                string         `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`
 	Type                 Entry_Type     `protobuf:"varint,5,opt,name=type,proto3,enum=Ydb.Scheme.Entry_Type" json:"type,omitempty"`
 	EffectivePermissions []*Permissions `protobuf:"bytes,6,rep,name=effective_permissions,json=effectivePermissions,proto3" json:"effective_permissions,omitempty"`
