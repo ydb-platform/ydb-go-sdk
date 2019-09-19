@@ -221,7 +221,7 @@ func (m *MagicUsers) Scan(res *table.Result) (err error) {
 	for i0 := 0; i0 < n0; i0++ {
 		res.ListItem(i0)
 		var x0 string
-		x0 = res.OUTF8()
+		x0 = res.UTF8()
 		xs0[i0] = x0
 	}
 	m.Users = xs0
@@ -402,7 +402,7 @@ func (ms *MagicUsersList) Scan(res *table.Result) (err error) {
 		for i0 := 0; i0 < n0; i0++ {
 			res.ListItem(i0)
 			var x1 string
-			x1 = res.OUTF8()
+			x1 = res.UTF8()
 			xs0[i0] = x1
 		}
 		x0.Users = xs0

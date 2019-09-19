@@ -647,15 +647,20 @@ func (g *Generator) assignBasicType(bw *bufio.Writer, depth int, t *Basic) strin
 
 func (g *Generator) writeStructFieldsScan(bw *bufio.Writer, depth int, res, rcvr string, s *Struct) {
 	for _, f := range s.Fields {
-		if s.SeekMode == SeekPosition {
-			line(bw, tab(depth), res, `.NextItem()`)
-		} else {
-			line(bw, tab(depth), res, `.SeekItem("`, f.Column, `")`)
+		// Do not seek to the field name if it is not a container – in such
+		// case struct is a flattened tuple.
+		flatten := f.T.Struct != nil && !f.T.Container
+		if !flatten {
+			if s.SeekMode == SeekPosition {
+				line(bw, tab(depth), res, `.NextItem()`)
+			} else {
+				line(bw, tab(depth), res, `.SeekItem("`, f.Column, `")`)
+			}
 		}
-
 		g.writeScan(bw, depth, res, rcvr+"."+f.Name, f.T)
-
-		line(bw)
+		if !flatten {
+			line(bw)
+		}
 	}
 }
 

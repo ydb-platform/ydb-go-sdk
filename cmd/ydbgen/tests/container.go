@@ -2,6 +2,7 @@ package tests
 
 //ydb:generate
 type Container struct {
+	Struct  Foo
 	Structs []Foo
 	Bytes   []byte   `ydb:"type:list<uint32>,conv:assert"`
 	Strings []string `ydb:"type:list<string>"`

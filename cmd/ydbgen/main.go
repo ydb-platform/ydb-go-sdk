@@ -432,16 +432,18 @@ func main() {
 					if err := inferType(&field.T, f.Type); err != nil {
 						log.Fatalf("%s.%s: %v", s.Name, field.Name, err)
 					}
-					if field.T.Slice != nil {
-						// Slices for fields are always containers.
-						field.T.Container = true
-					}
-					if t, _ := digBasic(&field.T); t != nil {
+					// Do not handle errors here due to the late binding.
+					dig(&field.T, func(t *T) {
+						if t.Basic == nil {
+							return
+						}
 						if t.Basic.Conv == 0 {
 							t.Basic.Conv = item.Mode.Conv
 						}
-						t.Optional = item.Mode.Wrap == WrapOptional
-					}
+						if !t.Optional && !t.Suggested {
+							t.Optional = item.Mode.Wrap == WrapOptional
+						}
+					})
 					s.Fields = append(s.Fields, field)
 				}
 				if s.SeekMode == SeekPosition {
@@ -466,6 +468,19 @@ func main() {
 	for _, file := range pkg.Files {
 		for _, s := range file.Structs {
 			for _, f := range s.Fields {
+				if f.T.Slice != nil || f.T.Struct != nil || f.T.Container {
+					// Slices or structs for fields are always containers
+					// currently.
+					dig(&f.T, func(t *T) {
+						if t.Basic != nil {
+							return
+						}
+						t.Container = true
+					})
+				}
+				if *verbose {
+					log.Printf("%s.%s: %s", s.Name, f.Name, f.T.String())
+				}
 				if err := f.Validate(); err != nil {
 					log.Fatalf(
 						"generate struct %q field %q error: %v",
@@ -687,6 +702,7 @@ type T struct {
 	Struct *Struct
 	Slice  *Slice
 
+	Suggested bool
 	Container bool
 	Optional  bool
 }
@@ -708,6 +724,48 @@ func (t *T) GetSlice() *Slice {
 		t.Slice = new(Slice)
 	}
 	return t.Slice
+}
+
+func (t T) String() (ret string) {
+	var (
+		prefix string
+		suffix string
+	)
+	if t.Optional {
+		suffix = "?"
+	}
+	if t.Container {
+		prefix = "[C]"
+	}
+	defer func() {
+		ret = prefix + ret + suffix
+	}()
+	if t.Basic != nil {
+		if t.Basic.Type == t.Basic.BaseType {
+			return typeString(t.Basic.Type)
+		}
+		return fmt.Sprintf(
+			"%s(%s)",
+			typeString(t.Basic.Type),
+			typeString(t.Basic.BaseType),
+		)
+	}
+	if t.Slice != nil {
+		return "list<" + t.Slice.T.String() + ">"
+	}
+	if t.Struct != nil {
+		var sb strings.Builder
+		for i, f := range t.Struct.Fields {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(f.Name)
+			sb.WriteByte(':')
+			sb.WriteString(f.T.String())
+		}
+		return "struct<" + sb.String() + ">"
+	}
+	return "<!T!>"
 }
 
 type Field struct {
@@ -759,6 +817,37 @@ func exactlyOne(bs ...bool) bool {
 		}
 	}
 	return has
+}
+
+func dig(t *T, it func(*T)) error {
+	if t == nil {
+		return nil
+	}
+	if !exactlyOne(
+		t.Basic != nil,
+		t.Struct != nil,
+		t.Slice != nil,
+	) {
+		return fmt.Errorf("ambiguous type inference/suggestion")
+	}
+
+	it(t)
+
+	if t.Basic != nil {
+		return nil
+	}
+	if t.Struct != nil {
+		for _, f := range t.Struct.Fields {
+			if err := dig(&f.T, it); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if t.Slice != nil {
+		return dig(&t.Slice.T, it)
+	}
+	panic("unexpected T")
 }
 
 func digBasic(t *T) (*T, error) {
@@ -1156,6 +1245,7 @@ func suggestType(t *T, s string, conv ConvMode) error {
 		switch s[:i] {
 		case "list":
 			t.Container = true
+			t.Suggested = true
 			slice := t.GetSlice()
 			return suggestType(&slice.T, s[i+1:n-1], conv)
 		default:
@@ -1175,6 +1265,8 @@ func suggestType(t *T, s string, conv ConvMode) error {
 	basic.Primitive = p
 	basic.BaseType = ydbtypes.GoTypeFromPrimitiveType(p)
 	basic.Conv = conv
+
+	t.Suggested = true
 
 	return nil
 }

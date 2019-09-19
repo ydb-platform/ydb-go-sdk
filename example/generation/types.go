@@ -26,8 +26,8 @@ type Users []User
 //ydb:gen scan
 //ydb:set seek:position
 type MagicUsers struct {
-	Magic uint `ydb:"type:uint32?,conv:unsafe"`
-	Users []string
+	Magic uint     `ydb:"type:uint32?,conv:unsafe"`
+	Users []string `ydb:"type:list<utf8>"`
 }
 
 //ydb:gen scan

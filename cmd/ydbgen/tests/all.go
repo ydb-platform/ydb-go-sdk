@@ -1,3 +1,3 @@
 package tests
 
-//go:generate ydbgen -dir .
+//go:generate ydbgen -dir . -verbose
