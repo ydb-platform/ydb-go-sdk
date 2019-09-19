@@ -312,45 +312,86 @@ func main() {
 			return true
 		})
 
-		var fillSlice func(*ast.ArrayType, *Slice) types.Type
-		fillSlice = func(arr *ast.ArrayType, dest *Slice) (base types.Type) {
-			defer func() {
-				base = types.NewSlice(base)
-			}()
-			typ := info.TypeOf(arr.Elt)
-			switch x := typ.(type) {
-			case *types.Basic:
-				t := &TypeInfo{
-					Type: x,
-				}
-				t.Primitive, err = ydbtypes.PrimitiveTypeFromGoType(typ)
-				if err != nil {
-					log.Fatal(err)
-				}
-				t.BaseType = ydbtypes.GoTypeFromPrimitiveType(t.Primitive)
-				dest.Basic = t
-				return t.BaseType
-
-			case *types.Named:
-				pkg.Couple(x.Obj().Id(), func(x interface{}) {
-					dest.Struct = x.(*Struct)
-				})
-				return x.Underlying()
-
-			case *types.Slice:
-				t := &TypeInfo{
-					Type:      x,
-					Container: true,
-					Slice:     new(Slice),
-				}
-				b := fillSlice(arr.Elt.(*ast.ArrayType), t.Slice)
-				dest.Basic = t
-				return types.NewSlice(b)
-
-			default:
-				log.Fatalf("unsupported type for slice element: %T (%[1]s)", x)
+		inferBasicType := func(t *Basic) (err error) {
+			if t.Primitive != 0 {
 				return nil
 			}
+			t.Primitive, err = ydbtypes.PrimitiveTypeFromGoType(t.Type)
+			if err != nil {
+				return err
+			}
+			t.BaseType = ydbtypes.GoTypeFromPrimitiveType(t.Primitive)
+			return nil
+		}
+
+		var inferType func(*T, ast.Expr) error
+		inferType = func(t *T, expr ast.Expr) error {
+			var typ types.Type
+			switch x := expr.(type) {
+			case *ast.SelectorExpr:
+				obj := info.ObjectOf(x.Sel)
+				typ = obj.Type()
+			case *ast.Ident:
+				typ = info.TypeOf(expr)
+			case *ast.ArrayType:
+				typ = info.TypeOf(expr)
+			default:
+				return fmt.Errorf("unexpected field ast type: %T", expr)
+			}
+
+			switch x := typ.(type) {
+			case *types.Slice:
+				if !t.Container && isByteSlice(x) {
+					// Special case for ydb string type.
+					t.GetBasic()
+					t.Basic.Type = x
+					inferBasicType(t.Basic)
+				} else {
+					inferType(&(t.GetSlice()).T, expr.(*ast.ArrayType).Elt)
+				}
+
+			case *types.Basic:
+				t.GetBasic().Type = x
+				inferBasicType(t.Basic)
+
+			case *types.Named:
+				// TODO(kamardin): []opt.Int32
+				obj := x.Obj()
+				name := strings.Join([]string{
+					obj.Pkg().Name(),
+					obj.Name(),
+				}, ".")
+				switch {
+				case name == "time.Time":
+					if t.Basic == nil || t.Basic.BaseType == nil {
+						return fmt.Errorf(
+							"field type tag required for %s conversion",
+							name,
+						)
+					}
+					t.Basic.Type = t.Basic.BaseType
+					t.Basic.Face = TimeFieldFace{}
+
+				default:
+					// TODO: shrink GenAll here.
+					typ, err := checkInterface(x, GenAll)
+					if err != nil {
+						pkg.Couple(obj.Name(), func(x interface{}) {
+							t.Struct = x.(*Struct)
+						})
+					} else {
+						t.GetBasic()
+						t.Basic.Type = typ
+						t.Basic.Face = DefaultFieldFace{}
+						inferBasicType(t.Basic)
+					}
+				}
+
+			default:
+				return fmt.Errorf("unexpected field object type: %T", x)
+			}
+
+			return nil
 		}
 
 		file := &File{
@@ -363,7 +404,7 @@ func main() {
 					Name:  item.Ident.Name,
 					Flags: item.Flags,
 				}
-				fillSlice(item.ArrayType, s)
+				inferType(&s.T, item.ArrayType.Elt)
 				file.Slices = append(file.Slices, s)
 
 			case item.StructType != nil:
@@ -378,103 +419,29 @@ func main() {
 				for i, f := range item.StructType.Fields.List {
 					name := f.Names[0].Name
 					field := &Field{
-						TypeInfo: TypeInfo{
-							Conv: item.Mode.Conv,
-						},
 						Name:     name,
 						Column:   camelToSnake(name),
 						Position: i,
 					}
 					if err := field.ParseTags(decl.Tag(i)); err != nil {
-						log.Fatal(err)
+						log.Fatalf("%s.%s: %v", s.Name, field.Name, err)
 					}
 					if field.Ignore {
 						continue
 					}
-
-					var (
-						typ types.Type
-						arr *ast.ArrayType
-					)
-					switch x := f.Type.(type) {
-					case *ast.SelectorExpr:
-						obj := info.ObjectOf(x.Sel)
-						typ = obj.Type()
-
-					case *ast.Ident:
-						typ = info.TypeOf(f.Type)
-
-					case *ast.ArrayType:
-						typ = info.TypeOf(f.Type)
-						arr = x
-
-					default:
-						log.Fatalf(
-							"unexpected field %q ast type: %T",
-							field.Name, f.Type,
-						)
+					if err := inferType(&field.T, f.Type); err != nil {
+						log.Fatalf("%s.%s: %v", s.Name, field.Name, err)
 					}
-
-					switch x := typ.(type) {
-					case *types.Slice:
-						field.Type = x
-						if field.Primitive == 0 {
-							// No "type" tag specified.
-							field.Container = true
-							field.Slice = &Slice{}
-							field.BaseType = fillSlice(arr, field.Slice)
+					if field.T.Slice != nil {
+						// Slices for fields are always containers.
+						field.T.Container = true
+					}
+					if t, _ := digBasic(&field.T); t != nil {
+						if t.Basic.Conv == 0 {
+							t.Basic.Conv = item.Mode.Conv
 						}
-
-					case *types.Basic:
-						field.Type = x
-
-					case *types.Named:
-						obj := x.Obj()
-						name := strings.Join([]string{
-							obj.Pkg().Name(),
-							obj.Name(),
-						}, ".")
-						switch {
-						case name == "time.Time":
-							if field.BaseType == nil {
-								log.Fatalf(
-									"%s.%s must have type tag specified (necessary for %s conversions)",
-									s.Name, field.Name, name,
-								)
-							}
-							field.Type = field.BaseType
-							field.Face = TimeFieldFace{}
-
-						default:
-							t, err := checkInterface(x, s.Flags)
-							if err != nil {
-								field.Container = true
-								pkg.Couple(obj.Name(), func(x interface{}) {
-									field.Struct = x.(*Struct)
-								})
-							} else {
-								field.Type = t
-								field.Face = DefaultFieldFace{}
-							}
-						}
-
-					default:
-						log.Fatalf("unexpected field object type: %T", x)
+						t.Optional = item.Mode.Wrap == WrapOptional
 					}
-
-					if !field.Container && field.Primitive == 0 {
-						var err error
-						field.Primitive, err = ydbtypes.PrimitiveTypeFromGoType(field.Type)
-						if err != nil {
-							log.Fatal(err)
-						}
-						field.Optional = item.Mode.Wrap == WrapOptional
-						field.BaseType = ydbtypes.GoTypeFromPrimitiveType(field.Primitive)
-					}
-					if err := field.Validate(); err != nil {
-						log.Fatalf("generate struct %q error: %v", s.Name, err)
-					}
-
 					s.Fields = append(s.Fields, field)
 				}
 				if s.SeekMode == SeekPosition {
@@ -496,7 +463,18 @@ func main() {
 	if err := pkg.Finalize(); err != nil {
 		log.Fatal(err)
 	}
-
+	for _, file := range pkg.Files {
+		for _, s := range file.Structs {
+			for _, f := range s.Fields {
+				if err := f.Validate(); err != nil {
+					log.Fatalf(
+						"generate struct %q field %q error: %v",
+						s.Name, f.Name, err,
+					)
+				}
+			}
+		}
+	}
 	g := Generator{
 		Dir: outputDir,
 	}
@@ -685,39 +663,59 @@ func (f *File) Empty() bool {
 
 type Struct struct {
 	Name     string
-	Fields   []*Field
-	SeekMode SeekMode
 	Flags    GenFlag
+	SeekMode SeekMode
+	Fields   []*Field
 }
 
 type Slice struct {
 	Name  string
 	Flags GenFlag
-
-	Basic  *TypeInfo
-	Struct *Struct
+	T     T
 }
 
-type TypeInfo struct {
+type Basic struct {
 	Conv      ConvMode
 	Face      FieldFace
 	Type      types.Type // Actual go type.
 	BaseType  types.Type // Column's go type.
 	Primitive internal.PrimitiveType
-	Optional  bool
+}
+
+type T struct {
+	Basic  *Basic
+	Struct *Struct
+	Slice  *Slice
 
 	Container bool
-	Struct    *Struct
-	Slice     *Slice
+	Optional  bool
+}
+
+func (t *T) GetBasic() *Basic {
+	if t.Basic == nil {
+		t.Basic = new(Basic)
+	}
+	return t.Basic
+}
+func (t *T) GetStruct() *Struct {
+	if t.Struct == nil {
+		t.Struct = new(Struct)
+	}
+	return t.Struct
+}
+func (t *T) GetSlice() *Slice {
+	if t.Slice == nil {
+		t.Slice = new(Slice)
+	}
+	return t.Slice
 }
 
 type Field struct {
-	TypeInfo
-
 	Name     string
 	Column   string
 	Position int
 	Ignore   bool
+	T        T
 }
 
 type ConvMode uint
@@ -750,40 +748,75 @@ func isAssignable(t1, t2 types.Type) bool {
 	return types.AssignableTo(t1, t2)
 }
 
-func (f *Field) Validate() error {
-	if f.Container {
-		if !isAssignable(f.Type, f.BaseType) {
-			return fmt.Errorf(
-				"field %q type %s is impossible to assign to %s",
-				f.Name, f.Type, f.BaseType,
-			)
+func exactlyOne(bs ...bool) bool {
+	var has bool
+	for _, cond := range bs {
+		if has && cond {
+			return false
 		}
+		if cond {
+			has = true
+		}
+	}
+	return has
+}
+
+func digBasic(t *T) (*T, error) {
+	if !exactlyOne(
+		t.Basic != nil,
+		t.Struct != nil,
+		t.Slice != nil,
+	) {
+		return nil, fmt.Errorf("ambiguous type inference/suggestion")
+	}
+	if t.Basic != nil {
+		return t, nil
+	}
+	if t.Struct != nil {
+		return nil, nil
+	}
+	return digBasic(&t.Slice.T)
+}
+
+func (f *Field) Validate() error {
+	tb, err := digBasic(&f.T)
+	if err != nil {
+		return err
+	}
+	if tb == nil {
 		return nil
 	}
-	if !types.ConvertibleTo(f.Type, f.BaseType) {
+	t := tb.Basic
+	if t.Type == nil {
+		return fmt.Errorf("insufficient type info: Type unknown")
+	}
+	if t.BaseType == nil {
+		return fmt.Errorf("insufficient type info: BaseType unknown")
+	}
+	if !types.ConvertibleTo(t.Type, t.BaseType) {
 		return fmt.Errorf(
-			"field %q impossible type conversion from %s to %s (ydb primitive type %s)",
-			f.Name, f.Type, f.BaseType, f.Primitive,
+			"impossible type conversion from %s to %s (ydb primitive type %s)",
+			t.Type, t.BaseType, t.Primitive,
 		)
 	}
-	if f.Conv == ConvDefault {
+	if t.Conv == ConvDefault {
 		for _, conv := range [][2]types.Type{
-			{f.BaseType, f.Type},
-			{f.Type, f.BaseType},
+			{t.BaseType, t.Type},
+			{t.Type, t.BaseType},
 		} {
 			if !isSafeConversion(conv[0], conv[1]) {
 				return fmt.Errorf(
-					"unsafe type conversion for field %q: from %s to %s",
-					f.Name, conv[0], conv[1],
+					"unsafe type conversion: from %s to %s",
+					conv[0], conv[1],
 				)
 			}
 		}
 	}
-	if f.Conv != ConvDefault {
+	if t.Conv != ConvDefault {
 		safe := true
 		for _, conv := range [][2]types.Type{
-			{f.BaseType, f.Type},
-			{f.Type, f.BaseType},
+			{t.BaseType, t.Type},
+			{t.Type, t.BaseType},
 		} {
 			if !isSafeConversion(conv[0], conv[1]) {
 				safe = false
@@ -792,8 +825,8 @@ func (f *Field) Validate() error {
 		}
 		if safe {
 			return fmt.Errorf(
-				"already safe type conversion for field %q: %s <-> %s",
-				f.Name, f.Type, f.BaseType,
+				"already safe type conversion: %s <-> %s",
+				t.Type, t.BaseType,
 			)
 		}
 	}
@@ -817,22 +850,15 @@ func (f *Field) ParseTags(tags string) (err error) {
 	var (
 		columnGiven   bool
 		positionGiven bool
+
+		conv ConvMode
+		typs string
 	)
 	for _, pair := range pairs {
 		key, value := splitPair(pair, ':')
-		if value == "" {
-			if len(pairs) == 1 {
-				// Special case when only column name or ignorance sign is given.
-				if key == "-" {
-					f.Ignore = true
-				} else {
-					f.Column = key
-				}
-				return
-			}
-			return fmt.Errorf("no value for tag key %q", key)
-		}
 		switch key {
+		case "-":
+			f.Ignore = true
 		case "column":
 			columnGiven = true
 			f.Column = value
@@ -843,24 +869,23 @@ func (f *Field) ParseTags(tags string) (err error) {
 				return
 			}
 		case "type":
-			if n := len(value); value[n-1] == '?' {
-				f.Optional = true
-				value = value[:n-1]
-			}
-			f.Primitive, err = ydbtypes.PrimitiveTypeFromString(value)
-			if err != nil {
-				return
-			}
-			f.BaseType = ydbtypes.GoTypeFromPrimitiveType(f.Primitive)
+			typs = value
 		case "conv":
-			f.Conv, err = ParseConvMode(value)
+			conv, err = ParseConvMode(value)
 			if err != nil {
 				return
 			}
+		case "container":
+			f.T.Container = true
 
 		default:
 			err = fmt.Errorf("unexpected tag key: %q", key)
 			return
+		}
+	}
+	if typs != "" {
+		if err := suggestType(&f.T, typs, conv); err != nil {
+			return err
 		}
 	}
 	if columnGiven && positionGiven {
@@ -1116,4 +1141,53 @@ func pointerReceiver(f *types.Func) error {
 		)
 	}
 	return nil
+}
+
+func suggestType(t *T, s string, conv ConvMode) error {
+	n := len(s)
+	i := strings.IndexByte(s, '<')
+	if i != -1 {
+		if s[n-1] != '>' {
+			return fmt.Errorf(
+				"syntax error: non balanced angle brackets: %q",
+				s,
+			)
+		}
+		switch s[:i] {
+		case "list":
+			t.Container = true
+			slice := t.GetSlice()
+			return suggestType(&slice.T, s[i+1:n-1], conv)
+		default:
+			return fmt.Errorf("unsupported container type: %q", s[:i])
+		}
+	}
+
+	if s[n-1] == '?' {
+		t.Optional = true
+		s = s[:n-1]
+	}
+	p, err := ydbtypes.PrimitiveTypeFromString(s)
+	if err != nil {
+		return err
+	}
+	basic := t.GetBasic()
+	basic.Primitive = p
+	basic.BaseType = ydbtypes.GoTypeFromPrimitiveType(p)
+	basic.Conv = conv
+
+	return nil
+}
+
+func isByteSlice(t types.Type) bool {
+	s, _ := t.(*types.Slice)
+	if s == nil {
+		return false
+	}
+	b, _ := s.Elem().(*types.Basic)
+	return b != nil && b.Kind() == types.Byte
+}
+
+func isByteSlices(t1, t2 types.Type) bool {
+	return isByteSlice(t1) && isByteSlice(t2)
 }

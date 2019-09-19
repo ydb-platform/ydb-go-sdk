@@ -20,18 +20,18 @@ func (u *User) StructValue() ydb.Value {
 	{
 		var v1 ydb.Value
 		{
-			vp0 := ydb.Uint64Value(u.ID)
-			v1 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.Uint64Value(u.ID))
+			v1 = vp0
 		}
 		var v2 ydb.Value
 		{
-			vp0 := ydb.UTF8Value(u.Name)
-			v2 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.UTF8Value(u.Name))
+			v2 = vp0
 		}
 		var v3 ydb.Value
 		{
-			vp0 := ydb.Uint32Value(u.Age)
-			v3 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.Uint32Value(u.Age))
+			v3 = vp0
 		}
 		v0 = ydb.StructValue(
 			ydb.StructFieldValue("user_id", v1),
@@ -76,41 +76,43 @@ func (s *Series) StructValue() ydb.Value {
 	{
 		var v1 ydb.Value
 		{
-			vp0 := ydb.Uint64Value(s.ID)
-			v1 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.Uint64Value(s.ID))
+			v1 = vp0
 		}
 		var v2 ydb.Value
 		{
-			vp0 := ydb.UTF8Value(s.Title)
-			v2 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.UTF8Value(s.Title))
+			v2 = vp0
 		}
 		var v3 ydb.Value
 		{
-			vp0 := ydb.UTF8Value(s.Info)
-			v3 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.UTF8Value(s.Info))
+			v3 = vp0
 		}
 		var v4 ydb.Value
 		{
+			var v5 ydb.Value
 			var x0 uint32
 			ok0 := !s.ReleaseDate.IsZero()
 			if ok0 {
 				x0 = ydb.Time(s.ReleaseDate).Datetime()
 			}
 			if ok0 {
-				v4 = ydb.OptionalValue(ydb.DatetimeValue(x0))
+				v5 = ydb.OptionalValue(ydb.DatetimeValue(x0))
 			} else {
-				v4 = ydb.NullValue(ydb.TypeDatetime)
+				v5 = ydb.NullValue(ydb.TypeDatetime)
 			}
+			v4 = v5
 		}
 		var v5 ydb.Value
 		{
-			vp0 := ydb.Uint64Value(s.Views)
-			v5 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.Uint64Value(s.Views))
+			v5 = vp0
 		}
 		var v6 ydb.Value
 		{
-			vp0 := ydb.Uint64Value(s.UploadedUserID)
-			v6 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.Uint64Value(s.UploadedUserID))
+			v6 = vp0
 		}
 		v0 = ydb.StructValue(
 			ydb.StructFieldValue("series_id", v1),
@@ -132,50 +134,58 @@ func (us UsersList) ListValue() ydb.Value {
 		{
 			var v1 ydb.Value
 			{
-				vp0 := ydb.Uint64Value(item0.ID)
-				v1 = ydb.OptionalValue(vp0)
+				var v2 ydb.Value
+				{
+					vp0 := ydb.OptionalValue(ydb.Uint64Value(item0.ID))
+					v2 = vp0
+				}
+				var v3 ydb.Value
+				{
+					vp0 := ydb.OptionalValue(ydb.UTF8Value(item0.Name))
+					v3 = vp0
+				}
+				var v4 ydb.Value
+				{
+					vp0 := ydb.OptionalValue(ydb.Uint32Value(item0.Age))
+					v4 = vp0
+				}
+				v1 = ydb.StructValue(
+					ydb.StructFieldValue("user_id", v2),
+					ydb.StructFieldValue("name", v3),
+					ydb.StructFieldValue("age", v4),
+				)
 			}
-			var v2 ydb.Value
-			{
-				vp0 := ydb.UTF8Value(item0.Name)
-				v2 = ydb.OptionalValue(vp0)
-			}
-			var v3 ydb.Value
-			{
-				vp0 := ydb.Uint32Value(item0.Age)
-				v3 = ydb.OptionalValue(vp0)
-			}
-			v0 = ydb.StructValue(
-				ydb.StructFieldValue("user_id", v1),
-				ydb.StructFieldValue("name", v2),
-				ydb.StructFieldValue("age", v3),
-			)
+			v0 = v1
 		}
 		vs0[i0] = v0
 	}
 	if len(vs0) == 0 {
 		var t1 ydb.Type
 		{
-			fs0 := make([]ydb.StructOption, 3)
 			var t2 ydb.Type
 			{
-				tp0 := ydb.TypeUint64
-				t2 = ydb.Optional(tp0)
+				fs0 := make([]ydb.StructOption, 3)
+				var t3 ydb.Type
+				{
+					tp0 := ydb.TypeUint64
+					t3 = ydb.Optional(tp0)
+				}
+				fs0[0] = ydb.StructField("user_id", t3)
+				var t4 ydb.Type
+				{
+					tp0 := ydb.TypeUTF8
+					t4 = ydb.Optional(tp0)
+				}
+				fs0[1] = ydb.StructField("name", t4)
+				var t5 ydb.Type
+				{
+					tp0 := ydb.TypeUint32
+					t5 = ydb.Optional(tp0)
+				}
+				fs0[2] = ydb.StructField("age", t5)
+				t2 = ydb.Struct(fs0...)
 			}
-			fs0[0] = ydb.StructField("user_id", t2)
-			var t3 ydb.Type
-			{
-				tp0 := ydb.TypeUTF8
-				t3 = ydb.Optional(tp0)
-			}
-			fs0[1] = ydb.StructField("name", t3)
-			var t4 ydb.Type
-			{
-				tp0 := ydb.TypeUint32
-				t4 = ydb.Optional(tp0)
-			}
-			fs0[2] = ydb.StructField("age", t4)
-			t1 = ydb.Struct(fs0...)
+			t1 = t2
 		}
 		t0 := ydb.List(t1)
 		list0 = ydb.ZeroValue(t0)
@@ -188,7 +198,6 @@ func (us UsersList) ListValue() ydb.Value {
 func (ss *SeriesList) Scan(res *table.Result) (err error) {
 	for res.NextRow() {
 		var x0 Series
-
 		res.NextItem()
 		x0.ID = res.OUint64()
 
@@ -229,94 +238,104 @@ func (ss SeriesList) ListValue() ydb.Value {
 		{
 			var v1 ydb.Value
 			{
-				vp0 := ydb.Uint64Value(item0.ID)
-				v1 = ydb.OptionalValue(vp0)
-			}
-			var v2 ydb.Value
-			{
-				vp0 := ydb.UTF8Value(item0.Title)
-				v2 = ydb.OptionalValue(vp0)
-			}
-			var v3 ydb.Value
-			{
-				vp0 := ydb.UTF8Value(item0.Info)
-				v3 = ydb.OptionalValue(vp0)
-			}
-			var v4 ydb.Value
-			{
-				var x0 uint32
-				ok0 := !item0.ReleaseDate.IsZero()
-				if ok0 {
-					x0 = ydb.Time(item0.ReleaseDate).Datetime()
+				var v2 ydb.Value
+				{
+					vp0 := ydb.OptionalValue(ydb.Uint64Value(item0.ID))
+					v2 = vp0
 				}
-				if ok0 {
-					v4 = ydb.OptionalValue(ydb.DatetimeValue(x0))
-				} else {
-					v4 = ydb.NullValue(ydb.TypeDatetime)
+				var v3 ydb.Value
+				{
+					vp0 := ydb.OptionalValue(ydb.UTF8Value(item0.Title))
+					v3 = vp0
 				}
+				var v4 ydb.Value
+				{
+					vp0 := ydb.OptionalValue(ydb.UTF8Value(item0.Info))
+					v4 = vp0
+				}
+				var v5 ydb.Value
+				{
+					var v6 ydb.Value
+					var x0 uint32
+					ok0 := !item0.ReleaseDate.IsZero()
+					if ok0 {
+						x0 = ydb.Time(item0.ReleaseDate).Datetime()
+					}
+					if ok0 {
+						v6 = ydb.OptionalValue(ydb.DatetimeValue(x0))
+					} else {
+						v6 = ydb.NullValue(ydb.TypeDatetime)
+					}
+					v5 = v6
+				}
+				var v6 ydb.Value
+				{
+					vp0 := ydb.OptionalValue(ydb.Uint64Value(item0.Views))
+					v6 = vp0
+				}
+				var v7 ydb.Value
+				{
+					vp0 := ydb.OptionalValue(ydb.Uint64Value(item0.UploadedUserID))
+					v7 = vp0
+				}
+				v1 = ydb.StructValue(
+					ydb.StructFieldValue("series_id", v2),
+					ydb.StructFieldValue("title", v3),
+					ydb.StructFieldValue("info", v4),
+					ydb.StructFieldValue("release_date", v5),
+					ydb.StructFieldValue("views", v6),
+					ydb.StructFieldValue("uploaded_user_id", v7),
+				)
 			}
-			var v5 ydb.Value
-			{
-				vp0 := ydb.Uint64Value(item0.Views)
-				v5 = ydb.OptionalValue(vp0)
-			}
-			var v6 ydb.Value
-			{
-				vp0 := ydb.Uint64Value(item0.UploadedUserID)
-				v6 = ydb.OptionalValue(vp0)
-			}
-			v0 = ydb.StructValue(
-				ydb.StructFieldValue("series_id", v1),
-				ydb.StructFieldValue("title", v2),
-				ydb.StructFieldValue("info", v3),
-				ydb.StructFieldValue("release_date", v4),
-				ydb.StructFieldValue("views", v5),
-				ydb.StructFieldValue("uploaded_user_id", v6),
-			)
+			v0 = v1
 		}
 		vs0[i0] = v0
 	}
 	if len(vs0) == 0 {
 		var t1 ydb.Type
 		{
-			fs0 := make([]ydb.StructOption, 6)
 			var t2 ydb.Type
 			{
-				tp0 := ydb.TypeUint64
-				t2 = ydb.Optional(tp0)
+				fs0 := make([]ydb.StructOption, 6)
+				var t3 ydb.Type
+				{
+					tp0 := ydb.TypeUint64
+					t3 = ydb.Optional(tp0)
+				}
+				fs0[0] = ydb.StructField("series_id", t3)
+				var t4 ydb.Type
+				{
+					tp0 := ydb.TypeUTF8
+					t4 = ydb.Optional(tp0)
+				}
+				fs0[1] = ydb.StructField("title", t4)
+				var t5 ydb.Type
+				{
+					tp0 := ydb.TypeUTF8
+					t5 = ydb.Optional(tp0)
+				}
+				fs0[2] = ydb.StructField("info", t5)
+				var t6 ydb.Type
+				{
+					tp0 := ydb.TypeDatetime
+					t6 = ydb.Optional(tp0)
+				}
+				fs0[3] = ydb.StructField("release_date", t6)
+				var t7 ydb.Type
+				{
+					tp0 := ydb.TypeUint64
+					t7 = ydb.Optional(tp0)
+				}
+				fs0[4] = ydb.StructField("views", t7)
+				var t8 ydb.Type
+				{
+					tp0 := ydb.TypeUint64
+					t8 = ydb.Optional(tp0)
+				}
+				fs0[5] = ydb.StructField("uploaded_user_id", t8)
+				t2 = ydb.Struct(fs0...)
 			}
-			fs0[0] = ydb.StructField("series_id", t2)
-			var t3 ydb.Type
-			{
-				tp0 := ydb.TypeUTF8
-				t3 = ydb.Optional(tp0)
-			}
-			fs0[1] = ydb.StructField("title", t3)
-			var t4 ydb.Type
-			{
-				tp0 := ydb.TypeUTF8
-				t4 = ydb.Optional(tp0)
-			}
-			fs0[2] = ydb.StructField("info", t4)
-			var t5 ydb.Type
-			{
-				tp0 := ydb.TypeDatetime
-				t5 = ydb.Optional(tp0)
-			}
-			fs0[3] = ydb.StructField("release_date", t5)
-			var t6 ydb.Type
-			{
-				tp0 := ydb.TypeUint64
-				t6 = ydb.Optional(tp0)
-			}
-			fs0[4] = ydb.StructField("views", t6)
-			var t7 ydb.Type
-			{
-				tp0 := ydb.TypeUint64
-				t7 = ydb.Optional(tp0)
-			}
-			fs0[5] = ydb.StructField("uploaded_user_id", t7)
-			t1 = ydb.Struct(fs0...)
+			t1 = t2
 		}
 		t0 := ydb.List(t1)
 		list0 = ydb.ZeroValue(t0)

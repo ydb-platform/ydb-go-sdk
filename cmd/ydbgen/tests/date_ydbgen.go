@@ -32,16 +32,18 @@ func (t *Times) Scan(res *table.Result) (err error) {
 func (t *Times) QueryParameters() *table.QueryParameters {
 	var v0 ydb.Value
 	{
+		var v1 ydb.Value
 		var x0 uint32
 		ok0 := !t.Date.IsZero()
 		if ok0 {
 			x0 = ydb.Time(t.Date).Date()
 		}
 		if ok0 {
-			v0 = ydb.OptionalValue(ydb.DateValue(x0))
+			v1 = ydb.OptionalValue(ydb.DateValue(x0))
 		} else {
-			v0 = ydb.NullValue(ydb.TypeDate)
+			v1 = ydb.NullValue(ydb.TypeDate)
 		}
+		v0 = v1
 	}
 	return table.NewQueryParameters(
 		table.ValueParam("$date", v0),
@@ -53,16 +55,18 @@ func (t *Times) StructValue() ydb.Value {
 	{
 		var v1 ydb.Value
 		{
+			var v2 ydb.Value
 			var x0 uint32
 			ok0 := !t.Date.IsZero()
 			if ok0 {
 				x0 = ydb.Time(t.Date).Date()
 			}
 			if ok0 {
-				v1 = ydb.OptionalValue(ydb.DateValue(x0))
+				v2 = ydb.OptionalValue(ydb.DateValue(x0))
 			} else {
-				v1 = ydb.NullValue(ydb.TypeDate)
+				v2 = ydb.NullValue(ydb.TypeDate)
 			}
+			v1 = v2
 		}
 		v0 = ydb.StructValue(
 			ydb.StructFieldValue("date", v1),

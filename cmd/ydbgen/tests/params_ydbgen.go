@@ -18,17 +18,17 @@ var (
 func (p *Params) QueryParameters() *table.QueryParameters {
 	var v0 ydb.Value
 	{
-		vp0 := ydb.UTF8Value(p.Name)
-		v0 = ydb.OptionalValue(vp0)
+		vp0 := ydb.OptionalValue(ydb.UTF8Value(p.Name))
+		v0 = vp0
 	}
 	var v1 ydb.Value
 	{
-		vp0 := ydb.Uint32Value(ydbConvI16ToU32(p.Int16ToUint32))
+		vp0 := ydb.OptionalValue(ydb.Uint32Value(ydbConvI16ToU32(p.Int16ToUint32)))
 		v1 = vp0
 	}
 	var v2 ydb.Value
 	{
-		vp0 := ydb.Int64Value(int64(p.IntToInt64))
+		vp0 := ydb.OptionalValue(ydb.Int64Value(int64(p.IntToInt64)))
 		v2 = vp0
 	}
 	return table.NewQueryParameters(

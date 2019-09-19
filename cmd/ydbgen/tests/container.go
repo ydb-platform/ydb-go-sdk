@@ -2,10 +2,10 @@ package tests
 
 //ydb:generate
 type Container struct {
-	String      string
-	IntToUint64 int `ydb:"type:uint64,conv:assert"`
-	Structs     []Foo
-	Bytes       []byte `ydb:"type:string"`
+	Structs []Foo
+	Bytes   []byte   `ydb:"type:list<uint32>,conv:assert"`
+	Strings []string `ydb:"type:list<string>"`
+	String  []byte
 }
 
 //ydb:generate
@@ -14,5 +14,8 @@ type Foo struct {
 	Ints []int32
 }
 
-//ydb:generate
+//ydb:generate scan
+type Foos []Foo
+
+//ydb:generate scan
 type Bar [][][]string

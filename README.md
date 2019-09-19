@@ -294,12 +294,12 @@ type User struct {
 
 //ydb:gen
 type User struct {
-	Tags []string
+	Tags []string `ydb:"type:list<string>"`
 }
 ```
 
 Example above will interpret value for `tags` column (or 0-th item, depending
-on the `seek` mode) as `List<UTF8>`.
+on the `seek` mode) as `List<String>`.
 
 Note that for `String` type this is neccessary to inform `ydbgen` that it is
 not a container by setting `type` field tag.

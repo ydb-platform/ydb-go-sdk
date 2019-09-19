@@ -24,7 +24,8 @@ func (o *Optional) Scan(res *table.Result) (err error) {
 	}
 
 	res.SeekItem("str")
-	{
+	res.Unwrap()
+	if !res.IsNull() {
 		x0 := string(res.String())
 		o.Str.Set(x0)
 	}
@@ -38,26 +39,30 @@ func (o *Optional) Scan(res *table.Result) (err error) {
 func (o *Optional) QueryParameters() *table.QueryParameters {
 	var v0 ydb.Value
 	{
+		var v1 ydb.Value
 		x0, ok0 := o.Int64.Get()
 		if ok0 {
-			v0 = ydb.OptionalValue(ydb.Int16Value(ydbConvI64ToI16(x0)))
+			v1 = ydb.OptionalValue(ydb.Int16Value(ydbConvI64ToI16(x0)))
 		} else {
-			v0 = ydb.NullValue(ydb.TypeInt16)
+			v1 = ydb.NullValue(ydb.TypeInt16)
 		}
+		v0 = v1
 	}
 	var v1 ydb.Value
 	{
+		var v2 ydb.Value
 		x0, ok0 := o.Str.Get()
 		if ok0 {
-			v1 = ydb.StringValue([]uint8(x0))
+			v2 = ydb.OptionalValue(ydb.StringValue([]uint8(x0)))
 		} else {
-			panic("ydbgen: no value for non-optional type")
+			v2 = ydb.NullValue(ydb.TypeString)
 		}
+		v1 = v2
 	}
 	var v2 ydb.Value
 	{
-		vp0 := ydb.Int32Value(o.Int32)
-		v2 = ydb.OptionalValue(vp0)
+		vp0 := ydb.OptionalValue(ydb.Int32Value(o.Int32))
+		v2 = vp0
 	}
 	return table.NewQueryParameters(
 		table.ValueParam("$int64", v0),
@@ -71,26 +76,30 @@ func (o *Optional) StructValue() ydb.Value {
 	{
 		var v1 ydb.Value
 		{
+			var v2 ydb.Value
 			x0, ok0 := o.Int64.Get()
 			if ok0 {
-				v1 = ydb.OptionalValue(ydb.Int16Value(ydbConvI64ToI16(x0)))
+				v2 = ydb.OptionalValue(ydb.Int16Value(ydbConvI64ToI16(x0)))
 			} else {
-				v1 = ydb.NullValue(ydb.TypeInt16)
+				v2 = ydb.NullValue(ydb.TypeInt16)
 			}
+			v1 = v2
 		}
 		var v2 ydb.Value
 		{
+			var v3 ydb.Value
 			x0, ok0 := o.Str.Get()
 			if ok0 {
-				v2 = ydb.StringValue([]uint8(x0))
+				v3 = ydb.OptionalValue(ydb.StringValue([]uint8(x0)))
 			} else {
-				panic("ydbgen: no value for non-optional type")
+				v3 = ydb.NullValue(ydb.TypeString)
 			}
+			v2 = v3
 		}
 		var v3 ydb.Value
 		{
-			vp0 := ydb.Int32Value(o.Int32)
-			v3 = ydb.OptionalValue(vp0)
+			vp0 := ydb.OptionalValue(ydb.Int32Value(o.Int32))
+			v3 = vp0
 		}
 		v0 = ydb.StructValue(
 			ydb.StructFieldValue("int64", v1),
@@ -114,7 +123,7 @@ func (o *Optional) StructType() ydb.Type {
 		var t2 ydb.Type
 		{
 			tp0 := ydb.TypeString
-			t2 = tp0
+			t2 = ydb.Optional(tp0)
 		}
 		fs0[1] = ydb.StructField("str", t2)
 		var t3 ydb.Type
