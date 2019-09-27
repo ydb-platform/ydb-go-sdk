@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -74,16 +75,21 @@ FROM AS_TABLE($episodesData);
 
 type Command struct {
 	config func(cli.Parameters) *ydb.DriverConfig
+	tls    func() *tls.Config
 }
 
 func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
 	cmd.config = cli.ExportDriverConfig(flag)
+	cmd.tls = cli.ExportTLSConfig(flag)
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	driver, err := (&ydb.Dialer{
+	dialer := &ydb.Dialer{
 		DriverConfig: cmd.config(params),
-	}).Dial(ctx, params.Endpoint)
+		TLSConfig:    cmd.tls(),
+		Timeout:      time.Second,
+	}
+	driver, err := dialer.Dial(ctx, params.Endpoint)
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
 	}

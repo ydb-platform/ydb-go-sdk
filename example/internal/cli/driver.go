@@ -2,6 +2,7 @@ package cli
 
 import (
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
@@ -15,6 +16,28 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/auth/metadata"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/traceutil"
 )
+
+func ExportTLSConfig(flag *flag.FlagSet) func() *tls.Config {
+	var (
+		insecure bool
+	)
+	flag.BoolVar(&insecure,
+		"insecure", true,
+		"prefer insecure connections",
+	)
+	return func() *tls.Config {
+		if insecure {
+			return nil
+		}
+		c := new(tls.Config)
+		if ca := os.Getenv("SSL_ROOT_CERTIFICATES_FILE"); ca != "" {
+			c.RootCAs = mustReadRootCerts(ca)
+		} else {
+			c.RootCAs = mustReadSystemRootCerts()
+		}
+		return c
+	}
+}
 
 func ExportDriverConfig(flag *flag.FlagSet) func(Parameters) *ydb.DriverConfig {
 	var (

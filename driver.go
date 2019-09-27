@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"io"
 	"net"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
@@ -143,7 +145,13 @@ type Dialer struct {
 
 	// NetDial is a optional function that may replace default network dialing
 	// function such as net.Dial("tcp").
+	//
+	// It is useful when TLS connection is required.
 	NetDial func(context.Context, string) (net.Conn, error)
+
+	// TLSConfig specifies the TLS configuration to use for tls client.
+	// If TLSConfig is zero then connections are insecure.
+	TLSConfig *tls.Config
 
 	// Timeout is the maximum amount of time a dial will wait for a connect to
 	// complete.
@@ -155,9 +163,10 @@ type Dialer struct {
 func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	config := d.DriverConfig.withDefaults()
 	return (&dialer{
-		netDial: d.NetDial,
-		timeout: d.Timeout,
-		config:  config,
+		netDial:   d.NetDial,
+		tlsConfig: d.TLSConfig,
+		timeout:   d.Timeout,
+		config:    config,
 		meta: &meta{
 			trace:       config.Trace,
 			database:    config.Database,
@@ -168,10 +177,11 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 
 // dialer is an instance holding single Dialer.Dial() configuration parameters.
 type dialer struct {
-	netDial func(context.Context, string) (net.Conn, error)
-	timeout time.Duration
-	config  DriverConfig
-	meta    *meta
+	netDial   func(context.Context, string) (net.Conn, error)
+	tlsConfig *tls.Config
+	timeout   time.Duration
+	config    DriverConfig
+	meta      *meta
 }
 
 func (d *dialer) dial(ctx context.Context, addr string) (Driver, error) {
@@ -311,9 +321,14 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	if d.netDial != nil {
 		opts = append(opts, grpc.WithDialer(withContextDialer(d.netDial)))
 	}
+	if c := d.tlsConfig; c != nil {
+		opts = append(opts, grpc.WithTransportCredentials(
+			credentials.NewTLS(c),
+		))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
+	}
 	return append(opts,
-		// TODO: allow secure driver use.
-		grpc.WithInsecure(),
 		grpc.WithBlock(),
 	)
 }
