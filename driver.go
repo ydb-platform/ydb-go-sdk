@@ -145,8 +145,6 @@ type Dialer struct {
 
 	// NetDial is a optional function that may replace default network dialing
 	// function such as net.Dial("tcp").
-	//
-	// It is useful when TLS connection is required.
 	NetDial func(context.Context, string) (net.Conn, error)
 
 	// TLSConfig specifies the TLS configuration to use for tls client.
