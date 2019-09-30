@@ -19,19 +19,24 @@ import (
 
 func ExportTLSConfig(flag *flag.FlagSet) func() *tls.Config {
 	var (
-		insecure bool
+		secure  bool
+		rootCAs string
 	)
-	flag.BoolVar(&insecure,
-		"insecure", true,
-		"prefer insecure connections",
+	flag.BoolVar(&secure,
+		"tls", false,
+		"use tls secure connections",
+	)
+	flag.StringVar(&rootCAs,
+		"root-ca", os.Getenv("SSL_ROOT_CERTIFICATES_FILE"),
+		"path to the root certificates file",
 	)
 	return func() *tls.Config {
-		if insecure {
+		if !secure {
 			return nil
 		}
 		c := new(tls.Config)
-		if ca := os.Getenv("SSL_ROOT_CERTIFICATES_FILE"); ca != "" {
-			c.RootCAs = mustReadRootCerts(ca)
+		if rootCAs != "" {
+			c.RootCAs = mustReadRootCerts(rootCAs)
 		} else {
 			c.RootCAs = mustReadSystemRootCerts()
 		}
