@@ -345,14 +345,13 @@ func main() {
 					// Special case for ydb string type.
 					t.GetBasic()
 					t.Basic.Type = x
-					inferBasicType(t.Basic)
-				} else {
-					inferType(&(t.GetSlice()).T, expr.(*ast.ArrayType).Elt)
+					return inferBasicType(t.Basic)
 				}
+				return inferType(&(t.GetSlice()).T, expr.(*ast.ArrayType).Elt)
 
 			case *types.Basic:
 				t.GetBasic().Type = x
-				inferBasicType(t.Basic)
+				return inferBasicType(t.Basic)
 
 			case *types.Named:
 				// TODO(kamardin): []opt.Int32
@@ -383,7 +382,7 @@ func main() {
 						t.GetBasic()
 						t.Basic.Type = typ
 						t.Basic.Face = DefaultFieldFace{}
-						inferBasicType(t.Basic)
+						return inferBasicType(t.Basic)
 					}
 				}
 
@@ -404,7 +403,9 @@ func main() {
 					Name:  item.Ident.Name,
 					Flags: item.Flags,
 				}
-				inferType(&s.T, item.ArrayType.Elt)
+				if err := inferType(&s.T, item.ArrayType.Elt); err != nil {
+					log.Fatalf("%s: %v", s.Name, err)
+				}
 				file.Slices = append(file.Slices, s)
 
 			case item.StructType != nil:
@@ -433,7 +434,7 @@ func main() {
 						log.Fatalf("%s.%s: %v", s.Name, field.Name, err)
 					}
 					// Do not handle errors here due to the late binding.
-					dig(&field.T, func(t *T) {
+					err := dig(&field.T, func(t *T) {
 						if t.Basic == nil {
 							return
 						}
@@ -444,6 +445,9 @@ func main() {
 							t.Optional = item.Mode.Wrap == WrapOptional
 						}
 					})
+					if err != nil {
+						log.Fatalf("%s.%s: %v", s.Name, field.Name, err)
+					}
 					s.Fields = append(s.Fields, field)
 				}
 				if s.SeekMode == SeekPosition {
@@ -471,12 +475,18 @@ func main() {
 				if f.T.Slice != nil || f.T.Struct != nil || f.T.Container {
 					// Slices or structs for fields are always containers
 					// currently.
-					dig(&f.T, func(t *T) {
+					err := dig(&f.T, func(t *T) {
 						if t.Basic != nil {
 							return
 						}
 						t.Container = true
 					})
+					if err != nil {
+						log.Fatalf(
+							"generate struct %q field %q error: %v",
+							s.Name, f.Name, err,
+						)
+					}
 				}
 				if *verbose {
 					log.Printf("%s.%s: %s", s.Name, f.Name, f.T.String())

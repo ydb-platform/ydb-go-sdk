@@ -349,8 +349,7 @@ func (d *driver) Close() error {
 	if d.explorer != nil {
 		d.explorer.Stop()
 	}
-	d.cluster.Close()
-	return nil
+	return d.cluster.Close()
 }
 
 func (d *driver) Call(ctx context.Context, op internal.Operation) error {

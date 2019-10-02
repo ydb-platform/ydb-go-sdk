@@ -35,7 +35,7 @@ func (f CommandFunc) Run(ctx context.Context, params Parameters) error {
 func (f CommandFunc) ExportFlags(*flag.FlagSet) {}
 
 func Run(cmd Command) {
-	flag := flag.NewFlagSet("example", flag.ContinueOnError)
+	flag := flag.NewFlagSet("example", flag.ExitOnError)
 
 	var params Parameters
 	flag.StringVar(&params.Endpoint,
