@@ -415,7 +415,7 @@ func (ms *MagicUsersList) Scan(res *table.Result) (err error) {
 	return res.Err()
 }
 
-func ydbConvU64ToU8(x uint64) uint8 { 
+func ydbConvU64ToU8(x uint64) uint8 {
 	const (
 		bits = 8
 		mask = (1 << (bits)) - 1

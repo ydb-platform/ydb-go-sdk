@@ -862,7 +862,7 @@ func (t ConversionTemplate) Write(bw *bufio.Writer) {
 
 	code(bw, `func `, t.Name, `(`)
 	code(bw, `x `, t.Type[0].String(), `)`)
-	line(bw, ` `, t.Type[1].String(), ` { `)
+	line(bw, ` `, t.Type[1].String(), ` {`)
 	defer func() {
 		line(bw, tab(1), `return `, t.Type[1].String(), `(x)`)
 		line(bw, `}`)
