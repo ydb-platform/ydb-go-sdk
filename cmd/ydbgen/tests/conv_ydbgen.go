@@ -40,7 +40,7 @@ func (c *ConvAssert) Scan(res *table.Result) (err error) {
 	return res.Err()
 }
 
-func ydbConvI16ToI8(x int16) int8 { 
+func ydbConvI16ToI8(x int16) int8 {
 	const (
 		bits = 8
 		mask = (1 << (bits - 1)) - 1
@@ -60,7 +60,7 @@ func ydbConvI16ToI8(x int16) int8 {
 	return int8(x)
 }
 
-func ydbConvI32ToB(x int32) byte { 
+func ydbConvI32ToB(x int32) byte {
 	if x < 0 {
 		panic("ydbgen: convassert: conversion of negative int32 to byte")
 	}
@@ -83,7 +83,7 @@ func ydbConvI32ToB(x int32) byte {
 	return byte(x)
 }
 
-func ydbConvU64ToI8(x uint64) int8 { 
+func ydbConvU64ToI8(x uint64) int8 {
 	const (
 		bits = 8
 		mask = (1 << (bits - 1)) - 1
@@ -97,4 +97,3 @@ func ydbConvU64ToI8(x uint64) int8 {
 	}
 	return int8(x)
 }
-

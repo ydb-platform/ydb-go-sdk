@@ -1,6 +1,6 @@
 package internal
 
-import "github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
+import "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 
 type FeatureFlag int
 

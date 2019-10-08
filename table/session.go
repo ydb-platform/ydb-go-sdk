@@ -7,12 +7,12 @@ import (
 	"runtime"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/draft/Ydb_Experimental_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Experimental"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/Ydb_Table_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/draft/Ydb_Experimental_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Experimental"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/cache/lru"
 )
 

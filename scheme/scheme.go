@@ -4,9 +4,9 @@ import (
 	"context"
 
 	ydb "github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Scheme_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Scheme"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/Ydb_Scheme_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Scheme"
 )
 
 type EntryType uint

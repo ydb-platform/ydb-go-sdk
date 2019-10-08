@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/grpc/Ydb_Table_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")

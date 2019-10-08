@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 	"github.com/yandex-cloud/ydb-go-sdk/testutil"
 )

@@ -4,7 +4,7 @@
 package Ydb_Experimental_V1
 
 import (
-	_ "github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Experimental"
+	_ "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Experimental"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	math "math"

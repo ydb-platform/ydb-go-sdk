@@ -2,9 +2,9 @@ package table
 
 import (
 	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Table"
 )
 
 type SessionStatus uint

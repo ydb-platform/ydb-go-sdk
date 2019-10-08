@@ -1,0 +1,22 @@
+SET(
+    api_spec_root
+    ${ARCADIA_ROOT}/kikimr/public/api
+)
+SET(
+    api_spec_dirs
+    ${api_spec_root}/protos
+    ${api_spec_root}/grpc
+)
+SET(
+    api_generated_suffix
+    kikimr/public/sdk/go/ydb/api
+)
+SET(
+    api_generated_root
+    ${ARCADIA_BUILD_ROOT}/${api_generated_suffix}
+)
+SET(
+    protobuf_import_dirs
+    ${ARCADIA_ROOT}
+    ${ARCADIA_ROOT}/contrib/libs/protobuf
+)

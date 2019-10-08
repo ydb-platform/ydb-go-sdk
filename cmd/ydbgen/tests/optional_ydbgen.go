@@ -137,7 +137,7 @@ func (o *Optional) StructType() ydb.Type {
 	return t0
 }
 
-func ydbConvI64ToI16(x int64) int16 { 
+func ydbConvI64ToI16(x int64) int16 {
 	const (
 		bits = 16
 		mask = (1 << (bits - 1)) - 1
@@ -156,4 +156,3 @@ func ydbConvI64ToI16(x int64) int16 {
 	}
 	return int16(x)
 }
-

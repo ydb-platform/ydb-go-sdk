@@ -8,7 +8,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 

@@ -38,10 +38,9 @@ func (p *Params) QueryParameters() *table.QueryParameters {
 	)
 }
 
-func ydbConvI16ToU32(x int16) uint32 { 
+func ydbConvI16ToU32(x int16) uint32 {
 	if x < 0 {
 		panic("ydbgen: convassert: conversion of negative int16 to uint32")
 	}
 	return uint32(x)
 }
-

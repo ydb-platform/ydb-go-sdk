@@ -4,9 +4,9 @@
 package Ydb_Experimental
 
 import (
-	Ydb "github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
-	Ydb_Issue "github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Issue"
-	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
+	Ydb "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	Ydb_Issue "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Issue"
+	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	math "math"

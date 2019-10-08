@@ -3,8 +3,8 @@ package internal
 import (
 	"github.com/golang/protobuf/proto"
 
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Issue"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Issue"
 )
 
 type Operation struct {

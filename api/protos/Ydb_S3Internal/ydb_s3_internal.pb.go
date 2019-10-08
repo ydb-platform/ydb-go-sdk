@@ -4,8 +4,8 @@
 package Ydb_S3Internal
 
 import (
-	Ydb "github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
-	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
+	Ydb "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	math "math"

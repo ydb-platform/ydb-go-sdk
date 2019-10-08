@@ -4,7 +4,7 @@
 package Ydb_Discovery_V1
 
 import (
-	_ "github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Discovery"
+	_ "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Discovery"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	math "math"

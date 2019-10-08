@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
 )
 
 type DriverTrace struct {

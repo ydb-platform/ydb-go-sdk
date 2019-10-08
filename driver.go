@@ -17,9 +17,9 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb_Operations"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/stats"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )

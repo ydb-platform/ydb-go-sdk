@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	ydb "github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
 )
 
 func TestResultAny(t *testing.T) {

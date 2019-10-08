@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/yandex-cloud/ydb-go-sdk/internal/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 )
 
 type V interface {
