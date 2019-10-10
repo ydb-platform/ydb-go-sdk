@@ -8,9 +8,7 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/draft/Ydb_Experimental_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Experimental"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/cache/lru"
@@ -603,17 +601,15 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 	return r, nil
 }
 
-// UploadRows uploads given list of ydb struct values to the table.
-// NOTE: this is experimental feature.
-func (s *Session) UploadRows(ctx context.Context, table string, rows ydb.Value) error {
-	var res Ydb_Experimental.UploadRowsResult
-	req := Ydb_Experimental.UploadRowsRequest{
+// BulkUpsert uploads given list of ydb struct values to the table.
+func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) error {
+	req := Ydb_Table.BulkUpsertRequest{
 		Table: table,
 		Rows:  internal.ValueToYDB(rows),
 	}
 	return s.c.Driver.Call(ctx, internal.Wrap(
-		Ydb_Experimental_V1.UploadRows,
-		&req, &res,
+		Ydb_Table_V1.BulkUpsert,
+		&req, nil,
 	))
 }
 
