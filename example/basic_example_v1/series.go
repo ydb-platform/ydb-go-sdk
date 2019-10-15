@@ -185,6 +185,27 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 	if err := res.Err(); err != nil {
 		return err
 	}
+	stats := res.Stats()
+	for i := 0; ; i++ {
+		phase, ok := stats.NextPhase()
+		if !ok {
+			break
+		}
+		log.Printf(
+			"# phase #%d: took %s",
+			i, phase.Duration,
+		)
+		for {
+			table, ok := phase.NextTableAccess()
+			if !ok {
+				break
+			}
+			log.Printf(
+				"#  accessed %s: read=(%drows, %dbytes)",
+				table.Name, table.Reads.Rows, table.Reads.Bytes,
+			)
+		}
+	}
 	return nil
 }
 

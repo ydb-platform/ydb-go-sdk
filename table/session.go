@@ -412,7 +412,8 @@ func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (*Transa
 		s:  s,
 	}
 	r := &Result{
-		sets: res.ResultSets,
+		sets:  res.ResultSets,
+		stats: res.QueryStats,
 	}
 	return t, r, nil
 }

@@ -12,6 +12,7 @@ import (
 
 	ydb "github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_TableStats"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 )
 
@@ -45,6 +46,8 @@ type Result struct {
 	set  *Ydb.ResultSet
 	row  *Ydb.Value
 
+	stats *Ydb_TableStats.QueryStats
+
 	closed bool
 
 	setCh       chan *Ydb.ResultSet
@@ -59,6 +62,11 @@ type Result struct {
 	setColumnIndex map[string]int
 
 	err error
+}
+
+// Stats returns query execution stats.
+func (r *Result) Stats() QueryStats {
+	return QueryStats{stats: r.stats}
 }
 
 // SetCount returns number of result sets.
