@@ -2,8 +2,11 @@ package ydb
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc"
 )
 
 type stubBalancer struct {
@@ -36,18 +39,61 @@ func (s stubBalancer) Remove(el balancerElement) {
 	}
 }
 
+type stubListener struct {
+	C chan net.Conn // Client half of the connection.
+}
+
+func newStubListener() *stubListener {
+	return &stubListener{
+		C: make(chan net.Conn),
+	}
+}
+
+func (ln *stubListener) Accept() (net.Conn, error) {
+	s, c := net.Pipe()
+	ln.C <- c
+	return s, nil
+}
+
+func (ln *stubListener) Addr() net.Addr {
+	return &net.TCPAddr{}
+}
+
+func (ln *stubListener) Close() error {
+	return nil
+}
+
+func (ln *stubListener) Dial() (*grpc.ClientConn, error) {
+	return grpc.Dial("",
+		grpc.WithDialer(func(string, time.Duration) (net.Conn, error) {
+			return <-ln.C, nil
+		}),
+		grpc.WithInsecure(),
+	)
+}
+
 func TestClusterAwait(t *testing.T) {
 	const timeout = 100 * time.Millisecond
 
+	ln := newStubListener()
+	srv := grpc.NewServer()
+	go srv.Serve(ln)
+
 	var connToReturn *conn
 	c := &cluster{
-		dial: func(context.Context, string, int) (*conn, error) {
-			return new(conn), nil
+		dial: func(context.Context, string, int) (_ *conn, err error) {
+			cc, err := ln.Dial()
+			if err != nil {
+				return nil, err
+			}
+			return &conn{
+				conn: cc,
+			}, nil
 		},
 		balancer: stubBalancer{
 			OnInsert: func(c *conn, _ connInfo) balancerElement {
 				connToReturn = c
-				return nil
+				return c.addr
 			},
 			OnNext: func() *conn {
 				return connToReturn

@@ -14,6 +14,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
@@ -155,6 +156,13 @@ type Dialer struct {
 	// complete.
 	// If Timeout is zero then no timeout is used.
 	Timeout time.Duration
+
+	// Keepalive is the interval used to check whether inner connections are
+	// still valid.
+	// If Keepalive is zero then there will be no keepalive checks.
+	//
+	// Dialer could increase keepalive interval if given value is too small.
+	Keepalive time.Duration
 }
 
 // Dial dials given addr and initializes driver instance on success.
@@ -163,6 +171,7 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	return (&dialer{
 		netDial:   d.NetDial,
 		tlsConfig: d.TLSConfig,
+		keepalive: d.Keepalive,
 		timeout:   d.Timeout,
 		config:    config,
 		meta: &meta{
@@ -177,15 +186,22 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 type dialer struct {
 	netDial   func(context.Context, string) (net.Conn, error)
 	tlsConfig *tls.Config
+	keepalive time.Duration
 	timeout   time.Duration
 	config    DriverConfig
 	meta      *meta
 }
 
-func (d *dialer) dial(ctx context.Context, addr string) (Driver, error) {
+func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 	cluster := cluster{
-		dial: d.dialHostPort,
+		dial:  d.dialHostPort,
+		trace: d.config.Trace,
 	}
+	defer func() {
+		if err != nil {
+			cluster.Close()
+		}
+	}()
 	var explorer *repeater
 	if d.config.DiscoveryInterval > 0 {
 		cluster.balancer = balancers[d.config.BalancingMethod]()
@@ -239,7 +255,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (Driver, error) {
 		cluster.balancer = new(singleConnBalancer)
 		cluster.Insert(ctx, e)
 
-		// Ensure that endpoint is connectable.
+		// Ensure that endpoint is online.
 		_, err = cluster.Get(ctx)
 		if err != nil {
 			return nil, err
@@ -291,16 +307,16 @@ func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
 }
 
 func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoint, err error) {
+	d.config.Trace.discoveryStart(ctx)
+	defer func() {
+		d.config.Trace.discoveryDone(ctx, endpoints, err)
+	}()
+
 	conn, err := d.dialAddr(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.conn.Close()
-
-	d.config.Trace.discoveryStart(ctx)
-	defer func() {
-		d.config.Trace.discoveryDone(ctx, endpoints, err)
-	}()
 
 	subctx := ctx
 	if d.timeout > 0 {
@@ -326,9 +342,16 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	} else {
 		opts = append(opts, grpc.WithInsecure())
 	}
-	return append(opts,
-		grpc.WithBlock(),
-	)
+	if p := d.keepalive; p > 0 {
+		opts = append(opts,
+			grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:                p,
+				Timeout:             time.Second,
+				PermitWithoutStream: true,
+			}),
+		)
+	}
+	return append(opts, grpc.WithBlock())
 }
 
 type driver struct {

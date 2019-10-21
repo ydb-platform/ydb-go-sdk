@@ -15,6 +15,11 @@ type DriverTrace struct {
 	GetConnStart func(GetConnStartInfo)
 	GetConnDone  func(GetConnDoneInfo)
 
+	// Only for background.
+	TrackConnStart func(TrackConnStartInfo)
+	// Only for background.
+	TrackConnDone func(TrackConnDoneInfo)
+
 	GetCredentialsStart func(GetCredentialsStartInfo)
 	GetCredentialsDone  func(GetCredentialsDoneInfo)
 
@@ -79,6 +84,22 @@ func (d DriverTrace) getConnDone(ctx context.Context, conn *conn, err error) {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).GetConnDone; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) trackConnStart(conn *conn) {
+	x := TrackConnStartInfo{
+		Address: conn.addr.String(),
+	}
+	if f := d.TrackConnStart; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) trackConnDone(conn *conn) {
+	x := TrackConnDoneInfo{
+		Address: conn.addr.String(),
+	}
+	if f := d.TrackConnDone; f != nil {
 		f(x)
 	}
 }
@@ -226,12 +247,24 @@ func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method stri
 type Method string
 
 // Name returns the rpc method name.
-func (m Method) Name() string {
+func (m Method) Name() (s string) {
+	_, s = m.Split()
+	return
+}
+
+// Service returns the rpc service name.
+func (m Method) Service() (s string) {
+	s, _ = m.Split()
+	return
+}
+
+// Split returns service name and method.
+func (m Method) Split() (service, method string) {
 	i := strings.LastIndex(string(m), "/")
 	if i == -1 {
-		return string(m)
+		return string(m), string(m)
 	}
-	return string(m[i+1:])
+	return strings.TrimPrefix(string(m[:i]), "/"), string(m[i+1:])
 }
 
 type (
@@ -251,6 +284,12 @@ type (
 		Context context.Context
 		Address string
 		Error   error
+	}
+	TrackConnStartInfo struct {
+		Address string
+	}
+	TrackConnDoneInfo struct {
+		Address string
 	}
 	GetCredentialsStartInfo struct {
 		Context context.Context
@@ -358,6 +397,28 @@ func composeDriverTrace(a, b DriverTrace) (c DriverTrace) {
 		c.GetConnDone = func(info GetConnDoneInfo) {
 			a.GetConnDone(info)
 			b.GetConnDone(info)
+		}
+	}
+	switch {
+	case a.TrackConnStart == nil:
+		c.TrackConnStart = b.TrackConnStart
+	case b.TrackConnStart == nil:
+		c.TrackConnStart = a.TrackConnStart
+	default:
+		c.TrackConnStart = func(info TrackConnStartInfo) {
+			a.TrackConnStart(info)
+			b.TrackConnStart(info)
+		}
+	}
+	switch {
+	case a.TrackConnDone == nil:
+		c.TrackConnDone = b.TrackConnDone
+	case b.TrackConnDone == nil:
+		c.TrackConnDone = a.TrackConnDone
+	default:
+		c.TrackConnDone = func(info TrackConnDoneInfo) {
+			a.TrackConnDone(info)
+			b.TrackConnDone(info)
 		}
 	}
 	switch {

@@ -135,10 +135,11 @@ type LogBackoff struct {
 
 // Wait implements Backoff interface.
 func (b LogBackoff) Wait(n int) <-chan time.Time {
-	return time.After(b.delay(n))
+	return time.After(b.Delay(n))
 }
 
-func (b LogBackoff) delay(i int) time.Duration {
+// Delay returns mapping of i to delay.
+func (b LogBackoff) Delay(i int) time.Duration {
 	s := b.SlotDuration
 	if s <= 0 {
 		s = time.Second

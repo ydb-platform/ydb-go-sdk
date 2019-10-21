@@ -78,7 +78,7 @@ func TestLogBackoff(t *testing.T) {
 				rand.Seed(seed)
 
 				for n, exp := range test.exp {
-					act := test.backoff.delay(n)
+					act := test.backoff.Delay(n)
 					if exp := exp.eq; exp != 0 {
 						if exp != act {
 							t.Fatalf(
