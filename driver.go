@@ -31,7 +31,7 @@ var (
 	DefaultDiscoveryInterval = time.Minute
 
 	// DefaultBalancingMethod contains driver's default balancing algorithm.
-	DefaultBalancingMethod = BalancingRoundRobin
+	DefaultBalancingMethod = BalancingP2C
 
 	// DefaultContextDeadlineMapping contains driver's default behavior of how
 	// to use context's deadline value.
@@ -639,6 +639,7 @@ func newConn(cc *grpc.ClientConn, addr connAddr) *conn {
 
 type connRuntime struct {
 	mu        sync.Mutex
+	state     ConnState
 	opStarted uint64
 	opSucceed uint64
 	opFailed  uint64
@@ -648,12 +649,32 @@ type connRuntime struct {
 }
 
 type ConnStats struct {
+	State        ConnState
 	OpStarted    uint64
 	OpFailed     uint64
 	OpSucceed    uint64
 	OpPerMinute  float64
 	ErrPerMinute float64
 	AvgOpTime    time.Duration
+}
+
+type ConnState uint
+
+const (
+	ConnStateUnknown ConnState = iota
+	ConnOnline
+	ConnOffline
+)
+
+func (s ConnState) String() string {
+	switch s {
+	case ConnOnline:
+		return "online"
+	case ConnOffline:
+		return "offline"
+	default:
+		return "unknown"
+	}
 }
 
 func ReadConnStats(d Driver, f func(Endpoint, ConnStats)) {
@@ -675,6 +696,7 @@ func (c *connRuntime) stats() ConnStats {
 	now := timeutil.Now()
 
 	r := ConnStats{
+		State:        c.state,
 		OpStarted:    c.opStarted,
 		OpSucceed:    c.opSucceed,
 		OpFailed:     c.opFailed,
@@ -686,6 +708,12 @@ func (c *connRuntime) stats() ConnStats {
 	}
 
 	return r
+}
+
+func (c *connRuntime) setState(s ConnState) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.state = s
 }
 
 func (c *connRuntime) operationStart(start time.Time) {

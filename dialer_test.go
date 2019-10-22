@@ -41,7 +41,16 @@ func TestClusterTracking(t *testing.T) {
 			name, traceutil.ClearContext(args),
 		)
 	})
-	dialTicket := make(chan func(net.Conn) net.Conn, 1)
+	var (
+		dialTicket  = make(chan func(net.Conn) net.Conn, 1)
+		dialRefused = make(chan chan struct{}, 1)
+	)
+	closeConn := func(conn net.Conn) {
+		ch := make(chan struct{})
+		dialRefused <- ch
+		conn.Close()
+		<-ch
+	}
 	dialer := &ydb.Dialer{
 		DriverConfig: &ydb.DriverConfig{
 			Database:          "xxx",
@@ -50,22 +59,33 @@ func TestClusterTracking(t *testing.T) {
 		},
 		NetDial: func(ctx context.Context, addr string) (net.Conn, error) {
 			var wrap func(net.Conn) net.Conn
-			if addr != balancer.Addr().String() {
+			switch addr {
+			case balancer.Addr().String():
+				// Dialing for balancer.
+				return balancer.DialContext(ctx)
+
+			default:
 				// Dialing for endpoint.
 				select {
 				case wrap = <-dialTicket:
 				default:
+					select {
+					case ch := <-dialRefused:
+						close(ch)
+					default:
+					}
 					return nil, fmt.Errorf("stub: kinda refused")
 				}
+				conn, err := db.DialContext(ctx, addr)
+				fmt.Println("DIAL", conn, err)
+				if err != nil {
+					return nil, err
+				}
+				if wrap != nil {
+					conn = wrap(conn)
+				}
+				return conn, nil
 			}
-			conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
-			if err != nil {
-				return nil, err
-			}
-			if wrap != nil {
-				conn = wrap(conn)
-			}
-			return conn, nil
 		},
 		Keepalive: 10 * time.Second,
 		Timeout:   250 * time.Millisecond,
@@ -105,7 +125,7 @@ func TestClusterTracking(t *testing.T) {
 
 	// Allow one connection to the endpoint.
 	dialTicket <- nil
-	conn := <-endpoint.C
+	conn := <-endpoint.ServerConn()
 
 	// Execute operation to ensure that connection established.
 	mustCreateSession()
@@ -117,7 +137,7 @@ func TestClusterTracking(t *testing.T) {
 
 	// Allow one connection to the endpoint.
 	dialTicket <- nil
-	conn = <-endpoint.C
+	conn = <-endpoint.ServerConn()
 
 	// Execute operation to ensure that connection established.
 	mustCreateSession()
@@ -136,7 +156,7 @@ func TestClusterTracking(t *testing.T) {
 		c.Conn = conn
 		return c
 	}
-	<-endpoint.C
+	<-endpoint.ServerConn()
 
 	// Must not create session because there are no alive conns.
 	mustNotCreateSession()
@@ -151,21 +171,8 @@ func TestClusterTracking(t *testing.T) {
 
 	// Allow one connection to the endpoint.
 	dialTicket <- nil
-	<-endpoint.C
+	<-endpoint.ServerConn()
 	mustCreateSession()
-}
-
-// closeConn closes connection received by a YDB server endpoint.
-func closeConn(conn net.Conn) {
-	// We using CloseWrite() here to avoid races when driver still thinks that
-	// connection is ready and returns us "All subs in transient..." error.
-	conn.(*net.TCPConn).CloseWrite()
-	for {
-		_, err := conn.Read([]byte{0})
-		if err != nil {
-			break
-		}
-	}
 }
 
 type connProxy struct {

@@ -163,11 +163,12 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 			e := c.index[conn.addr]
 			if e.handle != nil {
 				// e.handle may become nil when some race happened and other
-				// goroutine already removed conn from balancer and put sent it
+				// goroutine already removed conn from balancer and sent it
 				// to the tracker.
 				e.removeFrom(c.balancer)
 				c.index[conn.addr] = e
 				c.ready--
+				conn.runtime.setState(ConnOffline)
 				c.track(conn)
 			}
 			c.mu.Unlock()
@@ -226,11 +227,13 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint) {
 		info: info,
 	}
 	if cc != nil {
+		conn.runtime.setState(ConnOnline)
 		entry.insertInto(c.balancer)
 		c.ready++
 		wait = c.wait
 		c.wait = nil
 	} else {
+		conn.runtime.setState(ConnOffline)
 		c.track(conn)
 	}
 	c.index[addr] = entry
@@ -375,6 +378,7 @@ func (c *cluster) tracker() {
 				queue.Remove(x)
 
 				c.mu.Lock()
+				conn.runtime.setState(ConnOnline)
 				c.trace.trackConnDone(conn)
 				e := c.index[addr]
 				e.insertInto(c.balancer)

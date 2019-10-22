@@ -11,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
+	"unsafe"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
@@ -110,11 +112,9 @@ func (s *YDB) init() {
 
 type Endpoint struct {
 	db     *YDB
+	ln     *Listener
 	id     ydb.Endpoint
 	server *grpc.Server
-	proxy  *proxyListener
-
-	C <-chan net.Conn
 }
 
 // StartEndpoint starts to provide a YDB service on some local address.
@@ -124,33 +124,30 @@ func (s *YDB) StartEndpoint() *Endpoint {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	ln, err := net.Listen("tcp", "localhost:0")
+	ln := NewListener()
+	host, port, err := ln.HostPort()
 	if err != nil {
 		s.T.Fatal(err)
 	}
 	e := ydb.Endpoint{
-		Addr: "localhost",
-		Port: ln.Addr().(*net.TCPAddr).Port,
+		Addr: host,
+		Port: port,
 	}
-
 	srv := grpc.NewServer()
 	for _, desc := range s.descs {
 		srv.RegisterService(&desc, stubHandler(1))
 	}
-	conns := make(chan net.Conn, 1)
-	proxy := newProxyListener(ln, conns)
 	go func() {
-		if err := srv.Serve(proxy); err != nil {
+		if err := srv.Serve(ln); err != nil {
 			s.T.Fatal(err)
 		}
 	}()
 
 	x := &Endpoint{
-		C:      conns,
+		ln:     ln,
 		db:     s,
 		id:     e,
 		server: srv,
-		proxy:  proxy,
 	}
 	s.endpoints[e] = x
 
@@ -167,11 +164,19 @@ func (e *Endpoint) Close() {
 	}
 	delete(e.db.endpoints, e.id)
 	e.server.Stop()
-	_ = e.proxy.Close()
+	_ = e.ln.Close()
+}
+
+func (e *Endpoint) DialContext(ctx context.Context) (net.Conn, error) {
+	return e.ln.DialContext(ctx)
+}
+
+func (e *Endpoint) ServerConn() <-chan net.Conn {
+	return e.ln.Server
 }
 
 type Balancer struct {
-	ln     net.Listener
+	ln     *Listener
 	server *grpc.Server
 }
 
@@ -184,14 +189,15 @@ func (b *Balancer) Close() error {
 	return b.ln.Close()
 }
 
+func (b *Balancer) DialContext(ctx context.Context) (net.Conn, error) {
+	return b.ln.DialContext(ctx)
+}
+
 // StartBalancer starts to provide a discovery service on some local address.
 func (s *YDB) StartBalancer() *Balancer {
 	s.init()
 
-	ln, err := net.Listen("tcp", "localhost:0")
-	if err != nil {
-		s.T.Fatal(err)
-	}
+	ln := NewListener()
 	srv := grpc.NewServer()
 	m := ydb.Method(Ydb_Discovery_V1.ListEndpoints)
 
@@ -233,6 +239,21 @@ func (s *YDB) StartBalancer() *Balancer {
 	}
 }
 
+func (s *YDB) DialContext(ctx context.Context, addr string) (_ net.Conn, err error) {
+	var e ydb.Endpoint
+	e.Addr, e.Port, err = SplitHostPort(addr)
+	if err != nil {
+		return
+	}
+	s.mu.Lock()
+	x := s.endpoints[e]
+	s.mu.Unlock()
+	if x == nil {
+		return nil, fmt.Errorf("no such endpoint: %v", e)
+	}
+	return x.DialContext(ctx)
+}
+
 func (s *YDB) listEndpoints(db string) (resp *Ydb_Discovery.ListEndpointsResult, err error) {
 	if db != s.Database {
 		s.T.Errorf(
@@ -259,28 +280,82 @@ func (s *YDB) listEndpoints(db string) (resp *Ydb_Discovery.ListEndpointsResult,
 
 type stubHandler interface{}
 
-type proxyListener struct {
-	net.Listener
-	ticket chan struct{}
-	conns  chan<- net.Conn
+type Listener struct {
+	Client chan net.Conn
+	Server chan net.Conn
+	Closed chan struct{}
+
+	closeOnce sync.Once
 }
 
-func newProxyListener(ln net.Listener, conns chan<- net.Conn) *proxyListener {
-	return &proxyListener{
-		Listener: ln,
-		conns:    conns,
+func NewListener() *Listener {
+	return &Listener{
+		Client: make(chan net.Conn),
+		Server: make(chan net.Conn, 1),
+		Closed: make(chan struct{}),
 	}
 }
 
-func (p *proxyListener) Accept() (net.Conn, error) {
-	conn, err := p.Listener.Accept()
+func (ln *Listener) HostPort() (host string, port int, err error) {
+	return SplitHostPort(ln.Addr().String())
+}
+
+func SplitHostPort(addr string) (host string, port int, err error) {
+	var prt string
+	host, prt, err = net.SplitHostPort(addr)
+	if err != nil {
+		return
+	}
+	port, err = strconv.Atoi(prt)
+	return
+}
+
+func (ln *Listener) Accept() (net.Conn, error) {
+	s, c := net.Pipe()
 	select {
-	case p.conns <- conn:
+	case ln.Client <- c:
+	case <-ln.Closed:
+		return nil, fmt.Errorf("closed")
+	}
+	select {
+	case ln.Server <- s:
 	default:
 	}
-	return conn, err
+	return s, nil
 }
 
-func (p *proxyListener) Close() error {
-	return p.Listener.Close()
+func (ln *Listener) Addr() net.Addr {
+	return addr(fmt.Sprintf("local:%d", uint32(uintptr(unsafe.Pointer(ln)))))
+}
+
+type addr string
+
+func (a addr) Network() string { return "mem" }
+func (a addr) String() string  { return string(a) }
+
+func (ln *Listener) Close() error {
+	ln.closeOnce.Do(func() {
+		close(ln.Closed)
+	})
+	return nil
+}
+
+func (ln *Listener) DialContext(ctx context.Context) (net.Conn, error) {
+	select {
+	case c := <-ln.Client:
+		return c, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (ln *Listener) DialGRPC() (*grpc.ClientConn, error) {
+	return grpc.Dial("",
+		grpc.WithDialer(func(_ string, timeout time.Duration) (net.Conn, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			return ln.DialContext(ctx)
+		}),
+		grpc.WithInsecure(),
+	)
 }

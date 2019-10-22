@@ -63,10 +63,15 @@ func (ln *stubListener) Close() error {
 	return nil
 }
 
-func (ln *stubListener) Dial() (*grpc.ClientConn, error) {
+func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
 	return grpc.Dial("",
 		grpc.WithDialer(func(string, time.Duration) (net.Conn, error) {
-			return <-ln.C, nil
+			select {
+			case c := <-ln.C:
+				return c, nil
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 		}),
 		grpc.WithInsecure(),
 	)
@@ -81,8 +86,8 @@ func TestClusterAwait(t *testing.T) {
 
 	var connToReturn *conn
 	c := &cluster{
-		dial: func(context.Context, string, int) (_ *conn, err error) {
-			cc, err := ln.Dial()
+		dial: func(ctx context.Context, _ string, _ int) (_ *conn, err error) {
+			cc, err := ln.Dial(ctx)
 			if err != nil {
 				return nil, err
 			}
