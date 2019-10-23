@@ -37,21 +37,31 @@ const (
 	RetryAvailable
 	RetryBackoff
 	RetryDeleteSession
+	RetryCheckSession
+	RetryDropCache
 )
 
 func (m RetryMode) Retriable() bool         { return m&RetryAvailable != 0 }
 func (m RetryMode) MustDeleteSession() bool { return m&RetryDeleteSession != 0 }
+func (m RetryMode) MustCheckSession() bool  { return m&RetryCheckSession != 0 }
 func (m RetryMode) MustBackoff() bool       { return m&RetryBackoff != 0 }
+func (m RetryMode) MustDropCache() bool     { return m&RetryDropCache != 0 }
 
 // Check returns retry mode for err.
 func (r *RetryChecker) Check(err error) (m RetryMode) {
+	switch err {
+	case
+		context.Canceled,
+		context.DeadlineExceeded:
+		return RetryCheckSession
+	}
 	switch e := err.(type) {
 	case *TransportError:
 		switch e.Reason {
 		case TransportErrorResourceExhausted:
 			m |= RetryBackoff
 		default:
-			return
+			return RetryCheckSession
 		}
 	case *OpError:
 		switch e.Reason {
@@ -60,6 +70,9 @@ func (r *RetryChecker) Check(err error) (m RetryMode) {
 			StatusAborted:
 			// Repeat immediately.
 
+		case StatusSessionBusy:
+			m |= RetryCheckSession
+
 		case StatusOverloaded:
 			m |= RetryBackoff
 
@@ -67,6 +80,7 @@ func (r *RetryChecker) Check(err error) (m RetryMode) {
 			m |= RetryDeleteSession
 
 		case StatusNotFound:
+			m |= RetryDropCache
 			if !r.RetryNotFound {
 				return
 			}

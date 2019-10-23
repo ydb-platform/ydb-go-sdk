@@ -431,12 +431,10 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 }
 
 func isTimeoutError(err error) bool {
-	return IsOpError(err, StatusTimeout) ||
-		IsOpError(err, StatusCancelled) ||
-		IsBusyAfter(err)
-}
-
-func IsBusyAfter(err error) bool {
+	if IsOpError(err, StatusTimeout) ||
+		IsOpError(err, StatusCancelled) {
+		return true
+	}
 	if _, ok := err.(*TransportError); ok {
 		return true
 	}

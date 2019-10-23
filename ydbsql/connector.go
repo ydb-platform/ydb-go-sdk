@@ -106,23 +106,25 @@ func WithRetryBackoff(b ydb.Backoff) ConnectorOption {
 	}
 }
 
+var retryChecker = ydb.RetryChecker{
+	// NOTE: we do not want to retry not found prepared statement
+	// errors.
+	//
+	// In other case we would just burn the CPU looping up to max
+	// retry attempts times – we are not making any Prepare() calls
+	// in the retry callbacks.
+	RetryNotFound: false,
+}
+
 func Connector(opts ...ConnectorOption) driver.Connector {
 	c := &connector{
 		dialer: ydb.Dialer{
 			DriverConfig: new(ydb.DriverConfig),
 		},
 		retryConfig: RetryConfig{
-			MaxRetries: ydb.DefaultMaxRetries,
-			Backoff:    ydb.DefaultBackoff,
-			RetryChecker: ydb.RetryChecker{
-				// NOTE: we do not want to retry not found prepared statement
-				// errors.
-				//
-				// In other case we would just burn the CPU looping up to max
-				// retry attempts times – we do not making and Prepare() calls
-				// in the retry callbacks.
-				RetryNotFound: false,
-			},
+			MaxRetries:   ydb.DefaultMaxRetries,
+			Backoff:      ydb.DefaultBackoff,
+			RetryChecker: retryChecker,
 		},
 	}
 	for _, opt := range opts {

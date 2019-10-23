@@ -15,43 +15,6 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/testutil"
 )
 
-func TestRetryOnce(t *testing.T) {
-	for _, test := range []struct {
-		name string
-		err  error
-	}{
-		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorDeadlineExceeded,
-			},
-		},
-		{
-			err: context.DeadlineExceeded,
-		},
-		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusBadSession,
-			},
-		},
-	} {
-		config := &RetryConfig{
-			MaxRetries: 1,
-		}
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-
-			var calls int
-			retry(ctx, config, func(_ context.Context) (err error) {
-				if calls > 0 {
-					t.Fatalf("unexpected retry")
-				}
-				calls++
-				return test.err
-			})
-		})
-	}
-}
-
 type DriverBuilder struct {
 	Logf  func(string, ...interface{})
 	Error func(context.Context, testutil.MethodCode) error
@@ -189,7 +152,7 @@ func (b *DriverBuilder) Build() ydb.Driver {
 				err = b.Error(ctx, method)
 			}
 
-			s.busy = ydb.IsBusyAfter(err)
+			s.busy = isBusy(err)
 
 			return
 		},
@@ -257,7 +220,7 @@ func TestTxDoerStmt(t *testing.T) {
 		_, err := tx.Stmt(stmt).Exec()
 		return err
 	})
-	if !ydb.IsBusyAfter(err) {
+	if !isBusy(err) {
 		t.Fatalf("not busy error: %v", err)
 	}
 

@@ -142,7 +142,7 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 			defer s.Close(ctx)
 			s = nil
 
-		case ydb.IsBusyAfter(err):
+		case m.MustCheckSession():
 			r.SessionProvider.PutBusy(ctx, s)
 			s = nil
 		}

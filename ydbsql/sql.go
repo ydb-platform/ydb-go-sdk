@@ -76,9 +76,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	}
 	s, err := c.session.Prepare(ctx, query)
 	if err != nil {
-		if ydb.IsBusyAfter(err) {
-			c.busy = true
-		}
+		c.busy = isBusy(err)
 		return nil, mapBadSessionError(err)
 	}
 	return &stmt{
@@ -145,9 +143,7 @@ func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx
 	if isolation != nil {
 		c.tx, err = c.session.BeginTransaction(ctx, table.TxSettings(isolation))
 		if err != nil {
-			if ydb.IsBusyAfter(err) {
-				c.busy = true
-			}
+			c.busy = isBusy(err)
 			return nil, mapBadSessionError(err)
 		}
 		c.txc = table.TxControl(table.WithTx(c.tx))
@@ -290,31 +286,58 @@ func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
+	maxRetries := c.retryConfig.MaxRetries
 	if c.tx != nil {
-		// Under transaction. No need to retry nested calls.
+		// NOTE: when under transaction, no retries must be done.
+		maxRetries = 0
+	}
+	var m ydb.RetryMode
+	for i := 0; i <= maxRetries; i++ {
+		if m.MustBackoff() {
+			e := ydb.WaitBackoff(ctx, c.retryConfig.Backoff, i-1)
+			if e != nil {
+				// Use original error to make it possible to lay on for the
+				// client.
+				break
+			}
+		}
 		_, res, err = exec.do(ctx, tx, c.session, params)
-	} else {
-		// Direct call – retry on errors.
-		//
-		// NOTE: we do not retrying not found errors here. That is, not found
-		// prepared statements are immediately break retry a loop.
-		err = retry(ctx, c.retryConfig, func(ctx context.Context) (e error) {
-			_, res, e = exec.do(ctx, tx, c.session, params)
-			return e
-		})
+		if err == nil {
+			return res, nil
+		}
+
+		m = c.retryConfig.RetryChecker.Check(err)
+
+		if c.busy = m.MustCheckSession(); c.busy {
+			if m.Retriable() {
+				return nil, driver.ErrBadConn
+			}
+			// Can not use this conn anymore – operation started and may still
+			// be not finished.
+			//
+			// NOTE: we can not return ErrBadConn right here because in that
+			// case database/sql will retry given query. Instead, since we have
+			// marked this sql.Conn busy above, it will be closed after
+			// ResetSession() call by database/sql.
+			return nil, err
+		}
+		if m.MustDropCache() {
+			// NOTE: if prepared statement is not found, the easy solution is just
+			// to drop the sql.Conn (which mapping of table.Session) with all its
+			// cached queries.
+			//
+			// That is, it could be pretty messy to deal with database/sql prepare
+			// logic which happens for all sql.Conn instances implicitly.
+			return nil, driver.ErrBadConn
+		}
+		if m.MustDeleteSession() {
+			return nil, driver.ErrBadConn
+		}
+		if !m.Retriable() {
+			break
+		}
 	}
-	if ydb.IsBusyAfter(err) {
-		// Can not use this conn anymore – started operation may not be
-		// finished.
-		//
-		// NOTE: we can not return ErrBadConn right here because we do not
-		// know the state of started operation. Instead, we mark this
-		// connection busy and it will be closed after ResetSession() call
-		// by database/sql.
-		c.busy = true
-		return nil, err
-	}
-	return res, mapOpError(err)
+	return nil, err
 }
 
 type TxOperationFunc func(context.Context, *sql.Tx) error
@@ -365,7 +388,7 @@ func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 			// session must be closed. Thus we could retry whole transaction.
 			continue
 		}
-		// NOTE: not checking ydb.IsBusyAfter() here because it is checked
+		// NOTE: not checking isBusy() here because it is checked
 		// inside conn.exec() method.
 		m := rc.RetryChecker.Check(err)
 		if !m.Retriable() {
@@ -605,25 +628,6 @@ type result struct{}
 
 func (r result) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (r result) RowsAffected() (int64, error) { return 0, ErrUnsupported }
-
-func mapOpError(err error) error {
-	switch {
-	case ydb.IsOpError(err, ydb.StatusBadSession):
-		return driver.ErrBadConn
-
-	case ydb.IsOpError(err, ydb.StatusNotFound):
-		// NOTE: if prepared statement is not found, the easy solution is just
-		// to drop the sql.Conn (which mapping of table.Session) with all its
-		// cached queries.
-		//
-		// That is, it could be pretty messy to deal with database/sql prepare
-		// logic which happens for all sql.Conn instances implicitly.
-		return driver.ErrBadConn
-
-	default:
-		return err
-	}
-}
 
 func mapBadSessionError(err error) error {
 	if ydb.IsOpError(err, ydb.StatusBadSession) {
