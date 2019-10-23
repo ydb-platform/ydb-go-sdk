@@ -129,7 +129,10 @@ func (c *cluster) Close() (err error) {
 		close(wait)
 	}
 	for _, entry := range index {
-		entry.conn.conn.Close()
+		cc := entry.conn.conn
+		if cc != nil {
+			cc.Close()
+		}
 	}
 
 	<-c.trackerDone
