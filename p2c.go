@@ -6,14 +6,27 @@ import (
 	"time"
 )
 
+type P2CConfig struct {
+	// PreferLocal reports whether p2c balancer should prefer local endpoint
+	// when all other runtime indicators are the same (such as error rate or
+	// average response time).
+	PreferLocal bool
+
+	// OpTimeThreshold specifies such difference between endpoint average
+	// operation time when it becomes significant to be used during comparison.
+	OpTimeThreshold time.Duration
+}
+
 type criterion interface {
 	Best(a, b *connListElement) *connListElement
 }
 
 type connRuntimeCriterion struct {
+	PreferLocal     bool
+	OpTimeThreshold time.Duration
 }
 
-func (t connRuntimeCriterion) Best(c1, c2 *connListElement) *connListElement {
+func (c connRuntimeCriterion) Best(c1, c2 *connListElement) *connListElement {
 	s1 := c1.conn.runtime.stats()
 	s2 := c2.conn.runtime.stats()
 
@@ -30,7 +43,7 @@ func (t connRuntimeCriterion) Best(c1, c2 *connListElement) *connListElement {
 	if f1 == f2 {
 		t := s1.AvgOpTime - s2.AvgOpTime
 		switch {
-		case absDuration(t) > time.Second:
+		case absDuration(t) > c.OpTimeThreshold:
 			if t < 0 {
 				f1 = 0
 				f2 = 1
@@ -38,10 +51,10 @@ func (t connRuntimeCriterion) Best(c1, c2 *connListElement) *connListElement {
 				f1 = 1
 				f2 = 0
 			}
-		case c1.info.local && !c2.info.local:
+		case c.PreferLocal && c1.info.local && !c2.info.local:
 			f1 = 0
 			f2 = 1
-		case c2.info.local && !c1.info.local:
+		case c.PreferLocal && c2.info.local && !c1.info.local:
 			f1 = 1
 			f2 = 0
 		default:
@@ -70,7 +83,9 @@ type p2c struct {
 func (p *p2c) init() {
 	p.once.Do(func() {
 		if p.Criterion == nil {
-			p.Criterion = new(connRuntimeCriterion)
+			p.Criterion = &connRuntimeCriterion{
+				OpTimeThreshold: time.Second,
+			}
 		}
 		if p.Source == nil {
 			p.Source = rand.NewSource(0).(rand.Source64)

@@ -57,12 +57,21 @@ const (
 	BalancingP2C
 )
 
-var balancers = map[BalancingMethod]func() balancer{
-	BalancingRoundRobin: func() balancer {
+var balancers = map[BalancingMethod]func(interface{}) balancer{
+	BalancingRoundRobin: func(_ interface{}) balancer {
 		return new(roundRobin)
 	},
-	BalancingP2C: func() balancer {
-		return new(p2c)
+	BalancingP2C: func(c interface{}) balancer {
+		if c == nil {
+			return new(p2c)
+		}
+		config := c.(*P2CConfig)
+		return &p2c{
+			Criterion: connRuntimeCriterion{
+				PreferLocal:     config.PreferLocal,
+				OpTimeThreshold: config.OpTimeThreshold,
+			},
+		}
 	},
 }
 
@@ -121,11 +130,15 @@ type DriverConfig struct {
 	// If BalancingMethod is zero then the DefaultBalancingMethod is used.
 	BalancingMethod BalancingMethod
 
+	// BalancingConfig is an optional configuration related to selected
+	// BalancingMethod. That is, some balancing methods allow to be configured.
+	BalancingConfig interface{}
+
 	// PreferLocalEndpoints adds endpoint selection logic when local endpoints
 	// are always used first.
 	// When no alive local endpoints left other endpoints will be used.
 	//
-	// NOTE: some balancing methods (such as p2c) also use knowledge of
+	// NOTE: some balancing methods (such as p2c) also may use knowledge of
 	// endpoint's locality. Difference is that with PreferLocalEndpoints local
 	// endpoints selected separately from others. That is, if there at least
 	// one local endpoint it will be used regardless of its performance
@@ -225,20 +238,18 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		if d.config.PreferLocalEndpoints {
 			cluster.balancer = newMultiBalancer(
 				withBalancer(
-					balancers[d.config.BalancingMethod](),
-					func(_ *conn, info connInfo) bool {
+					d.newBalancer(), func(_ *conn, info connInfo) bool {
 						return info.local
 					},
 				),
 				withBalancer(
-					balancers[d.config.BalancingMethod](),
-					func(_ *conn, info connInfo) bool {
+					d.newBalancer(), func(_ *conn, info connInfo) bool {
 						return !info.local
 					},
 				),
 			)
 		} else {
-			cluster.balancer = balancers[d.config.BalancingMethod]()
+			cluster.balancer = d.newBalancer()
 		}
 
 		curr, err := d.discover(ctx, addr)
@@ -387,6 +398,10 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 		)
 	}
 	return append(opts, grpc.WithBlock())
+}
+
+func (d *dialer) newBalancer() balancer {
+	return balancers[d.config.BalancingMethod](d.config.BalancingConfig)
 }
 
 type driver struct {
