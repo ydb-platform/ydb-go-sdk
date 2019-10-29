@@ -13,15 +13,11 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
-// balancerElement is an empty interface that holds some balancer specific
-// data.
-type balancerElement interface {
-}
-
 // connInfo contains connection "static" stats – e.g. such that obtained from
 // discovery routine.
 type connInfo struct {
 	loadFactor float32
+	local      bool
 }
 
 // connEntry represents inserted into the cluster connection.
@@ -47,26 +43,6 @@ func (c *connEntry) removeFrom(b balancer) {
 	}
 	b.Remove(c.handle)
 	c.handle = nil
-}
-
-// balancer is an interface that implements particular load-balancing
-// algorithm.
-//
-// balancer methods called synchronized. That is, implementations must not
-// provide additional goroutine safety.
-type balancer interface {
-	// Next returns next connection for request.
-	// Next MUST not return nil if it has at least one connection.
-	Next() *conn
-
-	// Insert inserts new connection.
-	Insert(*conn, connInfo) balancerElement
-
-	// Update updates previously inserted connection.
-	Update(balancerElement, connInfo)
-
-	// Remove removes previously inserted connection.
-	Remove(balancerElement)
 }
 
 type cluster struct {
@@ -196,6 +172,7 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint) {
 	addr := connAddr{e.Addr, e.Port}
 	info := connInfo{
 		loadFactor: e.LoadFactor,
+		local:      e.Local,
 	}
 	conn, err := c.dial(ctx, e.Addr, e.Port)
 	if err != nil {
@@ -248,6 +225,7 @@ func (c *cluster) Update(ctx context.Context, ep Endpoint) {
 	addr := connAddr{ep.Addr, ep.Port}
 	info := connInfo{
 		loadFactor: ep.LoadFactor,
+		local:      ep.Local,
 	}
 
 	c.mu.Lock()

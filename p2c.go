@@ -7,15 +7,15 @@ import (
 )
 
 type criterion interface {
-	Best(a, b *conn) *conn
+	Best(a, b *connListElement) *connListElement
 }
 
 type connRuntimeCriterion struct {
 }
 
-func (t connRuntimeCriterion) Best(c1, c2 *conn) *conn {
-	s1 := c1.runtime.stats()
-	s2 := c2.runtime.stats()
+func (t connRuntimeCriterion) Best(c1, c2 *connListElement) *connListElement {
+	s1 := c1.conn.runtime.stats()
+	s2 := c2.conn.runtime.stats()
 
 	var (
 		f1 float64
@@ -29,7 +29,8 @@ func (t connRuntimeCriterion) Best(c1, c2 *conn) *conn {
 	}
 	if f1 == f2 {
 		t := s1.AvgOpTime - s2.AvgOpTime
-		if absDuration(t) > time.Second {
+		switch {
+		case absDuration(t) > time.Second:
 			if t < 0 {
 				f1 = 0
 				f2 = 1
@@ -37,7 +38,13 @@ func (t connRuntimeCriterion) Best(c1, c2 *conn) *conn {
 				f1 = 1
 				f2 = 0
 			}
-		} else {
+		case c1.info.local && !c2.info.local:
+			f1 = 0
+			f2 = 1
+		case c2.info.local && !c1.info.local:
+			f1 = 1
+			f2 = 0
+		default:
 			f1 = float64(s1.OpPending())
 			f2 = float64(s2.OpPending())
 		}
@@ -98,10 +105,10 @@ func (p *p2c) Next() *conn {
 			break
 		}
 	}
-	c1 := p.conns[r1].conn
-	c2 := p.conns[r2].conn
 
-	return p.Criterion.Best(c1, c2)
+	b := p.Criterion.Best(p.conns[r1], p.conns[r2])
+
+	return b.conn
 }
 
 func (p *p2c) Insert(conn *conn, info connInfo) balancerElement {

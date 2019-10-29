@@ -16,6 +16,33 @@ type stubBalancer struct {
 	OnRemove func(balancerElement)
 }
 
+func simpleBalancer() (*connList, balancer) {
+	cs := new(connList)
+	var i int
+	return cs, stubBalancer{
+		OnNext: func() *conn {
+			n := len(*cs)
+			if n == 0 {
+				return nil
+			}
+			e := (*cs)[i%n]
+			i++
+			return e.conn
+		},
+		OnInsert: func(conn *conn, info connInfo) balancerElement {
+			return cs.Insert(conn, info)
+		},
+		OnRemove: func(x balancerElement) {
+			e := x.(*connListElement)
+			cs.Remove(e)
+		},
+		OnUpdate: func(x balancerElement, info connInfo) {
+			e := x.(*connListElement)
+			e.info = info
+		},
+	}
+}
+
 func (s stubBalancer) Next() *conn {
 	if f := s.OnNext; f != nil {
 		return f()

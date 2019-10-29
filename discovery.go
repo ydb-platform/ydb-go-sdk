@@ -14,6 +14,7 @@ type Endpoint struct {
 	Addr       string
 	Port       int
 	LoadFactor float32
+	Local      bool
 }
 
 type discoveryClient struct {
@@ -47,8 +48,9 @@ func (d *discoveryClient) Discover(ctx context.Context, database string) ([]Endp
 	es := make([]Endpoint, len(res.Endpoints))
 	for i, e := range res.Endpoints {
 		es[i] = Endpoint{
-			Addr: e.Address,
-			Port: int(e.Port),
+			Addr:  e.Address,
+			Port:  int(e.Port),
+			Local: e.Location == res.SelfLocation,
 		}
 	}
 	return es, nil

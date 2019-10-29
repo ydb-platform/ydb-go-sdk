@@ -120,6 +120,24 @@ type DriverConfig struct {
 	// selection.
 	// If BalancingMethod is zero then the DefaultBalancingMethod is used.
 	BalancingMethod BalancingMethod
+
+	// PreferLocalEndpoints adds endpoint selection logic when local endpoints
+	// are always used first.
+	// When no alive local endpoints left other endpoints will be used.
+	//
+	// NOTE: some balancing methods (such as p2c) also use knowledge of
+	// endpoint's locality. Difference is that with PreferLocalEndpoints local
+	// endpoints selected separately from others. That is, if there at least
+	// one local endpoint it will be used regardless of its performance
+	// indicators.
+	//
+	// NOTE: currently driver (and even ydb itself) does not track load factor
+	// of each endpoint properly. Enabling this option may lead to the
+	// situation, when all but one nodes in local datacenter become inactive
+	// and all clients will overload this single instance very quickly. That
+	// is, currently this option may be called as experimental.
+	// You have been warned.
+	PreferLocalEndpoints bool
 }
 
 func (d *DriverConfig) withDefaults() (c DriverConfig) {
@@ -204,7 +222,24 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 	}()
 	var explorer *repeater
 	if d.config.DiscoveryInterval > 0 {
-		cluster.balancer = balancers[d.config.BalancingMethod]()
+		if d.config.PreferLocalEndpoints {
+			cluster.balancer = newMultiBalancer(
+				withBalancer(
+					balancers[d.config.BalancingMethod](),
+					func(_ *conn, info connInfo) bool {
+						return info.local
+					},
+				),
+				withBalancer(
+					balancers[d.config.BalancingMethod](),
+					func(_ *conn, info connInfo) bool {
+						return !info.local
+					},
+				),
+			)
+		} else {
+			cluster.balancer = balancers[d.config.BalancingMethod]()
+		}
 
 		curr, err := d.discover(ctx, addr)
 		if err != nil {
