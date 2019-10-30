@@ -280,6 +280,7 @@ func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
 			Addr:       addr.addr,
 			Port:       addr.port,
 			LoadFactor: entry.info.loadFactor,
+			Local:      entry.info.local,
 		}
 		s := entry.conn.runtime.stats()
 		it(e, s)
