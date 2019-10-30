@@ -1039,10 +1039,7 @@ func isSafeConversion(t1, t2 types.Type) bool {
 		// uint{8,16,32} -> uint
 		return sizeof(t1) < 64
 	}
-	if sizeof(t1) > sizeof(t2) {
-		return false
-	}
-	return true
+	return sizeof(t1) <= sizeof(t2)
 }
 
 func checkInterface(typ *types.Named, flags GenFlag) (_ *types.Basic, err error) {

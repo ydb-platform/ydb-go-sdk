@@ -148,9 +148,7 @@ func valueToString(buf *bytes.Buffer, t T, v *Ydb.Value) {
 				types[i] = x.T
 			}
 		case TupleType:
-			for i, t := range x.Elems {
-				types[i] = t
-			}
+			copy(types, x.Elems)
 		default:
 			panic("ydb: unkown iterable type")
 		}
