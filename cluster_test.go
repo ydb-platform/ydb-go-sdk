@@ -91,6 +91,7 @@ func (ln *stubListener) Close() error {
 }
 
 func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
+	//nolint:SA1019
 	return grpc.Dial("",
 		grpc.WithDialer(func(string, time.Duration) (net.Conn, error) {
 			select {

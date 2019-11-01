@@ -350,6 +350,7 @@ func (ln *Listener) DialContext(ctx context.Context) (net.Conn, error) {
 }
 
 func (ln *Listener) DialGRPC() (*grpc.ClientConn, error) {
+	//nolint:SA1019
 	return grpc.Dial("",
 		grpc.WithDialer(func(_ string, timeout time.Duration) (net.Conn, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)

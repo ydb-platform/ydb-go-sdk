@@ -482,6 +482,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		expSession *Session
 		done       = make(chan struct{}, 2)
 	)
+	//nolint:SA2002
 	for i := 0; i < 2; i++ {
 		go func() {
 			defer func() {

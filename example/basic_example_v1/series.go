@@ -406,7 +406,7 @@ func describeTable(ctx context.Context, sp *table.SessionPool, path string) (err
 			return nil
 		}),
 	)
-	return nil
+	return
 }
 
 func render(t *template.Template, data interface{}) string {

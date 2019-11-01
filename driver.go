@@ -379,6 +379,7 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	if d.netDial != nil {
+		//nolint:SA1019
 		opts = append(opts, grpc.WithDialer(withContextDialer(d.netDial)))
 	}
 	if c := d.tlsConfig; c != nil {
