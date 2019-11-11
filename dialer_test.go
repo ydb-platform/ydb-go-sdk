@@ -31,6 +31,7 @@ func TestClusterTracking(t *testing.T) {
 	}
 	balancer := db.StartBalancer()
 	defer balancer.Close()
+
 	endpoint := db.StartEndpoint()
 	defer endpoint.Close()
 
@@ -77,7 +78,6 @@ func TestClusterTracking(t *testing.T) {
 					return nil, fmt.Errorf("stub: kinda refused")
 				}
 				conn, err := db.DialContext(ctx, addr)
-				fmt.Println("DIAL", conn, err)
 				if err != nil {
 					return nil, err
 				}

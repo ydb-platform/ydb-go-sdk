@@ -22,14 +22,19 @@ type connInfo struct {
 
 // connEntry represents inserted into the cluster connection.
 type connEntry struct {
-	conn   *conn
-	info   connInfo
-	handle balancerElement
+	conn           *conn
+	handle         balancerElement
+	trackerQueueEl *list.Element
+
+	info connInfo
 }
 
 func (c *connEntry) insertInto(b balancer) {
 	if c.handle != nil {
 		panic("ydb: handle already exists")
+	}
+	if c.conn == nil {
+		panic("ydb: can't insert nil conn into balancer")
 	}
 	c.handle = b.Insert(c.conn, c.info)
 	if c.handle == nil {
@@ -63,6 +68,8 @@ type cluster struct {
 	trackerQueue  *list.List // list of *conn.
 
 	closed bool
+
+	testHookTrackerQueue func([]*list.Element)
 }
 
 func (c *cluster) init() {
@@ -70,8 +77,9 @@ func (c *cluster) init() {
 		c.index = make(map[connAddr]connEntry)
 
 		c.trackerCtx, c.trackerCancel = context.WithCancel(context.Background())
-		c.trackerWake = make(chan struct{})
+		c.trackerWake = make(chan struct{}, 1)
 		c.trackerDone = make(chan struct{})
+		c.trackerQueue = list.New()
 		go c.tracker()
 	})
 }
@@ -105,8 +113,11 @@ func (c *cluster) Close() (err error) {
 		close(wait)
 	}
 	for _, entry := range index {
-		cc := entry.conn.conn
-		if cc != nil {
+		c := entry.conn
+		if c == nil {
+			continue
+		}
+		if cc := c.conn; cc != nil {
 			cc.Close()
 		}
 	}
@@ -131,24 +142,37 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 		}
 		switch {
 		case size == 0 && conn != nil:
-			panic("ydb: driver: empty balancer has returned non-nil conn")
+			panic("ydb: empty balancer has returned non-nil conn")
 		case size != 0 && conn == nil:
-			panic("ydb: driver: non-empty balancer has returned nil conn")
+			panic("ydb: non-empty balancer has returned nil conn")
 		case conn != nil:
 			if isReady(conn) {
 				return conn, nil
 			}
 			c.mu.Lock()
-			e := c.index[conn.addr]
-			if e.handle != nil {
-				// e.handle may become nil when some race happened and other
+			entry, has := c.index[conn.addr]
+			if !has {
+				panic("ydb: balancer returned non-indexed conn")
+			}
+			if entry.handle != nil {
+				// entry.handle may become nil when some race happened and other
 				// goroutine already removed conn from balancer and sent it
 				// to the tracker.
-				e.removeFrom(c.balancer)
-				c.index[conn.addr] = e
-				c.ready--
 				conn.runtime.setState(ConnOffline)
-				c.track(conn)
+
+				// NOTE: we setting entry.conn to nil here to be more strict
+				// about the ownership of conn. That is, tracker goroutine
+				// takes full ownership of conn after c.track(conn) call.
+				//
+				// Leaving non-nil conn may lead to data races, when tracker
+				// changes conn.conn field (in case of unsuccessful initial
+				// dial) without any mutex used.
+				entry.removeFrom(c.balancer)
+				entry.conn = nil
+				entry.trackerQueueEl = c.track(conn)
+
+				c.index[conn.addr] = entry
+				c.ready--
 			}
 			c.mu.Unlock()
 		}
@@ -200,21 +224,19 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint) {
 	}
 	_, has := c.index[addr]
 	if has {
-		panic("ydb: driver: can't insert already existing endpoint")
+		panic("ydb: can't insert already existing endpoint")
 	}
-	entry := connEntry{
-		conn: conn,
-		info: info,
-	}
+	entry := connEntry{info: info}
 	if cc != nil {
 		conn.runtime.setState(ConnOnline)
+		entry.conn = conn
 		entry.insertInto(c.balancer)
 		c.ready++
 		wait = c.wait
 		c.wait = nil
 	} else {
 		conn.runtime.setState(ConnOffline)
-		c.track(conn)
+		entry.trackerQueueEl = c.track(conn)
 	}
 	c.index[addr] = entry
 }
@@ -234,15 +256,16 @@ func (c *cluster) Update(ctx context.Context, ep Endpoint) {
 		return
 	}
 
-	e, has := c.index[addr]
+	entry, has := c.index[addr]
 	if !has {
-		panic("ydb: driver: can't update not-existing endpoint")
+		panic("ydb: can't update not-existing endpoint")
 	}
 
-	e.info = info
-	c.index[addr] = e
-	if e.handle != nil {
-		c.balancer.Update(e.handle, info)
+	entry.info = info
+	c.index[addr] = entry
+	if entry.handle != nil {
+		// entry.handle may be nil when connection is being tracked.
+		c.balancer.Update(entry.handle, info)
 	}
 }
 
@@ -259,42 +282,59 @@ func (c *cluster) Remove(_ context.Context, e Endpoint) {
 	entry, has := c.index[addr]
 	if !has {
 		c.mu.Unlock()
-		panic("ydb: driver: can't remove not-existing endpoint")
+		panic("ydb: can't remove not-existing endpoint")
 	}
-	entry.removeFrom(c.balancer)
+	if el := entry.trackerQueueEl; el != nil {
+		// Connection is being tracked.
+		c.trackerQueue.Remove(el)
+	} else {
+		entry.removeFrom(c.balancer)
+		c.ready--
+	}
 	delete(c.index, addr)
-	c.ready--
 	c.mu.Unlock()
 
-	// update tracking
-	// update redialing
-	entry.conn.conn.Close()
+	if entry.conn != nil {
+		// entry.conn may be nil when connection is being tracked after
+		// unsuccessful dial().
+		entry.conn.conn.Close()
+	}
 }
 
 func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-
-	for addr, entry := range c.index {
+	if c.closed {
+		return
+	}
+	call := func(conn *conn, info connInfo) {
 		e := Endpoint{
-			Addr:       addr.addr,
-			Port:       addr.port,
-			LoadFactor: entry.info.loadFactor,
-			Local:      entry.info.local,
+			Addr:       conn.addr.addr,
+			Port:       conn.addr.port,
+			LoadFactor: info.loadFactor,
+			Local:      info.local,
 		}
-		s := entry.conn.runtime.stats()
+		s := conn.runtime.stats()
 		it(e, s)
+	}
+	for el := c.trackerQueue.Front(); el != nil; el = el.Next() {
+		conn := el.Value.(*conn)
+		entry := c.index[conn.addr]
+		call(conn, entry.info)
+	}
+	for _, entry := range c.index {
+		if entry.conn != nil {
+			call(entry.conn, entry.info)
+		}
 	}
 }
 
 // c.mu must be held.
-func (c *cluster) track(conn *conn) {
+func (c *cluster) track(conn *conn) (el *list.Element) {
 	c.trace.trackConnStart(conn)
-	if c.trackerQueue == nil {
-		c.trackerQueue = list.New()
-	}
-	c.trackerQueue.PushBack(conn)
+	el = c.trackerQueue.PushBack(conn)
 	c.wakeUpTracker()
+	return
 }
 
 func (c *cluster) wakeUpTracker() {
@@ -310,7 +350,7 @@ func (c *cluster) tracker() {
 	var active bool
 	timer := timeutil.NewTimer(time.Duration(1<<63 - 1))
 	if !timer.Stop() {
-		panic("can't stop timer")
+		panic("ydb: can't stop timer")
 	}
 	backoff := LogBackoff{
 		SlotDuration: time.Millisecond,
@@ -318,15 +358,14 @@ func (c *cluster) tracker() {
 		JitterLimit:  1,  // Without randomization.
 	}
 
-	var queue list.List
-	fetchQueue := func() {
-		c.mu.Lock()
-		q := c.trackerQueue
-		c.trackerQueue = nil
-		c.mu.Unlock()
-		if q != nil {
-			queue.PushBackList(q)
+	var queue []*list.Element
+	fetchQueue := func(dest []*list.Element) []*list.Element {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		for el := c.trackerQueue.Front(); el != nil; el = el.Next() {
+			dest = append(dest, el)
 		}
+		return dest
 	}
 	for i := 0; ; i++ {
 		select {
@@ -338,10 +377,15 @@ func (c *cluster) tracker() {
 			timer.Reset(backoff.Delay(i))
 
 		case <-timer.C():
-			fetchQueue()
+			queue = fetchQueue(queue[:0])
+			active = len(queue) > 0
+
+			if f := c.testHookTrackerQueue; f != nil {
+				f(queue)
+			}
 
 			ctx, cancel := context.WithTimeout(c.trackerCtx, time.Second)
-			for el := queue.Front(); el != nil; {
+			for _, el := range queue {
 				conn := el.Value.(*conn)
 				addr := conn.addr
 				if conn.conn == nil {
@@ -351,39 +395,49 @@ func (c *cluster) tracker() {
 					}
 				}
 				if !isReady(conn) {
-					el = el.Next()
 					continue
 				}
 
-				x := el
-				el = el.Next()
-				queue.Remove(x)
-
+				var wait chan struct{}
 				c.mu.Lock()
-				conn.runtime.setState(ConnOnline)
-				c.trace.trackConnDone(conn)
-				e := c.index[addr]
-				e.insertInto(c.balancer)
-				c.index[addr] = e
-				c.ready++
-				wait := c.wait
-				c.wait = nil
-				c.mu.Unlock()
+				entry, has := c.index[addr]
+				actual := has && entry.trackerQueueEl == el
+				if actual {
+					// Element is still in the index and element is actual.
+					//
+					// NOTE: we are checking both `has` flag and equality with
+					// `entry.trackerQueueEl` to get rid of races, when
+					// endpoint removed and added immediately while we stuck on
+					// dialing above.
+					c.trackerQueue.Remove(el)
+					active = c.trackerQueue.Len() > 0
 
+					conn.runtime.setState(ConnOnline)
+					c.trace.trackConnDone(conn)
+					entry.conn = conn
+					entry.insertInto(c.balancer)
+					c.index[addr] = entry
+					c.ready++
+
+					wait = c.wait
+					c.wait = nil
+				}
+				c.mu.Unlock()
+				if !actual {
+					conn.conn.Close()
+				}
 				if wait != nil {
 					close(wait)
 				}
 			}
 			cancel()
-
-			if active = queue.Len() > 0; active {
+			if active {
 				timer.Reset(backoff.Delay(i))
 			}
 
 		case <-c.trackerCtx.Done():
-			fetchQueue()
-
-			for el := queue.Front(); el != nil; el = el.Next() {
+			queue = fetchQueue(queue[:0])
+			for _, el := range queue {
 				conn := el.Value.(*conn)
 				if conn.conn != nil {
 					conn.conn.Close()
@@ -518,14 +572,14 @@ func (s *singleConnBalancer) Next() *conn {
 }
 func (s *singleConnBalancer) Insert(conn *conn, _ connInfo) balancerElement {
 	if s.conn != nil {
-		panic("single conn balancer: double Insert()")
+		panic("ydb: single conn balancer: double Insert()")
 	}
 	s.conn = conn
 	return conn
 }
 func (s *singleConnBalancer) Remove(el balancerElement) {
 	if s.conn != el.(*conn) {
-		panic("single conn balancer: Remove() unknown conn")
+		panic("ydb: single conn balancer: Remove() unknown conn")
 	}
 	s.conn = nil
 }
