@@ -310,22 +310,3 @@ not a container by setting `type` field tag.
 
 More examples are listed in `ydb/examples` directory.
 
-## Arcadia development notes
-
-This library uses generation of Go code from protobuf specs. That is, in case
-of development/debugging processes it is helpful to have result of that
-generation in the directory tree. To achieve this simply run this command:
-
-```
-$ ya make --add-result go kikimr/public/sdk/go/ydb
-```
-
-This will create symlinks inside directories to the result of generation.
-
-Also, this step may be automated via this command:
-```
-$ mkdir -p junk/$USERNAME
-$ ya gen-config > junk/$USERNAME/ya.conf
-$ sed -i "" 's/# add_result = \[\]/add_result = ["go"]/g' junk/$USERNAME/ya.conf
-```
-
