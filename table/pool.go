@@ -429,7 +429,7 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 	p.init()
 
 	const maxAttempts = 10
-	for i := 0; s == nil && err == nil && i < maxAttempts; i++ {
+	for i := 0; s == nil && i < maxAttempts; i++ {
 		p.mu.Lock()
 		if p.ready.Len() > 0 {
 			s = p.ready.Remove(p.ready.Front()).(*Session)
