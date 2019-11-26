@@ -151,10 +151,7 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 			}
 			c.mu.Lock()
 			entry, has := c.index[conn.addr]
-			if !has {
-				panic("ydb: balancer returned non-indexed conn")
-			}
-			if entry.handle != nil {
+			if has && entry.handle != nil {
 				// entry.handle may become nil when some race happened and other
 				// goroutine already removed conn from balancer and sent it
 				// to the tracker.
