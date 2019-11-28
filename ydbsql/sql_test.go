@@ -245,10 +245,10 @@ func TestStatement(t *testing.T) {
 	}
 	defer stmt.Close()
 
-	stmt.Exec()
-	stmt.Exec()
+	_, _ = stmt.Exec()
+	_, _ = stmt.Exec()
 
-	conn.QueryContext(ctx, "SELECT 42;")
+	_, _ = conn.QueryContext(ctx, "SELECT 42;")
 }
 
 func TestTx(t *testing.T) {
@@ -273,8 +273,8 @@ func TestTx(t *testing.T) {
 	}
 	defer stmt.Close()
 
-	stmt.Exec()
-	tx.Commit()
+	_, _ = stmt.Exec()
+	_ = tx.Commit()
 
 	time.Sleep(5 * time.Second)
 
@@ -283,7 +283,7 @@ func TestTx(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rows.Close()
+		_ = rows.Close()
 
 		time.Sleep(5 * time.Second)
 	}

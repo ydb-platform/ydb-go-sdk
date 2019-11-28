@@ -49,7 +49,7 @@ func TestClusterTracking(t *testing.T) {
 	closeConn := func(conn net.Conn) {
 		ch := make(chan struct{})
 		dialRefused <- ch
-		conn.Close()
+		_ = conn.Close()
 		<-ch
 	}
 	dialer := &ydb.Dialer{

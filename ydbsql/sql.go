@@ -63,7 +63,7 @@ func (c *conn) putSession(ctx context.Context) {
 
 func (c *conn) ResetSession(ctx context.Context) error {
 	if c.busy {
-		c.pool.PutBusy(ctx, c.session)
+		_ = c.pool.PutBusy(ctx, c.session)
 		return driver.ErrBadConn
 	}
 	c.putSession(ctx)

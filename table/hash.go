@@ -21,7 +21,7 @@ func (h *queryHasher) hash(s string) (r queryHash) {
 	}
 
 	h.buf.WriteString(s)
-	h.buf.WriteTo(h.sha)
+	_, _ = h.buf.WriteTo(h.sha)
 
 	bts := h.sha.Sum(h.bts[:0])
 

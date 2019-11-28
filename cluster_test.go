@@ -22,7 +22,9 @@ func TestClusterRemoveTracking(t *testing.T) {
 
 	ln := newStubListener()
 	srv := grpc.NewServer()
-	go srv.Serve(ln)
+	go func() {
+		_ = srv.Serve(ln)
+	}()
 
 	_, balancer := simpleBalancer()
 
@@ -65,9 +67,9 @@ func TestClusterRemoveTracking(t *testing.T) {
 	conn := <-ln.S
 
 	// Do not accept new connections.
-	ln.Close()
+	_ = ln.Close()
 	// Force cluster to reconnect.
-	conn.Close()
+	_ = conn.Close()
 	// Await for conn change its state inside cluster.
 	{
 		sub, cancel := context.WithCancel(ctx)
@@ -130,7 +132,9 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 
 	ln := newStubListener()
 	srv := grpc.NewServer()
-	go srv.Serve(ln)
+	go func() {
+		_ = srv.Serve(ln)
+	}()
 
 	_, balancer := simpleBalancer()
 
@@ -221,7 +225,9 @@ func TestClusterAwait(t *testing.T) {
 
 	ln := newStubListener()
 	srv := grpc.NewServer()
-	go srv.Serve(ln)
+	go func() {
+		_ = srv.Serve(ln)
+	}()
 
 	var connToReturn *conn
 	c := &cluster{

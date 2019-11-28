@@ -115,7 +115,7 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 	)
 	defer func() {
 		if s != nil {
-			r.SessionProvider.Put(context.Background(), s)
+			_ = r.SessionProvider.Put(context.Background(), s)
 		}
 	}()
 	for i := 0; i <= r.MaxRetries; i++ {
@@ -143,7 +143,7 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 			s = nil
 
 		case m.MustCheckSession():
-			r.SessionProvider.PutBusy(ctx, s)
+			_ = r.SessionProvider.PutBusy(ctx, s)
 			s = nil
 		}
 		if !m.Retriable() {

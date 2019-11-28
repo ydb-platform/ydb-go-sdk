@@ -147,9 +147,9 @@ func printSeries(series SeriesList) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	defer w.Flush()
 
-	fmt.Fprintln(w, "series_id\ttitle\trelease_date\tinfo\tviews\tuploaded_user_id")
+	_, _ = fmt.Fprintln(w, "series_id\ttitle\trelease_date\tinfo\tviews\tuploaded_user_id")
 	for _, s := range series {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%d\t%d\n",
+		_, _ = fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%d\t%d\n",
 			s.ID,
 			s.Title,
 			s.ReleaseDate.Format(TimeISO8601),

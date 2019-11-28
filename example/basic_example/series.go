@@ -175,7 +175,7 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 			var t ydb.Time
 			res.NextItem()
 			date := res.OUint64()
-			t.FromDate(uint32(date))
+			_ = t.FromDate(uint32(date))
 
 			log.Printf(">   %s %s", time.Time(t).Format(DateISO8601), title)
 		}

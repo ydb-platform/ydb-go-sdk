@@ -94,7 +94,7 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 	s1.OnClose(func() {
 		close(closed)
 	})
-	p.PutBusy(context.Background(), s1)
+	_ = p.PutBusy(context.Background(), s1)
 
 	<-timer.Created
 	<-timer.Reset
@@ -149,7 +149,7 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 	defer p.Close(context.Background())
 
 	s1 := mustGetSession(t, p)
-	p.PutBusy(context.Background(), s1)
+	_ = p.PutBusy(context.Background(), s1)
 
 	s2 := mustGetSession(t, p)
 	mustPutSession(t, p, s2)
@@ -298,7 +298,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				// himself in the wait queue, but not ready to receive the
 				// session when session arrives (that is, stucked between
 				// pushing channel in the list and reading from the channel).
-				p.Close(context.Background())
+				_ = p.Close(context.Background())
 				<-wait
 			} else {
 				// We testing the normal case, when session consumer registered
@@ -307,7 +307,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				<-wait
 				// Let the waiting goroutine to block on reading from channel.
 				runtime.Gosched()
-				p.Close(context.Background())
+				_ = p.Close(context.Background())
 			}
 
 			const timeout = time.Second
@@ -357,7 +357,7 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p.Close(context.Background())
+	_ = p.Close(context.Background())
 
 	if !closed1 {
 		t.Fatalf("session was not closed")
@@ -414,7 +414,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				defer func() {
 					close(got)
 				}()
-				p.Get(WithSessionPoolTrace(context.Background(), SessionPoolTrace{
+				_, _ = p.Get(WithSessionPoolTrace(context.Background(), SessionPoolTrace{
 					GetStart: func(SessionPoolGetStartInfo) {
 						get <- struct{}{}
 					},
@@ -433,7 +433,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				// himself in the wait queue, but not ready to receive the
 				// session when session arrives (that is, stucked between
 				// pushing channel in the list and reading from the channel).
-				s.Close(context.Background())
+				_ = s.Close(context.Background())
 				<-wait
 			} else {
 				// We testing the normal case, when session consumer registered
@@ -442,7 +442,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				<-wait
 				// Let the waiting goroutine to block on reading from channel.
 				runtime.Gosched()
-				s.Close(context.Background())
+				_ = s.Close(context.Background())
 			}
 
 			const timeout = time.Second
@@ -548,14 +548,14 @@ func TestSessionPoolPutInFull(t *testing.T) {
 	}
 
 	s := mustGetSession(t, p)
-	p.Put(context.Background(), s)
+	_ = p.Put(context.Background(), s)
 
 	defer func() {
 		if thePanic := recover(); thePanic == nil {
 			t.Fatalf("no panic")
 		}
 	}()
-	p.Put(context.Background(), simpleSession())
+	_ = p.Put(context.Background(), simpleSession())
 }
 
 func TestSessionPoolSizeLimitOverflow(t *testing.T) {
@@ -623,7 +623,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				// himself in the wait queue, but not ready to receive the
 				// session when session arrives (that is, stucked between
 				// pushing channel in the list and reading from the channel).
-				p.Put(context.Background(), s)
+				_ = p.Put(context.Background(), s)
 				<-wait
 			} else {
 				// We testing the normal case, when session consumer registered
@@ -632,7 +632,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				<-wait
 				// Let the waiting goroutine to block on reading from channel.
 				runtime.Gosched()
-				p.Put(context.Background(), s)
+				_ = p.Put(context.Background(), s)
 			}
 
 			const timeout = time.Second
@@ -787,7 +787,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 	mustGetSession(t, p)
 	assertCreated(1)
 
-	s.Close(context.Background())
+	_ = s.Close(context.Background())
 	assertDeleted(1)
 
 	mustGetSession(t, p)
@@ -977,7 +977,7 @@ func TestSessionPoolDoublePut(t *testing.T) {
 			t.Fatalf("no panic")
 		}
 	}()
-	p.Put(context.Background(), s)
+	_ = p.Put(context.Background(), s)
 }
 
 func TestSessionPoolReuseWaitChannel(t *testing.T) {

@@ -83,7 +83,9 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	if err != nil {
 		return err
 	}
-	tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
 
 	parsers := [...]func(){
 		func() {

@@ -116,7 +116,7 @@ type dep struct {
 }
 
 func (g *Generator) importDeps(bw *bufio.Writer, deps ...dep) {
-	bw.WriteString("import (\n")
+	_, _ = bw.WriteString("import (\n")
 	prev := deps[0].std
 	for _, dep := range deps {
 		if dep.std != prev {
@@ -169,7 +169,7 @@ func (g *Generator) Generate(pkg Package) error {
 		bw := bufio.NewWriter(file)
 
 		g.fileHeader(bw, pkg.Name)
-		bw.Flush() // Omit `... found EOF want package` error on panics.
+		_ = bw.Flush() // Omit `... found EOF want package` error on panics.
 
 		g.importDeps(bw,
 			dep{
@@ -231,7 +231,7 @@ func (g *Generator) Generate(pkg Package) error {
 			g.seenConv[name] = true
 		}
 		if err := bw.Flush(); err != nil {
-			os.Remove(file.Name())
+			_ = os.Remove(file.Name())
 			return err
 		}
 	}
@@ -955,12 +955,12 @@ func format(bw *bufio.Writer, info types.BasicInfo, depth int, in string) {
 
 func line(bw *bufio.Writer, args ...string) {
 	code(bw, args...)
-	bw.WriteByte('\n')
+	_ = bw.WriteByte('\n')
 }
 
 func code(bw *bufio.Writer, args ...string) {
 	for _, arg := range args {
-		bw.WriteString(arg)
+		_, _ = bw.WriteString(arg)
 	}
 }
 

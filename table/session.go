@@ -31,37 +31,39 @@ type Client struct {
 
 // CreateSession creates new session instance.
 // Unused sessions must be destroyed.
-func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
-	c.traceCreateSessionStart(ctx)
+func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
+	t.traceCreateSessionStart(ctx)
 	defer func() {
-		c.traceCreateSessionDone(ctx, s, err)
+		t.traceCreateSessionDone(ctx, s, err)
 	}()
 	var (
 		req Ydb_Table.CreateSessionRequest
 		res Ydb_Table.CreateSessionResult
 	)
-	err = c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CreateSession, &req, &res))
+	err = t.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CreateSession, &req, &res))
 	if err != nil {
 		return nil, err
 	}
 	s = &Session{
 		ID: res.SessionId,
-		c:  *c,
+		c:  *t,
 		qcache: lru.Cache{
-			MaxSize: c.cacheSize(),
+			MaxSize: t.cacheSize(),
 		},
 	}
 	runtime.SetFinalizer(s, func(s *Session) {
-		go s.Close(context.Background())
+		go func() {
+			_ = s.Close(context.Background())
+		}()
 	})
 	return
 }
 
-func (c *Client) cacheSize() int {
-	if c.MaxQueryCacheSize <= 0 {
+func (t *Client) cacheSize() int {
+	if t.MaxQueryCacheSize <= 0 {
 		return DefaultMaxQueryCacheSize
 	}
-	return c.MaxQueryCacheSize
+	return t.MaxQueryCacheSize
 }
 
 // Session represents a single table API session.

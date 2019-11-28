@@ -65,12 +65,12 @@ func (m *MetadataServer) DialFunc(_ context.Context, network, addr string) (net.
 		select {
 		case <-done:
 		case <-exit:
-			client.SetDeadline(aLongTimeAgo)
+			_ = client.SetDeadline(aLongTimeAgo)
 		}
 	}()
 	go func() {
 		defer func() {
-			client.Close()
+			_ = client.Close()
 			close(done)
 		}()
 		var (

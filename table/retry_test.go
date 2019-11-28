@@ -170,7 +170,7 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 			},
 		},
 	}
-	r.Do(
+	_ = r.Do(
 		context.Background(),
 		OperationFunc(func(ctx context.Context, s *Session) error {
 			if bad[s] {

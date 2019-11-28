@@ -230,7 +230,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 	}
 	defer func() {
 		if err != nil {
-			cluster.Close()
+			_ = cluster.Close()
 		}
 	}()
 	var explorer *repeater

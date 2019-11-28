@@ -30,12 +30,12 @@ type Command struct {
 func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
 	flag.Usage = func() {
 		out := flag.Output()
-		fmt.Fprintf(out, "Usage:\n%s command [options]\n", os.Args[0])
-		fmt.Fprintf(out, "\nOptions:\n")
+		_, _ = fmt.Fprintf(out, "Usage:\n%s command [options]\n", os.Args[0])
+		_, _ = fmt.Fprintf(out, "\nOptions:\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(out, "\nCommands:\n")
+		_, _ = fmt.Fprintf(out, "\nCommands:\n")
 		for c := range actions {
-			fmt.Fprintf(out, "  - %s\n", c)
+			_, _ = fmt.Fprintf(out, "  - %s\n", c)
 		}
 	}
 

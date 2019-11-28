@@ -53,7 +53,7 @@ func Run(cmd Command) {
 
 	cmd.ExportFlags(flag)
 
-	flag.Parse(os.Args[1:])
+	_ = flag.Parse(os.Args[1:])
 	params.Args = flag.Args()
 
 	ctx, cancel := context.WithCancel(context.Background())

@@ -254,7 +254,7 @@ func setupDeadline(ctx context.Context, conn net.Conn) (cancel func(*error)) {
 		case <-done:
 			interrupt <- nil
 		case <-ctx.Done():
-			conn.SetDeadline(aLongTimeAgo)
+			_ = conn.SetDeadline(aLongTimeAgo)
 			interrupt <- ctx.Err()
 		}
 	}()

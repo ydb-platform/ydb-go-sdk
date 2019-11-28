@@ -87,7 +87,7 @@ func CleanupDatabase(ctx context.Context, d ydb.Driver, sp table.SessionProvider
 				}
 				log.Println(strings.Repeat(" ", i*2), "dropping", c.Type, pt)
 				err = s.DropTable(ctx, pt)
-				sp.Put(ctx, s)
+				_ = sp.Put(ctx, s)
 				if err != nil {
 					return err
 				}

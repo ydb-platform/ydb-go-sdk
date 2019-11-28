@@ -118,7 +118,7 @@ func (c *cluster) Close() (err error) {
 			continue
 		}
 		if cc := c.conn; cc != nil {
-			cc.Close()
+			_ = cc.Close()
 		}
 	}
 
@@ -204,7 +204,7 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint) {
 	var wait chan struct{}
 	defer func() {
 		if err != nil && cc != nil {
-			cc.Close()
+			_ = cc.Close()
 			return
 		}
 		if wait != nil {
@@ -294,7 +294,7 @@ func (c *cluster) Remove(_ context.Context, e Endpoint) {
 	if entry.conn != nil {
 		// entry.conn may be nil when connection is being tracked after
 		// unsuccessful dial().
-		entry.conn.conn.Close()
+		_ = entry.conn.conn.Close()
 	}
 }
 
@@ -421,7 +421,7 @@ func (c *cluster) tracker() {
 				}
 				c.mu.Unlock()
 				if !actual {
-					conn.conn.Close()
+					_ = conn.conn.Close()
 				}
 				if wait != nil {
 					close(wait)
@@ -437,7 +437,7 @@ func (c *cluster) tracker() {
 			for _, el := range queue {
 				conn := el.Value.(*conn)
 				if conn.conn != nil {
-					conn.conn.Close()
+					_ = conn.conn.Close()
 				}
 			}
 			return

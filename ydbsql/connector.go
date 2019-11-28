@@ -232,7 +232,7 @@ type Driver struct {
 }
 
 func (d *Driver) Close() error {
-	d.c.pool.Close(context.Background())
+	_ = d.c.pool.Close(context.Background())
 	return d.c.client.Driver.Close()
 }
 

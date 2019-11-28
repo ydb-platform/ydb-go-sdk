@@ -43,12 +43,12 @@ func (q *QueryPhase) init(x *Ydb_TableStats.QueryPhaseStats) {
 //
 // If ok flag is false, then there are no more accessed tables and t is
 // invalid.
-func (p *QueryPhase) NextTableAccess() (t TableAccess, ok bool) {
-	if p.pos >= len(p.tables) {
+func (q *QueryPhase) NextTableAccess() (t TableAccess, ok bool) {
+	if q.pos >= len(q.tables) {
 		return
 	}
-	t.init(p.tables[p.pos])
-	p.pos++
+	t.init(q.tables[q.pos])
+	q.pos++
 	return t, true
 }
 

@@ -63,7 +63,7 @@ func TestStatementRemoveNotFound(t *testing.T) {
 	prepare()
 	assertNotPrepared() // Used from cache.
 
-	stmt1.Execute(ctx, TxControl(), nil)
+	_, _, _ = stmt1.Execute(ctx, TxControl(), nil)
 	prepare()
 	assertPrepared()
 }

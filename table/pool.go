@@ -803,14 +803,14 @@ func (p *SessionPool) notify(s *Session) (notified bool) {
 }
 
 // p.mu must NOT be held.
-func (p *SessionPool) closeSession(ctx context.Context, s *Session) error {
+func (p *SessionPool) closeSession(ctx context.Context, s *Session) {
 	timeout := p.DeleteTimeout
 	if timeout <= 0 {
 		timeout = DefaultSessionPoolDeleteTimeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	return s.Close(ctx)
+	_ = s.Close(ctx)
 }
 
 func (p *SessionPool) keepAliveSession(ctx context.Context, s *Session) (SessionInfo, error) {
