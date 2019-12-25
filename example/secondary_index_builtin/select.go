@@ -8,7 +8,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
@@ -36,8 +35,7 @@ func doSelect(
 			views >= $minViews
 	`
 	if len(args) == 0 {
-		fmt.Println("min views argument required")
-		return cli.ErrPrintUsage
+		return fmt.Errorf("min views argument required")
 	}
 	minViews, err := strconv.ParseUint(args[0], 10, 64)
 	if err != nil {
@@ -91,8 +89,7 @@ func doSelectJoin(
 			t2.name == $userName;
 	`
 	if len(args) == 0 {
-		fmt.Println("user name argument required")
-		return cli.ErrPrintUsage
+		return fmt.Errorf("user name argument requiered")
 	}
 	userName := args[0]
 

@@ -1027,7 +1027,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	<-timer.Created
 
 	// Now the most interesting and delicate part: we want to emulate a race
-	// condition between awaiting the session by touchCound() call and session
+	// condition between awaiting the session by touchCond() call and session
 	// deletion after failed Keepalive().
 	//
 	// So first step is to force keepalive. Note that we do not send keepalive

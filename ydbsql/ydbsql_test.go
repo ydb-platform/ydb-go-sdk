@@ -60,7 +60,7 @@ func TestLegacyDriverOpen(t *testing.T) {
 	t.Skip("need to be tested with docker")
 
 	db, err := sql.Open("ydb", fmt.Sprintf(
-		"ydb://ydb-ru.yandex.net:2135/ru/home/kamardin/mydb?token=%s",
+		"ydb://ydb-ru.yandex.net:2135/ru/home/kamardin/mydb?auth-token=%s",
 		os.Getenv("YDB_TOKEN"),
 	))
 	if err != nil {

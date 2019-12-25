@@ -19,24 +19,40 @@ func doCreate(
 		opts []table.CreateTableOption
 	}{
 		{
-			name: TableSeries,
+			name: "series",
 			opts: []table.CreateTableOption{
 				table.WithColumn("series_id", ydb.Optional(ydb.TypeUint64)),
 				table.WithColumn("title", ydb.Optional(ydb.TypeUTF8)),
-				table.WithColumn("series_info", ydb.Optional(ydb.TypeUTF8)),
+				table.WithColumn("info", ydb.Optional(ydb.TypeUTF8)),
 				table.WithColumn("release_date", ydb.Optional(ydb.TypeDatetime)),
 				table.WithColumn("views", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("uploaded_user_id", ydb.Optional(ydb.TypeUint64)),
 
 				table.WithPrimaryKeyColumn("series_id"),
+
+				table.WithIndex("views_index",
+					table.WithIndexType(table.GlobalIndex()),
+					table.WithIndexColumns("views"),
+				),
+				table.WithIndex("users_index",
+					table.WithIndexType(table.GlobalIndex()),
+					table.WithIndexColumns("uploaded_user_id"),
+				),
 			},
 		},
 		{
-			name: TableSeriesRevViews,
+			name: "users",
 			opts: []table.CreateTableOption{
-				table.WithColumn("rev_views", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("series_id", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("user_id", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("name", ydb.Optional(ydb.TypeUTF8)),
+				table.WithColumn("age", ydb.Optional(ydb.TypeUint32)),
 
-				table.WithPrimaryKeyColumn("rev_views", "series_id"),
+				table.WithPrimaryKeyColumn("user_id"),
+
+				table.WithIndex("name_index",
+					table.WithIndexType(table.GlobalIndex()),
+					table.WithIndexColumns("name"),
+				),
 			},
 		},
 	} {

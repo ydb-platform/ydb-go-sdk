@@ -15,7 +15,7 @@ type QueryStats struct {
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
 func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
-	if s.pos >= len(s.stats.QueryPhases) {
+	if s.stats == nil || s.pos >= len(s.stats.QueryPhases) {
 		return
 	}
 	p.init(s.stats.QueryPhases[s.pos])

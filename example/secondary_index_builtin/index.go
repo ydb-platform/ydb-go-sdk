@@ -13,19 +13,13 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
-const (
-	TableSeries         = "series"
-	TableSeriesRevViews = "series_rev_views"
-)
-
 var actions = map[string]func(context.Context, *table.SessionPool, string, ...string) error{
-	"create":    doCreate,
-	"generate":  doGenerate,
-	"update":    doUpdate,
-	"list":      doList,
-	"listviews": doListViews,
-	"delete":    doDelete,
-	"drop":      doDrop,
+	"create":     doCreate,
+	"insert":     doInsert,
+	"select":     doSelect,
+	"selectjoin": doSelectJoin,
+	"drop":       doDrop,
+	"describe":   doDescribe,
 }
 
 type Command struct {

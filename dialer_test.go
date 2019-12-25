@@ -104,7 +104,7 @@ func TestClusterTracking(t *testing.T) {
 		Driver: d,
 	}
 	mustCreateSession := func() {
-		sub, cancel := context.WithTimeout(ctx, 5*time.Second)
+		sub, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		_, err = tc.CreateSession(sub)
 		if err != nil {
