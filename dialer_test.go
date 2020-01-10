@@ -43,15 +43,9 @@ func TestClusterTracking(t *testing.T) {
 		)
 	})
 	var (
-		dialTicket  = make(chan func(net.Conn) net.Conn, 1)
-		dialRefused = make(chan chan struct{}, 1)
+		dialTicket = make(chan func(net.Conn) net.Conn, 1)
 	)
-	closeConn := func(conn net.Conn) {
-		ch := make(chan struct{})
-		dialRefused <- ch
-		_ = conn.Close()
-		<-ch
-	}
+
 	dialer := &ydb.Dialer{
 		DriverConfig: &ydb.DriverConfig{
 			Database:          "xxx",
@@ -60,23 +54,14 @@ func TestClusterTracking(t *testing.T) {
 		},
 		NetDial: func(ctx context.Context, addr string) (net.Conn, error) {
 			var wrap func(net.Conn) net.Conn
-			switch addr {
-			case balancer.Addr().String():
+			if addr == balancer.Addr().String() {
 				// Dialing for balancer.
 				return balancer.DialContext(ctx)
+			}
 
-			default:
-				// Dialing for endpoint.
-				select {
-				case wrap = <-dialTicket:
-				default:
-					select {
-					case ch := <-dialRefused:
-						close(ch)
-					default:
-					}
-					return nil, fmt.Errorf("stub: kinda refused")
-				}
+			select {
+			// Dialing for endpoint.
+			case wrap = <-dialTicket:
 				conn, err := db.DialContext(ctx, addr)
 				if err != nil {
 					return nil, err
@@ -85,6 +70,9 @@ func TestClusterTracking(t *testing.T) {
 					conn = wrap(conn)
 				}
 				return conn, nil
+
+			default:
+				return nil, fmt.Errorf("stub: kinda refused")
 			}
 		},
 		Keepalive: 10 * time.Second,
@@ -131,7 +119,7 @@ func TestClusterTracking(t *testing.T) {
 	mustCreateSession()
 
 	// Now close the connection to force driver to redial.
-	closeConn(conn)
+	_ = conn.Close()
 	// Must not create session because there are no alive conns.
 	mustNotCreateSession()
 
@@ -143,7 +131,7 @@ func TestClusterTracking(t *testing.T) {
 	mustCreateSession()
 
 	// Now close the connection to force driver to redial.
-	closeConn(conn)
+	_ = conn.Close()
 	// Must not create session because there are no alive conns.
 	mustNotCreateSession()
 
@@ -171,8 +159,10 @@ func TestClusterTracking(t *testing.T) {
 
 	// Allow one connection to the endpoint.
 	dialTicket <- nil
-	<-endpoint.ServerConn()
+	conn = <-endpoint.ServerConn()
 	mustCreateSession()
+
+	_ = conn.Close()
 }
 
 type connProxy struct {

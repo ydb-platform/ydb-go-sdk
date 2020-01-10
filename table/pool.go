@@ -27,7 +27,7 @@ var (
 	// that the pool is full and requested operation is not able to complete.
 	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
 
-	// ErrUnknownSession is returned by a SessionPool instance to indicate that
+	// ErrSessionUnknown is returned by a SessionPool instance to indicate that
 	// requested session does not exist within the pool.
 	ErrSessionUnknown = errors.New("ydb: table: unknown session")
 
@@ -59,7 +59,7 @@ type SessionPool struct {
 
 	// IdleLimit is an upper bound of pooled sessions without any activity
 	// within.
-	//IdleLimit int
+	// IdleLimit int
 
 	// IdleThreshold is a maximum duration between any activity within session.
 	// If this threshold reached, KeepAlive() method will be called on idle
@@ -223,7 +223,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		case s == nil && len(p.index) < p.limit:
 			// Can create new session without awaiting for reused one.
 			// Note that we must not increase p.n counter until successful session
-			// creation – in other way we will block some getter awaing on reused
+			// creation – in other way we will block some getter awaiting on reused
 			// session which creation was actually failed here.
 			//
 			// But on the other side, this behavior is racy – there is a
@@ -408,6 +408,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 		// Try to await touched session before creation of new one.
 		select {
 		case <-cond:
+
 		case <-ctx.Done():
 			return false, ctx.Err()
 		}
@@ -437,7 +438,7 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 			// Session could be deleted by some reason after we released the mutex.
 			// We are not dealing with this because even if session is not deleted
 			// by keeper() it could be staled on the server and the same user
-			// expirience will appear.
+			// experience will appear.
 		}
 		p.mu.Unlock()
 
@@ -545,9 +546,6 @@ func (p *SessionPool) busyChecker() {
 			}
 			return
 
-		case <-timer.C():
-			active = false
-
 		case s := <-p.busyCheck:
 			p.traceBusyCheckStart(ctx, s)
 
@@ -564,40 +562,41 @@ func (p *SessionPool) busyChecker() {
 				timer.Reset(p.BusyCheckInterval)
 			}
 
-			continue
-		}
-		for i := 0; i < len(toCheck); {
-			s := toCheck[i]
-			info, err := p.keepAliveSession(ctx, s)
-			if err != nil || info.Status == SessionReady {
-				n := len(toCheck)
-				toCheck[i] = toCheck[n-1]
-				toCheck[n-1] = nil
-				toCheck = toCheck[:n-1]
+		case <-timer.C():
+			active = false
+			for i := 0; i < len(toCheck); {
+				s := toCheck[i]
+				info, err := p.keepAliveSession(ctx, s)
+				if err != nil || info.Status == SessionReady {
+					n := len(toCheck)
+					toCheck[i] = toCheck[n-1]
+					toCheck[n-1] = nil
+					toCheck = toCheck[:n-1]
 
-				p.mu.Lock()
-				enoughSpace := !p.closed && len(p.index) < p.limit
-				reuse := enoughSpace && err == nil
-				if reuse {
-					p.index[s] = sessionInfo{}
-					if !p.notify(s) {
-						p.pushIdle(s, timeutil.Now())
-						p.pushReady(s)
+					p.mu.Lock()
+					enoughSpace := !p.closed && len(p.index) < p.limit
+					reuse := enoughSpace && err == nil
+					if reuse {
+						p.index[s] = sessionInfo{}
+						if !p.notify(s) {
+							p.pushIdle(s, timeutil.Now())
+							p.pushReady(s)
+						}
 					}
-				}
-				p.mu.Unlock()
-				if !reuse {
-					p.closeSession(ctx, s)
-				}
+					p.mu.Unlock()
+					if !reuse {
+						p.closeSession(ctx, s)
+					}
 
-				p.traceBusyCheckDone(ctx, s, reuse, err)
-			} else {
-				i++
+					p.traceBusyCheckDone(ctx, s, reuse, err)
+				} else {
+					i++
+				}
 			}
-		}
-		if len(toCheck) > 0 {
-			// Timer is never active here.
-			timer.Reset(p.BusyCheckInterval)
+			if len(toCheck) > 0 {
+				// Timer is never active here.
+				timer.Reset(p.BusyCheckInterval)
+			}
 		}
 	}
 }
@@ -615,11 +614,6 @@ func (p *SessionPool) keeper() {
 	for {
 		var now time.Time
 		select {
-		case now = <-timer.C():
-			// Handle tick outside select.
-			toTouch = toTouch[:0]
-			toDelete = toDelete[:0]
-
 		case <-wake:
 			wake = make(chan struct{})
 			timer.Reset(p.IdleThreshold)
@@ -627,85 +621,89 @@ func (p *SessionPool) keeper() {
 
 		case <-p.keeperStop:
 			return
-		}
 
-		p.mu.Lock()
-		{
-			p.touching = true
-			// Iterate over n most idle items.
-			n := p.KeepAliveBatchSize
-			if n <= 0 {
-				n = p.idle.Len()
-			}
-			for i := 0; i < n; i++ {
-				s, touched := p.peekFirstIdle()
-				if s == nil || now.Sub(touched) < p.IdleThreshold {
-					break
-				}
-				p.removeIdle(s)
-				toTouch = append(toTouch, s)
-			}
-		}
-		p.mu.Unlock()
-
-		var mark *list.Element // Element in the list to insert touched sessions after.
-		for i, s := range toTouch {
-			toTouch[i] = nil
-
-			_, err := p.keepAliveSession(context.Background(), s)
-			if err != nil {
-				toDelete = append(toDelete, s)
-				continue
-			}
+		case now = <-timer.C():
+			toTouch = toTouch[:0]
+			toDelete = toDelete[:0]
 
 			p.mu.Lock()
-			if !p.notify(s) {
-				// Need to push back session into list in order, to prevent
-				// shuffling of sessions order.
-				//
-				// That is, there may be a race condition, when some session S1
-				// pushed back in the list before we took the mutex. Suppose S1
-				// touched time is greater than ours `now` for S0. If so, it
-				// then may interrupt next keep alive iteration earlier and
-				// prevent our session S0 being touched:
-				// time.Since(S1) < threshold but time.Since(S0) > threshold.
-				mark = p.pushIdleInOrderAfter(s, now, mark)
+			{
+				p.touching = true
+				// Iterate over n most idle items.
+				n := p.KeepAliveBatchSize
+				if n <= 0 {
+					n = p.idle.Len()
+				}
+				for i := 0; i < n; i++ {
+					s, touched := p.peekFirstIdle()
+					if s == nil || now.Sub(touched) < p.IdleThreshold {
+						break
+					}
+					p.removeIdle(s)
+					toTouch = append(toTouch, s)
+				}
 			}
 			p.mu.Unlock()
-		}
 
-		var (
-			sleep bool
-			delay time.Duration
-		)
-		p.mu.Lock()
+			var mark *list.Element // Element in the list to insert touched sessions after.
+			for i, s := range toTouch {
+				toTouch[i] = nil
 
-		if s, touched := p.peekFirstIdle(); s == nil {
-			// No sessions to check. Let the Put() caller to wake up
-			// keeper when session arrive.
-			sleep = true
-			p.keeperWake = wake
-		} else {
-			// NOTE: negative delay is also fine.
-			delay = p.IdleThreshold - now.Sub(touched)
-		}
+				_, err := p.keepAliveSession(context.Background(), s)
+				if err != nil {
+					toDelete = append(toDelete, s)
+					continue
+				}
 
-		// Takers notification broadcast channel.
-		touchingDone := p.touchingDone
-		p.touchingDone = nil
-		p.touching = false
+				p.mu.Lock()
+				if !p.notify(s) {
+					// Need to push back session into list in order, to prevent
+					// shuffling of sessions order.
+					//
+					// That is, there may be a race condition, when some session S1
+					// pushed back in the list before we took the mutex. Suppose S1
+					// touched time is greater than ours `now` for S0. If so, it
+					// then may interrupt next keep alive iteration earlier and
+					// prevent our session S0 being touched:
+					// time.Since(S1) < threshold but time.Since(S0) > threshold.
+					mark = p.pushIdleInOrderAfter(s, now, mark)
+				}
+				p.mu.Unlock()
+			}
 
-		p.mu.Unlock()
+			var (
+				sleep bool
+				delay time.Duration
+			)
+			p.mu.Lock()
 
-		if !sleep {
-			timer.Reset(delay)
-		}
-		for i, s := range toDelete {
-			toDelete[i] = nil
-			p.closeSession(context.Background(), s)
-		}
-		if touchingDone != nil {
-			close(touchingDone)
+			if s, touched := p.peekFirstIdle(); s == nil {
+				// No sessions to check. Let the Put() caller to wake up
+				// keeper when session arrive.
+				sleep = true
+				p.keeperWake = wake
+			} else {
+				// NOTE: negative delay is also fine.
+				delay = p.IdleThreshold - now.Sub(touched)
+			}
+
+			// Takers notification broadcast channel.
+			touchingDone := p.touchingDone
+			p.touchingDone = nil
+			p.touching = false
+
+			p.mu.Unlock()
+
+			if !sleep {
+				timer.Reset(delay)
+			}
+			for i, s := range toDelete {
+				toDelete[i] = nil
+				p.closeSession(context.Background(), s)
+			}
+			if touchingDone != nil {
+				close(touchingDone)
+			}
 		}
 	}
 }
