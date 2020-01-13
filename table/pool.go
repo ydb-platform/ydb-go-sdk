@@ -181,6 +181,7 @@ func (p *SessionPool) createSession(ctx context.Context) (s *Session, err error)
 			}
 			if info.ready != nil {
 				p.ready.Remove(info.ready)
+				info.ready = nil
 			}
 		})
 	}
@@ -219,8 +220,8 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			return nil, ErrSessionPoolClosed
 		}
 		s = p.removeFirstIdle()
-		switch {
-		case s == nil && len(p.index) < p.limit:
+
+		if s == nil && len(p.index) < p.limit {
 			// Can create new session without awaiting for reused one.
 			// Note that we must not increase p.n counter until successful session
 			// creation – in other way we will block some getter awaiting on reused
@@ -239,10 +240,8 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			if err != nil {
 				return nil, err
 			}
-
 			p.mu.Lock()
-
-		case s == nil && len(p.index) == p.limit:
+		} else if s == nil && len(p.index) == p.limit {
 			// Try to wait for a touched session instead of creating new one.
 			//
 			// This should be done only if number of currently waiting goroutines
@@ -430,16 +429,14 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 	p.init()
 
 	const maxAttempts = 10
-	for i := 0; s == nil && i < maxAttempts; i++ {
+	for i := 0; i < maxAttempts; i++ {
 		p.mu.Lock()
-		if p.ready.Len() > 0 {
-			s = p.ready.Remove(p.ready.Front()).(*Session)
-			// NOTE: here is a race condition with keeper() running.
-			// Session could be deleted by some reason after we released the mutex.
-			// We are not dealing with this because even if session is not deleted
-			// by keeper() it could be staled on the server and the same user
-			// experience will appear.
-		}
+		// NOTE: here is a race condition with keeper() running.
+		// Session could be deleted by some reason after we released the mutex.
+		// We are not dealing with this because even if session is not deleted
+		// by keeper() it could be staled on the server and the same user
+		// experience will appear.
+		s = p.getReady()
 		p.mu.Unlock()
 
 		if s == nil {
@@ -447,8 +444,8 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 		}
 
 		took, err := p.Take(ctx, s)
-		if err == ErrSessionUnknown {
-			// Race described above occured – retry.
+		if err == nil && !took || err == ErrSessionUnknown {
+			// Session was marked for deletion or deleted by keeper() - race happen - retry
 			s = nil
 			err = nil
 			continue
@@ -456,13 +453,10 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 		if err != nil {
 			p.mu.Lock()
 			if !p.closed {
-				p.ready.PushBack(s)
+				p.pushReady(s)
 			}
 			p.mu.Unlock()
 			return nil, err
-		}
-		if !took {
-			panic("ydb: table: inconsistent session pool usage")
 		}
 
 		return s, nil
@@ -853,20 +847,7 @@ func (p *SessionPool) takeIdle(s *Session) (has, took bool) {
 
 // p.mu must be held.
 func (p *SessionPool) pushIdle(s *Session, now time.Time) {
-	p.handlePush(s, now, p.idle.PushBack(s))
-}
-
-// p.mu must be held.
-func (p *SessionPool) pushReady(s *Session) {
-	info, has := p.index[s]
-	if !has {
-		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
-	}
-	if info.ready != nil {
-		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
-	}
-	info.ready = p.ready.PushBack(s)
-	p.index[s] = info
+	p.handlePushIdle(s, now, p.idle.PushBack(s))
 }
 
 // p.mu must be held.
@@ -884,7 +865,7 @@ func (p *SessionPool) pushIdleInOrder(s *Session, now time.Time) (el *list.Eleme
 	} else {
 		el = p.idle.PushFront(s)
 	}
-	p.handlePush(s, now, el)
+	p.handlePushIdle(s, now, el)
 	return el
 }
 
@@ -895,7 +876,7 @@ func (p *SessionPool) pushIdleInOrderAfter(s *Session, now time.Time, mark *list
 		el := p.idle.InsertAfter(s, mark)
 		if n < p.idle.Len() {
 			// List changed, thus mark belongs to list.
-			p.handlePush(s, now, el)
+			p.handlePushIdle(s, now, el)
 			return el
 		}
 	}
@@ -903,7 +884,7 @@ func (p *SessionPool) pushIdleInOrderAfter(s *Session, now time.Time, mark *list
 }
 
 // p.mu must be held.
-func (p *SessionPool) handlePush(s *Session, now time.Time, el *list.Element) {
+func (p *SessionPool) handlePushIdle(s *Session, now time.Time, el *list.Element) {
 	info, has := p.index[s]
 	if !has {
 		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
@@ -925,6 +906,37 @@ func (p *SessionPool) wakeUpKeeper() {
 		p.keeperWake = nil
 		close(wake)
 	}
+}
+
+// p.mu must be held.
+func (p *SessionPool) getReady() *Session {
+	if p.ready.Len() == 0 {
+		return nil
+	}
+
+	s := p.ready.Remove(p.ready.Front()).(*Session)
+	info, has := p.index[s]
+	if !has {
+		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
+	}
+	if info.ready == nil {
+		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
+	}
+	info.ready = nil
+	return s
+}
+
+// p.mu must be held.
+func (p *SessionPool) pushReady(s *Session) {
+	info, has := p.index[s]
+	if !has {
+		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
+	}
+	if info.ready != nil {
+		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
+	}
+	info.ready = p.ready.PushBack(s)
+	p.index[s] = info
 }
 
 func (p *SessionPool) traceGetStart(ctx context.Context) {
