@@ -26,9 +26,6 @@ func TestClusterTracking(t *testing.T) {
 			Ydb_Table_V1.CreateSession: ydbtest.SuccessHandler(
 				ydbtest.Ident(&Ydb_Table.CreateSessionResult{}),
 			),
-			Ydb_Table_V1.DeleteSession: ydbtest.SuccessHandler(
-				ydbtest.Ident(&Ydb_Table.DeleteSessionResponse{}),
-			),
 		},
 		T: t,
 	}
@@ -158,7 +155,7 @@ func TestClusterTracking(t *testing.T) {
 
 	// Wait for grpc keepalive being prepared and redial attempt made.
 	// It takes 2 keepalive checks to insure that connection is dead
-	time.Sleep(dialer.Keepalive * 3)
+	time.Sleep(dialer.Keepalive * 2)
 	mustNotCreateSession()
 
 	// Allow one connection to the endpoint.

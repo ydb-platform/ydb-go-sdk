@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"runtime"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
@@ -51,11 +50,6 @@ func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 			MaxSize: t.cacheSize(),
 		},
 	}
-	runtime.SetFinalizer(s, func(s *Session) {
-		go func() {
-			_ = s.Close(context.Background())
-		}()
-	})
 	return
 }
 
@@ -99,7 +93,6 @@ func (s *Session) Close(ctx context.Context) (err error) {
 	s.closed = true
 	s.c.traceDeleteSessionStart(ctx, s)
 	defer func() {
-		runtime.SetFinalizer(s, nil)
 		for _, cb := range s.onClose {
 			cb()
 		}
