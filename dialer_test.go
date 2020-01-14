@@ -26,6 +26,9 @@ func TestClusterTracking(t *testing.T) {
 			Ydb_Table_V1.CreateSession: ydbtest.SuccessHandler(
 				ydbtest.Ident(&Ydb_Table.CreateSessionResult{}),
 			),
+			Ydb_Table_V1.DeleteSession: ydbtest.SuccessHandler(
+				ydbtest.Ident(&Ydb_Table.DeleteSessionResponse{}),
+			),
 		},
 		T: t,
 	}
@@ -75,7 +78,7 @@ func TestClusterTracking(t *testing.T) {
 				return nil, fmt.Errorf("stub: kinda refused")
 			}
 		},
-		Keepalive: 10 * time.Second,
+		Keepalive: 10 * time.Second, // Min GRPC KeepAlive time is 10s
 		Timeout:   250 * time.Millisecond,
 	}
 	d, err := dialer.Dial(ctx, balancer.Addr().String())
@@ -100,7 +103,7 @@ func TestClusterTracking(t *testing.T) {
 		}
 	}
 	mustNotCreateSession := func() {
-		sub, cancel := context.WithTimeout(ctx, time.Second)
+		sub, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
 		if _, err = tc.CreateSession(sub); err == nil {
 			t.Fatalf("unexpected no error")
@@ -153,8 +156,9 @@ func TestClusterTracking(t *testing.T) {
 	c.ticket <- struct{}{}
 	mustNotCreateSession()
 
-	// Wait for keepalive being prepared and redial attempt made.
-	time.Sleep(dialer.Keepalive * 2)
+	// Wait for grpc keepalive being prepared and redial attempt made.
+	// It takes 2 keepalive checks to insure that connection is dead
+	time.Sleep(dialer.Keepalive * 3)
 	mustNotCreateSession()
 
 	// Allow one connection to the endpoint.
@@ -172,7 +176,7 @@ type connProxy struct {
 
 func newConnProxy() *connProxy {
 	return &connProxy{
-		ticket: make(chan struct{}, 1),
+		ticket: make(chan struct{}),
 	}
 }
 
