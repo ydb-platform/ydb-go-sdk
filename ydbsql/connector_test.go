@@ -3,6 +3,7 @@ package ydbsql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -42,5 +43,40 @@ func TestConnectorDialOnPing(t *testing.T) {
 	case <-dial:
 	case <-time.After(timeout):
 		t.Fatalf("no dial after %s", timeout)
+	}
+}
+
+// KIKIMR-8592: check that we try re-dial after any error
+func TestConnectorRedialOnError(t *testing.T) {
+	const timeout = 100 * time.Millisecond
+
+	client, server := net.Pipe()
+	defer server.Close()
+	success := make(chan bool, 1)
+
+	dial := false
+	c := Connector(
+		WithEndpoint("127.0.0.1:9999"),
+		WithDialer(ydb.Dialer{
+			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
+				dial = true
+				if <-success {
+					// it will still fails on grpc dial
+					return client, nil
+				}
+				return nil, errors.New("any error")
+			},
+		}),
+	)
+
+	db := sql.OpenDB(c)
+	for i := 0; i < 3; i++ {
+		success <- i%2 == 0
+		ctx, _ := context.WithTimeout(context.Background(), timeout)
+		_ = db.PingContext(ctx)
+		if !dial {
+			t.Fatalf("no dial on re-ping at %v iteration", i)
+		}
+		dial = false
 	}
 }

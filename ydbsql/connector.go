@@ -23,12 +23,9 @@ func WithDialer(d ydb.Dialer) ConnectorOption {
 	}
 }
 
-// NOTE: must be called after all other options.
 func WithClient(client *table.Client) ConnectorOption {
 	return func(c *connector) {
-		c.prepare(func(_ context.Context) (*table.Client, error) {
-			return client, nil
-		})
+		c.client = client
 	}
 }
 
@@ -140,51 +137,37 @@ type connector struct {
 
 	clientTrace table.ClientTrace
 
-	once   sync.Once
+	mu     sync.Mutex
 	ready  chan struct{}
-	err    error // sticky error.
 	client *table.Client
 	pool   table.SessionPool // Used as a template for created connections.
 
 	retryConfig RetryConfig
 }
 
-func (c *connector) init(ctx context.Context) error {
-	c.prepare(c.dial)
-	select {
-	case <-c.ready:
-		return c.err
-	case <-ctx.Done():
-		return ctx.Err()
+func (c *connector) init(ctx context.Context) (err error) {
+	// in driver database/sql/sql.go:1228 connect run under mutex, but don't rely on it here
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Setup some more on less generic reasonable pool limit to prevent
+	// session overflow on the YDB servers.
+	//
+	// Note that it must be controlled from outside by making
+	// database/sql.DB.SetMaxIdleConns() call. Unfortunately, we can not
+	// receive that limit here and we do not want to force user to
+	// configure it twice (and pass it as an option to connector).
+	if c.pool.SizeLimit == 0 {
+		c.pool.SizeLimit = DefaultSessionPoolSizeLimit
 	}
-}
-
-func (c *connector) prepare(dial func(context.Context) (*table.Client, error)) {
-	c.once.Do(func() {
-		c.ready = make(chan struct{})
-		go func() {
-			defer close(c.ready)
-			ctx := context.TODO()
-			c.client, c.err = dial(ctx)
-			if c.err != nil {
-				return
-			}
-			c.pool.Builder = c.client
-
-			// Setup some more on less generic reasonable pool limit to prevent
-			// session overflow on the YDB servers.
-			//
-			// Note that it must be controlled from outside by making
-			// database/sql.DB.SetMaxIdleConns() call. Unfortunatly, we can not
-			// receive that limit here and we do not want to force user to
-			// configure it twice (and pass it as an option to connector).
-			c.pool.SizeLimit = DefaultSessionPoolSizeLimit
-
-			if c.pool.IdleThreshold == 0 {
-				c.pool.IdleThreshold = DefaultIdleThreshold
-			}
-		}()
-	})
+	if c.pool.IdleThreshold == 0 {
+		c.pool.IdleThreshold = DefaultIdleThreshold
+	}
+	if c.client == nil {
+		c.client, err = c.dial(ctx)
+	}
+	c.pool.Builder = c.client
+	return
 }
 
 func (c *connector) dial(ctx context.Context) (*table.Client, error) {
