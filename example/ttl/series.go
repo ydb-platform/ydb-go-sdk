@@ -378,10 +378,8 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 			table.OperationFunc(func(ctx context.Context, s *table.Session) error {
 				return s.CreateTable(ctx, path.Join(prefix, fmt.Sprintf("expiration_queue_%v", i)),
 					table.WithColumn("doc_id", ydb.Optional(ydb.TypeUint64)),
-					table.WithColumn("url", ydb.Optional(ydb.TypeUTF8)),
-					table.WithColumn("html", ydb.Optional(ydb.TypeUTF8)),
 					table.WithColumn("timestamp", ydb.Optional(ydb.TypeUint64)),
-					table.WithPrimaryKeyColumn("doc_id"),
+					table.WithPrimaryKeyColumn("timestamp", "doc_id"),
 				)
 			}),
 		)
