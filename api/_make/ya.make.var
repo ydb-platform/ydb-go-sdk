@@ -1,6 +1,14 @@
 SET(
+    api_spec_relative_dir
+    kikimr/public/api
+)
+SET(
     api_spec_root
-    ${ARCADIA_ROOT}/kikimr/public/api
+    ${ARCADIA_ROOT}/${api_spec_relative_dir}
+)
+SET(
+    api_spec_ext_proto_root
+    ${EXT_PROTO_ROOT}/${api_spec_relative_dir}
 )
 SET(
     api_spec_dirs
