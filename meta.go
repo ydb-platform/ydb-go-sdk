@@ -10,6 +10,7 @@ import (
 const (
 	metaDatabase = "x-ydb-database"
 	metaTicket   = "x-ydb-auth-ticket"
+	metaVersion  = "x-ydb-sdk-build-info"
 )
 
 type meta struct {
@@ -23,16 +24,17 @@ type meta struct {
 	curr  metadata.MD
 }
 
-func (m *meta) init() {
-	m.once.Do(func() {
-		md := make(metadata.MD, 1)
-		md.Set(metaDatabase, m.database)
-		m.curr = md
+func (m *meta) make() metadata.MD {
+	return metadata.New(map[string]string{
+		metaDatabase: m.database,
+		metaVersion:  revisionNumber,
 	})
 }
 
 func (m *meta) md(ctx context.Context) (md metadata.MD, _ error) {
-	m.init()
+	m.once.Do(func() {
+		m.curr = m.make()
+	})
 
 	if m.credentials == nil {
 		return m.curr, nil
@@ -50,9 +52,7 @@ func (m *meta) md(ctx context.Context) (md metadata.MD, _ error) {
 		// Continue.
 
 	case ErrCredentialsDropToken:
-		md := make(metadata.MD, 1)
-		md.Set(metaDatabase, m.database)
-		return md, nil
+		return m.make(), nil
 
 	case ErrCredentialsKeepToken:
 		return m.curr, nil
