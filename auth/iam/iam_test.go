@@ -29,7 +29,7 @@ func TestClientToken(t *testing.T) {
 	)
 	key, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	prevTimeFunc := jwt.TimeFunc
@@ -137,4 +137,41 @@ func TestClientToken(t *testing.T) {
 	// ttl (which is time.Minute).
 	shiftTime(time.Second)
 	getToken(2)
+}
+
+func TestOptionsConfig(t *testing.T) {
+	const (
+		keyID    = "key-id"
+		issuer   = "issuer"
+		audience = "audience"
+		endpoint = "endpoint"
+
+		ttl = time.Minute
+	)
+	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		t.Error(err)
+	}
+
+	c, err := NewClient(
+		WithKeyID(keyID),
+		WithIssuer(issuer),
+		WithAudience(audience),
+		WithEndpoint(endpoint),
+		WithTokenTTL(ttl),
+		WithPrivateKey(key),
+	)
+	if err != nil {
+		t.Error(err)
+	}
+	if cl, ok := c.(*Client); !ok ||
+		cl.KeyID != keyID ||
+		cl.Issuer != issuer ||
+		cl.Audience != audience ||
+		cl.Endpoint != endpoint ||
+		cl.TokenTTL != ttl ||
+		cl.Key != key {
+		t.Error("client object doesn't match")
+	}
+
 }

@@ -1,5 +1,5 @@
 /*
-Package iam provides interface for retreiving and caching iam tokens.
+Package iam provides interface for retrieving and caching iam tokens.
 */
 package iam
 
@@ -7,19 +7,32 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 
+	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
-// Default Client parameters.
+// Default client parameters.
 const (
 	DefaultAudience = "https://iam.api.cloud.yandex.net/iam/v1/tokens"
+	DefaultEndpoint = "iam.api.cloud.yandex.net:443"
 	DefaultTokenTTL = time.Hour
+)
+
+var (
+	ErrServiceFileInvalid       = errors.New("service account file is not valid")
+	ErrKeyCannotBeParsed        = errors.New("private key can not be parsed")
+	ErrPemCertKeyCannotBeAppend = errors.New("pem cert can not be append")
+	ErrEndpointRequired         = errors.New("iam: endpoint required")
 )
 
 // CreateTokenError contains reason of token creation failure.
@@ -36,7 +49,192 @@ type transport interface {
 	CreateToken(ctx context.Context, jwt string) (token string, expires time.Time, err error)
 }
 
+type ClientOption func(*Client) error
+
+// WithEndpoint set provided endpoint.
+func WithEndpoint(endpoint string) ClientOption {
+	return func(c *Client) error {
+		c.Endpoint = endpoint
+		return nil
+	}
+}
+
+// WithDefaultEndpoint set endpoint with default value.
+func WithDefaultEndpoint() ClientOption {
+	return func(c *Client) error {
+		c.Endpoint = DefaultEndpoint
+		return nil
+	}
+}
+
+// WithCertPool set provided certPool.
+func WithCertPool(certPool *x509.CertPool) ClientOption {
+	return func(c *Client) error {
+		c.CertPool = certPool
+		return nil
+	}
+}
+
+// WithCertPoolFile try set root certPool from provided cert file path.
+func WithCertPoolFile(path string) ClientOption {
+	return func(c *Client) error {
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		cp := x509.NewCertPool()
+		if ok := cp.AppendCertsFromPEM(data); !ok {
+			return ErrPemCertKeyCannotBeAppend
+		}
+
+		c.CertPool = cp
+		return nil
+	}
+}
+
+// WithSystemCertPool try set certPool with system root certificates.
+func WithSystemCertPool() ClientOption {
+	return func(c *Client) error {
+		var err error
+		c.CertPool, err = x509.SystemCertPool()
+		return err
+	}
+}
+
+// WithInsecureSkipVerify set insecureSkipVerify to true which force client accepts any TLS certificate
+// presented by the iam server and any host name in that certificate.
+//
+// If InsecureSkipVerify is set, then certPool field is not used.
+//
+// This should be used only for testing purposes.
+func WithInsecureSkipVerify(insecure bool) ClientOption {
+	return func(c *Client) error {
+		c.InsecureSkipVerify = insecure
+		return nil
+	}
+}
+
+// WithKeyID set provided keyID.
+func WithKeyID(keyID string) ClientOption {
+	return func(c *Client) error {
+		c.KeyID = keyID
+		return nil
+	}
+}
+
+// WithIssuer set provided issuer.
+func WithIssuer(issuer string) ClientOption {
+	return func(c *Client) error {
+		c.Issuer = issuer
+		return nil
+	}
+}
+
+// WithTokenTTL set provided tokenTTL duration.
+func WithTokenTTL(tokenTTL time.Duration) ClientOption {
+	return func(c *Client) error {
+		c.TokenTTL = tokenTTL
+		return nil
+	}
+}
+
+// WithAudience set provided audience.
+func WithAudience(audience string) ClientOption {
+	return func(c *Client) error {
+		c.Audience = audience
+		return nil
+	}
+}
+
+// WithPrivateKey set provided private key.
+func WithPrivateKey(key *rsa.PrivateKey) ClientOption {
+	return func(c *Client) error {
+		c.Key = key
+		return nil
+	}
+}
+
+// WithPrivateKeyFile try set key from provided private key file path
+func WithPrivateKeyFile(path string) ClientOption {
+	return func(c *Client) error {
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		key, err := parsePrivateKey(data)
+		if err != nil {
+			return err
+		}
+		c.Key = key
+		return nil
+	}
+}
+
+// WithServiceFile try set key, keyID, issuer from provided service account file path.
+//
+// Do not mix this option with WithKeyID, WithIssuer and key options (WithPrivateKey, WithPrivateKeyFile, etc).
+func WithServiceFile(path string) ClientOption {
+	return func(c *Client) error {
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		type keyFile struct {
+			ID               string `json:"id"`
+			ServiceAccountID string `json:"service_account_id"`
+			PrivateKey       string `json:"private_key"`
+		}
+		var info keyFile
+		if err = json.Unmarshal(data, &info); err != nil {
+			return err
+		}
+		if info.ID == "" || info.ServiceAccountID == "" || info.PrivateKey == "" {
+			return ErrServiceFileInvalid
+		}
+
+		key, err := parsePrivateKey([]byte(info.PrivateKey))
+		if err != nil {
+			return err
+		}
+		c.Key = key
+		c.KeyID = info.ID
+		c.Issuer = info.ServiceAccountID
+		return nil
+	}
+}
+
+// NewClient creates IAM (jwt) authorized client from provided ClientOptions list.
+//
+// To create successfully at least one of endpoint options must be provided.
+func NewClient(opts ...ClientOption) (ydb.Credentials, error) {
+	c := &Client{}
+	for _, opt := range opts {
+		err := opt(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if c.Endpoint == "" {
+		return nil, ErrEndpointRequired
+	}
+	if c.Audience == "" {
+		c.Audience = DefaultAudience
+	}
+	if c.TokenTTL == 0 {
+		c.TokenTTL = DefaultTokenTTL
+	}
+	c.transport = &grpcTransport{
+		endpoint:           c.Endpoint,
+		certPool:           c.CertPool,
+		insecureSkipVerify: c.InsecureSkipVerify,
+	}
+
+	return c, nil
+}
+
 // Client contains options for interaction with the iam.
+//
+// Deprecated: use NewClient instead. Will be moved to private in next release
 type Client struct {
 	Endpoint string
 	CertPool *x509.CertPool
@@ -90,7 +288,7 @@ func (c *Client) init() (err error) {
 }
 
 // Token returns cached token if no c.TokenTTL time has passed or no token
-// expiratation deadline from the last request exceeded. In other way, it makes
+// expiration deadline from the last request exceeded. In other way, it makes
 // request for a new one token.
 func (c *Client) Token(ctx context.Context) (token string, err error) {
 	if err = c.init(); err != nil {
@@ -165,4 +363,24 @@ func (c *Client) jwt(now time.Time) string {
 		panic(fmt.Sprintf("iam: could not sign jwt token: %v", err))
 	}
 	return s
+}
+
+func parsePrivateKey(raw []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(raw)
+	if block == nil {
+		return nil, ErrKeyCannotBeParsed
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err == nil {
+		return key, err
+	}
+
+	x, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	if key, ok := x.(*rsa.PrivateKey); ok {
+		return key, nil
+	}
+	return nil, ErrKeyCannotBeParsed
 }

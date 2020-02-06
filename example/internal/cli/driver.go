@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -18,28 +16,17 @@ import (
 )
 
 func ExportTLSConfig(flag *flag.FlagSet) func() *tls.Config {
-	var (
-		secure  bool
-		rootCAs string
-	)
-	flag.BoolVar(&secure,
-		"tls", false,
-		"use tls secure connections",
-	)
+	var rootCAs string
 	flag.StringVar(&rootCAs,
-		"root-ca", os.Getenv("SSL_ROOT_CERTIFICATES_FILE"),
+		"root-ca", os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"),
 		"path to the root certificates file",
 	)
 	return func() *tls.Config {
-		if !secure {
+		if rootCAs == "" {
 			return nil
 		}
 		c := new(tls.Config)
-		if rootCAs != "" {
-			c.RootCAs = mustReadRootCerts(rootCAs)
-		} else {
-			c.RootCAs = mustReadSystemRootCerts()
-		}
+		c.RootCAs = mustReadRootCerts(rootCAs)
 		return c
 	}
 }
@@ -88,62 +75,42 @@ func credentials() ydb.Credentials {
 		}
 	}
 
-	pk := os.Getenv("SA_PRIVATE_KEY_FILE")
-	if pk != "" {
-		var certPool *x509.CertPool
-		if ca := os.Getenv("SSL_ROOT_CERTIFICATES_FILE"); ca != "" {
-			certPool = mustReadRootCerts(ca)
+	// jwt
+	if pk, path := os.Getenv("SA_PRIVATE_KEY_FILE"), os.Getenv("SA_SERVICE_FILE"); pk != "" || path != "" {
+		var opts []iam.ClientOption
+
+		// with service account file
+		if path != "" {
+			opts = append(opts, iam.WithServiceFile(path))
+
+			// with private key file, key id and issuer id
 		} else {
-			certPool = mustReadSystemRootCerts()
+			opts = append(opts,
+				iam.WithPrivateKeyFile(pk),
+				iam.WithKeyID(mustGetenv("SA_ACCESS_KEY_ID")),
+				iam.WithIssuer(mustGetenv("SA_ID")),
+			)
 		}
-		return &iam.Client{
-			Key:    mustReadPrivateKey(pk),
-			KeyID:  mustGetenv("SA_ACCESS_KEY_ID"),
-			Issuer: mustGetenv("SA_ID"),
 
-			Endpoint: mustGetenv("SA_ENDPOINT"), // iam.api.cloud.yandex.net:443
-			CertPool: certPool,
+		if e := os.Getenv("SA_ENDPOINT"); e != "" {
+			opts = append(opts, iam.WithEndpoint(e))
+		} else {
+			opts = append(opts, iam.WithDefaultEndpoint()) // iam.api.cloud.yandex.net:443
 		}
+
+		if ca := os.Getenv("SSL_ROOT_CERTIFICATES_FILE"); ca != "" {
+			opts = append(opts, iam.WithCertPoolFile(ca))
+		} else {
+			opts = append(opts, iam.WithSystemCertPool())
+		}
+
+		c, err := iam.NewClient(opts...)
+		if err != nil {
+			panic(fmt.Errorf("configure credentials error: %v", err))
+		}
+		return c
 	}
-
 	return nil
-}
-
-func readFile(path string) ([]byte, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	return ioutil.ReadAll(file)
-}
-
-func readPrivateKey(path string) (key *rsa.PrivateKey, err error) {
-	p, err := readFile(path)
-	if err != nil {
-		return nil, err
-	}
-	block, _ := pem.Decode(p)
-	if block == nil {
-		return nil, fmt.Errorf("invalid pem encoding")
-	}
-	key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err == nil {
-		return
-	}
-	x, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if key, _ = x.(*rsa.PrivateKey); key != nil {
-		err = nil
-	}
-	return
-}
-
-func mustReadPrivateKey(path string) *rsa.PrivateKey {
-	key, err := readPrivateKey(path)
-	if err != nil {
-		panic(fmt.Errorf("read private key error: %v", err))
-	}
-	return key
 }
 
 func mustGetenv(name string) string {
@@ -155,7 +122,7 @@ func mustGetenv(name string) string {
 }
 
 func readRootCerts(path string) (*x509.CertPool, error) {
-	p, err := readFile(path)
+	p, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -170,14 +137,6 @@ func mustReadRootCerts(path string) *x509.CertPool {
 	roots, err := readRootCerts(path)
 	if err != nil {
 		panic(fmt.Errorf("read root certs error: %v", err))
-	}
-	return roots
-}
-
-func mustReadSystemRootCerts() *x509.CertPool {
-	roots, err := x509.SystemCertPool()
-	if err != nil {
-		panic(fmt.Errorf("read system root certs error: %v", err))
 	}
 	return roots
 }
