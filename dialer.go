@@ -11,6 +11,11 @@ import (
 	"google.golang.org/grpc/keepalive"
 )
 
+var (
+	// DefaultKeepaliveInterval contains default duration between grpc keepalive
+	DefaultKeepaliveInterval = 10 * time.Second
+)
+
 func Dial(ctx context.Context, addr string, c *DriverConfig) (Driver, error) {
 	d := Dialer{
 		DriverConfig: c,
@@ -48,10 +53,15 @@ type Dialer struct {
 // Dial dials given addr and initializes driver instance on success.
 func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	config := d.DriverConfig.withDefaults()
+	grpcKeepalive := d.Keepalive
+	if grpcKeepalive == 0 {
+		grpcKeepalive = DefaultKeepaliveInterval
+	}
+
 	return (&dialer{
 		netDial:   d.NetDial,
 		tlsConfig: d.TLSConfig,
-		keepalive: d.Keepalive,
+		keepalive: grpcKeepalive,
 		timeout:   d.Timeout,
 		config:    config,
 		meta: &meta{
@@ -237,15 +247,13 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	} else {
 		opts = append(opts, grpc.WithInsecure())
 	}
-	if p := d.keepalive; p > 0 {
-		opts = append(opts,
-			grpc.WithKeepaliveParams(keepalive.ClientParameters{
-				Time:                p,
-				Timeout:             time.Second,
-				PermitWithoutStream: true,
-			}),
-		)
-	}
+	opts = append(opts,
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                d.keepalive,
+			Timeout:             d.timeout,
+			PermitWithoutStream: true,
+		}),
+	)
 	return append(opts, grpc.WithBlock())
 }
 

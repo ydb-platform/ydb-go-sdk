@@ -7,57 +7,65 @@ import (
 	"syscall"
 )
 
-type Result struct {
+type result struct {
 	err    error
 	pushed int
 	failed int
 }
 
-type Tracker struct {
+type tracker struct {
 	cap    int
 	pushed int
 	failed int
 	done   chan error
-	track  chan Result
+	stop   chan struct{}
+	track  chan result
 }
 
-func InitTracker(cap int, infly int) *Tracker {
-	t := Tracker{
+func initTracker(cap int, infly int) *tracker {
+	t := tracker{
 		cap:    cap,
 		pushed: 0,
 		failed: 0,
 		done:   make(chan error),
-		track:  make(chan Result, infly),
+		stop:   make(chan struct{}),
+		track:  make(chan result, infly),
 	}
 
 	go func() {
 		defer close(t.done)
 		var err error
-		for t.pushed+t.failed < t.cap {
-			track, more := <-t.track
-			if !more || track.err != nil {
-				err = track.err
-				break
+	loop:
+		for {
+			select {
+			case track := <-t.track:
+				if track.err != nil {
+					err = track.err
+				}
+				t.pushed += track.pushed
+				t.failed += track.failed
+				if t.pushed+t.failed >= t.cap {
+					break loop
+				}
+			case <-t.stop:
+				break loop
 			}
-			t.pushed += track.pushed
-			t.failed += track.failed
 		}
-
 		t.done <- err
 	}()
 	return &t
 }
 
-func (t *Tracker) report() {
+func (t *tracker) report() {
 	if t.pushed > 0 {
 		fmt.Printf("Success on %v of %v\n", t.pushed, t.cap)
 	}
 	if t.failed > 0 {
-		fmt.Printf("Success on %v of %v\n", t.failed, t.cap)
+		fmt.Printf("Failed on %v of %v\n", t.failed, t.cap)
 	}
 }
 
-func (t *Tracker) respondSignal(s syscall.Signal) {
+func (t *tracker) respondSignal(s syscall.Signal) {
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, s)

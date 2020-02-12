@@ -13,6 +13,10 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
+const (
+	MaxGetConnTimeout = 10 * time.Second
+)
+
 // connInfo contains connection "static" stats – e.g. such that obtained from
 // discovery routine.
 type connInfo struct {
@@ -130,6 +134,12 @@ func (c *cluster) Close() (err error) {
 // Get returns next available connection.
 // It returns error on given context cancelation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
+
+	// KIKIMR-9019: Hard limit for get operation. Now <-wait can hang in case disconnect and reconnect to same endpoint
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
+	defer cancel()
+
 	for {
 		c.mu.RLock()
 		closed := c.closed

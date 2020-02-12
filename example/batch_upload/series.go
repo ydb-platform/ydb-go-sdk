@@ -79,7 +79,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		return fmt.Errorf("create tables error: %v", err)
 	}
 
-	//make input generator of count
+	// make input generator of count
 	query := fmt.Sprintf(`
 		DECLARE $items AS
 			'List<Struct<
@@ -91,19 +91,20 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		REPLACE INTO [%v]
 			SELECT * FROM AS_TABLE($items);`, name)
 	packSize := 11
-	tracker := InitTracker(cmd.count, cmd.infly)
+	t := initTracker(cmd.count, cmd.infly)
 	jobs := make(chan ItemList)
 	for i := 0; i < cmd.infly; i++ {
-		go uploadWorker(ctx, &sp, cmd.rps, query, jobs, tracker.track)
+		go uploadWorker(ctx, &sp, cmd.rps, query, jobs, t.track)
 	}
 
 	fmt.Printf(`Uploading...
   Do 'kill -USR1 %v' for progress datails
   Do 'kill -SIGINT %v' to cancel
 `, os.Getpid(), os.Getpid())
-	tracker.respondSignal(syscall.SIGUSR1)
+	t.respondSignal(syscall.SIGUSR1)
 
 	jobsCount := 0
+loop:
 	for i := 0; i < cmd.count; {
 		pack := ItemList{}
 		for ; i < cmd.count && len(pack) < packSize; i++ {
@@ -114,22 +115,29 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 			pack = append(pack, *item)
 		}
 
-		if ctx.Err() != nil {
-			break
+		select {
+		case <-ctx.Done():
+			break loop
+		case jobs <- pack:
+			jobsCount++
 		}
-		jobs <- pack
-		jobsCount++
 	}
 	close(jobs)
 
-	err = <-tracker.done
-	tracker.report()
+	select {
+	case <-ctx.Done():
+		close(t.stop)
+		err = <-t.done
+	case err = <-t.done:
+	}
+
+	t.report()
 
 	return err
 }
 
 func uploadWorker(ctx context.Context, sp *table.SessionPool, rps int, query string, jobs <-chan ItemList,
-	res chan<- Result) {
+	res chan<- result) {
 
 	throttle := time.Tick(time.Second / time.Duration(rps))
 
@@ -151,9 +159,9 @@ func uploadWorker(ctx context.Context, sp *table.SessionPool, rps int, query str
 				return err
 			}))
 		if err != nil {
-			res <- Result{err, 0, len(j)}
+			res <- result{err, 0, len(j)}
 		} else {
-			res <- Result{err, len(j), 0}
+			res <- result{err, len(j), 0}
 		}
 	}
 }

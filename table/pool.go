@@ -11,11 +11,12 @@ import (
 )
 
 var (
-	DefaultSessionPoolKeepAliveTimeout  = 500 * time.Millisecond
-	DefaultSessionPoolDeleteTimeout     = 500 * time.Millisecond
-	DefaultSessionPoolIdleThreshold     = 5 * time.Second
-	DefaultSessionPoolBusyCheckInterval = 1 * time.Second
-	DefaultSessionPoolSizeLimit         = 50
+	DefaultSessionPoolKeepAliveTimeout     = 500 * time.Millisecond
+	DefaultSessionPoolDeleteTimeout        = 500 * time.Millisecond
+	DefaultSessionPoolCreateSessionTimeout = 5 * time.Second
+	DefaultSessionPoolIdleThreshold        = 5 * time.Second
+	DefaultSessionPoolBusyCheckInterval    = 1 * time.Second
+	DefaultSessionPoolSizeLimit            = 50
 )
 
 var (
@@ -89,6 +90,11 @@ type SessionPool struct {
 	// DefaultSessionPoolKeepAliveTimeout is used.
 	KeepAliveTimeout time.Duration
 
+	// CreateSessionTimeout limits maximum time spent on Create session request
+	// If CreateSessionTimeout is less than or equal to zero then the
+	// DefaultSessionPoolCreateSessionTimeout is used.
+	CreateSessionTimeout time.Duration
+
 	// DeleteTimeout limits maximum time spent on Delete request for
 	// KeepAliveBatchSize number of sessions.
 	// If DeleteTimeout is less than or equal to zero then the
@@ -150,11 +156,24 @@ func (p *SessionPool) init() {
 			p.busyCheck = make(chan *Session)
 			go p.busyChecker()
 		}
+
+		if p.CreateSessionTimeout <= 0 {
+			p.CreateSessionTimeout = DefaultSessionPoolCreateSessionTimeout
+		}
+		if p.DeleteTimeout <= 0 {
+			p.DeleteTimeout = DefaultSessionPoolDeleteTimeout
+		}
+		if p.KeepAliveTimeout <= 0 {
+			p.KeepAliveTimeout = DefaultSessionPoolKeepAliveTimeout
+		}
 	})
 }
 
 // p.mu must NOT be held.
 func (p *SessionPool) createSession(ctx context.Context) (s *Session, err error) {
+	ctx, cancel := context.WithTimeout(ctx, p.CreateSessionTimeout)
+	defer cancel()
+
 	s, err = p.Builder.CreateSession(ctx)
 	if err != nil {
 		return
@@ -796,21 +815,13 @@ func (p *SessionPool) notify(s *Session) (notified bool) {
 
 // p.mu must NOT be held.
 func (p *SessionPool) closeSession(ctx context.Context, s *Session) {
-	timeout := p.DeleteTimeout
-	if timeout <= 0 {
-		timeout = DefaultSessionPoolDeleteTimeout
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, p.DeleteTimeout)
 	defer cancel()
 	_ = s.Close(ctx)
 }
 
 func (p *SessionPool) keepAliveSession(ctx context.Context, s *Session) (SessionInfo, error) {
-	timeout := p.KeepAliveTimeout
-	if timeout <= 0 {
-		timeout = DefaultSessionPoolKeepAliveTimeout
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, p.KeepAliveTimeout)
 	defer cancel()
 	return s.KeepAlive(ctx)
 }
