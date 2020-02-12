@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"errors"
 	"math"
 	"math/rand"
 	"time"
@@ -49,22 +50,23 @@ func (m RetryMode) MustDropCache() bool     { return m&RetryDropCache != 0 }
 
 // Check returns retry mode for err.
 func (r *RetryChecker) Check(err error) (m RetryMode) {
-	switch err {
+	var te *TransportError
+	var oe *OpError
+
+	switch {
 	case
-		context.Canceled,
-		context.DeadlineExceeded:
+		errors.Is(err, context.Canceled),
+		errors.Is(err, context.DeadlineExceeded):
 		return RetryCheckSession
-	}
-	switch e := err.(type) {
-	case *TransportError:
-		switch e.Reason {
+	case errors.As(err, &te):
+		switch te.Reason {
 		case TransportErrorResourceExhausted:
 			m |= RetryBackoff
 		default:
 			return RetryCheckSession
 		}
-	case *OpError:
-		switch e.Reason {
+	case errors.As(err, &oe):
+		switch oe.Reason {
 		case
 			StatusUnavailable,
 			StatusAborted:

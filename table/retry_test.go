@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,9 +18,15 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorResourceExhausted,
 		},
+		fmt.Errorf("wrap transport error: %w", &ydb.TransportError{
+			Reason: ydb.TransportErrorResourceExhausted,
+		}),
 		&ydb.OpError{
 			Reason: ydb.StatusOverloaded,
 		},
+		fmt.Errorf("wrap op error: %w", &ydb.OpError{
+			Reason: ydb.StatusOverloaded,
+		}),
 	} {
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
@@ -66,6 +73,9 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 		&ydb.OpError{
 			Reason: ydb.StatusNotFound,
 		},
+		fmt.Errorf("wrap op error: %w", &ydb.OpError{
+			Reason: ydb.StatusAborted,
+		}),
 	} {
 		t.Run("", func(t *testing.T) {
 			var count int
@@ -196,9 +206,15 @@ func TestRetryerImmediateReturn(t *testing.T) {
 		&ydb.OpError{
 			Reason: ydb.StatusGenericError,
 		},
+		fmt.Errorf("wrap op error: %w", &ydb.OpError{
+			Reason: ydb.StatusGenericError,
+		}),
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorPermissionDenied,
 		},
+		fmt.Errorf("wrap transport error: %w", &ydb.TransportError{
+			Reason: ydb.TransportErrorPermissionDenied,
+		}),
 		errors.New("whoa"),
 	} {
 		t.Run("", func(t *testing.T) {
