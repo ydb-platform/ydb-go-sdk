@@ -42,6 +42,7 @@ type TransportError struct {
 	Reason TransportErrorCode
 
 	message string
+	err     error
 }
 
 func (t *TransportError) Error() string {
@@ -52,11 +53,15 @@ func (t *TransportError) Error() string {
 	return s
 }
 
+func (t *TransportError) Unwrap() error {
+	return t.err
+}
+
 // IsTransportError reports whether err is TransportError with given code as
 // the Reason.
 func IsTransportError(err error, code TransportErrorCode) bool {
-	t, ok := err.(*TransportError)
-	if !ok {
+	var t *TransportError
+	if !errors.As(err, &t) {
 		return false
 	}
 	return t.Reason == code
@@ -89,8 +94,8 @@ func (e *OpError) Error() string {
 
 // IsOpError reports whether err is OpError with given code as the Reason.
 func IsOpError(err error, code StatusCode) bool {
-	op, ok := err.(*OpError)
-	if !ok {
+	var op *OpError
+	if !errors.As(err, &op) {
 		return false
 	}
 	return op.Reason == code

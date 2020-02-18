@@ -15,6 +15,10 @@ func (p *ParseError) Error() string {
 	)
 }
 
+func (p *ParseError) Unwrap() error {
+	return p.Err
+}
+
 func syntaxError(s string) *ParseError {
 	return &ParseError{
 		Err:   ErrSyntax,

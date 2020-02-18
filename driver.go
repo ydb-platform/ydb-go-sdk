@@ -243,20 +243,19 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 }
 
 func isTimeoutError(err error) bool {
-	if IsOpError(err, StatusTimeout) ||
-		IsOpError(err, StatusCancelled) {
+	var te *TransportError
+
+	switch {
+	case
+		IsOpError(err, StatusTimeout),
+		IsOpError(err, StatusCancelled),
+		errors.As(err, &te),
+		errors.Is(err, context.DeadlineExceeded),
+		errors.Is(err, context.Canceled):
 		return true
+	default:
+		return false
 	}
-	if _, ok := err.(*TransportError); ok {
-		return true
-	}
-	if err == context.DeadlineExceeded {
-		return true
-	}
-	if err == context.Canceled {
-		return true
-	}
-	return false
 }
 
 func errIf(cond bool, err error) error {
@@ -395,16 +394,14 @@ func invoke(
 }
 
 func mapGRPCError(err error) error {
-	grpcErr, ok := err.(interface {
-		GRPCStatus() *status.Status
-	})
+	s, ok := status.FromError(err)
 	if !ok {
 		return err
 	}
-	s := grpcErr.GRPCStatus()
 	return &TransportError{
 		Reason:  transportErrorCode(s.Code()),
 		message: s.Message(),
+		err:     err,
 	}
 }
 

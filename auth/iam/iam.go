@@ -45,6 +45,10 @@ func (e *CreateTokenError) Error() string {
 	return fmt.Sprintf("iam: create token error: %v", e.Reason)
 }
 
+func (e *CreateTokenError) Unwrap() error {
+	return e.Reason
+}
+
 type transport interface {
 	CreateToken(ctx context.Context, jwt string) (token string, expires time.Time, err error)
 }
