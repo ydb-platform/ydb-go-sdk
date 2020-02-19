@@ -249,9 +249,8 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	}
 	opts = append(opts,
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                d.keepalive,
-			Timeout:             d.timeout,
-			PermitWithoutStream: true,
+			Time:    d.keepalive,
+			Timeout: d.timeout,
 		}),
 	)
 	return append(opts, grpc.WithBlock())
