@@ -409,3 +409,137 @@ func assertRecvError(t *testing.T, d time.Duration, e <-chan error, exp error) {
 		t.Errorf("%s: nothing received after %s", fileLine(2), d)
 	}
 }
+
+func TestDiffEndpoint(t *testing.T) {
+	// lists must be sorted
+	noEndpoints := []Endpoint{}
+	someEndpoints := []Endpoint{
+		{
+			Addr: "0",
+			Port: 0,
+		},
+		{
+			Addr: "1",
+			Port: 1,
+		},
+	}
+	sameSomeEndpoints := []Endpoint{
+		{
+			Addr:       "0",
+			Port:       0,
+			LoadFactor: 1,
+			Local:      true,
+		},
+		{
+			Addr:       "1",
+			Port:       1,
+			LoadFactor: 2,
+			Local:      true,
+		},
+	}
+	anotherEndpoints := []Endpoint{
+		{
+			Addr: "2",
+			Port: 0,
+		},
+		{
+			Addr: "3",
+			Port: 1,
+		},
+	}
+	moreEndpointsOverlap := []Endpoint{
+		{
+			Addr:       "0",
+			Port:       0,
+			LoadFactor: 1,
+			Local:      true,
+		},
+		{
+			Addr: "1",
+			Port: 1,
+		},
+		{
+			Addr: "1",
+			Port: 2,
+		},
+	}
+
+	type TC struct {
+		name         string
+		curr, next   []Endpoint
+		eq, add, del int
+	}
+
+	tests := []TC{
+		{
+			name: "none",
+			curr: noEndpoints,
+			next: noEndpoints,
+			eq:   0,
+			add:  0,
+			del:  0,
+		},
+		{
+			name: "equals",
+			curr: someEndpoints,
+			next: sameSomeEndpoints,
+			eq:   2,
+			add:  0,
+			del:  0,
+		},
+		{
+			name: "noneToSome",
+			curr: noEndpoints,
+			next: someEndpoints,
+			eq:   0,
+			add:  2,
+			del:  0,
+		},
+		{
+			name: "SomeToNone",
+			curr: someEndpoints,
+			next: noEndpoints,
+			eq:   0,
+			add:  0,
+			del:  2,
+		},
+		{
+			name: "SomeToMore",
+			curr: someEndpoints,
+			next: moreEndpointsOverlap,
+			eq:   2,
+			add:  1,
+			del:  0,
+		},
+		{
+			name: "MoreToSome",
+			curr: moreEndpointsOverlap,
+			next: someEndpoints,
+			eq:   2,
+			add:  0,
+			del:  1,
+		},
+		{
+			name: "SomeToAnother",
+			curr: someEndpoints,
+			next: anotherEndpoints,
+			eq:   0,
+			add:  2,
+			del:  2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			eq, add, del := 0, 0, 0
+			diffEndpoints(tc.curr, tc.next,
+				func(i, j int) { eq++ },
+				func(i, j int) { add++ },
+				func(i, j int) { del++ },
+			)
+			if eq != tc.eq || add != tc.add || del != tc.del {
+				t.Errorf("Got %d, %d, %d expected: %d, %d, %d", eq, add, del, tc.eq, tc.add, tc.del)
+			}
+		})
+	}
+}

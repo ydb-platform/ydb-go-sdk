@@ -89,3 +89,25 @@ func (m *multiBalancer) Remove(x balancerElement) {
 		}
 	}
 }
+
+type singleConnBalancer struct {
+	conn *conn
+}
+
+func (s *singleConnBalancer) Next() *conn {
+	return s.conn
+}
+func (s *singleConnBalancer) Insert(conn *conn, _ connInfo) balancerElement {
+	if s.conn != nil {
+		panic("ydb: single conn balancer: double Insert()")
+	}
+	s.conn = conn
+	return conn
+}
+func (s *singleConnBalancer) Remove(el balancerElement) {
+	if s.conn != el.(*conn) {
+		panic("ydb: single conn balancer: Remove() unknown conn")
+	}
+	s.conn = nil
+}
+func (s *singleConnBalancer) Update(balancerElement, connInfo) {}
