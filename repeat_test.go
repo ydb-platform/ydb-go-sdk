@@ -25,13 +25,10 @@ func TestRepeater(t *testing.T) {
 	defer cleanup()
 
 	exec := make(chan struct{}, 1)
-	r := repeater{
-		Interval: 42 * time.Second,
-		Task: func(_ context.Context) {
+	r := NewRepeater(42*time.Second, 0,
+		func(_ context.Context) {
 			exec <- struct{}{}
-		},
-	}
-	r.Start()
+		})
 
 	timerC <- time.Now()
 	assertRecv(t, 500*time.Millisecond, exec)
@@ -56,15 +53,12 @@ func TestRepeaterCancelation(t *testing.T) {
 	})
 	defer cleanup()
 
-	r := repeater{
-		Interval: 42 * time.Second,
-		Task: func(ctx context.Context) {
+	r := NewRepeater(42*time.Second, 0,
+		func(ctx context.Context) {
 			enter <- struct{}{}
 			<-ctx.Done()
 			exit <- struct{}{}
-		},
-	}
-	r.Start()
+		})
 
 	// Run callback in a separate goroutine to avoid deadlock.
 	// That is, StubTimer run its function in the same goroutine as Emit

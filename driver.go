@@ -167,10 +167,9 @@ func (d *DriverConfig) withDefaults() (c DriverConfig) {
 }
 
 type driver struct {
-	cluster  *cluster
-	meta     *meta
-	trace    DriverTrace
-	explorer *repeater
+	cluster *cluster
+	meta    *meta
+	trace   DriverTrace
 
 	requestTimeout       time.Duration
 	streamTimeout        time.Duration
@@ -181,9 +180,6 @@ type driver struct {
 }
 
 func (d *driver) Close() error {
-	if d.explorer != nil {
-		d.explorer.Stop()
-	}
 	return d.cluster.Close()
 }
 

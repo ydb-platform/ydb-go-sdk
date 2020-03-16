@@ -16,6 +16,151 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil/timetest"
 )
 
+func TestClusterFastRedial(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ln := newStubListener()
+	srv := grpc.NewServer()
+	go func() {
+		_ = srv.Serve(ln)
+	}()
+
+	cs, balancer := simpleBalancer()
+	c := &cluster{
+		dial: func(ctx context.Context, s string, p int) (*conn, error) {
+			cc, err := ln.Dial(ctx)
+			return &conn{
+				addr: connAddr{s, p},
+				conn: cc,
+			}, err
+		},
+		balancer: balancer,
+	}
+
+	pingConnects := func(size int) chan struct{} {
+		done := make(chan struct{})
+		go func() {
+			for i := 0; i < size*10; i++ {
+				con, err := c.Get(context.Background())
+				// enforce close bad connects to track them
+				if err == nil && con != nil && con.addr.addr == "bad" {
+					_ = con.conn.Close()
+				}
+			}
+			close(done)
+		}()
+		return done
+	}
+
+	ne := []Endpoint{
+		{Addr: "foo"},
+		{Addr: "bad"},
+	}
+	mergeEndpointIntoCluster(ctx, c, []Endpoint{}, ne)
+	select {
+	case <-pingConnects(len(ne)):
+
+	case <-time.After(time.Second * 10):
+		t.Fatalf("Time limit exceeded while %d endpoints in balance. Wait channel used", len(*cs))
+	}
+}
+
+func TestClusterMergeEndpoints(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ln := newStubListener()
+	srv := grpc.NewServer()
+	go func() {
+		_ = srv.Serve(ln)
+	}()
+
+	cs, balancer := simpleBalancer()
+	c := &cluster{
+		dial: func(ctx context.Context, s string, p int) (*conn, error) {
+			cc, err := ln.Dial(ctx)
+			return &conn{
+				addr: connAddr{s, p},
+				conn: cc,
+			}, err
+		},
+		balancer: balancer,
+	}
+
+	pingConnects := func(size int) {
+		for i := 0; i < size*10; i++ {
+			sub, cancel := context.WithTimeout(ctx, time.Millisecond)
+			defer cancel()
+			con, err := c.Get(sub)
+			// enforce close bad connects to track them
+			if err == nil && con != nil && con.addr.addr == "bad" {
+				_ = con.conn.Close()
+			}
+		}
+	}
+	assert := func(t *testing.T, total, inBalance, onTracking int) {
+		if len(c.index) != total {
+			t.Fatalf("total expected number of endpoints %d got %d", total, len(c.index))
+		}
+		if len(*cs) != inBalance {
+			t.Fatalf("inBalance expected number of endpoints %d got %d", inBalance, len(*cs))
+		}
+		if c.trackerQueue.Len() != onTracking {
+			t.Fatalf("onTracking expected number of endpoints %d got %d", onTracking, c.trackerQueue.Len())
+		}
+	}
+
+	endpoints := []Endpoint{
+		{Addr: "foo"},
+		{Addr: "foo", Port: 123},
+	}
+	badEndpoints := []Endpoint{
+		{Addr: "bad"},
+		{Addr: "bad", Port: 123},
+	}
+	nextEndpoints := []Endpoint{
+		{Addr: "foo"},
+		{Addr: "bar"},
+		{Addr: "bar", Port: 123},
+	}
+	nextBadEndpoints := []Endpoint{
+		{Addr: "bad", Port: 23},
+	}
+	t.Run("initial fill", func(t *testing.T) {
+		ne := append(endpoints, badEndpoints...)
+		// merge new endpoints into balancer
+		mergeEndpointIntoCluster(ctx, c, []Endpoint{}, ne)
+		// try endpoints, filter out bad ones to tracking
+		pingConnects(len(ne))
+		assert(t, len(ne), len(endpoints), len(badEndpoints))
+	})
+	t.Run("update with another endpoints", func(t *testing.T) {
+		ne := append(nextEndpoints, nextBadEndpoints...)
+		// merge new endpoints into balancer
+		mergeEndpointIntoCluster(ctx, c, append(endpoints, badEndpoints...), ne)
+		// try endpoints, filter out bad ones to tracking
+		pingConnects(len(ne))
+		assert(t, len(ne), len(nextEndpoints), len(nextBadEndpoints))
+	})
+	t.Run("left only bad", func(t *testing.T) {
+		ne := nextBadEndpoints
+		// merge new endpoints into balancer
+		mergeEndpointIntoCluster(ctx, c, append(nextEndpoints, nextBadEndpoints...), ne)
+		// try endpoints, filter out bad ones to tracking
+		pingConnects(len(ne))
+		assert(t, len(ne), 0, len(nextBadEndpoints))
+	})
+	t.Run("left only good", func(t *testing.T) {
+		ne := nextEndpoints
+		// merge new endpoints into balancer
+		mergeEndpointIntoCluster(ctx, c, nextBadEndpoints, ne)
+		// try endpoints, filter out bad ones to tracking
+		pingConnects(len(ne))
+		assert(t, len(ne), len(nextEndpoints), 0)
+	})
+}
+
 func TestClusterRemoveTracking(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -72,8 +217,8 @@ func TestClusterRemoveTracking(t *testing.T) {
 	_ = conn.Close()
 	// Await for conn change its state inside cluster.
 	{
-		sub, cancel := context.WithCancel(ctx)
-		cancel()
+		sub, cancel := context.WithTimeout(ctx, time.Millisecond)
+		defer cancel()
 		for {
 			_, err := c.Get(sub)
 			if err != nil {
@@ -180,44 +325,46 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 	}
 	defer c.Close()
 
-	endpoint := Endpoint{Addr: "foo"}
-	c.Insert(ctx, endpoint)
+	t.Run("test actual block of tracker", func(t *testing.T) {
+		endpoint := Endpoint{Addr: "foo"}
+		c.Insert(ctx, endpoint)
 
-	// Wait for connection become tracked.
-	<-timer.Reset
-	assertTracking(1)
-	<-timer.Reset
+		// Wait for connection become tracked.
+		<-timer.Reset
+		assertTracking(1)
+		<-timer.Reset
 
-	// Now force tracker to make another iteration, but not release
-	// testHookTrackerQueue by reading from tracking channel.
-	timer.C <- timeutil.Now()
-	blocked := <-tracking
+		// Now force tracker to make another iteration, but not release
+		// testHookTrackerQueue by reading from tracking channel.
+		timer.C <- timeutil.Now()
+		blocked := <-tracking
 
-	// While our tracker is in progress (stuck on writing to the tracking
-	// channel actually) remove endpoint.
-	c.Remove(ctx, endpoint)
+		// While our tracker is in progress (stuck on writing to the tracking
+		// channel actually) remove endpoint.
+		c.Remove(ctx, endpoint)
 
-	// Now insert back the same endpoint with alive connection (and let dialer
-	// to dial successfuly).
-	dialTicket <- 100
-	c.Insert(ctx, endpoint)
+		// Now insert back the same endpoint with alive connection (and let dialer
+		// to dial successfuly).
+		dialTicket <- 100
+		c.Insert(ctx, endpoint)
 
-	// Release the tracker iteration.
-	dialTicket <- 200
-	<-blocked
-	<-timer.Reset
-	assertTracking(0)
+		// Release the tracker iteration.
+		dialTicket <- 200
+		<-blocked
+		<-timer.Reset
+		assertTracking(0)
 
-	var ss []ConnStats
-	c.Stats(func(_ Endpoint, s ConnStats) {
-		ss = append(ss, s)
+		var ss []ConnStats
+		c.Stats(func(_ Endpoint, s ConnStats) {
+			ss = append(ss, s)
+		})
+		if len(ss) != 1 {
+			t.Fatalf("unexpected number of connection stats")
+		}
+		if ss[0].OpStarted != 100 {
+			t.Fatalf("unexpected connection used")
+		}
 	})
-	if len(ss) != 1 {
-		t.Fatalf("unexpected number of connection stats")
-	}
-	if ss[0].OpStarted != 100 {
-		t.Fatalf("unexpected connection used")
-	}
 }
 
 func TestClusterAwait(t *testing.T) {
@@ -267,10 +414,12 @@ func TestClusterAwait(t *testing.T) {
 	{
 		got, cancel := get()
 		defer cancel()
-
-		assertNoRecv(t, timeout, got)
-
+		assertRecvError(t, timeout, got, ErrClusterEmpty)
+	}
+	{
 		c.Insert(context.Background(), Endpoint{})
+		got, cancel := get()
+		defer cancel()
 		assertRecvError(t, timeout, got, nil)
 	}
 }
@@ -375,15 +524,11 @@ func (ln *stubListener) Close() error {
 }
 
 func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
-	//nolint:SA1019
 	return grpc.Dial("",
-		grpc.WithDialer(func(string, time.Duration) (net.Conn, error) {
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			select {
 			case <-ln.exit:
 				return nil, fmt.Errorf("refused")
-			default:
-			}
-			select {
 			case c := <-ln.C:
 				return c, nil
 			case <-ctx.Done():
@@ -408,6 +553,18 @@ func assertRecvError(t *testing.T, d time.Duration, e <-chan error, exp error) {
 	case <-time.After(d):
 		t.Errorf("%s: nothing received after %s", fileLine(2), d)
 	}
+}
+
+func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []Endpoint) {
+	sortEndpoints(curr)
+	sortEndpoints(next)
+	diffEndpoints(curr, next,
+		func(i, j int) { c.Update(ctx, next[j]) },
+		func(i, j int) {
+			c.Insert(ctx, next[j])
+		},
+		func(i, j int) { c.Remove(ctx, curr[i]) },
+	)
 }
 
 func TestDiffEndpoint(t *testing.T) {

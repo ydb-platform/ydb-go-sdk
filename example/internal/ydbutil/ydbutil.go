@@ -57,9 +57,13 @@ func EnsurePathExists(ctx context.Context, d ydb.Driver, database, path string) 
 	return nil
 }
 
-func CleanupDatabase(ctx context.Context, d ydb.Driver, sp table.SessionProvider, database string) error {
+func CleanupDatabase(ctx context.Context, d ydb.Driver, sp table.SessionProvider, database string, names ...string) error {
 	s := scheme.Client{
 		Driver: d,
+	}
+	filter := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		filter[n] = struct{}{}
 	}
 	var list func(int, string) error
 	list = func(i int, p string) error {
@@ -69,6 +73,9 @@ func CleanupDatabase(ctx context.Context, d ydb.Driver, sp table.SessionProvider
 		}
 		log.Println(strings.Repeat(" ", i*2), "inspecting", dir.Name, dir.Type)
 		for _, c := range dir.Children {
+			if _, has := filter[c.Name]; len(filter) > 0 && !has {
+				continue
+			}
 			pt := path.Join(p, c.Name)
 			switch c.Type {
 			case scheme.EntryDirectory:

@@ -60,11 +60,13 @@ func TestConnectorRedialOnError(t *testing.T) {
 		WithDialer(ydb.Dialer{
 			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
 				dial = true
-				if <-success {
+				select {
+				case <-success:
 					// it will still fails on grpc dial
 					return client, nil
+				default:
+					return nil, errors.New("any error")
 				}
-				return nil, errors.New("any error")
 			},
 		}),
 	)

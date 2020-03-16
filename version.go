@@ -1,5 +1,5 @@
 package ydb
 
 const (
-	revisionNumber = "go_sdk_revision: 2019.02"
+	Version = "go-sdk-2019.03.1"
 )

@@ -101,13 +101,14 @@ type SessionPool struct {
 	// DefaultSessionPoolDeleteTimeout is used.
 	DeleteTimeout time.Duration
 
-	mu       sync.Mutex
-	initOnce sync.Once
-	index    map[*Session]sessionInfo
-	limit    int        // Upper bound for pool size.
-	idle     *list.List // list<*Session>
-	ready    *list.List // list<*Session>
-	waitq    *list.List // list<*chan *Session>
+	mu               sync.Mutex
+	initOnce         sync.Once
+	index            map[*Session]sessionInfo
+	createInProgress int        // KIKIMR-9163: in-create-process counter
+	limit            int        // Upper bound for pool size.
+	idle             *list.List // list<*Session>
+	ready            *list.List // list<*Session>
+	waitq            *list.List // list<*chan *Session>
 
 	keeperWake chan struct{} // Set by keeper.
 	keeperStop chan struct{}
@@ -130,7 +131,6 @@ func (p *SessionPool) init() {
 		p.idle = list.New()
 		p.ready = list.New()
 		p.waitq = list.New()
-
 		p.limit = p.SizeLimit
 		if p.limit <= 0 {
 			p.limit = DefaultSessionPoolSizeLimit
@@ -170,50 +170,64 @@ func (p *SessionPool) init() {
 }
 
 // p.mu must NOT be held.
-func (p *SessionPool) createSession(ctx context.Context) (s *Session, err error) {
-	ctx, cancel := context.WithTimeout(ctx, p.CreateSessionTimeout)
-	defer cancel()
-
-	s, err = p.Builder.CreateSession(ctx)
-	if err != nil {
-		return
-	}
-
+func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
+	// pre-check the pool size
 	p.mu.Lock()
-	enoughSpace := len(p.index) < p.limit
-	if enoughSpace {
-		p.index[s] = sessionInfo{}
-		s.OnClose(func() {
-			p.mu.Lock()
-			defer p.mu.Unlock()
-
-			info, has := p.index[s]
-			if p.closed || !has {
-				return
-			}
-
-			delete(p.index, s)
-			p.notify(nil)
-
-			if info.idle != nil {
-				panic("ydb: table: session closed while still in idle pool")
-			}
-			if info.ready != nil {
-				p.ready.Remove(info.ready)
-				info.ready = nil
-			}
-		})
-	}
-	p.mu.Unlock()
+	var s *Session
+	p.createInProgress++
+	enoughSpace := p.createInProgress+len(p.index) <= p.limit
+	defer func() {
+		p.createInProgress--
+		p.mu.Unlock()
+		if !enoughSpace && s != nil {
+			p.closeSession(ctx, s)
+		}
+	}()
 
 	if !enoughSpace {
-		// We lost the race – pool is full now and session can not be reused.
-		p.closeSession(ctx, s)
-		s = nil
-		err = ErrSessionPoolOverflow
+		return nil, ErrSessionPoolOverflow
 	}
 
-	return
+	p.mu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, p.CreateSessionTimeout)
+	defer cancel()
+	s, err := p.Builder.CreateSession(ctx)
+	p.mu.Lock()
+	// while creating session pool may become full
+	enoughSpace = p.createInProgress+len(p.index) <= p.limit
+
+	if err != nil {
+		return nil, err
+	}
+	if !enoughSpace {
+		return nil, ErrSessionPoolOverflow
+	}
+
+	p.index[s] = sessionInfo{}
+	s.OnClose(func() {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		if p.closed {
+			return
+		}
+
+		info, has := p.index[s]
+		if !has {
+			return
+		}
+
+		delete(p.index, s)
+		p.notify(nil)
+
+		if info.idle != nil {
+			panic("ydb: table: session closed while still in idle pool")
+		}
+		if info.ready != nil {
+			p.ready.Remove(info.ready)
+			info.ready = nil
+		}
+	})
+	return s, nil
 }
 
 // Get returns first idle session from the SessionPool and removes it from
@@ -239,38 +253,31 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			return nil, ErrSessionPoolClosed
 		}
 		s = p.removeFirstIdle()
+		p.mu.Unlock()
 
-		if s == nil && len(p.index) < p.limit {
-			// Can create new session without awaiting for reused one.
-			// Note that we must not increase p.n counter until successful session
-			// creation – in other way we will block some getter awaiting on reused
-			// session which creation was actually failed here.
-			//
-			// But on the other side, this behavior is racy – there is a
-			// probability of creation of multiple session here (for the first time
-			// of pool usage, thus it is rare). We deal well with this race in the
-			// Put() implementation.
-			p.mu.Unlock()
-
+		if s == nil {
+			// Try create new session without awaiting for reused one.
 			s, err = p.createSession(ctx)
-			if err == ErrSessionPoolOverflow {
-				err = nil
+			// got session or err is not recoverable
+			if s != nil || err != nil && !errors.Is(err, ErrSessionPoolOverflow) {
+				return s, err
 			}
-			if err != nil {
-				return nil, err
-			}
-			p.mu.Lock()
-		} else if s == nil && len(p.index) == p.limit {
-			// Try to wait for a touched session instead of creating new one.
+			err = nil
+		}
+
+		// get here after ErrSessionPoolOverflow error
+		if s == nil {
+			// Try to wait for a touched session - pool is full.
 			//
 			// This should be done only if number of currently waiting goroutines
 			// are less than maximum amount of touched session. That is, we want to
 			// be fair here and not to lock more goroutines than we could ship
 			// session to.
+			p.mu.Lock()
 			ch = getWaitCh()
 			el = p.waitq.PushBack(ch)
+			p.mu.Unlock()
 		}
-		p.mu.Unlock()
 
 		if ch == nil {
 			continue

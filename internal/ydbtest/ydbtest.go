@@ -11,7 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 	"unsafe"
 
 	"github.com/golang/protobuf/proto"
@@ -350,11 +349,8 @@ func (ln *Listener) DialContext(ctx context.Context) (net.Conn, error) {
 }
 
 func (ln *Listener) DialGRPC() (*grpc.ClientConn, error) {
-	//nolint:SA1019
 	return grpc.Dial("",
-		grpc.WithDialer(func(_ string, timeout time.Duration) (net.Conn, error) {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
 			return ln.DialContext(ctx)
 		}),
 		grpc.WithInsecure(),

@@ -466,7 +466,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		IdleThreshold:     -1,
 		BusyCheckInterval: -1,
 		Builder: &StubBuilder{
-			Limit: 2,
+			Limit: 1,
 			OnCreateSession: func(ctx context.Context) (*Session, error) {
 				req := createReq{
 					release: make(chan struct{}),
@@ -482,26 +482,37 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		expSession *Session
 		done       = make(chan struct{}, 2)
 	)
-	//nolint:SA2002
+
+	var err error
+	// nolint:SA2002
 	for i := 0; i < 2; i++ {
 		go func() {
 			defer func() {
 				done <- struct{}{}
 			}()
-			s, err := p.Get(context.Background())
-			if err != nil {
-				t.Fatal(err)
+			s, e := p.Get(context.Background())
+			if e != nil {
+				err = e
+				return
 			}
 			if s != expSession {
-				t.Fatalf("unexpected session: %v; want %v", s, expSession)
+				err = fmt.Errorf("unexpected session: %v; want %v", s, expSession)
+				return
 			}
 			mustPutSession(t, p, s)
 		}()
 	}
-
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Wait for both requests are created.
 	r1 := <-create
-	r2 := <-create
+	select {
+	case <-create:
+		t.Fatalf("session 2 on race created while pool size 1")
+	case <-time.After(time.Millisecond * 5):
+		// ok
+	}
 
 	// Release the first create session request.
 	// Created session must be stored in the pool.
@@ -517,23 +528,6 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	// Ensure that session is in the pool.
 	s := mustGetSession(t, p)
 	mustPutSession(t, p, s)
-
-	// Release the second create session request.
-	// Created session must deleted immediately because there is no more space
-	// in the pool.
-	deleted := make(chan struct{})
-	r2.session.OnClose(func() {
-		close(deleted)
-	})
-	close(r2.release)
-
-	const timeout = time.Second
-	select {
-	case <-deleted:
-		<-done
-	case <-time.After(timeout):
-		t.Fatalf("no session delete after %s", timeout)
-	}
 }
 
 func TestSessionPoolPutInFull(t *testing.T) {

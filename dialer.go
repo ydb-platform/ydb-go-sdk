@@ -92,7 +92,6 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 			_ = cluster.Close()
 		}
 	}()
-	var explorer *repeater
 	if d.config.DiscoveryInterval > 0 {
 		if d.config.PreferLocalEndpoints {
 			cluster.balancer = newMultiBalancer(
@@ -111,19 +110,18 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 			cluster.balancer = d.newBalancer()
 		}
 
-		curr, err := d.discover(ctx, addr)
+		var curr []Endpoint
+		curr, err = d.discover(ctx, addr)
 		if err != nil {
 			return nil, err
 		}
-		// Sort current list of endpoints to prevent additional sorting withing
-		// background discovery below.
+		// Endpoints mast be sorted to merge
 		sortEndpoints(curr)
 		for _, e := range curr {
 			cluster.Insert(ctx, e)
 		}
-		explorer = &repeater{
-			Interval: d.config.DiscoveryInterval,
-			Task: func(ctx context.Context) {
+		cluster.explorer = NewRepeater(d.config.DiscoveryInterval, 0,
+			func(ctx context.Context) {
 				next, err := d.discover(ctx, addr)
 				if err != nil {
 					return
@@ -144,9 +142,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 					},
 				)
 				curr = next
-			},
-		}
-		explorer.Start()
+			})
 	} else {
 		var (
 			e   Endpoint
@@ -168,7 +164,6 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 	}
 	return &driver{
 		cluster:                &cluster,
-		explorer:               explorer,
 		meta:                   d.meta,
 		trace:                  d.config.Trace,
 		requestTimeout:         d.config.RequestTimeout,
@@ -217,7 +212,8 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 		d.config.Trace.discoveryDone(ctx, endpoints, err)
 	}()
 
-	conn, err := d.dialAddr(ctx, addr)
+	var conn *conn
+	conn, err = d.dialAddr(ctx, addr)
 	if err != nil {
 		return nil, err
 	}

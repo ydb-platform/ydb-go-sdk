@@ -62,7 +62,10 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	defer sp.Close(ctx)
 
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database)
+	prefix := path.Join(params.Database, params.Path)
+	name := path.Join(prefix, "upload_example")
+
+	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, "upload_example")
 	if err != nil {
 		return err
 	}
@@ -70,9 +73,6 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	if err != nil {
 		return err
 	}
-
-	prefix := path.Join(params.Database, params.Path)
-	name := path.Join(prefix, "upload_example")
 
 	err = createTable(ctx, &sp, name)
 	if err != nil {

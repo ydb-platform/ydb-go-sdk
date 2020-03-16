@@ -12,47 +12,48 @@ import (
 type repeater struct {
 	// Interval contains an interval between task execution.
 	// Interval must be greater than zero; if not, Repeater will panic.
-	Interval time.Duration
+	interval time.Duration
 
-	// Timeout is an optional timeout for an operation passed as a context
-	// instance.
-	Timeout time.Duration
+	// Timeout for an operation passed as a context instance.
+	// If 0 passed - no timeout is set
+	timeout time.Duration
 
 	// Task is a function that must be executed periodically.
-	Task func(context.Context)
+	task func(context.Context)
 
-	timer     timeutil.Timer
-	startOnce sync.Once
-	stopOnce  sync.Once
-	stop      chan struct{}
-	done      chan struct{}
-	ctx       context.Context
-	cancel    context.CancelFunc
+	timer    timeutil.Timer
+	stopOnce sync.Once
+	stop     chan struct{}
+	done     chan struct{}
+	ctx      context.Context
+	cancel   context.CancelFunc
+	force    chan struct{}
 }
 
-// Start begins to execute its task periodically.
-func (r *repeater) Start() {
-	r.startOnce.Do(func() {
-		if r.Interval <= 0 {
-			panic("repeater: non-positive interval")
-		}
-		r.timer = timeutil.NewTimer(r.Interval)
-		r.stop = make(chan struct{})
-		r.done = make(chan struct{})
-		r.ctx, r.cancel = context.WithCancel(context.Background())
-		go r.worker()
-	})
+// NewRepeater creates and begins to execute task periodically.
+func NewRepeater(interval, timeout time.Duration, task func(ctx context.Context)) *repeater {
+	if interval <= 0 {
+		return nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	r := &repeater{
+		interval: interval,
+		timeout:  timeout,
+		task:     task,
+		timer:    timeutil.NewTimer(interval),
+		stopOnce: sync.Once{},
+		stop:     make(chan struct{}),
+		done:     make(chan struct{}),
+		ctx:      ctx,
+		cancel:   cancel,
+		force:    make(chan struct{}),
+	}
+	go r.worker()
+	return r
 }
 
 // Stop stops to execute its task.
 func (r *repeater) Stop() {
-	var dummy bool
-	r.startOnce.Do(func() {
-		dummy = true
-	})
-	if dummy {
-		return
-	}
 	r.stopOnce.Do(func() {
 		close(r.stop)
 		r.cancel()
@@ -60,21 +61,33 @@ func (r *repeater) Stop() {
 	})
 }
 
+func (r *repeater) Force() {
+	select {
+	case r.force <- struct{}{}:
+	default:
+	}
+}
+
 func (r *repeater) worker() {
 	defer close(r.done)
 	for {
 		select {
-		case <-r.timer.C():
-			r.timer.Reset(r.Interval)
 		case <-r.stop:
 			return
+		case <-r.timer.C():
+
+		case <-r.force:
+			if !r.timer.Stop() {
+				<-r.timer.C()
+			}
 		}
+		r.timer.Reset(r.interval)
 		ctx := r.ctx
-		if t := r.Timeout; t > 0 {
+		if t := r.timeout; t > 0 {
 			var cancel context.CancelFunc
 			ctx, cancel = context.WithTimeout(ctx, t)
 			defer cancel()
 		}
-		r.Task(ctx)
+		r.task(ctx)
 	}
 }

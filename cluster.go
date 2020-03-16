@@ -3,6 +3,7 @@ package ydb
 import (
 	"container/list"
 	"context"
+	"errors"
 	"sort"
 	"strings"
 	"sync"
@@ -15,6 +16,14 @@ import (
 
 const (
 	MaxGetConnTimeout = 10 * time.Second
+)
+
+var (
+	// ErrClusterClosed returned when requested on a closed cluster.
+	ErrClusterClosed = errors.New("cluster closed")
+
+	// ErrClusterEmpty returned when no connections left in cluster.
+	ErrClusterEmpty = errors.New("cluster empty")
 )
 
 // connInfo contains connection "static" stats – e.g. such that obtained from
@@ -57,6 +66,7 @@ func (c *connEntry) removeFrom(b balancer) {
 type cluster struct {
 	dial     func(context.Context, string, int) (*conn, error)
 	balancer balancer
+	explorer *repeater
 	trace    DriverTrace
 
 	mu    sync.RWMutex
@@ -101,6 +111,9 @@ func (c *cluster) Close() (err error) {
 		c.mu.Unlock()
 		return
 	}
+	if c.explorer != nil {
+		c.explorer.Stop()
+	}
 	c.closed = true
 
 	wait := c.wait
@@ -132,10 +145,9 @@ func (c *cluster) Close() (err error) {
 }
 
 // Get returns next available connection.
-// It returns error on given context cancelation or when cluster become closed.
+// It returns error on given context cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
-
-	// KIKIMR-9019: Hard limit for get operation. Now <-wait can hang in case disconnect and reconnect to same endpoint
+	// Hard limit for get operation.
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
@@ -144,56 +156,70 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 		c.mu.RLock()
 		closed := c.closed
 		wait := c.await()
-		size := c.ready
+		ready := c.ready
+		size := len(c.index)
 		conn = c.balancer.Next()
 		c.mu.RUnlock()
-		if closed {
-			return nil, ErrClosed
-		}
-		switch {
-		case size == 0 && conn != nil:
-			panic("ydb: empty balancer has returned non-nil conn")
-		case size != 0 && conn == nil:
-			panic("ydb: non-empty balancer has returned nil conn")
-		case conn != nil:
-			if isReady(conn) {
-				return conn, nil
-			}
-			c.mu.Lock()
-			entry, has := c.index[conn.addr]
-			if has && entry.handle != nil {
-				// entry.handle may become nil when some race happened and other
-				// goroutine already removed conn from balancer and sent it
-				// to the tracker.
-				conn.runtime.setState(ConnOffline)
-
-				// NOTE: we setting entry.conn to nil here to be more strict
-				// about the ownership of conn. That is, tracker goroutine
-				// takes full ownership of conn after c.track(conn) call.
-				//
-				// Leaving non-nil conn may lead to data races, when tracker
-				// changes conn.conn field (in case of unsuccessful initial
-				// dial) without any mutex used.
-				entry.removeFrom(c.balancer)
-				entry.conn = nil
-				entry.trackerQueueEl = c.track(conn)
-
-				c.index[conn.addr] = entry
-				c.ready--
-			}
-			c.mu.Unlock()
-		}
 		select {
-		case <-wait():
-			// Continue.
 		case <-ctx.Done():
 			return nil, ctx.Err()
+		default:
+			switch {
+			case closed:
+				return nil, ErrClusterClosed
+			case ready == 0 && conn != nil:
+				panic("ydb: empty balancer has returned non-nil conn")
+			case ready != 0 && conn == nil:
+				panic("ydb: non-empty balancer has returned nil conn")
+			case size == 0:
+				return nil, ErrClusterEmpty
+			case conn != nil && isReady(conn):
+				return conn, nil
+			case conn != nil:
+				c.mu.Lock()
+				entry, has := c.index[conn.addr]
+				if has && entry.handle != nil {
+					// entry.handle may become nil when some race happened and other
+					// goroutine already removed conn from balancer and sent it
+					// to the tracker.
+					conn.runtime.setState(ConnOffline)
+
+					// NOTE: we setting entry.conn to nil here to be more strict
+					// about the ownership of conn. That is, tracker goroutine
+					// takes full ownership of conn after c.track(conn) call.
+					//
+					// Leaving non-nil conn may lead to data races, when tracker
+					// changes conn.conn field (in case of unsuccessful initial
+					// dial) without any mutex used.
+					entry.removeFrom(c.balancer)
+					entry.conn = nil
+					entry.trackerQueueEl = c.track(conn)
+
+					c.index[conn.addr] = entry
+					c.ready--
+					ready = c.ready
+
+					// more then half connections under tracking - re-discover now
+					if c.explorer != nil && ready*2 < len(c.index) {
+						c.explorer.Force()
+					}
+				}
+				c.mu.Unlock()
+			case ready <= 0:
+				select {
+				// wait if no ready connections left
+				case <-wait():
+
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			}
 		}
 	}
 }
 
 func isReady(conn *conn) bool {
-	return conn.conn != nil && conn.conn.GetState() == connectivity.Ready
+	return conn != nil && conn.conn != nil && conn.conn.GetState() == connectivity.Ready
 }
 
 // Insert inserts new connection into the cluster.
@@ -234,7 +260,7 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint) {
 		panic("ydb: can't insert already existing endpoint")
 	}
 	entry := connEntry{info: info}
-	if cc != nil {
+	if isReady(conn) {
 		conn.runtime.setState(ConnOnline)
 		entry.conn = conn
 		entry.insertInto(c.balancer)
@@ -340,15 +366,11 @@ func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
 func (c *cluster) track(conn *conn) (el *list.Element) {
 	c.trace.trackConnStart(conn)
 	el = c.trackerQueue.PushBack(conn)
-	c.wakeUpTracker()
-	return
-}
-
-func (c *cluster) wakeUpTracker() {
 	select {
 	case c.trackerWake <- struct{}{}:
 	default:
 	}
+	return
 }
 
 func (c *cluster) tracker() {

@@ -27,7 +27,7 @@ type meta struct {
 func (m *meta) make() metadata.MD {
 	return metadata.New(map[string]string{
 		metaDatabase: m.database,
-		metaVersion:  revisionNumber,
+		metaVersion:  Version,
 	})
 }
 
