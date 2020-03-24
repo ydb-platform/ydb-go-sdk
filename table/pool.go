@@ -207,10 +207,6 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 	s.OnClose(func() {
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		if p.closed {
-			return
-		}
-
 		info, has := p.index[s]
 		if !has {
 			return
@@ -531,10 +527,11 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	p.mu.Lock()
 	idle := p.idle
 	waitq := p.waitq
-	p.idle = nil
-	p.ready = nil
-	p.waitq = nil
-	p.index = nil
+	p.limit = 0
+	p.idle = list.New()
+	p.ready = list.New()
+	p.waitq = list.New()
+	p.index = make(map[*Session]sessionInfo)
 	p.mu.Unlock()
 
 	for el := waitq.Front(); el != nil; el = el.Next() {
@@ -569,7 +566,7 @@ func (p *SessionPool) busyChecker() {
 		case s := <-p.busyCheck:
 			p.traceBusyCheckStart(ctx, s)
 
-			if len(toCheck) == p.limit {
+			if len(toCheck) >= p.limit {
 				// Do not check more sessions than pool's capacity.
 				p.closeSession(ctx, s)
 				p.traceBusyCheckDone(ctx, s, false, nil)

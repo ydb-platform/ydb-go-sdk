@@ -1,3 +1,7 @@
+## 2019.03.02
+
+* fix panic on access to index after pool close
+
 ## 2019.03.1
 
 * added session pre-creation limit check in pool
