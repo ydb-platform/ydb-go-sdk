@@ -14,7 +14,7 @@ var (
 	DefaultSessionPoolKeepAliveTimeout     = 500 * time.Millisecond
 	DefaultSessionPoolDeleteTimeout        = 500 * time.Millisecond
 	DefaultSessionPoolCreateSessionTimeout = 5 * time.Second
-	DefaultSessionPoolIdleThreshold        = 5 * time.Second
+	DefaultSessionPoolIdleThreshold        = 5 * time.Minute
 	DefaultSessionPoolBusyCheckInterval    = 1 * time.Second
 	DefaultSessionPoolSizeLimit            = 50
 )
@@ -633,6 +633,9 @@ func (p *SessionPool) keeper() {
 		select {
 		case <-wake:
 			wake = make(chan struct{})
+			if !timer.Stop() {
+				<-timer.C()
+			}
 			timer.Reset(p.IdleThreshold)
 			continue
 

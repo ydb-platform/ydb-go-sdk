@@ -1,5 +1,6 @@
 ## 2019.03.02
 
+* set session keepAlive period to 5 min - same as in other SDKs.
 * fix panic on access to index after pool close
 
 ## 2019.03.1
