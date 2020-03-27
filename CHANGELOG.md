@@ -11,3 +11,4 @@
 ## 2019.02
 
 * support cloud IAM (jwt) authorization from service account file
+* minimum version of Go become 1.13. Started support of new `errors` features

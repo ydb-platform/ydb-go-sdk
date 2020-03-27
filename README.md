@@ -6,8 +6,11 @@
 
 ## Overview
 
-Currently package ydb provides **scheme** and **table** API client
-implementations for YDB.
+Currently package ydb provides **scheme** and **table** API client implementations for YDB.
+
+## Prerequisites
+
+Requires Go 1.13 or later.
 
 ## Usage
 
@@ -73,9 +76,9 @@ The straightforward example of querying data may looks similar to this:
 			age := res.OUint64()
 
 			// Note that any value getter (such that OUTF8() and OUint64()
-			// above) may fail the result scanning. When this happens, getter 
-			// function returns zero value of requested type and marks result 
-			// scanning as failed, preventing any further scanning. In this 
+			// above) may fail the result scanning. When this happens, getter
+			// function returns zero value of requested type and marks result
+			// scanning as failed, preventing any further scanning. In this
 			// case res.Err() will return the cause of fail.
 			if res.Err() == nil {
 				users = append(users, user{
@@ -102,7 +105,7 @@ reduce boilerplate overhead for such cases `ydb` provides generic retry logic:
 		Builder:            &tc,         // Create new sessions within tc.
 	}
 	defer sp.Reset(ctx) // Close all sessions within pool.
-	
+
 	var res *table.Result
 	// Retry() will call given OperationFunc with the following invariants:
 	//  - previous operation failed with retriable error;
@@ -143,8 +146,8 @@ passing values to prepare query. There is an **experimental** tool named
 
 Currently it is possible to generate such things:
 - scanning values from result into a struct or slice of structs;
-- building query parameters from struct 
-- building ydb's struct value from struct 
+- building query parameters from struct
+- building ydb's struct value from struct
 - building ydb's list value from slice of structs
 
 The very short example could be like this:
@@ -191,8 +194,8 @@ type User struct {
 
 
 #### Binary flags
- 
- Flag   | Value      | Default | Meaning 
+
+ Flag   | Value      | Default | Meaning
 --------|:----------:|:-------:|---------
  `wrap` | `optional` | +       | Wraps all mapped field types with optional type if no explicit tag is specified.
  `wrap` | `none`     |         | No wrapping performed.
@@ -206,7 +209,7 @@ serialization.
 
 #### Struct tags and values overview
 
- Tag      | Value    | Default | Meaning 
+ Tag      | Value    | Default | Meaning
 ----------|:--------:|:-------:|---------
  `type`   | `T`      |         | Specifies which ydb primitive type must be used for this field.
  `type`   | `T?`     |         | The same as above, but wraps T with optional type.
