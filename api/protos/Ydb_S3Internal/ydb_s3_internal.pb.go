@@ -217,7 +217,9 @@ func init() {
 	proto.RegisterType((*S3ListingResult)(nil), "Ydb.S3Internal.S3ListingResult")
 }
 
-func init() { proto.RegisterFile("ydb_s3_internal.proto", fileDescriptor_1a251a79ecaf5049) }
+func init() {
+	proto.RegisterFile("ydb_s3_internal.proto", fileDescriptor_1a251a79ecaf5049)
+}
 
 var fileDescriptor_1a251a79ecaf5049 = []byte{
 	// 481 bytes of a gzipped FileDescriptorProto

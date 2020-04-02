@@ -21,7 +21,9 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
-func init() { proto.RegisterFile("ydb_experimental_v1.proto", fileDescriptor_ffefa8afda07c0f3) }
+func init() {
+	proto.RegisterFile("ydb_experimental_v1.proto", fileDescriptor_ffefa8afda07c0f3)
+}
 
 var fileDescriptor_ffefa8afda07c0f3 = []byte{
 	// 209 bytes of a gzipped FileDescriptorProto

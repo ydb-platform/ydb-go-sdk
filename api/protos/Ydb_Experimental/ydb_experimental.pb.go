@@ -490,7 +490,9 @@ func init() {
 	proto.RegisterType((*ExecuteStreamQueryResult)(nil), "Ydb.Experimental.ExecuteStreamQueryResult")
 }
 
-func init() { proto.RegisterFile("ydb_experimental.proto", fileDescriptor_ac21a693e2c386a5) }
+func init() {
+	proto.RegisterFile("ydb_experimental.proto", fileDescriptor_ac21a693e2c386a5)
+}
 
 var fileDescriptor_ac21a693e2c386a5 = []byte{
 	// 671 bytes of a gzipped FileDescriptorProto

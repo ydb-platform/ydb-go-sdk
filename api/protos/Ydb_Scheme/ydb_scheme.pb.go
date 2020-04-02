@@ -855,7 +855,9 @@ func init() {
 	proto.RegisterType((*ModifyPermissionsResponse)(nil), "Ydb.Scheme.ModifyPermissionsResponse")
 }
 
-func init() { proto.RegisterFile("ydb_scheme.proto", fileDescriptor_eeaf0ffb27b25a32) }
+func init() {
+	proto.RegisterFile("ydb_scheme.proto", fileDescriptor_eeaf0ffb27b25a32)
+}
 
 var fileDescriptor_eeaf0ffb27b25a32 = []byte{
 	// 753 bytes of a gzipped FileDescriptorProto

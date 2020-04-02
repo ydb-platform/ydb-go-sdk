@@ -597,7 +597,9 @@ func init() {
 	proto.RegisterType((*Operation)(nil), "Ydb.Operations.Operation")
 }
 
-func init() { proto.RegisterFile("ydb_operation.proto", fileDescriptor_589bdee9fb97c360) }
+func init() {
+	proto.RegisterFile("ydb_operation.proto", fileDescriptor_589bdee9fb97c360)
+}
 
 var fileDescriptor_589bdee9fb97c360 = []byte{
 	// 728 bytes of a gzipped FileDescriptorProto

@@ -4766,7 +4766,9 @@ func init() {
 	proto.RegisterType((*BulkUpsertResult)(nil), "Ydb.Table.BulkUpsertResult")
 }
 
-func init() { proto.RegisterFile("ydb_table.proto", fileDescriptor_1b2e4c4d1a772d33) }
+func init() {
+	proto.RegisterFile("ydb_table.proto", fileDescriptor_1b2e4c4d1a772d33)
+}
 
 var fileDescriptor_1b2e4c4d1a772d33 = []byte{
 	// 3693 bytes of a gzipped FileDescriptorProto

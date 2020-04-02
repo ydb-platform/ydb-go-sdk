@@ -84,7 +84,9 @@ func init() {
 	proto.RegisterType((*FeatureFlag)(nil), "Ydb.FeatureFlag")
 }
 
-func init() { proto.RegisterFile("ydb_common.proto", fileDescriptor_ac23b1f8425834a0) }
+func init() {
+	proto.RegisterFile("ydb_common.proto", fileDescriptor_ac23b1f8425834a0)
+}
 
 var fileDescriptor_ac23b1f8425834a0 = []byte{
 	// 157 bytes of a gzipped FileDescriptorProto
