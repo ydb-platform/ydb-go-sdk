@@ -71,6 +71,12 @@ func WithSessionPoolTrace(t table.SessionPoolTrace) ConnectorOption {
 	}
 }
 
+func WithSessionPoolSizeLimit(n int) ConnectorOption {
+	return func(c *connector) {
+		c.pool.SizeLimit = n
+	}
+}
+
 func WithSessionPoolIdleThreshold(d time.Duration) ConnectorOption {
 	return func(c *connector) {
 		c.pool.IdleThreshold = d
@@ -83,9 +89,27 @@ func WithSessionPoolBusyCheckInterval(d time.Duration) ConnectorOption {
 	}
 }
 
-func WithSessionPoolSizeLimit(n int) ConnectorOption {
+func WithSessionPoolKeepAliveBatchSize(n int) ConnectorOption {
 	return func(c *connector) {
-		c.pool.SizeLimit = n
+		c.pool.KeepAliveBatchSize = n
+	}
+}
+
+func WithSessionPoolKeepAliveTimeout(d time.Duration) ConnectorOption {
+	return func(c *connector) {
+		c.pool.KeepAliveTimeout = d
+	}
+}
+
+func WithSessionPoolCreateSessionTimeout(d time.Duration) ConnectorOption {
+	return func(c *connector) {
+		c.pool.CreateSessionTimeout = d
+	}
+}
+
+func WithSessionPoolDeleteTimeout(d time.Duration) ConnectorOption {
+	return func(c *connector) {
+		c.pool.DeleteTimeout = d
 	}
 }
 
