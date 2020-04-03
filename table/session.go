@@ -142,11 +142,14 @@ func (s *Session) CreateTable(ctx context.Context, path string, opts ...CreateTa
 }
 
 // DescribeTable describes table at given path.
-func (s *Session) DescribeTable(ctx context.Context, path string) (desc Description, err error) {
+func (s *Session) DescribeTable(ctx context.Context, path string, opts ...DescribeTableOption) (desc Description, err error) {
 	var res Ydb_Table.DescribeTableResult
 	req := Ydb_Table.DescribeTableRequest{
 		SessionId: s.ID,
 		Path:      path,
+	}
+	for _, opt := range opts {
+		opt((*describeTableDesc)(&req))
 	}
 	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DescribeTable, &req, &res))
 	if err != nil {

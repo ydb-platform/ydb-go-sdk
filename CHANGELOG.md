@@ -1,5 +1,6 @@
 ## 2020.04.1
 
+* added options to `DescribeTable` request
 * added `ydbsql/connector` options to configure `pool`s  `KeepAliveBatchSize`, `KeepAliveTimeout`, `CreateSessionTimeout`, `DeleteTimeout`
 
 ## 2020.03.2

@@ -43,6 +43,29 @@ type Description struct {
 }
 
 type (
+	describeTableDesc   Ydb_Table.DescribeTableRequest
+	DescribeTableOption func(d *describeTableDesc)
+)
+
+func WithShardKeyBounds() DescribeTableOption {
+	return func(d *describeTableDesc) {
+		d.IncludeShardKeyBounds = true
+	}
+}
+
+func WithTableStats() DescribeTableOption {
+	return func(d *describeTableDesc) {
+		d.IncludeTableStats = true
+	}
+}
+
+func WithPartitionStats() DescribeTableOption {
+	return func(d *describeTableDesc) {
+		d.IncludePartitionStats = true
+	}
+}
+
+type (
 	createTableDesc   Ydb_Table.CreateTableRequest
 	CreateTableOption func(d *createTableDesc)
 )

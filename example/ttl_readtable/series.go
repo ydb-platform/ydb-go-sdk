@@ -292,7 +292,7 @@ func deleteExpired(ctx context.Context, sp *table.SessionPool, prefix string, ti
 	var res table.Description
 	err := table.Retry(ctx, sp,
 		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
-			res, err = s.DescribeTable(ctx, path.Join(prefix, "documents"))
+			res, err = s.DescribeTable(ctx, path.Join(prefix, "documents"), table.WithShardKeyBounds())
 			return err
 		}),
 	)
