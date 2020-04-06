@@ -122,9 +122,7 @@ func getField(name string, src, dst interface{}) bool {
 
 		v := reflect.ValueOf(dst)
 		if v.Type().Kind() != reflect.Ptr {
-			panic(fmt.Sprintf(
-				"ydb/testutil: destination value must be a pointer",
-			))
+			panic("ydb/testutil: destination value must be a pointer")
 		}
 		if v.Type().Elem().Kind() != fv.Type().Kind() {
 			panic(fmt.Sprintf(

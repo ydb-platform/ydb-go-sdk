@@ -870,8 +870,10 @@ func (t *Client) traceBeginTransactionDone(ctx context.Context, s *Session, tx *
 func (t *Client) traceCommitTransactionStart(ctx context.Context, tx *Transaction) {
 	x := CommitTransactionStartInfo{
 		Context: ctx,
-		Session: tx.s,
-		TxID:    tx.id,
+	}
+	if tx != nil {
+		x.Session = tx.s
+		x.TxID = tx.id
 	}
 	if a := t.Trace.CommitTransactionStart; a != nil {
 		a(x)
@@ -883,10 +885,10 @@ func (t *Client) traceCommitTransactionStart(ctx context.Context, tx *Transactio
 func (t *Client) traceCommitTransactionDone(ctx context.Context, tx *Transaction, err error) {
 	x := CommitTransactionDoneInfo{
 		Context: ctx,
-		Session: tx.s,
 		Error:   err,
 	}
 	if tx != nil {
+		x.Session = tx.s
 		x.TxID = tx.id
 	}
 	if a := t.Trace.CommitTransactionDone; a != nil {
@@ -899,8 +901,10 @@ func (t *Client) traceCommitTransactionDone(ctx context.Context, tx *Transaction
 func (t *Client) traceRollbackTransactionStart(ctx context.Context, tx *Transaction) {
 	x := RollbackTransactionStartInfo{
 		Context: ctx,
-		Session: tx.s,
-		TxID:    tx.id,
+	}
+	if tx != nil {
+		x.Session = tx.s
+		x.TxID = tx.id
 	}
 	if a := t.Trace.RollbackTransactionStart; a != nil {
 		a(x)
@@ -912,10 +916,10 @@ func (t *Client) traceRollbackTransactionStart(ctx context.Context, tx *Transact
 func (t *Client) traceRollbackTransactionDone(ctx context.Context, tx *Transaction, err error) {
 	x := RollbackTransactionDoneInfo{
 		Context: ctx,
-		Session: tx.s,
 		Error:   err,
 	}
 	if tx != nil {
+		x.Session = tx.s
 		x.TxID = tx.id
 	}
 	if a := t.Trace.RollbackTransactionDone; a != nil {
