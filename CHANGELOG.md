@@ -1,3 +1,7 @@
+## 2020.04.2
+
+* remove deprecated IAM (jwt) `Client` structure
+
 ## 2020.04.1
 
 * added options to `DescribeTable` request

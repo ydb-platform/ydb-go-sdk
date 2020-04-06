@@ -53,11 +53,11 @@ type transport interface {
 	CreateToken(ctx context.Context, jwt string) (token string, expires time.Time, err error)
 }
 
-type ClientOption func(*Client) error
+type ClientOption func(*client) error
 
 // WithEndpoint set provided endpoint.
 func WithEndpoint(endpoint string) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.Endpoint = endpoint
 		return nil
 	}
@@ -65,7 +65,7 @@ func WithEndpoint(endpoint string) ClientOption {
 
 // WithDefaultEndpoint set endpoint with default value.
 func WithDefaultEndpoint() ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.Endpoint = DefaultEndpoint
 		return nil
 	}
@@ -73,7 +73,7 @@ func WithDefaultEndpoint() ClientOption {
 
 // WithCertPool set provided certPool.
 func WithCertPool(certPool *x509.CertPool) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.CertPool = certPool
 		return nil
 	}
@@ -81,7 +81,7 @@ func WithCertPool(certPool *x509.CertPool) ClientOption {
 
 // WithCertPoolFile try set root certPool from provided cert file path.
 func WithCertPoolFile(path string) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
@@ -98,7 +98,7 @@ func WithCertPoolFile(path string) ClientOption {
 
 // WithSystemCertPool try set certPool with system root certificates.
 func WithSystemCertPool() ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		var err error
 		c.CertPool, err = x509.SystemCertPool()
 		return err
@@ -112,7 +112,7 @@ func WithSystemCertPool() ClientOption {
 //
 // This should be used only for testing purposes.
 func WithInsecureSkipVerify(insecure bool) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.InsecureSkipVerify = insecure
 		return nil
 	}
@@ -120,7 +120,7 @@ func WithInsecureSkipVerify(insecure bool) ClientOption {
 
 // WithKeyID set provided keyID.
 func WithKeyID(keyID string) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.KeyID = keyID
 		return nil
 	}
@@ -128,7 +128,7 @@ func WithKeyID(keyID string) ClientOption {
 
 // WithIssuer set provided issuer.
 func WithIssuer(issuer string) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.Issuer = issuer
 		return nil
 	}
@@ -136,7 +136,7 @@ func WithIssuer(issuer string) ClientOption {
 
 // WithTokenTTL set provided tokenTTL duration.
 func WithTokenTTL(tokenTTL time.Duration) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.TokenTTL = tokenTTL
 		return nil
 	}
@@ -144,7 +144,7 @@ func WithTokenTTL(tokenTTL time.Duration) ClientOption {
 
 // WithAudience set provided audience.
 func WithAudience(audience string) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.Audience = audience
 		return nil
 	}
@@ -152,7 +152,7 @@ func WithAudience(audience string) ClientOption {
 
 // WithPrivateKey set provided private key.
 func WithPrivateKey(key *rsa.PrivateKey) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		c.Key = key
 		return nil
 	}
@@ -160,7 +160,7 @@ func WithPrivateKey(key *rsa.PrivateKey) ClientOption {
 
 // WithPrivateKeyFile try set key from provided private key file path
 func WithPrivateKeyFile(path string) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
@@ -178,7 +178,7 @@ func WithPrivateKeyFile(path string) ClientOption {
 //
 // Do not mix this option with WithKeyID, WithIssuer and key options (WithPrivateKey, WithPrivateKeyFile, etc).
 func WithServiceFile(path string) ClientOption {
-	return func(c *Client) error {
+	return func(c *client) error {
 		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
@@ -211,7 +211,7 @@ func WithServiceFile(path string) ClientOption {
 //
 // To create successfully at least one of endpoint options must be provided.
 func NewClient(opts ...ClientOption) (ydb.Credentials, error) {
-	c := &Client{}
+	c := &client{}
 	for _, opt := range opts {
 		err := opt(c)
 		if err != nil {
@@ -237,9 +237,7 @@ func NewClient(opts ...ClientOption) (ydb.Credentials, error) {
 }
 
 // Client contains options for interaction with the iam.
-//
-// Deprecated: use NewClient instead. Will be moved to private in next release
-type Client struct {
+type client struct {
 	Endpoint string
 	CertPool *x509.CertPool
 
@@ -268,7 +266,7 @@ type Client struct {
 	transport transport
 }
 
-func (c *Client) init() (err error) {
+func (c *client) init() (err error) {
 	c.once.Do(func() {
 		if c.Endpoint == "" {
 			c.err = fmt.Errorf("iam: endpoint required")
@@ -294,7 +292,7 @@ func (c *Client) init() (err error) {
 // Token returns cached token if no c.TokenTTL time has passed or no token
 // expiration deadline from the last request exceeded. In other way, it makes
 // request for a new one token.
-func (c *Client) Token(ctx context.Context) (token string, err error) {
+func (c *client) Token(ctx context.Context) (token string, err error) {
 	if err = c.init(); err != nil {
 		return
 	}
@@ -327,7 +325,7 @@ func (c *Client) Token(ctx context.Context) (token string, err error) {
 	return token, nil
 }
 
-func (c *Client) expired() bool {
+func (c *client) expired() bool {
 	return c.expires.Sub(timeutil.Now()) <= 0
 }
 
@@ -342,7 +340,7 @@ var ps256WithSaltLengthEqualsHash = &jwt.SigningMethodRSAPSS{
 	},
 }
 
-func (c *Client) jwt(now time.Time) string {
+func (c *client) jwt(now time.Time) string {
 	var (
 		issued = now.UTC().Unix()
 		expire = now.Add(c.TokenTTL).UTC().Unix()

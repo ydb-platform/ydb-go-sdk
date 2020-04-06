@@ -52,7 +52,7 @@ func TestClientToken(t *testing.T) {
 			{"baz", 0},
 		}
 	)
-	c := Client{
+	c := client{
 		Endpoint: endpoint,
 		Key:      key,
 		KeyID:    keyID,
@@ -164,7 +164,7 @@ func TestOptionsConfig(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if cl, ok := c.(*Client); !ok ||
+	if cl, ok := c.(*client); !ok ||
 		cl.KeyID != keyID ||
 		cl.Issuer != issuer ||
 		cl.Audience != audience ||
