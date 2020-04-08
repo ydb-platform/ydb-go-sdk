@@ -5,6 +5,7 @@ PEERDIR(
     vendor/github.com/golang/protobuf/protoc-gen-go/descriptor
     vendor/github.com/golang/protobuf/protoc-gen-go/grpc
     vendor/github.com/golang/protobuf/ptypes/any
+    vendor/github.com/golang/protobuf/ptypes/empty
     vendor/github.com/golang/protobuf/ptypes/duration
     vendor/github.com/golang/protobuf/ptypes/timestamp
     contrib/libs/protobuf
