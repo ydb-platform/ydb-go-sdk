@@ -152,18 +152,6 @@ func TestClusterTracking(t *testing.T) {
 	// Allow the first read of connection handshake.
 	c.ticket <- struct{}{}
 	mustNotCreateSession()
-
-	// Wait for grpc keepalive being prepared and redial attempt made.
-	// It takes 2 keepalive checks to insure that connection is dead
-	time.Sleep(dialer.Keepalive * 2)
-	mustNotCreateSession()
-
-	// Allow one connection to the endpoint.
-	dialTicket <- nil
-	conn = <-endpoint.ServerConn()
-	mustCreateSession()
-
-	_ = conn.Close()
 }
 
 type connProxy struct {

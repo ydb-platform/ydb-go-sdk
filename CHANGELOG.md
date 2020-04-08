@@ -1,5 +1,6 @@
 ## 2020.04.2
 
+* set limits to grpc `MaxCallRecvMsgSize` and `MaxCallSendMsgSize` to 64MB
 * remove deprecated IAM (jwt) `Client` structure
 
 ## 2020.04.1

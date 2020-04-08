@@ -14,6 +14,7 @@ import (
 var (
 	// DefaultKeepaliveInterval contains default duration between grpc keepalive
 	DefaultKeepaliveInterval = 10 * time.Second
+	DefaultGRPCMsgSize       = 64 * 1024 * 1024 // 64MB
 )
 
 func Dial(ctx context.Context, addr string, c *DriverConfig) (Driver, error) {
@@ -249,6 +250,11 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 			Timeout: d.timeout,
 		}),
 	)
+	opts = append(opts, grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
+		grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
+	))
+
 	return append(opts, grpc.WithBlock())
 }
 
