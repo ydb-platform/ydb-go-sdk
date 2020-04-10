@@ -32,9 +32,9 @@ func (it IssueIterator) Get(i int) (issue Issue, nested IssueIterator) {
 		nested = IssueIterator(xs)
 	}
 	return Issue{
-		Message:  *x.Message,
-		Code:     *x.IssueCode,
-		Severity: *x.Severity,
+		Message:  x.GetMessage(),
+		Code:     x.GetIssueCode(),
+		Severity: x.GetSeverity(),
 	}, nested
 }
 
@@ -104,9 +104,9 @@ func IsOpError(err error, code StatusCode) bool {
 func iterateIssues(issues []*Ydb_Issue.IssueMessage, it func(Issue)) {
 	for _, x := range issues {
 		it(Issue{
-			Message:  *x.Message,
-			Code:     *x.IssueCode,
-			Severity: *x.Severity,
+			Message:  x.GetMessage(),
+			Code:     x.GetIssueCode(),
+			Severity: x.GetSeverity(),
 		})
 	}
 }
@@ -120,12 +120,12 @@ func dumpIssues(buf *bytes.Buffer, ms []*Ydb_Issue.IssueMessage) {
 	defer buf.WriteByte(']')
 	for _, m := range ms {
 		buf.WriteByte('{')
-		if code := *m.IssueCode; code != 0 {
+		if code := m.GetIssueCode(); code != 0 {
 			buf.WriteByte('#')
 			buf.WriteString(strconv.Itoa(int(code)))
 			buf.WriteByte(' ')
 		}
-		buf.WriteString(strings.TrimSuffix(*m.Message, "."))
+		buf.WriteString(strings.TrimSuffix(m.GetMessage(), "."))
 		dumpIssues(buf, m.Issues)
 		buf.WriteByte('}')
 	}
