@@ -1277,10 +1277,7 @@ func (m *ColumnMeta) GetFamily() string {
 }
 
 type TtlSettings struct {
-	// The column type must be one of:
-	// - TZ_DATE
-	// - TZ_DATETIME
-	// - TZ_TIMESTAMP
+	// The column type must be a date type
 	ColumnName           string   `protobuf:"bytes,1,opt,name=column_name,json=columnName,proto3" json:"column_name,omitempty"`
 	ExpireAfterSeconds   uint32   `protobuf:"varint,2,opt,name=expire_after_seconds,json=expireAfterSeconds,proto3" json:"expire_after_seconds,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -1340,11 +1337,12 @@ type CreateTableRequest struct {
 	Profile         *TableProfile                   `protobuf:"bytes,5,opt,name=profile,proto3" json:"profile,omitempty"`
 	OperationParams *Ydb_Operations.OperationParams `protobuf:"bytes,6,opt,name=operation_params,json=operationParams,proto3" json:"operation_params,omitempty"`
 	// List of secondary indexes
-	Indexes              []*TableIndex `protobuf:"bytes,7,rep,name=indexes,proto3" json:"indexes,omitempty"`
-	TtlSettings          *TtlSettings  `protobuf:"bytes,8,opt,name=ttl_settings,json=ttlSettings,proto3" json:"ttl_settings,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
-	XXX_unrecognized     []byte        `json:"-"`
-	XXX_sizecache        int32         `json:"-"`
+	Indexes []*TableIndex `protobuf:"bytes,7,rep,name=indexes,proto3" json:"indexes,omitempty"`
+	// Table rows time to live settings
+	TtlSettings          *TtlSettings `protobuf:"bytes,8,opt,name=ttl_settings,json=ttlSettings,proto3" json:"ttl_settings,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
 }
 
 func (m *CreateTableRequest) Reset()         { *m = CreateTableRequest{} }
@@ -1577,6 +1575,8 @@ type AlterTableRequest struct {
 	OperationParams *Ydb_Operations.OperationParams `protobuf:"bytes,5,opt,name=operation_params,json=operationParams,proto3" json:"operation_params,omitempty"`
 	// Columns to alter
 	AlterColumns []*ColumnMeta `protobuf:"bytes,6,rep,name=alter_columns,json=alterColumns,proto3" json:"alter_columns,omitempty"`
+	// Setup or remove time to live settings
+	//
 	// Types that are valid to be assigned to TtlAction:
 	//	*AlterTableRequest_SetTtlSettings
 	//	*AlterTableRequest_DropTtlSettings
