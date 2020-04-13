@@ -1,3 +1,7 @@
+## 2020.04.3
+
+* fix races in test hooks
+
 ## 2020.04.2
 
 * set limits to grpc `MaxCallRecvMsgSize` and `MaxCallSendMsgSize` to 64MB

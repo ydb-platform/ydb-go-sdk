@@ -122,6 +122,9 @@ type SessionPool struct {
 	busyCheckerDone chan struct{}
 
 	closed bool
+
+	waitChPool        sync.Pool
+	testHookGetWaitCh func() // nil except some tests.
 }
 
 func (p *SessionPool) init() {
@@ -270,7 +273,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			// be fair here and not to lock more goroutines than we could ship
 			// session to.
 			p.mu.Lock()
-			ch = getWaitCh()
+			ch = p.getWaitCh()
 			el = p.waitq.PushBack(ch)
 			p.mu.Unlock()
 		}
@@ -292,7 +295,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 				// Put only filled and not closed channel back to the pool.
 				// That is, we need to avoid races on filling reused channel
 				// for the next waiter – session could be lost for a long time.
-				putWaitCh(ch)
+				p.putWaitCh(ch)
 			}
 
 		case <-ctx.Done():
@@ -731,36 +734,31 @@ func (p *SessionPool) keeper() {
 	}
 }
 
-var (
-	waitChPool        sync.Pool
-	testHookGetWaitCh func() // nil except some tests.
-)
-
 // getWaitCh returns pointer to a channel of sessions.
 //
 // Note that returning a pointer reduces allocations on sync.Pool usage –
 // sync.Pool.Get() returns empty interface, which leads to allocation for
 // non-pointer values.
-func getWaitCh() *chan *Session {
-	if testHookGetWaitCh != nil {
-		testHookGetWaitCh()
+func (p *SessionPool) getWaitCh() *chan *Session {
+	if p.testHookGetWaitCh != nil {
+		p.testHookGetWaitCh()
 	}
-	p, ok := waitChPool.Get().(*chan *Session)
+	s, ok := p.waitChPool.Get().(*chan *Session)
 	if !ok {
 		// NOTE: MUST NOT be buffered.
 		// In other case we could cork an already no-owned channel.
 		ch := make(chan *Session)
-		p = &ch
+		s = &ch
 	}
-	return p
+	return s
 }
 
 // putWaitCh receives pointer to a channel and makes it available for further
 // use.
 // Note that ch MUST NOT be owned by any goroutine at the call moment and ch
 // MUST NOT contain any value.
-func putWaitCh(ch *chan *Session) {
-	waitChPool.Put(ch)
+func (p *SessionPool) putWaitCh(ch *chan *Session) {
+	p.waitChPool.Put(ch)
 }
 
 // p.mu must be held.

@@ -289,7 +289,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				got <- err
 			}()
 
-			regwait := whenWantWaitCh()
+			regwait := whenWantWaitCh(p)
 			<-get     // Await for getter blocked on awaiting session.
 			<-regwait // Let the getter register itself in the wait queue.
 
@@ -424,7 +424,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				}))
 			}()
 
-			regwait := whenWantWaitCh()
+			regwait := whenWantWaitCh(p)
 			<-get     // Await for getter blocked on awaiting session.
 			<-regwait // Let the getter register itself in the wait queue.
 
@@ -608,7 +608,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				got <- sessionAndError{s, err}
 			}()
 
-			regwait := whenWantWaitCh()
+			regwait := whenWantWaitCh(p)
 			<-get     // Await for getter blocked on awaiting session.
 			<-regwait // Let the getter register itself in the wait queue.
 
@@ -975,9 +975,10 @@ func TestSessionPoolDoublePut(t *testing.T) {
 }
 
 func TestSessionPoolReuseWaitChannel(t *testing.T) {
-	ch1 := getWaitCh()
-	putWaitCh(ch1)
-	ch2 := getWaitCh()
+	p := SessionPool{}
+	ch1 := p.getWaitCh()
+	p.putWaitCh(ch1)
+	ch2 := p.getWaitCh()
 	if ch1 != ch2 {
 		t.Errorf("unexpected reused channel")
 	}
@@ -1201,13 +1202,13 @@ func (p *SessionPool) debug() {
 	fmt.Printf("<-> tail\n")
 }
 
-func whenWantWaitCh() <-chan struct{} {
+func whenWantWaitCh(p *SessionPool) <-chan struct{} {
 	var (
-		prev = testHookGetWaitCh
+		prev = p.testHookGetWaitCh
 		ch   = make(chan struct{})
 	)
-	testHookGetWaitCh = func() {
-		testHookGetWaitCh = prev
+	p.testHookGetWaitCh = func() {
+		p.testHookGetWaitCh = prev
 		close(ch)
 	}
 	return ch
