@@ -72,9 +72,9 @@ func (c *Client) Token(ctx context.Context) (token string, err error) {
 		return p.token, nil
 
 	case <-ctx.Done():
-		p.mu.Lock()
+		c.mu.Lock()
 		c.gone(p)
-		p.mu.Unlock()
+		c.mu.Unlock()
 
 		return "", ctx.Err()
 	}
@@ -91,7 +91,6 @@ type tokenPromise struct {
 	expires time.Time
 	err     error
 
-	mu      sync.Mutex
 	waiters int64
 	cancel  func()
 }

@@ -1,5 +1,6 @@
 ## 2020.04.3
 
+* fix race in `auth.metadata`
 * fix races in test hooks
 
 ## 2020.04.2
