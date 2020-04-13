@@ -94,7 +94,7 @@ func (c *cluster) init() {
 		c.trackerWake = make(chan struct{}, 1)
 		c.trackerDone = make(chan struct{})
 		c.trackerQueue = list.New()
-		go c.tracker()
+		go c.tracker(timeutil.NewTimer(time.Duration(1<<63 - 1)))
 	})
 }
 
@@ -373,11 +373,10 @@ func (c *cluster) track(conn *conn) (el *list.Element) {
 	return
 }
 
-func (c *cluster) tracker() {
+func (c *cluster) tracker(timer timeutil.Timer) {
 	defer close(c.trackerDone)
 
 	var active bool
-	timer := timeutil.NewTimer(time.Duration(1<<63 - 1))
 	if !timer.Stop() {
 		panic("ydb: can't stop timer")
 	}
