@@ -1,3 +1,7 @@
+## 2020.04.4
+
+* added `InstanceServiceAccount` in `auth.iam`
+
 ## 2020.04.3
 
 * fix race in `auth.metadata`
