@@ -35,7 +35,6 @@ func (m *instanceServiceAccountCredentials) Token(ctx context.Context) (string, 
 			return m.token, nil
 		}
 	}
-	m.mu.RUnlock()
 
 	//renew
 	m.mu.RUnlock()
