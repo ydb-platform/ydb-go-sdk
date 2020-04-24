@@ -28,10 +28,12 @@ type instanceServiceAccountCredentials struct {
 func (m *instanceServiceAccountCredentials) Token(ctx context.Context) (string, error) {
 	m.mu.RLock()
 
-	const renewOverhead = 5 * time.Second
-	if m.expiresAt.Add(renewOverhead).Before(time.Now()) {
-		defer m.mu.RUnlock()
-		return m.token, nil
+	const renewOverhead = 15 * time.Second
+	if m.token != "" {
+		if m.expiresAt.Sub(time.Now()) > renewOverhead {
+			defer m.mu.RUnlock()
+			return m.token, nil
+		}
 	}
 	m.mu.RUnlock()
 
