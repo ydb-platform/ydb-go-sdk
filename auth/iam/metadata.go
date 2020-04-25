@@ -30,7 +30,7 @@ func (m *instanceServiceAccountCredentials) Token(ctx context.Context) (string, 
 
 	const renewOverhead = 15 * time.Second
 	if m.token != "" {
-		if m.expiresAt.Sub(time.Now()) > renewOverhead {
+		if time.Until(m.expiresAt) > renewOverhead {
 			defer m.mu.RUnlock()
 			return m.token, nil
 		}
