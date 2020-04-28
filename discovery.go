@@ -22,7 +22,7 @@ type discoveryClient struct {
 	meta *meta
 }
 
-func (d *discoveryClient) Discover(ctx context.Context, database string) ([]Endpoint, error) {
+func (d *discoveryClient) Discover(ctx context.Context, database string, ssl bool) ([]Endpoint, error) {
 	var (
 		resp Ydb_Operations.GetOperationResponse
 		res  Ydb_Discovery.ListEndpointsResult
@@ -45,12 +45,14 @@ func (d *discoveryClient) Discover(ctx context.Context, database string) ([]Endp
 	if err != nil {
 		return nil, err
 	}
-	es := make([]Endpoint, len(res.Endpoints))
-	for i, e := range res.Endpoints {
-		es[i] = Endpoint{
-			Addr:  e.Address,
-			Port:  int(e.Port),
-			Local: e.Location == res.SelfLocation,
+	es := make([]Endpoint, 0, len(res.Endpoints))
+	for _, e := range res.Endpoints {
+		if e.Ssl == ssl {
+			es = append(es, Endpoint{
+				Addr:  e.Address,
+				Port:  int(e.Port),
+				Local: e.Location == res.SelfLocation,
+			})
 		}
 	}
 	return es, nil

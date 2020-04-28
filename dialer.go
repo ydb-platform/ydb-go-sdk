@@ -116,7 +116,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		if err != nil {
 			return nil, err
 		}
-		// Endpoints mast be sorted to merge
+		// Endpoints must be sorted to merge
 		sortEndpoints(curr)
 		for _, e := range curr {
 			cluster.Insert(ctx, e)
@@ -131,7 +131,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 				sortEndpoints(next)
 				diffEndpoints(curr, next,
 					func(i, j int) {
-						// Endpoints are equal but we still need to update meta
+						// Endpoints are equal, but we still need to update meta
 						// data such that load factor and others.
 						cluster.Update(ctx, next[j])
 					},
@@ -230,16 +230,16 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 	return (&discoveryClient{
 		conn: conn,
 		meta: d.meta,
-	}).Discover(subctx, d.config.Database)
+	}).Discover(subctx, d.config.Database, d.useTLS())
 }
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	if d.netDial != nil {
 		opts = append(opts, grpc.WithContextDialer(d.netDial))
 	}
-	if c := d.tlsConfig; c != nil {
+	if d.useTLS() {
 		opts = append(opts, grpc.WithTransportCredentials(
-			credentials.NewTLS(c),
+			credentials.NewTLS(d.tlsConfig),
 		))
 	} else {
 		opts = append(opts, grpc.WithInsecure())
@@ -260,4 +260,8 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 
 func (d *dialer) newBalancer() balancer {
 	return balancers[d.config.BalancingMethod](d.config.BalancingConfig)
+}
+
+func (d *dialer) useTLS() bool {
+	return d.tlsConfig != nil
 }

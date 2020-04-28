@@ -1,6 +1,10 @@
+## 2020.04.5
+
+* return on discovery only endpoints that match SSL status of driver
+
 ## 2020.04.4
 
-* added `InstanceServiceAccount` in `auth.iam`
+* added GCP metadata auth style with `InstanceServiceAccount` in `auth.iam`.
 
 ## 2020.04.3
 
