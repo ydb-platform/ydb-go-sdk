@@ -25,7 +25,7 @@ func main() {
 		"output debug info",
 	)
 	flag.StringVar(&suffix,
-		"file-suffix", "_trace",
+		"file-suffix", "_gtrace",
 		"suffix for generated go files",
 	)
 	flag.Parse()
