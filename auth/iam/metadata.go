@@ -106,7 +106,7 @@ func InstanceServiceAccount() (ydb.Credentials, error) {
 			Transport: &http.Transport{
 				DialContext: (&net.Dialer{
 					Timeout:   time.Second, // One second should be enough for localhost connection.
-					KeepAlive: 0,           // No keep alive. Near token per hour requested.
+					KeepAlive: -1,          // No keep alive. Near token per hour requested.
 				}).DialContext,
 			},
 		},
