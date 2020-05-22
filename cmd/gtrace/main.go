@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -19,25 +20,43 @@ func main() {
 	var (
 		verbose bool
 		suffix  string
+		write   bool
 	)
 	flag.BoolVar(&verbose,
 		"v", false,
 		"output debug info",
+	)
+	flag.BoolVar(&write,
+		"w", false,
+		"write trace to file",
 	)
 	flag.StringVar(&suffix,
 		"file-suffix", "_gtrace",
 		"suffix for generated go files",
 	)
 	flag.Parse()
+
 	log.SetFlags(log.Lshortfile)
 
-	gofile := os.Getenv("GOFILE")
-	if gofile == "" {
-		log.Fatal("no $GOFILE env found")
-	}
-	workDir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
+	var (
+		goGen   bool
+		gofile  string
+		workDir string
+		err     error
+	)
+	if gofile = os.Getenv("GOFILE"); gofile != "" {
+		goGen = true
+		workDir, err = os.Getwd()
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		args := flag.Args()
+		if len(args) == 0 {
+			log.Fatal("no $GOFILE env nor file parameter are given")
+		}
+		gofile = path.Base(args[0])
+		workDir = path.Dir(args[0])
 	}
 
 	srcFilePath := path.Join(workDir, gofile)
@@ -45,18 +64,29 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var (
-		base = path.Base(srcFilePath)
-		ext  = path.Ext(base)
-		name = strings.TrimSuffix(base, ext)
-
-		dstFilePath = path.Join(workDir, name+suffix+ext)
-	)
-	dstFile, err := os.OpenFile(dstFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		log.Fatal(err)
+	if verbose {
+		log.Printf("source file: %s", srcFilePath)
+		log.Printf("package files: %v", pkgFilePaths)
 	}
-	defer dstFile.Close()
+
+	var dest io.Writer
+	if goGen || write {
+		var (
+			base = path.Base(srcFilePath)
+			ext  = path.Ext(base)
+			name = strings.TrimSuffix(base, ext)
+
+			dstFilePath = path.Join(workDir, name+suffix+ext)
+		)
+		dstFile, err := os.OpenFile(dstFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer dstFile.Close()
+		dest = dstFile
+	} else {
+		dest = os.Stdout
+	}
 
 	var (
 		pkgFiles = make([]*os.File, 0, len(pkgFilePaths))
@@ -177,7 +207,7 @@ func main() {
 		})
 	}
 	w := Writer{
-		Output: dstFile,
+		Output: dest,
 	}
 	p := Package{
 		Package: pkg,

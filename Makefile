@@ -1,3 +1,4 @@
+.PHONY: gtrace
 gtrace:
 	go build -o gtrace ./cmd/gtrace
 
