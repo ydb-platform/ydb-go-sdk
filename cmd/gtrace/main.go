@@ -332,7 +332,7 @@ func (x *GenItem) ParseComment(text string) (err error) {
 	case "set":
 		return x.ParseParameter(text)
 	default:
-		return fmt.Errorf("unkown prefix: %q", prefix)
+		return fmt.Errorf("unknown prefix: %q", prefix)
 	}
 	return nil
 }

@@ -279,7 +279,7 @@ func (w *Writer) composeHookCall(fn Func, h1, h2 string) {
 
 var contextType = (func() types.Type {
 	pkg := types.NewPackage("context", "context")
-	typ := types.NewInterface(nil, nil)
+	typ := types.NewInterfaceType(nil, nil)
 	name := types.NewTypeName(0, pkg, "Context", typ)
 	return types.NewNamed(name, typ, nil)
 })()
