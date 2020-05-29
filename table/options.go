@@ -238,22 +238,22 @@ func WithStoragePolicyPreset(name string) StoragePolicyOption {
 }
 func WithStoragePolicySyslog(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.Syslog = &Ydb_Table.StorageSettings{StorageKind: kind}
+		s.Syslog = &Ydb_Table.StoragePool{Media: kind}
 	}
 }
 func WithStoragePolicyLog(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.Log = &Ydb_Table.StorageSettings{StorageKind: kind}
+		s.Log = &Ydb_Table.StoragePool{Media: kind}
 	}
 }
 func WithStoragePolicyData(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.Data = &Ydb_Table.StorageSettings{StorageKind: kind}
+		s.Data = &Ydb_Table.StoragePool{Media: kind}
 	}
 }
 func WithStoragePolicyExternal(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.External = &Ydb_Table.StorageSettings{StorageKind: kind}
+		s.External = &Ydb_Table.StoragePool{Media: kind}
 	}
 }
 func WithStoragePolicyKeepInMemory(flag ydb.FeatureFlag) StoragePolicyOption {

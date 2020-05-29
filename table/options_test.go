@@ -36,10 +36,10 @@ func TestSessionOptionsProfile(t *testing.T) {
 		opt((*createTableDesc)(&req))
 		p := req.Profile.StoragePolicy
 		if p.PresetName != "abc" ||
-			p.Syslog.StorageKind != "any1" ||
-			p.Log.StorageKind != "any2" ||
-			p.Data.StorageKind != "any3" ||
-			p.External.StorageKind != "any4" ||
+			p.Syslog.Media != "any1" ||
+			p.Log.Media != "any2" ||
+			p.Data.Media != "any3" ||
+			p.External.Media != "any4" ||
 			p.KeepInMemory != Ydb.FeatureFlag_ENABLED {
 			t.Errorf("Storage policy is not as expected")
 		}
