@@ -1,6 +1,6 @@
 # gtrace
 
-[![CI][ci-badge][ci-url]]
+[![CI][ci-badge]][ci-url]
 
 Command line tool **gtrace** generates boilerplate code for Go components tracing (aka _instrumentation_).
 
