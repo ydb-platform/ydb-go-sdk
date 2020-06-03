@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -55,12 +54,12 @@ func main() {
 		if len(args) == 0 {
 			log.Fatal("no $GOFILE env nor file parameter are given")
 		}
-		gofile = path.Base(args[0])
-		workDir = path.Dir(args[0])
+		gofile = filepath.Base(args[0])
+		workDir = filepath.Dir(args[0])
 	}
 
-	srcFilePath := path.Join(workDir, gofile)
-	pkgFilePaths, err := filepath.Glob(path.Join(workDir, "*.go"))
+	srcFilePath := filepath.Join(workDir, gofile)
+	pkgFilePaths, err := filepath.Glob(filepath.Join(workDir, "*.go"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,11 +71,11 @@ func main() {
 	var dest io.Writer
 	if goGen || write {
 		var (
-			base = path.Base(srcFilePath)
-			ext  = path.Ext(base)
+			base = filepath.Base(srcFilePath)
+			ext  = filepath.Ext(base)
 			name = strings.TrimSuffix(base, ext)
 
-			dstFilePath = path.Join(workDir, name+suffix+ext)
+			dstFilePath = filepath.Join(workDir, name+suffix+ext)
 		)
 		dstFile, err := os.OpenFile(dstFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
