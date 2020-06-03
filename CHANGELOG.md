@@ -1,3 +1,7 @@
+## 2020.06.1
+
+* exported internal `api.Wrap`/`api.Unwrap` methods and linked structures
+
 ## 2020.04.5
 
 * return on discovery only endpoints that match SSL status of driver

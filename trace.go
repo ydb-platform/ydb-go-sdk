@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/yandex-cloud/ydb-go-sdk/api"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
 )
 
 type DriverTrace struct {
@@ -225,7 +225,7 @@ func (d DriverTrace) streamRecvStart(ctx context.Context, conn *conn, method str
 		f(x)
 	}
 }
-func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method string, resp internal.StreamOperationResponse, err error) {
+func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method string, resp api.StreamOperationResponse, err error) {
 	x := StreamRecvDoneInfo{
 		Context: ctx,
 		Address: conn.addr.String(),

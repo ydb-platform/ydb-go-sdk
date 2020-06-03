@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/yandex-cloud/ydb-go-sdk/api"
 	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -208,11 +208,11 @@ type Driver struct {
 	OnClose      func() error
 }
 
-func (d *Driver) Call(ctx context.Context, op internal.Operation) error {
+func (d *Driver) Call(ctx context.Context, op api.Operation) error {
 	if d.OnCall == nil {
 		return ErrNotImplemented
 	}
-	method, req, res := internal.Unwrap(op)
+	method, req, res := api.Unwrap(op)
 	code := grpcMethodToCode[method]
 
 	// NOTE: req and res may be converted to testutil inner structs, which are
@@ -220,11 +220,11 @@ func (d *Driver) Call(ctx context.Context, op internal.Operation) error {
 	return d.OnCall(ctx, code, req, res)
 }
 
-func (d *Driver) StreamRead(ctx context.Context, op internal.StreamOperation) error {
+func (d *Driver) StreamRead(ctx context.Context, op api.StreamOperation) error {
 	if d.OnStreamRead == nil {
 		return ErrNotImplemented
 	}
-	method, req, res, processor := internal.UnwrapStreamOperation(op)
+	method, req, res, processor := api.UnwrapStreamOperation(op)
 	code := grpcMethodToCode[method]
 
 	return d.OnStreamRead(ctx, code, req, res, processor)

@@ -15,9 +15,9 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"github.com/yandex-cloud/ydb-go-sdk/api"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/stats"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
@@ -40,8 +40,8 @@ var ErrClosed = errors.New("driver closed")
 
 // Driver is an interface of YDB driver.
 type Driver interface {
-	Call(context.Context, internal.Operation) error
-	StreamRead(context.Context, internal.StreamOperation) error
+	Call(context.Context, api.Operation) error
+	StreamRead(context.Context, api.StreamOperation) error
 	Close() error
 }
 
@@ -183,7 +183,7 @@ func (d *driver) Close() error {
 	return d.cluster.Close()
 }
 
-func (d *driver) Call(ctx context.Context, op internal.Operation) error {
+func (d *driver) Call(ctx context.Context, op api.Operation) error {
 	// Remember raw context to pass it for the tracing functions.
 	rawctx := ctx
 
@@ -216,7 +216,7 @@ func (d *driver) Call(ctx context.Context, op internal.Operation) error {
 	}
 
 	var resp Ydb_Operations.GetOperationResponse
-	method, req, res := internal.Unwrap(op)
+	method, req, res := api.Unwrap(op)
 
 	params, ok := operationParams(ctx, d.contextDeadlineMapping)
 	if ok {
@@ -261,7 +261,7 @@ func errIf(cond bool, err error) error {
 	return nil
 }
 
-func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) (err error) {
+func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawctx := ctx
 
@@ -291,7 +291,7 @@ func (d *driver) StreamRead(ctx context.Context, op internal.StreamOperation) (e
 		return err
 	}
 
-	method, req, resp, process := internal.UnwrapStreamOperation(op)
+	method, req, resp, process := api.UnwrapStreamOperation(op)
 	desc := grpc.StreamDesc{
 		StreamName:    path.Base(method),
 		ServerStreams: true,
