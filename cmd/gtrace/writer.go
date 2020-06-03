@@ -201,7 +201,7 @@ func (w *Writer) compose(trace Trace) {
 		t := w.declare("t")
 		x := w.declare("x")
 		ret := w.declare("ret")
-		w.line(`// Compose returns a new `, trace.Name, ` which has functional fields composed `)
+		w.line(`// Compose returns a new `, trace.Name, ` which has functional fields composed`)
 		w.line(`// both from `, t, ` and `, x, `.`)
 		w.code(`func (`, t, ` `, trace.Name, `) Compose(`, x, ` `, trace.Name, `) `)
 		w.line(`(`, ret, ` `, trace.Name, `) {`)

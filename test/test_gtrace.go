@@ -6,7 +6,7 @@ import (
 	"context"
 )
 
-// Compose returns a new Trace which has functional fields composed 
+// Compose returns a new Trace which has functional fields composed
 // both from t and x.
 func (t Trace) Compose(x Trace) (ret Trace) {
 	switch {

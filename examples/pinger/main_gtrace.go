@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-// Compose returns a new PingTrace which has functional fields composed 
+// Compose returns a new PingTrace which has functional fields composed
 // both from t and x.
 func (t PingTrace) Compose(x PingTrace) (ret PingTrace) {
 	switch {
