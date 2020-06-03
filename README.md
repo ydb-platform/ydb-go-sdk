@@ -1,5 +1,7 @@
 # gtrace
 
+[![CI][ci-badge][ci-url]]
+
 Command line tool **gtrace** generates boilerplate code for Go components tracing (aka _instrumentation_).
 
 ## Usage
@@ -214,3 +216,6 @@ func (c *Client) ping(ctx context.Context) error {
 ### Examples
 
 For more details feel free to read the `examples` package of this repo as well as delve into `test/test_grace.go`.
+
+[ci-badge]: https://github.com/gobwas/gtrace/workflows/CI/badge.svg
+[ci-url]:   https://github.com/gobwas/gtrace/actions?query=workflow%3ACI
