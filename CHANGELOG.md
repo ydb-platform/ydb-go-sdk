@@ -1,3 +1,7 @@
+## 2020.06.2
+* Refactored `InstanceServiceAccount`: refresh token in background.
+  Also, will never produce error on creation.
+
 ## 2020.06.1
 
 * exported internal `api.Wrap`/`api.Unwrap` methods and linked structures

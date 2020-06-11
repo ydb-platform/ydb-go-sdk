@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
@@ -37,16 +37,17 @@ var (
 
 // CreateTokenError contains reason of token creation failure.
 type CreateTokenError struct {
-	Reason error
+	Cause  error
+	Reason string
 }
 
 // Error implements error interface.
 func (e *CreateTokenError) Error() string {
-	return fmt.Sprintf("iam: create token error: %v", e.Reason)
+	return fmt.Sprintf("iam: create token error: %s", e.Reason)
 }
 
 func (e *CreateTokenError) Unwrap() error {
-	return e.Reason
+	return e.Cause
 }
 
 type transport interface {
@@ -314,7 +315,8 @@ func (c *client) Token(ctx context.Context) (token string, err error) {
 	token, expires, err = c.transport.CreateToken(ctx, c.jwt(now))
 	if err != nil {
 		return "", &CreateTokenError{
-			Reason: err,
+			Cause:  err,
+			Reason: err.Error(),
 		}
 	}
 	c.token = token
