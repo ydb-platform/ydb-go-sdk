@@ -10,6 +10,8 @@ import (
 
 var _ ydb.Credentials = &instanceServiceAccountCredentials{}
 
+const metadataURL = "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
+
 type instanceServiceAccountCredentials struct {
 	mu  *sync.RWMutex
 	ctx context.Context
@@ -19,6 +21,8 @@ type instanceServiceAccountCredentials struct {
 
 	expiry time.Time
 	timer  *time.Timer
+
+	metadataURL string
 }
 
 // Returns cached token if it is valid. Otherwise, will try to renew.
@@ -68,7 +72,7 @@ func (m *instanceServiceAccountCredentials) refreshLoop() {
 // Otherwise, if current token has expired, clear it and set up err.
 func (m *instanceServiceAccountCredentials) refreshOnce() {
 	now := time.Now()
-	tok, err := metaCall()
+	tok, err := metaCall(m.metadataURL)
 
 	// Call has been performed, now updating fields
 	m.mu.Lock()
@@ -100,16 +104,24 @@ func (m *instanceServiceAccountCredentials) refreshOnce() {
 	m.token, m.expiry, m.err = tok.Token, now.Add(tok.ExpiresIn), nil
 }
 
-// Credentials provider that uses instance metadata to obtain token for service account attached to instance.
+// Credentials provider that uses instance metadata url to obtain token for service account attached to instance.
 // Cancelling context will lead to credentials refresh halt.
 // It should be used during application stop or credentials recreation.
-func InstanceServiceAccount(ctx context.Context) ydb.Credentials {
+func InstanceServiceAccountURL(ctx context.Context, url string) ydb.Credentials {
 	credentials := &instanceServiceAccountCredentials{
-		mu:    &sync.RWMutex{},
-		ctx:   ctx,
-		timer: time.NewTimer(0), // Allocate expired
+		metadataURL: url,
+		mu:          &sync.RWMutex{},
+		ctx:         ctx,
+		timer:       time.NewTimer(0), // Allocate expired
 	}
 	// Start refresh loop.
 	go credentials.refreshLoop()
 	return credentials
+}
+
+// Credentials provider that uses instance metadata with default url to obtain token for service account attached to instance.
+// Cancelling context will lead to credentials refresh halt.
+// It should be used during application stop or credentials recreation.
+func InstanceServiceAccount(ctx context.Context) ydb.Credentials {
+	return InstanceServiceAccountURL(ctx, metadataURL)
 }

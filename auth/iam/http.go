@@ -14,9 +14,8 @@ type metadataIAMResponse struct {
 	ExpiresIn time.Duration
 }
 
-func metaCall() (res *metadataIAMResponse, err error) {
+func metaCall(metadataURL string) (res *metadataIAMResponse, err error) {
 	// from YC go-sdk
-	const metadataURL = "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
 
 	defer func() {
 		if e := recover(); e != nil {
