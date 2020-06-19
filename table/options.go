@@ -573,13 +573,13 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 
 func WithCollectStatsModeNone() ExecuteDataQueryOption {
 	return func(d *executeDataQueryDesc) {
-		d.CollectStats = Ydb_Table.ExecuteDataQueryRequest_STATS_COLLECTION_NONE
+		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
 	}
 }
 
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
 	return func(d *executeDataQueryDesc) {
-		d.CollectStats = Ydb_Table.ExecuteDataQueryRequest_STATS_COLLECTION_BASIC
+		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
 	}
 }
 
