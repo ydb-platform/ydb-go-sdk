@@ -136,6 +136,11 @@ and storage backend.
 For more information please see the docs of `ydb/ydbsql` package which provides
 `database/sql` driver implementation.
 
+## Credentials
+
+There are different variants to get `ydb.Credentials` object to get authorized.
+Usage examples can be found [here](example/internal/cli/driver.go) at `func credentials(...) ydb.Credentials`.
+
 ## Generating code
 
 ### Overview

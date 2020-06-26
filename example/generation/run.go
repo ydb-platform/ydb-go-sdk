@@ -29,8 +29,8 @@ type Command struct {
 	config func(cli.Parameters) *ydb.DriverConfig
 }
 
-func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
+	cmd.config = cli.ExportDriverConfig(ctx, flag)
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
@@ -84,7 +84,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 				magic: Uint32?,
 				score: Int64?,
 				updated: Timestamp?>>";
-			
+
 			REPLACE INTO users
 			SELECT
 				id,
@@ -118,8 +118,8 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 			DECLARE $magic AS "Uint32?";
 			DECLARE $score AS "Int64?";
 			DECLARE $updated AS "Timestamp?";
-			
-			UPSERT INTO users 
+
+			UPSERT INTO users
 				(id, username, mode, magic, score, updated)
 			VALUES
 				($id, $username, $mode, $magic, $score, $updated);`
@@ -164,12 +164,12 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	{
 		const query = `
-			SELECT 
-				magic, 
+			SELECT
+				magic,
 				LIST(username)
 			FROM
 				users
-			GROUP BY 
+			GROUP BY
 				magic;`
 
 		stmt, err := session.Prepare(ctx, withPragma(prefix, query))

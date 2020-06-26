@@ -23,7 +23,7 @@ type Parameters struct {
 
 type Command interface {
 	Run(context.Context, Parameters) error
-	ExportFlags(*flag.FlagSet)
+	ExportFlags(context.Context, *flag.FlagSet)
 }
 
 type CommandFunc func(context.Context, Parameters) error
@@ -32,7 +32,7 @@ func (f CommandFunc) Run(ctx context.Context, params Parameters) error {
 	return f(ctx, params)
 }
 
-func (f CommandFunc) ExportFlags(*flag.FlagSet) {}
+func (f CommandFunc) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func Run(cmd Command) {
 	flag := flag.NewFlagSet("example", flag.ExitOnError)
@@ -51,13 +51,13 @@ func Run(cmd Command) {
 		"name of the database to use",
 	)
 
-	cmd.ExportFlags(flag)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd.ExportFlags(ctx, flag)
 
 	_ = flag.Parse(os.Args[1:])
 	params.Args = flag.Args()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	quit := make(chan error)
 	go processSignals(map[os.Signal]func(){

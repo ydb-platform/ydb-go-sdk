@@ -26,7 +26,7 @@ type Command struct {
 	count  int
 }
 
-func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
+func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
 	flag.Usage = func() {
 		out := flag.Output()
 		_, _ = fmt.Fprintf(out, "Usage:\n%s command [options]\n", os.Args[0])
@@ -34,7 +34,7 @@ func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
 		flag.PrintDefaults()
 	}
 
-	cmd.config = cli.ExportDriverConfig(flag)
+	cmd.config = cli.ExportDriverConfig(ctx, flag)
 	cmd.tls = cli.ExportTLSConfig(flag)
 
 	flag.IntVar(&cmd.rps, "rps", 100, "limit write rate")

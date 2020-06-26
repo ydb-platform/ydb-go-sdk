@@ -28,7 +28,7 @@ type Command struct {
 	sessionPool func() *table.SessionPool
 }
 
-func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
+func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
 	flag.Usage = func() {
 		out := flag.Output()
 		_, _ = fmt.Fprintf(out, "Usage:\n%s command [options]\n", os.Args[0])
@@ -40,7 +40,7 @@ func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
 		}
 	}
 
-	cmd.config = cli.ExportDriverConfig(flag)
+	cmd.config = cli.ExportDriverConfig(ctx, flag)
 	cmd.client = cli.ExportTableClient(flag)
 	cmd.sessionPool = cli.ExportSessionPool(flag)
 }

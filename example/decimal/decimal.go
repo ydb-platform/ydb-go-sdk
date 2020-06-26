@@ -42,8 +42,8 @@ type Command struct {
 	config func(cli.Parameters) *ydb.DriverConfig
 }
 
-func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
+	cmd.config = cli.ExportDriverConfig(ctx, flag)
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {

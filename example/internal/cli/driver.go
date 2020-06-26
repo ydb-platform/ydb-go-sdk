@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
@@ -31,7 +32,7 @@ func ExportTLSConfig(flag *flag.FlagSet) func() *tls.Config {
 	}
 }
 
-func ExportDriverConfig(flag *flag.FlagSet) func(Parameters) *ydb.DriverConfig {
+func ExportDriverConfig(ctx context.Context, flag *flag.FlagSet) func(Parameters) *ydb.DriverConfig {
 	var (
 		config ydb.DriverConfig
 		trace  bool
@@ -57,13 +58,13 @@ func ExportDriverConfig(flag *flag.FlagSet) func(Parameters) *ydb.DriverConfig {
 		}
 
 		config.Database = params.Database
-		config.Credentials = credentials()
+		config.Credentials = credentials(ctx)
 
 		return &config
 	}
 }
 
-func credentials() ydb.Credentials {
+func credentials(ctx context.Context) ydb.Credentials {
 	if token := os.Getenv("YDB_TOKEN"); token != "" {
 		return ydb.AuthTokenCredentials{
 			AuthToken: token,
@@ -75,7 +76,7 @@ func credentials() ydb.Credentials {
 		}
 	}
 
-	// jwt
+	// iam (jwt)
 	if pk, path := os.Getenv("SA_PRIVATE_KEY_FILE"), os.Getenv("SA_SERVICE_FILE"); pk != "" || path != "" {
 		var opts []iam.ClientOption
 
@@ -109,6 +110,15 @@ func credentials() ydb.Credentials {
 			panic(fmt.Errorf("configure credentials error: %v", err))
 		}
 		return c
+	}
+
+	// iam metadata
+	if url, ok := os.LookupEnv("IAM_METADATA"); ok {
+		if url != "" {
+			return iam.InstanceServiceAccountURL(ctx, url)
+		}
+		// use default endpoint
+		return iam.InstanceServiceAccount(ctx)
 	}
 	return nil
 }

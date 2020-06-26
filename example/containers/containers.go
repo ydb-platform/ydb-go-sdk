@@ -32,13 +32,13 @@ var query = template.Must(template.New("fill database").Parse(`
 		);
 
 	$struct = AsStruct(
-		Uint32("0") as foo, 
-		UTF8("x") as bar, 
+		Uint32("0") as foo,
+		UTF8("x") as bar,
 		Int64("0") as baz,
 	);
 	$variantStructType = VariantType(TypeOf($struct));
 	SELECT Variant(42, "baz", $variantStructType);
-	
+
 	$tuple = AsTuple(
 		Uint32("0"),
 		UTF8("x"),
@@ -52,8 +52,8 @@ type Command struct {
 	config func(cli.Parameters) *ydb.DriverConfig
 }
 
-func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
+	cmd.config = cli.ExportDriverConfig(ctx, flag)
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {

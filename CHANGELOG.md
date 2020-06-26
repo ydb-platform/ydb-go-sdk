@@ -1,6 +1,7 @@
 ## 2020.06.2
 * Refactored `InstanceServiceAccount`: refresh token in background.
   Also, will never produce error on creation.
+* Added getting `ydb.Credentials` examples
 
 ## 2020.06.1
 

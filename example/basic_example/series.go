@@ -78,8 +78,8 @@ type Command struct {
 	tls    func() *tls.Config
 }
 
-func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
+	cmd.config = cli.ExportDriverConfig(ctx, flag)
 	cmd.tls = cli.ExportTLSConfig(flag)
 }
 
@@ -103,7 +103,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	defer sp.Close(ctx)
 
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database)
+	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, "series", "episodes", "seasons")
 	if err != nil {
 		return err
 	}

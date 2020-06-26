@@ -19,8 +19,8 @@ type Command struct {
 	tls    func() *tls.Config
 }
 
-func (cmd *Command) ExportFlags(flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
+	cmd.config = cli.ExportDriverConfig(ctx, flag)
 	cmd.tls = cli.ExportTLSConfig(flag)
 }
 
@@ -86,18 +86,18 @@ func selectPaging(
 
 	var query = fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
-		
+
 		DECLARE $limit AS Uint64;
 		DECLARE $lastCity AS Utf8;
 		DECLARE $lastNumber AS Uint32;
-		
+
 		$Data = (
 			SELECT * FROM schools
 			WHERE city = $lastCity AND number > $lastNumber
 			ORDER BY city, number LIMIT $limit
-		
+
 			UNION ALL
-		
+
 			SELECT * FROM schools
 			WHERE city > $lastCity
 			ORDER BY city, number LIMIT $limit
@@ -148,12 +148,12 @@ func selectPaging(
 func fillTableWithData(ctx context.Context, sp *table.SessionPool, prefix string) (err error) {
 	var query = fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
-		
+
 		DECLARE $schoolsData AS "List<Struct<
 			city: Utf8,
 			number: Uint32,
 			address: Utf8>>";
-		
+
 		REPLACE INTO schools
 		SELECT
 			city,
