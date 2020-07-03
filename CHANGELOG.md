@@ -1,3 +1,6 @@
+## 2020.07.1
+* Support go modules tooling for ydbgen
+
 ## 2020.06.2
 * Refactored `InstanceServiceAccount`: refresh token in background.
   Also, will never produce error on creation.

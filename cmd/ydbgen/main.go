@@ -174,6 +174,14 @@ func main() {
 	}
 	if *goroot != "" {
 		build.Default.GOROOT = *goroot
+		expPath := fmt.Sprintf("%s%cbin", *goroot, os.PathSeparator)
+		if os.Getenv("PATH") != "" {
+			expPath = fmt.Sprintf("%s%c%s", os.Getenv("PATH"), os.PathListSeparator, expPath)
+		}
+		err = os.Setenv("PATH", expPath)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// A Config controls various options of the type checker.
