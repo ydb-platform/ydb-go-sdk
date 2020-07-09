@@ -1,10 +1,14 @@
+## 2020.07.2
+* return TableStats and PartitionStats on DescribeTable request with options
+* added `ydbsql/connector` option to configure `DefaultTxControl`
+
 ## 2020.07.1
-* Support go modules tooling for ydbgen
+* support go modules tooling for ydbgen
 
 ## 2020.06.2
-* Refactored `InstanceServiceAccount`: refresh token in background.
-  Also, will never produce error on creation.
-* Added getting `ydb.Credentials` examples
+* refactored `InstanceServiceAccount`: refresh token in background.
+  Also, will never produce error on creation
+* added getting `ydb.Credentials` examples
 
 ## 2020.06.1
 
@@ -16,7 +20,7 @@
 
 ## 2020.04.4
 
-* added GCP metadata auth style with `InstanceServiceAccount` in `auth.iam`.
+* added GCP metadata auth style with `InstanceServiceAccount` in `auth.iam`
 
 ## 2020.04.3
 
@@ -36,7 +40,7 @@
 
 ## 2020.03.2
 
-* set session keepAlive period to 5 min - same as in other SDKs.
+* set session keepAlive period to 5 min - same as in other SDKs
 * fix panic on access to index after pool close
 
 ## 2020.03.1

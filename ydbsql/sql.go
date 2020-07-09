@@ -20,13 +20,6 @@ var (
 	ErrSessionBusy         = errors.New("ydbsql: session is busy")
 )
 
-var defaultTxControl = table.TxControl(
-	table.BeginTx(
-		table.WithSerializableReadWrite(),
-	),
-	table.CommitTx(),
-)
-
 // conn is a connection to the ydb.
 type conn struct {
 	idle bool
@@ -35,8 +28,10 @@ type conn struct {
 	retryConfig *RetryConfig
 	session     *table.Session
 	pool        *table.SessionPool
-	tx          *table.Transaction
-	txc         *table.TransactionControl
+	defaultTxc  *table.TransactionControl
+
+	tx  *table.Transaction
+	txc *table.TransactionControl
 }
 
 func (c *conn) takeSession(ctx context.Context) bool {
@@ -208,7 +203,7 @@ func (c *conn) Commit() error {
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	txc := c.txc
 	if txc == nil {
-		txc = defaultTxControl
+		txc = c.defaultTxc
 	}
 	_, err := c.exec(ctx, txc, exec{text: query}, params(args))
 	if err != nil {
@@ -220,7 +215,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	txc := c.txc
 	if txc == nil {
-		txc = defaultTxControl
+		txc = c.defaultTxc
 	}
 	res, err := c.exec(ctx, txc, exec{text: query}, params(args))
 	if err != nil {
@@ -469,7 +464,7 @@ func (s *stmt) CheckNamedValue(v *driver.NamedValue) error {
 func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	txc := s.conn.txc
 	if txc == nil {
-		txc = defaultTxControl
+		txc = s.conn.defaultTxc
 	}
 	_, err := s.conn.exec(ctx, txc, exec{stmt: s.stmt}, params(args))
 	if err != nil {
@@ -481,7 +476,7 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	txc := s.conn.txc
 	if txc == nil {
-		txc = defaultTxControl
+		txc = s.conn.defaultTxc
 	}
 	res, err := s.conn.exec(ctx, txc, exec{stmt: s.stmt}, params(args))
 	if err != nil {

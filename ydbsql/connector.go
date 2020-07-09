@@ -127,6 +127,12 @@ func WithRetryBackoff(b ydb.Backoff) ConnectorOption {
 	}
 }
 
+func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
+	return func(c *connector) {
+		c.defaultTxControl = txControl
+	}
+}
+
 var retryChecker = ydb.RetryChecker{
 	// NOTE: we do not want to retry not found prepared statement
 	// errors.
@@ -147,6 +153,12 @@ func Connector(opts ...ConnectorOption) driver.Connector {
 			Backoff:      ydb.DefaultBackoff,
 			RetryChecker: retryChecker,
 		},
+		defaultTxControl: table.TxControl(
+			table.BeginTx(
+				table.WithSerializableReadWrite(),
+			),
+			table.CommitTx(),
+		),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -166,7 +178,8 @@ type connector struct {
 	client *table.Client
 	pool   table.SessionPool // Used as a template for created connections.
 
-	retryConfig RetryConfig
+	retryConfig      RetryConfig
+	defaultTxControl *table.TransactionControl
 }
 
 func (c *connector) init(ctx context.Context) (err error) {
@@ -217,6 +230,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		session:     s,
 		pool:        &c.pool,
 		retryConfig: &c.retryConfig,
+		defaultTxc:  c.defaultTxControl,
 	}, nil
 }
 

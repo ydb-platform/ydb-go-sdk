@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
 func TestConnectorDialOnPing(t *testing.T) {
@@ -69,6 +70,12 @@ func TestConnectorRedialOnError(t *testing.T) {
 				}
 			},
 		}),
+		WithDefaultTxControl(table.TxControl(
+			table.BeginTx(
+				table.WithStaleReadOnly(),
+			),
+			table.CommitTx()),
+		),
 	)
 
 	db := sql.OpenDB(c)
