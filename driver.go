@@ -18,6 +18,7 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/api"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
+	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/stats"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
@@ -215,8 +216,10 @@ func (d *driver) Call(ctx context.Context, op api.Operation) error {
 		return err
 	}
 
-	var resp Ydb_Operations.GetOperationResponse
-	method, req, res := api.Unwrap(op)
+	method, req, res, resp := internal.Unwrap(op)
+	if resp == nil {
+		resp = internal.WrapOpResponse(&Ydb_Operations.GetOperationResponse{})
+	}
 
 	params, ok := operationParams(ctx, d.contextDeadlineMapping)
 	if ok {
@@ -227,7 +230,7 @@ func (d *driver) Call(ctx context.Context, op api.Operation) error {
 	conn.runtime.operationStart(start)
 	d.trace.operationStart(rawctx, conn, method, params)
 
-	err = invoke(ctx, conn.conn, &resp, method, req, res)
+	err = invoke(ctx, conn.conn, resp, method, req, res)
 
 	conn.runtime.operationDone(
 		start, timeutil.Now(),
@@ -291,7 +294,7 @@ func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (err er
 		return err
 	}
 
-	method, req, resp, process := api.UnwrapStreamOperation(op)
+	method, req, resp, process := internal.UnwrapStreamOperation(op)
 	desc := grpc.StreamDesc{
 		StreamName:    path.Base(method),
 		ServerStreams: true,
@@ -355,25 +358,24 @@ func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (err er
 
 func invoke(
 	ctx context.Context, conn *grpc.ClientConn,
-	resp *Ydb_Operations.GetOperationResponse,
+	resp internal.Response,
 	method string, req, res proto.Message,
 	opts ...grpc.CallOption,
 ) (
 	err error,
 ) {
-	err = grpc.Invoke(ctx, method, req, resp, conn, opts...)
-	op := resp.Operation
+	err = grpc.Invoke(ctx, method, req, resp.GetResponseProto(), conn, opts...)
 	switch {
 	case err != nil:
 		err = mapGRPCError(err)
 
-	case !op.Ready:
+	case !resp.GetOpReady():
 		err = ErrOperationNotReady
 
-	case op.Status != Ydb.StatusIds_SUCCESS:
+	case resp.GetStatus() != Ydb.StatusIds_SUCCESS:
 		err = &OpError{
-			Reason: statusCode(op.Status),
-			issues: op.Issues,
+			Reason: statusCode(resp.GetStatus()),
+			issues: resp.GetIssues(),
 		}
 	}
 	if err != nil {
@@ -386,7 +388,7 @@ func invoke(
 		// implementation will lag some time – no strict behavior is possible.
 		return nil
 	}
-	return proto.Unmarshal(op.Result.Value, res)
+	return proto.Unmarshal(resp.GetResult().Value, res)
 }
 
 func mapGRPCError(err error) error {

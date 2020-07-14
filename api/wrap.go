@@ -1,60 +1,31 @@
 package api
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"github.com/golang/protobuf/proto"
-
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Issue"
 )
 
-type Operation struct {
-	method string
-	req    proto.Message
-	res    proto.Message
-}
+type Operation = internal.Operation
 
 func Wrap(method string, req, res proto.Message) Operation {
-	return Operation{
-		method: method,
-		req:    req,
-		res:    res,
-	}
+	return internal.Wrap(method, req, res)
 }
 
 func Unwrap(op Operation) (method string, req, res proto.Message) {
-	return op.method, op.req, op.res
+	method, req, res, _ = internal.Unwrap(op)
+	return method, req, res
 }
 
-// StreamOperationResponse is an interface that provides access to the
-// API-specific response fields.
-//
-// NOTE: YDB API currently does not provide generic response wrapper as it does
-// with RPC API. Thus wee need to generalize it by the hand using this interface.
-//
-// This generalization is needed for checking status codes and issues in one place.
-type StreamOperationResponse interface {
-	GetStatus() Ydb.StatusIds_StatusCode
-	GetIssues() []*Ydb_Issue.IssueMessage
-}
+type StreamOperationResponse = internal.StreamOperationResponse
 
-type StreamOperation struct {
-	method    string
-	req       proto.Message
-	resp      StreamOperationResponse
-	processor func(error)
-}
+type StreamOperation = internal.StreamOperation
 
 func WrapStreamOperation(
 	method string, req proto.Message,
 	resp StreamOperationResponse,
 	p func(error),
 ) StreamOperation {
-	return StreamOperation{
-		method:    method,
-		req:       req,
-		resp:      resp,
-		processor: p,
-	}
+	return internal.WrapStreamOperation(method, req, resp, p)
 }
 
 func UnwrapStreamOperation(op StreamOperation) (
@@ -62,5 +33,5 @@ func UnwrapStreamOperation(op StreamOperation) (
 	resp StreamOperationResponse,
 	processor func(error),
 ) {
-	return op.method, op.req, op.resp, op.processor
+	return internal.UnwrapStreamOperation(op)
 }

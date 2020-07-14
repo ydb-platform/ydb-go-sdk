@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api"
 	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
@@ -40,7 +39,7 @@ func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		req Ydb_Table.CreateSessionRequest
 		res Ydb_Table.CreateSessionResult
 	)
-	err = t.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.CreateSession, &req, &res))
+	err = t.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CreateSession, &req, &res))
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +101,7 @@ func (s *Session) Close(ctx context.Context) (err error) {
 	req := Ydb_Table.DeleteSessionRequest{
 		SessionId: s.ID,
 	}
-	return s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.DeleteSession, &req, nil))
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DeleteSession, &req, nil))
 }
 
 // KeepAlive keeps idle session alive.
@@ -115,7 +114,7 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 	req := Ydb_Table.KeepAliveRequest{
 		SessionId: s.ID,
 	}
-	err = s.c.Driver.Call(ctx, api.Wrap(
+	err = s.c.Driver.Call(ctx, internal.Wrap(
 		Ydb_Table_V1.KeepAlive, &req, &res,
 	))
 	if err != nil {
@@ -139,7 +138,7 @@ func (s *Session) CreateTable(ctx context.Context, path string, opts ...CreateTa
 	for _, opt := range opts {
 		opt((*createTableDesc)(&req))
 	}
-	return s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.CreateTable, &req, nil))
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CreateTable, &req, nil))
 }
 
 // DescribeTable describes table at given path.
@@ -152,7 +151,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 	for _, opt := range opts {
 		opt((*describeTableDesc)(&req))
 	}
-	err = s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.DescribeTable, &req, &res))
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DescribeTable, &req, &res))
 	if err != nil {
 		return desc, err
 	}
@@ -199,7 +198,7 @@ func (s *Session) DropTable(ctx context.Context, path string, opts ...DropTableO
 	for _, opt := range opts {
 		opt((*dropTableDesc)(&req))
 	}
-	return s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.DropTable, &req, nil))
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DropTable, &req, nil))
 }
 
 // AlterTable modifies schema of table at given path with given options.
@@ -211,7 +210,7 @@ func (s *Session) AlterTable(ctx context.Context, path string, opts ...AlterTabl
 	for _, opt := range opts {
 		opt((*alterTableDesc)(&req))
 	}
-	return s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.AlterTable, &req, nil))
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.AlterTable, &req, nil))
 }
 
 // CopyTable creates copy of table at given path.
@@ -221,7 +220,7 @@ func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...CopyTa
 		SourcePath:      src,
 		DestinationPath: dst,
 	}
-	return s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.CopyTable, &req, nil))
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CopyTable, &req, nil))
 }
 
 // DataQueryExplanation is a result of ExplainDataQuery call.
@@ -237,7 +236,7 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 		SessionId: s.ID,
 		YqlText:   query,
 	}
-	err = s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.ExplainDataQuery, &req, &res))
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExplainDataQuery, &req, &res))
 	if err != nil {
 		return
 	}
@@ -320,7 +319,7 @@ func (s *Session) Prepare(
 		SessionId: s.ID,
 		YqlText:   query,
 	}
-	err = s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.PrepareDataQuery, &req, &res))
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.PrepareDataQuery, &req, &res))
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +436,7 @@ func (s *Session) executeDataQuery(
 	for _, opt := range opts {
 		opt((*executeDataQueryDesc)(req))
 	}
-	err = s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.ExecuteDataQuery, req, res))
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExecuteDataQuery, req, res))
 	return
 }
 
@@ -453,14 +452,14 @@ func (s *Session) ExecuteSchemeQuery(
 	for _, opt := range opts {
 		opt((*executeSchemeQueryDesc)(&req))
 	}
-	return s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.ExecuteSchemeQuery, &req, nil))
+	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExecuteSchemeQuery, &req, nil))
 }
 
 // DescribeTableOptions describes supported table options.
 func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDescription, err error) {
 	var res Ydb_Table.DescribeTableOptionsResult
 	req := Ydb_Table.DescribeTableOptionsRequest{}
-	err = s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.DescribeTableOptions, &req, &res))
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DescribeTableOptions, &req, &res))
 	if err != nil {
 		return
 	}
@@ -573,7 +572,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 		ch = make(chan *Ydb.ResultSet, 1)
 		ce = new(error)
 	)
-	err = s.c.Driver.StreamRead(ctx, api.WrapStreamOperation(
+	err = s.c.Driver.StreamRead(ctx, internal.WrapStreamOperation(
 		Ydb_Table_V1.StreamReadTable, &req, &resp,
 		func(err error) {
 			if err != io.EOF {
@@ -607,7 +606,7 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) 
 		Table: table,
 		Rows:  internal.ValueToYDB(rows),
 	}
-	return s.c.Driver.Call(ctx, api.Wrap(
+	return s.c.Driver.Call(ctx, internal.Wrap(
 		Ydb_Table_V1.BulkUpsert,
 		&req, nil,
 	))
@@ -625,7 +624,7 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 		SessionId:  s.ID,
 		TxSettings: &tx.settings,
 	}
-	err = s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.BeginTransaction, &req, &res))
+	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.BeginTransaction, &req, &res))
 	if err != nil {
 		return
 	}
@@ -674,7 +673,7 @@ func (tx *Transaction) Commit(ctx context.Context) (err error) {
 		SessionId: tx.s.ID,
 		TxId:      tx.id,
 	}
-	return tx.s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.CommitTransaction, &req, nil))
+	return tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CommitTransaction, &req, nil))
 }
 
 // Rollback performs a rollback of the specified active transaction.
@@ -687,7 +686,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 		SessionId: tx.s.ID,
 		TxId:      tx.id,
 	}
-	return tx.s.c.Driver.Call(ctx, api.Wrap(Ydb_Table_V1.RollbackTransaction, &req, nil))
+	return tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.RollbackTransaction, &req, nil))
 }
 
 func (tx *Transaction) txc() *TransactionControl {

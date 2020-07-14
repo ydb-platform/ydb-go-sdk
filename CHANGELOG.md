@@ -1,3 +1,6 @@
+## 2020.07.3
+* made `api` wrapper for `internal` api subset
+
 ## 2020.07.2
 * return TableStats and PartitionStats on DescribeTable request with options
 * added `ydbsql/connector` option to configure `DefaultTxControl`

@@ -8,6 +8,7 @@ import (
 	discovery "github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Discovery_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Discovery"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
+	"github.com/yandex-cloud/ydb-go-sdk/internal"
 )
 
 type Endpoint struct {
@@ -39,7 +40,7 @@ func (d *discoveryClient) Discover(ctx context.Context, database string, ssl boo
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 	err = invoke(
-		ctx, d.conn.conn, &resp,
+		ctx, d.conn.conn, internal.WrapOpResponse(&resp),
 		discovery.ListEndpoints, &req, &res,
 	)
 	if err != nil {

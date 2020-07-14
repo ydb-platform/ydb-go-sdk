@@ -1,11 +1,9 @@
 package ydb
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"context"
 	"strings"
-
-	"github.com/yandex-cloud/ydb-go-sdk/api"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
 )
 
 type DriverTrace struct {
@@ -165,7 +163,7 @@ func (d DriverTrace) operationStart(ctx context.Context, conn *conn, method stri
 		f(x)
 	}
 }
-func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method string, params OperationParams, resp Ydb_Operations.GetOperationResponse, err error) {
+func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method string, params OperationParams, resp internal.Response, err error) {
 	x := OperationDoneInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
@@ -173,10 +171,8 @@ func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method strin
 		Params:  params,
 		Error:   err,
 	}
-	if op := resp.Operation; op != nil {
-		x.OpID = op.Id
-		x.Issues = IssueIterator(op.Issues)
-	}
+	x.OpID = resp.GetOpID()
+	x.Issues = IssueIterator(resp.GetIssues())
 	if f := d.OperationDone; f != nil {
 		f(x)
 	}
@@ -225,7 +221,7 @@ func (d DriverTrace) streamRecvStart(ctx context.Context, conn *conn, method str
 		f(x)
 	}
 }
-func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method string, resp api.StreamOperationResponse, err error) {
+func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method string, resp internal.StreamOperationResponse, err error) {
 	x := StreamRecvDoneInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
