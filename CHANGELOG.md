@@ -1,3 +1,7 @@
+## 2020.07.4
+* added coordination service
+* added rate_limiter service
+
 ## 2020.07.3
 * made `api` wrapper for `internal` api subset
 

@@ -188,3 +188,9 @@ func putPermissions(dst []Permissions, src []*Ydb_Scheme.Permissions) {
 		(dst[i]).from(p)
 	}
 }
+
+func InnerConvertEntry(y *Ydb_Scheme.Entry) *Entry {
+	res := &Entry{}
+	res.from(y)
+	return res
+}
