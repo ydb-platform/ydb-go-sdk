@@ -1,3 +1,6 @@
+## 2020.07.5
+* support new types: DyNumber, JsonDocument
+
 ## 2020.07.4
 * added coordination service
 * added rate_limiter service

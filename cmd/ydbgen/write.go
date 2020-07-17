@@ -994,6 +994,10 @@ func ydbTypeName(t internal.PrimitiveType) string {
 		return "JSON"
 	case internal.TypeUUID:
 		return "UUID"
+	case internal.TypeJSONDocument:
+		return "JSONDocument"
+	case internal.TypeDyNumber:
+		return "DyNumber"
 
 	default:
 		panic("ydbgen: unexpected primitive type")

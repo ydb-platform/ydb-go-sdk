@@ -595,6 +595,18 @@ func (s *Scanner) UUID() (v [16]byte) {
 	}
 	return s.uint128()
 }
+func (s *Scanner) JSONDocument() (v string) {
+	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_JSON_DOCUMENT) {
+		return
+	}
+	return s.text()
+}
+func (s *Scanner) DyNumber() (v string) {
+	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DYNUMBER) {
+		return
+	}
+	return s.text()
+}
 
 // Decimal returns decimal value represented by big-endian 128 bit signed
 // integes.
@@ -822,6 +834,24 @@ func (s *Scanner) OUUID() (v [16]byte) {
 	}
 	return s.uint128()
 }
+func (s *Scanner) OJSONDocument() (v string) {
+	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_JSON_DOCUMENT) {
+		return
+	}
+	if s.isNull() {
+		return
+	}
+	return s.text()
+}
+func (s *Scanner) ODyNumber() (v string) {
+	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DYNUMBER) {
+		return
+	}
+	if s.isNull() {
+		return
+	}
+	return s.text()
+}
 func (s *Scanner) ODecimal(t ydb.Type) (v [16]byte) {
 	if s.err != nil || !s.assertCurrentTypeOptionalDecimal(t) {
 		return
@@ -907,7 +937,9 @@ func (s *Scanner) Any() interface{} {
 		internal.TypeTzTimestamp,
 		internal.TypeUTF8,
 		internal.TypeYSON,
-		internal.TypeJSON:
+		internal.TypeJSON,
+		internal.TypeJSONDocument,
+		internal.TypeDyNumber:
 		return s.text()
 	default:
 		panic("ydb/table: unknown primitive type")

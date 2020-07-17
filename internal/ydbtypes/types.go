@@ -60,6 +60,10 @@ func PrimitiveTypeFromString(s string) (t internal.PrimitiveType, err error) {
 		t = internal.TypeJSON
 	case "uuid":
 		t = internal.TypeUUID
+	case "jsondocument":
+		t = internal.TypeJSONDocument
+	case "dynumber":
+		t = internal.TypeDyNumber
 	default:
 		err = fmt.Errorf("ydbtypes: unknown type: %q", s)
 	}
@@ -183,6 +187,12 @@ func GoTypeFromPrimitiveType(t internal.PrimitiveType) types.Type {
 
 	case internal.TypeUUID:
 		return bytesArray16
+
+	case internal.TypeJSONDocument:
+		return types.Typ[types.String]
+
+	case internal.TypeDyNumber:
+		return types.Typ[types.String]
 
 	case internal.TypeString:
 		return bytesSlice

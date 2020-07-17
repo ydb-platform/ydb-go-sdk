@@ -414,6 +414,26 @@ func UUIDValue(v [16]byte) Value {
 		},
 	}
 }
+func JSONDocumentValue(v string) Value {
+	return Value{
+		t: TypeJSONDocument,
+		v: &Ydb.Value{
+			Value: &Ydb.Value_TextValue{
+				TextValue: v,
+			},
+		},
+	}
+}
+func DyNumberValue(v string) Value {
+	return Value{
+		t: TypeDyNumber,
+		v: &Ydb.Value{
+			Value: &Ydb.Value_TextValue{
+				TextValue: v,
+			},
+		},
+	}
+}
 func DecimalValue(t T, v [16]byte) Value {
 	return Value{
 		t: t,
@@ -596,7 +616,7 @@ func ZeroValue(t T) Value {
 			v.Value = new(Ydb.Value_DoubleValue)
 
 		case
-			TypeUTF8, TypeYSON, TypeJSON,
+			TypeUTF8, TypeYSON, TypeJSON, TypeJSONDocument, TypeDyNumber,
 			TypeTzDate, TypeTzDatetime, TypeTzTimestamp:
 
 			v.Value = new(Ydb.Value_TextValue)

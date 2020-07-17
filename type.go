@@ -83,28 +83,30 @@ func Decimal(precision, scale uint32) Type {
 
 // Primitive types known by YDB.
 const (
-	TypeUnknown     = internal.TypeUnknown
-	TypeBool        = internal.TypeBool
-	TypeInt8        = internal.TypeInt8
-	TypeUint8       = internal.TypeUint8
-	TypeInt16       = internal.TypeInt16
-	TypeUint16      = internal.TypeUint16
-	TypeInt32       = internal.TypeInt32
-	TypeUint32      = internal.TypeUint32
-	TypeInt64       = internal.TypeInt64
-	TypeUint64      = internal.TypeUint64
-	TypeFloat       = internal.TypeFloat
-	TypeDouble      = internal.TypeDouble
-	TypeDate        = internal.TypeDate
-	TypeDatetime    = internal.TypeDatetime
-	TypeTimestamp   = internal.TypeTimestamp
-	TypeInterval    = internal.TypeInterval
-	TypeTzDate      = internal.TypeTzDate
-	TypeTzDatetime  = internal.TypeTzDatetime
-	TypeTzTimestamp = internal.TypeTzTimestamp
-	TypeString      = internal.TypeString
-	TypeUTF8        = internal.TypeUTF8
-	TypeYSON        = internal.TypeYSON
-	TypeJSON        = internal.TypeJSON
-	TypeUUID        = internal.TypeUUID
+	TypeUnknown      = internal.TypeUnknown
+	TypeBool         = internal.TypeBool
+	TypeInt8         = internal.TypeInt8
+	TypeUint8        = internal.TypeUint8
+	TypeInt16        = internal.TypeInt16
+	TypeUint16       = internal.TypeUint16
+	TypeInt32        = internal.TypeInt32
+	TypeUint32       = internal.TypeUint32
+	TypeInt64        = internal.TypeInt64
+	TypeUint64       = internal.TypeUint64
+	TypeFloat        = internal.TypeFloat
+	TypeDouble       = internal.TypeDouble
+	TypeDate         = internal.TypeDate
+	TypeDatetime     = internal.TypeDatetime
+	TypeTimestamp    = internal.TypeTimestamp
+	TypeInterval     = internal.TypeInterval
+	TypeTzDate       = internal.TypeTzDate
+	TypeTzDatetime   = internal.TypeTzDatetime
+	TypeTzTimestamp  = internal.TypeTzTimestamp
+	TypeString       = internal.TypeString
+	TypeUTF8         = internal.TypeUTF8
+	TypeYSON         = internal.TypeYSON
+	TypeJSON         = internal.TypeJSON
+	TypeUUID         = internal.TypeUUID
+	TypeJSONDocument = internal.TypeJSONDocument
+	TypeDyNumber     = internal.TypeDyNumber
 )
