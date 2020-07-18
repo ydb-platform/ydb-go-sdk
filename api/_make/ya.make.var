@@ -26,5 +26,5 @@ SET(
 SET(
     protobuf_import_dirs
     ${ARCADIA_ROOT}
-    ${ARCADIA_ROOT}/contrib/libs/protobuf
+    ${ARCADIA_ROOT}/contrib/libs/protobuf/src
 )
