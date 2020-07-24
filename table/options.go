@@ -474,7 +474,7 @@ type TransactionControl struct {
 	desc Ydb_Table.TransactionControl
 }
 
-func (t TransactionControl) id() string {
+func (t *TransactionControl) id() string {
 	if tx, ok := t.desc.TxSelector.(*Ydb_Table.TransactionControl_TxId); ok {
 		return tx.TxId
 	}

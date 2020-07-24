@@ -1,8 +1,10 @@
 package table
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
@@ -90,7 +92,8 @@ func TestSessionOptionsProfile(t *testing.T) {
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*createTableDesc)(&req))
 		p := req.Profile.PartitioningPolicy
-		if pp, ok := p.Partitions.(*Ydb_Table.PartitioningPolicy_ExplicitPartitions); !ok || !reflect.DeepEqual(pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{internal.ValueToYDB(ydb.Int64Value(1))}) {
+
+		if pp, ok := p.Partitions.(*Ydb_Table.PartitioningPolicy_ExplicitPartitions); !ok || !cmp.Equal(pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{internal.ValueToYDB(ydb.Int64Value(1))}, cmp.Comparer(proto.Equal)) {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		}
 	}

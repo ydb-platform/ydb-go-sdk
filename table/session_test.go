@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Scheme"
@@ -132,7 +134,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	defer cancel()
 
 	var (
-		result Ydb_Table.DescribeTableResult
+		result *Ydb_Table.DescribeTableResult
 		e      error
 	)
 	b := StubBuilder{
@@ -140,8 +142,8 @@ func TestSessionDescribeTable(t *testing.T) {
 		Handler: methodHandlers{
 			testutil.TableDescribeTable: func(req, res interface{}) error {
 				r, _ := res.(*Ydb_Table.DescribeTableResult)
-				*r = result
-
+				r.Reset()
+				proto.Merge(r, result)
 				return e
 			},
 		},
@@ -180,7 +182,7 @@ func TestSessionDescribeTable(t *testing.T) {
 				},
 			},
 		}
-		result = Ydb_Table.DescribeTableResult{
+		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{
 				Name:                 expect.Name,
 				Owner:                "",

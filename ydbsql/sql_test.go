@@ -6,9 +6,11 @@ import (
 	"database/sql/driver"
 	"log"
 	"os"
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/traceutil"
@@ -130,7 +132,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txExp != nil {
 				sExp = table.TxSettings(test.txExp)
 			}
-			if !reflect.DeepEqual(sAct, sExp) {
+			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmp.AllowUnexported(table.TransactionSettings{})) {
 				t.Fatalf("unexpected tx settings: %+v; want %+v", sAct, sExp)
 			}
 
@@ -141,7 +143,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txcExp != nil {
 				cExp = table.TxControl(test.txcExp...)
 			}
-			if !reflect.DeepEqual(cAct, cExp) {
+			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmp.AllowUnexported(table.TransactionSettings{})) {
 				t.Fatalf("unexpected settings: %+v; want %+v", cAct, cExp)
 			}
 		})
