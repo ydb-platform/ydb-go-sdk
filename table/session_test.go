@@ -167,8 +167,9 @@ func TestSessionDescribeTable(t *testing.T) {
 			PrimaryKey: []string{"testKey"},
 			Columns: []Column{
 				{
-					Name: "testColumn",
-					Type: ydb.Void(),
+					Name:   "testColumn",
+					Type:   ydb.Void(),
+					Family: "testFamily",
 				},
 			},
 			KeyRanges: []KeyRange{
@@ -179,6 +180,14 @@ func TestSessionDescribeTable(t *testing.T) {
 				{
 					From: ydb.Int64Value(100500),
 					To:   nil,
+				},
+			},
+			ColumnFamilies: []ColumnFamily{
+				{
+					Name:         "testFamily",
+					Data:         StoragePool{},
+					Compression:  ColumnFamilyCompressionLZ4,
+					KeepInMemory: ydb.FeatureEnabled,
 				},
 			},
 		}
@@ -194,7 +203,7 @@ func TestSessionDescribeTable(t *testing.T) {
 				{
 					Name:   expect.Columns[0].Name,
 					Type:   internal.TypeToYDB(expect.Columns[0].Type),
-					Family: "",
+					Family: "testFamily",
 				},
 			},
 			PrimaryKey: expect.PrimaryKey,
@@ -203,6 +212,14 @@ func TestSessionDescribeTable(t *testing.T) {
 			},
 			Indexes:    nil,
 			TableStats: nil,
+			ColumnFamilies: []*Ydb_Table.ColumnFamily{
+				{
+					Name:         "testFamily",
+					Data:         nil,
+					Compression:  Ydb_Table.ColumnFamily_COMPRESSION_LZ4,
+					KeepInMemory: Ydb.FeatureFlag_ENABLED,
+				},
+			},
 		}
 
 		d, err := s.DescribeTable(ctx, "")

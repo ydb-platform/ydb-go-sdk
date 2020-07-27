@@ -1,3 +1,6 @@
+##2020.07.6
+* support Column Families
+
 ## 2020.07.5
 * support new types: DyNumber, JsonDocument
 

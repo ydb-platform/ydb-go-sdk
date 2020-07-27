@@ -151,7 +151,6 @@ func uploadWorker(ctx context.Context, sp *table.SessionPool, rps int, query str
 				if err != nil {
 					return err
 				}
-				stmt.NumInput()
 				_, _, err = stmt.Execute(ctx, writeTx,
 					table.NewQueryParameters(
 						table.ValueParam("$items", j.ListValue()),

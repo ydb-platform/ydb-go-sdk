@@ -19,7 +19,7 @@ func TestResultAny(t *testing.T) {
 	}{
 		{
 			columns: []Column{
-				{"column0", ydb.Optional(ydb.TypeUint32)},
+				{"column0", ydb.Optional(ydb.TypeUint32), "family0"},
 			},
 			values: []ydb.Value{
 				ydb.OptionalValue(ydb.Uint32Value(43)),

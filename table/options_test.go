@@ -25,29 +25,6 @@ func TestSessionOptionsProfile(t *testing.T) {
 	}
 	{
 		opt := WithProfile(
-			WithStoragePolicy(
-				WithStoragePolicyPreset("abc"),
-				WithStoragePolicySyslog("any1"),
-				WithStoragePolicyLog("any2"),
-				WithStoragePolicyData("any3"),
-				WithStoragePolicyExternal("any4"),
-				WithStoragePolicyKeepInMemory(ydb.FeatureEnabled),
-			),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
-		p := req.Profile.StoragePolicy
-		if p.PresetName != "abc" ||
-			p.Syslog.Media != "any1" ||
-			p.Log.Media != "any2" ||
-			p.Data.Media != "any3" ||
-			p.External.Media != "any4" ||
-			p.KeepInMemory != Ydb.FeatureFlag_ENABLED {
-			t.Errorf("Storage policy is not as expected")
-		}
-	}
-	{
-		opt := WithProfile(
 			WithCompactionPolicy(WithCompactionPolicyPreset("abc")),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -136,5 +113,87 @@ func TestSessionOptionsProfile(t *testing.T) {
 			t.Errorf("Caching policy is not as expected")
 		}
 	}
+}
 
+func TestStoragePolicyOptions(t *testing.T) {
+	{
+		opt := WithProfile(
+			WithStoragePolicy(
+				WithStoragePolicyPreset("abc"),
+				WithStoragePolicySyslog("any1"),
+				WithStoragePolicyLog("any2"),
+				WithStoragePolicyData("any3"),
+				WithStoragePolicyExternal("any4"),
+				WithStoragePolicyKeepInMemory(ydb.FeatureEnabled),
+			),
+		)
+		req := Ydb_Table.CreateTableRequest{}
+		opt((*createTableDesc)(&req))
+		p := req.Profile.StoragePolicy
+		if p.PresetName != "abc" ||
+			p.Syslog.Media != "any1" ||
+			p.Log.Media != "any2" ||
+			p.Data.Media != "any3" ||
+			p.External.Media != "any4" ||
+			p.KeepInMemory != Ydb.FeatureFlag_ENABLED {
+			t.Errorf("Storage policy is not as expected")
+		}
+	}
+}
+
+func TestAlterTableOptions(t *testing.T) {
+	{
+		opt := WithAddColumn("a", ydb.TypeBool)
+		req := Ydb_Table.AlterTableRequest{}
+		opt((*alterTableDesc)(&req))
+		if len(req.AddColumns) != 1 ||
+			req.AddColumns[0].Name != "a" {
+			t.Errorf("Alter table options is not as expected")
+		}
+	}
+	{
+		column := Column{
+			Name:   "a",
+			Type:   ydb.TypeBool,
+			Family: "b",
+		}
+		opt := WithAddColumnMeta(column)
+		req := Ydb_Table.AlterTableRequest{}
+		opt((*alterTableDesc)(&req))
+		if len(req.AddColumns) != 1 ||
+			req.AddColumns[0].Name != column.Name ||
+			req.AddColumns[0].Type != internal.TypeToYDB(column.Type) ||
+			req.AddColumns[0].Family != column.Family {
+			t.Errorf("Alter table options is not as expected")
+		}
+	}
+	{
+		opt := WithDropColumn("a")
+		req := Ydb_Table.AlterTableRequest{}
+		opt((*alterTableDesc)(&req))
+		if len(req.DropColumns) != 1 ||
+			req.DropColumns[0] != "a" {
+			t.Errorf("Alter table options is not as expected")
+		}
+	}
+	{
+		cf := ColumnFamily{
+			Name: "a",
+			Data: StoragePool{
+				Media: "ssd",
+			},
+			Compression:  ColumnFamilyCompressionLZ4,
+			KeepInMemory: ydb.FeatureEnabled,
+		}
+		opt := WithAlterColumnFamilies(cf)
+		req := Ydb_Table.AlterTableRequest{}
+		opt((*alterTableDesc)(&req))
+		if len(req.AddColumnFamilies) != 1 ||
+			req.AddColumnFamilies[0].Name != cf.Name ||
+			req.AddColumnFamilies[0].Data.Media != cf.Data.Media ||
+			req.AddColumnFamilies[0].Compression != cf.Compression.toYDB() ||
+			req.AddColumnFamilies[0].KeepInMemory != cf.KeepInMemory.ToYDB() {
+			t.Errorf("Alter table options is not as expected")
+		}
+	}
 }

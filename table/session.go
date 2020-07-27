@@ -159,8 +159,9 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 	cs := make([]Column, len(res.Columns))
 	for i, c := range res.Columns {
 		cs[i] = Column{
-			Name: c.Name,
-			Type: internal.TypeFromYDB(c.Type),
+			Name:   c.Name,
+			Type:   internal.TypeFromYDB(c.Type),
+			Family: c.Family,
 		}
 	}
 
@@ -181,11 +182,17 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		rs[i].From = last
 	}
 
+	cf := make([]ColumnFamily, len(res.ColumnFamilies))
+	for i, c := range res.ColumnFamilies {
+		cf[i] = columnFamily(c)
+	}
+
 	return Description{
-		Name:       res.Self.Name,
-		PrimaryKey: res.PrimaryKey,
-		Columns:    cs,
-		KeyRanges:  rs,
+		Name:           res.Self.Name,
+		PrimaryKey:     res.PrimaryKey,
+		Columns:        cs,
+		KeyRanges:      rs,
+		ColumnFamilies: cf,
 	}, nil
 }
 

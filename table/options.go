@@ -31,15 +31,99 @@ type SessionInfo struct {
 }
 
 type Column struct {
-	Name string
-	Type ydb.Type
+	Name   string
+	Type   ydb.Type
+	Family string
+}
+
+func (c Column) toYDB() *Ydb_Table.ColumnMeta {
+	return &Ydb_Table.ColumnMeta{
+		Name:   c.Name,
+		Type:   internal.TypeToYDB(c.Type),
+		Family: c.Family,
+	}
 }
 
 type Description struct {
-	Name       string
-	Columns    []Column
-	PrimaryKey []string
-	KeyRanges  []KeyRange
+	Name           string
+	Columns        []Column
+	PrimaryKey     []string
+	KeyRanges      []KeyRange
+	ColumnFamilies []ColumnFamily
+}
+
+type ColumnFamily struct {
+	Name         string
+	Data         StoragePool
+	Compression  ColumnFamilyCompression
+	KeepInMemory ydb.FeatureFlag
+}
+
+func (c ColumnFamily) toYDB() *Ydb_Table.ColumnFamily {
+	return &Ydb_Table.ColumnFamily{
+		Name: c.Name,
+		Data: &Ydb_Table.StoragePool{
+			Media: c.Data.Media,
+		},
+		Compression:  c.Compression.toYDB(),
+		KeepInMemory: c.KeepInMemory.ToYDB(),
+	}
+}
+
+func columnFamily(c *Ydb_Table.ColumnFamily) ColumnFamily {
+	return ColumnFamily{
+		Name: c.Name,
+		Data: StoragePool{
+			Media: c.GetData().GetMedia(),
+		},
+		Compression:  columnFamilyCompression(c.Compression),
+		KeepInMemory: internal.FeatureFlagFromYDB(c.KeepInMemory),
+	}
+}
+
+type StoragePool struct {
+	Media string
+}
+
+type ColumnFamilyCompression uint
+
+const (
+	ColumnFamilyCompressionUnknown ColumnFamilyCompression = iota
+	ColumnFamilyCompressionNone
+	ColumnFamilyCompressionLZ4
+)
+
+func (c ColumnFamilyCompression) String() string {
+	switch c {
+	case ColumnFamilyCompressionNone:
+		return "none"
+	case ColumnFamilyCompressionLZ4:
+		return "lz4"
+	default:
+		return "unknown"
+	}
+}
+
+func (c ColumnFamilyCompression) toYDB() Ydb_Table.ColumnFamily_Compression {
+	switch c {
+	case ColumnFamilyCompressionNone:
+		return Ydb_Table.ColumnFamily_COMPRESSION_NONE
+	case ColumnFamilyCompressionLZ4:
+		return Ydb_Table.ColumnFamily_COMPRESSION_LZ4
+	default:
+		return Ydb_Table.ColumnFamily_COMPRESSION_UNSPECIFIED
+	}
+}
+
+func columnFamilyCompression(c Ydb_Table.ColumnFamily_Compression) ColumnFamilyCompression {
+	switch c {
+	case Ydb_Table.ColumnFamily_COMPRESSION_NONE:
+		return ColumnFamilyCompressionNone
+	case Ydb_Table.ColumnFamily_COMPRESSION_LZ4:
+		return ColumnFamilyCompressionLZ4
+	default:
+		return ColumnFamilyCompressionUnknown
+	}
 }
 
 type (
@@ -93,6 +177,12 @@ func WithColumn(name string, typ ydb.Type) CreateTableOption {
 	}
 }
 
+func WithColumnMeta(column Column) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.Columns = append(d.Columns, column.toYDB())
+	}
+}
+
 func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
 	return func(d *createTableDesc) {
 		d.PrimaryKey = append(d.PrimaryKey, columns...)
@@ -119,6 +209,15 @@ func WithIndex(name string, opts ...IndexOption) CreateTableOption {
 func WithIndexColumns(columns ...string) IndexOption {
 	return func(d *indexDesc) {
 		d.IndexColumns = append(d.IndexColumns, columns...)
+	}
+}
+
+func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.ColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
+		for i, c := range cf {
+			d.ColumnFamilies[i] = c.toYDB()
+		}
 	}
 }
 
@@ -258,7 +357,7 @@ func WithStoragePolicyExternal(kind string) StoragePolicyOption {
 }
 func WithStoragePolicyKeepInMemory(flag ydb.FeatureFlag) StoragePolicyOption {
 	return func(s *storagePolicy) {
-		s.KeepInMemory = internal.FeatureFlagToYDB(flag)
+		s.KeepInMemory = flag.ToYDB()
 	}
 }
 
@@ -331,12 +430,12 @@ func WithReplicationPolicyReplicasCount(n uint32) ReplicationPolicyOption {
 }
 func WithReplicationPolicyCreatePerAZ(flag ydb.FeatureFlag) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
-		e.CreatePerAvailabilityZone = internal.FeatureFlagToYDB(flag)
+		e.CreatePerAvailabilityZone = flag.ToYDB()
 	}
 }
 func WithReplicationPolicyAllowPromotion(flag ydb.FeatureFlag) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
-		e.AllowPromotion = internal.FeatureFlagToYDB(flag)
+		e.AllowPromotion = flag.ToYDB()
 	}
 }
 
@@ -371,9 +470,33 @@ func WithAddColumn(name string, typ ydb.Type) AlterTableOption {
 	}
 }
 
+func WithAddColumnMeta(column Column) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.AddColumns = append(d.AddColumns, column.toYDB())
+	}
+}
+
 func WithDropColumn(name string) AlterTableOption {
 	return func(d *alterTableDesc) {
 		d.DropColumns = append(d.DropColumns, name)
+	}
+}
+
+func WithAddColumnFamilies(cf ...ColumnFamily) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
+		for i, c := range cf {
+			d.AddColumnFamilies[i] = c.toYDB()
+		}
+	}
+}
+
+func WithAlterColumnFamilies(cf ...ColumnFamily) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
+		for i, c := range cf {
+			d.AddColumnFamilies[i] = c.toYDB()
+		}
 	}
 }
 
