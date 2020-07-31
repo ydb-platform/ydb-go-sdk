@@ -1,4 +1,4 @@
-##2020.07.7
+##2020.07.7 
 * support manage table attributes
 
 ##2020.07.6

@@ -1,6 +1,8 @@
 package table
 
 import (
+	"time"
+
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
@@ -49,7 +51,22 @@ type Description struct {
 	Columns        []Column
 	PrimaryKey     []string
 	KeyRanges      []KeyRange
+	Stats          *TableStats
 	ColumnFamilies []ColumnFamily
+}
+
+type TableStats struct {
+	PartitionStats   []PartitionStats
+	RowsEstimate     uint64
+	StoreSize        uint64
+	Partitions       uint64
+	CreationTime     time.Time
+	ModificationTime time.Time
+}
+
+type PartitionStats struct {
+	RowsEstimate uint64
+	StoreSize    uint64
 }
 
 type ColumnFamily struct {

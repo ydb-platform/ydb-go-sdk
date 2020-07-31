@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
@@ -182,6 +183,32 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		rs[i].From = last
 	}
 
+	var stats *TableStats
+	if res.TableStats != nil {
+		resStats := res.TableStats
+		partStats := make([]PartitionStats, len(res.TableStats.PartitionStats))
+		for i, v := range res.TableStats.PartitionStats {
+			partStats[i].RowsEstimate = v.RowsEstimate
+			partStats[i].StoreSize = v.StoreSize
+		}
+		var creationTime, modificationTime time.Time
+		if resStats.CreationTime.GetSeconds() != 0 {
+			creationTime = time.Unix(resStats.CreationTime.GetSeconds(), int64(resStats.CreationTime.GetNanos()))
+		}
+		if resStats.ModificationTime.GetSeconds() != 0 {
+			modificationTime = time.Unix(resStats.ModificationTime.GetSeconds(), int64(resStats.ModificationTime.GetNanos()))
+		}
+
+		stats = &TableStats{
+			PartitionStats:   partStats,
+			RowsEstimate:     resStats.RowsEstimate,
+			StoreSize:        resStats.StoreSize,
+			Partitions:       resStats.Partitions,
+			CreationTime:     creationTime,
+			ModificationTime: modificationTime,
+		}
+	}
+
 	cf := make([]ColumnFamily, len(res.ColumnFamilies))
 	for i, c := range res.ColumnFamilies {
 		cf[i] = columnFamily(c)
@@ -192,6 +219,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		PrimaryKey:     res.PrimaryKey,
 		Columns:        cs,
 		KeyRanges:      rs,
+		Stats:          stats,
 		ColumnFamilies: cf,
 	}, nil
 }
