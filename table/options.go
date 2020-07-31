@@ -189,6 +189,12 @@ func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
 	}
 }
 
+func WithAttribute(key, value string) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.Attributes[key] = value
+	}
+}
+
 type (
 	indexDesc   Ydb_Table.TableIndex
 	IndexOption func(d *indexDesc)
@@ -467,6 +473,12 @@ func WithAddColumn(name string, typ ydb.Type) AlterTableOption {
 			Name: name,
 			Type: internal.TypeToYDB(typ),
 		})
+	}
+}
+
+func WithAlterAttribute(key, value string) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.AlterAttributes[key] = value
 	}
 }
 

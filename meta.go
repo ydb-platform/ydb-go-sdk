@@ -77,9 +77,10 @@ func (m *meta) md(ctx context.Context) (md metadata.MD, _ error) {
 	}
 	m.token = token
 
-	m.curr = make(metadata.MD, 2)
+	m.curr = make(metadata.MD, 3)
 	m.curr.Set(metaDatabase, m.database)
 	m.curr.Set(metaTicket, m.token)
+	m.curr.Set(metaVersion, Version)
 
 	return m.curr, nil
 }
