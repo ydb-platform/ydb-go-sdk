@@ -2761,9 +2761,7 @@ func init() {
 	proto.RegisterType((*DescribeNodeResult)(nil), "Ydb.Coordination.DescribeNodeResult")
 }
 
-func init() {
-	proto.RegisterFile("ydb_coordination.proto", fileDescriptor_b9a2a9ea29b22c6a)
-}
+func init() { proto.RegisterFile("ydb_coordination.proto", fileDescriptor_b9a2a9ea29b22c6a) }
 
 var fileDescriptor_b9a2a9ea29b22c6a = []byte{
 	// 1991 bytes of a gzipped FileDescriptorProto

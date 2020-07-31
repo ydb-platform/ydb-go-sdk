@@ -306,9 +306,7 @@ func init() {
 	proto.RegisterType((*QueryStats)(nil), "Ydb.TableStats.QueryStats")
 }
 
-func init() {
-	proto.RegisterFile("ydb_query_stats.proto", fileDescriptor_bd6647573551cb14)
-}
+func init() { proto.RegisterFile("ydb_query_stats.proto", fileDescriptor_bd6647573551cb14) }
 
 var fileDescriptor_bd6647573551cb14 = []byte{
 	// 398 bytes of a gzipped FileDescriptorProto

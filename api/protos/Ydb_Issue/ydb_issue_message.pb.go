@@ -165,9 +165,7 @@ func init() {
 	proto.RegisterType((*IssueMessage_Position)(nil), "Ydb.Issue.IssueMessage.Position")
 }
 
-func init() {
-	proto.RegisterFile("ydb_issue_message.proto", fileDescriptor_0b472e41df8bb0e5)
-}
+func init() { proto.RegisterFile("ydb_issue_message.proto", fileDescriptor_0b472e41df8bb0e5) }
 
 var fileDescriptor_0b472e41df8bb0e5 = []byte{
 	// 256 bytes of a gzipped FileDescriptorProto

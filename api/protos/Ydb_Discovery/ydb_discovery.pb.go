@@ -371,9 +371,7 @@ func init() {
 	proto.RegisterType((*WhoAmIResponse)(nil), "Ydb.Discovery.WhoAmIResponse")
 }
 
-func init() {
-	proto.RegisterFile("ydb_discovery.proto", fileDescriptor_a2b240df5737142d)
-}
+func init() { proto.RegisterFile("ydb_discovery.proto", fileDescriptor_a2b240df5737142d) }
 
 var fileDescriptor_a2b240df5737142d = []byte{
 	// 427 bytes of a gzipped FileDescriptorProto

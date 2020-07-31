@@ -1024,9 +1024,7 @@ func init() {
 	proto.RegisterType((*AcquireResourceResult)(nil), "Ydb.RateLimiter.AcquireResourceResult")
 }
 
-func init() {
-	proto.RegisterFile("ydb_rate_limiter.proto", fileDescriptor_78a9f931ad9b1c4b)
-}
+func init() { proto.RegisterFile("ydb_rate_limiter.proto", fileDescriptor_78a9f931ad9b1c4b) }
 
 var fileDescriptor_78a9f931ad9b1c4b = []byte{
 	// 650 bytes of a gzipped FileDescriptorProto
