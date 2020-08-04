@@ -214,6 +214,11 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		cf[i] = columnFamily(c)
 	}
 
+	attrs := make(map[string]string, len(res.Attributes))
+	for k, v := range res.Attributes {
+		attrs[k] = v
+	}
+
 	return Description{
 		Name:           res.Self.Name,
 		PrimaryKey:     res.PrimaryKey,
@@ -221,6 +226,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		KeyRanges:      rs,
 		Stats:          stats,
 		ColumnFamilies: cf,
+		Attributes:     attrs,
 	}, nil
 }
 

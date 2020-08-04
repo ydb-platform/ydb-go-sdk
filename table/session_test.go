@@ -190,6 +190,7 @@ func TestSessionDescribeTable(t *testing.T) {
 					KeepInMemory: ydb.FeatureEnabled,
 				},
 			},
+			Attributes: map[string]string{},
 		}
 		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{

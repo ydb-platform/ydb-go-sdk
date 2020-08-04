@@ -53,6 +53,7 @@ type Description struct {
 	KeyRanges      []KeyRange
 	Stats          *TableStats
 	ColumnFamilies []ColumnFamily
+	Attributes     map[string]string
 }
 
 type TableStats struct {
