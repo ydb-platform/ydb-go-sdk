@@ -209,6 +209,9 @@ func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
 
 func WithAttribute(key, value string) CreateTableOption {
 	return func(d *createTableDesc) {
+		if d.Attributes == nil {
+			d.Attributes = make(map[string]string)
+		}
 		d.Attributes[key] = value
 	}
 }
@@ -496,6 +499,9 @@ func WithAddColumn(name string, typ ydb.Type) AlterTableOption {
 
 func WithAlterAttribute(key, value string) AlterTableOption {
 	return func(d *alterTableDesc) {
+		if d.AlterAttributes == nil {
+			d.AlterAttributes = make(map[string]string)
+		}
 		d.AlterAttributes[key] = value
 	}
 }
