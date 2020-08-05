@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
@@ -76,11 +77,14 @@ type Session struct {
 	qcache lru.Cache
 	qhash  queryHasher
 
-	closed  bool
-	onClose []func()
+	closeMux sync.Mutex
+	closed   bool
+	onClose  []func()
 }
 
 func (s *Session) OnClose(cb func()) {
+	s.closeMux.Lock()
+	defer s.closeMux.Unlock()
 	if s.closed {
 		return
 	}
@@ -88,6 +92,8 @@ func (s *Session) OnClose(cb func()) {
 }
 
 func (s *Session) Close(ctx context.Context) (err error) {
+	s.closeMux.Lock()
+	defer s.closeMux.Unlock()
 	if s.closed {
 		return nil
 	}
