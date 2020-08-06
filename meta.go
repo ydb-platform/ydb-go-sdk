@@ -8,15 +8,18 @@ import (
 )
 
 const (
-	metaDatabase = "x-ydb-database"
-	metaTicket   = "x-ydb-auth-ticket"
-	metaVersion  = "x-ydb-sdk-build-info"
+	metaDatabase    = "x-ydb-database"
+	metaTicket      = "x-ydb-auth-ticket"
+	metaVersion     = "x-ydb-sdk-build-info"
+	metaRequestType = "x-ydb-request-type"
+	metaTeraceID    = "x-ydb-trace-id"
 )
 
 type meta struct {
-	trace       DriverTrace
-	credentials Credentials
-	database    string
+	trace        DriverTrace
+	credentials  Credentials
+	database     string
+	requestsType string
 
 	once  sync.Once
 	mu    sync.RWMutex
@@ -25,10 +28,17 @@ type meta struct {
 }
 
 func (m *meta) make() metadata.MD {
-	return metadata.New(map[string]string{
+	newMeta := metadata.New(map[string]string{
 		metaDatabase: m.database,
 		metaVersion:  Version,
 	})
+	if m.requestsType != "" {
+		newMeta.Set(metaRequestType, m.requestsType)
+	}
+	if m.token != "" {
+		newMeta.Set(metaTicket, m.token)
+	}
+	return newMeta
 }
 
 func (m *meta) md(ctx context.Context) (md metadata.MD, _ error) {
@@ -52,6 +62,9 @@ func (m *meta) md(ctx context.Context) (md metadata.MD, _ error) {
 		// Continue.
 
 	case ErrCredentialsDropToken:
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		m.token = ""
 		return m.make(), nil
 
 	case ErrCredentialsKeepToken:
@@ -77,10 +90,6 @@ func (m *meta) md(ctx context.Context) (md metadata.MD, _ error) {
 	}
 	m.token = token
 
-	m.curr = make(metadata.MD, 3)
-	m.curr.Set(metaDatabase, m.database)
-	m.curr.Set(metaTicket, m.token)
-	m.curr.Set(metaVersion, Version)
-
+	m.curr = m.make()
 	return m.curr, nil
 }

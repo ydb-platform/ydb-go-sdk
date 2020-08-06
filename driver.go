@@ -149,6 +149,10 @@ type DriverConfig struct {
 	// is, currently this option may be called as experimental.
 	// You have been warned.
 	PreferLocalEndpoints bool
+
+	// RequestsType set an additional type hint to all requests.
+	// It is needed only for debug purposes and advanced cases.
+	RequestsType string
 }
 
 func (d *DriverConfig) withDefaults() (c DriverConfig) {

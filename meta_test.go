@@ -10,7 +10,8 @@ import (
 func TestMetaErrDropToken(t *testing.T) {
 	var call int
 	m := &meta{
-		database: "database",
+		database:     "database",
+		requestsType: "requestType",
 		credentials: CredentialsFunc(func(context.Context) (string, error) {
 			if call == 0 {
 				call++
@@ -26,6 +27,7 @@ func TestMetaErrDropToken(t *testing.T) {
 	}
 	assertMetaHasDatabase(t, md1)
 	assertMetaHasToken(t, md1)
+	assertMetaHasRequestType(t, md1)
 
 	md2, err := m.md(context.Background())
 	if err != nil {
@@ -33,12 +35,14 @@ func TestMetaErrDropToken(t *testing.T) {
 	}
 	assertMetaHasDatabase(t, md2)
 	assertMetaHasNoToken(t, md2)
+	assertMetaHasRequestType(t, md2)
 }
 
 func TestMetaErrKeepToken(t *testing.T) {
 	var call int
 	m := &meta{
-		database: "database",
+		database:     "database",
+		requestsType: "requestType",
 		credentials: CredentialsFunc(func(context.Context) (string, error) {
 			if call == 0 {
 				call++
@@ -54,13 +58,15 @@ func TestMetaErrKeepToken(t *testing.T) {
 	}
 	assertMetaHasDatabase(t, md1)
 	assertMetaHasToken(t, md1)
+	assertMetaHasRequestType(t, md1)
 
 	md2, err := m.md(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertMetaHasDatabase(t, md2)
-	assertMetaHasToken(t, md1)
+	assertMetaHasToken(t, md2)
+	assertMetaHasRequestType(t, md2)
 }
 
 func assertMetaHasDatabase(t *testing.T, md metadata.MD) {
@@ -76,5 +82,10 @@ func assertMetaHasToken(t *testing.T, md metadata.MD) {
 func assertMetaHasNoToken(t *testing.T, md metadata.MD) {
 	if len(md.Get(metaTicket)) != 0 {
 		t.Errorf("unexpected token info in meta")
+	}
+}
+func assertMetaHasRequestType(t *testing.T, md metadata.MD) {
+	if len(md.Get(metaRequestType)) == 0 {
+		t.Errorf("no request type info in meta")
 	}
 }

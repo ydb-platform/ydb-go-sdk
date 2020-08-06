@@ -66,9 +66,10 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 		timeout:   d.Timeout,
 		config:    config,
 		meta: &meta{
-			trace:       config.Trace,
-			database:    config.Database,
-			credentials: config.Credentials,
+			trace:        config.Trace,
+			database:     config.Database,
+			credentials:  config.Credentials,
+			requestsType: config.RequestsType,
 		},
 	}).dial(ctx, addr)
 }
