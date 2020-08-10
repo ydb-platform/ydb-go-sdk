@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/importer"
 	"go/parser"
 	"go/token"
@@ -13,7 +16,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	_ "unsafe" // For go:linkname.
 )
+
+//go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile
+func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
 
 func main() {
 	var (
@@ -44,6 +52,7 @@ func main() {
 		err     error
 	)
 	if gofile = os.Getenv("GOFILE"); gofile != "" {
+		// NOTE: GOFILE is always a filename without path.
 		goGen = true
 		workDir, err = os.Getwd()
 		if err != nil {
@@ -58,14 +67,16 @@ func main() {
 		workDir = filepath.Dir(args[0])
 	}
 
-	srcFilePath := filepath.Join(workDir, gofile)
-	pkgFilePaths, err := filepath.Glob(filepath.Join(workDir, "*.go"))
+	buildCtx := build.Default
+	bpkg, err := buildCtx.ImportDir(workDir, build.IgnoreVendor)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	srcFilePath := filepath.Join(workDir, gofile)
 	if verbose {
 		log.Printf("source file: %s", srcFilePath)
-		log.Printf("package files: %v", pkgFilePaths)
+		log.Printf("package files: %v", bpkg.GoFiles)
 	}
 
 	var dest io.Writer
@@ -74,9 +85,32 @@ func main() {
 			base = filepath.Base(srcFilePath)
 			ext  = filepath.Ext(base)
 			name = strings.TrimSuffix(base, ext)
-
-			dstFilePath = filepath.Join(workDir, name+suffix+ext)
 		)
+
+		// Fill in source filename tags.
+		srcFileTags := make(map[string]bool)
+		build_goodOSArchFile(&buildCtx, gofile, srcFileTags)
+		var dstName string
+		switch len(srcFileTags) {
+		case 0: // *
+			dstName = name + suffix
+
+		case 1: // *_GOOS or *_GOARCH
+			i := strings.LastIndexByte(name, '_')
+			dstName = name[:i] + suffix + name[i:]
+
+		case 2: // *_GOOS_GOARCH
+			var i int
+			i = strings.LastIndexByte(name, '_')
+			i = strings.LastIndexByte(name[:i], '_')
+			dstName = name[:i] + suffix + name[i:]
+		}
+
+		dstFilePath := filepath.Join(workDir, dstName+ext)
+		if verbose {
+			log.Printf("destination file path: %+v", dstFilePath)
+		}
+
 		dstFile, err := os.OpenFile(dstFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
 			log.Fatal(err)
@@ -88,18 +122,18 @@ func main() {
 	}
 
 	var (
-		pkgFiles = make([]*os.File, 0, len(pkgFilePaths))
-		astFiles = make([]*ast.File, 0, len(pkgFilePaths))
+		pkgFiles = make([]*os.File, 0, len(bpkg.GoFiles))
+		astFiles = make([]*ast.File, 0, len(bpkg.GoFiles))
+
+		buildConstraints []string
 	)
 	fset := token.NewFileSet()
-	for _, p := range pkgFilePaths {
-		if strings.HasSuffix(p, suffix+".go") {
+	for _, name := range bpkg.GoFiles {
+		if strings.HasSuffix(name, suffix+".go") {
+			// Skip gtrace generated files.
 			continue
 		}
-		if strings.HasSuffix(p, "_test.go") {
-			continue
-		}
-		file, err := os.Open(p)
+		file, err := os.Open(filepath.Join(workDir, name))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -112,6 +146,16 @@ func main() {
 
 		pkgFiles = append(pkgFiles, file)
 		astFiles = append(astFiles, ast)
+
+		if name == gofile {
+			if _, err := file.Seek(0, io.SeekStart); err != nil {
+				log.Fatal(err)
+			}
+			buildConstraints, err = scanBuildConstraints(file)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 	}
 	info := types.Info{
 		Types: make(map[ast.Expr]types.TypeAndValue),
@@ -173,8 +217,8 @@ func main() {
 				return false
 
 			case *ast.CommentGroup:
-				for _, c := range v.List {
-					logf("comment %q", c.Text)
+				for i, c := range v.List {
+					logf("#%d comment %q", i, c.Text)
 
 					text := strings.TrimPrefix(c.Text, "//gtrace:")
 					if c.Text != text {
@@ -209,7 +253,8 @@ func main() {
 		Output: dest,
 	}
 	p := Package{
-		Package: pkg,
+		Package:          pkg,
+		BuildConstraints: buildConstraints,
 	}
 	for _, item := range items {
 		t := Trace{
@@ -278,7 +323,9 @@ func buildFunc(info types.Info, fn *ast.FuncType) (ret Func, err error) {
 
 type Package struct {
 	*types.Package
-	Traces []Trace
+
+	BuildConstraints []string
+	Traces           []Trace
 }
 
 type Trace struct {
@@ -359,4 +406,26 @@ func split(s string, c byte) (s1, s2 string) {
 		return s, ""
 	}
 	return s[:i], s[i+1:]
+}
+
+func scanBuildConstraints(r io.Reader) (cs []string, err error) {
+	br := bufio.NewReader(r)
+	for {
+		line, err := br.ReadBytes('\n')
+		if err != nil {
+			return nil, err
+		}
+		line = bytes.TrimSpace(line)
+		if comm := bytes.TrimPrefix(line, []byte("//")); !bytes.Equal(comm, line) {
+			comm = bytes.TrimSpace(comm)
+			if bytes.HasPrefix(comm, []byte("+build")) {
+				cs = append(cs, string(line))
+				continue
+			}
+		}
+		if bytes.HasPrefix(line, []byte("package ")) {
+			break
+		}
+	}
+	return cs, nil
 }

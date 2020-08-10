@@ -9,7 +9,12 @@ examples: gtrace
 
 .PHONY: test
 test: gtrace
-	PATH=$(PWD):$(PATH)	go generate ./test
+	find ./test -name '*_gtrace*' -delete
+	for os in linux darwin; do \
+		for arch in amd64 arm64; do \
+			PATH=$(PWD):$(PATH)	GOOS=$$os GOARCH=$$arch go generate ./test; \
+		done; \
+	done
 	go test -v ./test
 
 clean:

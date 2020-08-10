@@ -6,6 +6,19 @@ import (
 	"testing"
 )
 
+func TestConditional(t *testing.T) {
+	var called bool
+	trace := ConditionalBuildTrace{
+		OnSomething: func() {
+			called = true
+		},
+	}
+	trace.onSomething()
+	if !called {
+		t.Fatalf("not called")
+	}
+}
+
 func TestCompose(t *testing.T) {
 	var act []string
 	called := func(name, arg string) {

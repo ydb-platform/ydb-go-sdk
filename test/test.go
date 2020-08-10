@@ -1,6 +1,6 @@
 package test
 
-//go:generate gtrace
+//go:generate gtrace -v
 
 //gtrace:gen
 //gtrace:set context
