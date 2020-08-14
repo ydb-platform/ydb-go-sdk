@@ -50,7 +50,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	prefix := path.Join(params.Database, params.Path)
 
-	err = ydbutil.CleanupDatabase(ctx, driver, table.SingleSession(session), params.Database)
+	err = ydbutil.CleanupDatabase(ctx, driver, table.SingleSession(session), params.Database, "users")
 	if err != nil {
 		return err
 	}

@@ -73,7 +73,7 @@ func CleanupDatabase(ctx context.Context, d ydb.Driver, sp table.SessionProvider
 		}
 		log.Println(strings.Repeat(" ", i*2), "inspecting", dir.Name, dir.Type)
 		for _, c := range dir.Children {
-			if _, has := filter[c.Name]; len(filter) > 0 && !has {
+			if _, has := filter[c.Name]; !has {
 				continue
 			}
 			pt := path.Join(p, c.Name)

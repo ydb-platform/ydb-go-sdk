@@ -44,7 +44,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	defer sp.Close(ctx)
 
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database)
+	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, "schools")
 	if err != nil {
 		return err
 	}

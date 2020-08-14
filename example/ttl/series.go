@@ -50,7 +50,12 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	defer sp.Close(ctx)
 
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database)
+	cleanupDBs := []string{"documents"}
+	for i := 0; i < ExpirationQueueCount; i++ {
+		cleanupDBs = append(cleanupDBs, fmt.Sprintf("expiration_queue_%v", i))
+	}
+
+	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, cleanupDBs...)
 	if err != nil {
 		return err
 	}
