@@ -26,6 +26,7 @@ func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
 // QueryPhase holds query execution phase statistics.
 type QueryPhase struct {
 	Duration time.Duration
+	CPUTime  time.Duration
 
 	tables []*Ydb_TableStats.TableAccessStats
 	pos    int
@@ -36,6 +37,7 @@ func (q *QueryPhase) init(x *Ydb_TableStats.QueryPhaseStats) {
 		return
 	}
 	q.Duration = time.Microsecond * time.Duration(x.DurationUs)
+	q.CPUTime = time.Microsecond * time.Duration(x.CpuTimeUs)
 	q.tables = x.TableAccess
 }
 

@@ -1,3 +1,6 @@
+##2020.08.1
+* added `CPUTime` field to `QueryPhase` struct
+
 ##2020.07.7 
 * support manage table attributes
 
