@@ -1,5 +1,6 @@
 ##2020.08.1
-* added `CPUTime` field to `QueryPhase` struct
+* added `CPUTime` and `AffectedShards` fields to `QueryPhase` struct
+* added `CompilationPhase` statistics
 
 ##2020.07.7 
 * support manage table attributes

@@ -12,6 +12,31 @@ type QueryStats struct {
 	pos   int
 }
 
+func (s *QueryStats) Compilation() (c *CompilationPhase) {
+	if s == nil || s.stats == nil || s.stats.Compilation == nil {
+		return nil
+	}
+	res := new(CompilationPhase)
+	res.init(s.stats.Compilation)
+	return res
+}
+
+// CompilationPhase holds query compilation phase statistics.
+type CompilationPhase struct {
+	FromCache bool
+	Duration  time.Duration
+	CPUTime   time.Duration
+}
+
+func (c *CompilationPhase) init(x *Ydb_TableStats.CompilationStats) {
+	if x == nil {
+		return
+	}
+	c.FromCache = x.FromCache
+	c.Duration = time.Microsecond * time.Duration(x.DurationUs)
+	c.CPUTime = time.Microsecond * time.Duration(x.CpuTimeUs)
+}
+
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
 func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
@@ -25,8 +50,9 @@ func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
 
 // QueryPhase holds query execution phase statistics.
 type QueryPhase struct {
-	Duration time.Duration
-	CPUTime  time.Duration
+	Duration       time.Duration
+	CPUTime        time.Duration
+	AffectedShards uint64
 
 	tables []*Ydb_TableStats.TableAccessStats
 	pos    int
@@ -38,7 +64,9 @@ func (q *QueryPhase) init(x *Ydb_TableStats.QueryPhaseStats) {
 	}
 	q.Duration = time.Microsecond * time.Duration(x.DurationUs)
 	q.CPUTime = time.Microsecond * time.Duration(x.CpuTimeUs)
+	q.AffectedShards = x.AffectedShards
 	q.tables = x.TableAccess
+	q.pos = 0
 }
 
 // NextTableAccess returns next accessed table within query execution phase.
