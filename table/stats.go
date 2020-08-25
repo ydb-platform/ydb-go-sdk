@@ -12,23 +12,23 @@ type QueryStats struct {
 	pos   int
 }
 
-func (s *QueryStats) Compilation() (c *CompilationPhase) {
+func (s *QueryStats) Compilation() (c *CompilationStats) {
 	if s == nil || s.stats == nil || s.stats.Compilation == nil {
 		return nil
 	}
-	res := new(CompilationPhase)
+	res := new(CompilationStats)
 	res.init(s.stats.Compilation)
 	return res
 }
 
-// CompilationPhase holds query compilation phase statistics.
-type CompilationPhase struct {
+// CompilationStats holds query compilation statistics.
+type CompilationStats struct {
 	FromCache bool
 	Duration  time.Duration
 	CPUTime   time.Duration
 }
 
-func (c *CompilationPhase) init(x *Ydb_TableStats.CompilationStats) {
+func (c *CompilationStats) init(x *Ydb_TableStats.CompilationStats) {
 	if x == nil {
 		return
 	}
