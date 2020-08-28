@@ -479,6 +479,48 @@ func WithCachingPolicyPreset(name string) CachingPolicyOption {
 }
 
 type (
+	partitioningSettings       Ydb_Table.PartitioningSettings
+	PartitioningSettingsOption func(settings *partitioningSettings)
+)
+
+func WithPartitioningSettings(opts ...PartitioningSettingsOption) CreateTableOption {
+	return func(d *createTableDesc) {
+		if d.PartitioningSettings == nil {
+			d.PartitioningSettings = new(Ydb_Table.PartitioningSettings)
+		}
+		for _, opt := range opts {
+			opt((*partitioningSettings)(d.PartitioningSettings))
+		}
+	}
+}
+
+func WithPartitioningBySize(flag ydb.FeatureFlag) PartitioningSettingsOption {
+	return func(settings *partitioningSettings) {
+		settings.PartitioningBySize = flag.ToYDB()
+	}
+}
+func WithPartitionSizeMb(partitionSizeMb uint64) PartitioningSettingsOption {
+	return func(settings *partitioningSettings) {
+		settings.PartitionSizeMb = partitionSizeMb
+	}
+}
+func WithPartitioningByLoad(flag ydb.FeatureFlag) PartitioningSettingsOption {
+	return func(settings *partitioningSettings) {
+		settings.PartitioningByLoad = flag.ToYDB()
+	}
+}
+func WithMinPartitionsCount(minPartitionsCount uint64) PartitioningSettingsOption {
+	return func(settings *partitioningSettings) {
+		settings.MinPartitionsCount = minPartitionsCount
+	}
+}
+func WithMaxPartitionsCount(maxPartitionsCount uint64) PartitioningSettingsOption {
+	return func(settings *partitioningSettings) {
+		settings.MaxPartitionsCount = maxPartitionsCount
+	}
+}
+
+type (
 	dropTableDesc   Ydb_Table.DropTableRequest
 	DropTableOption func(*dropTableDesc)
 )
@@ -532,6 +574,17 @@ func WithAlterColumnFamilies(cf ...ColumnFamily) AlterTableOption {
 		d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
 		for i, c := range cf {
 			d.AddColumnFamilies[i] = c.toYDB()
+		}
+	}
+}
+
+func WithAlterPartitioningSettings(opts ...PartitioningSettingsOption) AlterTableOption {
+	return func(d *alterTableDesc) {
+		if d.AlterPartitioningSettings == nil {
+			d.AlterPartitioningSettings = new(Ydb_Table.PartitioningSettings)
+		}
+		for _, opt := range opts {
+			opt((*partitioningSettings)(d.AlterPartitioningSettings))
 		}
 	}
 }

@@ -1,3 +1,6 @@
+##2020.08.2
+* added `PartitioningSettings` support for `CreateTable` and `AlterTable`
+
 ##2020.08.1
 * added `CPUTime` and `AffectedShards` fields to `QueryPhase` struct
 * added `CompilationStats` statistics
