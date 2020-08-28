@@ -34,6 +34,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	if err != nil {
 		return fmt.Errorf("dial error: %v", err)
 	}
+	defer driver.Close()
 
 	tableClient := table.Client{
 		Driver: driver,

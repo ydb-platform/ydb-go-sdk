@@ -56,6 +56,8 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	tableClient := table.Client{
 		Driver: driver,
 	}
+	defer driver.Close()
+
 	sp := table.SessionPool{
 		IdleThreshold: time.Second,
 		Builder:       &tableClient,
