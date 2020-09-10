@@ -51,8 +51,9 @@ type Result struct {
 }
 
 // Stats returns query execution stats.
-func (r *Result) Stats() QueryStats {
-	return QueryStats{stats: r.stats}
+func (r *Result) Stats() (stats QueryStats) {
+	stats.init(r.stats)
+	return
 }
 
 // SetCount returns number of result sets.

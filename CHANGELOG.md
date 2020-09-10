@@ -1,3 +1,6 @@
+##2020.09.1
+* added `ProcessCPUTime` method to `QueryStats`
+
 ##2020.08.2
 * added `PartitioningSettings` support for `CreateTable` and `AlterTable`
 

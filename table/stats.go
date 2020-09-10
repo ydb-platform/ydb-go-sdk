@@ -8,8 +8,25 @@ import (
 
 // QueryStats holds query execution statistics.
 type QueryStats struct {
-	stats *Ydb_TableStats.QueryStats
-	pos   int
+	stats          *Ydb_TableStats.QueryStats
+	processCPUTime time.Duration
+	pos            int
+}
+
+func (s *QueryStats) init(stats *Ydb_TableStats.QueryStats) {
+	if s == nil {
+		return
+	}
+	s.stats = stats
+	s.processCPUTime = time.Microsecond * time.Duration(stats.GetProcessCpuTimeUs())
+	s.pos = 0
+}
+
+func (s *QueryStats) ProcessCPUTime() time.Duration {
+	if s == nil {
+		return 0
+	}
+	return s.processCPUTime
 }
 
 func (s *QueryStats) Compilation() (c *CompilationStats) {
