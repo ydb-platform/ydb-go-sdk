@@ -226,13 +226,15 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 	}
 
 	return Description{
-		Name:           res.Self.Name,
-		PrimaryKey:     res.PrimaryKey,
-		Columns:        cs,
-		KeyRanges:      rs,
-		Stats:          stats,
-		ColumnFamilies: cf,
-		Attributes:     attrs,
+		Name:                res.Self.Name,
+		PrimaryKey:          res.PrimaryKey,
+		Columns:             cs,
+		KeyRanges:           rs,
+		Stats:               stats,
+		ColumnFamilies:      cf,
+		Attributes:          attrs,
+		ReadReplicaSettings: readReplicas(res.ReadReplicasSettings),
+		StorageSettings:     storageSettings(res.StorageSettings),
 	}, nil
 }
 

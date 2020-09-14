@@ -1,152 +1,10 @@
 package table
 
 import (
-	"time"
-
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-)
-
-type SessionStatus uint
-
-const (
-	SessionStatusUnknown SessionStatus = iota
-	SessionReady
-	SessionBusy
-)
-
-func (s SessionStatus) String() string {
-	switch s {
-	case SessionReady:
-		return "ready"
-	case SessionBusy:
-		return "busy"
-	default:
-		return "unknown"
-	}
-}
-
-type SessionInfo struct {
-	Status SessionStatus
-}
-
-type Column struct {
-	Name   string
-	Type   ydb.Type
-	Family string
-}
-
-func (c Column) toYDB() *Ydb_Table.ColumnMeta {
-	return &Ydb_Table.ColumnMeta{
-		Name:   c.Name,
-		Type:   internal.TypeToYDB(c.Type),
-		Family: c.Family,
-	}
-}
-
-type Description struct {
-	Name           string
-	Columns        []Column
-	PrimaryKey     []string
-	KeyRanges      []KeyRange
-	Stats          *TableStats
-	ColumnFamilies []ColumnFamily
-	Attributes     map[string]string
-}
-
-type TableStats struct {
-	PartitionStats   []PartitionStats
-	RowsEstimate     uint64
-	StoreSize        uint64
-	Partitions       uint64
-	CreationTime     time.Time
-	ModificationTime time.Time
-}
-
-type PartitionStats struct {
-	RowsEstimate uint64
-	StoreSize    uint64
-}
-
-type ColumnFamily struct {
-	Name         string
-	Data         StoragePool
-	Compression  ColumnFamilyCompression
-	KeepInMemory ydb.FeatureFlag
-}
-
-func (c ColumnFamily) toYDB() *Ydb_Table.ColumnFamily {
-	return &Ydb_Table.ColumnFamily{
-		Name: c.Name,
-		Data: &Ydb_Table.StoragePool{
-			Media: c.Data.Media,
-		},
-		Compression:  c.Compression.toYDB(),
-		KeepInMemory: c.KeepInMemory.ToYDB(),
-	}
-}
-
-func columnFamily(c *Ydb_Table.ColumnFamily) ColumnFamily {
-	return ColumnFamily{
-		Name: c.Name,
-		Data: StoragePool{
-			Media: c.GetData().GetMedia(),
-		},
-		Compression:  columnFamilyCompression(c.Compression),
-		KeepInMemory: internal.FeatureFlagFromYDB(c.KeepInMemory),
-	}
-}
-
-type StoragePool struct {
-	Media string
-}
-
-type ColumnFamilyCompression uint
-
-const (
-	ColumnFamilyCompressionUnknown ColumnFamilyCompression = iota
-	ColumnFamilyCompressionNone
-	ColumnFamilyCompressionLZ4
-)
-
-func (c ColumnFamilyCompression) String() string {
-	switch c {
-	case ColumnFamilyCompressionNone:
-		return "none"
-	case ColumnFamilyCompressionLZ4:
-		return "lz4"
-	default:
-		return "unknown"
-	}
-}
-
-func (c ColumnFamilyCompression) toYDB() Ydb_Table.ColumnFamily_Compression {
-	switch c {
-	case ColumnFamilyCompressionNone:
-		return Ydb_Table.ColumnFamily_COMPRESSION_NONE
-	case ColumnFamilyCompressionLZ4:
-		return Ydb_Table.ColumnFamily_COMPRESSION_LZ4
-	default:
-		return Ydb_Table.ColumnFamily_COMPRESSION_UNSPECIFIED
-	}
-}
-
-func columnFamilyCompression(c Ydb_Table.ColumnFamily_Compression) ColumnFamilyCompression {
-	switch c {
-	case Ydb_Table.ColumnFamily_COMPRESSION_NONE:
-		return ColumnFamilyCompressionNone
-	case Ydb_Table.ColumnFamily_COMPRESSION_LZ4:
-		return ColumnFamilyCompressionLZ4
-	default:
-		return ColumnFamilyCompressionUnknown
-	}
-}
-
-type (
-	describeTableDesc   Ydb_Table.DescribeTableRequest
-	DescribeTableOption func(d *describeTableDesc)
 )
 
 func WithShardKeyBounds() DescribeTableOption {
@@ -248,19 +106,15 @@ func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
 	}
 }
 
-type IndexType interface {
-	setup(*indexDesc)
+func WithReadReplicasSettings(rr ReadReplicasSettings) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.ReadReplicasSettings = rr.toYDB()
+	}
 }
 
-type globalIndex struct{}
-
-func GlobalIndex() IndexType {
-	return globalIndex{}
-}
-
-func (globalIndex) setup(d *indexDesc) {
-	d.Type = &Ydb_Table.TableIndex_GlobalIndex{
-		GlobalIndex: new(Ydb_Table.GlobalIndex),
+func WithStorageSettings(ss StorageSettings) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.StorageSettings = ss.toYDB()
 	}
 }
 
@@ -297,6 +151,7 @@ func WithStoragePolicy(opts ...StoragePolicyOption) ProfileOption {
 		}
 	}
 }
+
 func WithCompactionPolicy(opts ...CompactionPolicyOption) ProfileOption {
 	return func(p *profile) {
 		if p.CompactionPolicy == nil {
@@ -307,6 +162,7 @@ func WithCompactionPolicy(opts ...CompactionPolicyOption) ProfileOption {
 		}
 	}
 }
+
 func WithPartitioningPolicy(opts ...PartitioningPolicyOption) ProfileOption {
 	return func(p *profile) {
 		if p.PartitioningPolicy == nil {
@@ -317,6 +173,7 @@ func WithPartitioningPolicy(opts ...PartitioningPolicyOption) ProfileOption {
 		}
 	}
 }
+
 func WithExecutionPolicy(opts ...ExecutionPolicyOption) ProfileOption {
 	return func(p *profile) {
 		if p.ExecutionPolicy == nil {
@@ -327,6 +184,7 @@ func WithExecutionPolicy(opts ...ExecutionPolicyOption) ProfileOption {
 		}
 	}
 }
+
 func WithReplicationPolicy(opts ...ReplicationPolicyOption) ProfileOption {
 	return func(p *profile) {
 		if p.ReplicationPolicy == nil {
@@ -337,6 +195,7 @@ func WithReplicationPolicy(opts ...ReplicationPolicyOption) ProfileOption {
 		}
 	}
 }
+
 func WithCachingPolicy(opts ...CachingPolicyOption) ProfileOption {
 	return func(p *profile) {
 		if p.CachingPolicy == nil {
@@ -391,28 +250,6 @@ func WithStoragePolicyKeepInMemory(flag ydb.FeatureFlag) StoragePolicyOption {
 func WithCompactionPolicyPreset(name string) CompactionPolicyOption {
 	return func(c *compactionPolicy) { c.PresetName = name }
 }
-
-type PartitioningMode uint
-
-func (p PartitioningMode) toYDB() Ydb_Table.PartitioningPolicy_AutoPartitioningPolicy {
-	switch p {
-	case PartitioningDisabled:
-		return Ydb_Table.PartitioningPolicy_DISABLED
-	case PartitioningAutoSplit:
-		return Ydb_Table.PartitioningPolicy_AUTO_SPLIT
-	case PartitioningAutoSplitMerge:
-		return Ydb_Table.PartitioningPolicy_AUTO_SPLIT_MERGE
-	default:
-		panic("ydb: unknown partitioning mode")
-	}
-}
-
-const (
-	PartitioningUnknown PartitioningMode = iota
-	PartitioningDisabled
-	PartitioningAutoSplit
-	PartitioningAutoSplitMerge
-)
 
 func WithPartitioningPolicyPreset(name string) PartitioningPolicyOption {
 	return func(p *partitioningPolicy) {
@@ -578,6 +415,18 @@ func WithAlterColumnFamilies(cf ...ColumnFamily) AlterTableOption {
 	}
 }
 
+func WithAlterReadReplicasSettings(rr ReadReplicasSettings) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.SetReadReplicasSettings = rr.toYDB()
+	}
+}
+
+func WithAlterStorageSettings(ss StorageSettings) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.AlterStorageSettings = ss.toYDB()
+	}
+}
+
 func WithAlterPartitioningSettings(opts ...PartitioningSettingsOption) AlterTableOption {
 	return func(d *alterTableDesc) {
 		if d.AlterPartitioningSettings == nil {
@@ -594,6 +443,51 @@ type (
 	CopyTableOption func(*copyTableDesc)
 )
 
+type (
+	executeSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
+	ExecuteSchemeQueryOption func(*executeSchemeQueryDesc)
+)
+
+type (
+	executeDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
+	ExecuteDataQueryOption func(*executeDataQueryDesc)
+)
+
+type (
+	queryCachePolicy       Ydb_Table.QueryCachePolicy
+	QueryCachePolicyOption func(*queryCachePolicy)
+)
+
+func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
+	return func(p *queryCachePolicy) {
+		p.KeepInCache = true
+	}
+}
+
+func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
+	return func(d *executeDataQueryDesc) {
+		if d.QueryCachePolicy == nil {
+			d.QueryCachePolicy = new(Ydb_Table.QueryCachePolicy)
+		}
+		for _, opt := range opts {
+			opt((*queryCachePolicy)(d.QueryCachePolicy))
+		}
+	}
+}
+
+func WithCollectStatsModeNone() ExecuteDataQueryOption {
+	return func(d *executeDataQueryDesc) {
+		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+	}
+}
+
+func WithCollectStatsModeBasic() ExecuteDataQueryOption {
+	return func(d *executeDataQueryDesc) {
+		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
+	}
+}
+
+// Transaction control options
 type (
 	txDesc   Ydb_Table.TransactionSettings
 	TxOption func(*txDesc)
@@ -701,126 +595,18 @@ func TxControl(opts ...TxControlOption) *TransactionControl {
 	return c
 }
 
-type TableOptionsDescription struct {
-	TableProfilePresets       []TableProfileDescription
-	StoragePolicyPresets      []StoragePolicyDescription
-	CompactionPolicyPresets   []CompactionPolicyDescription
-	PartitioningPolicyPresets []PartitioningPolicyDescription
-	ExecutionPolicyPresets    []ExecutionPolicyDescription
-	ReplicationPolicyPresets  []ReplicationPolicyDescription
-	CachingPolicyPresets      []CachingPolicyDescription
-}
-
-type (
-	TableProfileDescription struct {
-		Name   string
-		Labels map[string]string
-
-		DefaultStoragePolicy      string
-		DefaultCompactionPolicy   string
-		DefaultPartitioningPolicy string
-		DefaultExecutionPolicy    string
-		DefaultReplicationPolicy  string
-		DefaultCachingPolicy      string
-
-		AllowedStoragePolicies      []string
-		AllowedCompactionPolicies   []string
-		AllowedPartitioningPolicies []string
-		AllowedExecutionPolicies    []string
-		AllowedReplicationPolicies  []string
-		AllowedCachingPolicies      []string
-	}
-	StoragePolicyDescription struct {
-		Name   string
-		Labels map[string]string
-	}
-	CompactionPolicyDescription struct {
-		Name   string
-		Labels map[string]string
-	}
-	PartitioningPolicyDescription struct {
-		Name   string
-		Labels map[string]string
-	}
-	ExecutionPolicyDescription struct {
-		Name   string
-		Labels map[string]string
-	}
-	ReplicationPolicyDescription struct {
-		Name   string
-		Labels map[string]string
-	}
-	CachingPolicyDescription struct {
-		Name   string
-		Labels map[string]string
-	}
-)
-
-type (
-	executeDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
-	ExecuteDataQueryOption func(*executeDataQueryDesc)
-)
-
-type (
-	queryCachePolicy       Ydb_Table.QueryCachePolicy
-	QueryCachePolicyOption func(*queryCachePolicy)
-)
-
-func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
-	return func(p *queryCachePolicy) {
-		p.KeepInCache = true
-	}
-}
-
-func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
-	return func(d *executeDataQueryDesc) {
-		if d.QueryCachePolicy == nil {
-			d.QueryCachePolicy = new(Ydb_Table.QueryCachePolicy)
-		}
-		for _, opt := range opts {
-			opt((*queryCachePolicy)(d.QueryCachePolicy))
-		}
-	}
-}
-
-func WithCollectStatsModeNone() ExecuteDataQueryOption {
-	return func(d *executeDataQueryDesc) {
-		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
-	}
-}
-
-func WithCollectStatsModeBasic() ExecuteDataQueryOption {
-	return func(d *executeDataQueryDesc) {
-		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
-	}
-}
-
-type (
-	executeSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
-	ExecuteSchemeQueryOption func(*executeSchemeQueryDesc)
-)
-
+// Read table options
 type (
 	readTableDesc   Ydb_Table.ReadTableRequest
 	ReadTableOption func(*readTableDesc)
 )
-
-type KeyRange struct {
-	From ydb.Value
-	To   ydb.Value
-}
-
-func (d *readTableDesc) initKeyRange() {
-	if d.KeyRange == nil {
-		d.KeyRange = new(Ydb_Table.KeyRange)
-	}
-}
 
 func ReadColumn(name string) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.Columns = append(desc.Columns, name)
 	}
 }
+
 func ReadOrdered() ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.Ordered = true
@@ -833,16 +619,11 @@ func ReadOrdered() ReadTableOption {
 // Both x.From and x.To may be nil.
 func ReadKeyRange(x KeyRange) ReadTableOption {
 	return func(desc *readTableDesc) {
-		desc.initKeyRange()
 		if x.From != nil {
-			desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
-				GreaterOrEqual: internal.ValueToYDB(x.From),
-			}
+			ReadGreaterOrEqual(x.From)(desc)
 		}
 		if x.To != nil {
-			desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
-				Less: internal.ValueToYDB(x.To),
-			}
+			ReadLess(x.To)(desc)
 		}
 	}
 }
@@ -855,6 +636,7 @@ func ReadGreater(x ydb.Value) ReadTableOption {
 		}
 	}
 }
+
 func ReadGreaterOrEqual(x ydb.Value) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.initKeyRange()
@@ -863,6 +645,7 @@ func ReadGreaterOrEqual(x ydb.Value) ReadTableOption {
 		}
 	}
 }
+
 func ReadLess(x ydb.Value) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.initKeyRange()
@@ -871,6 +654,7 @@ func ReadLess(x ydb.Value) ReadTableOption {
 		}
 	}
 }
+
 func ReadLessOrEqual(x ydb.Value) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.initKeyRange()
@@ -882,5 +666,11 @@ func ReadLessOrEqual(x ydb.Value) ReadTableOption {
 func ReadRowLimit(n uint64) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.RowLimit = n
+	}
+}
+
+func (d *readTableDesc) initKeyRange() {
+	if d.KeyRange == nil {
+		d.KeyRange = new(Ydb_Table.KeyRange)
 	}
 }

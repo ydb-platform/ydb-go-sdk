@@ -191,6 +191,16 @@ func TestSessionDescribeTable(t *testing.T) {
 				},
 			},
 			Attributes: map[string]string{},
+			ReadReplicaSettings: ReadReplicasSettings{
+				Type:  ReadReplicasAnyAzReadReplicas,
+				Count: 42,
+			},
+			StorageSettings: StorageSettings{
+				TableCommitLog0:    StoragePool{Media: "m1"},
+				TableCommitLog1:    StoragePool{Media: "m2"},
+				External:           StoragePool{Media: "m3"},
+				StoreExternalBlobs: ydb.FeatureEnabled,
+			},
 		}
 		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{
@@ -221,6 +231,8 @@ func TestSessionDescribeTable(t *testing.T) {
 					KeepInMemory: Ydb.FeatureFlag_ENABLED,
 				},
 			},
+			ReadReplicasSettings: expect.ReadReplicaSettings.toYDB(),
+			StorageSettings:      expect.StorageSettings.toYDB(),
 		}
 
 		d, err := s.DescribeTable(ctx, "")

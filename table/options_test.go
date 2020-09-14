@@ -196,4 +196,32 @@ func TestAlterTableOptions(t *testing.T) {
 			t.Errorf("Alter table options is not as expected")
 		}
 	}
+	{
+		rr := ReadReplicasSettings{
+			Type:  ReadReplicasAnyAzReadReplicas,
+			Count: 42,
+		}
+		opt := WithAlterReadReplicasSettings(rr)
+		req := Ydb_Table.AlterTableRequest{}
+		opt((*alterTableDesc)(&req))
+		rrOut := readReplicas(req.SetReadReplicasSettings)
+		if rr != rrOut {
+			t.Errorf("Alter table set read replicas options is not as expected")
+		}
+	}
+	{
+		ss := StorageSettings{
+			TableCommitLog0:    StoragePool{Media: "m1"},
+			TableCommitLog1:    StoragePool{Media: "m2"},
+			External:           StoragePool{Media: "m3"},
+			StoreExternalBlobs: internal.FeatureEnabled,
+		}
+		opt := WithAlterStorageSettings(ss)
+		req := Ydb_Table.AlterTableRequest{}
+		opt((*alterTableDesc)(&req))
+		rrOut := storageSettings(req.AlterStorageSettings)
+		if ss != rrOut {
+			t.Errorf("Alter table storage settings options is not as expected")
+		}
+	}
 }

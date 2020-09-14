@@ -1,5 +1,7 @@
 ##2020.09.1
 * added `ProcessCPUTime` method to `QueryStats`
+* added `ReadReplicasSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`
+* added `StorageSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`
 
 ##2020.08.2
 * added `PartitioningSettings` support for `CreateTable` and `AlterTable`
@@ -8,7 +10,7 @@
 * added `CPUTime` and `AffectedShards` fields to `QueryPhase` struct
 * added `CompilationStats` statistics
 
-##2020.07.7 
+##2020.07.7
 * support manage table attributes
 
 ##2020.07.6
