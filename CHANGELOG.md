@@ -1,3 +1,6 @@
+##2020.09.2
+* parallelize endpoint operations
+
 ##2020.09.1
 * added `ProcessCPUTime` method to `QueryStats`
 * added `ReadReplicasSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`

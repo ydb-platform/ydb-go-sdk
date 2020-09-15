@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -119,9 +120,12 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		}
 		// Endpoints must be sorted to merge
 		sortEndpoints(curr)
+		wg := new(sync.WaitGroup)
+		wg.Add(len(curr))
 		for _, e := range curr {
-			cluster.Insert(ctx, e)
+			go cluster.Insert(ctx, e, wg)
 		}
+		wg.Wait()
 		cluster.explorer = NewRepeater(d.config.DiscoveryInterval, 0,
 			func(ctx context.Context) {
 				next, err := d.discover(ctx, addr)
@@ -130,19 +134,29 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 				}
 				// NOTE: curr endpoints must be sorted here.
 				sortEndpoints(next)
+
+				wg := new(sync.WaitGroup)
+				max := len(next) + len(curr)
+				wg.Add(max) // set to max possible amount
+				actual := 0
 				diffEndpoints(curr, next,
 					func(i, j int) {
+						actual++
 						// Endpoints are equal, but we still need to update meta
 						// data such that load factor and others.
-						cluster.Update(ctx, next[j])
+						go cluster.Update(ctx, next[j], wg)
 					},
 					func(i, j int) {
-						cluster.Insert(ctx, next[j])
+						actual++
+						go cluster.Insert(ctx, next[j], wg)
 					},
 					func(i, j int) {
-						cluster.Remove(ctx, curr[i])
+						actual++
+						go cluster.Remove(ctx, curr[i], wg)
 					},
 				)
+				wg.Add(actual - max) // adjust
+				wg.Wait()
 				curr = next
 			})
 	} else {

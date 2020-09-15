@@ -223,7 +223,11 @@ func isReady(conn *conn) bool {
 }
 
 // Insert inserts new connection into the cluster.
-func (c *cluster) Insert(ctx context.Context, e Endpoint) {
+func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...*sync.WaitGroup) {
+	if len(wg) > 0 {
+		defer wg[0].Done()
+	}
+
 	c.init()
 
 	addr := connAddr{e.Addr, e.Port}
@@ -276,7 +280,11 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint) {
 
 // Update updates existing connection's runtime stats such that load factor and
 // others.
-func (c *cluster) Update(ctx context.Context, ep Endpoint) {
+func (c *cluster) Update(ctx context.Context, ep Endpoint, wg ...*sync.WaitGroup) {
+	if len(wg) > 0 {
+		defer wg[0].Done()
+	}
+
 	addr := connAddr{ep.Addr, ep.Port}
 	info := connInfo{
 		loadFactor: ep.LoadFactor,
@@ -303,7 +311,11 @@ func (c *cluster) Update(ctx context.Context, ep Endpoint) {
 }
 
 // Remove removes and closes previously inserted connection.
-func (c *cluster) Remove(_ context.Context, e Endpoint) {
+func (c *cluster) Remove(_ context.Context, e Endpoint, wg ...*sync.WaitGroup) {
+	if len(wg) > 0 {
+		defer wg[0].Done()
+	}
+
 	addr := connAddr{e.Addr, e.Port}
 
 	c.mu.Lock()
