@@ -183,7 +183,7 @@ func (rr ReadReplicasSettings) toYDB() *Ydb_Table.ReadReplicasSettings {
 	}
 }
 
-func readReplicas(rr *Ydb_Table.ReadReplicasSettings) ReadReplicasSettings {
+func readReplicasSettings(rr *Ydb_Table.ReadReplicasSettings) ReadReplicasSettings {
 	t, c := ReadReplicasPerAzReadReplicas, uint64(0)
 
 	if c = rr.GetPerAzReadReplicasCount(); c != 0 {
@@ -223,10 +223,10 @@ func (ss StorageSettings) toYDB() *Ydb_Table.StorageSettings {
 
 func storageSettings(ss *Ydb_Table.StorageSettings) StorageSettings {
 	return StorageSettings{
-		TableCommitLog0:    storagePool(ss.TabletCommitLog0),
-		TableCommitLog1:    storagePool(ss.TabletCommitLog1),
-		External:           storagePool(ss.External),
-		StoreExternalBlobs: internal.FeatureFlagFromYDB(ss.StoreExternalBlobs),
+		TableCommitLog0:    storagePool(ss.GetTabletCommitLog0()),
+		TableCommitLog1:    storagePool(ss.GetTabletCommitLog1()),
+		External:           storagePool(ss.GetExternal()),
+		StoreExternalBlobs: internal.FeatureFlagFromYDB(ss.GetStoreExternalBlobs()),
 	}
 }
 

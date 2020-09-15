@@ -233,8 +233,8 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		Stats:               stats,
 		ColumnFamilies:      cf,
 		Attributes:          attrs,
-		ReadReplicaSettings: readReplicas(res.ReadReplicasSettings),
-		StorageSettings:     storageSettings(res.StorageSettings),
+		ReadReplicaSettings: readReplicasSettings(res.GetReadReplicasSettings()),
+		StorageSettings:     storageSettings(res.GetStorageSettings()),
 	}, nil
 }
 

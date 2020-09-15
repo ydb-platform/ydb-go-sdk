@@ -204,7 +204,7 @@ func TestAlterTableOptions(t *testing.T) {
 		opt := WithAlterReadReplicasSettings(rr)
 		req := Ydb_Table.AlterTableRequest{}
 		opt((*alterTableDesc)(&req))
-		rrOut := readReplicas(req.SetReadReplicasSettings)
+		rrOut := readReplicasSettings(req.GetSetReadReplicasSettings())
 		if rr != rrOut {
 			t.Errorf("Alter table set read replicas options is not as expected")
 		}
@@ -219,7 +219,7 @@ func TestAlterTableOptions(t *testing.T) {
 		opt := WithAlterStorageSettings(ss)
 		req := Ydb_Table.AlterTableRequest{}
 		opt((*alterTableDesc)(&req))
-		rrOut := storageSettings(req.AlterStorageSettings)
+		rrOut := storageSettings(req.GetAlterStorageSettings())
 		if ss != rrOut {
 			t.Errorf("Alter table storage settings options is not as expected")
 		}
