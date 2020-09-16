@@ -1,4 +1,4 @@
-package ydb_test
+package ydbtest_test
 
 import (
 	"context"
