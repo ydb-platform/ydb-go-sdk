@@ -1,0 +1,52 @@
+syntax = "proto3";
+option cc_enable_arenas = true;
+
+package Ydb.YqlInternal;
+
+option java_package = "com.yandex.ydb.yql_internal";
+option java_outer_classname = "YqlInternalProtos";
+
+import "kikimr/public/api/protos/ydb_common.proto";
+import "kikimr/public/api/protos/ydb_operation.proto";
+import "kikimr/public/api/protos/ydb_table.proto";
+import "kikimr/public/api/protos/ydb_value.proto";
+
+message ExecQuerySettings {
+    Ydb.FeatureFlag.Status strict_dml = 1;
+    Ydb.FeatureFlag.Status use_new_engine = 2;
+    bool get_query_plan = 3;
+}
+
+message ExecDataQueryAstRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string cluster_name = 2;
+    string query_ast = 3;
+    map<string, TypedValue> parameters = 4;
+    Ydb.Table.TransactionSettings tx_settings = 5;
+    ExecQuerySettings settings = 6;
+}
+
+message ExecDataQueryAstResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
+message ExecDataQueryAstResult {
+    repeated Ydb.ResultSet result_sets = 1;
+    string query_ast = 2;
+    string query_plan = 3;
+}
+
+message ExplainDataQueryAstRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string cluster_name = 2;
+    string query_ast = 3;
+}
+
+message ExplainDataQueryAstResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
+message ExplainDataQueryAstResult {
+    string query_ast = 2;
+    string query_plan = 3;
+}

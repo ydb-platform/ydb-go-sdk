@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package Ydb.Scripting.V1;
+option java_package = "com.yandex.ydb.scripting.v1";
+
+import "kikimr/public/api/protos/ydb_scripting.proto";
+
+service ScriptingService {
+    rpc ExecuteYql(Scripting.ExecuteYqlRequest) returns (Scripting.ExecuteYqlResponse);
+}

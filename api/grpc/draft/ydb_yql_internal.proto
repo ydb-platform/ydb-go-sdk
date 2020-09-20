@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package Ydb.YqlInternal.V0;
+
+option java_package = "com.yandex.ydb.yql_internal.v1";
+import "kikimr/public/api/protos/ydb_yql_internal.proto";
+
+service YqlInternalService {
+    rpc ExecDataQueryAst(YqlInternal.ExecDataQueryAstRequest) returns (YqlInternal.ExecDataQueryAstResponse);
+    rpc ExplainDataQueryAst(YqlInternal.ExplainDataQueryAstRequest) returns (YqlInternal.ExplainDataQueryAstResponse);
+}

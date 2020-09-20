@@ -1,0 +1,82 @@
+syntax = "proto3";
+option cc_enable_arenas = true;
+
+package Ydb.Experimental;
+option java_package = "com.yandex.ydb.experimental";
+option java_outer_classname = "ExperimentalProtos";
+
+import "kikimr/public/api/protos/ydb_issue_message.proto";
+import "kikimr/public/api/protos/ydb_operation.proto";
+import "kikimr/public/api/protos/ydb_status_codes.proto";
+import "kikimr/public/api/protos/ydb_value.proto";
+
+message UploadRowsRequest {
+    string table = 1;
+    TypedValue rows = 2;  // Must be List of Structs
+    Ydb.Operations.OperationParams operation_params = 3;
+}
+
+message UploadRowsResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
+message UploadRowsResult {
+    // TODO: ?
+}
+
+////////////////////////////////////////////////////////////
+
+message ExecuteStreamQueryRequest {
+    string yql_text = 1;
+    map<string, TypedValue> parameters = 2;
+
+    enum ProfileMode {
+        PROFILE_MODE_UNSPECIFIED = 0;
+        NONE = 1;
+        BASIC = 2;
+        FULL = 3;
+    }
+
+    ProfileMode profile_mode = 3;
+    bool explain = 4;
+}
+
+message ExecuteStreamQueryResponse {
+    StatusIds.StatusCode status = 1;
+    repeated Ydb.Issue.IssueMessage issues = 2;
+    ExecuteStreamQueryResult result = 3;
+}
+
+message StreamQueryProgress {
+}
+
+message ExecuteStreamQueryResult {
+    oneof result {
+        Ydb.ResultSet result_set = 1;
+        string profile = 2;
+        StreamQueryProgress progress = 3;
+        string query_plan = 4;
+    }
+}
+
+////////////////////////////////////////////////////////////
+
+message GetDiskSpaceUsageRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string database = 2;
+}
+
+message GetDiskSpaceUsageResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
+message GetDiskSpaceUsageResult {
+    string cloud_id = 1;
+    string folder_id = 2;
+    string database_id = 3;
+
+    // in bytes
+    uint64 total_size = 4;
+    uint64 data_size = 5;
+    uint64 index_size = 6;
+}

@@ -1,0 +1,23 @@
+package Ydb.Issue;
+option java_package = "com.yandex.ydb";
+
+// IssueMessage is a transport format for yql/public/issue library
+message IssueMessage {
+    message Position {
+        optional uint32 row = 1;
+        optional uint32 column = 2;
+        optional string file = 3;
+    }
+
+    optional Position position = 1;
+    optional string message = 2;
+    optional Position end_position = 3;
+    optional uint32 issue_code = 4;
+    // Severity values from yql/public/issue/protos/issue_severity.proto
+    // FATAL = 0;
+    // ERROR = 1;
+    // WARNING = 2;
+    // INFO = 3;
+    optional uint32 severity = 5;
+    repeated IssueMessage issues = 6;
+}
