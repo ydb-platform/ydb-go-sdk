@@ -11,31 +11,39 @@ type WG interface {
 	Add(delta int)
 }
 
-var _ WG = &sync.WaitGroup{}
-
-type wgImpl struct {
-	wg        *sync.WaitGroup
-	once      *sync.Once
+// Must be used only be reference
+type wg struct {
+	wg        sync.WaitGroup
+	once      sync.Once
 	firstDone chan struct{}
 }
 
-func (w wgImpl) Done() {
+var _ WG = &sync.WaitGroup{}
+var _ WG = &wg{}
+
+func (w *wg) Done() {
 	w.once.Do(w.first)
 	w.wg.Done()
 }
 
-func (w wgImpl) first() {
+func (w *wg) first() {
 	close(w.firstDone)
 }
 
-func (w wgImpl) Wait() {
+func (w *wg) Wait() {
 	w.wg.Wait()
 }
 
-func (w wgImpl) Add(delta int) {
+func (w *wg) Add(delta int) {
 	w.wg.Add(delta)
 }
 
-func (w wgImpl) WaitFirst() {
+func (w *wg) WaitFirst() {
 	<-w.firstDone
+}
+
+func newWG() *wg {
+	w := new(wg)
+	w.firstDone = make(chan struct{})
+	return w
 }

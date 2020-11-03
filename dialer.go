@@ -120,18 +120,13 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		}
 		// Endpoints must be sorted to merge
 		sortEndpoints(curr)
-		wg := &wgImpl{
-			wg:        new(sync.WaitGroup),
-			once:      new(sync.Once),
-			firstDone: make(chan struct{}),
-		}
+		wg := newWG()
 		wg.Add(len(curr))
 		for _, e := range curr {
 			go cluster.Insert(ctx, e, wg)
 		}
 		if d.config.FastDial {
 			wg.WaitFirst()
-			go wg.Wait()
 		} else {
 			wg.Wait()
 		}
