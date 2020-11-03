@@ -14,7 +14,7 @@ import "kikimr/public/api/protos/ydb_value.proto";
 message ExecQuerySettings {
     Ydb.FeatureFlag.Status strict_dml = 1;
     Ydb.FeatureFlag.Status use_new_engine = 2;
-    bool get_query_plan = 3;
+    reserved 3; // bool get_query_plan
 }
 
 message ExecDataQueryAstRequest {

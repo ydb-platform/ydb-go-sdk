@@ -38,4 +38,5 @@ message QueryStats {
     repeated QueryPhaseStats query_phases = 1;
     CompilationStats compilation = 2;
     uint64 process_cpu_time_us = 3;
+    string query_plan = 4;
 }

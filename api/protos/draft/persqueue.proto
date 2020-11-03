@@ -81,6 +81,7 @@ message WriteRequest {
         bytes data = 2;
         uint64 create_time_ms = 3; //timestamp in ms
         ECodec codec = 4;
+        uint32 uncompressed_size = 5;
     }
 
     message DataBatch {
@@ -243,6 +244,7 @@ message MessageMeta {
     MapType extra_fields = 7;
     ECodec codec = 8;
     string ip = 9;
+    uint32 uncompressed_size = 10;
 }
 
 /**
@@ -287,6 +289,7 @@ message ReadResponse {
             uint64 seq_no = 4;
 
             uint64 create_time_ms = 5;
+            uint64 uncompressed_size = 6;
 
             bytes data = 1;
         }

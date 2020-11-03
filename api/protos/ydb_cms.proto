@@ -58,6 +58,8 @@ message DatabaseOptions {
     bool disable_tx_service = 1;
     // Old-style database, do not create external schemeshard for database
     bool disable_external_subdomain = 2;
+    // Transaction plan resolution in milliseconds
+    uint32 plan_resolution = 3;
 }
 
 message Attribute {
