@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 )
@@ -698,5 +699,82 @@ func OptionalValue(v V) Value {
 	return Value{
 		t: OptionalType{T: x.t},
 		v: val,
+	}
+}
+
+// returns -1, 0, 1 if l < r, l ==r, l > r. Returns error if types are not comparable.
+// Current implementation is simplified.
+// Values are comparable only if they have the same type.
+// Only some primitive types are comparable,
+// namely Int* and Uint*,  UTF8 and String.
+func Compare(l, r Value) (int, error) {
+	lt, ok := l.t.(PrimitiveType)
+	if !ok {
+		return 0, fmt.Errorf("left operand is not of PrimitiveType: %s", lt.String())
+	}
+	lv := l.v.Value
+	rt, ok := l.t.(PrimitiveType)
+	if !ok {
+		return 0, fmt.Errorf("right operand is not of PrimitiveType: %s", rt.String())
+	}
+	rv := r.v.Value
+	if rt != lt {
+		return 0, fmt.Errorf("operands have different types %s and %s", lt.String(), rt.String())
+	}
+	switch lt {
+	case TypeUint8, TypeUint16, TypeUint32:
+		ll := lv.(*Ydb.Value_Uint32Value).Uint32Value
+		rr := rv.(*Ydb.Value_Uint32Value).Uint32Value
+		switch {
+		case ll < rr:
+			return -1, nil
+		case ll > rr:
+			return 1, nil
+		default:
+			return 0, nil
+		}
+	case TypeInt8, TypeInt16, TypeInt32:
+		ll := lv.(*Ydb.Value_Int32Value).Int32Value
+		rr := rv.(*Ydb.Value_Int32Value).Int32Value
+		switch {
+		case ll < rr:
+			return -1, nil
+		case ll > rr:
+			return 1, nil
+		default:
+			return 0, nil
+		}
+	case TypeUint64:
+		ll := lv.(*Ydb.Value_Uint64Value).Uint64Value
+		rr := rv.(*Ydb.Value_Uint64Value).Uint64Value
+		switch {
+		case ll < rr:
+			return -1, nil
+		case ll > rr:
+			return 1, nil
+		default:
+			return 0, nil
+		}
+	case TypeInt64:
+		ll := lv.(*Ydb.Value_Int64Value).Int64Value
+		rr := rv.(*Ydb.Value_Int64Value).Int64Value
+		switch {
+		case ll < rr:
+			return -1, nil
+		case ll > rr:
+			return 1, nil
+		default:
+			return 0, nil
+		}
+	case TypeUTF8:
+		ll := lv.(*Ydb.Value_TextValue).TextValue
+		rr := rv.(*Ydb.Value_TextValue).TextValue
+		return strings.Compare(ll, rr), nil
+	case TypeString:
+		ll := lv.(*Ydb.Value_BytesValue).BytesValue
+		rr := rv.(*Ydb.Value_BytesValue).BytesValue
+		return bytes.Compare(ll, rr), nil
+	default:
+		return 0, fmt.Errorf("unsupported type %s", lt.String())
 	}
 }

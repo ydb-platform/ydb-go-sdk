@@ -1,3 +1,6 @@
+##2020.10.4
+* Function to compare two ydb.Value
+
 ##2020.10.3
 * Support scan query execution
 

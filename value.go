@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"errors"
 )
 
 type Value interface {
@@ -83,4 +84,21 @@ func DictValue(pairs ...Value) Value {
 
 func VariantValue(v Value, i uint32, variantT Type) Value {
 	return internal.VariantValue(v, i, variantT)
+}
+
+// returns -1, 0, 1 if l < r, l ==r, l > r. Returns error if types are not comparable.
+// Current implementation is simplified.
+// Values are comparable only if they have the same type.
+// Only some primitive types are comparable,
+// namely Int* and Uint*,  UTF8 and String.
+func Compare(l, r Value) (int, error) {
+	lv, ok := l.(internal.Value)
+	if !ok {
+		return 0, errors.New("unsupported implementation of Value")
+	}
+	rv, ok := r.(internal.Value)
+	if !ok {
+		return 0, errors.New("unsupported implementation of Value")
+	}
+	return internal.Compare(lv, rv)
 }
