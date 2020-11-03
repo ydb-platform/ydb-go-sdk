@@ -1,3 +1,7 @@
+##2020.09.3
+* Add `FastDial` option to `DriverConfig`.
+  This will allow `Dialer` to return `Driver` as soon as the 1st connection is ready.
+
 ##2020.09.2
 * parallelize endpoint operations
 

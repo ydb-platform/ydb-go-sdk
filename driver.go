@@ -153,6 +153,10 @@ type DriverConfig struct {
 	// RequestsType set an additional type hint to all requests.
 	// It is needed only for debug purposes and advanced cases.
 	RequestsType string
+
+	// FastDial will make dialer return Driver as soon as 1st connection succeeds.
+	// NB: it may be not the fastest node to serve requests.
+	FastDial bool
 }
 
 func (d *DriverConfig) withDefaults() (c DriverConfig) {

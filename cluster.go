@@ -223,7 +223,7 @@ func isReady(conn *conn) bool {
 }
 
 // Insert inserts new connection into the cluster.
-func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...*sync.WaitGroup) {
+func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...WG) {
 	if len(wg) > 0 {
 		defer wg[0].Done()
 	}
@@ -280,7 +280,7 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...*sync.WaitGroup)
 
 // Update updates existing connection's runtime stats such that load factor and
 // others.
-func (c *cluster) Update(ctx context.Context, ep Endpoint, wg ...*sync.WaitGroup) {
+func (c *cluster) Update(ctx context.Context, ep Endpoint, wg ...WG) {
 	if len(wg) > 0 {
 		defer wg[0].Done()
 	}
@@ -311,7 +311,7 @@ func (c *cluster) Update(ctx context.Context, ep Endpoint, wg ...*sync.WaitGroup
 }
 
 // Remove removes and closes previously inserted connection.
-func (c *cluster) Remove(_ context.Context, e Endpoint, wg ...*sync.WaitGroup) {
+func (c *cluster) Remove(_ context.Context, e Endpoint, wg ...WG) {
 	if len(wg) > 0 {
 		defer wg[0].Done()
 	}
