@@ -1,3 +1,6 @@
+##2020.10.2
+* Add table Ttl options
+
 ##2020.10.1
 * added `KeyBloomFilter` support for `CreateTable`, `AlterTable` and `DescribeTalbe`
 * added `PartitioningSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`. Move to `PartitioningSettings` object

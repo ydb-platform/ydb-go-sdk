@@ -57,6 +57,7 @@ type Description struct {
 	StorageSettings      StorageSettings
 	KeyBloomFilter       ydb.FeatureFlag
 	PartitioningSettings PartitioningSettings
+	TTLSettings          *TTLSettings
 }
 
 type TableStats struct {
@@ -260,6 +261,23 @@ func partitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSettin
 	}
 }
 
+func ttlSettings(s *Ydb_Table.TtlSettings) *TTLSettings {
+	if s == nil {
+		return nil
+	}
+	switch mode := s.Mode.(type) {
+	// for the time being the only implementation of Mode
+	case *Ydb_Table.TtlSettings_DateTypeColumn:
+		c := mode.DateTypeColumn
+		return &TTLSettings{
+			DateTimeColumn: c.ColumnName,
+			TTLSeconds:     c.ExpireAfterSeconds,
+		}
+	default:
+		return nil
+	}
+}
+
 type IndexType interface {
 	setup(*indexDesc)
 }
@@ -356,4 +374,9 @@ type (
 type KeyRange struct {
 	From ydb.Value
 	To   ydb.Value
+}
+
+type TTLSettings struct {
+	DateTimeColumn string
+	TTLSeconds     uint32
 }

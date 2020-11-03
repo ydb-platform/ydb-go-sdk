@@ -65,6 +65,19 @@ func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
 	}
 }
 
+func WithTTL(settings TTLSettings) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.TtlSettings = &Ydb_Table.TtlSettings{
+			Mode: &Ydb_Table.TtlSettings_DateTypeColumn{
+				DateTypeColumn: &Ydb_Table.DateTypeColumnModeSettings{
+					ColumnName:         settings.DateTimeColumn,
+					ExpireAfterSeconds: settings.TTLSeconds,
+				},
+			},
+		}
+	}
+}
+
 func WithAttribute(key, value string) CreateTableOption {
 	return func(d *createTableDesc) {
 		if d.Attributes == nil {
@@ -461,6 +474,27 @@ func WithAlterPartitioningSettings(opts ...PartitioningSettingsOption) AlterTabl
 		for _, opt := range opts {
 			opt((*ydbPartitioningSettings)(d.AlterPartitioningSettings))
 		}
+	}
+}
+
+func WithSetTTL(settings TTLSettings) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
+			SetTtlSettings: &Ydb_Table.TtlSettings{
+				Mode: &Ydb_Table.TtlSettings_DateTypeColumn{
+					DateTypeColumn: &Ydb_Table.DateTypeColumnModeSettings{
+						ColumnName:         settings.DateTimeColumn,
+						ExpireAfterSeconds: settings.TTLSeconds,
+					},
+				},
+			},
+		}
+	}
+}
+
+func WithDropTTL() AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
 	}
 }
 

@@ -237,6 +237,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		StorageSettings:      storageSettings(res.GetStorageSettings()),
 		KeyBloomFilter:       internal.FeatureFlagFromYDB(res.GetKeyBloomFilter()),
 		PartitioningSettings: partitioningSettings(res.GetPartitioningSettings()),
+		TTLSettings:          ttlSettings(res.GetTtlSettings()),
 	}, nil
 }
 
