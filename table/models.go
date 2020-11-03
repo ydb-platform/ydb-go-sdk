@@ -46,15 +46,17 @@ func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 }
 
 type Description struct {
-	Name                string
-	Columns             []Column
-	PrimaryKey          []string
-	KeyRanges           []KeyRange
-	Stats               *TableStats
-	ColumnFamilies      []ColumnFamily
-	Attributes          map[string]string
-	ReadReplicaSettings ReadReplicasSettings
-	StorageSettings     StorageSettings
+	Name                 string
+	Columns              []Column
+	PrimaryKey           []string
+	KeyRanges            []KeyRange
+	Stats                *TableStats
+	ColumnFamilies       []ColumnFamily
+	Attributes           map[string]string
+	ReadReplicaSettings  ReadReplicasSettings
+	StorageSettings      StorageSettings
+	KeyBloomFilter       ydb.FeatureFlag
+	PartitioningSettings PartitioningSettings
 }
 
 type TableStats struct {
@@ -227,6 +229,34 @@ func storageSettings(ss *Ydb_Table.StorageSettings) StorageSettings {
 		TableCommitLog1:    storagePool(ss.GetTabletCommitLog1()),
 		External:           storagePool(ss.GetExternal()),
 		StoreExternalBlobs: internal.FeatureFlagFromYDB(ss.GetStoreExternalBlobs()),
+	}
+}
+
+type PartitioningSettings struct {
+	PartitioningBySize ydb.FeatureFlag
+	PartitionSizeMb    uint64
+	PartitioningByLoad ydb.FeatureFlag
+	MinPartitionsCount uint64
+	MaxPartitionsCount uint64
+}
+
+func (ps PartitioningSettings) toYDB() *Ydb_Table.PartitioningSettings {
+	return &Ydb_Table.PartitioningSettings{
+		PartitioningBySize: ps.PartitioningBySize.ToYDB(),
+		PartitionSizeMb:    ps.PartitionSizeMb,
+		PartitioningByLoad: ps.PartitioningByLoad.ToYDB(),
+		MinPartitionsCount: ps.MinPartitionsCount,
+		MaxPartitionsCount: ps.MaxPartitionsCount,
+	}
+}
+
+func partitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSettings {
+	return PartitioningSettings{
+		PartitioningBySize: internal.FeatureFlagFromYDB(ps.GetPartitioningBySize()),
+		PartitionSizeMb:    ps.GetPartitionSizeMb(),
+		PartitioningByLoad: internal.FeatureFlagFromYDB(ps.GetPartitioningByLoad()),
+		MinPartitionsCount: ps.GetMinPartitionsCount(),
+		MaxPartitionsCount: ps.GetMaxPartitionsCount(),
 	}
 }
 

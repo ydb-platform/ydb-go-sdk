@@ -1,3 +1,7 @@
+##2020.10.1
+* added `KeyBloomFilter` support for `CreateTable`, `AlterTable` and `DescribeTalbe`
+* added `PartitioningSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`. Move to `PartitioningSettings` object
+
 ##2020.09.3
 * Add `FastDial` option to `DriverConfig`.
   This will allow `Dialer` to return `Driver` as soon as the 1st connection is ready.

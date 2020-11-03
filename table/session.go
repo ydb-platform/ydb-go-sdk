@@ -226,15 +226,17 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 	}
 
 	return Description{
-		Name:                res.Self.Name,
-		PrimaryKey:          res.PrimaryKey,
-		Columns:             cs,
-		KeyRanges:           rs,
-		Stats:               stats,
-		ColumnFamilies:      cf,
-		Attributes:          attrs,
-		ReadReplicaSettings: readReplicasSettings(res.GetReadReplicasSettings()),
-		StorageSettings:     storageSettings(res.GetStorageSettings()),
+		Name:                 res.Self.Name,
+		PrimaryKey:           res.PrimaryKey,
+		Columns:              cs,
+		KeyRanges:            rs,
+		Stats:                stats,
+		ColumnFamilies:       cf,
+		Attributes:           attrs,
+		ReadReplicaSettings:  readReplicasSettings(res.GetReadReplicasSettings()),
+		StorageSettings:      storageSettings(res.GetStorageSettings()),
+		KeyBloomFilter:       internal.FeatureFlagFromYDB(res.GetKeyBloomFilter()),
+		PartitioningSettings: partitioningSettings(res.GetPartitioningSettings()),
 	}, nil
 }
 

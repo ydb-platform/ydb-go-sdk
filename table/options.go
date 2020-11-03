@@ -97,6 +97,12 @@ func WithIndexColumns(columns ...string) IndexOption {
 	}
 }
 
+func WithIndexType(t IndexType) IndexOption {
+	return func(d *indexDesc) {
+		t.setup(d)
+	}
+}
+
 func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
 	return func(d *createTableDesc) {
 		d.ColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
@@ -118,9 +124,9 @@ func WithStorageSettings(ss StorageSettings) CreateTableOption {
 	}
 }
 
-func WithIndexType(t IndexType) IndexOption {
-	return func(d *indexDesc) {
-		t.setup(d)
+func WithKeyBloomFilter(f ydb.FeatureFlag) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.KeyBloomFilter = f.ToYDB()
 	}
 }
 
@@ -315,44 +321,51 @@ func WithCachingPolicyPreset(name string) CachingPolicyOption {
 	}
 }
 
+func WithPartitioningSettingsObject(ps PartitioningSettings) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.PartitioningSettings = ps.toYDB()
+	}
+}
+
 type (
-	partitioningSettings       Ydb_Table.PartitioningSettings
-	PartitioningSettingsOption func(settings *partitioningSettings)
+	ydbPartitioningSettings    Ydb_Table.PartitioningSettings
+	PartitioningSettingsOption func(settings *ydbPartitioningSettings)
 )
 
+// Deprecated: use WithPartitioningSettingsObject instead. Will be removed after Jan 2021.
 func WithPartitioningSettings(opts ...PartitioningSettingsOption) CreateTableOption {
 	return func(d *createTableDesc) {
 		if d.PartitioningSettings == nil {
 			d.PartitioningSettings = new(Ydb_Table.PartitioningSettings)
 		}
 		for _, opt := range opts {
-			opt((*partitioningSettings)(d.PartitioningSettings))
+			opt((*ydbPartitioningSettings)(d.PartitioningSettings))
 		}
 	}
 }
 
 func WithPartitioningBySize(flag ydb.FeatureFlag) PartitioningSettingsOption {
-	return func(settings *partitioningSettings) {
+	return func(settings *ydbPartitioningSettings) {
 		settings.PartitioningBySize = flag.ToYDB()
 	}
 }
 func WithPartitionSizeMb(partitionSizeMb uint64) PartitioningSettingsOption {
-	return func(settings *partitioningSettings) {
+	return func(settings *ydbPartitioningSettings) {
 		settings.PartitionSizeMb = partitionSizeMb
 	}
 }
 func WithPartitioningByLoad(flag ydb.FeatureFlag) PartitioningSettingsOption {
-	return func(settings *partitioningSettings) {
+	return func(settings *ydbPartitioningSettings) {
 		settings.PartitioningByLoad = flag.ToYDB()
 	}
 }
 func WithMinPartitionsCount(minPartitionsCount uint64) PartitioningSettingsOption {
-	return func(settings *partitioningSettings) {
+	return func(settings *ydbPartitioningSettings) {
 		settings.MinPartitionsCount = minPartitionsCount
 	}
 }
 func WithMaxPartitionsCount(maxPartitionsCount uint64) PartitioningSettingsOption {
-	return func(settings *partitioningSettings) {
+	return func(settings *ydbPartitioningSettings) {
 		settings.MaxPartitionsCount = maxPartitionsCount
 	}
 }
@@ -427,13 +440,26 @@ func WithAlterStorageSettings(ss StorageSettings) AlterTableOption {
 	}
 }
 
+func WithAlterKeyBloomFilter(f ydb.FeatureFlag) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.SetKeyBloomFilter = f.ToYDB()
+	}
+}
+
+func WithAlterPartitionSettingsObject(ps PartitioningSettings) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.AlterPartitioningSettings = ps.toYDB()
+	}
+}
+
+// Deprecated: use WithAlterPartitionSettingsObject instead. Will be removed after Jan 2021.
 func WithAlterPartitioningSettings(opts ...PartitioningSettingsOption) AlterTableOption {
 	return func(d *alterTableDesc) {
 		if d.AlterPartitioningSettings == nil {
 			d.AlterPartitioningSettings = new(Ydb_Table.PartitioningSettings)
 		}
 		for _, opt := range opts {
-			opt((*partitioningSettings)(d.AlterPartitioningSettings))
+			opt((*ydbPartitioningSettings)(d.AlterPartitioningSettings))
 		}
 	}
 }
