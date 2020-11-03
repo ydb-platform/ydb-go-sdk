@@ -547,6 +547,17 @@ func WithCollectStatsModeBasic() ExecuteDataQueryOption {
 	}
 }
 
+type (
+	executeScanQueryDesc   Ydb_Table.ExecuteScanQueryRequest
+	ExecuteScanQueryOption func(*executeScanQueryDesc)
+)
+
+func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {
+	return func(desc *executeScanQueryDesc) {
+		desc.Mode = m.toYDB()
+	}
+}
+
 // Transaction control options
 type (
 	txDesc   Ydb_Table.TransactionSettings

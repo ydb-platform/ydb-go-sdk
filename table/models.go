@@ -316,6 +316,24 @@ func (p PartitioningMode) toYDB() Ydb_Table.PartitioningPolicy_AutoPartitioningP
 	}
 }
 
+type ExecuteScanQueryRequestMode byte
+
+const (
+	ExecuteScanQueryRequestModeExec ExecuteScanQueryRequestMode = iota
+	ExecuteScanQueryRequestModeExplain
+)
+
+func (p ExecuteScanQueryRequestMode) toYDB() Ydb_Table.ExecuteScanQueryRequest_Mode {
+	switch p {
+	case ExecuteScanQueryRequestModeExec:
+		return Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC
+	case ExecuteScanQueryRequestModeExplain:
+		return Ydb_Table.ExecuteScanQueryRequest_MODE_EXPLAIN
+	default:
+		panic("ydb: unknown execute scan query mode")
+	}
+}
+
 type TableOptionsDescription struct {
 	TableProfilePresets       []TableProfileDescription
 	StoragePolicyPresets      []StoragePolicyDescription

@@ -608,6 +608,11 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextStreamSet() calls.
 func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...ReadTableOption) (r *Result, err error) {
+	s.c.traceStreamReadTableStart(ctx, s)
+	defer func() {
+		s.c.traceStreamReadTableDone(ctx, s, r, err)
+	}()
+
 	var resp Ydb_Table.ReadTableResponse
 	req := Ydb_Table.ReadTableRequest{
 		SessionId: s.ID,
@@ -617,12 +622,11 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 		opt((*readTableDesc)(&req))
 	}
 
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(ctx)
-
+	ctx, cancel := context.WithCancel(ctx)
 	var (
-		ch = make(chan *Ydb.ResultSet, 1)
-		ce = new(error)
+		ch   = make(chan *Ydb.ResultSet, 1)
+		ce   = new(error)
+		once = sync.Once{}
 	)
 	err = s.c.Driver.StreamRead(ctx, internal.WrapStreamOperation(
 		Ydb_Table_V1.StreamReadTable, &req, &resp,
@@ -631,11 +635,78 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 				*ce = err
 			}
 			if err != nil {
-				close(ch)
+				once.Do(func() { close(ch) })
 				return
 			}
 			select {
 			case <-ctx.Done():
+				once.Do(func() { close(ch) })
+			case ch <- resp.Result.ResultSet:
+			}
+		},
+	))
+	if err != nil {
+		cancel()
+		return
+	}
+	r = &Result{
+		setCh:       ch,
+		setChErr:    ce,
+		setChCancel: cancel,
+	}
+	return r, nil
+}
+
+// StreamExecuteScanQuery scan-reads table at given path with given options.
+//
+// Note that given ctx controls the lifetime of the whole read, not only this
+// StreamExecuteScanQuery() call; that is, the time until returned result is closed
+// via Close() call or fully drained by sequential NextStreamSet() calls.
+func (s *Session) StreamExecuteScanQuery(
+	ctx context.Context,
+	query string,
+	params *QueryParameters,
+	opts ...ExecuteScanQueryOption,
+) (
+	r *Result, err error,
+) {
+	q := new(DataQuery)
+	q.initFromText(query)
+
+	s.c.traceStreamExecuteScanQueryStart(ctx, s, q, params)
+	defer func() {
+		s.c.traceStreamExecuteScanQueryDone(ctx, s, q, params, r, err)
+	}()
+
+	var resp Ydb_Table.ExecuteScanQueryPartialResponse
+	req := Ydb_Table.ExecuteScanQueryRequest{
+		Query:      &q.query,
+		Parameters: params.params(),
+		Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
+	}
+	for _, opt := range opts {
+		opt((*executeScanQueryDesc)(&req))
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	var (
+		ch   = make(chan *Ydb.ResultSet, 1)
+		ce   = new(error)
+		once = sync.Once{}
+	)
+	err = s.c.Driver.StreamRead(ctx, internal.WrapStreamOperation(
+		Ydb_Table_V1.StreamExecuteScanQuery, &req, &resp,
+		func(err error) {
+			if err != io.EOF {
+				*ce = err
+			}
+			if err != nil {
+				once.Do(func() { close(ch) })
+				return
+			}
+			select {
+			case <-ctx.Done():
+				once.Do(func() { close(ch) })
 			case ch <- resp.Result.ResultSet:
 			}
 		},
@@ -705,7 +776,7 @@ func (tx *Transaction) Execute(
 	return
 }
 
-// Execute executes prepared statement stmt within transaction tx.
+// ExecuteStatement executes prepared statement stmt within transaction tx.
 func (tx *Transaction) ExecuteStatement(
 	ctx context.Context,
 	stmt *Statement, params *QueryParameters,
@@ -891,6 +962,68 @@ func (t *Client) traceExecuteDataQueryDone(
 		b(x)
 	}
 }
+func (t *Client) traceStreamReadTableStart(ctx context.Context, s *Session) {
+	x := StreamReadTableStartInfo{
+		Context: ctx,
+		Session: s,
+	}
+	if a := t.Trace.StreamReadTableStart; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).StreamReadTableStart; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceStreamReadTableDone(
+	ctx context.Context, s *Session, r *Result, err error,
+) {
+	x := StreamReadTableDoneInfo{
+		Context: ctx,
+		Session: s,
+		Result:  r,
+		Error:   err,
+	}
+	if a := t.Trace.StreamReadTableDone; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).StreamReadTableDone; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceStreamExecuteScanQueryStart(ctx context.Context, s *Session, query *DataQuery, params *QueryParameters) {
+	x := StreamExecuteScanQueryStartInfo{
+		Context:    ctx,
+		Session:    s,
+		Query:      query,
+		Parameters: params,
+	}
+	if a := t.Trace.StreamExecuteScanQueryStart; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).StreamExecuteScanQueryStart; b != nil {
+		b(x)
+	}
+}
+func (t *Client) traceStreamExecuteScanQueryDone(
+	ctx context.Context, s *Session, query *DataQuery,
+	params *QueryParameters, r *Result, err error,
+) {
+	x := StreamExecuteScanQueryDoneInfo{
+		Context:    ctx,
+		Session:    s,
+		Query:      query,
+		Parameters: params,
+		Result:     r,
+		Error:      err,
+	}
+	if a := t.Trace.StreamExecuteScanQueryDone; a != nil {
+		a(x)
+	}
+	if b := ContextClientTrace(ctx).StreamExecuteScanQueryDone; b != nil {
+		b(x)
+	}
+}
+
 func (t *Client) traceBeginTransactionStart(ctx context.Context, s *Session) {
 	x := BeginTransactionStartInfo{
 		Context: ctx,

@@ -1,3 +1,6 @@
+##2020.10.3
+* Support scan query execution
+
 ##2020.10.2
 * Add table Ttl options
 

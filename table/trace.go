@@ -19,6 +19,12 @@ type ClientTrace struct {
 	ExecuteDataQueryStart func(ExecuteDataQueryStartInfo)
 	ExecuteDataQueryDone  func(ExecuteDataQueryDoneInfo)
 
+	StreamReadTableStart func(StreamReadTableStartInfo)
+	StreamReadTableDone  func(StreamReadTableDoneInfo)
+
+	StreamExecuteScanQueryStart func(StreamExecuteScanQueryStartInfo)
+	StreamExecuteScanQueryDone  func(StreamExecuteScanQueryDoneInfo)
+
 	BeginTransactionStart func(BeginTransactionStartInfo)
 	BeginTransactionDone  func(BeginTransactionDoneInfo)
 
@@ -84,6 +90,30 @@ type (
 		Query      *DataQuery
 		Parameters *QueryParameters
 		Prepared   bool
+		Result     *Result
+		Error      error
+	}
+	StreamReadTableStartInfo struct {
+		Context context.Context
+		Session *Session
+	}
+	StreamReadTableDoneInfo struct {
+		Context context.Context
+		Session *Session
+		Result  *Result
+		Error   error
+	}
+	StreamExecuteScanQueryStartInfo struct {
+		Context    context.Context
+		Session    *Session
+		Query      *DataQuery
+		Parameters *QueryParameters
+	}
+	StreamExecuteScanQueryDoneInfo struct {
+		Context    context.Context
+		Session    *Session
+		Query      *DataQuery
+		Parameters *QueryParameters
 		Result     *Result
 		Error      error
 	}
@@ -246,6 +276,50 @@ func composeClientTrace(a, b ClientTrace) (c ClientTrace) {
 		c.ExecuteDataQueryDone = func(info ExecuteDataQueryDoneInfo) {
 			a.ExecuteDataQueryDone(info)
 			b.ExecuteDataQueryDone(info)
+		}
+	}
+	switch {
+	case a.StreamReadTableStart == nil:
+		c.StreamReadTableStart = b.StreamReadTableStart
+	case b.StreamReadTableStart == nil:
+		c.StreamReadTableStart = a.StreamReadTableStart
+	default:
+		c.StreamReadTableStart = func(info StreamReadTableStartInfo) {
+			a.StreamReadTableStart(info)
+			b.StreamReadTableStart(info)
+		}
+	}
+	switch {
+	case a.StreamReadTableDone == nil:
+		c.StreamReadTableDone = b.StreamReadTableDone
+	case b.StreamReadTableDone == nil:
+		c.StreamReadTableDone = a.StreamReadTableDone
+	default:
+		c.StreamReadTableDone = func(info StreamReadTableDoneInfo) {
+			a.StreamReadTableDone(info)
+			b.StreamReadTableDone(info)
+		}
+	}
+	switch {
+	case a.StreamExecuteScanQueryStart == nil:
+		c.StreamExecuteScanQueryStart = b.StreamExecuteScanQueryStart
+	case b.StreamExecuteScanQueryStart == nil:
+		c.StreamExecuteScanQueryStart = a.StreamExecuteScanQueryStart
+	default:
+		c.StreamExecuteScanQueryStart = func(info StreamExecuteScanQueryStartInfo) {
+			a.StreamExecuteScanQueryStart(info)
+			b.StreamExecuteScanQueryStart(info)
+		}
+	}
+	switch {
+	case a.StreamExecuteScanQueryDone == nil:
+		c.StreamExecuteScanQueryDone = b.StreamExecuteScanQueryDone
+	case b.StreamExecuteScanQueryDone == nil:
+		c.StreamExecuteScanQueryDone = a.StreamExecuteScanQueryDone
+	default:
+		c.StreamExecuteScanQueryDone = func(info StreamExecuteScanQueryDoneInfo) {
+			a.StreamExecuteScanQueryDone(info)
+			b.StreamExecuteScanQueryDone(info)
 		}
 	}
 	switch {

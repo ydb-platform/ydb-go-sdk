@@ -142,6 +142,11 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		return fmt.Errorf("select simple error: %v", err)
 	}
 
+	err = scanQuerySelect(ctx, &sp, prefix)
+	if err != nil {
+		return fmt.Errorf("scan query select error: %v", err)
+	}
+
 	err = readTable(ctx, &sp, path.Join(
 		prefix, "series",
 	))
@@ -168,6 +173,7 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 	if err != nil {
 		return err
 	}
+	log.Printf("\n> read_table:")
 	// TODO(kamardin): truncated flag.
 	for res.NextSet() {
 		for res.NextRow() {
@@ -180,7 +186,7 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 			res.NextItem()
 			date := res.String()
 
-			log.Printf("\n> read_table: %d %s %d", id, title, date)
+			log.Printf("#  %d %s %d", id, title, date)
 		}
 	}
 	if err := res.Err(); err != nil {
@@ -309,7 +315,71 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 			)
 		}
 	}
-	if err := res.Err(); err != nil {
+	if err = res.Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) (err error) {
+	query := render(
+		template.Must(template.New("").Parse(`
+			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+
+			DECLARE $series AS List<UInt64>;
+
+			SELECT series_id, season_id, title, CAST(CAST(first_aired AS Date) AS String) AS first_aired
+			FROM seasons
+			WHERE series_id IN $series
+		`)),
+		templateConfig{
+			TablePathPrefix: prefix,
+		},
+	)
+
+	var res *table.Result
+	err = table.Retry(ctx, sp,
+		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
+			res, err = s.StreamExecuteScanQuery(ctx, query,
+				table.NewQueryParameters(
+					table.ValueParam("$series",
+						ydb.ListValue(
+							ydb.Uint64Value(1),
+							ydb.Uint64Value(10),
+						),
+					),
+				),
+			)
+			return
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	log.Print("\n> scan_query_select:")
+	for res.NextStreamSet(ctx) {
+		if err = res.Err(); err != nil {
+			return err
+		}
+
+		for res.NextRow() {
+			res.SeekItem("series_id")
+			id := res.OUint64()
+
+			res.SeekItem("season_id")
+			season := res.OUint64()
+
+			res.SeekItem("title")
+			title := res.OUTF8()
+
+			res.SeekItem("first_aired")
+			date := res.OString()
+
+			log.Printf("#  Season, SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", id, season, title, date)
+		}
+	}
+	if err = res.Err(); err != nil {
 		return err
 	}
 	return nil
