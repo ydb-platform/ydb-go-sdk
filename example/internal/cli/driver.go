@@ -136,7 +136,10 @@ func readRootCerts(path string) (*x509.CertPool, error) {
 	if err != nil {
 		return nil, err
 	}
-	roots := x509.NewCertPool()
+	roots, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
 	if ok := roots.AppendCertsFromPEM(p); !ok {
 		return nil, fmt.Errorf("parse pem error")
 	}
