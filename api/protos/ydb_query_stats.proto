@@ -39,4 +39,5 @@ message QueryStats {
     CompilationStats compilation = 2;
     uint64 process_cpu_time_us = 3;
     string query_plan = 4;
+    string query_ast = 5;
 }
