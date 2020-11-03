@@ -1,6 +1,7 @@
 package ydb
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
@@ -110,3 +111,7 @@ const (
 	TypeJSONDocument = internal.TypeJSONDocument
 	TypeDyNumber     = internal.TypeDyNumber
 )
+
+func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
+	internal.WriteTypeStringTo(buf, t)
+}
