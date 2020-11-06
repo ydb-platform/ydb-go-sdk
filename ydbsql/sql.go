@@ -32,6 +32,8 @@ type conn struct {
 
 	tx  *table.Transaction
 	txc *table.TransactionControl
+
+	execOpts []table.ExecuteDataQueryOption
 }
 
 func (c *conn) takeSession(ctx context.Context) bool {
@@ -205,7 +207,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if txc == nil {
 		txc = c.defaultTxc
 	}
-	_, err := c.exec(ctx, txc, exec{text: query}, params(args))
+	_, err := c.exec(ctx, txc, exec{text: query, opts: c.execOpts}, params(args))
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +219,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if txc == nil {
 		txc = c.defaultTxc
 	}
-	res, err := c.exec(ctx, txc, exec{text: query}, params(args))
+	res, err := c.exec(ctx, txc, exec{text: query, opts: c.execOpts}, params(args))
 	if err != nil {
 		return nil, err
 	}
@@ -263,6 +265,7 @@ func (c *conn) Begin() (driver.Tx, error) {
 type exec struct {
 	stmt *table.Statement
 	text string
+	opts []table.ExecuteDataQueryOption
 }
 
 func (r exec) do(
@@ -272,9 +275,9 @@ func (r exec) do(
 	*table.Transaction, *table.Result, error,
 ) {
 	if r.stmt != nil {
-		return r.stmt.Execute(ctx, tx, params)
+		return r.stmt.Execute(ctx, tx, params, r.opts...)
 	}
-	return session.Execute(ctx, tx, r.text, params)
+	return session.Execute(ctx, tx, r.text, params, r.opts...)
 }
 
 func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec, params *table.QueryParameters) (res *table.Result, err error) {

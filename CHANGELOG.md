@@ -1,3 +1,6 @@
+##2020.11.2
+* added `ydbsql/connector` options to configure default list of `ExecDataQueryOption`
+
 ##2020.11.1
 * Tune `grpc.Conn` behaviour
 

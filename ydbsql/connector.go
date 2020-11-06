@@ -133,6 +133,12 @@ func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
 	}
 }
 
+func WithDefaultExecDataQueryOption(opts ...table.ExecuteDataQueryOption) ConnectorOption {
+	return func(c *connector) {
+		c.execOpts = append(c.execOpts, opts...)
+	}
+}
+
 var retryChecker = ydb.RetryChecker{
 	// NOTE: we do not want to retry not found prepared statement
 	// errors.
@@ -180,6 +186,8 @@ type connector struct {
 
 	retryConfig      RetryConfig
 	defaultTxControl *table.TransactionControl
+
+	execOpts []table.ExecuteDataQueryOption
 }
 
 func (c *connector) init(ctx context.Context) (err error) {
@@ -231,6 +239,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		pool:        &c.pool,
 		retryConfig: &c.retryConfig,
 		defaultTxc:  c.defaultTxControl,
+		execOpts:    c.execOpts,
 	}, nil
 }
 
