@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	MaxGetConnTimeout = 10 * time.Second
+	MaxGetConnTimeout    = 10 * time.Second
+	ConnResetOfflineRate = uint64(10)
 )
 
 var (
@@ -222,6 +223,15 @@ func isReady(conn *conn) bool {
 	return conn != nil && conn.conn != nil && conn.conn.GetState() == connectivity.Ready
 }
 
+func isBroken(conn *conn) bool {
+	if conn == nil || conn.conn == nil {
+		return true
+	}
+	state := conn.conn.GetState()
+
+	return state == connectivity.Shutdown || state == connectivity.TransientFailure
+}
+
 // Insert inserts new connection into the cluster.
 func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...WG) {
 	if len(wg) > 0 {
@@ -393,7 +403,7 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 		panic("ydb: can't stop timer")
 	}
 	backoff := LogBackoff{
-		SlotDuration: time.Millisecond,
+		SlotDuration: 5 * time.Millisecond,
 		Ceiling:      10, // ~1s (2^10ms)
 		JitterLimit:  1,  // Without randomization.
 	}
@@ -427,6 +437,12 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 			ctx, cancel := context.WithTimeout(c.trackerCtx, time.Second)
 			for _, el := range queue {
 				conn := el.Value.(*conn)
+				if conn.conn != nil && (isBroken(conn) || conn.runtime.offlineCount%ConnResetOfflineRate == 0) {
+					co := conn.conn
+					conn.conn = nil
+					go func() { _ = co.Close() }()
+				}
+
 				addr := conn.addr
 				if conn.conn == nil {
 					x, err := c.dial(ctx, addr.addr, addr.port)

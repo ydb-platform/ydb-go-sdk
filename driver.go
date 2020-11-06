@@ -372,7 +372,7 @@ func invoke(
 ) (
 	err error,
 ) {
-	err = grpc.Invoke(ctx, method, req, resp.GetResponseProto(), conn, opts...)
+	err = conn.Invoke(ctx, method, req, resp.GetResponseProto(), opts...)
 	switch {
 	case err != nil:
 		err = mapGRPCError(err)
@@ -444,14 +444,15 @@ func newConn(cc *grpc.ClientConn, addr connAddr) *conn {
 }
 
 type connRuntime struct {
-	mu        sync.Mutex
-	state     ConnState
-	opStarted uint64
-	opSucceed uint64
-	opFailed  uint64
-	opTime    *stats.Series
-	opRate    *stats.Series
-	errRate   *stats.Series
+	mu           sync.Mutex
+	state        ConnState
+	offlineCount uint64
+	opStarted    uint64
+	opSucceed    uint64
+	opFailed     uint64
+	opTime       *stats.Series
+	opRate       *stats.Series
+	errRate      *stats.Series
 }
 
 type ConnStats struct {
@@ -520,6 +521,9 @@ func (c *connRuntime) setState(s ConnState) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.state = s
+	if s == ConnOffline {
+		c.offlineCount++
+	}
 }
 
 func (c *connRuntime) operationStart(start time.Time) {

@@ -1,3 +1,6 @@
+##2020.11.1
+* Tune `grpc.Conn` behaviour
+
 ##2020.10.4
 * Function to compare two ydb.Value
 
