@@ -48,7 +48,7 @@ type Dialer struct {
 
 	// NetDial is an optional function that may replace default network dialing
 	// function such as net.Dial("tcp").
-	// Deprecated: Use it for test purposes and special cases only. In general must not been set.
+	// Deprecated: Use it for test purposes and special cases only. In most cases should be left empty.
 	NetDial func(context.Context, string) (net.Conn, error)
 }
 
