@@ -56,6 +56,8 @@ message TableIndex {
     oneof type {
        GlobalIndex global_index = 3;
     }
+    // list of columns content to be copied in to index table
+    repeated string data_columns = 4;
 }
 
 // Represent secondary index with index state
