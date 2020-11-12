@@ -14,7 +14,8 @@ import (
 
 var (
 	// DefaultKeepaliveInterval contains default duration between grpc keepalive
-	DefaultKeepaliveInterval = 15 * time.Second
+	DefaultKeepaliveInterval = 5 * time.Minute
+	MinKeepaliveInterval     = 1 * time.Minute
 	DefaultGRPCMsgSize       = 64 * 1024 * 1024 // 64MB
 )
 
@@ -31,10 +32,6 @@ type Dialer struct {
 	// DriverConfig is a driver configuration.
 	DriverConfig *DriverConfig
 
-	// NetDial is a optional function that may replace default network dialing
-	// function such as net.Dial("tcp").
-	NetDial func(context.Context, string) (net.Conn, error)
-
 	// TLSConfig specifies the TLS configuration to use for tls client.
 	// If TLSConfig is zero then connections are insecure.
 	TLSConfig *tls.Config
@@ -46,10 +43,13 @@ type Dialer struct {
 
 	// Keepalive is the interval used to check whether inner connections are
 	// still valid.
-	// If Keepalive is zero then there will be no keepalive checks.
-	//
 	// Dialer could increase keepalive interval if given value is too small.
 	Keepalive time.Duration
+
+	// NetDial is an optional function that may replace default network dialing
+	// function such as net.Dial("tcp").
+	// Deprecated: Use it for test purposes and special cases only. In general must not been set.
+	NetDial func(context.Context, string) (net.Conn, error)
 }
 
 // Dial dials given addr and initializes driver instance on success.
@@ -58,6 +58,8 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	grpcKeepalive := d.Keepalive
 	if grpcKeepalive == 0 {
 		grpcKeepalive = DefaultKeepaliveInterval
+	} else if grpcKeepalive < MinKeepaliveInterval {
+		grpcKeepalive = MinKeepaliveInterval
 	}
 
 	return (&dialer{

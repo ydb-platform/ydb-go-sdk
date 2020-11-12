@@ -1,3 +1,6 @@
+##2020.11.3
+* increase default and minimum `Dialer.KeepAlive` setting
+
 ##2020.11.2
 * added `ydbsql/connector` options to configure default list of `ExecDataQueryOption`
 

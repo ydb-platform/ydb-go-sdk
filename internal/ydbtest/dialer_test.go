@@ -75,8 +75,7 @@ func TestClusterTracking(t *testing.T) {
 				return nil, fmt.Errorf("stub: kinda refused")
 			}
 		},
-		Keepalive: 10 * time.Second, // Min GRPC KeepAlive time is 10s
-		Timeout:   250 * time.Millisecond,
+		Timeout: 250 * time.Millisecond,
 	}
 	d, err := dialer.Dial(ctx, balancer.Addr().String())
 	if err != nil {
