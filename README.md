@@ -109,7 +109,7 @@ reduce boilerplate overhead for such cases `ydb` provides generic retry logic:
 	var res *table.Result
 	// Retry() will call given OperationFunc with the following invariants:
 	//  - previous operation failed with retriable error;
-	//  - number of retries is under the limit (default to 10, see table.Repeater docs);
+	//  - number of retries is under the limit (default to 10, see table.Retryer docs);
 	//
 	// Note that in case of prepared statements call to Prepare() must be made
 	// inside the Operation body.
@@ -121,11 +121,11 @@ reduce boilerplate overhead for such cases `ydb` provides generic retry logic:
 	)
 ```
 
-That is, instead of manually creation of `table.Session`, we give a
+That is, instead of manual creation of `table.Session`, we give a
 `SessionPool` such responsibility. It holds instances of active sessions and
 "pings" them periodically to keep them alive.
 
-See `table.Repeater` docs for more information about retrying options.
+See `table.Retryer` docs for more information about retry options.
 
 ### database/sql driver
 
