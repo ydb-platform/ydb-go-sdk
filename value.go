@@ -2,7 +2,6 @@ package ydb
 
 import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"errors"
 )
 
 type Value interface {
@@ -86,19 +85,17 @@ func VariantValue(v Value, i uint32, variantT Type) Value {
 	return internal.VariantValue(v, i, variantT)
 }
 
-// returns -1, 0, 1 if l < r, l ==r, l > r. Returns error if types are not comparable.
-// Current implementation is simplified.
-// Values are comparable only if they have the same type.
-// Only some primitive types are comparable,
-// namely Int* and Uint*,  UTF8 and String.
+// Compare compares its operands.
+// It returns -1, 0, 1 if l < r, l == r, l > r. Returns error if types are not comparable.
+// Comparable types are all integer types, UUID, DyNumber, Float, Double, String, UTF8,
+// Date, Datetime, Timestamp, Tuples and Lists.
+// Primitive arguments are comparable if their types are the same.
+// Optional type is comparable to underlying type, e.g. Optional<Optional<Float>> is comparable to Float.
+// Null value is comparable to non-null value of the same type and is considered less than any non-null value.
+// Tuples and Lists are comparable if their elements are comparable.
+// Tuples and Lists are compared lexicographically. If tuples (lists) have different length and elements of the
+// shorter tuple (list) are all equal to corresponding elements of the other tuple (list), than the shorter tuple (list)
+// is considered less than the longer one.
 func Compare(l, r Value) (int, error) {
-	lv, ok := l.(internal.Value)
-	if !ok {
-		return 0, errors.New("unsupported implementation of Value")
-	}
-	rv, ok := r.(internal.Value)
-	if !ok {
-		return 0, errors.New("unsupported implementation of Value")
-	}
-	return internal.Compare(lv, rv)
+	return internal.Compare(l, r)
 }

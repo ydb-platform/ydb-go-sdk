@@ -1,3 +1,6 @@
+##2020.11.4
+* Re-implementation of ydb.Value comparison
+
 ##2020.11.3
 * increase default and minimum `Dialer.KeepAlive` setting
 
