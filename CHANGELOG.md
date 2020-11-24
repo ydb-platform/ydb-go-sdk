@@ -1,5 +1,6 @@
 ##2020.11.4
-* Re-implementation of ydb.Value comparison
+* re-implementation of ydb.Value comparison
+* fix basic examples
 
 ##2020.11.3
 * increase default and minimum `Dialer.KeepAlive` setting
@@ -8,23 +9,23 @@
 * added `ydbsql/connector` options to configure default list of `ExecDataQueryOption`
 
 ##2020.11.1
-* Tune `grpc.Conn` behaviour
+* tune `grpc.Conn` behaviour
 
 ##2020.10.4
-* Function to compare two ydb.Value
+* function to compare two ydb.Value
 
 ##2020.10.3
-* Support scan query execution
+* support scan query execution
 
 ##2020.10.2
-* Add table Ttl options
+* add table Ttl options
 
 ##2020.10.1
 * added `KeyBloomFilter` support for `CreateTable`, `AlterTable` and `DescribeTalbe`
 * added `PartitioningSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`. Move to `PartitioningSettings` object
 
 ##2020.09.3
-* Add `FastDial` option to `DriverConfig`.
+* add `FastDial` option to `DriverConfig`.
   This will allow `Dialer` to return `Driver` as soon as the 1st connection is ready.
 
 ##2020.09.2

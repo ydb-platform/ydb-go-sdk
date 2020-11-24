@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -144,7 +145,10 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	err = scanQuerySelect(ctx, &sp, prefix)
 	if err != nil {
-		return fmt.Errorf("scan query select error: %v", err)
+		var te *ydb.TransportError
+		if !errors.As(err, &te) || te.Reason != ydb.TransportErrorUnimplemented {
+			return fmt.Errorf("scan query select error: %v", err)
+		}
 	}
 
 	err = readTable(ctx, &sp, path.Join(
