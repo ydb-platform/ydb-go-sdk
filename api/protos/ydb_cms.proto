@@ -102,6 +102,8 @@ message CreateDatabaseRequest {
     repeated Attribute attributes = 5;
     // Optional quotas for schema operations
     SchemaOperationQuotas schema_operation_quotas = 8;
+    // Optional idempotency key
+    string idempotency_key = 9;
 }
 
 message CreateDatabaseResponse {
@@ -171,6 +173,8 @@ message AlterDatabaseRequest {
     uint64 generation = 8;
     // Change quotas for schema operations
     SchemaOperationQuotas schema_operation_quotas = 9;
+    // Optional idempotency key
+    string idempotency_key = 10;
 }
 
 message AlterDatabaseResponse {
