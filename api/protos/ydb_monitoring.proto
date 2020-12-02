@@ -122,7 +122,7 @@ message LocationStorageVDisk {
 }
 
 message LocationStorageGroup {
-    uint32 id = 1;
+    string id = 1;
     LocationStorageVDisk vdisk = 2;
 }
 
@@ -150,15 +150,22 @@ message LocationCompute {
     LocationComputeTablet tablet = 3;
 }
 
+message LocationDatabase {
+    string name = 1;
+}
+
 message Location {
     LocationStorage storage = 1;
     LocationCompute compute = 2;
+    LocationDatabase database = 3;
 }
 
 message IssueLog {
-    StatusFlag.Status status = 1;
-    string message = 2;
-    Location location = 3;
+    string id = 1;
+    StatusFlag.Status status = 2;
+    string message = 3;
+    Location location = 4;
+    repeated string reason = 5;
 }
 
 message DatabaseStatus {

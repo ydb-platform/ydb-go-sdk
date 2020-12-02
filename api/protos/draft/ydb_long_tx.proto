@@ -1,0 +1,152 @@
+syntax = "proto3";
+option cc_enable_arenas = true;
+
+package Ydb.LongTx;
+option java_package = "com.yandex.ydb.long_tx";
+option java_outer_classname = "LongTxProtos";
+
+import "kikimr/public/api/protos/ydb_operation.proto";
+import "kikimr/public/api/protos/ydb_value.proto";
+
+message Snapshot {
+    uint64 plan_step = 1;
+    uint64 tx_id = 2;
+}
+
+message LongTxId {
+    uint64 initiator = 1;
+    uint64 write_id = 2;
+    Snapshot snapshot = 3;
+}
+
+// LongTxId + metadata + signature
+message LongTx {
+    message Table {
+        string path = 1;
+        uint64 id = 2;
+        repeated uint64 shards = 3;
+    }
+
+    LongTxId id = 1;
+    repeated Table tables = 2;
+    string signature = 3;
+}
+
+message Data
+{
+    enum Format {
+        FORMAT_UNSPECIFIED      = 0x0000;
+        YDB_ROWS                = 0x0001;
+        //CLICKHOUSE            = 0x0002;
+        //APACHE_ARROW          = 0x0003;
+        //APACHE_PARQUET        = 0x0004;
+        //APACHE_ORC            = 0x0005;
+    }
+
+    Format format = 1;
+    bytes data = 2;
+}
+
+message BeginTxRequest {
+    enum TxTypeId {
+        TX_TYPE_ID_UNSPECIFIED  = 0x0000;
+        WRITE                   = 0x0001;
+        READ                    = 0x0002;
+    //  READ_STREAM             = 0x0003;
+    //  READ_WITH_COMMIT        = 0x0004;
+    }
+
+    Ydb.Operations.OperationParams operation_params = 1;
+    TxTypeId tx_type = 2;
+    repeated string tables = 3;
+}
+
+message BeginTxResult {
+    LongTx tx = 1;
+}
+
+message BeginTxResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
+message CommitTxRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    LongTx tx = 2;
+    bool abort = 3;
+}
+
+message CommitTxResult {
+    LongTxId tx = 1;
+    bool abort = 2;
+}
+
+message CommitTxResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
+message WriteRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    LongTx tx = 2;
+    string table = 3;
+    uint32 chunk = 4;
+    Data data = 5;
+}
+
+message WriteResult {
+    LongTxId tx = 1;
+    string table = 2;
+    uint32 chunk = 3;
+}
+
+message WriteResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
+message ReadRequest {
+    message SelectQuery {
+        // Column name without an alias or function with an alias.
+        // We disallow unnamed functions cause they lead to troubles in result column naming.
+        // We disallow syntax aliases for columns. Every column is addressed by its unique (not qualified) name.
+        message NamedColumn {
+            string name = 1;
+            Function function = 2;
+        }
+
+        message Function {
+            message Argument {
+                oneof argument {
+                    NamedColumn column = 1;
+                    TypedValue value = 2;
+                }
+            }
+
+            string name = 1;
+            repeated Argument arguments = 2;
+        }
+
+        repeated NamedColumn select = 1;
+        Function where = 2;
+        //repeated NamedColumn group_by = 3;
+        //Function having = 4;
+        //repeated NamedColumn order_by = 5;
+        //uint64 limit = 6;
+        //uint64 offset = 7;
+    }
+
+    Ydb.Operations.OperationParams operation_params = 1;
+    LongTx tx = 2;
+    string table = 3;
+    uint32 chunk = 4;
+    SelectQuery query = 5;
+}
+
+message ReadResult {
+    LongTxId tx = 1;
+    string table = 2;
+    uint32 chunk = 3;
+    Data data = 4;
+}
+
+message ReadResponse {
+    Ydb.Operations.Operation operation = 1;
+}
