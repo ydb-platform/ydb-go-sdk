@@ -1,3 +1,6 @@
+##2020.12.1
+* added CommitTx method, which returns QueryStats
+
 ##2020.11.4
 * re-implementation of ydb.Value comparison
 * fix basic examples

@@ -514,6 +514,11 @@ type (
 )
 
 type (
+	commitTransactionDesc   Ydb_Table.CommitTransactionRequest
+	CommitTransactionOption func(*commitTransactionDesc)
+)
+
+type (
 	queryCachePolicy       Ydb_Table.QueryCachePolicy
 	QueryCachePolicyOption func(*queryCachePolicy)
 )
@@ -532,6 +537,18 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 		for _, opt := range opts {
 			opt((*queryCachePolicy)(d.QueryCachePolicy))
 		}
+	}
+}
+
+func WithCommitCollectStatsModeNone() CommitTransactionOption {
+	return func(d *commitTransactionDesc) {
+		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+	}
+}
+
+func WithCommitCollectStatsModeBasic() CommitTransactionOption {
+	return func(d *commitTransactionDesc) {
+		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
 	}
 }
 

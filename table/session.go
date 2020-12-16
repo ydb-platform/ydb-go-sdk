@@ -786,6 +786,7 @@ func (tx *Transaction) ExecuteStatement(
 	return
 }
 
+// Deprecated: Use CommitTx instead
 // Commit commits specified active transaction.
 func (tx *Transaction) Commit(ctx context.Context) (err error) {
 	tx.s.c.traceCommitTransactionStart(ctx, tx)
@@ -797,6 +798,24 @@ func (tx *Transaction) Commit(ctx context.Context) (err error) {
 		TxId:      tx.id,
 	}
 	return tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CommitTransaction, &req, nil))
+}
+
+// CommitTx commits specified active transaction.
+func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOption) (result *Result, err error) {
+	tx.s.c.traceCommitTransactionStart(ctx, tx)
+	defer func() {
+		tx.s.c.traceCommitTransactionDone(ctx, tx, err)
+	}()
+	res := new(Ydb_Table.CommitTransactionResult)
+	req := &Ydb_Table.CommitTransactionRequest{
+		SessionId: tx.s.ID,
+		TxId:      tx.id,
+	}
+	for _, opt := range opts {
+		opt((*commitTransactionDesc)(req))
+	}
+	err = tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CommitTransaction, req, res))
+	return &Result{stats: res.QueryStats}, err
 }
 
 // Rollback performs a rollback of the specified active transaction.
