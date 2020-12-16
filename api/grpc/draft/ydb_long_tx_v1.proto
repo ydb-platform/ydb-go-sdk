@@ -6,9 +6,10 @@ option java_package = "com.yandex.ydb.long_tx.v1";
 import "kikimr/public/api/protos/draft/ydb_long_tx.proto";
 
 service LongTxService {
-    rpc BeginTx(BeginTxRequest) returns (BeginTxResponse);
-    rpc CommitTx(CommitTxRequest) returns (CommitTxResponse);
+    rpc BeginTx(BeginTransactionRequest) returns (BeginTransactionResponse);
+    rpc CommitTx(CommitTransactionRequest) returns (CommitTransactionResponse);
+    rpc RollbackTx(RollbackTransactionRequest) returns (RollbackTransactionResponse);
     rpc Write(WriteRequest) returns (WriteResponse);
     rpc Read(ReadRequest) returns (ReadResponse);
-//  rpc ReadStream(ReadStreamRequest) returns (stream ReadStreamResponse);
+//  rpc ResolveNodes(ResolveNodesRequest) returns (stream ResolveNodesResponse);
 }

@@ -79,3 +79,37 @@ message ImportFromS3Response {
     // operation.metadata = ImportFromS3Metadata
     Ydb.Operations.Operation operation = 1;
 }
+
+/// Data
+message YdbDumpFormat {
+}
+
+message DsvFormat {
+    string delimiter = 1;
+}
+
+message ImportDataResult {
+}
+
+message ImportDataRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    // Full path to table
+    string path = 2;
+    // Data serialized in the selected format. Restrictions:
+    // - sorted by primary key;
+    // - all keys must be from the same shard;
+    // - table has no global secondary indexes;
+    // - size of serialized data is limited to 8 MB.
+    bytes data = 3 [(length).le = 8388608];
+    oneof format {
+        // Result of `ydb tools dump`
+        YdbDumpFormat ydb_dump = 4;
+        // Delimiter-separated values
+        DsvFormat dsv = 5;
+    }
+}
+
+message ImportDataResponse {
+    // operation.result = ImportDataResult
+    Ydb.Operations.Operation operation = 1;
+}
