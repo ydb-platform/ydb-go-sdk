@@ -98,7 +98,6 @@ message ReadRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     TransactionMeta tx_meta = 2;
     string path = 3;
-    string chunk = 4;
     oneof query {
         string sql = 11;
         bytes generated = 12;
@@ -108,7 +107,7 @@ message ReadRequest {
 message ReadResult {
     TransactionMeta tx_meta = 1;
     string path = 2;
-    string chunk = 3;
+    uint64 chunk = 3;
     Data data = 4;
 }
 

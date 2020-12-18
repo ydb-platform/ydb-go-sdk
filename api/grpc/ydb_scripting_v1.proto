@@ -7,4 +7,5 @@ import "kikimr/public/api/protos/ydb_scripting.proto";
 
 service ScriptingService {
     rpc ExecuteYql(Scripting.ExecuteYqlRequest) returns (Scripting.ExecuteYqlResponse);
+    rpc ExplainYql(Scripting.ExplainYqlRequest) returns (Scripting.ExplainYqlResponse);
 }
