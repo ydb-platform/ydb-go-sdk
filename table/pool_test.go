@@ -296,7 +296,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			if test.racy {
 				// We testing the case, when session consumer registered
 				// himself in the wait queue, but not ready to receive the
-				// session when session arrives (that is, stucked between
+				// session when session arrives (that is, stuck between
 				// pushing channel in the list and reading from the channel).
 				_ = p.Close(context.Background())
 				<-wait

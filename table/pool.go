@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yandex-cloud/ydb-go-sdk"
+
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
 
@@ -17,6 +19,8 @@ var (
 	DefaultSessionPoolIdleThreshold        = 5 * time.Minute
 	DefaultSessionPoolBusyCheckInterval    = 1 * time.Second
 	DefaultSessionPoolSizeLimit            = 50
+	DefaultKeepAliveMinSize                = 10
+	DefaultIdleKeepAliveThreshold          = 2
 )
 
 var (
@@ -57,6 +61,20 @@ type SessionPool struct {
 	// If SizeLimit is less than or equal to zero then the
 	// DefaultSessionPoolSizeLimit variable is used as a limit.
 	SizeLimit int
+
+	// KeepAliveMinSize is a lower bound for sessions in the pool. If there are more sessions open, then
+	// the excess idle ones will be closed and removed after IdleKeepAliveThreshold is reached for each of them.
+	// If KeepAliveMinSize is less than zero, then no sessions will be preserved
+	// If KeepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
+	KeepAliveMinSize int
+
+	// IdleKeepAliveThreshold is a number of keepAlive messages to call before the
+	// Session is removed if it is an excess session (see KeepAliveMinSize)
+	// This means session lifetime = IdleThreshold * IdleKeepAliveThreshold
+	// If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
+	// be removed ever.
+	// If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
+	IdleKeepAliveThreshold int
 
 	// IdleLimit is an upper bound of pooled sessions without any activity
 	// within.
@@ -146,6 +164,16 @@ func (p *SessionPool) init() {
 			p.keeperStop = make(chan struct{})
 			p.keeperDone = make(chan struct{})
 			go p.keeper()
+		}
+
+		if p.KeepAliveMinSize < 0 {
+			p.KeepAliveMinSize = 0
+		} else if p.KeepAliveMinSize == 0 {
+			p.KeepAliveMinSize = DefaultKeepAliveMinSize
+		}
+
+		if p.IdleKeepAliveThreshold == 0 {
+			p.IdleKeepAliveThreshold = DefaultIdleKeepAliveThreshold
 		}
 
 		if p.BusyCheckInterval == 0 {
@@ -624,8 +652,9 @@ func (p *SessionPool) busyChecker() {
 func (p *SessionPool) keeper() {
 	defer close(p.keeperDone)
 	var (
-		toTouch  []*Session // Cached for reuse.
-		toDelete []*Session // Cached for reuse.
+		toTouch    []*Session // Cached for reuse.
+		toDelete   []*Session // Cached for reuse.
+		toTryAgain []*Session // Cached for reuse.
 
 		wake  = make(chan struct{})
 		timer = timeutil.NewTimer(p.IdleThreshold)
@@ -650,6 +679,7 @@ func (p *SessionPool) keeper() {
 
 		case now = <-timer.C():
 			toTouch = toTouch[:0]
+			toTryAgain = toTryAgain[:0]
 			toDelete = toDelete[:0]
 
 			p.mu.Lock()
@@ -665,7 +695,7 @@ func (p *SessionPool) keeper() {
 					if s == nil || now.Sub(touched) < p.IdleThreshold {
 						break
 					}
-					p.removeIdle(s)
+					_ = p.removeIdle(s)
 					toTouch = append(toTouch, s)
 				}
 			}
@@ -675,9 +705,26 @@ func (p *SessionPool) keeper() {
 			for i, s := range toTouch {
 				toTouch[i] = nil
 
+				p.mu.Lock()
+				keepAliveCount := p.incrementKeepAlive(s)
+				p.mu.Unlock()
+				// if keepAlive was called more than the corresponding limit for the session to be alive and more
+				// sessions are open than the lower limit of continuously kept sessions
+				if p.IdleKeepAliveThreshold > 0 && keepAliveCount > p.IdleKeepAliveThreshold &&
+					p.KeepAliveMinSize < len(p.index) {
+
+					toDelete = append(toDelete, s)
+					continue
+				}
+
 				_, err := p.keepAliveSession(context.Background(), s)
 				if err != nil {
-					toDelete = append(toDelete, s)
+					opErr, ok := err.(*ydb.OpError)
+					if ok && opErr.Reason == ydb.StatusBadSession {
+						toDelete = append(toDelete, s)
+					} else {
+						toTryAgain = append(toTryAgain, s)
+					}
 					continue
 				}
 
@@ -693,6 +740,16 @@ func (p *SessionPool) keeper() {
 					// prevent our session S0 being touched:
 					// time.Since(S1) < threshold but time.Since(S0) > threshold.
 					mark = p.pushIdleInOrderAfter(s, now, mark)
+				}
+				p.mu.Unlock()
+			}
+
+			{ // push all the soft failed sessions to retry on the next tick
+				pushBackTime := now.Add(-p.IdleThreshold)
+
+				p.mu.Lock()
+				for _, el := range toTryAgain {
+					_ = p.pushIdleInOrder(el, pushBackTime)
 				}
 				p.mu.Unlock()
 			}
@@ -775,13 +832,33 @@ func (p *SessionPool) peekFirstIdle() (s *Session, touched time.Time) {
 	return s, info.touched
 }
 
+// removes first Session from idle and resets the keepAliveCount
+// to prevent session from dying in the keeper after it was returned
+// to be used only in outgoing functions that make Session busy.
 // p.mu must be held.
 func (p *SessionPool) removeFirstIdle() *Session {
 	s, _ := p.peekFirstIdle()
 	if s != nil {
-		p.removeIdle(s)
+		info := p.removeIdle(s)
+		info.keepAliveCount = 0
+		p.index[s] = info
 	}
 	return s
+}
+
+// Increments the Keep Alive Counter and returns the previous number.
+// Unlike other info modifiers, this one doesn't care if it didn't find the session, it skips
+// the action. You can still check it later if needed, if the return code is -1
+// p.mu must be held.
+func (p *SessionPool) incrementKeepAlive(s *Session) int {
+	info, has := p.index[s]
+	if !has || info.idle == nil {
+		return -1
+	}
+	ret := info.keepAliveCount
+	info.keepAliveCount++
+	p.index[s] = info
+	return ret
 }
 
 // p.mu must be held.
@@ -835,7 +912,7 @@ func (p *SessionPool) keepAliveSession(ctx context.Context, s *Session) (Session
 }
 
 // p.mu must be held.
-func (p *SessionPool) removeIdle(s *Session) {
+func (p *SessionPool) removeIdle(s *Session) sessionInfo {
 	info, has := p.index[s]
 	if !has || info.idle == nil {
 		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
@@ -844,8 +921,12 @@ func (p *SessionPool) removeIdle(s *Session) {
 	p.idle.Remove(info.idle)
 	info.idle = nil
 	p.index[s] = info
+	return info
 }
 
+// Removes Session from idle pool and resets keepAliveCount for it not
+// to die in keeper when it will be returned
+// to be used only in outgoing functions that make Session busy.
 // p.mu must be held.
 func (p *SessionPool) takeIdle(s *Session) (has, took bool) {
 	var info sessionInfo
@@ -860,7 +941,9 @@ func (p *SessionPool) takeIdle(s *Session) (has, took bool) {
 		return
 	}
 	took = true
-	p.removeIdle(s)
+	info = p.removeIdle(s)
+	info.keepAliveCount = 0
+	p.index[s] = info
 	return
 }
 
@@ -1120,9 +1203,10 @@ func (p *SessionPool) traceCloseDone(ctx context.Context, err error) {
 }
 
 type sessionInfo struct {
-	idle    *list.Element
-	ready   *list.Element
-	touched time.Time
+	idle           *list.Element
+	ready          *list.Element
+	touched        time.Time
+	keepAliveCount int
 }
 
 func panicLocked(mu sync.Locker, message string) {
