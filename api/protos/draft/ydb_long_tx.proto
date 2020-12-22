@@ -108,7 +108,8 @@ message ReadResult {
     TransactionMeta tx_meta = 1;
     string path = 2;
     uint64 chunk = 3;
-    Data data = 4;
+    bool finished = 4;
+    Data data = 5;
 }
 
 message ReadResponse {

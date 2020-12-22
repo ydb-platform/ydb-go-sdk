@@ -21,7 +21,8 @@ message LongTxId {
 message LongTxRoutes {
     message Table {
         string path = 1;
-        repeated uint64 shards = 2;
+        uint64 id = 2;
+        repeated uint64 shards = 3;
     }
 
     repeated Table tables = 1;
