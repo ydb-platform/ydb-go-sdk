@@ -1,8 +1,8 @@
-// +build darwin
+// +build windows
 
 package test
 
-//go:generate gtrace
+//go:generate gtrace -v
 
 //gtrace:gen
 type ConditionalBuildTrace struct {

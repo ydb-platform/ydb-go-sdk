@@ -10,6 +10,15 @@ examples: gtrace
 .PHONY: test
 test: gtrace
 	find ./test -name '*_gtrace*' -delete
+	for os in linux darwin windows; do \
+		echo "--------"; \
+		echo "running: GOOS=$$os go generate ./test"; \
+		echo "--------"; \
+		PATH=$(PWD):$(PATH)	GOOS=$$os go generate ./test; \
+		if [[ $$? -ne 0 ]]; then \
+			exit 1;\
+		fi; \
+	done; \
 	for os in linux darwin; do \
 		for arch in amd64 arm64; do \
 			echo "--------"; \
