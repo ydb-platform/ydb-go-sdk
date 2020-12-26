@@ -15,7 +15,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"text/tabwriter"
 
 	_ "unsafe" // For go:linkname.
 )
@@ -46,14 +48,16 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 
 	var (
-		goGen   bool
+		// Reports whether we were called from go:generate.
+		isGoGenerate bool
+
 		gofile  string
 		workDir string
 		err     error
 	)
 	if gofile = os.Getenv("GOFILE"); gofile != "" {
 		// NOTE: GOFILE is always a filename without path.
-		goGen = true
+		isGoGenerate = true
 		workDir, err = os.Getwd()
 		if err != nil {
 			log.Fatal(err)
@@ -61,14 +65,19 @@ func main() {
 	} else {
 		args := flag.Args()
 		if len(args) == 0 {
-			log.Fatal("no $GOFILE env nor file parameter are given")
+			log.Fatal("no $GOFILE env nor file parameter were given")
 		}
 		gofile = filepath.Base(args[0])
 		workDir = filepath.Dir(args[0])
 	}
 
 	buildCtx := build.Default
-	bpkg, err := buildCtx.ImportDir(workDir, build.IgnoreVendor)
+	if verbose {
+		var sb strings.Builder
+		prettyPrint(&sb, buildCtx)
+		log.Printf("build context:\n%s", sb.String())
+	}
+	buildPkg, err := buildCtx.ImportDir(workDir, build.IgnoreVendor)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -76,41 +85,23 @@ func main() {
 	srcFilePath := filepath.Join(workDir, gofile)
 	if verbose {
 		log.Printf("source file: %s", srcFilePath)
-		log.Printf("package files: %v", bpkg.GoFiles)
+		log.Printf("package files: %v", buildPkg.GoFiles)
 	}
 
 	var dest io.Writer
-	if goGen || write {
-		var (
-			base = filepath.Base(srcFilePath)
-			ext  = filepath.Ext(base)
-			name = strings.TrimSuffix(base, ext)
-		)
-
-		// Fill in source filename tags.
-		srcFileTags := make(map[string]bool)
-		build_goodOSArchFile(&buildCtx, gofile, srcFileTags)
-		var dstName string
-		switch len(srcFileTags) {
-		case 0: // *
-			dstName = name + suffix
-
-		case 1: // *_GOOS or *_GOARCH
-			i := strings.LastIndexByte(name, '_')
-			dstName = name[:i] + suffix + name[i:]
-
-		case 2: // *_GOOS_GOARCH
-			var i int
-			i = strings.LastIndexByte(name, '_')
-			i = strings.LastIndexByte(name[:i], '_')
-			dstName = name[:i] + suffix + name[i:]
+	if isGoGenerate || write {
+		// We should support Go suffixes like `_linux.go` properly.
+		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
+		if verbose {
+			log.Printf(
+				"split os/args tags of %q: %q %q %q",
+				gofile, name, tags, ext,
+			)
 		}
-
-		dstFilePath := filepath.Join(workDir, dstName+ext)
+		dstFilePath := filepath.Join(workDir, name+suffix+tags+ext)
 		if verbose {
 			log.Printf("destination file path: %+v", dstFilePath)
 		}
-
 		dstFile, err := os.OpenFile(dstFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if err != nil {
 			log.Fatal(err)
@@ -122,16 +113,23 @@ func main() {
 	}
 
 	var (
-		pkgFiles = make([]*os.File, 0, len(bpkg.GoFiles))
-		astFiles = make([]*ast.File, 0, len(bpkg.GoFiles))
+		pkgFiles = make([]*os.File, 0, len(buildPkg.GoFiles))
+		astFiles = make([]*ast.File, 0, len(buildPkg.GoFiles))
 
 		buildConstraints []string
 	)
 	fset := token.NewFileSet()
-	for _, name := range bpkg.GoFiles {
-		if strings.HasSuffix(name, suffix+".go") {
+	for _, name := range buildPkg.GoFiles {
+		base, _, _ := splitOSArchTags(&buildCtx, name)
+		if strings.HasSuffix(base, suffix) {
 			// Skip gtrace generated files.
+			if verbose {
+				log.Printf("skipped package file: %q", name)
+			}
 			continue
+		}
+		if verbose {
+			log.Printf("parsing package file: %q", name)
 		}
 		file, err := os.Open(filepath.Join(workDir, name))
 		if err != nil {
@@ -321,6 +319,37 @@ func buildFunc(info types.Info, fn *ast.FuncType) (ret Func, err error) {
 	return ret, nil
 }
 
+func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
+	fileTags := make(map[string]bool)
+	build_goodOSArchFile(ctx, name, fileTags)
+	ext = filepath.Ext(name)
+	switch len(fileTags) {
+	case 0: // *
+		base = strings.TrimSuffix(name, ext)
+
+	case 1: // *_GOOS or *_GOARCH
+		i := strings.LastIndexByte(name, '_')
+
+		base = name[:i]
+		tags = strings.TrimSuffix(name[i:], ext)
+
+	case 2: // *_GOOS_GOARCH
+		var i int
+		i = strings.LastIndexByte(name, '_')
+		i = strings.LastIndexByte(name[:i], '_')
+
+		base = name[:i]
+		tags = strings.TrimSuffix(name[i:], ext)
+
+	default:
+		panic(fmt.Sprintf(
+			"gtrace: internal error: unexpected number of OS/arch tags: %d",
+			len(fileTags),
+		))
+	}
+	return
+}
+
 type Package struct {
 	*types.Package
 
@@ -428,4 +457,20 @@ func scanBuildConstraints(r io.Reader) (cs []string, err error) {
 		}
 	}
 	return cs, nil
+}
+
+func prettyPrint(w io.Writer, x interface{}) {
+	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
+	t := reflect.TypeOf(x)
+	v := reflect.ValueOf(x)
+	for i := 0; i < t.NumField(); i++ {
+		if v.Field(i).IsZero() {
+			continue
+		}
+		fmt.Fprintf(tw, "%s:\t%v\n",
+			t.Field(i).Name,
+			v.Field(i),
+		)
+	}
+	tw.Flush()
 }

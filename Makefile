@@ -12,7 +12,13 @@ test: gtrace
 	find ./test -name '*_gtrace*' -delete
 	for os in linux darwin; do \
 		for arch in amd64 arm64; do \
+			echo "--------"; \
+			echo "running: GOOS=$$os GOARCH=$$arch go generate ./test"; \
+			echo "--------"; \
 			PATH=$(PWD):$(PATH)	GOOS=$$os GOARCH=$$arch go generate ./test; \
+			if [[ $$? -ne 0 ]]; then \
+				exit 1;\
+			fi; \
 		done; \
 	done
 	go test -v ./test
