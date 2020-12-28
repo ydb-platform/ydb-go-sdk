@@ -37,3 +37,4 @@ clean:
 	rm -f gtrace
 	rm -f pinger
 	find ./test -name '*_gtrace*' -delete
+	find ./examples -name '*_gtrace*' -delete
