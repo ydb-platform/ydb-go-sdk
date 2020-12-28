@@ -6,6 +6,7 @@ gtrace:
 examples: gtrace
 	PATH=$(PWD):$(PATH)	go generate ./examples/...
 	go build -o pinger ./examples/pinger
+	go build -o buildtags ./examples/buildtags
 
 .PHONY: test
 test: gtrace
@@ -35,3 +36,4 @@ test: gtrace
 clean:
 	rm -f gtrace
 	rm -f pinger
+	find ./test -name '*_gtrace*' -delete

@@ -185,3 +185,70 @@ func TestCompose(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildTagTrace(t *testing.T) {
+	t0 := BuildTagTrace{
+		OnSomethingA: func() func() {
+			panic("must not be called")
+		},
+		OnSomethingB: func(int8, int16) func(int32, int64) {
+			panic("must not be called")
+		},
+		OnSomethingC: func(Type) func(Type) {
+			panic("must not be called")
+		},
+	}
+	t1 := BuildTagTrace{
+		OnSomethingA: func() func() {
+			panic("must not be called")
+		},
+		OnSomethingB: func(int8, int16) func(int32, int64) {
+			panic("must not be called")
+		},
+		OnSomethingC: func(Type) func(Type) {
+			panic("must not be called")
+		},
+	}
+	trace := t0.Compose(t1)
+	trace.onSomethingA(context.Background())()
+	trace.onSomethingB(context.Background(), 1, 2)(3, 4)
+	trace.onSomethingC(context.Background(), Type{})(Type{})
+}
+
+func BenchmarkBuildTagTrace(b *testing.B) {
+	x := BuildTagTrace{
+		OnSomethingA: func() func() {
+			return func() {
+				//
+			}
+		},
+		OnSomethingB: func(int8, int16) func(int32, int64) {
+			return func(int32, int64) {
+				//
+			}
+		},
+		OnSomethingC: func(Type) func(Type) {
+			return func(Type) {
+				//
+			}
+		},
+	}
+
+	t := x.Compose(x).Compose(x).Compose(x)
+
+	b.Run("OnSomethingA", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			t.onSomethingA(context.Background())()
+		}
+	})
+	b.Run("OnSomethingB", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			t.onSomethingB(context.Background(), 1, 2)(3, 4)
+		}
+	})
+	b.Run("OnSomethingC", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			t.onSomethingC(context.Background(), Type{})(Type{})
+		}
+	})
+}

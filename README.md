@@ -90,7 +90,7 @@ func (c *Client) ping(ctx context.Context) error {
 }
 ```
 
-*grace* has generated that `lib.Client.onPing()` unexported method which checks if appopriate _probe_ function is non-nil (as well as the returned _ping done_ callback). If any of the callbacks is nil it returns noop functions to avoid branching in the `Client.ping()` code.
+*grace* has generated that `lib.Client.onPing()` non-exported method which checks if appopriate _probe_ function is non-nil (as well as the returned _ping done_ callback). If any of the callbacks is nil it returns noop functions to avoid branching in the `Client.ping()` code.
 
 ### Composing
 
@@ -212,6 +212,14 @@ func (c *Client) ping(ctx context.Context) error {
 	return err
 }
 ```
+
+### Build Tags
+
+**gtrace** can generate zero-cost tracing helpers when tracing of your app is optional. That is, your client code will remain the same -- composing traces with needed callbacks, calling non-exported versions of _hooks_ (or _shortcuts_) etc. But after compilation calling the tracing helpers would take no CPU time.
+
+To do that, you can pass the `-tag` flag to `gtrace` binary, which will result generation of two `_gtrace` files -- one which will be used when compiling with `-tags gtrace`, and one with stubs.
+
+> NOTE: **gtrace** also respects build constraints for GOOS and GOARCH.
 
 ### Examples
 

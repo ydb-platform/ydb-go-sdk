@@ -27,9 +27,11 @@ func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
 
 func main() {
 	var (
-		verbose bool
-		suffix  string
-		write   bool
+		verbose    bool
+		suffix     string
+		stubSuffix string
+		write      bool
+		buildTag   string
 	)
 	flag.BoolVar(&verbose,
 		"v", false,
@@ -42,6 +44,14 @@ func main() {
 	flag.StringVar(&suffix,
 		"file-suffix", "_gtrace",
 		"suffix for generated go files",
+	)
+	flag.StringVar(&stubSuffix,
+		"stub-file-suffix", "_stub",
+		"suffix for generated stub go files",
+	)
+	flag.StringVar(&buildTag,
+		"tag", "",
+		"build tag which needs to be passed to enable tracing",
 	)
 	flag.Parse()
 
@@ -88,7 +98,7 @@ func main() {
 		log.Printf("package files: %v", buildPkg.GoFiles)
 	}
 
-	var dest io.Writer
+	var writers []Writer
 	if isGoGenerate || write {
 		// We should support Go suffixes like `_linux.go` properly.
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
@@ -98,18 +108,38 @@ func main() {
 				gofile, name, tags, ext,
 			)
 		}
-		dstFilePath := filepath.Join(workDir, name+suffix+tags+ext)
-		if verbose {
-			log.Printf("destination file path: %+v", dstFilePath)
+		openFile := func(name string) (*os.File, func()) {
+			p := filepath.Join(workDir, name)
+			if verbose {
+				log.Printf("destination file path: %+v", p)
+			}
+			f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+			if err != nil {
+				log.Fatal(err)
+			}
+			return f, func() { f.Close() }
 		}
-		dstFile, err := os.OpenFile(dstFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-		if err != nil {
-			log.Fatal(err)
+		f, clean := openFile(name + suffix + tags + ext)
+		defer clean()
+		writers = append(writers, Writer{
+			Output:   f,
+			BuildTag: buildTag,
+		})
+		if buildTag != "" {
+			f, clean := openFile(name + suffix + stubSuffix + tags + ext)
+			defer clean()
+			writers = append(writers, Writer{
+				Output:   f,
+				BuildTag: buildTag,
+				Stub:     true,
+			})
 		}
-		defer dstFile.Close()
-		dest = dstFile
 	} else {
-		dest = os.Stdout
+		writers = append(writers, Writer{
+			Output:   os.Stdout,
+			BuildTag: buildTag,
+			Stub:     true,
+		})
 	}
 
 	var (
@@ -121,7 +151,7 @@ func main() {
 	fset := token.NewFileSet()
 	for _, name := range buildPkg.GoFiles {
 		base, _, _ := splitOSArchTags(&buildCtx, name)
-		if strings.HasSuffix(base, suffix) {
+		if isGenerated(base, suffix) {
 			// Skip gtrace generated files.
 			if verbose {
 				log.Printf("skipped package file: %q", name)
@@ -247,9 +277,6 @@ func main() {
 			return true
 		})
 	}
-	w := Writer{
-		Output: dest,
-	}
 	p := Package{
 		Package:          pkg,
 		BuildConstraints: buildConstraints,
@@ -278,8 +305,10 @@ func main() {
 		}
 		p.Traces = append(p.Traces, t)
 	}
-	if err := w.Write(p); err != nil {
-		log.Fatal(err)
+	for _, w := range writers {
+		if err := w.Write(p); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	log.Println("OK")
@@ -473,4 +502,14 @@ func prettyPrint(w io.Writer, x interface{}) {
 		)
 	}
 	tw.Flush()
+}
+
+func isGenerated(base, suffix string) bool {
+	i := strings.Index(base, suffix)
+	if i == -1 {
+		return false
+	}
+	n := len(base)
+	m := i + len(suffix)
+	return m == n || base[m] == '_'
 }
