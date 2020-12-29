@@ -311,7 +311,7 @@ func main() {
 		}
 	}
 
-	log.Println("OK")
+	log.Printf("%s: OK", srcFilePath)
 }
 
 func buildFunc(info types.Info, fn *ast.FuncType) (ret Func, err error) {
