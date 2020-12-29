@@ -104,33 +104,33 @@ func ContextBuildTagTrace(ctx context.Context) BuildTagTrace {
 	return t
 }
 
-func gtraceNoop() {
+func gtraceNoopDe11bf52() {
 }
 func (BuildTagTrace) onSomethingA(context.Context) func() {
-	return gtraceNoop
+	return gtraceNoopDe11bf52
 }
-func gtraceNoop1(int32, int64) {
+func gtraceNoop61afed37(int32, int64) {
 }
 func (BuildTagTrace) onSomethingB(context.Context, int8, int16) func(int32, int64) {
-	return gtraceNoop1
+	return gtraceNoop61afed37
 }
-func gtraceNoop2(Type) {
+func gtraceNoop8bdd2eba(Type) {
 }
 func (BuildTagTrace) onSomethingC(context.Context, Type) func(Type) {
-	return gtraceNoop2
+	return gtraceNoop8bdd2eba
 }
-func gtraceNoop3() {
+func gtraceNoopDe11bf521() {
 }
 func buildTagTraceOnSomethingA(context.Context, BuildTagTrace) func() {
-	return gtraceNoop3
+	return gtraceNoopDe11bf521
 }
-func gtraceNoop4(int32, int64) {
+func gtraceNoop61afed371(int32, int64) {
 }
 func buildTagTraceOnSomethingB(context.Context, BuildTagTrace, int8, int16) func(int32, int64) {
-	return gtraceNoop4
+	return gtraceNoop61afed371
 }
-func gtraceNoop5(string, int, bool, error) {
+func gtraceNoop8bdd2eba1(string, int, bool, error) {
 }
 func buildTagTraceOnSomethingC(context.Context, BuildTagTrace, string, int, bool, error) func(string, int, bool, error) {
-	return gtraceNoop5
+	return gtraceNoop8bdd2eba1
 }

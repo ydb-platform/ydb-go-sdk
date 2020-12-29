@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"container/list"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"go/token"
 	"go/types"
@@ -327,14 +329,14 @@ var contextType = (func() types.Type {
 	return types.NewNamed(name, typ, nil)
 })()
 
-func (w *Writer) stubFunc(f Func) (name string) {
-	name = funcName("gtrace", "noop")
+func (w *Writer) stubFunc(id string, f Func) (name string) {
+	name = funcName("gtrace", "noop", id)
 	name = unexported(name)
 	name = w.declare(name)
 
 	var res string
 	for _, f := range f.Result {
-		res = w.stubFunc(f)
+		res = w.stubFunc(id, f)
 	}
 	w.newScope(func() {
 		w.code(`func `, name)
@@ -354,7 +356,7 @@ func (w *Writer) stubFunc(f Func) (name string) {
 func (w *Writer) hookStub(trace Trace, hook Hook) {
 	var stubName string
 	if hook.Func.HasResult() {
-		stubName = w.stubFunc(hook.Func.Result[0])
+		stubName = w.stubFunc(uniqueTraceHookID(trace, hook), hook.Func.Result[0])
 	}
 	w.newScope(func() {
 		w.code(`func (`, trace.Name, `) `, unexported(hook.Name))
@@ -380,14 +382,14 @@ func (w *Writer) hookStub(trace Trace, hook Hook) {
 	})
 }
 
-func (w *Writer) stubShortcutFunc(f Func) (name string) {
-	name = funcName("gtrace", "noop")
+func (w *Writer) stubShortcutFunc(id string, f Func) (name string) {
+	name = funcName("gtrace", "noop", id)
 	name = unexported(name)
 	name = w.declare(name)
 
 	var res string
 	for _, f := range f.Result {
-		res = w.stubShortcutFunc(f)
+		res = w.stubShortcutFunc(id, f)
 	}
 	w.newScope(func() {
 		w.code(`func `, name)
@@ -422,7 +424,10 @@ func (w *Writer) hookShortcutStub(trace Trace, hook Hook) {
 
 	var stubName string
 	if hook.Func.HasResult() {
-		stubName = w.stubShortcutFunc(hook.Func.Result[0])
+		stubName = w.stubShortcutFunc(
+			uniqueTraceHookID(trace, hook),
+			hook.Func.Result[0],
+		)
 	}
 
 	w.newScope(func() {
@@ -896,4 +901,13 @@ func (s *scope) set(v string) bool {
 func (s *scope) where(v string) string {
 	d := s.vars[v]
 	return d.where
+}
+
+func uniqueTraceHookID(t Trace, h Hook) string {
+	hash := md5.New()
+	io.WriteString(hash, t.Name)
+	io.WriteString(hash, h.Name)
+	p := hash.Sum(nil)
+	s := hex.EncodeToString(p)
+	return s[:8]
 }
