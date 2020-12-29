@@ -55,7 +55,11 @@ func main() {
 	)
 	flag.Parse()
 
-	log.SetFlags(log.Lshortfile)
+	if verbose {
+		log.SetFlags(log.Lshortfile)
+	} else {
+		log.SetFlags(0)
+	}
 
 	var (
 		// Reports whether we were called from go:generate.
@@ -80,7 +84,10 @@ func main() {
 		gofile = filepath.Base(args[0])
 		workDir = filepath.Dir(args[0])
 	}
-
+	{
+		prefix := filepath.Join(filepath.Base(workDir), gofile)
+		log.SetPrefix("[" + prefix + "] ")
+	}
 	buildCtx := build.Default
 	if verbose {
 		var sb strings.Builder
@@ -311,7 +318,7 @@ func main() {
 		}
 	}
 
-	log.Printf("%s: OK", srcFilePath)
+	log.Println("OK")
 }
 
 func buildFunc(info types.Info, fn *ast.FuncType) (ret Func, err error) {
