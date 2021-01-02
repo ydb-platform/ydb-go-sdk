@@ -82,10 +82,7 @@ message ImportFromS3Response {
 
 /// Data
 message YdbDumpFormat {
-}
-
-message DsvFormat {
-    string delimiter = 1;
+    repeated string columns = 1;
 }
 
 message ImportDataResult {
@@ -97,15 +94,13 @@ message ImportDataRequest {
     string path = 2;
     // Data serialized in the selected format. Restrictions:
     // - sorted by primary key;
-    // - all keys must be from the same shard;
+    // - all keys must be from the same partition;
     // - table has no global secondary indexes;
     // - size of serialized data is limited to 8 MB.
     bytes data = 3 [(length).le = 8388608];
     oneof format {
         // Result of `ydb tools dump`
         YdbDumpFormat ydb_dump = 4;
-        // Delimiter-separated values
-        DsvFormat dsv = 5;
     }
 }
 
