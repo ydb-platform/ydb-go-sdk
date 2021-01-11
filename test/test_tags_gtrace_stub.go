@@ -132,6 +132,6 @@ func buildTagTraceOnSomethingB(context.Context, BuildTagTrace, int8, int16) func
 }
 func gtraceNoop8bdd2eba1(Embeded, string, int, bool, error, bytes.Reader) {
 }
-func buildTagTraceOnSomethingC(context.Context, BuildTagTrace, Embeded, string, int, bool, error, bytes.Reader) func(Embeded, string, int, bool, error, bytes.Reader) {
+func buildTagTraceOnSomethingC(ctx context.Context, t BuildTagTrace, e Embeded, s string, integer int, boolean bool, e1 error, r bytes.Reader) func(_ Embeded, _ string, integer int, boolean bool, _ error, _ bytes.Reader) {
 	return gtraceNoop8bdd2eba1
 }

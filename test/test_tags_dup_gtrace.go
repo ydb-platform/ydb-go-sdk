@@ -237,7 +237,7 @@ func anotherBuildTagTraceOnSomethingB(ctx context.Context, t AnotherBuildTagTrac
 		res(i, i1)
 	}
 }
-func anotherBuildTagTraceOnSomethingC(ctx context.Context, t AnotherBuildTagTrace, e Embeded, s string, integer int, boolean bool, e1 error, r bytes.Reader) func(Embeded, string, int, bool, error, bytes.Reader) {
+func anotherBuildTagTraceOnSomethingC(ctx context.Context, t AnotherBuildTagTrace, e Embeded, s string, integer int, boolean bool, e1 error, r bytes.Reader) func(_ Embeded, _ string, integer int, boolean bool, _ error, _ bytes.Reader) {
 	var p Type
 	p.Embeded = e
 	p.String = s
