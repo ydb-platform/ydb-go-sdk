@@ -6,6 +6,7 @@ package test
 
 import (
 	"context"
+	"bytes"
 )
 
 // Compose returns a new BuildTagTrace which has functional fields composed
@@ -43,18 +44,18 @@ func (t BuildTagTrace) Compose(x BuildTagTrace) (ret BuildTagTrace) {
 	default:
 		h1 := t.OnSomethingB
 		h2 := x.OnSomethingB
-		ret.OnSomethingB = func(in0 int8, in1 int16) func(int32, int64) {
-			r1 := h1(in0, in1)
-			r2 := h2(in0, in1)
+		ret.OnSomethingB = func(i int8, i1 int16) func(int32, int64) {
+			r1 := h1(i, i1)
+			r2 := h2(i, i1)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(in0 int32, in1 int64) {
-					r1(in0, in1)
-					r2(in0, in1)
+				return func(i int32, i1 int64) {
+					r1(i, i1)
+					r2(i, i1)
 				}
 			}
 		}
@@ -67,18 +68,18 @@ func (t BuildTagTrace) Compose(x BuildTagTrace) (ret BuildTagTrace) {
 	default:
 		h1 := t.OnSomethingC
 		h2 := x.OnSomethingC
-		ret.OnSomethingC = func(in0 Type) func(Type) {
-			r1 := h1(in0)
-			r2 := h2(in0)
+		ret.OnSomethingC = func(t Type) func(Type) {
+			r1 := h1(t)
+			r2 := h2(t)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(in0 Type) {
-					r1(in0)
-					r2(in0)
+				return func(t Type) {
+					r1(t)
+					r2(t)
 				}
 			}
 		}
@@ -129,8 +130,8 @@ func gtraceNoop61afed371(int32, int64) {
 func buildTagTraceOnSomethingB(context.Context, BuildTagTrace, int8, int16) func(int32, int64) {
 	return gtraceNoop61afed371
 }
-func gtraceNoop8bdd2eba1(string, int, bool, error) {
+func gtraceNoop8bdd2eba1(Embeded, string, int, bool, error, bytes.Reader) {
 }
-func buildTagTraceOnSomethingC(context.Context, BuildTagTrace, string, int, bool, error) func(string, int, bool, error) {
+func buildTagTraceOnSomethingC(context.Context, BuildTagTrace, Embeded, string, int, bool, error, bytes.Reader) func(Embeded, string, int, bool, error, bytes.Reader) {
 	return gtraceNoop8bdd2eba1
 }

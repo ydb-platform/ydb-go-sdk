@@ -15,9 +15,9 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnInput
 		h2 := x.OnInput
-		ret.OnInput = func(in0 string) func() {
-			r1 := h1(in0)
-			r2 := h2(in0)
+		ret.OnInput = func(s string) func() {
+			r1 := h1(s)
+			r2 := h2(s)
 			switch {
 			case r1 == nil:
 				return r2
@@ -33,14 +33,14 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	}
 	return ret
 }
-func (t Trace) onInput(in0 string) func() {
+func (t Trace) onInput(s string) func() {
 	fn := t.OnInput
 	if fn == nil {
 		return func() {
 			return
 		}
 	}
-	res := fn(in0)
+	res := fn(s)
 	if res == nil {
 		return func() {
 			return

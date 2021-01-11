@@ -15,9 +15,9 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnInput
 		h2 := x.OnInput
-		ret.OnInput = func(in0 string) func() {
-			r1 := h1(in0)
-			r2 := h2(in0)
+		ret.OnInput = func(s string) func() {
+			r1 := h1(s)
+			r2 := h2(s)
 			switch {
 			case r1 == nil:
 				return r2
@@ -33,13 +33,13 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	}
 	return ret
 }
-func gtraceNoop() {
+func gtraceNoopE065cdda() {
 }
 func (Trace) onInput(string) func() {
-	return gtraceNoop
+	return gtraceNoopE065cdda
 }
-func gtraceNoop1() {
+func gtraceNoopE065cdda1() {
 }
 func traceOnInput(Trace, string) func() {
-	return gtraceNoop1
+	return gtraceNoopE065cdda1
 }

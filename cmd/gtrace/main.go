@@ -327,7 +327,14 @@ func buildFunc(info types.Info, fn *ast.FuncType) (ret Func, err error) {
 		if t == nil {
 			log.Fatalf("unknown type: %s", p.Type)
 		}
-		ret.Params = append(ret.Params, t)
+		var name string
+		if len(p.Names) > 0 {
+			name = p.Names[0].Name
+		}
+		ret.Params = append(ret.Params, Param{
+			Name: name,
+			Type: t,
+		})
 	}
 	if fn.Results == nil {
 		return ret, nil
@@ -404,8 +411,13 @@ type Hook struct {
 	Func Func
 }
 
+type Param struct {
+	Name string // Might be empty.
+	Type types.Type
+}
+
 type Func struct {
-	Params []types.Type
+	Params []Param
 	Result []Func // 0 or 1.
 }
 
@@ -467,6 +479,14 @@ func (x *GenItem) ParseParameter(text string) (err error) {
 
 func split(s string, c byte) (s1, s2 string) {
 	i := strings.IndexByte(s, c)
+	if i == -1 {
+		return s, ""
+	}
+	return s[:i], s[i+1:]
+}
+
+func rsplit(s string, c byte) (s1, s2 string) {
+	i := strings.LastIndexByte(s, c)
 	if i == -1 {
 		return s, ""
 	}

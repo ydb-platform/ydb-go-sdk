@@ -6,6 +6,7 @@ package test
 
 import (
 	"context"
+	"bytes"
 )
 
 // Compose returns a new BuildTagTrace which has functional fields composed
@@ -43,18 +44,18 @@ func (t BuildTagTrace) Compose(x BuildTagTrace) (ret BuildTagTrace) {
 	default:
 		h1 := t.OnSomethingB
 		h2 := x.OnSomethingB
-		ret.OnSomethingB = func(in0 int8, in1 int16) func(int32, int64) {
-			r1 := h1(in0, in1)
-			r2 := h2(in0, in1)
+		ret.OnSomethingB = func(i int8, i1 int16) func(int32, int64) {
+			r1 := h1(i, i1)
+			r2 := h2(i, i1)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(in0 int32, in1 int64) {
-					r1(in0, in1)
-					r2(in0, in1)
+				return func(i int32, i1 int64) {
+					r1(i, i1)
+					r2(i, i1)
 				}
 			}
 		}
@@ -67,18 +68,18 @@ func (t BuildTagTrace) Compose(x BuildTagTrace) (ret BuildTagTrace) {
 	default:
 		h1 := t.OnSomethingC
 		h2 := x.OnSomethingC
-		ret.OnSomethingC = func(in0 Type) func(Type) {
-			r1 := h1(in0)
-			r2 := h2(in0)
+		ret.OnSomethingC = func(t Type) func(Type) {
+			r1 := h1(t)
+			r2 := h2(t)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(in0 Type) {
-					r1(in0)
-					r2(in0)
+				return func(t Type) {
+					r1(t)
+					r2(t)
 				}
 			}
 		}
@@ -144,7 +145,7 @@ func (t BuildTagTrace) onSomethingA(ctx context.Context) func() {
 	}
 	return res
 }
-func (t BuildTagTrace) onSomethingB(ctx context.Context, in0 int8, in1 int16) func(int32, int64) {
+func (t BuildTagTrace) onSomethingB(ctx context.Context, i int8, i1 int16) func(int32, int64) {
 	c := ContextBuildTagTrace(ctx)
 	var fn func(int8, int16) func(int32, int64) 
 	switch {
@@ -155,18 +156,18 @@ func (t BuildTagTrace) onSomethingB(ctx context.Context, in0 int8, in1 int16) fu
 	default:
 		h1 := t.OnSomethingB
 		h2 := c.OnSomethingB
-		fn = func(in0 int8, in1 int16) func(int32, int64) {
-			r1 := h1(in0, in1)
-			r2 := h2(in0, in1)
+		fn = func(i int8, i1 int16) func(int32, int64) {
+			r1 := h1(i, i1)
+			r2 := h2(i, i1)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(in0 int32, in1 int64) {
-					r1(in0, in1)
-					r2(in0, in1)
+				return func(i int32, i1 int64) {
+					r1(i, i1)
+					r2(i, i1)
 				}
 			}
 		}
@@ -176,7 +177,7 @@ func (t BuildTagTrace) onSomethingB(ctx context.Context, in0 int8, in1 int16) fu
 			return
 		}
 	}
-	res := fn(in0, in1)
+	res := fn(i, i1)
 	if res == nil {
 		return func(int32, int64) {
 			return
@@ -184,7 +185,7 @@ func (t BuildTagTrace) onSomethingB(ctx context.Context, in0 int8, in1 int16) fu
 	}
 	return res
 }
-func (t BuildTagTrace) onSomethingC(ctx context.Context, in0 Type) func(Type) {
+func (t BuildTagTrace) onSomethingC(ctx context.Context, t1 Type) func(Type) {
 	c := ContextBuildTagTrace(ctx)
 	var fn func(Type) func(Type) 
 	switch {
@@ -195,18 +196,18 @@ func (t BuildTagTrace) onSomethingC(ctx context.Context, in0 Type) func(Type) {
 	default:
 		h1 := t.OnSomethingC
 		h2 := c.OnSomethingC
-		fn = func(in0 Type) func(Type) {
-			r1 := h1(in0)
-			r2 := h2(in0)
+		fn = func(t Type) func(Type) {
+			r1 := h1(t)
+			r2 := h2(t)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(in0 Type) {
-					r1(in0)
-					r2(in0)
+				return func(t Type) {
+					r1(t)
+					r2(t)
 				}
 			}
 		}
@@ -216,7 +217,7 @@ func (t BuildTagTrace) onSomethingC(ctx context.Context, in0 Type) func(Type) {
 			return
 		}
 	}
-	res := fn(in0)
+	res := fn(t1)
 	if res == nil {
 		return func(Type) {
 			return
@@ -232,23 +233,27 @@ func buildTagTraceOnSomethingA(ctx context.Context, t BuildTagTrace) func() {
 }
 func buildTagTraceOnSomethingB(ctx context.Context, t BuildTagTrace, i int8, i1 int16) func(int32, int64) {
 	res := t.onSomethingB(ctx, i, i1)
-	return func(i2 int32, i3 int64) {
-		res(i2, i3)
+	return func(i int32, i1 int64) {
+		res(i, i1)
 	}
 }
-func buildTagTraceOnSomethingC(ctx context.Context, t BuildTagTrace, s string, i int, b bool, e error) func(string, int, bool, error) {
+func buildTagTraceOnSomethingC(ctx context.Context, t BuildTagTrace, e Embeded, s string, integer int, boolean bool, e1 error, r bytes.Reader) func(Embeded, string, int, bool, error, bytes.Reader) {
 	var p Type
+	p.Embeded = e
 	p.String = s
-	p.Integer = i
-	p.Boolean = b
-	p.Error = e
+	p.Integer = integer
+	p.Boolean = boolean
+	p.Error = e1
+	p.Reader = r
 	res := t.onSomethingC(ctx, p)
-	return func(s1 string, i1 int, b1 bool, e1 error) {
+	return func(e Embeded, s string, integer int, boolean bool, e1 error, r bytes.Reader) {
 		var p Type
-		p.String = s1
-		p.Integer = i1
-		p.Boolean = b1
+		p.Embeded = e
+		p.String = s
+		p.Integer = integer
+		p.Boolean = boolean
 		p.Error = e1
+		p.Reader = r
 		res(p)
 	}
 }

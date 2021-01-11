@@ -18,18 +18,18 @@ func (t PingTrace) Compose(x PingTrace) (ret PingTrace) {
 	default:
 		h1 := t.OnRequest
 		h2 := x.OnRequest
-		ret.OnRequest = func(in0 PingTraceRequestStart) func(PingTraceRequestDone) {
-			r1 := h1(in0)
-			r2 := h2(in0)
+		ret.OnRequest = func(p PingTraceRequestStart) func(PingTraceRequestDone) {
+			r1 := h1(p)
+			r2 := h2(p)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(in0 PingTraceRequestDone) {
-					r1(in0)
-					r2(in0)
+				return func(p PingTraceRequestDone) {
+					r1(p)
+					r2(p)
 				}
 			}
 		}
@@ -55,7 +55,7 @@ func ContextPingTrace(ctx context.Context) PingTrace {
 	return t
 }
 
-func (t PingTrace) onRequest(ctx context.Context, in0 PingTraceRequestStart) func(PingTraceRequestDone) {
+func (t PingTrace) onRequest(ctx context.Context, p PingTraceRequestStart) func(PingTraceRequestDone) {
 	c := ContextPingTrace(ctx)
 	var fn func(PingTraceRequestStart) func(PingTraceRequestDone) 
 	switch {
@@ -66,18 +66,18 @@ func (t PingTrace) onRequest(ctx context.Context, in0 PingTraceRequestStart) fun
 	default:
 		h1 := t.OnRequest
 		h2 := c.OnRequest
-		fn = func(in0 PingTraceRequestStart) func(PingTraceRequestDone) {
-			r1 := h1(in0)
-			r2 := h2(in0)
+		fn = func(p PingTraceRequestStart) func(PingTraceRequestDone) {
+			r1 := h1(p)
+			r2 := h2(p)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(in0 PingTraceRequestDone) {
-					r1(in0)
-					r2(in0)
+				return func(p PingTraceRequestDone) {
+					r1(p)
+					r2(p)
 				}
 			}
 		}
@@ -87,7 +87,7 @@ func (t PingTrace) onRequest(ctx context.Context, in0 PingTraceRequestStart) fun
 			return
 		}
 	}
-	res := fn(in0)
+	res := fn(p)
 	if res == nil {
 		return func(PingTraceRequestDone) {
 			return
@@ -99,9 +99,9 @@ func pingTraceOnRequest(ctx context.Context, t PingTrace, r *http.Request) func(
 	var p PingTraceRequestStart
 	p.Request = r
 	res := t.onRequest(ctx, p)
-	return func(r1 *http.Response, e error) {
+	return func(r *http.Response, e error) {
 		var p PingTraceRequestDone
-		p.Response = r1
+		p.Response = r
 		p.Error = e
 		res(p)
 	}

@@ -14,6 +14,7 @@ type Trace struct {
 	OnSomething1 func(int8, int16) func(int32, int64)
 	OnSomething2 func(Type) func(Type) func(Type)
 	OnAnother    func()
+	OnAnother1   func(named string)
 
 	// Not supported signatures:
 	Skipped0 func() string
