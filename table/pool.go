@@ -577,6 +577,15 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	return nil
 }
 
+func (p *SessionPool) Stats() SessionPoolStats {
+	return SessionPoolStats{
+		Idle:    p.idle.Len(),
+		Ready:   p.ready.Len(),
+		MinSize: p.KeepAliveMinSize,
+		MaxSize: p.SizeLimit,
+	}
+}
+
 func (p *SessionPool) busyChecker() {
 	defer close(p.busyCheckerDone)
 	var (
@@ -1212,4 +1221,11 @@ type sessionInfo struct {
 func panicLocked(mu sync.Locker, message string) {
 	mu.Unlock()
 	panic(message)
+}
+
+type SessionPoolStats struct {
+	Idle    int
+	Ready   int
+	MinSize int
+	MaxSize int
 }
