@@ -1,0 +1,76 @@
+syntax = "proto3";
+option cc_enable_arenas = true;
+
+package Yql.Analytics;
+option java_package = "com.yandex.yql.analytics";
+option java_outer_classname = "AnalyticsProtos";
+
+import "kikimr/public/api/protos/ydb_operation.proto";
+import "kikimr/public/api/protos/ydb_value.proto";
+
+import "google/protobuf/timestamp.proto";
+
+////////////////////////////////////////////////////////////
+
+message ExecuteQueryRequest {
+    enum EExecuteMode {
+        MODE_UNSPECIFIED      = 0x0000;
+        RUN                   = 0x0001;
+        EXPLAIN               = 0x0002;
+        VALIDATE              = 0x0003;
+        PARSE                 = 0x0004;
+    }
+
+    Ydb.Operations.OperationParams operation_params = 1;
+    string yql_text = 2;
+    EExecuteMode execute_mode = 3;
+    uint64 max_result_bytes = 4;
+    uint64 max_result_rows = 5;
+    uint32 expire_after_seconds = 6;
+    // Map of query parameters (optional)
+    map<string, Ydb.TypedValue> parameters = 7;
+}
+
+message ExecuteQueryResponse {
+    Ydb.Operations.Operation operation = 1; // ExecuteQueryResult
+}
+
+message ExecuteQueryResult {
+    string result_id = 1;
+    string query_plan = 2;
+}
+
+message GetResultInfoRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string result_id = 2;
+}
+
+message GetResultInfoResponse {
+    Ydb.Operations.Operation operation = 1; // GetResultInfoResult
+}
+
+message ResultSetInfo {
+    uint64 rows_count = 1;
+    bool is_truncated = 2;
+}
+
+message GetResultInfoResult {
+    repeated ResultSetInfo result_sets = 1;
+    google.protobuf.Timestamp expiration_deadline = 2;
+}
+ 
+message GetResultDataRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string result_id = 2;
+    uint32 result_set_id = 3;
+    uint64 offset = 4;
+    uint64 limit = 5;
+}
+
+message GetResultDataResponse {
+    Ydb.Operations.Operation operation = 1; // GetResultDataResult
+}
+
+message GetResultDataResult {
+    Ydb.ResultSet result_set = 1;
+}

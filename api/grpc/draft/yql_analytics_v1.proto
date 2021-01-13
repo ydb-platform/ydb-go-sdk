@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package Yql.Analytics.V1;
+option java_package = "com.yandex.yql.analytics.v1";
+
+import "kikimr/public/api/protos/draft/yql_analytics.proto";
+
+service AnalyticsService {
+    rpc ExecuteQuery(Analytics.ExecuteQueryRequest) returns (Analytics.ExecuteQueryResponse);
+
+    rpc GetResultInfo(Analytics.GetResultInfoRequest) returns (Analytics.GetResultInfoResponse);
+
+    rpc GetResultData(Analytics.GetResultDataRequest) returns (Analytics.GetResultDataResponse);
+}
+
