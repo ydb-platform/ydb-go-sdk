@@ -105,7 +105,7 @@ func main() {
 		log.Printf("package files: %v", buildPkg.GoFiles)
 	}
 
-	var writers []Writer
+	var writers []*Writer
 	if isGoGenerate || write {
 		// We should support Go suffixes like `_linux.go` properly.
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
@@ -128,7 +128,7 @@ func main() {
 		}
 		f, clean := openFile(name + suffix + tags + ext)
 		defer clean()
-		writers = append(writers, Writer{
+		writers = append(writers, &Writer{
 			Context:  buildCtx,
 			Output:   f,
 			BuildTag: buildTag,
@@ -136,7 +136,7 @@ func main() {
 		if buildTag != "" {
 			f, clean := openFile(name + suffix + stubSuffix + tags + ext)
 			defer clean()
-			writers = append(writers, Writer{
+			writers = append(writers, &Writer{
 				Context:  buildCtx,
 				Output:   f,
 				BuildTag: buildTag,
@@ -144,7 +144,7 @@ func main() {
 			})
 		}
 	} else {
-		writers = append(writers, Writer{
+		writers = append(writers, &Writer{
 			Context:  buildCtx,
 			Output:   os.Stdout,
 			BuildTag: buildTag,
