@@ -186,6 +186,19 @@ func TestCompose(t *testing.T) {
 	}
 }
 
+func TestShortcutPerFieldTrace(t *testing.T) {
+	var called bool
+	t0 := ShortcutPerFieldTrace{
+		OnFoo: func() {
+			called = true
+		},
+	}
+	shortcutPerFieldTraceOnFoo(t0)
+	if !called {
+		t.Fatalf("hook wasn't called")
+	}
+}
+
 func TestBuildTagTrace(t *testing.T) {
 	t0 := BuildTagTrace{
 		OnSomethingA: func() func() {

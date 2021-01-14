@@ -258,8 +258,8 @@ func main() {
 				for i, c := range v.List {
 					logf("#%d comment %q", i, c.Text)
 
-					text := strings.TrimPrefix(c.Text, "//gtrace:")
-					if c.Text != text {
+					text, ok := TrimConfigComment(c.Text)
+					if ok {
 						if item == nil {
 							item = &GenItem{
 								File: pkgFiles[i],
@@ -284,6 +284,7 @@ func main() {
 				}
 				return false
 			}
+
 			return true
 		})
 	}
@@ -298,20 +299,39 @@ func main() {
 		}
 		for _, field := range item.StructType.Fields.List {
 			name := field.Names[0].Name
-			if fn, ok := field.Type.(*ast.FuncType); ok {
-				f, err := buildFunc(info, fn)
-				if err != nil {
-					log.Printf(
-						"skipping hook %s due to error: %v",
-						name, err,
-					)
-					continue
-				}
-				t.Hooks = append(t.Hooks, Hook{
-					Name: name,
-					Func: f,
-				})
+			fn, ok := field.Type.(*ast.FuncType)
+			if !ok {
+				continue
 			}
+			f, err := buildFunc(info, fn)
+			if err != nil {
+				log.Printf(
+					"skipping hook %s due to error: %v",
+					name, err,
+				)
+				continue
+			}
+			var config GenConfig
+			if doc := field.Doc; doc != nil {
+				for _, line := range doc.List {
+					text, ok := TrimConfigComment(line.Text)
+					if !ok {
+						continue
+					}
+					err := config.ParseComment(text)
+					if err != nil {
+						log.Fatalf(
+							"malformed comment string: %q: %v",
+							text, err,
+						)
+					}
+				}
+			}
+			t.Hooks = append(t.Hooks, Hook{
+				Name: name,
+				Func: f,
+				Flag: item.GenConfig.Flag | config.Flag,
+			})
 		}
 		p.Traces = append(p.Traces, t)
 	}
@@ -412,6 +432,7 @@ type Trace struct {
 type Hook struct {
 	Name string
 	Func Func
+	Flag GenFlag
 }
 
 type Param struct {
@@ -442,28 +463,31 @@ const (
 	GenAll = ^GenFlag(0)
 )
 
-type GenItem struct {
-	File       *os.File
-	Ident      *ast.Ident
-	TypeSpec   *ast.TypeSpec
-	StructType *ast.StructType
-
+type GenConfig struct {
 	Flag GenFlag
 }
 
-func (x *GenItem) ParseComment(text string) (err error) {
+func TrimConfigComment(text string) (string, bool) {
+	s := strings.TrimPrefix(text, "//gtrace:")
+	if text != s {
+		return s, true
+	}
+	return "", false
+}
+
+func (g *GenConfig) ParseComment(text string) (err error) {
 	prefix, text := split(text, ' ')
 	switch prefix {
 	case "gen":
 	case "set":
-		return x.ParseParameter(text)
+		return g.ParseParameter(text)
 	default:
 		return fmt.Errorf("unknown prefix: %q", prefix)
 	}
 	return nil
 }
 
-func (x *GenItem) ParseParameter(text string) (err error) {
+func (g *GenConfig) ParseParameter(text string) (err error) {
 	text = strings.TrimSpace(text)
 	param, _ := split(text, '=')
 	if param == "" {
@@ -471,13 +495,21 @@ func (x *GenItem) ParseParameter(text string) (err error) {
 	}
 	switch param {
 	case "shortcut":
-		x.Flag |= GenShortcut
+		g.Flag |= GenShortcut
 	case "context":
-		x.Flag |= GenContext
+		g.Flag |= GenContext
 	default:
 		return fmt.Errorf("unexpected parameter: %q", param)
 	}
 	return nil
+}
+
+type GenItem struct {
+	GenConfig
+	File       *os.File
+	Ident      *ast.Ident
+	TypeSpec   *ast.TypeSpec
+	StructType *ast.StructType
 }
 
 func split(s string, c byte) (s1, s2 string) {

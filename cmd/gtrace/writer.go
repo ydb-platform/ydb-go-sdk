@@ -87,10 +87,10 @@ func (w *Writer) Write(p Package) error {
 			}
 		}
 		for _, trace := range p.Traces {
-			if !trace.Flag.Has(GenShortcut) {
-				continue
-			}
 			for _, hook := range trace.Hooks {
+				if !hook.Flag.Has(GenShortcut) {
+					continue
+				}
 				if w.Stub {
 					w.stubHookShortcut(trace, hook)
 				} else {
@@ -203,10 +203,10 @@ func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 	return
 }
 
-func (w *Writer) traceFuncImports(dst []dep, trace Trace, fn Func) []dep {
+func (w *Writer) funcImports(dst []dep, flag GenFlag, fn Func) []dep {
 	for _, p := range fn.Params {
 		dst = w.typeImports(dst, p.Type)
-		if !trace.Flag.Has(GenShortcut) {
+		if !flag.Has(GenShortcut) {
 			continue
 		}
 		if _, s := unwrapStruct(p.Type); s != nil {
@@ -218,7 +218,7 @@ func (w *Writer) traceFuncImports(dst []dep, trace Trace, fn Func) []dep {
 		}
 	}
 	for _, fn := range fn.Result {
-		dst = w.traceFuncImports(dst, trace, fn)
+		dst = w.funcImports(dst, flag, fn)
 	}
 	return dst
 }
@@ -232,7 +232,7 @@ func (w *Writer) traceImports(dst []dep, t Trace) []dep {
 		})
 	}
 	for _, h := range t.Hooks {
-		dst = w.traceFuncImports(dst, t, h.Func)
+		dst = w.funcImports(dst, h.Flag, h.Func)
 	}
 	return dst
 }
