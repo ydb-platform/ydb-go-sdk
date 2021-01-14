@@ -129,6 +129,7 @@ func main() {
 		f, clean := openFile(name + suffix + tags + ext)
 		defer clean()
 		writers = append(writers, Writer{
+			Context:  buildCtx,
 			Output:   f,
 			BuildTag: buildTag,
 		})
@@ -136,6 +137,7 @@ func main() {
 			f, clean := openFile(name + suffix + stubSuffix + tags + ext)
 			defer clean()
 			writers = append(writers, Writer{
+				Context:  buildCtx,
 				Output:   f,
 				BuildTag: buildTag,
 				Stub:     true,
@@ -143,6 +145,7 @@ func main() {
 		}
 	} else {
 		writers = append(writers, Writer{
+			Context:  buildCtx,
 			Output:   os.Stdout,
 			BuildTag: buildTag,
 			Stub:     true,

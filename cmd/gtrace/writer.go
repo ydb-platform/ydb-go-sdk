@@ -6,10 +6,14 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"go/build"
 	"go/token"
 	"go/types"
 	"io"
+	"io/ioutil"
+	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,6 +25,7 @@ type Writer struct {
 	Output   io.Writer
 	BuildTag string
 	Stub     bool
+	Context  build.Context
 
 	once sync.Once
 	bw   *bufio.Writer
@@ -30,6 +35,7 @@ type Writer struct {
 	scope *list.List
 
 	pkg *types.Package
+	std map[string]bool
 }
 
 func (w *Writer) Write(p Package) error {
@@ -160,9 +166,9 @@ type dep struct {
 	typName string
 }
 
-func (w *Writer) imports(dst []dep, t types.Type) []dep {
+func (w *Writer) typeImports(dst []dep, t types.Type) []dep {
 	if p, ok := t.(*types.Pointer); ok {
-		return w.imports(dst, p.Elem())
+		return w.typeImports(dst, p.Elem())
 	}
 	n, ok := t.(*types.Named)
 	if !ok {
@@ -197,19 +203,22 @@ func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 	return
 }
 
-func (w *Writer) funcImports(dst []dep, fn Func) []dep {
+func (w *Writer) traceFuncImports(dst []dep, trace Trace, fn Func) []dep {
 	for _, p := range fn.Params {
-		dst = w.imports(dst, p.Type)
+		dst = w.typeImports(dst, p.Type)
+		if !trace.Flag.Has(GenShortcut) {
+			continue
+		}
 		if _, s := unwrapStruct(p.Type); s != nil {
 			forEachField(s, func(v *types.Var) {
 				if v.Exported() {
-					dst = w.imports(dst, v.Type())
+					dst = w.typeImports(dst, v.Type())
 				}
 			})
 		}
 	}
 	for _, fn := range fn.Result {
-		dst = w.funcImports(dst, fn)
+		dst = w.traceFuncImports(dst, trace, fn)
 	}
 	return dst
 }
@@ -223,27 +232,87 @@ func (w *Writer) traceImports(dst []dep, t Trace) []dep {
 		})
 	}
 	for _, h := range t.Hooks {
-		dst = w.funcImports(dst, h.Func)
+		dst = w.traceFuncImports(dst, t, h.Func)
 	}
 	return dst
 }
 
 func (w *Writer) importDeps(deps []dep) {
-	var seen map[string]bool
-	for _, d := range deps {
-		if seen == nil {
-			seen = make(map[string]bool)
-			w.line(`import (`)
-		}
+	seen := map[string]bool{}
+	for i := 0; i < len(deps); {
+		d := deps[i]
 		if seen[d.pkgPath] {
+			n := len(deps)
+			deps[i], deps[n-1] = deps[n-1], deps[i]
+			deps = deps[:n-1]
 			continue
 		}
 		seen[d.pkgPath] = true
+		i++
+	}
+	if len(deps) == 0 {
+		return
+	}
+	sort.Slice(deps, func(i, j int) bool {
+		var (
+			d0   = deps[i]
+			d1   = deps[j]
+			std0 = w.isStdLib(d0.pkgPath)
+			std1 = w.isStdLib(d1.pkgPath)
+		)
+		if std0 != std1 {
+			return std0
+		}
+		return d0.pkgPath < d1.pkgPath
+	})
+	w.line(`import (`)
+	var (
+		lastStd bool
+	)
+	for _, d := range deps {
+		if w.isStdLib(d.pkgPath) {
+			lastStd = true
+		} else if lastStd {
+			lastStd = false
+			w.line()
+		}
 		w.line("\t", `"`, d.pkgPath, `"`)
 	}
-	if len(seen) > 0 {
-		w.line(`)`)
-		w.line()
+	w.line(`)`)
+	w.line()
+}
+
+func (w *Writer) isStdLib(pkg string) bool {
+	w.ensureStdLibMapping()
+	s := strings.Split(pkg, "/")[0]
+	return w.std[s]
+}
+
+func (w *Writer) ensureStdLibMapping() {
+	if w.std != nil {
+		return
+	}
+	w.std = make(map[string]bool)
+
+	src := filepath.Join(w.Context.GOROOT, "src")
+	files, err := ioutil.ReadDir(src)
+	if err != nil {
+		panic(fmt.Sprintf("can't list GOROOT's src: %v", err))
+	}
+	for _, file := range files {
+		if !file.IsDir() {
+			continue
+		}
+		name := filepath.Base(file.Name())
+		switch name {
+		case
+			"cmd",
+			"internal":
+			// Ignored.
+
+		default:
+			w.std[name] = true
+		}
 	}
 }
 

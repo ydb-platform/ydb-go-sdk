@@ -5,8 +5,8 @@
 package test
 
 import (
-	"context"
 	"bytes"
+	"context"
 )
 
 // Compose returns a new BuildTagTrace which has functional fields composed
