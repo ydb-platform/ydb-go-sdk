@@ -30,9 +30,10 @@ message ExecuteYqlResult {
 
 message ExplainYqlRequest {
     enum Mode {
-        PARSE = 0;
-        VALIDATE = 1;
-        PLAN = 2;
+        MODE_UNSPECIFIED = 0;
+        // PARSE = 1;
+        VALIDATE = 2;
+        PLAN = 3;
     }
 
     Ydb.Operations.OperationParams operation_params = 1;

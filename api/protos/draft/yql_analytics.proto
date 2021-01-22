@@ -12,6 +12,17 @@ import "google/protobuf/timestamp.proto";
 
 ////////////////////////////////////////////////////////////
 
+message YdbDatabase {
+   string endpoint = 1;
+   string database = 2;
+}
+
+message Connection {
+    oneof connection {
+        YdbDatabase ydb_database = 1;
+    }
+}
+
 message ExecuteQueryRequest {
     enum EExecuteMode {
         MODE_UNSPECIFIED      = 0x0000;
@@ -29,6 +40,7 @@ message ExecuteQueryRequest {
     uint32 expire_after_seconds = 6;
     // Map of query parameters (optional)
     map<string, Ydb.TypedValue> parameters = 7;
+    repeated Connection connections = 8;
 }
 
 message ExecuteQueryResponse {
