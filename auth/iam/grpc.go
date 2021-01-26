@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	v1 "a.yandex-team.ru/cloud/bitbucket/public-api/yandex/cloud/iam/v1"
+	v1 "github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1"
 )
 
 type grpcTransport struct {

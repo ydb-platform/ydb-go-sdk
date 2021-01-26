@@ -10,7 +10,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
 
-	v1 "a.yandex-team.ru/cloud/bitbucket/public-api/yandex/cloud/iam/v1"
+	v1 "github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1"
 )
 
 func TestGRPCCreateToken(t *testing.T) {
