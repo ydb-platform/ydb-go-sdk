@@ -17,12 +17,17 @@ Requires Go 1.13 or later.
 The straightforward example of querying data may looks similar to this:
 
 ```go
-	driver, err := ydb.Dial(ctx, "ydb-ru.yandex.net:2135", &ydb.DriverConfig{
-		Database: "/ru/home/username/db",
-		Credentials: ydb.AuthTokenCredentials{
-			AuthToken: os.Getenv("YDB_TOKEN"),
-		},
-	})
+	dialer := &ydb.Dialer{
+        DriverConfig: &ydb.DriverConfig{
+            Database: "/ru/home/username/db",
+            Credentials: ydb.AuthTokenCredentials{
+                AuthToken: os.Getenv("YDB_TOKEN"),
+            },
+        },
+        TLSConfig:    &tls.Config{/*...*/},
+        Timeout:      time.Second,
+    }
+    driver, err := dialer.Dial(ctx, "ydb-ru.yandex.net:2135")
 	if err != nil {
 		// handle error
 	}
@@ -41,26 +46,24 @@ The straightforward example of querying data may looks similar to this:
 		table.BeginTx(table.WithSerializableReadWrite()),
 		table.CommitTx(),
 	)
+
 	// Execute text query without preparation and with given "autocommit"
 	// transaction control. That is, transaction will be commited without
 	// additional calls. Notice the "_" unused variable – it stands for created
 	// transaction during execution, but as said above, transaction is commited
 	// for us and we do not want to do anything with it.
 	_, res, err := s.Execute(ctx, txc,
-		table.TextDataQuery(
-			`DECLARE $id AS "Utf8"; SELECT * FROM users WHERE user_id=$id`,
-		),
+		`DECLARE $mystr AS Utf8?; SELECT 42 as id, $mystr as mystr`,
 		table.NewQueryParameters(
-			table.ValueParam("$id", ydb.UTF8Value("42")),
+			table.ValueParam("$mystr", ydb.OptionalValue(ydb.UTF8Value("test"))),
 		),
 	)
 	if err != nil {
-		// handle error
+		return err // handle error
 	}
 	// Scan for received values within the result set(s).
 	// Note that Next*() methods report about success of advancing, while
 	// res.Err() reports the reason of last unsuccessful one.
-	var users []user
 	for res.NextSet() {
 		for res.NextRow() {
 			// Suppose our "users" table has two rows: id and age.
@@ -70,28 +73,30 @@ The straightforward example of querying data may looks similar to this:
 			// Note the O*() getters. "O" stands for Optional. That is,
 			// currently, all columns in tables are optional types.
 			res.NextItem()
-			id := res.OUTF8()
+			id := res.Int32()
 
 			res.NextItem()
-			age := res.OUint64()
+			myStr := res.OUTF8()
 
-			// Note that any value getter (such that OUTF8() and OUint64()
+			// Note that any value getter (such that OUTF8() and Int32()
 			// above) may fail the result scanning. When this happens, getter
 			// function returns zero value of requested type and marks result
 			// scanning as failed, preventing any further scanning. In this
 			// case res.Err() will return the cause of fail.
 			if res.Err() == nil {
-				users = append(users, user{
-					id:  id,
-					age: age,
-				})
+				// do something with data
+				fmt.Printf("got id %v, got mystr: %v", id, myStr)
+			} else {
+				return res.Err() // handle error
 			}
 		}
 	}
 	if res.Err() != nil {
-		// handle error
+		return res.Err() // handle error
 	}
 ```
+
+This example can be tested as `ydb/example/from_readme`
 
 YDB sessions may become staled and appropriate error will be returned. To
 reduce boilerplate overhead for such cases `ydb` provides generic retry logic:
