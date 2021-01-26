@@ -7,16 +7,6 @@ option java_outer_classname = "MonitoringProtos";
 
 import "kikimr/public/api/protos/ydb_operation.proto";
 
-message SelfCheckRequest {
-    Ydb.Operations.OperationParams operation_params = 1;
-    bool return_verbose_status = 2;
-}
-
-message SelfCheckResponse {
-    // After successfull completion must contain SelfCheckResult.
-    Ydb.Operations.Operation operation = 1;
-}
-
 message StatusFlag {
     // Describes the general state of a component.
     // From GREEN to RED, where GREEN is good, and RED is bad.
@@ -31,6 +21,18 @@ message StatusFlag {
         RED = 6;
     }
 }
+
+message SelfCheckRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    bool return_verbose_status = 2;
+    StatusFlag.Status minimum_status = 3;
+}
+
+message SelfCheckResponse {
+    // After successfull completion must contain SelfCheckResult.
+    Ydb.Operations.Operation operation = 1;
+}
+
 
 message SelfCheck {
     // Describes the result of self-check performed.
@@ -169,13 +171,14 @@ message IssueLog {
 }
 
 message DatabaseStatus {
-    StatusFlag.Status overall = 1;
-    StorageStatus storage = 2;
-    ComputeStatus compute = 3;
+    string name = 1;
+    StatusFlag.Status overall = 2;
+    StorageStatus storage = 3;
+    ComputeStatus compute = 4;
 }
 
 message SelfCheckResult {
     SelfCheck.Result self_check_result = 1;
     repeated IssueLog issue_log = 2;
-    DatabaseStatus database_status = 3;
+    repeated DatabaseStatus database_status = 3;
 }
