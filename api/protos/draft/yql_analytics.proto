@@ -19,19 +19,146 @@ message YdbDatabase {
 
 message Connection {
     oneof connection {
-        YdbDatabase ydb_database = 1;
+        YdbDatabase ydb_database = 1;        
     }
 }
 
-message ExecuteQueryRequest {
-    enum EExecuteMode {
-        MODE_UNSPECIFIED      = 0x0000;
-        RUN                   = 0x0001;
-        EXPLAIN               = 0x0002;
-        VALIDATE              = 0x0003;
-        PARSE                 = 0x0004;
+message GetConnectionsRequest {
+    string folder_id = 1;
+    message Filter {
+        string connection_id = 1;
+    }
+    Filter filter = 2;
+}
+
+message ConnectionEntity {
+    string folder_id = 1;
+    string connection_id = 2; // create new if connection_id is empty
+    string created_by = 3;
+    string modified_by = 4;
+    string name = 5;
+    Connection connection = 6;
+    string acl = 7;
+    google.protobuf.Timestamp creation_time = 8;
+    google.protobuf.Timestamp modification_time = 9;
+    bool is_deleted = 10;
+}
+
+message GetConnectionsResponse {
+    repeated ConnectionEntity entity = 1;
+}
+
+message ModifyConnectionsRequest {
+    repeated ConnectionEntity connection = 1; 
+}
+
+message ModifyConnectionsResponse { }
+
+enum EFieldType {
+    NONE = 0;
+    SQL = 1;
+    QUERY_PLAN = 2;
+}
+
+message GetQueriesRequest {
+    string folder_id = 1;
+    string continuation_token = 2;
+    int32 limit = 3;
+
+    message Filter {
+        string query_id = 1;
+        // see EFieldType
+        int32 field_type = 2;
+    }
+    Filter filter = 4;
+}
+
+message GetQueriesResponse {
+    message QueryEntity {
+        string id = 1;
+        string sql = 2; // filled by point request if filed_type contains `SQL'
+        string created_by = 3;
+        string modified_by = 4;
+        string name = 5;
+        string folder_id = 6;
+        string acl = 7;
+        int64 rows_limit = 8;	
+        int64 bytes_limit = 9;
+        google.protobuf.Timestamp creation_time = 10;
+        google.protobuf.Timestamp modification_time = 11;
     }
 
+    repeated QueryEntity queries = 1;
+    string continuation_token = 2;
+}
+
+message GetHistoryRequest {
+    string folder_id = 1;
+    string continuation_token = 2;
+
+    message Filter {
+        string query_id = 1;
+        string history_id = 2;
+        // see EFieldType
+        int32 field_type = 3;
+    }
+    Filter filter = 3;
+}
+
+message QueryStatistics {
+}
+
+
+enum EExecuteMode {
+    MODE_UNSPECIFIED      = 0x0000;
+    RUN                   = 0x0001;
+    EXPLAIN               = 0x0002;
+    VALIDATE              = 0x0003;
+    PARSE                 = 0x0004;
+}
+
+enum EQueryStatus {
+    UNSPECIFIED = 0;
+    SAVED = 1;
+    RUNNING = 2;
+    FAILED = 3;
+    FINISHED = 4;
+}
+
+message GetHistoryResponse {
+    message HistoryEntity {
+        string id = 1;
+        string sql = 2; // filled by point request if field_type contains `SQL'
+        string created_by = 3;
+        string modified_by = 4;
+        string name = 5;
+        string folder_id = 6;
+        string acl = 7;
+        string query_plan = 8; // filled by point request if field_type contains `QUERY_PLAN'
+        string query_id = 9;
+
+        repeated bool truncated = 10;
+        repeated int64 rows_count = 11;
+        EQueryStatus status = 12; 
+        EExecuteMode execute_mode = 13;
+
+        int64 rows_limit = 14;
+        int64 bytes_limit = 15;
+
+        google.protobuf.Timestamp start_time = 16;
+        google.protobuf.Timestamp finish_time = 17;
+        google.protobuf.Timestamp expiration_deadline = 18;
+        google.protobuf.Timestamp creation_time = 19;
+        google.protobuf.Timestamp modification_time = 20;
+
+        QueryStatistics statistics = 21;
+    }
+    
+    repeated HistoryEntity history = 1;
+    string continuation_token = 2;
+}
+
+message ExecuteQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string yql_text = 2;
     EExecuteMode execute_mode = 3;
@@ -48,24 +175,29 @@ message ExecuteQueryResponse {
 }
 
 message ExecuteQueryResult {
+    // string history_id = 1; // TODO
     string result_id = 1;
-    string query_plan = 2;
+    string query_plan = 2; // TODO: delete
 }
 
+// delete
 message GetResultInfoRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string result_id = 2;
 }
 
+// delete
 message GetResultInfoResponse {
     Ydb.Operations.Operation operation = 1; // GetResultInfoResult
 }
 
+// delete
 message ResultSetInfo {
     uint64 rows_count = 1;
     bool is_truncated = 2;
 }
 
+// delete
 message GetResultInfoResult {
     repeated ResultSetInfo result_sets = 1;
     google.protobuf.Timestamp expiration_deadline = 2;
@@ -73,7 +205,9 @@ message GetResultInfoResult {
  
 message GetResultDataRequest {
     Ydb.Operations.OperationParams operation_params = 1;
+    // TODO: history_id
     string result_id = 2;
+    // TODO: uint*->int*
     uint32 result_set_id = 3;
     uint64 offset = 4;
     uint64 limit = 5;

@@ -11,5 +11,13 @@ service AnalyticsService {
     rpc GetResultInfo(Analytics.GetResultInfoRequest) returns (Analytics.GetResultInfoResponse);
 
     rpc GetResultData(Analytics.GetResultDataRequest) returns (Analytics.GetResultDataResponse);
+
+    rpc GetConnections(Analytics.GetConnectionsRequest) returns (Analytics.GetConnectionsResponse);
+
+    rpc ModifyConnections(Analytics.ModifyConnectionsRequest) returns (Analytics.ModifyConnectionsResponse);
+
+    rpc GetQueries(Analytics.GetQueriesRequest) returns (Analytics.GetQueriesResponse);
+
+    rpc GetHistory(Analytics.GetHistoryRequest) returns (Analytics.GetHistoryResponse);
 }
 

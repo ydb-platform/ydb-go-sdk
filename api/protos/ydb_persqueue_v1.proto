@@ -1287,3 +1287,4 @@ message DescribeTopicResult {
     TopicSettings settings = 2;
 
 }
+
