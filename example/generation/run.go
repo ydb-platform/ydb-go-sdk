@@ -77,13 +77,13 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	{
 		const fill = `
-			DECLARE $users AS "List<Struct<
+			DECLARE $users AS List<Struct<
 				id: Uint64?,
 				username: Utf8?,
 				mode: Uint64?,
 				magic: Uint32?,
 				score: Int64?,
-				updated: Timestamp?>>";
+				updated: Timestamp?>>;
 
 			REPLACE INTO users
 			SELECT
@@ -112,12 +112,12 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	{
 		const insert = `
-			DECLARE $id AS "Uint64?";
-			DECLARE $username AS "Utf8?";
-			DECLARE $mode AS "Uint64?";
-			DECLARE $magic AS "Uint32?";
-			DECLARE $score AS "Int64?";
-			DECLARE $updated AS "Timestamp?";
+			DECLARE $id AS Uint64?;
+			DECLARE $username AS Utf8?;
+			DECLARE $mode AS Uint64?;
+			DECLARE $magic AS Uint32?;
+			DECLARE $score AS Int64?;
+			DECLARE $updated AS Timestamp?;
 
 			UPSERT INTO users
 				(id, username, mode, magic, score, updated)
@@ -141,7 +141,8 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		}
 	}
 	{
-		const query = `SELECT * FROM users;`
+		const query = `
+			SELECT * FROM users;`
 
 		stmt, err := session.Prepare(ctx, withPragma(prefix, query))
 		if err != nil {
@@ -166,7 +167,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		const query = `
 			SELECT
 				magic,
-				LIST(username)
+				AGGREGATE_LIST(username)
 			FROM
 				users
 			GROUP BY

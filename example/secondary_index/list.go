@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"text/tabwriter"
+
+	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
 func doList(

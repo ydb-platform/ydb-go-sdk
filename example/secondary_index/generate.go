@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
 	"context"
 	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
 	"time"
+
+	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
 func doGenerate(
@@ -58,7 +59,7 @@ func insertSeriesWorker(ctx context.Context, sp *table.SessionPool, prefix strin
 	err chan<- error) {
 	query := fmt.Sprintf(`
         PRAGMA TablePathPrefix("%v");
-		
+
 		DECLARE $seriesId AS Uint64;
         DECLARE $title AS Utf8;
         DECLARE $seriesInfo AS Utf8;

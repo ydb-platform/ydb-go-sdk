@@ -22,9 +22,9 @@ type templateConfig struct {
 var writeQuery = template.Must(template.New("fill database").Parse(`
 PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
-DECLARE $decimals AS "List<Struct<
+DECLARE $decimals AS List<Struct<
 	id: Uint32,
-	value: Decimal(22,9)>>";
+	value: Decimal(22,9)>>;
 
 REPLACE INTO decimals
 SELECT

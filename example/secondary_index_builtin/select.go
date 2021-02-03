@@ -19,19 +19,19 @@ func doSelect(
 ) error {
 	const query = `
 		PRAGMA TablePathPrefix("%s");
-		
+
 		DECLARE $minViews AS Uint64;
-		
-		SELECT 
+
+		SELECT
 			series_id,
-			title, 
+			title,
 			info,
 			release_date,
 			views,
 			uploaded_user_id
-		FROM 
-			[series]:views_index
-		WHERE 
+		FROM
+			` + "`series`" + `:views_index
+		WHERE
 			views >= $minViews
 	`
 	if len(args) == 0 {
@@ -73,17 +73,17 @@ func doSelectJoin(
 
         DECLARE $userName AS Utf8;
 
-        SELECT 
+        SELECT
 			t1.series_id,
 			t1.title,
-			t1.info, 
+			t1.info,
 			t1.release_date,
 			t1.views,
 			t1.uploaded_user_id
         FROM
-			[series]:users_index AS t1
+			` + "`series`" + `:users_index AS t1
         INNER JOIN
-			[users]:name_index AS t2
+			` + "`users`" + `:name_index AS t2
 			ON t1.uploaded_user_id == t2.user_id
         WHERE
 			t2.name == $userName;

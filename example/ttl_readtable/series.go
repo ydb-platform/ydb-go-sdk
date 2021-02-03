@@ -194,9 +194,9 @@ func deleteExpiredDocuments(ctx context.Context, sp *table.SessionPool, prefix s
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
-		DECLARE $keys AS 'List<Struct<
+		DECLARE $keys AS List<Struct<
             doc_id: Uint64
-        >>';
+        >>;
 
         DECLARE $timestamp AS Uint64;
 
@@ -205,7 +205,7 @@ func deleteExpiredDocuments(ctx context.Context, sp *table.SessionPool, prefix s
             FROM AS_TABLE($keys) AS k
             INNER JOIN documents AS d
             ON k.doc_id = d.doc_id
-            WHERE timestamp <= $timestamp
+            WHERE ts <= $timestamp
         );
 
         DELETE FROM documents ON
@@ -244,7 +244,7 @@ func deleteExpiredRange(ctx context.Context, sp *table.SessionPool, prefix strin
 			res, err = s.StreamReadTable(ctx, path.Join(prefix, "documents"),
 				table.ReadKeyRange(keyRange),
 				table.ReadColumn("doc_id"),
-				table.ReadColumn("timestamp"))
+				table.ReadColumn("ts"))
 			return err
 		}),
 	)
@@ -263,7 +263,7 @@ func deleteExpiredRange(ctx context.Context, sp *table.SessionPool, prefix strin
 			res.SeekItem("doc_id")
 			docID := res.OUint64()
 
-			res.SeekItem("timestamp")
+			res.SeekItem("ts")
 			rowTimestamp := res.OUint64()
 
 			if rowTimestamp <= timestamp {
@@ -324,7 +324,7 @@ func readDocument(ctx context.Context, sp *table.SessionPool, prefix, url string
 
         $doc_id = Digest::CityHash($url);
 
-        SELECT doc_id, url, html, timestamp
+        SELECT doc_id, url, html, ts
         FROM documents
         WHERE doc_id = $doc_id;`, prefix)
 
@@ -353,7 +353,7 @@ func readDocument(ctx context.Context, sp *table.SessionPool, prefix, url string
 		res.SeekItem("url")
 		fmt.Printf("\tUrl: %v\n", res.OUTF8())
 
-		res.SeekItem("timestamp")
+		res.SeekItem("ts")
 		fmt.Printf("\tTimestamp: %v\n", res.OUint64())
 
 		res.SeekItem("html")
@@ -378,7 +378,7 @@ func addDocument(ctx context.Context, sp *table.SessionPool, prefix, url, html s
         $doc_id = Digest::CityHash($url);
 
         REPLACE INTO documents
-            (doc_id, url, html, timestamp)
+            (doc_id, url, html, ts)
         VALUES
             ($doc_id, $url, $html, $timestamp);`, prefix)
 
@@ -404,7 +404,7 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 				table.WithColumn("doc_id", ydb.Optional(ydb.TypeUint64)),
 				table.WithColumn("url", ydb.Optional(ydb.TypeUTF8)),
 				table.WithColumn("html", ydb.Optional(ydb.TypeUTF8)),
-				table.WithColumn("timestamp", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("ts", ydb.Optional(ydb.TypeUint64)),
 				table.WithPrimaryKeyColumn("doc_id"),
 				table.WithProfile(
 					table.WithPartitioningPolicy(

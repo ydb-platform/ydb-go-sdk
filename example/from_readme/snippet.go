@@ -67,7 +67,8 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	// transaction during execution, but as said above, transaction is commited
 	// for us and we do not want to do anything with it.
 	_, res, err := s.Execute(ctx, txc,
-		`DECLARE $mystr AS Utf8?; SELECT 42 as id, $mystr as mystr`,
+		`
+DECLARE $mystr AS Utf8?; SELECT 42 as id, $mystr as mystr`,
 		table.NewQueryParameters(
 			table.ValueParam("$mystr", ydb.OptionalValue(ydb.UTF8Value("test"))),
 		),
@@ -99,7 +100,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 			// case res.Err() will return the cause of fail.
 			if res.Err() == nil {
 				// do something with data
-				fmt.Printf("got id %v, got mystr: %v", id, myStr)
+				fmt.Printf("got id %v, got mystr: %v\n", id, myStr)
 			} else {
 				return res.Err() // handle error
 			}

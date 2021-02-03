@@ -16,21 +16,21 @@ func doInsert(
 ) error {
 	const query = `
 		PRAGMA TablePathPrefix("%s");
-		
-		DECLARE $seriesData AS "List<Struct<
+
+		DECLARE $seriesData AS List<Struct<
 		    series_id: Uint64?,
 		    title: Utf8?,
 		    info: Utf8?,
 		    release_date: Datetime?,
 		    views: Uint64?,
-		    uploaded_user_id: Uint64?>>";
-		
-		DECLARE $usersData AS "List<Struct<
+		    uploaded_user_id: Uint64?>>;
+
+		DECLARE $usersData AS List<Struct<
 		    user_id: Uint64?,
 		    name: Utf8?,
-		    age: Uint32?>>";
-		
-		
+		    age: Uint32?>>;
+
+
 		REPLACE INTO series
 		SELECT
 		    series_id,
@@ -40,7 +40,7 @@ func doInsert(
 		    views,
 		    uploaded_user_id
 		FROM AS_TABLE($seriesData);
-		
+
 		REPLACE INTO users
 		SELECT
 		    user_id,

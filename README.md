@@ -53,7 +53,8 @@ The straightforward example of querying data may looks similar to this:
 	// transaction during execution, but as said above, transaction is commited
 	// for us and we do not want to do anything with it.
 	_, res, err := s.Execute(ctx, txc,
-		`DECLARE $mystr AS Utf8?; SELECT 42 as id, $mystr as mystr`,
+		`--!syntax_v1
+DECLARE $mystr AS Utf8?; SELECT 42 as id, $mystr as mystr`,
 		table.NewQueryParameters(
 			table.ValueParam("$mystr", ydb.OptionalValue(ydb.UTF8Value("test"))),
 		),
@@ -85,7 +86,7 @@ The straightforward example of querying data may looks similar to this:
 			// case res.Err() will return the cause of fail.
 			if res.Err() == nil {
 				// do something with data
-				fmt.Printf("got id %v, got mystr: %v", id, myStr)
+				fmt.Printf("got id %v, got mystr: %v\n", id, myStr)
 			} else {
 				return res.Err() // handle error
 			}

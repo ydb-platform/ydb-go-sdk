@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
 	"context"
 	"fmt"
 	"strconv"
+
+	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
 func doDelete(
@@ -42,7 +43,7 @@ func deleteTransaction(ctx context.Context, sp *table.SessionPool, prefix string
 
         $data = (
             SELECT series_id, ($maxUint64 - views) AS rev_views
-            FROM [series]
+            FROM `+"`series`"+`
             WHERE series_id = $seriesId
         );
 

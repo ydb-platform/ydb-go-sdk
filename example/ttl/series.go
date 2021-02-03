@@ -157,25 +157,23 @@ func readExpiredBatchTransaction(ctx context.Context, sp *table.SessionPool, pre
             SELECT *
             FROM expiration_queue_%v
             WHERE
-                timestamp <= $timestamp
+                ts <= $timestamp
                 AND
-                timestamp > $prev_timestamp
-            ORDER BY timestamp, doc_id
-            LIMIT 100
+                ts > $prev_timestamp
 
             UNION ALL
 
             SELECT *
             FROM expiration_queue_%v
             WHERE
-                timestamp = $prev_timestamp AND doc_id > $prev_doc_id
-            ORDER BY timestamp, doc_id
+                ts = $prev_timestamp AND doc_id > $prev_doc_id
+            ORDER BY ts, doc_id
             LIMIT 100
         );
 
-        SELECT timestamp, doc_id
+        SELECT ts, doc_id
         FROM $data
-        ORDER BY timestamp, doc_id
+        ORDER BY ts, doc_id
         LIMIT 100;`, prefix, queue, queue)
 
 	readTx := table.TxControl(table.BeginTx(table.WithOnlineReadOnly()), table.CommitTx())
@@ -212,10 +210,10 @@ func deleteDocumentWithTimestamp(ctx context.Context, sp *table.SessionPool, pre
         DECLARE $timestamp AS Uint64;
 
         DELETE FROM documents
-        WHERE doc_id = $doc_id AND timestamp = $timestamp;
+        WHERE doc_id = $doc_id AND ts = $timestamp;
 
         DELETE FROM expiration_queue_%v
-        WHERE timestamp = $timestamp AND doc_id = $doc_id;`, prefix, queue)
+        WHERE ts = $timestamp AND doc_id = $doc_id;`, prefix, queue)
 
 	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
 
@@ -252,7 +250,7 @@ func deleteExpired(ctx context.Context, sp *table.SessionPool, prefix string, qu
 			empty = false
 			res.SeekItem("doc_id")
 			lastDocID = res.OUint64()
-			res.SeekItem("timestamp")
+			res.SeekItem("ts")
 			lastTimestamp = res.OUint64()
 			fmt.Printf("\tDocId: %d\n\tTimestamp: %d\n", lastDocID, lastTimestamp)
 
@@ -275,7 +273,7 @@ func readDocument(ctx context.Context, sp *table.SessionPool, prefix, url string
 
         $doc_id = Digest::CityHash($url);
 
-        SELECT doc_id, url, html, timestamp
+        SELECT doc_id, url, html, ts
         FROM documents
         WHERE doc_id = $doc_id;`, prefix)
 
@@ -307,7 +305,7 @@ func readDocument(ctx context.Context, sp *table.SessionPool, prefix, url string
 		res.SeekItem("url")
 		fmt.Printf("\tUrl: %v\n", res.OUTF8())
 
-		res.SeekItem("timestamp")
+		res.SeekItem("ts")
 		fmt.Printf("\tTimestamp: %v\n", res.OUint64())
 
 		res.SeekItem("html")
@@ -333,12 +331,12 @@ func addDocument(ctx context.Context, sp *table.SessionPool, prefix, url, html s
         $doc_id = Digest::CityHash($url);
 
         REPLACE INTO documents
-            (doc_id, url, html, timestamp)
+            (doc_id, url, html, ts)
         VALUES
             ($doc_id, $url, $html, $timestamp);
 
         REPLACE INTO expiration_queue_%v
-            (timestamp, doc_id)
+            (ts, doc_id)
         VALUES
             ($timestamp, $doc_id);`, prefix, queue)
 
@@ -367,7 +365,7 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 				table.WithColumn("doc_id", ydb.Optional(ydb.TypeUint64)),
 				table.WithColumn("url", ydb.Optional(ydb.TypeUTF8)),
 				table.WithColumn("html", ydb.Optional(ydb.TypeUTF8)),
-				table.WithColumn("timestamp", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("ts", ydb.Optional(ydb.TypeUint64)),
 				table.WithPrimaryKeyColumn("doc_id"),
 				table.WithProfile(
 					table.WithPartitioningPolicy(
@@ -384,8 +382,8 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 			table.OperationFunc(func(ctx context.Context, s *table.Session) error {
 				return s.CreateTable(ctx, path.Join(prefix, fmt.Sprintf("expiration_queue_%v", i)),
 					table.WithColumn("doc_id", ydb.Optional(ydb.TypeUint64)),
-					table.WithColumn("timestamp", ydb.Optional(ydb.TypeUint64)),
-					table.WithPrimaryKeyColumn("timestamp", "doc_id"),
+					table.WithColumn("ts", ydb.Optional(ydb.TypeUint64)),
+					table.WithPrimaryKeyColumn("ts", "doc_id"),
 				)
 			}),
 		)

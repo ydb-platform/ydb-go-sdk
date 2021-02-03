@@ -13,7 +13,7 @@ import (
 )
 
 var query = template.Must(template.New("fill database").Parse(`
-	DECLARE $var AS "Variant<Utf8,Uint64,Uint32>";
+	DECLARE $var AS Variant<Utf8,Uint64,Uint32>;
 	SELECT
 		AsList("foo", "bar", "baz");
 	SELECT
@@ -26,9 +26,9 @@ var query = template.Must(template.New("fill database").Parse(`
 		);
 	SELECT
 		AsStruct(
-			41 AS "foo",
-			42 AS "bar",
-			43 AS "baz",
+			41 AS foo,
+			42 AS bar,
+			43 AS baz,
 		);
 
 	$struct = AsStruct(

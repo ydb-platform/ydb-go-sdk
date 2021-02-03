@@ -52,6 +52,10 @@ func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
+	if len(params.Args) < 1 {
+		fmt.Printf("no command specified.\n\n")
+		return cli.ErrPrintUsage
+	}
 	var (
 		name   = strings.ToLower(params.Args[0])
 		action = actions[name]

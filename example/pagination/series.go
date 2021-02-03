@@ -95,7 +95,6 @@ func selectPaging(
 		$Data = (
 			SELECT * FROM schools
 			WHERE city = $lastCity AND number > $lastNumber
-			ORDER BY city, number LIMIT $limit
 
 			UNION ALL
 
@@ -150,10 +149,10 @@ func fillTableWithData(ctx context.Context, sp *table.SessionPool, prefix string
 	var query = fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
-		DECLARE $schoolsData AS "List<Struct<
+		DECLARE $schoolsData AS List<Struct<
 			city: Utf8,
 			number: Uint32,
-			address: Utf8>>";
+			address: Utf8>>;
 
 		REPLACE INTO schools
 		SELECT
