@@ -17,9 +17,19 @@ message YdbDatabase {
    string database = 2;
 }
 
+message ClickHouseCluster {
+   string cluster = 1;
+   string host = 2;
+   int32 port = 3;
+   bool secure = 4;
+   string login = 5;
+   string password = 6;
+}
+
 message Connection {
     oneof connection {
         YdbDatabase ydb_database = 1;        
+        ClickHouseCluster clickhouse_cluster = 2;
     }
 }
 
@@ -92,6 +102,21 @@ message GetQueriesResponse {
     string continuation_token = 2;
 }
 
+message ModifyQueryRequest {
+    string id = 1; // ro
+    string folder_id = 2; // ro
+
+    string sql = 4;
+    string name = 5;
+    string acl = 6;
+    int64 rows_limit = 7;
+    int64 bytes_limit = 8;
+
+    bool is_deleted = 9;
+}
+
+message ModifyQueryResponse { }
+
 message GetHistoryRequest {
     string folder_id = 1;
     string continuation_token = 2;
@@ -157,6 +182,17 @@ message GetHistoryResponse {
     repeated HistoryEntity history = 1;
     string continuation_token = 2;
 }
+
+message ModifyHistoryRequest {
+    string id = 1; // ro
+    string folder_id = 2; // ro
+
+    string name = 4;
+    string acl = 5;
+    bool is_deleted = 6;
+}
+
+message ModifyHistoryResponse { }
 
 message ExecuteQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;

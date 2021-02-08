@@ -18,6 +18,9 @@ service AnalyticsService {
 
     rpc GetQueries(Analytics.GetQueriesRequest) returns (Analytics.GetQueriesResponse);
 
-    rpc GetHistory(Analytics.GetHistoryRequest) returns (Analytics.GetHistoryResponse);
-}
+    rpc ModifyQuery(Analytics.ModifyQueryRequest) returns (Analytics.ModifyQueryResponse);
 
+    rpc GetHistory(Analytics.GetHistoryRequest) returns (Analytics.GetHistoryResponse);
+
+    rpc ModifyHistory(Analytics.ModifyHistoryRequest) returns (Analytics.ModifyHistoryResponse);
+}

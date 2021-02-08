@@ -13,7 +13,7 @@ message Data
         FORMAT_UNSPECIFIED      = 0x0000;
         YDB_ROWS                = 0x0001;
         //CLICKHOUSE            = 0x0002;
-        //APACHE_ARROW          = 0x0003;
+        APACHE_ARROW            = 0x0003;
         //APACHE_PARQUET        = 0x0004;
         //APACHE_ORC            = 0x0005;
     }
