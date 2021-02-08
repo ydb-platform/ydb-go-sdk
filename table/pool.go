@@ -578,9 +578,18 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 }
 
 func (p *SessionPool) Stats() SessionPoolStats {
+	idleCount := 0
+	if p.idle != nil {
+		idleCount = p.idle.Len()
+	}
+	readyCount := 0
+	if p.ready != nil {
+		readyCount = p.ready.Len()
+	}
+
 	return SessionPoolStats{
-		Idle:    p.idle.Len(),
-		Ready:   p.ready.Len(),
+		Idle:    idleCount,
+		Ready:   readyCount,
 		MinSize: p.KeepAliveMinSize,
 		MaxSize: p.SizeLimit,
 	}
