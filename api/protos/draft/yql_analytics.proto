@@ -118,8 +118,9 @@ message ModifyQueryRequest {
 message ModifyQueryResponse { }
 
 message GetHistoryRequest {
-    string folder_id = 1;
-    string continuation_token = 2;
+    Ydb.Operations.OperationParams operation_params = 1;
+    string folder_id = 2;
+    string continuation_token = 3;
 
     message Filter {
         string query_id = 1;
@@ -127,7 +128,7 @@ message GetHistoryRequest {
         // see EFieldType
         int32 field_type = 3;
     }
-    Filter filter = 3;
+    Filter filter = 4;
 }
 
 message QueryStatistics {
@@ -151,6 +152,10 @@ enum EQueryStatus {
 }
 
 message GetHistoryResponse {
+    Ydb.Operations.Operation operation = 1; // GetHistoryResult
+}
+
+message GetHistoryResult {
     message HistoryEntity {
         string id = 1;
         string sql = 2; // filled by point request if field_type contains `SQL'
@@ -178,7 +183,7 @@ message GetHistoryResponse {
 
         QueryStatistics statistics = 21;
     }
-    
+
     repeated HistoryEntity history = 1;
     string continuation_token = 2;
 }
@@ -211,42 +216,15 @@ message ExecuteQueryResponse {
 }
 
 message ExecuteQueryResult {
-    // string history_id = 1; // TODO
-    string result_id = 1;
-    string query_plan = 2; // TODO: delete
+    string history_id = 1;
 }
 
-// delete
-message GetResultInfoRequest {
-    Ydb.Operations.OperationParams operation_params = 1;
-    string result_id = 2;
-}
-
-// delete
-message GetResultInfoResponse {
-    Ydb.Operations.Operation operation = 1; // GetResultInfoResult
-}
-
-// delete
-message ResultSetInfo {
-    uint64 rows_count = 1;
-    bool is_truncated = 2;
-}
-
-// delete
-message GetResultInfoResult {
-    repeated ResultSetInfo result_sets = 1;
-    google.protobuf.Timestamp expiration_deadline = 2;
-}
- 
 message GetResultDataRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    // TODO: history_id
-    string result_id = 2;
-    // TODO: uint*->int*
-    uint32 result_set_id = 3;
-    uint64 offset = 4;
-    uint64 limit = 5;
+    string history_id = 2;
+    int32 result_set_id = 3;
+    int64 offset = 4;
+    int64 limit = 5;
 }
 
 message GetResultDataResponse {

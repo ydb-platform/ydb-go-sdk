@@ -8,8 +8,6 @@ import "kikimr/public/api/protos/draft/yql_analytics.proto";
 service AnalyticsService {
     rpc ExecuteQuery(Analytics.ExecuteQueryRequest) returns (Analytics.ExecuteQueryResponse);
 
-    rpc GetResultInfo(Analytics.GetResultInfoRequest) returns (Analytics.GetResultInfoResponse);
-
     rpc GetResultData(Analytics.GetResultDataRequest) returns (Analytics.GetResultDataResponse);
 
     rpc GetConnections(Analytics.GetConnectionsRequest) returns (Analytics.GetConnectionsResponse);
