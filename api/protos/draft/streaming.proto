@@ -1,0 +1,25 @@
+syntax = "proto3";
+option cc_enable_arenas = true;
+
+package Streaming;
+option java_package = "com.yandex.Streaming";
+option java_outer_classname = "StreamingProtos";
+
+import "kikimr/public/api/protos/ydb_operation.proto";
+
+////////////////////////////////////////////////////////////
+
+// Asynchronously request exectuion
+// The result is a request sent for execution, not a completed request
+message ExecuteQueryRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string yql_text = 2;
+}
+
+message ExecuteQueryResponse {
+    Ydb.Operations.Operation operation = 1; // ExecuteQueryResult
+}
+
+message ExecuteQueryResult {
+    string result_id = 1;
+}

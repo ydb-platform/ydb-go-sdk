@@ -132,6 +132,7 @@ message GetHistoryRequest {
 }
 
 message QueryStatistics {
+    bytes yson = 1;
 }
 
 
