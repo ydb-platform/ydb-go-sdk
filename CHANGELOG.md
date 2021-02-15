@@ -1,3 +1,7 @@
+##2021.02.1
+* Changed semantics of `table.Result.O...` methods (e.g., `OUTF8`):
+  it will not fail it current item is non-optional primitive.
+
 ##2020.12.1
 * added CommitTx method, which returns QueryStats
 

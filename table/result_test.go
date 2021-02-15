@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	ydb "github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
 )
@@ -49,6 +49,56 @@ func TestResultAny(t *testing.T) {
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
 						t.Errorf(
 							"unexpected Any() result: %[1]v (%[1]T); want %[2]v (%[2]T)",
+							act, exp,
+						)
+					}
+					i++
+				}
+			}
+			if err := res.Err(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestResultOUint32(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		columns []Column
+		values  []ydb.Value
+		exp     []uint32
+	}{
+		{
+			columns: []Column{
+				{"column0", ydb.Optional(ydb.TypeUint32), "family0"},
+				{"column1", ydb.TypeUint32, "family0"},
+			},
+			values: []ydb.Value{
+				ydb.OptionalValue(ydb.Uint32Value(43)),
+				ydb.Uint32Value(43),
+			},
+			exp: []uint32{
+				43,
+				43,
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			res := NewResult(
+				NewResultSet(
+					WithColumns(test.columns...),
+					WithValues(test.values...),
+				),
+			)
+			var i int
+			for res.NextSet() {
+				for res.NextRow() {
+					res.NextItem()
+					act := res.OUint32()
+					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
+						t.Errorf(
+							"unexpected OUint32() result: %[1]v (%[1]T); want %[2]v (%[2]T)",
 							act, exp,
 						)
 					}

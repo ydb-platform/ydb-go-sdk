@@ -1125,11 +1125,14 @@ func (s *Scanner) assertCurrentTypeDecimal(t ydb.Type) bool {
 	return true
 }
 func (s *Scanner) assertCurrentTypeOptionalDecimal(t ydb.Type) bool {
-	x := s.assertTypeOptional(s.stack.current().t)
-	if x == nil {
+	typ := s.stack.current().t
+	if t, _ := typ.Type.(*Ydb.Type_OptionalType); t != nil {
+		typ = t.OptionalType.Item
+	}
+	if typ == nil {
 		return false
 	}
-	d := s.assertTypeDecimal(x.OptionalType.Item)
+	d := s.assertTypeDecimal(typ)
 	if d == nil {
 		return false
 	}
@@ -1151,12 +1154,14 @@ func (s *Scanner) assertCurrentTypePrimitive(id Ydb.Type_PrimitiveTypeId) bool {
 	return true
 }
 func (s *Scanner) assertCurrentTypeOptionalPrimitive(id Ydb.Type_PrimitiveTypeId) bool {
-	c := s.stack.current()
-	x := s.assertTypeOptional(c.t)
-	if x == nil {
+	typ := s.stack.current().t
+	if t, _ := typ.Type.(*Ydb.Type_OptionalType); t != nil {
+		typ = t.OptionalType.Item
+	}
+	if typ == nil {
 		return false
 	}
-	p := s.assertTypePrimitive(x.OptionalType.Item)
+	p := s.assertTypePrimitive(typ)
 	if p == nil {
 		return false
 	}
