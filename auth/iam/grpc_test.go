@@ -58,7 +58,8 @@ func TestGRPCCreateToken(t *testing.T) {
 }
 
 type StubTokenService struct {
-	OnCreate func(context.Context, *v1.CreateIamTokenRequest) (*v1.CreateIamTokenResponse, error)
+	OnCreate                  func(context.Context, *v1.CreateIamTokenRequest) (*v1.CreateIamTokenResponse, error)
+	OnCreateForServiceAccount func(ctx context.Context, req *v1.CreateIamTokenForServiceAccountRequest) (*v1.CreateIamTokenResponse, error)
 }
 
 func (s *StubTokenService) ListenAndServe() (
@@ -85,6 +86,13 @@ func (s *StubTokenService) ListenAndServe() (
 
 func (s StubTokenService) Create(ctx context.Context, req *v1.CreateIamTokenRequest) (res *v1.CreateIamTokenResponse, err error) {
 	if f := s.OnCreate; f != nil {
+		return f(ctx, req)
+	}
+	return nil, fmt.Errorf("stub: not implemented")
+}
+
+func (s StubTokenService) CreateForServiceAccount(ctx context.Context, req *v1.CreateIamTokenForServiceAccountRequest) (*v1.CreateIamTokenResponse, error) {
+	if f := s.OnCreateForServiceAccount; f != nil {
 		return f(ctx, req)
 	}
 	return nil, fmt.Errorf("stub: not implemented")
