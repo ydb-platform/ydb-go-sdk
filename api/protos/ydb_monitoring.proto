@@ -33,7 +33,6 @@ message SelfCheckResponse {
     Ydb.Operations.Operation operation = 1;
 }
 
-
 message SelfCheck {
     // Describes the result of self-check performed.
     enum Result {
@@ -168,6 +167,8 @@ message IssueLog {
     string message = 3;
     Location location = 4;
     repeated string reason = 5;
+    string type = 6;
+    uint32 level = 7;
 }
 
 message DatabaseStatus {

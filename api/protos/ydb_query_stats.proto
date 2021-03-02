@@ -25,6 +25,7 @@ message QueryPhaseStats {
     repeated TableAccessStats table_access = 2;
     uint64 cpu_time_us = 3;
     uint64 affected_shards = 4;
+    bool literal_phase = 5;
 }
 
 message CompilationStats {

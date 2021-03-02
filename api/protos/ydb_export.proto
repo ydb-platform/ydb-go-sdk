@@ -73,6 +73,18 @@ message ExportToS3Settings {
         HTTPS = 2;
     }
 
+    enum StorageClass {
+        STORAGE_CLASS_UNSPECIFIED = 0;
+        STANDARD = 1;
+        REDUCED_REDUNDANCY = 2;
+        STANDARD_IA = 3;
+        ONEZONE_IA = 4;
+        INTELLIGENT_TIERING = 5;
+        GLACIER = 6;
+        DEEP_ARCHIVE = 7;
+        OUTPOSTS = 8;
+    };
+
     message Item {
         // Database path to a table to be exported
         string source_path = 1 [(required) = true];
@@ -93,6 +105,7 @@ message ExportToS3Settings {
     repeated Item items = 6 [(size).ge = 1];
     string description = 7 [(length).le = 128];
     uint32 number_of_retries = 8;
+    StorageClass storage_class = 9;
 }
 
 message ExportToS3Result {
