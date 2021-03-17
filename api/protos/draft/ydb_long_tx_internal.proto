@@ -7,27 +7,6 @@ option java_outer_classname = "LongTxInternalProtos";
 
 import "kikimr/public/api/protos/ydb_value.proto";
 
-message Snapshot {
-    uint64 plan_step = 1;
-    uint64 tx_id = 2;
-}
-
-message LongTxId {
-    uint64 initiator = 1;
-    uint64 write_id = 2;
-    Snapshot snapshot = 3;
-}
-
-message LongTxRoutes {
-    message Table {
-        string path = 1;
-        uint64 id = 2;
-        repeated uint64 shards = 3;
-    }
-
-    repeated Table tables = 1;
-}
-
 message GeneratedSelectQuery {
     // Column name without an alias or function with an alias.
     // We disallow unnamed functions cause they lead to troubles in result column naming.

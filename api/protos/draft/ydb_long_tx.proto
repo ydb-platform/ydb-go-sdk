@@ -22,11 +22,6 @@ message Data
     bytes data = 2;
 }
 
-message TransactionMeta {
-    bytes long_tx_id = 1;
-    bytes routes = 2;
-}
-
 message BeginTransactionRequest {
     enum TxTypeId {
         TX_TYPE_ID_UNSPECIFIED  = 0x0000;
@@ -38,12 +33,11 @@ message BeginTransactionRequest {
 
     Ydb.Operations.OperationParams operation_params = 1;
     TxTypeId tx_type = 2;
-    repeated string paths = 3;
 }
 
 message BeginTransactionResult {
-    // Full transaction metadata required for other requests. Other results could contain long_tx_id only.
-    TransactionMeta tx_meta = 1;
+    // Transaction id required for other requests.
+    string tx_id = 1;
 }
 
 message BeginTransactionResponse {
@@ -52,11 +46,11 @@ message BeginTransactionResponse {
 
 message CommitTransactionRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    TransactionMeta tx_meta = 2;
+    string tx_id = 2;
 }
 
 message CommitTransactionResult {
-    TransactionMeta tx_meta = 1;
+    string tx_id = 1;
 }
 
 message CommitTransactionResponse {
@@ -65,11 +59,11 @@ message CommitTransactionResponse {
 
 message RollbackTransactionRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    TransactionMeta tx_meta = 2;
+    string tx_id = 2;
 }
 
 message RollbackTransactionResult {
-    TransactionMeta tx_meta = 1;
+    string tx_id = 1;
 }
 
 message RollbackTransactionResponse {
@@ -78,14 +72,14 @@ message RollbackTransactionResponse {
 
 message WriteRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    TransactionMeta tx_meta = 2;
+    string tx_id = 2;
     string path = 3;
     string dedup_id = 4;
     Data data = 5;
 }
 
 message WriteResult {
-    TransactionMeta tx_meta = 1;
+    string tx_id = 1;
     string path = 2;
     string dedup_id = 3;
 }
@@ -96,7 +90,7 @@ message WriteResponse {
 
 message ReadRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    TransactionMeta tx_meta = 2;
+    string tx_id = 2;
     string path = 3;
     oneof query {
         string sql = 11;
@@ -105,7 +99,7 @@ message ReadRequest {
 }
 
 message ReadResult {
-    TransactionMeta tx_meta = 1;
+    string tx_id = 1;
     string path = 2;
     uint64 chunk = 3;
     bool finished = 4;

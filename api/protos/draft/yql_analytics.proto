@@ -235,3 +235,13 @@ message GetResultDataResponse {
 message GetResultDataResult {
     Ydb.ResultSet result_set = 1;
 }
+
+message ResultSetHeader {
+   repeated Ydb.Column column = 1;
+   int64 rows_count = 2;
+   bool truncated = 3;
+}
+
+message ResultSetHeaders {
+   repeated ResultSetHeader header = 1;
+}

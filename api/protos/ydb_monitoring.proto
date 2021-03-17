@@ -26,6 +26,7 @@ message SelfCheckRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     bool return_verbose_status = 2;
     StatusFlag.Status minimum_status = 3;
+    uint32 maximum_level = 4;
 }
 
 message SelfCheckResponse {
@@ -143,6 +144,7 @@ message LocationComputePool {
 
 message LocationComputeTablet {
     string type = 1;
+    string id = 2;
 }
 
 message LocationCompute {

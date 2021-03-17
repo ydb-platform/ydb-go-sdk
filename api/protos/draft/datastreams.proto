@@ -215,7 +215,7 @@ message ListStreamsResponse {
 }
 message ListStreamsResult {
     bool has_more_streams = 1; // true if more stream names are available
-    string stream_names = 2; // name of streams
+    repeated string stream_names = 2; // name of streams
 }
 
 
@@ -447,7 +447,7 @@ message DecreaseStreamRetentionPeriodRequest {
     // kinesis stream id
     string stream_name = 2;
     // Retention period in hours
-    int32 retention_perioud_hours = 3;
+    int32 retention_period_hours = 3;
 }
 message DecreaseStreamRetentionPeriodResponse {
     // Result of request will be inside operation.

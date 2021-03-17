@@ -44,8 +44,9 @@ message DeleteSessionResponse {
 }
 
 message GlobalIndex {
-    // list of columns content to be copied in to index table
-    repeated string data_columns = 1;
+}
+
+message GlobalAsyncIndex {
 }
 
 // Represent secondary index
@@ -57,7 +58,10 @@ message TableIndex {
     // Type of index
     oneof type {
        GlobalIndex global_index = 3;
+       GlobalAsyncIndex global_async_index = 4;
     }
+    // list of columns content to be copied in to index table
+    repeated string data_columns = 5;
 }
 
 // Represent secondary index with index state
@@ -76,8 +80,11 @@ message TableIndexDescription {
     // Type of index
     oneof type {
        GlobalIndex global_index = 3;
+       GlobalAsyncIndex global_async_index = 5;
     }
     Status status = 4;
+    // list of columns content to be copied in to index table
+    repeated string data_columns = 6;
 }
 
 // State of index building operation
