@@ -106,6 +106,9 @@ type StoragePool struct {
 }
 
 func (s StoragePool) toYDB() *Ydb_Table.StoragePool {
+	if s.Media == "" {
+		return nil
+	}
 	return &Ydb_Table.StoragePool{
 		Media: s.Media,
 	}

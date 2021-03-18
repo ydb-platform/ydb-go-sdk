@@ -560,9 +560,7 @@ func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []Endp
 	sortEndpoints(next)
 	diffEndpoints(curr, next,
 		func(i, j int) { c.Update(ctx, next[j]) },
-		func(i, j int) {
-			c.Insert(ctx, next[j])
-		},
+		func(i, j int) { c.Insert(ctx, next[j]) },
 		func(i, j int) { c.Remove(ctx, curr[i]) },
 	)
 }

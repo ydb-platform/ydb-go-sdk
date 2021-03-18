@@ -16,6 +16,8 @@ func (f FeatureFlag) ToYDB() Ydb.FeatureFlag_Status {
 		return Ydb.FeatureFlag_ENABLED
 	case FeatureDisabled:
 		return Ydb.FeatureFlag_DISABLED
+	case FeatureUnknown:
+		return Ydb.FeatureFlag_STATUS_UNSPECIFIED
 	default:
 		panic("ydb: unknown feature flag status")
 	}
@@ -23,12 +25,12 @@ func (f FeatureFlag) ToYDB() Ydb.FeatureFlag_Status {
 
 func FeatureFlagFromYDB(f Ydb.FeatureFlag_Status) FeatureFlag {
 	switch f {
-	case Ydb.FeatureFlag_STATUS_UNSPECIFIED:
-		return FeatureUnknown
 	case Ydb.FeatureFlag_ENABLED:
 		return FeatureEnabled
 	case Ydb.FeatureFlag_DISABLED:
 		return FeatureDisabled
+	case Ydb.FeatureFlag_STATUS_UNSPECIFIED:
+		return FeatureUnknown
 	default:
 		panic("ydb: unknown Ydb feature flag status")
 	}
