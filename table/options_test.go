@@ -197,6 +197,22 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 	}
 	{
+		cf := ColumnFamily{
+			Name:        "default",
+			Compression: ColumnFamilyCompressionLZ4,
+		}
+		opt := WithAlterColumnFamilies(cf)
+		req := Ydb_Table.AlterTableRequest{}
+		opt((*alterTableDesc)(&req))
+		if len(req.AddColumnFamilies) != 1 ||
+			req.AddColumnFamilies[0].Name != cf.Name ||
+			req.AddColumnFamilies[0].Data != nil ||
+			req.AddColumnFamilies[0].Compression != cf.Compression.toYDB() ||
+			req.AddColumnFamilies[0].KeepInMemory != Ydb.FeatureFlag_STATUS_UNSPECIFIED {
+			t.Errorf("Alter table options is not as expected")
+		}
+	}
+	{
 		rr := ReadReplicasSettings{
 			Type:  ReadReplicasAnyAzReadReplicas,
 			Count: 42,

@@ -83,10 +83,8 @@ type ColumnFamily struct {
 
 func (c ColumnFamily) toYDB() *Ydb_Table.ColumnFamily {
 	return &Ydb_Table.ColumnFamily{
-		Name: c.Name,
-		Data: &Ydb_Table.StoragePool{
-			Media: c.Data.Media,
-		},
+		Name:         c.Name,
+		Data:         c.Data.toYDB(),
 		Compression:  c.Compression.toYDB(),
 		KeepInMemory: c.KeepInMemory.ToYDB(),
 	}
