@@ -1,3 +1,7 @@
+##2021.03.1
+* Fixed a race between `SessionPool.Put` and `SessionPool.Get`, where the latter
+  would end up waiting forever for a session that is already in the pool.
+
 ##2021.02.1
 * Changed semantics of `table.Result.O...` methods (e.g., `OUTF8`):
   it will not fail if current item is non-optional primitive.

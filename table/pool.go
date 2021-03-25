@@ -301,6 +301,11 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			// be fair here and not to lock more goroutines than we could ship
 			// session to.
 			p.mu.Lock()
+			s = p.removeFirstIdle()
+			if s != nil {
+				p.mu.Unlock()
+				return s, nil
+			}
 			ch = p.getWaitCh()
 			el = p.waitq.PushBack(ch)
 			p.mu.Unlock()
