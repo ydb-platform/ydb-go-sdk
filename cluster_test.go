@@ -524,7 +524,7 @@ func (ln *stubListener) Close() error {
 }
 
 func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
-	return grpc.Dial("",
+	return grpc.DialContext(ctx, "",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			select {
 			case <-ln.exit:
