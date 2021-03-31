@@ -1,3 +1,6 @@
+##2021.03.2
+* Add Truncated flag support.
+
 ##2021.03.1
 * Fixed a race between `SessionPool.Put` and `SessionPool.Get`, where the latter
   would end up waiting forever for a session that is already in the pool.

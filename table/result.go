@@ -127,6 +127,11 @@ func (r *Result) NextSet() bool {
 	return true
 }
 
+// Truncated returns true if current result set has been truncated by server.
+func (r *Result) Truncated() bool {
+	return r.Scanner.ResultSetTruncated()
+}
+
 // NextStreamSet selects next result set from the result of streaming operation.
 // It returns false if stream is closed or ctx is canceled.
 // Note that in case of context cancelation it does not marks whole result as

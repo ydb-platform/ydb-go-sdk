@@ -80,6 +80,11 @@ func (s *Scanner) columns(it func(name string, typ internal.T)) {
 	}
 }
 
+// ResultSetTruncated returns true if current result set has been truncated by server
+func (s *Scanner) ResultSetTruncated() bool {
+	return s.set.Truncated
+}
+
 // Err returns error caused scanner to be broken.
 func (s *Scanner) Err() error {
 	return s.err
