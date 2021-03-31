@@ -330,11 +330,13 @@ message PutRecordsRequestEntry {
     string explicit_hash_key = 2;
     string partition_key = 3;
 }
+
 message PutRecordsResultEntry {
     StatusIds.StatusCode code = 1;
     string error_message = 2;
-    string sequence_number = 3;
-    string shard = 4;
+    string error_code = 3;
+    string sequence_number = 4;
+    string shard = 5;
 }
 
 message GetRecordsRequest {

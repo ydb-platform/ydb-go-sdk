@@ -256,9 +256,36 @@ message DateTypeColumnModeSettings {
     uint32 expire_after_seconds = 2;
 }
 
+message ValueSinceUnixEpochModeSettings {
+    // Same as DateTypeColumnModeSettings (above), but useful when type of the
+    // value stored in <column_name> is not a date type.
+
+    enum Unit {
+        UNIT_UNSPECIFIED = 0;
+        UNIT_SECONDS = 1;
+        UNIT_MILLISECONDS = 2;
+        UNIT_MICROSECONDS = 3;
+        UNIT_NANOSECONDS = 4;
+    }
+
+    // The column type must be one of:
+    // - Uint32
+    // - Uint64
+    // - DyNumber
+    string column_name = 1;
+
+    // Interpretation of the value stored in <column_name>
+    Unit column_unit = 2;
+
+    // This option is always interpreted as seconds regardless of the
+    // <column_unit> value.
+    uint32 expire_after_seconds = 3;
+}
+
 message TtlSettings {
     oneof mode {
         DateTypeColumnModeSettings date_type_column = 1;
+        ValueSinceUnixEpochModeSettings value_since_unix_epoch = 2;
     }
 
     // There is no guarantee that expired row will be deleted immediately upon

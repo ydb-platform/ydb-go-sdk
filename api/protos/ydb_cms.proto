@@ -81,6 +81,18 @@ message SchemaOperationQuotas {
     repeated LeakyBucket leaky_bucket_quotas = 1;
 }
 
+// A set of quotas for the database
+message DatabaseQuotas {
+    // A maximum data size in bytes, new data will be rejected when exceeded
+    uint64 data_size_hard_quota = 1;
+
+    // An optional size in bytes (lower than data_size_hard_quota). When data
+    // size becomes lower than this value new data ingestion is re-enabled
+    // again. This is useful to help avoid database from rapidly entering and
+    // exiting from the overloaded state.
+    uint64 data_size_soft_quota = 2;
+}
+
 // Request to create a new database. For successfull creation
 // specified database shouldn't exist. At least one storage
 // unit should be requested for the database.
@@ -104,6 +116,8 @@ message CreateDatabaseRequest {
     SchemaOperationQuotas schema_operation_quotas = 8;
     // Optional idempotency key
     string idempotency_key = 9;
+    // Optional quotas for the database
+    DatabaseQuotas database_quotas = 10;
 }
 
 message CreateDatabaseResponse {
@@ -151,6 +165,8 @@ message GetDatabaseStatusResult {
     uint64 generation = 6;
     // Current quotas for schema operations
     SchemaOperationQuotas schema_operation_quotas = 9;
+    // Current quotas for the database
+    DatabaseQuotas database_quotas = 10;
 }
 
 // Change resources allocated for database.
@@ -175,6 +191,8 @@ message AlterDatabaseRequest {
     SchemaOperationQuotas schema_operation_quotas = 9;
     // Optional idempotency key
     string idempotency_key = 10;
+    // Change quotas for the database
+    DatabaseQuotas database_quotas = 11;
 }
 
 message AlterDatabaseResponse {

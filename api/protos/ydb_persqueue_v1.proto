@@ -910,6 +910,9 @@ message MigrationStreamingReadServerMessage {
             bytes data = 5;
             // Uncompressed size of client message body.
             uint64 uncompressed_size = 6;
+            // kinesis data
+            string partition_key = 7;
+            bytes explicit_hash = 8;
         }
 
         // Representation of sequence of client messages from one write session.
