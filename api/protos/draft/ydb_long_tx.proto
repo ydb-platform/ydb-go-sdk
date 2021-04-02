@@ -94,7 +94,6 @@ message ReadRequest {
     string path = 3;
     oneof query {
         string sql = 11;
-        bytes generated = 12;
     }
 }
 
