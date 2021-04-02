@@ -65,6 +65,8 @@ func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
 	}
 }
 
+// Deprecated: use WithTimeToLiveSettings instead.
+// Will be removed after Jan 2022.
 func WithTTL(settings TTLSettings) CreateTableOption {
 	return func(d *createTableDesc) {
 		d.TtlSettings = &Ydb_Table.TtlSettings{
@@ -75,6 +77,13 @@ func WithTTL(settings TTLSettings) CreateTableOption {
 				},
 			},
 		}
+
+	}
+}
+
+func WithTimeToLiveSettings(settings TimeToLiveSettings) CreateTableOption {
+	return func(d *createTableDesc) {
+		d.TtlSettings = settings.ToYDB()
 	}
 }
 
@@ -465,7 +474,8 @@ func WithAlterPartitionSettingsObject(ps PartitioningSettings) AlterTableOption 
 	}
 }
 
-// Deprecated: use WithAlterPartitionSettingsObject instead. Will be removed after Jan 2021.
+// Deprecated: use WithAlterPartitionSettingsObject instead.
+// Will be removed after Jan 2021.
 func WithAlterPartitioningSettings(opts ...PartitioningSettingsOption) AlterTableOption {
 	return func(d *alterTableDesc) {
 		if d.AlterPartitioningSettings == nil {
@@ -477,6 +487,8 @@ func WithAlterPartitioningSettings(opts ...PartitioningSettingsOption) AlterTabl
 	}
 }
 
+// Deprecated: use WithSetTimeToLiveSettings instead.
+// Will be removed after Jan 2022.
 func WithSetTTL(settings TTLSettings) AlterTableOption {
 	return func(d *alterTableDesc) {
 		d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
@@ -492,7 +504,23 @@ func WithSetTTL(settings TTLSettings) AlterTableOption {
 	}
 }
 
+func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
+			SetTtlSettings: settings.ToYDB(),
+		}
+	}
+}
+
+// Deprecated: use WithDropTimeToLive instead.
+// Will be removed after Jan 2022.
 func WithDropTTL() AlterTableOption {
+	return func(d *alterTableDesc) {
+		d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
+	}
+}
+
+func WithDropTimeToLive() AlterTableOption {
 	return func(d *alterTableDesc) {
 		d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
 	}

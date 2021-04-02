@@ -57,7 +57,11 @@ type Description struct {
 	StorageSettings      StorageSettings
 	KeyBloomFilter       ydb.FeatureFlag
 	PartitioningSettings PartitioningSettings
-	TTLSettings          *TTLSettings
+
+	// Deprecated: use TimeToLiveSettings instead.
+	// Will be removed after Jan 2022.
+	TTLSettings        *TTLSettings
+	TimeToLiveSettings *TimeToLiveSettings
 }
 
 type TableStats struct {
@@ -395,7 +399,124 @@ type KeyRange struct {
 	To   ydb.Value
 }
 
+// Deprecated use TimeToLiveSettings instead.
+// Will be removed after Jan 2022.
 type TTLSettings struct {
 	DateTimeColumn string
 	TTLSeconds     uint32
+}
+
+type TimeToLiveSettings struct {
+	ColumnName         string
+	ExpireAfterSeconds uint32
+
+	ColumnUnit *TimeToLiveUnit // valid with Mode = TimeToLiveModeValueSinceUnixEpoch
+	// Specifies mode
+	Mode TimeToLiveMode
+}
+
+type TimeToLiveMode byte
+
+const (
+	TimeToLiveModeDateType TimeToLiveMode = iota
+	TimeToLiveModeValueSinceUnixEpoch
+)
+
+func (ttl *TimeToLiveSettings) ToYDB() *Ydb_Table.TtlSettings {
+	if ttl == nil {
+		return nil
+	}
+	switch ttl.Mode {
+	case TimeToLiveModeValueSinceUnixEpoch:
+		return &Ydb_Table.TtlSettings{
+			Mode: &Ydb_Table.TtlSettings_ValueSinceUnixEpoch{
+				ValueSinceUnixEpoch: &Ydb_Table.ValueSinceUnixEpochModeSettings{
+					ColumnName:         ttl.ColumnName,
+					ColumnUnit:         ttl.ColumnUnit.ToYDB(),
+					ExpireAfterSeconds: ttl.ExpireAfterSeconds,
+				},
+			},
+		}
+	default: // currently use TimeToLiveModeDateType mode as default
+		return &Ydb_Table.TtlSettings{
+			Mode: &Ydb_Table.TtlSettings_DateTypeColumn{
+				DateTypeColumn: &Ydb_Table.DateTypeColumnModeSettings{
+					ColumnName:         ttl.ColumnName,
+					ExpireAfterSeconds: ttl.ExpireAfterSeconds,
+				},
+			},
+		}
+	}
+}
+
+func timeToLiveSettings(settings *Ydb_Table.TtlSettings) *TimeToLiveSettings {
+	if settings == nil {
+		return nil
+	}
+	switch mode := settings.Mode.(type) {
+	case *Ydb_Table.TtlSettings_DateTypeColumn:
+		return &TimeToLiveSettings{
+			ColumnName:         mode.DateTypeColumn.ColumnName,
+			ExpireAfterSeconds: mode.DateTypeColumn.ExpireAfterSeconds,
+			Mode:               TimeToLiveModeDateType,
+		}
+
+	case *Ydb_Table.TtlSettings_ValueSinceUnixEpoch:
+		return &TimeToLiveSettings{
+			ColumnName:         mode.ValueSinceUnixEpoch.ColumnName,
+			ColumnUnit:         timeToLiveUnit(mode.ValueSinceUnixEpoch.ColumnUnit),
+			ExpireAfterSeconds: mode.ValueSinceUnixEpoch.ExpireAfterSeconds,
+			Mode:               TimeToLiveModeValueSinceUnixEpoch,
+		}
+	}
+	return nil
+}
+
+type TimeToLiveUnit int32
+
+const (
+	TimeToLiveUnitUnspecified TimeToLiveUnit = iota
+	TimeToLiveUnitSeconds
+	TimeToLiveUnitMilliseconds
+	TimeToLiveUnitMicroseconds
+	TimeToLiveUnitNanoseconds
+)
+
+func (unit *TimeToLiveUnit) ToYDB() Ydb_Table.ValueSinceUnixEpochModeSettings_Unit {
+	if unit == nil {
+		return Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_UNSPECIFIED
+	}
+	switch *unit {
+	case TimeToLiveUnitSeconds:
+		return Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_SECONDS
+	case TimeToLiveUnitMilliseconds:
+		return Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MILLISECONDS
+	case TimeToLiveUnitMicroseconds:
+		return Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MICROSECONDS
+	case TimeToLiveUnitNanoseconds:
+		return Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_NANOSECONDS
+	case TimeToLiveUnitUnspecified:
+		return Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_UNSPECIFIED
+	default:
+		panic("ydb: unknown unit for value since epoch")
+	}
+}
+
+func timeToLiveUnit(unit Ydb_Table.ValueSinceUnixEpochModeSettings_Unit) *TimeToLiveUnit {
+	var res TimeToLiveUnit
+	switch unit {
+	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_SECONDS:
+		res = TimeToLiveUnitSeconds
+	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MILLISECONDS:
+		res = TimeToLiveUnitMilliseconds
+	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MICROSECONDS:
+		res = TimeToLiveUnitMicroseconds
+	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_NANOSECONDS:
+		res = TimeToLiveUnitNanoseconds
+	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_UNSPECIFIED:
+		res = TimeToLiveUnitUnspecified
+	default:
+		panic("ydb: unknown Ydb unit for value since epoch")
+	}
+	return &res
 }

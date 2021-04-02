@@ -1,3 +1,10 @@
+##2021.04.1
+* Added `table.TimeToLiveSSettings` struct and corresponding
+  `table.WithTimeToLiveSettings`, `table.WithSetTimeToLive`
+  and `table.WithDropTimeToLive` options.
+* Deprecated `table.TTLSettings` struct alongside with
+  `table.WithTTL`, `table.WithSetTTL` and `table.WithDropTTL` functions.
+
 ##2021.03.2
 * Add Truncated flag support.
 

@@ -238,6 +238,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		KeyBloomFilter:       internal.FeatureFlagFromYDB(res.GetKeyBloomFilter()),
 		PartitioningSettings: partitioningSettings(res.GetPartitioningSettings()),
 		TTLSettings:          ttlSettings(res.GetTtlSettings()),
+		TimeToLiveSettings:   timeToLiveSettings(res.GetTtlSettings()),
 	}, nil
 }
 
