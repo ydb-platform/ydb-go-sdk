@@ -5,6 +5,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 
 import "kikimr/public/api/protos/validation/validation.proto";
+import "kikimr/public/api/protos/ydb_common.proto";
 import "kikimr/public/api/protos/ydb_issue_message.proto";
 import "kikimr/public/api/protos/ydb_status_codes.proto";
 
@@ -43,6 +44,10 @@ message OperationParams {
 
     // User-defined labels of operation.
     map<string, string> labels = 4 [(map_key).length.le = 128, (length).le = 128];
+
+    // If enabled, server will report cost information, if supported by the operation.
+    // This flag is mostly useful for SYNC operations, to get the cost information in the response.
+    Ydb.FeatureFlag.Status report_cost_info = 5;
 }
 
 message GetOperationRequest {
@@ -101,5 +106,10 @@ message Operation {
     google.protobuf.Any result = 5;
 
     google.protobuf.Any metadata = 6;
+
+    // Contains information about the cost of the operation.
+    // For completed operations, it shows the final cost of the operation.
+    // For operations in progress, it might indicate the current cost of the operation (if supported).
+    CostInfo cost_info = 7;
 }
 

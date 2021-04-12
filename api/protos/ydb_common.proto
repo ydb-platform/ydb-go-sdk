@@ -12,3 +12,8 @@ message FeatureFlag {
         DISABLED = 2;
     }
 }
+
+message CostInfo {
+    // Total amount of request units (RU), consumed by the operation.
+    double consumed_units = 1;
+}
