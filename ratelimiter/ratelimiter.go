@@ -12,6 +12,8 @@ import (
 type HierarchicalDrrSettings struct {
 	MaxUnitsPerSecond       float64
 	MaxBurstSizeCoefficient float64
+	PrefetchCoefficient     float64
+	PrefetchWatermark       float64
 }
 
 type Resource struct {
@@ -31,6 +33,8 @@ func (c *Client) CreateResource(ctx context.Context, coordinationNodePath string
 			Type: &Ydb_RateLimiter.Resource_HierarchicalDrr{HierarchicalDrr: &Ydb_RateLimiter.HierarchicalDrrSettings{
 				MaxUnitsPerSecond:       resource.HierarchicalDrr.MaxUnitsPerSecond,
 				MaxBurstSizeCoefficient: resource.HierarchicalDrr.MaxBurstSizeCoefficient,
+				PrefetchCoefficient:     resource.HierarchicalDrr.PrefetchCoefficient,
+				PrefetchWatermark:       resource.HierarchicalDrr.PrefetchWatermark,
 			}},
 		},
 	}
@@ -47,6 +51,8 @@ func (c *Client) AlterResource(ctx context.Context, coordinationNodePath string,
 			Type: &Ydb_RateLimiter.Resource_HierarchicalDrr{HierarchicalDrr: &Ydb_RateLimiter.HierarchicalDrrSettings{
 				MaxUnitsPerSecond:       resource.HierarchicalDrr.MaxUnitsPerSecond,
 				MaxBurstSizeCoefficient: resource.HierarchicalDrr.MaxBurstSizeCoefficient,
+				PrefetchCoefficient:     resource.HierarchicalDrr.PrefetchCoefficient,
+				PrefetchWatermark:       resource.HierarchicalDrr.PrefetchWatermark,
 			}},
 		},
 	}
@@ -102,6 +108,8 @@ func (c *Client) DescribeResource(ctx context.Context, coordinationNodePath stri
 		result.HierarchicalDrr = HierarchicalDrrSettings{
 			MaxUnitsPerSecond:       res.Resource.GetHierarchicalDrr().MaxUnitsPerSecond,
 			MaxBurstSizeCoefficient: res.Resource.GetHierarchicalDrr().MaxBurstSizeCoefficient,
+			PrefetchCoefficient:     res.Resource.GetHierarchicalDrr().PrefetchCoefficient,
+			PrefetchWatermark:       res.Resource.GetHierarchicalDrr().PrefetchWatermark,
 		}
 	}
 
