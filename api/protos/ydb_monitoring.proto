@@ -105,6 +105,7 @@ message ComputeNodeStatus {
 message ComputeStatus {
     StatusFlag.Status overall = 1;
     repeated ComputeNodeStatus nodes = 2;
+    repeated ComputeTabletStatus tablets = 3;
 }
 
 message LocationNode {
@@ -144,7 +145,8 @@ message LocationComputePool {
 
 message LocationComputeTablet {
     string type = 1;
-    string id = 2;
+    repeated string id = 2;
+    uint32 count = 3;
 }
 
 message LocationCompute {

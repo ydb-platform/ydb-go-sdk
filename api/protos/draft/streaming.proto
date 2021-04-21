@@ -6,20 +6,44 @@ option java_package = "com.yandex.Streaming";
 option java_outer_classname = "StreamingProtos";
 
 import "kikimr/public/api/protos/ydb_operation.proto";
+import "kikimr/streaming/libs/control_plane/proto/public/control_plane.proto";
 
 ////////////////////////////////////////////////////////////
 
 // Asynchronously request exectuion
 // The result is a request sent for execution, not a completed request
-message ExecuteQueryRequest {
+message InstallQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    string yql_text = 2;
+    NStreams.NControlPlane.TInstallQueryRequest request = 2;
 }
 
-message ExecuteQueryResponse {
-    Ydb.Operations.Operation operation = 1; // ExecuteQueryResult
+message InstallQueryResponse {
+    Ydb.Operations.Operation operation = 1; // NStreams.NControlPlane.TInstallQueryResponse
 }
 
-message ExecuteQueryResult {
-    string result_id = 1;
+message DeleteQueryRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    NStreams.NControlPlane.TDeleteQueryRequest request = 2;
+}
+
+message DeleteQueryResponse {
+    Ydb.Operations.Operation operation = 1; // NStreams.NControlPlane.TDeleteQueryResponse
+}
+
+message ListQueriesRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    NStreams.NControlPlane.TListQueriesRequest request = 2;
+}
+
+message ListQueriesResponse {
+    Ydb.Operations.Operation operation = 1; // NStreams.NControlPlane.TListQueriesResponse
+}
+
+message DescribeQueryRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    NStreams.NControlPlane.TDescribeQueryRequest request = 2;
+}
+
+message DescribeQueryResponse {
+    Ydb.Operations.Operation operation = 1; // NStreams.NControlPlane.TDescribeQueryResponse
 }

@@ -16,6 +16,9 @@ service DataStreamsService {
     rpc DeleteStream(DeleteStreamRequest) returns (DeleteStreamResponse);
     rpc DescribeStream(DescribeStreamRequest) returns (DescribeStreamResponse);
     rpc ListShards(ListShardsRequest) returns (ListShardsResponse);
+    rpc SetWriteQuota(SetWriteQuotaRequest) returns (SetWriteQuotaResponse);
+    rpc UpdateStream(UpdateStreamRequest) returns (UpdateStreamResponse);
+
     // Data methods
     rpc PutRecord(PutRecordRequest) returns (PutRecordResponse);
     rpc PutRecords(PutRecordsRequest) returns (PutRecordsResponse);

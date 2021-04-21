@@ -34,7 +34,7 @@ message ChildShard {
 
 message Consumer {
     string consumer_arn = 1;
-    uint32 consumer_creation_timestamp = 2;
+    int32 consumer_creation_timestamp = 2;
     string consumer_name = 3;
     ConsumerDescription.ConsumerStatus consumer_status = 4;
 }
@@ -43,7 +43,7 @@ message HashKeyRange {
     string ending_hash_key = 2;
 }
 message Record {
-    uint32 timestamp = 1;
+    int32 timestamp = 1;
     bytes data = 2;
     EncryptionType encryption = 3;
     string partition_key = 4;
@@ -67,6 +67,8 @@ message StreamDescription {
     string stream_arn = 7;
     int32 timestamp = 8;
     StreamStatus stream_status = 9;
+    string stream_name = 10;
+    int32 write_quota_kb_per_sec = 11;
 }
 
 message SequenceNumberRange {
@@ -124,7 +126,7 @@ message ShardFilter {
     ShardIteratorType type = 3;
 }
 message StartingPosition {
-    uint32 timestamp = 1;
+    int32 timestamp = 1;
     string sequence_number = 2;
     ShardIteratorType type = 3;
 }
@@ -144,7 +146,7 @@ message StreamDescriptionSummary {
 message SubscribeToShardEvent {
     repeated ChildShard child_shards = 1;
     string continuation_sequence_number = 2;
-    uint32 millis_behind_latest = 3;
+    int32 millis_behind_latest = 3;
     repeated Record records = 4;
 }
 message SubscribeToShardEventStream {
@@ -179,6 +181,11 @@ message CreateStreamRequest {
     string stream_name = 2;
     // shards count for a new stream
     int32 shard_count = 3;
+
+    // Datastreams extension. Allow to set retention and write quota on stream creation
+    int32 write_quota_kb_per_sec = 4;
+    int32 retention_period_hours = 5;
+
 }
 message CreateStreamResponse {
     // Result of request will be inside operation.
@@ -226,7 +233,7 @@ message ListShardsRequest {
     int32 max_results = 3;
     string next_token = 4; // "ListShardsIterator" - token for shards pagination
     ShardFilter shard_filter = 5; // Предлагаю в первой версии не заморачиваться
-    uint32 stream_creation_timestamp = 6;
+    int32 stream_creation_timestamp = 6;
     string stream_name = 7;
 }
 message ListShardsResponse {
@@ -239,13 +246,42 @@ message ListShardsResult {
 }
 
 
+message SetWriteQuotaRequest {
+    // Result of request will be inside operation.
+    Ydb.Operations.OperationParams operation_params = 1;
+
+    string stream_name = 2;
+    int32 write_quota_kb_per_sec = 3;
+}
+message SetWriteQuotaResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+message SetWriteQuotaResult {
+}
+
+message UpdateStreamRequest {
+    // Result of request will be inside operation.
+    Ydb.Operations.OperationParams operation_params = 1;
+
+    string stream_name = 2;
+    int32 write_quota_kb_per_sec = 3;
+    int32 target_shard_count = 4;
+    int32 retention_period_hours = 5;
+}
+message UpdateStreamResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+message UpdateStreamResult {
+
+}
+
 message ListStreamConsumersRequest {
     Ydb.Operations.OperationParams operation_params = 1;
 
-    uint32 max_results = 2;
+    int32 max_results = 2;
     string next_token = 3;
     string stream_arn = 4;
-    uint32 stream_creation_timestamp = 5;
+    int32 stream_creation_timestamp = 5;
 }
 message ListStreamConsumersResponse {
     // Result of request will be inside operation.
@@ -390,7 +426,7 @@ message PutRecordsResponse {
 }
 message PutRecordsResult {
     EncryptionType encryption_type = 1;
-    uint32 failed_record_count = 2;
+    int32 failed_record_count = 2;
     repeated PutRecordsResultEntry records = 3;
 }
 
@@ -466,8 +502,8 @@ message DescribeLimitsResponse {
     Ydb.Operations.Operation operation = 1;
 }
 message DescribeLimitsResult {
-    uint32 open_shard_count = 1;
-    uint32 shard_limit = 2;
+    int32 open_shard_count = 1;
+    int32 shard_limit = 2;
 }
 
 

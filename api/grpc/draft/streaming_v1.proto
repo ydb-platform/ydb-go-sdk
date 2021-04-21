@@ -6,5 +6,8 @@ option java_package = "com.yandex.streaming.v1";
 import "kikimr/public/api/protos/draft/streaming.proto";
 
 service StreamingService {
-    rpc ExecuteQuery(Streaming.ExecuteQueryRequest) returns (Streaming.ExecuteQueryResponse);
+    rpc InstallQuery(Streaming.InstallQueryRequest) returns (Streaming.InstallQueryResponse);
+    rpc DeleteQuery(Streaming.DeleteQueryRequest) returns (Streaming.DeleteQueryResponse);
+    rpc ListQueries(Streaming.ListQueriesRequest) returns (Streaming.ListQueriesResponse);    
+    rpc DescribeQuery(Streaming.DescribeQueryRequest) returns (Streaming.DescribeQueryResponse);
 }

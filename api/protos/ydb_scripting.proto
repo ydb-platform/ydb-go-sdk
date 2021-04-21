@@ -30,29 +30,23 @@ message ExecuteYqlResult {
     Ydb.TableStats.QueryStats query_stats = 2;
 }
 
-message StreamExecuteYqlRequest {
-    string script = 1;
-    map<string, TypedValue> parameters = 2;
-    Ydb.Table.QueryStatsCollection.Mode collect_stats = 3;
-}
-
-// YqlScript can have multiple results (result sets).
-// Each result has an index (starting at 0).
-// Response for StreamExecuteYqlRequest is a stream of StreamExecuteYqlPartialResponse messages.
-// All these responses except the final one contain StreamExecuteYqlPartialResult messages with
+// Response for StreamExecuteYql is a stream of ExecuteYqlPartialResponse messages.
+// These responses can contain ExecuteYqlPartialResult messages with
 // results (or result parts) for data or scan queries in the script.
-message StreamExecuteYqlPartialResponse {
+// YqlScript can have multiple results (result sets).
+// Each result set has an index (starting at 0).
+message ExecuteYqlPartialResponse {
     StatusIds.StatusCode status = 1;
     repeated Ydb.Issue.IssueMessage issues = 2;
-    StreamExecuteYqlPartialResult result = 3;
+    ExecuteYqlPartialResult result = 3;
 }
 
-// Contains result (or a result part) for one data or scan query in the script.
+// Contains result set (or a result set part) for one data or scan query in the script.
 // One result set can be split into several responses with same result_index.
-// The final response doesn't have result set and can have query stats instead.
-message StreamExecuteYqlPartialResult {
+// Only the final response can contain query stats.
+message ExecuteYqlPartialResult {
     // Index of current result
-    uint32 result_index = 1;
+    uint32 result_set_index = 1;
     // Result set (or a result set part) for one data or scan query
     Ydb.ResultSet result_set = 2;
     Ydb.TableStats.QueryStats query_stats = 3;
