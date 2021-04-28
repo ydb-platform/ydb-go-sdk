@@ -91,6 +91,9 @@ message DatabaseQuotas {
     // again. This is useful to help avoid database from rapidly entering and
     // exiting from the overloaded state.
     uint64 data_size_soft_quota = 2;
+
+    // A maximum count of shards in all data streams.
+    uint64 data_stream_shards_quota = 3;
 }
 
 // Request to create a new database. For successfull creation
