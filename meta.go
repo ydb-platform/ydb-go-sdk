@@ -12,8 +12,21 @@ const (
 	metaTicket      = "x-ydb-auth-ticket"
 	metaVersion     = "x-ydb-sdk-build-info"
 	metaRequestType = "x-ydb-request-type"
-	metaTeraceID    = "x-ydb-trace-id"
+	metaTraceID     = "x-ydb-trace-id"
+	metaUserAgent   = "x-ydb-user-agent"
 )
+
+var (
+	userAgentInfo []string
+)
+
+// AppendUserAgentInfo appends info to x-ydb-user-agent header
+func AppendUserAgentInfo(info ...string) {
+	if len(info) == 0 {
+		return
+	}
+	userAgentInfo = append(userAgentInfo, info...)
+}
 
 type meta struct {
 	trace        DriverTrace
@@ -32,6 +45,7 @@ func (m *meta) make() metadata.MD {
 		metaDatabase: m.database,
 		metaVersion:  Version,
 	})
+	newMeta[metaUserAgent] = userAgentInfo
 	if m.requestsType != "" {
 		newMeta.Set(metaRequestType, m.requestsType)
 	}
