@@ -56,15 +56,23 @@ message ConnectionEntity {
     bool is_deleted = 10;
 }
 
-message GetConnectionsResponse {
+message GetConnectionsResult {
     repeated ConnectionEntity entity = 1;
+}
+
+message GetConnectionsResponse {
+    Ydb.Operations.Operation operation = 1; // GetConnectionsResult
 }
 
 message ModifyConnectionsRequest {
     repeated ConnectionEntity connection = 1; 
 }
 
-message ModifyConnectionsResponse { }
+message ModifyConnectionsResult { }
+
+message ModifyConnectionsResponse {
+    Ydb.Operations.Operation operation = 1; // ModifyConnectionsResult
+}
 
 enum EFieldType {
     NONE = 0;
