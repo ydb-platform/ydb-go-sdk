@@ -6,7 +6,7 @@ package Ydb
 import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	_struct "github.com/golang/protobuf/ptypes/struct"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	math "math"
 )
 
@@ -574,7 +574,7 @@ type Type_VariantType struct {
 }
 
 type Type_VoidType struct {
-	VoidType _struct.NullValue `protobuf:"varint,201,opt,name=void_type,json=voidType,proto3,enum=google.protobuf.NullValue,oneof"`
+	VoidType structpb.NullValue `protobuf:"varint,201,opt,name=void_type,json=voidType,proto3,enum=google.protobuf.NullValue,oneof"`
 }
 
 func (*Type_TypeId) isType_Type() {}
@@ -658,11 +658,11 @@ func (m *Type) GetVariantType() *VariantType {
 	return nil
 }
 
-func (m *Type) GetVoidType() _struct.NullValue {
+func (m *Type) GetVoidType() structpb.NullValue {
 	if x, ok := m.GetType().(*Type_VoidType); ok {
 		return x.VoidType
 	}
-	return _struct.NullValue_NULL_VALUE
+	return structpb.NullValue_NULL_VALUE
 }
 
 // XXX_OneofWrappers is for the internal use of the proto package.
@@ -817,7 +817,7 @@ type Value_TextValue struct {
 }
 
 type Value_NullFlagValue struct {
-	NullFlagValue _struct.NullValue `protobuf:"varint,10,opt,name=null_flag_value,json=nullFlagValue,proto3,enum=google.protobuf.NullValue,oneof"`
+	NullFlagValue structpb.NullValue `protobuf:"varint,10,opt,name=null_flag_value,json=nullFlagValue,proto3,enum=google.protobuf.NullValue,oneof"`
 }
 
 type Value_NestedValue struct {
@@ -922,11 +922,11 @@ func (m *Value) GetTextValue() string {
 	return ""
 }
 
-func (m *Value) GetNullFlagValue() _struct.NullValue {
+func (m *Value) GetNullFlagValue() structpb.NullValue {
 	if x, ok := m.GetValue().(*Value_NullFlagValue); ok {
 		return x.NullFlagValue
 	}
-	return _struct.NullValue_NULL_VALUE
+	return structpb.NullValue_NULL_VALUE
 }
 
 func (m *Value) GetNestedValue() *Value {

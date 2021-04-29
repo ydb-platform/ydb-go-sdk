@@ -11,8 +11,8 @@ import (
 	Ydb_TableStats "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_TableStats"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	empty "github.com/golang/protobuf/ptypes/empty"
-	timestamp "github.com/golang/protobuf/ptypes/timestamp"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	math "math"
 )
 
@@ -1289,12 +1289,12 @@ type TableStats struct {
 	// Number of partitions in table
 	Partitions uint64 `protobuf:"varint,4,opt,name=partitions,proto3" json:"partitions,omitempty"`
 	// Timestamp of table creation
-	CreationTime *timestamp.Timestamp `protobuf:"bytes,5,opt,name=creation_time,json=creationTime,proto3" json:"creation_time,omitempty"`
+	CreationTime *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=creation_time,json=creationTime,proto3" json:"creation_time,omitempty"`
 	// Timestamp of last modification
-	ModificationTime     *timestamp.Timestamp `protobuf:"bytes,6,opt,name=modification_time,json=modificationTime,proto3" json:"modification_time,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
+	ModificationTime     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=modification_time,json=modificationTime,proto3" json:"modification_time,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
 }
 
 func (m *TableStats) Reset()         { *m = TableStats{} }
@@ -1350,14 +1350,14 @@ func (m *TableStats) GetPartitions() uint64 {
 	return 0
 }
 
-func (m *TableStats) GetCreationTime() *timestamp.Timestamp {
+func (m *TableStats) GetCreationTime() *timestamppb.Timestamp {
 	if m != nil {
 		return m.CreationTime
 	}
 	return nil
 }
 
-func (m *TableStats) GetModificationTime() *timestamp.Timestamp {
+func (m *TableStats) GetModificationTime() *timestamppb.Timestamp {
 	if m != nil {
 		return m.ModificationTime
 	}
@@ -2802,7 +2802,7 @@ type AlterTableRequest_SetTtlSettings struct {
 }
 
 type AlterTableRequest_DropTtlSettings struct {
-	DropTtlSettings *empty.Empty `protobuf:"bytes,8,opt,name=drop_ttl_settings,json=dropTtlSettings,proto3,oneof"`
+	DropTtlSettings *emptypb.Empty `protobuf:"bytes,8,opt,name=drop_ttl_settings,json=dropTtlSettings,proto3,oneof"`
 }
 
 func (*AlterTableRequest_SetTtlSettings) isAlterTableRequest_TtlAction() {}
@@ -2823,7 +2823,7 @@ func (m *AlterTableRequest) GetSetTtlSettings() *TtlSettings {
 	return nil
 }
 
-func (m *AlterTableRequest) GetDropTtlSettings() *empty.Empty {
+func (m *AlterTableRequest) GetDropTtlSettings() *emptypb.Empty {
 	if x, ok := m.GetTtlAction().(*AlterTableRequest_DropTtlSettings); ok {
 		return x.DropTtlSettings
 	}

@@ -8,8 +8,8 @@ import (
 	Ydb_Issue "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Issue"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	any "github.com/golang/protobuf/ptypes/any"
-	duration "github.com/golang/protobuf/ptypes/duration"
+	anypb "google.golang.org/protobuf/types/known/anypb"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	math "math"
 )
 
@@ -62,13 +62,13 @@ type OperationParams struct {
 	// will receive TIMEOUT status code, which will be sent back to client if it was waiting for the operation result.
 	// Timeout of operation does not tell anything about its result, it might be completed successfully
 	// or cancelled on server.
-	OperationTimeout *duration.Duration `protobuf:"bytes,2,opt,name=operation_timeout,json=operationTimeout,proto3" json:"operation_timeout,omitempty"`
+	OperationTimeout *durationpb.Duration `protobuf:"bytes,2,opt,name=operation_timeout,json=operationTimeout,proto3" json:"operation_timeout,omitempty"`
 	// Server will try to cancel the operation after the specified duration starting from the time
 	// the operation arrives at server.
 	// In case of successful cancellation operation will receive CANCELLED status code, which will be
 	// sent back to client if it was waiting for the operation result.
 	// In case when cancellation isn't possible, no action will be performed.
-	CancelAfter *duration.Duration `protobuf:"bytes,3,opt,name=cancel_after,json=cancelAfter,proto3" json:"cancel_after,omitempty"`
+	CancelAfter *durationpb.Duration `protobuf:"bytes,3,opt,name=cancel_after,json=cancelAfter,proto3" json:"cancel_after,omitempty"`
 	// User-defined labels of operation.
 	Labels map[string]string `protobuf:"bytes,4,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// If enabled, server will report cost information, if supported by the operation.
@@ -111,14 +111,14 @@ func (m *OperationParams) GetOperationMode() OperationParams_OperationMode {
 	return OperationParams_OPERATION_MODE_UNSPECIFIED
 }
 
-func (m *OperationParams) GetOperationTimeout() *duration.Duration {
+func (m *OperationParams) GetOperationTimeout() *durationpb.Duration {
 	if m != nil {
 		return m.OperationTimeout
 	}
 	return nil
 }
 
-func (m *OperationParams) GetCancelAfter() *duration.Duration {
+func (m *OperationParams) GetCancelAfter() *durationpb.Duration {
 	if m != nil {
 		return m.CancelAfter
 	}
@@ -518,8 +518,8 @@ type Operation struct {
 	Status Ydb.StatusIds_StatusCode  `protobuf:"varint,3,opt,name=status,proto3,enum=Ydb.StatusIds_StatusCode" json:"status,omitempty"`
 	Issues []*Ydb_Issue.IssueMessage `protobuf:"bytes,4,rep,name=issues,proto3" json:"issues,omitempty"`
 	// Result data
-	Result   *any.Any `protobuf:"bytes,5,opt,name=result,proto3" json:"result,omitempty"`
-	Metadata *any.Any `protobuf:"bytes,6,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Result   *anypb.Any `protobuf:"bytes,5,opt,name=result,proto3" json:"result,omitempty"`
+	Metadata *anypb.Any `protobuf:"bytes,6,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	// Contains information about the cost of the operation.
 	// For completed operations, it shows the final cost of the operation.
 	// For operations in progress, it might indicate the current cost of the operation (if supported).
@@ -582,14 +582,14 @@ func (m *Operation) GetIssues() []*Ydb_Issue.IssueMessage {
 	return nil
 }
 
-func (m *Operation) GetResult() *any.Any {
+func (m *Operation) GetResult() *anypb.Any {
 	if m != nil {
 		return m.Result
 	}
 	return nil
 }
 
-func (m *Operation) GetMetadata() *any.Any {
+func (m *Operation) GetMetadata() *anypb.Any {
 	if m != nil {
 		return m.Metadata
 	}

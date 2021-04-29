@@ -7,7 +7,7 @@ import (
 	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
-	timestamp "github.com/golang/protobuf/ptypes/timestamp"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	math "math"
 )
 
@@ -166,13 +166,13 @@ func (m *ExportProgress) XXX_DiscardUnknown() {
 var xxx_messageInfo_ExportProgress proto.InternalMessageInfo
 
 type ExportItemProgress struct {
-	PartsTotal           uint32               `protobuf:"varint,1,opt,name=parts_total,json=partsTotal,proto3" json:"parts_total,omitempty"`
-	PartsCompleted       uint32               `protobuf:"varint,2,opt,name=parts_completed,json=partsCompleted,proto3" json:"parts_completed,omitempty"`
-	StartTime            *timestamp.Timestamp `protobuf:"bytes,3,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
-	EndTime              *timestamp.Timestamp `protobuf:"bytes,4,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
-	XXX_unrecognized     []byte               `json:"-"`
-	XXX_sizecache        int32                `json:"-"`
+	PartsTotal           uint32                 `protobuf:"varint,1,opt,name=parts_total,json=partsTotal,proto3" json:"parts_total,omitempty"`
+	PartsCompleted       uint32                 `protobuf:"varint,2,opt,name=parts_completed,json=partsCompleted,proto3" json:"parts_completed,omitempty"`
+	StartTime            *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	EndTime              *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
 }
 
 func (m *ExportItemProgress) Reset()         { *m = ExportItemProgress{} }
@@ -214,14 +214,14 @@ func (m *ExportItemProgress) GetPartsCompleted() uint32 {
 	return 0
 }
 
-func (m *ExportItemProgress) GetStartTime() *timestamp.Timestamp {
+func (m *ExportItemProgress) GetStartTime() *timestamppb.Timestamp {
 	if m != nil {
 		return m.StartTime
 	}
 	return nil
 }
 
-func (m *ExportItemProgress) GetEndTime() *timestamp.Timestamp {
+func (m *ExportItemProgress) GetEndTime() *timestamppb.Timestamp {
 	if m != nil {
 		return m.EndTime
 	}
