@@ -18,11 +18,14 @@ type balancer interface {
 	// Insert inserts new connection.
 	Insert(*conn, connInfo) balancerElement
 
-	// Update updates previously inserted connection.
+	// Update updates some balancer element connection.
 	Update(balancerElement, connInfo)
 
-	// Remove removes previously inserted connection.
+	// Remove removes balancer element.
 	Remove(balancerElement)
+
+	// Pessimize pessimizes some balancer element.
+	Pessimize(balancerElement)
 }
 
 type multiHandle struct {
@@ -90,6 +93,14 @@ func (m *multiBalancer) Remove(x balancerElement) {
 	}
 }
 
+func (m *multiBalancer) Pessimize(x balancerElement) {
+	for i, x := range x.(multiHandle).elements {
+		if x != nil {
+			m.balancer[i].Pessimize(x)
+		}
+	}
+}
+
 type singleConnBalancer struct {
 	conn *conn
 }
@@ -111,3 +122,4 @@ func (s *singleConnBalancer) Remove(el balancerElement) {
 	s.conn = nil
 }
 func (s *singleConnBalancer) Update(balancerElement, connInfo) {}
+func (s *singleConnBalancer) Pessimize(el balancerElement)     {}

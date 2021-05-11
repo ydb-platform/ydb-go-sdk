@@ -9,6 +9,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 		name   string
 		add    []Endpoint
 		del    []Endpoint
+		banned map[string]struct{}
 		repeat int
 		exp    map[string]int
 		err    bool
@@ -124,6 +125,93 @@ func TestRoundRobinBalancer(t *testing.T) {
 			repeat: 1,
 			err:    true,
 		},
+		{
+			add: []Endpoint{
+				{Addr: "foo", LoadFactor: 0},
+				{Addr: "bar", LoadFactor: 0},
+				{Addr: "baz", LoadFactor: 0},
+			},
+			banned: map[string]struct{}{
+				"foo": {},
+				"bar": {},
+			},
+			repeat: 100,
+			err:    true,
+			exp: map[string]int{
+				"baz": 100,
+			},
+		},
+		{
+			add: []Endpoint{
+				{Addr: "foo", LoadFactor: 0},
+				{Addr: "bar", LoadFactor: 0},
+				{Addr: "baz", LoadFactor: 0},
+			},
+			banned: map[string]struct{}{
+				"foo": {},
+			},
+			repeat: 100,
+			err:    true,
+			exp: map[string]int{
+				"bar": 50,
+				"baz": 50,
+			},
+		},
+		{
+			add: []Endpoint{
+				{Addr: "foo", LoadFactor: 0},
+				{Addr: "bar", LoadFactor: 0},
+				{Addr: "baz", LoadFactor: 0},
+			},
+			banned: map[string]struct{}{
+				"foo": {},
+				"bar": {},
+				"baz": {},
+			},
+			repeat: 150,
+			err:    true,
+			exp: map[string]int{
+				"foo": 50,
+				"bar": 50,
+				"baz": 50,
+			},
+		},
+		{
+			add: []Endpoint{
+				{Addr: "foo", LoadFactor: 10},
+				{Addr: "bar", LoadFactor: 20},
+				{Addr: "baz", LoadFactor: 30},
+			},
+			banned: map[string]struct{}{
+				"foo": {},
+				"bar": {},
+				"baz": {},
+			},
+			repeat: 150,
+			err:    true,
+			exp: map[string]int{
+				"foo": 75,
+				"bar": 50,
+				"baz": 25,
+			},
+		},
+		{
+			add: []Endpoint{
+				{Addr: "foo", LoadFactor: 10},
+				{Addr: "bar", LoadFactor: 20},
+				{Addr: "baz", LoadFactor: 30},
+			},
+			banned: map[string]struct{}{
+				"foo": {},
+			},
+			repeat: 150,
+			err:    true,
+			exp: map[string]int{
+				"foo": 0,
+				"bar": 100,
+				"baz": 50,
+			},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var (
@@ -143,6 +231,9 @@ func TestRoundRobinBalancer(t *testing.T) {
 			}
 			for _, e := range test.del {
 				r.Remove(melem[e.Addr])
+			}
+			for addr := range test.banned {
+				r.Pessimize(melem[addr])
 			}
 			for i := 0; i < test.repeat; i++ {
 				conn := r.Next()

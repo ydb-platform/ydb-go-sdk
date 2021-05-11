@@ -110,6 +110,7 @@ func Retry(ctx context.Context, s SessionProvider, op Operation) error {
 // Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 	var (
+		e error
 		s *Session
 		m ydb.RetryMode
 	)
@@ -119,40 +120,39 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 		}
 	}()
 	for i := 0; i <= r.MaxRetries; i++ {
-		if s == nil {
-			var e error
-			s, e = r.SessionProvider.Get(ctx)
+		s, e = func() (*Session, error) {
+			s, e := r.SessionProvider.Get(ctx)
 			if e != nil {
-				if err == nil {
-					// It is initial attempt to get a Session.
-					// Otherwise s could be nil only when status bad session
-					// received – that is, we must return bad session error to
-					// make it possible to lay on for the client.
-					err = e
-				}
-				return
+				return s, e
 			}
-		}
-		if err = op.Do(ctx, s); err == nil {
+			return s, op.Do(ctx, s)
+		}()
+		if e == nil {
 			return nil
 		}
-		m = r.RetryChecker.Check(err)
+		if err == nil {
+			err = e
+		}
+		m = r.RetryChecker.Check(e)
 		switch {
 		case m.MustDeleteSession():
-			defer s.Close(ctx)
-			s = nil
-
+			if s != nil {
+				_ = s.Close(ctx)
+				s = nil
+			}
 		case m.MustCheckSession():
-			_ = r.SessionProvider.PutBusy(ctx, s)
-			s = nil
+			if s != nil {
+				_ = r.SessionProvider.PutBusy(ctx, s)
+				s = nil
+			}
 		}
 		if !m.Retriable() {
+			// Return original error to make it possible to lay on for the client.
 			return err
 		}
 		if m.MustBackoff() {
 			if e := ydb.WaitBackoff(ctx, r.Backoff, i); e != nil {
-				// Return original error to make it possible to lay on for the
-				// client.
+				// Return original error to make it possible to lay on for the client.
 				return err
 			}
 		}

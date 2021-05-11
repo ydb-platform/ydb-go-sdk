@@ -27,6 +27,13 @@ type connRuntimeCriterion struct {
 }
 
 func (c connRuntimeCriterion) Best(c1, c2 *connListElement) *connListElement {
+	if !c1.banned && c2.banned {
+		return c1
+	}
+	if c1.banned && !c2.banned {
+		return c2
+	}
+
 	s1 := c1.conn.runtime.stats()
 	s2 := c2.conn.runtime.stats()
 
@@ -138,6 +145,10 @@ func (p *p2c) Update(x balancerElement, info connInfo) {
 
 func (p *p2c) Remove(x balancerElement) {
 	p.conns.Remove(x.(*connListElement))
+}
+
+func (p *p2c) Pessimize(x balancerElement) {
+	(x.(*connListElement)).banned = true
 }
 
 type lockedSource struct {

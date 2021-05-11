@@ -60,7 +60,8 @@ func (r *RetryChecker) Check(err error) (m RetryMode) {
 		return RetryCheckSession
 	case errors.As(err, &te):
 		switch te.Reason {
-		case TransportErrorResourceExhausted:
+		case TransportErrorResourceExhausted,
+			TransportErrorAborted:
 			m |= RetryBackoff
 		default:
 			return RetryCheckSession
