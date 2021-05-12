@@ -65,7 +65,7 @@ message StreamDescription {
     int32 retention_period_hours = 5;
     repeated Shard shards = 6;
     string stream_arn = 7;
-    int32 timestamp = 8;
+    int64 stream_creation_timestamp = 8;
     StreamStatus stream_status = 9;
     string stream_name = 10;
     int32 write_quota_kb_per_sec = 11;
@@ -95,7 +95,7 @@ message ConsumerDescription {
     }
 
     string consumer_arn = 1;
-    int32 consumer_creation_timestamp = 2;
+    int64 consumer_creation_timestamp = 2;
     string consumer_name = 3;
     ConsumerStatus consumer_status = 4;
     string stream_arn = 5;
@@ -122,11 +122,11 @@ message ShardFilter {
     }
 
     string shard_id = 1;
-    int32 timestamp = 2;
+    int64 timestamp = 2;
     ShardIteratorType type = 3;
 }
 message StartingPosition {
-    int32 timestamp = 1;
+    int64 timestamp = 1;
     string sequence_number = 2;
     ShardIteratorType type = 3;
 }
@@ -139,7 +139,7 @@ message StreamDescriptionSummary {
     int32 open_shard_count = 5;
     int32 retention_period_hours = 6;
     string stream_arn = 7;
-    int32 stream_creation_timestamp = 8;
+    int64 stream_creation_timestamp = 8;
     string stream_name = 9;
     StreamDescription.StreamStatus stream_status = 10;
 }
@@ -233,7 +233,7 @@ message ListShardsRequest {
     int32 max_results = 3;
     string next_token = 4; // "ListShardsIterator" - token for shards pagination
     ShardFilter shard_filter = 5; // Предлагаю в первой версии не заморачиваться
-    int32 stream_creation_timestamp = 6;
+    int64 stream_creation_timestamp = 6;
     string stream_name = 7;
 }
 message ListShardsResponse {
@@ -281,7 +281,7 @@ message ListStreamConsumersRequest {
     int32 max_results = 2;
     string next_token = 3;
     string stream_arn = 4;
-    int32 stream_creation_timestamp = 5;
+    int64 stream_creation_timestamp = 5;
 }
 message ListStreamConsumersResponse {
     // Result of request will be inside operation.
@@ -438,7 +438,7 @@ message GetShardIteratorRequest {
     ShardIteratorType shard_iterator_type = 3;
     string starting_sequence_number = 4;
     string stream_name = 5;
-    int32 timestamp = 6;
+    int64 timestamp = 6;
 }
 message GetShardIteratorResponse {
     // Result of request will be inside operation.
