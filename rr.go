@@ -50,6 +50,9 @@ func (r *roundRobin) Remove(x balancerElement) {
 }
 
 func (r *roundRobin) Pessimize(x balancerElement) {
+	if x == nil {
+		return
+	}
 	x.(*connListElement).banned = true
 	r.belt = r.distribute()
 }

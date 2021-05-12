@@ -148,6 +148,9 @@ func (p *p2c) Remove(x balancerElement) {
 }
 
 func (p *p2c) Pessimize(x balancerElement) {
+	if x == nil {
+		return
+	}
 	(x.(*connListElement)).banned = true
 }
 

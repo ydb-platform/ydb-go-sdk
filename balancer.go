@@ -94,6 +94,9 @@ func (m *multiBalancer) Remove(x balancerElement) {
 }
 
 func (m *multiBalancer) Pessimize(x balancerElement) {
+	if x == nil {
+		return
+	}
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
 			m.balancer[i].Pessimize(x)
