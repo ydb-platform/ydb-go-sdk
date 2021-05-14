@@ -288,7 +288,8 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...WG) {
 	c.index[addr] = entry
 }
 
-// Update updates existing connection's runtime stats such that load factor and others.
+// Update updates existing connection's runtime stats such that load factor and
+// others.
 func (c *cluster) Update(ctx context.Context, ep Endpoint, wg ...WG) {
 	if len(wg) > 0 {
 		defer wg[0].Done()
@@ -324,12 +325,15 @@ func (c *cluster) Remove(_ context.Context, e Endpoint, wg ...WG) {
 	if len(wg) > 0 {
 		defer wg[0].Done()
 	}
+
 	addr := connAddr{e.Addr, e.Port}
+
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		return
 	}
+
 	entry, has := c.index[addr]
 	if !has {
 		c.mu.Unlock()
@@ -350,21 +354,6 @@ func (c *cluster) Remove(_ context.Context, e Endpoint, wg ...WG) {
 		// unsuccessful dial().
 		_ = entry.conn.conn.Close()
 	}
-}
-
-func (c *cluster) Pessimize(addr connAddr) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.closed {
-		return
-	}
-
-	entry, has := c.index[addr]
-	if !has {
-		panic("ydb: can't pessimize not-existing endpoint")
-	}
-
-	c.balancer.Pessimize(entry.handle)
 }
 
 func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
@@ -601,33 +590,31 @@ func diffslice(a, b int, cmp func(i, j int) int, eq, add, del func(i, j int)) {
 }
 
 type connListElement struct {
-	index  int
-	conn   *conn
-	info   connInfo
-	banned bool
+	index int
+	conn  *conn
+	info  connInfo
 }
 
 type connList []*connListElement
 
 func (cs *connList) Insert(conn *conn, info connInfo) *connListElement {
 	e := &connListElement{
-		index:  len(*cs),
-		conn:   conn,
-		info:   info,
-		banned: false,
+		index: len(*cs),
+		conn:  conn,
+		info:  info,
 	}
 	*cs = append(*cs, e)
 	return e
 }
 
 func (cs *connList) Remove(x *connListElement) {
-	l := *cs
+	list := *cs
 	var (
-		n    = len(l)
-		last = l[n-1]
+		n    = len(list)
+		last = list[n-1]
 	)
 	last.index = x.index
-	l[x.index], l[n-1] = l[n-1], nil
-	l = l[:n-1]
-	*cs = l
+	list[x.index], list[n-1] = list[n-1], nil
+	list = list[:n-1]
+	*cs = list
 }

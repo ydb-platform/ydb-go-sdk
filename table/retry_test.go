@@ -62,40 +62,27 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	}
 }
 
-func TestRetryerImmediateRetry(t *testing.T) {
-	for testErr, session := range map[error]*Session{
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorResourceExhausted,
-		}: nil,
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorAborted,
-		}: nil,
+func TestRetryerImmediateiRetry(t *testing.T) {
+	for _, testErr := range []error{
 		&ydb.OpError{
 			Reason: ydb.StatusUnavailable,
-		}: new(Session),
-		&ydb.OpError{
-			Reason: ydb.StatusOverloaded,
-		}: new(Session),
+		},
 		&ydb.OpError{
 			Reason: ydb.StatusAborted,
-		}: new(Session),
+		},
 		&ydb.OpError{
 			Reason: ydb.StatusNotFound,
-		}: new(Session),
+		},
 		fmt.Errorf("wrap op error: %w", &ydb.OpError{
 			Reason: ydb.StatusAborted,
-		}): new(Session),
+		}),
 	} {
 		t.Run("", func(t *testing.T) {
 			var count int
 			r := Retryer{
-				MaxRetries:   3,
-				RetryChecker: ydb.DefaultRetryChecker,
-				SessionProvider: SessionProviderFunc{
-					OnGet: func(ctx context.Context) (s *Session, err error) {
-						return session, nil
-					},
-				},
+				MaxRetries:      1,
+				RetryChecker:    ydb.DefaultRetryChecker,
+				SessionProvider: SingleSession(new(Session)),
 			}
 			err := r.Do(
 				context.Background(),
@@ -108,61 +95,9 @@ func TestRetryerImmediateRetry(t *testing.T) {
 				t.Errorf("unexpected operation calls: %v; want %v", act, exp)
 			}
 			if err != testErr {
-				t.Fatalf("unexpected error: %v; want: %v", err, testErr)
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
-	}
-}
-
-func TestRetryerResourceExhausted(t *testing.T) {
-	tick := time.Millisecond * 100
-	countGet := 0
-	countBackoff := 0
-	countDo := 0
-	maxRetries := 3
-	r := Retryer{
-		MaxRetries: maxRetries,
-		SessionProvider: SessionProviderFunc{
-			OnGet: func(ctx context.Context) (s *Session, err error) {
-				countGet++
-				if countGet < maxRetries {
-					return nil, &ydb.TransportError{
-						Reason: ydb.TransportErrorResourceExhausted,
-					}
-				}
-				return new(Session), nil
-			},
-		},
-		Backoff: ydb.BackoffFunc(func(n int) <-chan time.Time {
-			countBackoff++
-			return time.After(tick * time.Duration(n+1))
-		}),
-	}
-
-	err := r.Do(
-		context.Background(),
-		OperationFunc(func(ctx context.Context, s *Session) error {
-			countDo++
-			if countDo < maxRetries {
-				return &ydb.TransportError{
-					Reason: ydb.TransportErrorResourceExhausted,
-				}
-			}
-			return nil
-		}),
-	)
-
-	if !ydb.IsTransportError(err, ydb.TransportErrorResourceExhausted) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if act, exp := countGet, maxRetries+1; act != exp {
-		t.Errorf("unexpected get calls: %v; want %v", act, exp)
-	}
-	if act, exp := countBackoff, maxRetries+1; act != exp {
-		t.Errorf("unexpected backoff calls: %v; want %v", act, exp)
-	}
-	if act, exp := countDo-1, 1; act != exp {
-		t.Errorf("unexpected do calls: %v; want %v", act, exp)
 	}
 }
 

@@ -66,13 +66,6 @@ func TestClusterFastRedial(t *testing.T) {
 	}
 }
 
-func wrapClusterForTests(c *cluster) *cluster {
-	c.index = make(map[connAddr]connEntry)
-	c.trackerQueue = list.New()
-	c.once.Do(func() {})
-	return c
-}
-
 func TestClusterMergeEndpoints(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -84,7 +77,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	}()
 
 	cs, balancer := simpleBalancer()
-	c := wrapClusterForTests(&cluster{
+	c := &cluster{
 		dial: func(ctx context.Context, s string, p int) (*conn, error) {
 			cc, err := ln.Dial(ctx)
 			return &conn{
@@ -93,7 +86,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			}, err
 		},
 		balancer: balancer,
-	})
+	}
 
 	pingConnects := func(size int) {
 		for i := 0; i < size*10; i++ {
@@ -432,11 +425,10 @@ func TestClusterAwait(t *testing.T) {
 }
 
 type stubBalancer struct {
-	OnNext      func() *conn
-	OnInsert    func(*conn, connInfo) balancerElement
-	OnUpdate    func(balancerElement, connInfo)
-	OnRemove    func(balancerElement)
-	OnPessimize func(balancerElement)
+	OnNext   func() *conn
+	OnInsert func(*conn, connInfo) balancerElement
+	OnUpdate func(balancerElement, connInfo)
+	OnRemove func(balancerElement)
 }
 
 func simpleBalancer() (*connList, balancer) {
@@ -463,10 +455,6 @@ func simpleBalancer() (*connList, balancer) {
 			e := x.(*connListElement)
 			e.info = info
 		},
-		OnPessimize: func(x balancerElement) {
-			e := x.(*connListElement)
-			e.banned = true
-		},
 	}
 }
 
@@ -489,11 +477,6 @@ func (s stubBalancer) Update(el balancerElement, i connInfo) {
 }
 func (s stubBalancer) Remove(el balancerElement) {
 	if f := s.OnRemove; f != nil {
-		f(el)
-	}
-}
-func (s stubBalancer) Pessimize(el balancerElement) {
-	if f := s.OnPessimize; f != nil {
 		f(el)
 	}
 }

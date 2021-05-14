@@ -49,14 +49,6 @@ func (r *roundRobin) Remove(x balancerElement) {
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Pessimize(x balancerElement) {
-	if x == nil {
-		return
-	}
-	x.(*connListElement).banned = true
-	r.belt = r.distribute()
-}
-
 func (r *roundRobin) updateMinMax(info connInfo) {
 	if len(r.conns) == 1 {
 		r.min = info.loadFactor
@@ -105,22 +97,9 @@ func (r *roundRobin) spread(f func(float32) int32) []int {
 		index = make([]int, 0, len(r.conns))
 	)
 	for _, x := range r.conns {
-		if x.banned {
-			continue
-		}
 		d := f(x.info.loadFactor)
 		dist = append(dist, d)
 		index = append(index, x.index)
-	}
-	if len(index) == 0 {
-		for _, x := range r.conns {
-			if !x.banned {
-				continue
-			}
-			d := f(x.info.loadFactor)
-			dist = append(dist, d)
-			index = append(index, x.index)
-		}
 	}
 	return genBelt(index, dist)
 }

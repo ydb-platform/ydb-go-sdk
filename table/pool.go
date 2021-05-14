@@ -257,20 +257,6 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 	return s, nil
 }
 
-func isCreateSessionErrorRetriable(err error) bool {
-	switch {
-	case
-		errors.Is(err, ErrSessionPoolOverflow),
-		ydb.IsOpError(err, ydb.StatusOverloaded),
-		ydb.IsTransportError(err, ydb.TransportErrorResourceExhausted),
-		ydb.IsTransportError(err, ydb.TransportErrorDeadlineExceeded),
-		ydb.IsTransportError(err, ydb.TransportErrorUnavailable):
-		return true
-	default:
-		return false
-	}
-}
-
 // Get returns first idle session from the SessionPool and removes it from
 // there. If no items stored in SessionPool it creates new one by calling
 // Builder.CreateSession() method and returns it.
@@ -299,8 +285,8 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		if s == nil {
 			// Try create new session without awaiting for reused one.
 			s, err = p.createSession(ctx)
-
-			if s != nil || (err != nil && !isCreateSessionErrorRetriable(err)) {
+			// got session or err is not recoverable
+			if s != nil || err != nil && !errors.Is(err, ErrSessionPoolOverflow) {
 				return s, err
 			}
 			err = nil
