@@ -36,11 +36,12 @@ message Connection {
 }
 
 message GetConnectionsRequest {
-    string folder_id = 1;
+    Ydb.Operations.OperationParams operation_params = 1;
+    string folder_id = 2;
     message Filter {
         string connection_id = 1;
     }
-    Filter filter = 2;
+    Filter filter = 3;
 }
 
 message ConnectionEntity {
