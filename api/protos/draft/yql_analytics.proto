@@ -38,10 +38,11 @@ message Connection {
 message GetConnectionsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string folder_id = 2;
+    string name = 3;
     message Filter {
         string connection_id = 1;
     }
-    Filter filter = 3;
+    Filter filter = 4;
 }
 
 message ConnectionEntity {
@@ -66,7 +67,8 @@ message GetConnectionsResponse {
 }
 
 message ModifyConnectionsRequest {
-    repeated ConnectionEntity connection = 1; 
+    Ydb.Operations.OperationParams operation_params = 1;
+    repeated ConnectionEntity connection = 2; 
 }
 
 message ModifyConnectionsResult { }
