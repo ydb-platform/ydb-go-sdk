@@ -12,6 +12,12 @@ Currently package ydb provides **scheme** and **table** API client implementatio
 
 Requires Go 1.13 or later.
 
+## Install
+
+```
+go get -u github.com/yandex-cloud/ydb-go-sdk
+```
+
 ## Usage
 
 The straightforward example of querying data may looks similar to this:
@@ -38,7 +44,7 @@ The straightforward example of querying data may looks similar to this:
 	if err != nil {
 		// handle error
 	}
-	defer s.Close()
+	defer s.Close(ctx)
 
 	// Prepare transaction control for upcoming query execution.
 	// NOTE: result of TxControl() may be reused.
