@@ -1,5 +1,20 @@
 package ydb
 
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
+var (
+	// ErrNilBalancerElement returned when requested on a nil balancer element.
+	ErrNilBalancerElement = errors.New("nil balancer element")
+	// ErrUnknownBalancerElement returned when requested on a unknown balancer element.
+	ErrUnknownBalancerElement = errors.New("unknown balancer element")
+	// ErrUnknownTypeOfBalancerElement returned when requested on a unknown type of balancer element.
+	ErrUnknownTypeOfBalancerElement = errors.New("unknown type of balancer element")
+)
+
 // balancerElement is an empty interface that holds some balancer specific
 // data.
 type balancerElement interface {
@@ -23,6 +38,12 @@ type balancer interface {
 
 	// Remove removes previously inserted connection.
 	Remove(balancerElement)
+
+	// Pessimize pessimizes some balancer element.
+	Pessimize(balancerElement) error
+
+	// Contains returns true if balancer contains requested element.
+	Contains(balancerElement) bool
 }
 
 type multiHandle struct {
@@ -49,6 +70,15 @@ func newMultiBalancer(opts ...balancerOption) *multiBalancer {
 		opt(m)
 	}
 	return m
+}
+
+func (m *multiBalancer) Contains(x balancerElement) bool {
+	for _, b := range m.balancer {
+		if b.Contains(x) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *multiBalancer) Next() *conn {
@@ -90,6 +120,29 @@ func (m *multiBalancer) Remove(x balancerElement) {
 	}
 }
 
+func (m *multiBalancer) Pessimize(x balancerElement) error {
+	if x == nil {
+		return ErrNilBalancerElement
+	}
+	good := 0
+	all := 0
+	errs := make([]string, 0)
+	for i, x := range x.(multiHandle).elements {
+		if x != nil {
+			all++
+			if e := m.balancer[i].Pessimize(x); e == nil {
+				good++
+			} else if !errors.Is(e, ErrUnknownBalancerElement) { // collect error only if not an ErrUnknownBalancerElement
+				errs = append(errs, e.Error())
+			}
+		}
+	}
+	if good > 0 || all == 0 {
+		return nil
+	}
+	return fmt.Errorf("[multiBalancer] unknown balancer element %+v; errors: [ %s ]", x, strings.Join(errs, "; "))
+}
+
 type singleConnBalancer struct {
 	conn *conn
 }
@@ -104,10 +157,17 @@ func (s *singleConnBalancer) Insert(conn *conn, _ connInfo) balancerElement {
 	s.conn = conn
 	return conn
 }
-func (s *singleConnBalancer) Remove(el balancerElement) {
-	if s.conn != el.(*conn) {
+func (s *singleConnBalancer) Remove(x balancerElement) {
+	if s.conn != x.(*conn) {
 		panic("ydb: single conn balancer: Remove() unknown conn")
 	}
 	s.conn = nil
 }
-func (s *singleConnBalancer) Update(balancerElement, connInfo) {}
+func (s *singleConnBalancer) Update(balancerElement, connInfo)   {}
+func (s *singleConnBalancer) Pessimize(el balancerElement) error { return nil }
+func (s *singleConnBalancer) Contains(x balancerElement) bool {
+	if x == nil {
+		return false
+	}
+	return s.conn != x.(*conn)
+}

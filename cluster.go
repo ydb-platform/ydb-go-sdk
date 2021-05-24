@@ -25,6 +25,9 @@ var (
 
 	// ErrClusterEmpty returned when no connections left in cluster.
 	ErrClusterEmpty = errors.New("cluster empty")
+
+	// ErrUnknownEndpoint returned when no connections left in cluster.
+	ErrUnknownEndpoint = errors.New("unknown endpoint")
 )
 
 // connInfo contains connection "static" stats – e.g. such that obtained from
@@ -313,6 +316,9 @@ func (c *cluster) Update(ctx context.Context, ep Endpoint, wg ...WG) {
 	}
 
 	entry.info = info
+	if entry.conn != nil {
+		entry.conn.runtime.setState(ConnOnline)
+	}
 	c.index[addr] = entry
 	if entry.handle != nil {
 		// entry.handle may be nil when connection is being tracked.
@@ -354,6 +360,26 @@ func (c *cluster) Remove(_ context.Context, e Endpoint, wg ...WG) {
 		// unsuccessful dial().
 		_ = entry.conn.conn.Close()
 	}
+}
+
+func (c *cluster) Pessimize(addr connAddr) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return ErrClusterClosed
+	}
+
+	entry, has := c.index[addr]
+	if !has {
+		return ErrUnknownEndpoint
+	}
+	if entry.handle == nil {
+		return ErrNilBalancerElement
+	}
+	if !c.balancer.Contains(entry.handle) {
+		return ErrUnknownBalancerElement
+	}
+	return c.balancer.Pessimize(entry.handle)
 }
 
 func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
@@ -468,7 +494,9 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 					c.trackerQueue.Remove(el)
 					active = c.trackerQueue.Len() > 0
 
-					conn.runtime.setState(ConnOnline)
+					if conn.runtime.getState() != ConnBanned {
+						conn.runtime.setState(ConnOnline)
+					}
 					c.trace.trackConnDone(conn)
 					entry.conn = conn
 					entry.insertInto(c.balancer)
@@ -617,4 +645,15 @@ func (cs *connList) Remove(x *connListElement) {
 	list[x.index], list[n-1] = list[n-1], nil
 	list = list[:n-1]
 	*cs = list
+}
+
+func (cs *connList) Contains(x *connListElement) bool {
+	l := *cs
+	var (
+		n = len(l)
+	)
+	if x.index >= n {
+		return false
+	}
+	return l[x.index] == x
 }

@@ -246,6 +246,14 @@ func (d *driver) Call(ctx context.Context, op api.Operation) error {
 	)
 	d.trace.operationDone(rawctx, conn, method, params, resp, err)
 
+	if err != nil {
+		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
+			// remove node from discovery cache on any transport error
+			d.trace.pessimizationStart(rawctx, &conn.addr)
+			d.trace.pessimizationDone(rawctx, &conn.addr, d.cluster.Pessimize(conn.addr))
+		}
+	}
+
 	return err
 }
 
@@ -444,7 +452,7 @@ func newConn(cc *grpc.ClientConn, addr connAddr) *conn {
 }
 
 type connRuntime struct {
-	mu           sync.Mutex
+	mu           sync.RWMutex
 	state        ConnState
 	offlineCount uint64
 	opStarted    uint64
@@ -465,12 +473,13 @@ type ConnStats struct {
 	AvgOpTime    time.Duration
 }
 
-type ConnState uint
+type ConnState int8
 
 const (
-	ConnStateUnknown ConnState = iota
+	ConnOffline ConnState = iota - 2
+	ConnBanned
+	ConnStateUnknown
 	ConnOnline
-	ConnOffline
 )
 
 func (s ConnState) String() string {
@@ -479,6 +488,8 @@ func (s ConnState) String() string {
 		return "online"
 	case ConnOffline:
 		return "offline"
+	case ConnBanned:
+		return "banned"
 	default:
 		return "unknown"
 	}
@@ -524,6 +535,12 @@ func (c *connRuntime) setState(s ConnState) {
 	if s == ConnOffline {
 		c.offlineCount++
 	}
+}
+
+func (c *connRuntime) getState() (s ConnState) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.state
 }
 
 func (c *connRuntime) operationStart(start time.Time) {

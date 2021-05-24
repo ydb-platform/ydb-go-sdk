@@ -49,6 +49,33 @@ func (r *roundRobin) Remove(x balancerElement) {
 	r.belt = r.distribute()
 }
 
+func (r *roundRobin) Pessimize(x balancerElement) error {
+	if x == nil {
+		return ErrNilBalancerElement
+	}
+	el, ok := x.(*connListElement)
+	if !ok {
+		return ErrUnknownTypeOfBalancerElement
+	}
+	if !r.conns.Contains(el) {
+		return ErrUnknownBalancerElement
+	}
+	el.conn.runtime.setState(ConnBanned)
+	r.belt = r.distribute()
+	return nil
+}
+
+func (r *roundRobin) Contains(x balancerElement) bool {
+	if x == nil {
+		return false
+	}
+	el, ok := x.(*connListElement)
+	if !ok {
+		return false
+	}
+	return r.conns.Contains(el)
+}
+
 func (r *roundRobin) updateMinMax(info connInfo) {
 	if len(r.conns) == 1 {
 		r.min = info.loadFactor
@@ -96,12 +123,28 @@ func (r *roundRobin) spread(f func(float32) int32) []int {
 		dist  = make([]int32, 0, len(r.conns))
 		index = make([]int, 0, len(r.conns))
 	)
-	for _, x := range r.conns {
-		d := f(x.info.loadFactor)
-		dist = append(dist, d)
-		index = append(index, x.index)
+	fill := func(state ConnState) (filled bool) {
+		for _, x := range r.conns {
+			if x.conn.runtime.getState() == state {
+				d := f(x.info.loadFactor)
+				dist = append(dist, d)
+				index = append(index, x.index)
+				filled = true
+			}
+		}
+		return filled
 	}
-	return genBelt(index, dist)
+	for _, s := range [...]ConnState{
+		ConnOnline,
+		ConnBanned,
+		ConnStateUnknown,
+		ConnOffline,
+	} {
+		if fill(s) {
+			return genBelt(index, dist)
+		}
+	}
+	return nil
 }
 
 func genBelt(index []int, weight []int32) (r []int) {

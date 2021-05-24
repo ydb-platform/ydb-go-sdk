@@ -13,6 +13,9 @@ type DriverTrace struct {
 	GetConnStart func(GetConnStartInfo)
 	GetConnDone  func(GetConnDoneInfo)
 
+	PessimizationStart func(PessimizationStartInfo)
+	PessimizationDone  func(PessimizationDoneInfo)
+
 	// Only for background.
 	TrackConnStart func(TrackConnStartInfo)
 	// Only for background.
@@ -98,6 +101,31 @@ func (d DriverTrace) trackConnDone(conn *conn) {
 		Address: conn.addr.String(),
 	}
 	if f := d.TrackConnDone; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) pessimizationStart(ctx context.Context, addr *connAddr) {
+	x := PessimizationStartInfo{
+		Context: ctx,
+		Address: addr.String(),
+	}
+	if f := d.PessimizationStart; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).PessimizationStart; f != nil {
+		f(x)
+	}
+}
+func (d DriverTrace) pessimizationDone(ctx context.Context, addr *connAddr, err error) {
+	x := PessimizationDoneInfo{
+		Context: ctx,
+		Address: addr.String(),
+		Error:   err,
+	}
+	if f := d.PessimizationDone; f != nil {
+		f(x)
+	}
+	if f := ContextDriverTrace(ctx).PessimizationDone; f != nil {
 		f(x)
 	}
 }
@@ -281,6 +309,15 @@ type (
 		Address string
 		Error   error
 	}
+	PessimizationStartInfo struct {
+		Context context.Context
+		Address string
+	}
+	PessimizationDoneInfo struct {
+		Context context.Context
+		Address string
+		Error   error
+	}
 	TrackConnStartInfo struct {
 		Address string
 	}
@@ -393,6 +430,28 @@ func composeDriverTrace(a, b DriverTrace) (c DriverTrace) {
 		c.GetConnDone = func(info GetConnDoneInfo) {
 			a.GetConnDone(info)
 			b.GetConnDone(info)
+		}
+	}
+	switch {
+	case a.PessimizationStart == nil:
+		c.PessimizationStart = b.PessimizationStart
+	case b.PessimizationStart == nil:
+		c.PessimizationStart = a.PessimizationStart
+	default:
+		c.PessimizationStart = func(info PessimizationStartInfo) {
+			a.PessimizationStart(info)
+			b.PessimizationStart(info)
+		}
+	}
+	switch {
+	case a.PessimizationDone == nil:
+		c.PessimizationDone = b.PessimizationDone
+	case b.PessimizationDone == nil:
+		c.PessimizationDone = a.PessimizationDone
+	default:
+		c.PessimizationDone = func(info PessimizationDoneInfo) {
+			a.PessimizationDone(info)
+			b.PessimizationDone(info)
 		}
 	}
 	switch {

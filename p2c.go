@@ -26,9 +26,32 @@ type connRuntimeCriterion struct {
 	OpTimeThreshold time.Duration
 }
 
+func (c connRuntimeCriterion) chooseByState(c1, c2 *connListElement, s1, s2 ConnState) *connListElement {
+	if s1 == s2 {
+		return nil
+	}
+	switch s1 {
+	case ConnStateUnknown:
+	case ConnOnline:
+	case ConnOffline:
+	case ConnBanned:
+	}
+	if s1 > s2 {
+		return c1
+	} else if s2 > s1 {
+		return c2
+	} else {
+		return nil
+	}
+}
+
 func (c connRuntimeCriterion) Best(c1, c2 *connListElement) *connListElement {
 	s1 := c1.conn.runtime.stats()
 	s2 := c2.conn.runtime.stats()
+
+	if choise := c.chooseByState(c1, c2, s1.State, s2.State); choise != nil {
+		return choise
+	}
 
 	var (
 		f1 float64
@@ -138,6 +161,32 @@ func (p *p2c) Update(x balancerElement, info connInfo) {
 
 func (p *p2c) Remove(x balancerElement) {
 	p.conns.Remove(x.(*connListElement))
+}
+
+func (p *p2c) Pessimize(x balancerElement) error {
+	if x == nil {
+		return ErrNilBalancerElement
+	}
+	el, ok := x.(*connListElement)
+	if !ok {
+		return ErrUnknownTypeOfBalancerElement
+	}
+	if !p.conns.Contains(el) {
+		return ErrUnknownBalancerElement
+	}
+	el.conn.runtime.setState(ConnBanned)
+	return nil
+}
+
+func (p *p2c) Contains(x balancerElement) bool {
+	if x == nil {
+		return false
+	}
+	el, ok := x.(*connListElement)
+	if !ok {
+		return false
+	}
+	return p.conns.Contains(el)
 }
 
 type lockedSource struct {
