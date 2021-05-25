@@ -71,7 +71,9 @@ message ModifyConnectionsRequest {
     repeated ConnectionEntity connection = 2; 
 }
 
-message ModifyConnectionsResult { }
+message ModifyConnectionsResult {
+    repeated string connection_id = 1;
+ }
 
 message ModifyConnectionsResponse {
     Ydb.Operations.Operation operation = 1; // ModifyConnectionsResult
