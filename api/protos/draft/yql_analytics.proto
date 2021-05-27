@@ -17,6 +17,7 @@ message YdbDatabase {
    string database = 2;
    string name = 3;
    string id = 4;
+   bool secure = 5;
 }
 
 message ClickHouseCluster {

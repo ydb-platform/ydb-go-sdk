@@ -3,6 +3,8 @@ option cc_enable_arenas = true;
 
 package Ydb.DataStreams.V1;
 
+import "google/protobuf/descriptor.proto";
+
 import "kikimr/public/api/protos/ydb_operation.proto";
 import "kikimr/public/api/protos/ydb_status_codes.proto";
 import "kikimr/public/api/protos/validation/validation.proto";
@@ -10,6 +12,17 @@ import "kikimr/public/api/protos/validation/validation.proto";
 
 option java_package = "com.yandex.ydb.datastreams.v1";
 
+
+//--------------Extsions to simplify json <--------> proto conversion--------------
+
+enum EFieldTransformationType {
+    TRANSFORM_NONE = 0;
+    TRANSFORM_BASE64 = 1;
+}
+
+extend google.protobuf.FieldOptions {
+    EFieldTransformationType FieldTransformer = 58123;
+}
 
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------
@@ -69,6 +82,7 @@ message StreamDescription {
     StreamStatus stream_status = 9;
     string stream_name = 10;
     int32 write_quota_kb_per_sec = 11;
+    string owner = 12;
 }
 
 message SequenceNumberRange {
@@ -362,7 +376,7 @@ message DescribeStreamConsumerResult {
 //-----------------------------------------------------------------------------------
 
 message PutRecordsRequestEntry {
-    bytes data = 1;
+    bytes data = 1 [(FieldTransformer) = TRANSFORM_BASE64];
     string explicit_hash_key = 2;
     string partition_key = 3;
 }
@@ -396,7 +410,7 @@ message GetRecordsResult {
 message PutRecordRequest {
     Ydb.Operations.OperationParams operation_params = 1;
 
-    bytes data = 2; // data blob
+    bytes data = 2 [(FieldTransformer) = TRANSFORM_BASE64]; // data blob
     string explicit_hash_key = 3; // explicit hash key. If empty hash is calculated as md5(partitionKey)
     string partition_key = 4; // partition key
     // Кажется в нашей модели поле не нужно. Нужно только валидировать его

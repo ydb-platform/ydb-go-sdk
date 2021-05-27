@@ -147,6 +147,7 @@ message GetDatabaseStatusResult {
         RUNNING = 2;
         REMOVING = 3;
         PENDING_RESOURCES = 4;
+        CONFIGURING = 5;
     }
 
     // Full path to database's home dir.
