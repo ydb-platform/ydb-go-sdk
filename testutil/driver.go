@@ -7,6 +7,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/api"
+
 	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/internal"
@@ -208,26 +211,36 @@ type Driver struct {
 	OnClose      func() error
 }
 
-func (d *Driver) Call(ctx context.Context, op internal.Operation) error {
+func (d *Driver) CallEx(ctx context.Context, op api.Operation, ex *ydb.ExtendedCallParams) (*ydb.MetaInfo, error) {
 	if d.OnCall == nil {
-		return ErrNotImplemented
+		return nil, ErrNotImplemented
 	}
 	method, req, res, _ := internal.Unwrap(op)
 	code := grpcMethodToCode[method]
 
 	// NOTE: req and res may be converted to testutil inner structs, which are
 	// mirrors of grpc api envelopes.
-	return d.OnCall(ctx, code, req, res)
+	return nil, d.OnCall(ctx, code, req, res)
 }
 
-func (d *Driver) StreamRead(ctx context.Context, op internal.StreamOperation) error {
+func (d *Driver) StreamReadEx(ctx context.Context, op api.StreamOperation, ex *ydb.ExtendedCallParams) (*ydb.MetaInfo, error) {
 	if d.OnStreamRead == nil {
-		return ErrNotImplemented
+		return nil, ErrNotImplemented
 	}
 	method, req, res, processor := internal.UnwrapStreamOperation(op)
 	code := grpcMethodToCode[method]
 
-	return d.OnStreamRead(ctx, code, req, res, processor)
+	return nil, d.OnStreamRead(ctx, code, req, res, processor)
+}
+
+func (d *Driver) Call(ctx context.Context, op internal.Operation) error {
+	_, err := d.CallEx(ctx, op, nil)
+	return err
+}
+
+func (d *Driver) StreamRead(ctx context.Context, op internal.StreamOperation) error {
+	_, err := d.StreamReadEx(ctx, op, nil)
+	return err
 }
 
 func (d *Driver) Close() error {

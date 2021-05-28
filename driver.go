@@ -34,15 +34,68 @@ var (
 	// DefaultContextDeadlineMapping contains driver's default behavior of how
 	// to use context's deadline value.
 	DefaultContextDeadlineMapping = ContextDeadlineOperationTimeout
+
+	// ErrClosed is returned when operation requested on a closed driver.
+	ErrClosed = errors.New("driver closed")
+
+	// ErrNilConnection is returned when use nil preferred connection
+	ErrNilConnection = errors.New("nil connection")
 )
 
-// ErrClosed is returned when operation requested on a closed driver.
-var ErrClosed = errors.New("driver closed")
+// MetaInfo is struct contained information about call
+type MetaInfo struct {
+	Conn *conn
+}
+
+type ConnUseType uint8
+
+const (
+	ConnUseTypeDefault ConnUseType = 1 << iota >> 1
+	ConnUseTypeBalancer
+	ConnUseTypeEndpoint
+
+	ConnUseTypeSmart = ConnUseTypeBalancer | ConnUseTypeEndpoint
+)
+
+type ExtendedCallParams struct {
+	conn        *conn
+	connUseType ConnUseType
+}
+
+func NewEx() *ExtendedCallParams {
+	return &ExtendedCallParams{}
+}
+
+func (ex *ExtendedCallParams) WithConn(c interface{}) *ExtendedCallParams {
+	if ex == nil {
+		panic("nil ex")
+	}
+	if c != nil {
+		if conn, ok := c.(*conn); !ok {
+			panic("cannot cast c to *conn")
+		} else {
+			ex.conn = conn
+		}
+	} else {
+		ex.conn = nil
+	}
+	return ex
+}
+
+func (ex *ExtendedCallParams) WithConnUseType(connUseType ConnUseType) *ExtendedCallParams {
+	if ex == nil {
+		panic("nil ex")
+	}
+	ex.connUseType = connUseType
+	return ex
+}
 
 // Driver is an interface of YDB driver.
 type Driver interface {
 	Call(context.Context, api.Operation) error
+	CallEx(context.Context, api.Operation, *ExtendedCallParams) (*MetaInfo, error)
 	StreamRead(context.Context, api.StreamOperation) error
+	StreamReadEx(context.Context, api.StreamOperation, *ExtendedCallParams) (*MetaInfo, error)
 	Close() error
 }
 
@@ -192,7 +245,32 @@ func (d *driver) Close() error {
 	return d.cluster.Close()
 }
 
-func (d *driver) Call(ctx context.Context, op api.Operation) error {
+func (d *driver) Call(ctx context.Context, op api.Operation) (err error) {
+	_, err = d.CallEx(ctx, op, nil)
+	return
+}
+
+func (d *driver) getConn(rawctx, ctx context.Context, ex *ExtendedCallParams) (*conn, error) {
+	if ex != nil {
+		if ex.connUseType == ConnUseTypeEndpoint {
+			return ex.conn, func() error {
+				if ex.conn == nil {
+					return ErrNilConnection
+				}
+				return nil
+			}()
+		}
+		if ex.connUseType != ConnUseTypeBalancer && ex.conn != nil && ex.conn.runtime.getState() == ConnOnline {
+			return ex.conn, nil
+		}
+	}
+	d.trace.getConnStart(rawctx)
+	conn, err := d.cluster.Get(ctx)
+	d.trace.getConnDone(rawctx, conn, err)
+	return conn, err
+}
+
+func (d *driver) CallEx(ctx context.Context, op api.Operation, ex *ExtendedCallParams) (info *MetaInfo, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawctx := ctx
 
@@ -209,19 +287,21 @@ func (d *driver) Call(ctx context.Context, op api.Operation) error {
 	}
 
 	// Get credentials (token actually) for the request.
-	md, err := d.meta.md(ctx)
+	var md metadata.MD
+	md, err = d.meta.md(ctx)
 	if err != nil {
-		return err
+		return
 	}
 	if len(md) > 0 {
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	d.trace.getConnStart(rawctx)
-	conn, err := d.cluster.Get(ctx)
-	d.trace.getConnDone(rawctx, conn, err)
+	conn, err := d.getConn(rawctx, ctx, ex)
+	info = &MetaInfo{
+		Conn: conn,
+	}
 	if err != nil {
-		return err
+		return
 	}
 
 	method, req, res, resp := internal.Unwrap(op)
@@ -254,7 +334,7 @@ func (d *driver) Call(ctx context.Context, op api.Operation) error {
 		}
 	}
 
-	return err
+	return
 }
 
 func isTimeoutError(err error) bool {
@@ -281,6 +361,11 @@ func errIf(cond bool, err error) error {
 }
 
 func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (err error) {
+	_, err = d.StreamReadEx(ctx, op, nil)
+	return
+}
+
+func (d *driver) StreamReadEx(ctx context.Context, op api.StreamOperation, ex *ExtendedCallParams) (info *MetaInfo, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawctx := ctx
 
@@ -297,17 +382,18 @@ func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (err er
 	// Get credentials (token actually) for the request.
 	md, err := d.meta.md(ctx)
 	if err != nil {
-		return err
+		return
 	}
 	if len(md) > 0 {
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	d.trace.getConnStart(rawctx)
-	conn, err := d.cluster.Get(ctx)
-	d.trace.getConnDone(rawctx, conn, err)
+	conn, err := d.getConn(rawctx, ctx, ex)
+	info = &MetaInfo{
+		Conn: conn,
+	}
 	if err != nil {
-		return err
+		return
 	}
 
 	method, req, resp, process := internal.UnwrapStreamOperation(op)
@@ -329,13 +415,13 @@ func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (err er
 		grpc.MaxCallRecvMsgSize(50*1024*1024), // 50MB
 	)
 	if err != nil {
-		return mapGRPCError(err)
+		return info, mapGRPCError(err)
 	}
 	if err := s.SendMsg(req); err != nil {
-		return mapGRPCError(err)
+		return info, mapGRPCError(err)
 	}
 	if err := s.CloseSend(); err != nil {
-		return mapGRPCError(err)
+		return info, mapGRPCError(err)
 	}
 
 	go func() {
@@ -369,7 +455,7 @@ func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (err er
 		}
 	}()
 
-	return nil
+	return info, nil
 }
 
 func invoke(
@@ -433,6 +519,13 @@ type conn struct {
 	addr connAddr
 
 	runtime connRuntime
+}
+
+func Address(v interface{}) string {
+	if conn, ok := v.(*conn); ok {
+		return conn.addr.String()
+	}
+	return ""
 }
 
 func newConn(cc *grpc.ClientConn, addr connAddr) *conn {

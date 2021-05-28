@@ -41,13 +41,20 @@ func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		req Ydb_Table.CreateSessionRequest
 		res Ydb_Table.CreateSessionResult
 	)
-	err = t.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CreateSession, &req, &res))
+	var info *ydb.MetaInfo
+	info, err = t.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.CreateSession, &req, &res), nil)
 	if err != nil {
 		return nil, err
 	}
 	s = &Session{
 		ID: res.SessionId,
-		c:  *t,
+		conn: func() interface{} {
+			if info != nil {
+				return info.Conn
+			}
+			return nil
+		}(),
+		c: *t,
 		qcache: lru.Cache{
 			MaxSize: t.cacheSize(),
 		},
@@ -70,7 +77,8 @@ func (t *Client) cacheSize() int {
 // Note that after Session is no longer needed it should be destroyed by
 // Close() call.
 type Session struct {
-	ID string
+	ID   string
+	conn interface{}
 
 	c Client
 
@@ -108,7 +116,12 @@ func (s *Session) Close(ctx context.Context) (err error) {
 	req := Ydb_Table.DeleteSessionRequest{
 		SessionId: s.ID,
 	}
-	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DeleteSession, &req, nil))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.DeleteSession, &req, nil), ydb.NewEx().WithConn(s.conn))
+	return err
+}
+
+func (s *Session) Address() string {
+	return ydb.Address(s.conn)
 }
 
 // KeepAlive keeps idle session alive.
@@ -121,9 +134,9 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 	req := Ydb_Table.KeepAliveRequest{
 		SessionId: s.ID,
 	}
-	err = s.c.Driver.Call(ctx, internal.Wrap(
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(
 		Ydb_Table_V1.KeepAlive, &req, &res,
-	))
+	), ydb.NewEx().WithConn(s.conn).WithConnUseType(ydb.ConnUseTypeEndpoint))
 	if err != nil {
 		return
 	}
@@ -137,7 +150,7 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 }
 
 // CreateTable creates table at given path with given options.
-func (s *Session) CreateTable(ctx context.Context, path string, opts ...CreateTableOption) error {
+func (s *Session) CreateTable(ctx context.Context, path string, opts ...CreateTableOption) (err error) {
 	req := Ydb_Table.CreateTableRequest{
 		SessionId: s.ID,
 		Path:      path,
@@ -145,7 +158,8 @@ func (s *Session) CreateTable(ctx context.Context, path string, opts ...CreateTa
 	for _, opt := range opts {
 		opt((*createTableDesc)(&req))
 	}
-	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CreateTable, &req, nil))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.CreateTable, &req, nil), ydb.NewEx().WithConn(s.conn))
+	return err
 }
 
 // DescribeTable describes table at given path.
@@ -158,7 +172,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 	for _, opt := range opts {
 		opt((*describeTableDesc)(&req))
 	}
-	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DescribeTable, &req, &res))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.DescribeTable, &req, &res), ydb.NewEx().WithConn(s.conn))
 	if err != nil {
 		return desc, err
 	}
@@ -243,7 +257,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 }
 
 // DropTable drops table at given path with given options.
-func (s *Session) DropTable(ctx context.Context, path string, opts ...DropTableOption) error {
+func (s *Session) DropTable(ctx context.Context, path string, opts ...DropTableOption) (err error) {
 	req := Ydb_Table.DropTableRequest{
 		SessionId: s.ID,
 		Path:      path,
@@ -251,11 +265,12 @@ func (s *Session) DropTable(ctx context.Context, path string, opts ...DropTableO
 	for _, opt := range opts {
 		opt((*dropTableDesc)(&req))
 	}
-	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DropTable, &req, nil))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.DropTable, &req, nil), ydb.NewEx().WithConn(s.conn))
+	return err
 }
 
 // AlterTable modifies schema of table at given path with given options.
-func (s *Session) AlterTable(ctx context.Context, path string, opts ...AlterTableOption) error {
+func (s *Session) AlterTable(ctx context.Context, path string, opts ...AlterTableOption) (err error) {
 	req := Ydb_Table.AlterTableRequest{
 		SessionId: s.ID,
 		Path:      path,
@@ -263,17 +278,19 @@ func (s *Session) AlterTable(ctx context.Context, path string, opts ...AlterTabl
 	for _, opt := range opts {
 		opt((*alterTableDesc)(&req))
 	}
-	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.AlterTable, &req, nil))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.AlterTable, &req, nil), ydb.NewEx().WithConn(s.conn))
+	return err
 }
 
 // CopyTable creates copy of table at given path.
-func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...CopyTableOption) error {
+func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...CopyTableOption) (err error) {
 	req := Ydb_Table.CopyTableRequest{
 		SessionId:       s.ID,
 		SourcePath:      src,
 		DestinationPath: dst,
 	}
-	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CopyTable, &req, nil))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.CopyTable, &req, nil), ydb.NewEx().WithConn(s.conn))
+	return err
 }
 
 // DataQueryExplanation is a result of ExplainDataQuery call.
@@ -289,7 +306,7 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 		SessionId: s.ID,
 		YqlText:   query,
 	}
-	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExplainDataQuery, &req, &res))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.ExplainDataQuery, &req, &res), ydb.NewEx().WithConn(s.conn))
 	if err != nil {
 		return
 	}
@@ -372,7 +389,7 @@ func (s *Session) Prepare(
 		SessionId: s.ID,
 		YqlText:   query,
 	}
-	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.PrepareDataQuery, &req, &res))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.PrepareDataQuery, &req, &res), ydb.NewEx().WithConn(s.conn))
 	if err != nil {
 		return nil, err
 	}
@@ -404,8 +421,10 @@ func (s *Session) addQueryToCache(key queryHash, stmt *Statement) {
 
 // Execute executes given data query represented by text.
 func (s *Session) Execute(
-	ctx context.Context, tx *TransactionControl,
-	query string, params *QueryParameters,
+	ctx context.Context,
+	tx *TransactionControl,
+	query string,
+	params *QueryParameters,
 	opts ...ExecuteDataQueryOption,
 ) (
 	txr *Transaction, r *Result, err error,
@@ -489,7 +508,7 @@ func (s *Session) executeDataQuery(
 	for _, opt := range opts {
 		opt((*executeDataQueryDesc)(req))
 	}
-	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExecuteDataQuery, req, res))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.ExecuteDataQuery, req, res), ydb.NewEx().WithConn(s.conn))
 	return
 }
 
@@ -497,7 +516,7 @@ func (s *Session) executeDataQuery(
 func (s *Session) ExecuteSchemeQuery(
 	ctx context.Context, query string,
 	opts ...ExecuteSchemeQueryOption,
-) error {
+) (err error) {
 	req := Ydb_Table.ExecuteSchemeQueryRequest{
 		SessionId: s.ID,
 		YqlText:   query,
@@ -505,14 +524,15 @@ func (s *Session) ExecuteSchemeQuery(
 	for _, opt := range opts {
 		opt((*executeSchemeQueryDesc)(&req))
 	}
-	return s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.ExecuteSchemeQuery, &req, nil))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.ExecuteSchemeQuery, &req, nil), ydb.NewEx().WithConn(s.conn))
+	return err
 }
 
 // DescribeTableOptions describes supported table options.
 func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDescription, err error) {
 	var res Ydb_Table.DescribeTableOptionsResult
 	req := Ydb_Table.DescribeTableOptionsRequest{}
-	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.DescribeTableOptions, &req, &res))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.DescribeTableOptions, &req, &res), ydb.NewEx().WithConn(s.conn))
 	if err != nil {
 		return
 	}
@@ -725,15 +745,16 @@ func (s *Session) StreamExecuteScanQuery(
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.
-func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) error {
+func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) (err error) {
 	req := Ydb_Table.BulkUpsertRequest{
 		Table: table,
 		Rows:  internal.ValueToYDB(rows),
 	}
-	return s.c.Driver.Call(ctx, internal.Wrap(
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(
 		Ydb_Table_V1.BulkUpsert,
 		&req, nil,
-	))
+	), ydb.NewEx().WithConn(s.conn))
+	return err
 }
 
 // BeginTransaction begins new transaction within given session with given
@@ -748,7 +769,7 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 		SessionId:  s.ID,
 		TxSettings: &tx.settings,
 	}
-	err = s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.BeginTransaction, &req, &res))
+	_, err = s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.BeginTransaction, &req, &res), ydb.NewEx().WithConn(s.conn))
 	if err != nil {
 		return
 	}
@@ -798,7 +819,8 @@ func (tx *Transaction) Commit(ctx context.Context) (err error) {
 		SessionId: tx.s.ID,
 		TxId:      tx.id,
 	}
-	return tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CommitTransaction, &req, nil))
+	_, err = tx.s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.CommitTransaction, &req, nil), ydb.NewEx().WithConn(tx.s.conn))
+	return err
 }
 
 // CommitTx commits specified active transaction.
@@ -815,7 +837,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOp
 	for _, opt := range opts {
 		opt((*commitTransactionDesc)(req))
 	}
-	err = tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.CommitTransaction, req, res))
+	_, err = tx.s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.CommitTransaction, req, res), ydb.NewEx().WithConn(tx.s.conn))
 	return &Result{stats: res.QueryStats}, err
 }
 
@@ -829,7 +851,8 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 		SessionId: tx.s.ID,
 		TxId:      tx.id,
 	}
-	return tx.s.c.Driver.Call(ctx, internal.Wrap(Ydb_Table_V1.RollbackTransaction, &req, nil))
+	_, err = tx.s.c.Driver.CallEx(ctx, internal.Wrap(Ydb_Table_V1.RollbackTransaction, &req, nil), ydb.NewEx().WithConn(tx.s.conn))
+	return err
 }
 
 func (tx *Transaction) txc() *TransactionControl {
@@ -855,6 +878,9 @@ func (t *Client) traceCreateSessionDone(ctx context.Context, s *Session, err err
 		Context: ctx,
 		Session: s,
 		Error:   err,
+	}
+	if s != nil {
+		x.Endpoint = ydb.Address(s.conn)
 	}
 	if a := t.Trace.CreateSessionDone; a != nil {
 		a(x)
