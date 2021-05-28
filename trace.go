@@ -1,9 +1,10 @@
 package ydb
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
 	"context"
 	"strings"
+
+	"github.com/yandex-cloud/ydb-go-sdk/internal"
 )
 
 type DriverTrace struct {
@@ -104,10 +105,11 @@ func (d DriverTrace) trackConnDone(conn *conn) {
 		f(x)
 	}
 }
-func (d DriverTrace) pessimizationStart(ctx context.Context, addr *connAddr) {
+func (d DriverTrace) pessimizationStart(ctx context.Context, addr *connAddr, cause error) {
 	x := PessimizationStartInfo{
 		Context: ctx,
 		Address: addr.String(),
+		Cause:   cause,
 	}
 	if f := d.PessimizationStart; f != nil {
 		f(x)
@@ -200,7 +202,9 @@ func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method strin
 		Error:   err,
 	}
 	x.OpID = resp.GetOpID()
-	x.Issues = IssueIterator(resp.GetIssues())
+	if resp != nil {
+		x.Issues = resp.GetIssues()
+	}
 	if f := d.OperationDone; f != nil {
 		f(x)
 	}
@@ -257,7 +261,7 @@ func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method stri
 		Error:   err,
 	}
 	if resp != nil {
-		x.Issues = IssueIterator(resp.GetIssues())
+		x.Issues = resp.GetIssues()
 	}
 	if f := d.StreamRecvDone; f != nil {
 		f(x)
@@ -312,6 +316,7 @@ type (
 	PessimizationStartInfo struct {
 		Context context.Context
 		Address string
+		Cause   error
 	}
 	PessimizationDoneInfo struct {
 		Context context.Context

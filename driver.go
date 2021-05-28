@@ -249,7 +249,7 @@ func (d *driver) Call(ctx context.Context, op api.Operation) error {
 	if err != nil {
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			d.trace.pessimizationStart(rawctx, &conn.addr)
+			d.trace.pessimizationStart(rawctx, &conn.addr, err)
 			d.trace.pessimizationDone(rawctx, &conn.addr, d.cluster.Pessimize(conn.addr))
 		}
 	}
