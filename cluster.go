@@ -362,7 +362,7 @@ func (c *cluster) Remove(_ context.Context, e Endpoint, wg ...WG) {
 	}
 }
 
-func (c *cluster) Pessimize(addr connAddr) error {
+func (c *cluster) Pessimize(addr connAddr) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
@@ -379,7 +379,21 @@ func (c *cluster) Pessimize(addr connAddr) error {
 	if !c.balancer.Contains(entry.handle) {
 		return ErrUnknownBalancerElement
 	}
-	return c.balancer.Pessimize(entry.handle)
+	err = c.balancer.Pessimize(entry.handle)
+	if err == nil && c.explorer != nil {
+		// count ratio (banned/all)
+		online := 0
+		for _, e := range c.index {
+			if e.conn != nil && e.conn.runtime.getState() == ConnOnline {
+				online++
+			}
+		}
+		// more then half connections banned - re-discover now
+		if online*2 < len(c.index) {
+			c.explorer.Force()
+		}
+	}
+	return err
 }
 
 func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
