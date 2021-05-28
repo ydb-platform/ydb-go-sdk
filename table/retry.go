@@ -95,6 +95,9 @@ type Retryer struct {
 	// Backoff is a selected backoff policy.
 	// If backoff is nil, then the DefaultBackoff is used.
 	Backoff ydb.Backoff
+
+	// Trace provide tracing of retry logic
+	Trace RetryTrace
 }
 
 // Retry calls Retryer.Do() configured with default values.
@@ -107,18 +110,32 @@ func Retry(ctx context.Context, s SessionProvider, op Operation) error {
 	}).Do(ctx, op)
 }
 
+// RetryWithTrace calls Retryer.Do() configured with default values and custom tracer.
+func RetryWithTrace(ctx context.Context, s SessionProvider, op Operation, trace RetryTrace) error {
+	return (Retryer{
+		SessionProvider: s,
+		MaxRetries:      ydb.DefaultMaxRetries,
+		RetryChecker:    ydb.DefaultRetryChecker,
+		Backoff:         ydb.DefaultBackoff,
+		Trace:           trace,
+	}).Do(ctx, op)
+}
+
 // Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
+	r.traceRetryLoopStart(ctx)
 	var (
 		s *Session
 		m ydb.RetryMode
+		i int
 	)
 	defer func() {
+		r.traceRetryLoopDone(ctx, op, i)
 		if s != nil {
-			_ = r.SessionProvider.Put(context.Background(), s)
+			_ = r.SessionProvider.Put(ctx, s)
 		}
 	}()
-	for i := 0; i <= r.MaxRetries; i++ {
+	for i = 0; i <= r.MaxRetries; i++ {
 		if s == nil {
 			var e error
 			s, e = r.SessionProvider.Get(ctx)
@@ -158,6 +175,31 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 		}
 	}
 	return err
+}
+
+func (r Retryer) traceRetryLoopStart(ctx context.Context) {
+	x := RetryLoopStartInfo{
+		Context: ctx,
+	}
+	if a := r.Trace.RetryLoopStart; a != nil {
+		a(x)
+	}
+	if b := ContextRetryTrace(ctx).RetryLoopStart; b != nil {
+		b(x)
+	}
+}
+
+func (r Retryer) traceRetryLoopDone(ctx context.Context, op Operation, attempts int) {
+	x := RetryLoopDoneInfo{
+		Context:  ctx,
+		Attempts: attempts,
+	}
+	if a := r.Trace.RetryLoopDone; a != nil {
+		a(x)
+	}
+	if b := ContextRetryTrace(ctx).RetryLoopDone; b != nil {
+		b(x)
+	}
 }
 
 var (

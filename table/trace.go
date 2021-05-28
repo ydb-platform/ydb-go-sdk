@@ -1,6 +1,8 @@
 package table
 
-import "context"
+import (
+	"context"
+)
 
 // ClientTrace contains options for tracing table client activity.
 type ClientTrace struct {
@@ -35,14 +37,21 @@ type ClientTrace struct {
 	RollbackTransactionDone  func(RollbackTransactionDoneInfo)
 }
 
+// RetryTrace contains options for tracing retry client activity.
+type RetryTrace struct {
+	RetryLoopStart func(RetryLoopStartInfo)
+	RetryLoopDone  func(RetryLoopDoneInfo)
+}
+
 type (
 	CreateSessionStartInfo struct {
 		Context context.Context
 	}
 	CreateSessionDoneInfo struct {
-		Context context.Context
-		Session *Session
-		Error   error
+		Context  context.Context
+		Session  *Session
+		Endpoint string
+		Error    error
 	}
 	KeepAliveStartInfo struct {
 		Context context.Context
@@ -149,10 +158,18 @@ type (
 		TxID    string
 		Error   error
 	}
+	RetryLoopStartInfo struct {
+		Context context.Context
+	}
+	RetryLoopDoneInfo struct {
+		Context  context.Context
+		Attempts int
+	}
 )
 
 type clientTraceContextKey struct{}
 
+// WithClientTrace add client tracer into context
 func WithClientTrace(ctx context.Context, trace ClientTrace) context.Context {
 	return context.WithValue(ctx,
 		clientTraceContextKey{},
@@ -164,6 +181,23 @@ func WithClientTrace(ctx context.Context, trace ClientTrace) context.Context {
 
 func ContextClientTrace(ctx context.Context) ClientTrace {
 	trace, _ := ctx.Value(clientTraceContextKey{}).(ClientTrace)
+	return trace
+}
+
+type retryTraceContextKey struct{}
+
+// WithRetryTrace add retry tracer into context
+func WithRetryTrace(ctx context.Context, trace RetryTrace) context.Context {
+	return context.WithValue(ctx,
+		retryTraceContextKey{},
+		composeRetryTrace(
+			ContextRetryTrace(ctx), trace,
+		),
+	)
+}
+
+func ContextRetryTrace(ctx context.Context) RetryTrace {
+	trace, _ := ctx.Value(retryTraceContextKey{}).(RetryTrace)
 	return trace
 }
 
@@ -386,6 +420,32 @@ func composeClientTrace(a, b ClientTrace) (c ClientTrace) {
 		c.RollbackTransactionDone = func(info RollbackTransactionDoneInfo) {
 			a.RollbackTransactionDone(info)
 			b.RollbackTransactionDone(info)
+		}
+	}
+	return
+}
+
+func composeRetryTrace(a, b RetryTrace) (c RetryTrace) {
+	switch {
+	case a.RetryLoopStart == nil:
+		c.RetryLoopStart = b.RetryLoopStart
+	case b.RetryLoopStart == nil:
+		c.RetryLoopStart = a.RetryLoopStart
+	default:
+		c.RetryLoopStart = func(info RetryLoopStartInfo) {
+			a.RetryLoopStart(info)
+			b.RetryLoopStart(info)
+		}
+	}
+	switch {
+	case a.RetryLoopDone == nil:
+		c.RetryLoopDone = b.RetryLoopDone
+	case b.RetryLoopDone == nil:
+		c.RetryLoopDone = a.RetryLoopDone
+	default:
+		c.RetryLoopDone = func(info RetryLoopDoneInfo) {
+			a.RetryLoopDone(info)
+			b.RetryLoopDone(info)
 		}
 	}
 	return
