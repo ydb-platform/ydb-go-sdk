@@ -138,6 +138,16 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 				if err != nil {
 					return
 				}
+				// if nothing endpoint - re-discover after one second
+				// and use old endpoint list
+				if len(next) == 0 {
+					go func() {
+						time.Sleep(time.Second)
+						cluster.explorer.Force()
+
+					}()
+					return
+				}
 				// NOTE: curr endpoints must be sorted here.
 				sortEndpoints(next)
 
@@ -239,7 +249,9 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 	if err != nil {
 		return nil, err
 	}
-	defer conn.conn.Close()
+	defer func() {
+		_ = conn.conn.Close()
+	}()
 
 	subctx := ctx
 	if d.timeout > 0 {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math/rand"
 	"net"
 	"path"
 	"strconv"
@@ -29,7 +30,7 @@ var (
 	DefaultDiscoveryInterval = time.Minute
 
 	// DefaultBalancingMethod contains driver's default balancing algorithm.
-	DefaultBalancingMethod = BalancingP2C
+	DefaultBalancingMethod = BalancingRandomChoice
 
 	// DefaultContextDeadlineMapping contains driver's default behavior of how
 	// to use context's deadline value.
@@ -106,6 +107,7 @@ const (
 	BalancingUnknown BalancingMethod = iota
 	BalancingRoundRobin
 	BalancingP2C
+	BalancingRandomChoice
 )
 
 var balancers = map[BalancingMethod]func(interface{}) balancer{
@@ -122,6 +124,11 @@ var balancers = map[BalancingMethod]func(interface{}) balancer{
 				PreferLocal:     config.PreferLocal,
 				OpTimeThreshold: config.OpTimeThreshold,
 			},
+		}
+	},
+	BalancingRandomChoice: func(_ interface{}) balancer {
+		return &randomChoice{
+			r: rand.New(rand.NewSource(time.Now().UnixNano())),
 		}
 	},
 }

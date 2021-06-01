@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestRoundRobinBalancer(t *testing.T) {
-	for _, test := range []struct {
+var (
+	testData = [...]struct {
 		name   string
 		add    []Endpoint
 		del    []Endpoint
@@ -212,7 +212,11 @@ func TestRoundRobinBalancer(t *testing.T) {
 				"baz": 50,
 			},
 		},
-	} {
+	}
+)
+
+func TestRoundRobinBalancer(t *testing.T) {
+	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				mconn = map[*conn]string{} // conn to addr mapping for easy matching.
@@ -250,6 +254,59 @@ func TestRoundRobinBalancer(t *testing.T) {
 			}
 			for addr, exp := range test.exp {
 				if act := mdist[addr]; act != exp {
+					t.Errorf(
+						"unexpected distribution for addr %q: %v; want %v",
+						addr, act, exp,
+					)
+				}
+				delete(mdist, addr)
+			}
+			for addr := range mdist {
+				t.Fatalf("unexpected addr in distribution: %q", addr)
+			}
+		})
+	}
+}
+
+func TestRandomChoiceBalancer(t *testing.T) {
+	for _, test := range testData {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				mconn = map[*conn]string{} // conn to addr mapping for easy matching.
+				maddr = map[string]*conn{} // addr to conn mapping.
+				melem = map[string]balancerElement{}
+				mdist = map[string]int{}
+			)
+			r := new(roundRobin)
+			for _, e := range test.add {
+				c := new(conn)
+				c.runtime.setState(ConnOnline)
+				mconn[c] = e.Addr
+				maddr[e.Addr] = c
+				melem[e.Addr] = r.Insert(c, connInfo{
+					loadFactor: e.LoadFactor,
+				})
+			}
+			for _, e := range test.del {
+				r.Remove(melem[e.Addr])
+			}
+			for addr := range test.banned {
+				if err := r.Pessimize(melem[addr]); err != nil {
+					t.Errorf("unexpected pessimization error: %w", err)
+				}
+			}
+			for i := 0; i < test.repeat; i++ {
+				conn := r.Next()
+				if conn == nil {
+					if len(test.add) > len(test.del) {
+						t.Fatal("unexpected no-conn")
+					}
+				} else {
+					mdist[mconn[conn]]++
+				}
+			}
+			for addr, exp := range test.exp {
+				if act := mdist[addr]; act < int(float64(exp)*0.9) || act > int(float64(exp)*1.1) {
 					t.Errorf(
 						"unexpected distribution for addr %q: %v; want %v",
 						addr, act, exp,

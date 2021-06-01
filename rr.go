@@ -3,6 +3,8 @@ package ydb
 import (
 	"container/heap"
 	"math"
+	"math/rand"
+	"sync"
 	"sync/atomic"
 )
 
@@ -19,12 +21,28 @@ type roundRobin struct {
 	conns connList
 }
 
+type randomChoice struct {
+	roundRobin
+	r *rand.Rand // without seed by default
+	m sync.Mutex
+}
+
 func (r *roundRobin) Next() *conn {
 	if n := len(r.conns); n == 0 {
 		return nil
 	}
 	d := int(atomic.AddInt32(&r.next, 1)) % len(r.belt)
 	i := r.belt[d]
+	return r.conns[i].conn
+}
+
+func (r *randomChoice) Next() *conn {
+	if n := len(r.conns); n == 0 {
+		return nil
+	}
+	r.m.Lock()
+	i := r.belt[r.r.Intn(len(r.belt))]
+	r.m.Unlock()
 	return r.conns[i].conn
 }
 
