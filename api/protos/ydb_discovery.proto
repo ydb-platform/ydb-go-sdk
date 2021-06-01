@@ -21,6 +21,7 @@ message EndpointInfo {
     bool ssl = 4;
     repeated string service = 5;
     string location = 6;
+    uint32 node_id = 7;
 }
 	
 message ListEndpointsResult {

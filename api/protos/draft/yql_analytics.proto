@@ -31,13 +31,14 @@ message ClickHouseCluster {
 
 message Connection {
     oneof connection {
-        YdbDatabase ydb_database = 1;        
+        YdbDatabase ydb_database = 1;
         ClickHouseCluster clickhouse_cluster = 2;
     }
 }
 
 message GetConnectionsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
+    string cloud_id = 100;
     string folder_id = 2;
     string name = 3;
     message Filter {
@@ -46,14 +47,30 @@ message GetConnectionsRequest {
     Filter filter = 4;
 }
 
+enum EVisibility {
+    VISIBILITY_NONE = 0;
+    VISIBILITY_PUBLIC = 1;
+    VISIBILITY_CLOUD = 2;
+    VISIBILITY_FOLDER = 3;
+}
+
+message Acl {
+    message Ace { }
+
+    repeated Ace ace = 1;
+
+    EVisibility visibility = 2;
+}
+
 message ConnectionEntity {
+    string cloud_id = 100;
     string folder_id = 1;
     string connection_id = 2; // create new if connection_id is empty
     string created_by = 3;
     string modified_by = 4;
     string name = 5;
     Connection connection = 6;
-    string acl = 7;
+    Acl acl = 7;
     google.protobuf.Timestamp creation_time = 8;
     google.protobuf.Timestamp modification_time = 9;
     bool is_deleted = 10;
@@ -69,7 +86,7 @@ message GetConnectionsResponse {
 
 message ModifyConnectionsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    repeated ConnectionEntity connection = 2; 
+    repeated ConnectionEntity connection = 2;
 }
 
 message ModifyConnectionsResult {
@@ -87,6 +104,7 @@ enum EFieldType {
 }
 
 message GetQueriesRequest {
+    string cloud_id = 100;
     string folder_id = 1;
     string continuation_token = 2;
     int32 limit = 3;
@@ -106,9 +124,10 @@ message GetQueriesResponse {
         string created_by = 3;
         string modified_by = 4;
         string name = 5;
+        string cloud_id = 100;
         string folder_id = 6;
-        string acl = 7;
-        int64 rows_limit = 8;	
+        Acl acl = 7;
+        int64 rows_limit = 8;
         int64 bytes_limit = 9;
         google.protobuf.Timestamp creation_time = 10;
         google.protobuf.Timestamp modification_time = 11;
@@ -120,11 +139,12 @@ message GetQueriesResponse {
 
 message ModifyQueryRequest {
     string id = 1; // ro
+    string cloud_id = 100; // ro
     string folder_id = 2; // ro
 
     string sql = 4;
     string name = 5;
-    string acl = 6;
+    Acl acl = 6;
     int64 rows_limit = 7;
     int64 bytes_limit = 8;
 
@@ -135,6 +155,7 @@ message ModifyQueryResponse { }
 
 message GetHistoryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
+    string cloud_id = 100;
     string folder_id = 2;
     string continuation_token = 3;
 
@@ -179,14 +200,15 @@ message GetHistoryResult {
         string created_by = 3;
         string modified_by = 4;
         string name = 5;
+        string cloud_id = 100;
         string folder_id = 6;
-        string acl = 7;
+        Acl acl = 7;
         string query_plan = 8; // filled by point request if field_type contains `QUERY_PLAN'
         string query_id = 9;
 
         repeated bool truncated = 10;
         repeated int64 rows_count = 11;
-        EQueryStatus status = 12; 
+        EQueryStatus status = 12;
         EExecuteMode execute_mode = 13;
 
         int64 rows_limit = 14;
@@ -207,10 +229,11 @@ message GetHistoryResult {
 
 message ModifyHistoryRequest {
     string id = 1; // ro
+    string cloud_id = 100; // ro
     string folder_id = 2; // ro
 
     string name = 4;
-    string acl = 5;
+    Acl acl = 5;
     bool is_deleted = 6;
 }
 
@@ -226,6 +249,7 @@ message ExecuteQueryRequest {
     // Map of query parameters (optional)
     map<string, Ydb.TypedValue> parameters = 7;
     repeated Connection connections = 8;
+    string folder_id = 9;
 }
 
 message ExecuteQueryResponse {
