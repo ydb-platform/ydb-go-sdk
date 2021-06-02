@@ -211,7 +211,7 @@ type Driver struct {
 	OnClose      func() error
 }
 
-func (d *Driver) CallEx(ctx context.Context, op api.Operation, ex *ydb.ExtendedCallParams) (*ydb.MetaInfo, error) {
+func (d *Driver) Call(ctx context.Context, op api.Operation) (ydb.CallInfo, error) {
 	if d.OnCall == nil {
 		return nil, ErrNotImplemented
 	}
@@ -223,7 +223,7 @@ func (d *Driver) CallEx(ctx context.Context, op api.Operation, ex *ydb.ExtendedC
 	return nil, d.OnCall(ctx, code, req, res)
 }
 
-func (d *Driver) StreamReadEx(ctx context.Context, op api.StreamOperation, ex *ydb.ExtendedCallParams) (*ydb.MetaInfo, error) {
+func (d *Driver) StreamRead(ctx context.Context, op api.StreamOperation) (ydb.CallInfo, error) {
 	if d.OnStreamRead == nil {
 		return nil, ErrNotImplemented
 	}
@@ -231,16 +231,6 @@ func (d *Driver) StreamReadEx(ctx context.Context, op api.StreamOperation, ex *y
 	code := grpcMethodToCode[method]
 
 	return nil, d.OnStreamRead(ctx, code, req, res, processor)
-}
-
-func (d *Driver) Call(ctx context.Context, op internal.Operation) error {
-	_, err := d.CallEx(ctx, op, nil)
-	return err
-}
-
-func (d *Driver) StreamRead(ctx context.Context, op internal.StreamOperation) error {
-	_, err := d.StreamReadEx(ctx, op, nil)
-	return err
 }
 
 func (d *Driver) Close() error {

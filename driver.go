@@ -43,60 +43,43 @@ var (
 	ErrNilConnection = errors.New("nil connection")
 )
 
-// MetaInfo is struct contained information about call
-type MetaInfo struct {
-	Conn *conn
+// EndpointInfo is struct contained information about endpoint
+type EndpointInfo interface {
+	Conn() *conn
+	Address() string
 }
 
-type ConnUseType uint8
+// CallInfo is struct contained information about call
+type CallInfo interface {
+	EndpointInfo
+}
+
+type callInfo struct {
+	conn *conn
+}
+
+func (info *callInfo) Conn() *conn {
+	return info.conn
+}
+
+func (info *callInfo) Address() string {
+	return info.conn.addr.String()
+}
+
+type ConnUsePolicy uint8
 
 const (
-	ConnUseTypeDefault ConnUseType = 1 << iota >> 1
-	ConnUseTypeBalancer
-	ConnUseTypeEndpoint
+	ConnUseDefault ConnUsePolicy = 1 << iota >> 1
+	ConnUseBalancer
+	ConnUseEndpoint
 
-	ConnUseTypeSmart = ConnUseTypeBalancer | ConnUseTypeEndpoint
+	ConnUseSmart = ConnUseBalancer | ConnUseEndpoint
 )
-
-type ExtendedCallParams struct {
-	conn        *conn
-	connUseType ConnUseType
-}
-
-func NewEx() *ExtendedCallParams {
-	return &ExtendedCallParams{}
-}
-
-func (ex *ExtendedCallParams) WithConn(c interface{}) *ExtendedCallParams {
-	if ex == nil {
-		panic("nil ex")
-	}
-	if c != nil {
-		if conn, ok := c.(*conn); !ok {
-			panic("cannot cast c to *conn")
-		} else {
-			ex.conn = conn
-		}
-	} else {
-		ex.conn = nil
-	}
-	return ex
-}
-
-func (ex *ExtendedCallParams) WithConnUseType(connUseType ConnUseType) *ExtendedCallParams {
-	if ex == nil {
-		panic("nil ex")
-	}
-	ex.connUseType = connUseType
-	return ex
-}
 
 // Driver is an interface of YDB driver.
 type Driver interface {
-	Call(context.Context, api.Operation) error
-	CallEx(context.Context, api.Operation, *ExtendedCallParams) (*MetaInfo, error)
-	StreamRead(context.Context, api.StreamOperation) error
-	StreamReadEx(context.Context, api.StreamOperation, *ExtendedCallParams) (*MetaInfo, error)
+	Call(context.Context, api.Operation) (CallInfo, error)
+	StreamRead(context.Context, api.StreamOperation) (CallInfo, error)
 	Close() error
 }
 
@@ -157,7 +140,7 @@ type DriverConfig struct {
 
 	// OperationTimeout is the maximum amount of time a YDB server will process
 	// an operation. After timeout exceeds YDB will try to cancel operation and
-	// regardless of the cancelation appropriate error will be returned to
+	// regardless of the cancellation appropriate error will be returned to
 	// the client.
 	// If OperationTimeout is zero then no timeout is used.
 	OperationTimeout time.Duration
@@ -252,34 +235,9 @@ func (d *driver) Close() error {
 	return d.cluster.Close()
 }
 
-func (d *driver) Call(ctx context.Context, op api.Operation) (err error) {
-	_, err = d.CallEx(ctx, op, nil)
-	return
-}
-
-func (d *driver) getConn(rawctx, ctx context.Context, ex *ExtendedCallParams) (*conn, error) {
-	if ex != nil {
-		if ex.connUseType == ConnUseTypeEndpoint {
-			return ex.conn, func() error {
-				if ex.conn == nil {
-					return ErrNilConnection
-				}
-				return nil
-			}()
-		}
-		if ex.connUseType != ConnUseTypeBalancer && ex.conn != nil && ex.conn.runtime.getState() == ConnOnline {
-			return ex.conn, nil
-		}
-	}
-	d.trace.getConnStart(rawctx)
-	conn, err := d.cluster.Get(ctx)
-	d.trace.getConnDone(rawctx, conn, err)
-	return conn, err
-}
-
-func (d *driver) CallEx(ctx context.Context, op api.Operation, ex *ExtendedCallParams) (info *MetaInfo, err error) {
+func (d *driver) Call(ctx context.Context, op api.Operation) (info CallInfo, err error) {
 	// Remember raw context to pass it for the tracing functions.
-	rawctx := ctx
+	rawCtx := ctx
 
 	if t := d.requestTimeout; t > 0 {
 		var cancel context.CancelFunc
@@ -303,12 +261,23 @@ func (d *driver) CallEx(ctx context.Context, op api.Operation, ex *ExtendedCallP
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	conn, err := d.getConn(rawctx, ctx, ex)
-	info = &MetaInfo{
-		Conn: conn,
+	conn, backoffUseBalancer := ContextConn(rawCtx)
+	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
+		d.trace.getConnStart(rawCtx)
+		conn, err = d.cluster.Get(ctx)
+		d.trace.getConnDone(rawCtx, conn, err)
 	}
+
+	info = &callInfo{
+		conn: conn,
+	}
+
 	if err != nil {
 		return
+	}
+
+	if conn.conn == nil {
+		return info, ErrNilConnection
 	}
 
 	method, req, res, resp := internal.Unwrap(op)
@@ -323,7 +292,7 @@ func (d *driver) CallEx(ctx context.Context, op api.Operation, ex *ExtendedCallP
 
 	start := timeutil.Now()
 	conn.runtime.operationStart(start)
-	d.trace.operationStart(rawctx, conn, method, params)
+	d.trace.operationStart(rawCtx, conn, method, params)
 
 	err = invoke(ctx, conn.conn, resp, method, req, res)
 
@@ -331,13 +300,13 @@ func (d *driver) CallEx(ctx context.Context, op api.Operation, ex *ExtendedCallP
 		start, timeutil.Now(),
 		errIf(isTimeoutError(err), err),
 	)
-	d.trace.operationDone(rawctx, conn, method, params, resp, err)
+	d.trace.operationDone(rawCtx, conn, method, params, resp, err)
 
 	if err != nil {
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			d.trace.pessimizationStart(rawctx, &conn.addr, err)
-			d.trace.pessimizationDone(rawctx, &conn.addr, d.cluster.Pessimize(conn.addr))
+			d.trace.pessimizationStart(rawCtx, &conn.addr, err)
+			d.trace.pessimizationDone(rawCtx, &conn.addr, d.cluster.Pessimize(conn.addr))
 		}
 	}
 
@@ -367,14 +336,9 @@ func errIf(cond bool, err error) error {
 	return nil
 }
 
-func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (err error) {
-	_, err = d.StreamReadEx(ctx, op, nil)
-	return
-}
-
-func (d *driver) StreamReadEx(ctx context.Context, op api.StreamOperation, ex *ExtendedCallParams) (info *MetaInfo, err error) {
+func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (info CallInfo, err error) {
 	// Remember raw context to pass it for the tracing functions.
-	rawctx := ctx
+	rawCtx := ctx
 
 	var cancel context.CancelFunc
 	if t := d.streamTimeout; t > 0 {
@@ -395,10 +359,17 @@ func (d *driver) StreamReadEx(ctx context.Context, op api.StreamOperation, ex *E
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	conn, err := d.getConn(rawctx, ctx, ex)
-	info = &MetaInfo{
-		Conn: conn,
+	conn, backoffUseBalancer := ContextConn(rawCtx)
+	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
+		d.trace.getConnStart(rawCtx)
+		conn, err = d.cluster.Get(ctx)
+		d.trace.getConnDone(rawCtx, conn, err)
 	}
+
+	info = &callInfo{
+		conn: conn,
+	}
+
 	if err != nil {
 		return
 	}
@@ -410,11 +381,11 @@ func (d *driver) StreamReadEx(ctx context.Context, op api.StreamOperation, ex *E
 	}
 
 	conn.runtime.streamStart(timeutil.Now())
-	d.trace.streamStart(rawctx, conn, method)
+	d.trace.streamStart(rawCtx, conn, method)
 	defer func() {
 		if err != nil {
 			conn.runtime.streamDone(timeutil.Now(), err)
-			d.trace.streamDone(rawctx, conn, method, err)
+			d.trace.streamDone(rawCtx, conn, method, err)
 		}
 	}()
 
@@ -435,18 +406,18 @@ func (d *driver) StreamReadEx(ctx context.Context, op api.StreamOperation, ex *E
 		var err error
 		defer func() {
 			conn.runtime.streamDone(timeutil.Now(), hideEOF(err))
-			d.trace.streamDone(rawctx, conn, method, hideEOF(err))
+			d.trace.streamDone(rawCtx, conn, method, hideEOF(err))
 			if cancel != nil {
 				cancel()
 			}
 		}()
 		for err == nil {
 			conn.runtime.streamRecv(timeutil.Now())
-			d.trace.streamRecvStart(rawctx, conn, method)
+			d.trace.streamRecvStart(rawCtx, conn, method)
 
 			err = s.RecvMsg(resp)
 
-			d.trace.streamRecvDone(rawctx, conn, method, resp, hideEOF(err))
+			d.trace.streamRecvDone(rawCtx, conn, method, resp, hideEOF(err))
 			if err != nil {
 				err = mapGRPCError(err)
 			} else {
@@ -526,13 +497,6 @@ type conn struct {
 	addr connAddr
 
 	runtime connRuntime
-}
-
-func Address(v interface{}) string {
-	if conn, ok := v.(*conn); ok {
-		return conn.addr.String()
-	}
-	return ""
 }
 
 func newConn(cc *grpc.ClientConn, addr connAddr) *conn {

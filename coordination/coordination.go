@@ -64,7 +64,7 @@ type Client struct {
 	Driver ydb.Driver
 }
 
-func (c *Client) CreateNode(ctx context.Context, path string, config Config) error {
+func (c *Client) CreateNode(ctx context.Context, path string, config Config) (err error) {
 	req := Ydb_Coordination.CreateNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
@@ -76,12 +76,13 @@ func (c *Client) CreateNode(ctx context.Context, path string, config Config) err
 			RateLimiterCountersMode:  config.RateLimiterCountersMode.to(),
 		},
 	}
-	return c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, api.Wrap(
 		Ydb_Coordination_V1.CreateNode, &req, nil,
 	))
+	return
 }
 
-func (c *Client) AlterNode(ctx context.Context, path string, config Config) error {
+func (c *Client) AlterNode(ctx context.Context, path string, config Config) (err error) {
 	req := Ydb_Coordination.AlterNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
@@ -93,18 +94,20 @@ func (c *Client) AlterNode(ctx context.Context, path string, config Config) erro
 			RateLimiterCountersMode:  config.RateLimiterCountersMode.to(),
 		},
 	}
-	return c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, api.Wrap(
 		Ydb_Coordination_V1.AlterNode, &req, nil,
 	))
+	return
 }
 
-func (c *Client) DropNode(ctx context.Context, path string) error {
+func (c *Client) DropNode(ctx context.Context, path string) (err error) {
 	req := Ydb_Coordination.DropNodeRequest{
 		Path: path,
 	}
-	return c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, api.Wrap(
 		Ydb_Coordination_V1.DropNode, &req, nil,
 	))
+	return
 }
 
 // Describes a coordination node
@@ -113,7 +116,7 @@ func (c *Client) DescribeNode(ctx context.Context, path string) (*scheme.Entry, 
 	req := Ydb_Coordination.DescribeNodeRequest{
 		Path: path,
 	}
-	err := c.Driver.Call(ctx, api.Wrap(
+	_, err := c.Driver.Call(ctx, api.Wrap(
 		Ydb_Coordination_V1.DescribeNode, &req, &res,
 	))
 	if err != nil {

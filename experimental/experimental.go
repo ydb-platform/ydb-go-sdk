@@ -17,13 +17,14 @@ type Client struct {
 }
 
 // UploadRows not fully supported yet
-func (c *Client) UploadRows(ctx context.Context, tableName string, typ ydb.Value) error {
+func (c *Client) UploadRows(ctx context.Context, tableName string, typ ydb.Value) (err error) {
 	req := Ydb_Experimental.UploadRowsRequest{
 		Table:           tableName,
 		Rows:            internal.ValueToYDB(typ),
 		OperationParams: nil,
 	}
-	return c.Driver.Call(ctx, api.Wrap(Ydb_Experimental_V1.UploadRows, &req, nil))
+	_, err = c.Driver.Call(ctx, api.Wrap(Ydb_Experimental_V1.UploadRows, &req, nil))
+	return
 }
 
 // ExecuteStreamQuery not fully supported yet
@@ -36,7 +37,7 @@ func (c *Client) ExecuteStreamQuery(ctx context.Context, query string, params *Q
 	for _, opt := range opts {
 		opt((*streamQueryDesc)(&req))
 	}
-	err := c.Driver.Call(ctx, api.Wrap(Ydb_Experimental_V1.ExecuteStreamQuery, &req, &res))
+	_, err := c.Driver.Call(ctx, api.Wrap(Ydb_Experimental_V1.ExecuteStreamQuery, &req, &res))
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +51,7 @@ func (c *Client) GetDiskSpaceUsage(ctx context.Context, database string) (*DiskS
 		OperationParams: nil,
 		Database:        database,
 	}
-	err := c.Driver.Call(ctx, api.Wrap(Ydb_Experimental_V1.GetDiskSpaceUsage, &req, &res))
+	_, err := c.Driver.Call(ctx, api.Wrap(Ydb_Experimental_V1.GetDiskSpaceUsage, &req, &res))
 	if err != nil {
 		return nil, err
 	}

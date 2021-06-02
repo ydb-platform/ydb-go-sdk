@@ -16,6 +16,12 @@ type (
 	ctxOpTimeoutKey     struct{}
 	ctxOpCancelAfterKey struct{}
 	ctxOpModeKey        struct{}
+	ctxEndpointInfoKey  struct{}
+
+	ctxEndpointInfo struct {
+		conn   *conn
+		policy ConnUsePolicy
+	}
 )
 
 // ContextDeadlineMapping describes how context.Context's deadline value is
@@ -52,6 +58,37 @@ func WithOperationTimeout(parent context.Context, d time.Duration) context.Conte
 func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
 	d, ok = ctx.Value(ctxOpTimeoutKey{}).(time.Duration)
 	return
+}
+
+// WithEndpointInfo returns a copy of parent with connection info
+func WithEndpointInfoAndPolicy(parent context.Context, endpointInfo EndpointInfo, policy ConnUsePolicy) context.Context {
+	if endpointInfo != nil {
+		return context.WithValue(parent, ctxEndpointInfoKey{}, ctxEndpointInfo{
+			conn:   endpointInfo.Conn(),
+			policy: policy,
+		})
+	}
+	return parent
+}
+
+// WithEndpointInfo returns a copy of parent with connection info
+func WithEndpointInfo(parent context.Context, endpointInfo EndpointInfo) context.Context {
+	if endpointInfo != nil {
+		return context.WithValue(parent, ctxEndpointInfoKey{}, ctxEndpointInfo{
+			conn:   endpointInfo.Conn(),
+			policy: ConnUseSmart,
+		})
+	}
+	return parent
+}
+
+// ContextConn returns the conn and conn use policy
+func ContextConn(ctx context.Context) (conn *conn, backoffUseBalancer bool) {
+	connInfo, ok := ctx.Value(ctxEndpointInfoKey{}).(ctxEndpointInfo)
+	if !ok {
+		return nil, true
+	}
+	return connInfo.conn, connInfo.policy != ConnUseEndpoint
 }
 
 // WithOperationCancelAfter returns a copy of parent in which YDB operation

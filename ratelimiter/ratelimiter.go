@@ -25,7 +25,7 @@ type Client struct {
 	Driver ydb.Driver
 }
 
-func (c *Client) CreateResource(ctx context.Context, coordinationNodePath string, resource Resource) error {
+func (c *Client) CreateResource(ctx context.Context, coordinationNodePath string, resource Resource) (err error) {
 	req := Ydb_RateLimiter.CreateResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
@@ -38,12 +38,13 @@ func (c *Client) CreateResource(ctx context.Context, coordinationNodePath string
 			}},
 		},
 	}
-	return c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, api.Wrap(
 		Ydb_RateLimiter_V1.CreateResource, &req, nil,
 	))
+	return
 }
 
-func (c *Client) AlterResource(ctx context.Context, coordinationNodePath string, resource Resource) error {
+func (c *Client) AlterResource(ctx context.Context, coordinationNodePath string, resource Resource) (err error) {
 	req := Ydb_RateLimiter.AlterResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
@@ -56,20 +57,22 @@ func (c *Client) AlterResource(ctx context.Context, coordinationNodePath string,
 			}},
 		},
 	}
-	return c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, api.Wrap(
 		Ydb_RateLimiter_V1.AlterResource, &req, nil,
 	))
+	return
 }
 
-func (c *Client) DropResource(ctx context.Context, coordinationNodePath string, resourcePath string) error {
+func (c *Client) DropResource(ctx context.Context, coordinationNodePath string, resourcePath string) (err error) {
 	req := Ydb_RateLimiter.DropResourceRequest{
 		OperationParams:      nil,
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 	}
-	return c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, api.Wrap(
 		Ydb_RateLimiter_V1.DropResource, &req, nil,
 	))
+	return
 }
 
 func (c *Client) ListResource(ctx context.Context, coordinationNodePath string, resourcePath string, recursive bool) ([]string, error) {
@@ -78,7 +81,7 @@ func (c *Client) ListResource(ctx context.Context, coordinationNodePath string, 
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 	}
-	err := c.Driver.Call(ctx, api.Wrap(
+	_, err := c.Driver.Call(ctx, api.Wrap(
 		Ydb_RateLimiter_V1.ListResources, &req, &res,
 	))
 	if err != nil {
@@ -93,7 +96,7 @@ func (c *Client) DescribeResource(ctx context.Context, coordinationNodePath stri
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 	}
-	err := c.Driver.Call(ctx, api.Wrap(
+	_, err := c.Driver.Call(ctx, api.Wrap(
 		Ydb_RateLimiter_V1.DescribeResource, &req, &res,
 	))
 	if err != nil {
@@ -116,7 +119,7 @@ func (c *Client) DescribeResource(ctx context.Context, coordinationNodePath stri
 	return result, nil
 }
 
-func (c *Client) AcquireResource(ctx context.Context, coordinationNodePath string, resourcePath string, amount uint64, isUsedAmount bool) error {
+func (c *Client) AcquireResource(ctx context.Context, coordinationNodePath string, resourcePath string, amount uint64, isUsedAmount bool) (err error) {
 	var req Ydb_RateLimiter.AcquireResourceRequest
 	if isUsedAmount {
 		req = Ydb_RateLimiter.AcquireResourceRequest{
@@ -131,7 +134,8 @@ func (c *Client) AcquireResource(ctx context.Context, coordinationNodePath strin
 			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Required{Required: amount},
 		}
 	}
-	return c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, api.Wrap(
 		Ydb_RateLimiter_V1.AcquireResource, &req, nil,
 	))
+	return
 }

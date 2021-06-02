@@ -65,20 +65,22 @@ type Client struct {
 	Driver ydb.Driver
 }
 
-func (c *Client) MakeDirectory(ctx context.Context, path string) error {
+func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
 	req := Ydb_Scheme.MakeDirectoryRequest{
 		Path: path,
 	}
-	return c.Driver.Call(ctx, internal.Wrap(Ydb_Scheme_V1.MakeDirectory, &req, nil))
+	_, err = c.Driver.Call(ctx, internal.Wrap(Ydb_Scheme_V1.MakeDirectory, &req, nil))
+	return
 }
 
-func (c *Client) RemoveDirectory(ctx context.Context, path string) error {
+func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	req := Ydb_Scheme.RemoveDirectoryRequest{
 		Path: path,
 	}
-	return c.Driver.Call(ctx, internal.Wrap(
+	_, err = c.Driver.Call(ctx, internal.Wrap(
 		Ydb_Scheme_V1.RemoveDirectory, &req, nil,
 	))
+	return
 }
 
 func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, err error) {
@@ -86,7 +88,7 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, e
 	req := Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
 	}
-	err = c.Driver.Call(ctx, internal.Wrap(
+	_, err = c.Driver.Call(ctx, internal.Wrap(
 		Ydb_Scheme_V1.ListDirectory, &req, &res,
 	))
 	if err != nil {
@@ -103,7 +105,7 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err er
 	req := Ydb_Scheme.DescribePathRequest{
 		Path: path,
 	}
-	err = c.Driver.Call(ctx, internal.Wrap(
+	_, err = c.Driver.Call(ctx, internal.Wrap(
 		Ydb_Scheme_V1.DescribePath, &req, &res,
 	))
 	if err == nil {
@@ -112,7 +114,7 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err er
 	return e, err
 }
 
-func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...PermissionsOption) error {
+func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...PermissionsOption) (err error) {
 	var desc permissionsDesc
 	for _, opt := range opts {
 		opt(&desc)
@@ -122,9 +124,10 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...Per
 		Actions:          desc.actions,
 		ClearPermissions: desc.clear,
 	}
-	return c.Driver.Call(ctx, internal.Wrap(
+	_, err = c.Driver.Call(ctx, internal.Wrap(
 		Ydb_Scheme_V1.ModifyPermissions, &req, nil,
 	))
+	return
 }
 
 func (e *Entry) from(y *Ydb_Scheme.Entry) {
