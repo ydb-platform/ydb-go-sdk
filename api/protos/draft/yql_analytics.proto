@@ -235,9 +235,17 @@ message ModifyHistoryRequest {
     string name = 4;
     Acl acl = 5;
     bool is_deleted = 6;
+    string yql_text = 7;
+    Ydb.Operations.OperationParams operation_params = 8;
 }
 
-message ModifyHistoryResponse { }
+message ModifyHistoryResult{
+    string history_id = 1;
+}
+
+message ModifyHistoryResponse {
+    Ydb.Operations.Operation operation = 1; // ModifyHistoryResult
+}
 
 message ExecuteQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
@@ -250,6 +258,7 @@ message ExecuteQueryRequest {
     map<string, Ydb.TypedValue> parameters = 7;
     repeated Connection connections = 8;
     string folder_id = 9;
+    string cloud_id = 10;
 }
 
 message ExecuteQueryResponse {
