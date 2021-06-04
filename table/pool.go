@@ -591,12 +591,23 @@ func (p *SessionPool) Stats() SessionPoolStats {
 	if p.ready != nil {
 		readyCount = p.ready.Len()
 	}
-
+	indexCount := 0
+	waitQ := 0
+	p.mu.Lock()
+	if p.index != nil {
+		indexCount = len(p.index)
+	}
+	p.mu.Unlock()
+	if p.waitq != nil {
+		waitQ = p.waitq.Len()
+	}
 	return SessionPoolStats{
 		Idle:    idleCount,
 		Ready:   readyCount,
+		Index:   indexCount,
+		WaitQ:   waitQ,
 		MinSize: p.KeepAliveMinSize,
-		MaxSize: p.SizeLimit,
+		MaxSize: p.limit,
 	}
 }
 
@@ -1240,6 +1251,8 @@ func panicLocked(mu sync.Locker, message string) {
 type SessionPoolStats struct {
 	Idle    int
 	Ready   int
+	Index   int
+	WaitQ   int
 	MinSize int
 	MaxSize int
 }
