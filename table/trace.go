@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"time"
 )
 
 // ClientTrace contains options for tracing table client activity.
@@ -51,6 +52,7 @@ type (
 		Context  context.Context
 		Session  *Session
 		Endpoint string
+		Latency  time.Duration
 		Error    error
 	}
 	KeepAliveStartInfo struct {
@@ -70,6 +72,7 @@ type (
 	DeleteSessionDoneInfo struct {
 		Context context.Context
 		Session *Session
+		Latency time.Duration
 		Error   error
 	}
 	PrepareDataQueryStartInfo struct {
@@ -163,6 +166,7 @@ type (
 	}
 	RetryLoopDoneInfo struct {
 		Context  context.Context
+		Latency  time.Duration
 		Attempts int
 	}
 )
@@ -473,9 +477,11 @@ type (
 		Context context.Context
 	}
 	SessionPoolGetDoneInfo struct {
-		Context context.Context
-		Session *Session
-		Error   error
+		Context       context.Context
+		Session       *Session
+		Latency       time.Duration
+		RetryAttempts int
+		Error         error
 	}
 	SessionPoolWaitStartInfo struct {
 		Context context.Context

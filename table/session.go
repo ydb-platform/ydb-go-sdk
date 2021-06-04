@@ -34,8 +34,9 @@ type Client struct {
 // Unused sessions must be destroyed.
 func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 	t.traceCreateSessionStart(ctx)
+	start := time.Now()
 	defer func() {
-		t.traceCreateSessionDone(ctx, s, err)
+		t.traceCreateSessionDone(ctx, s, time.Since(start), err)
 	}()
 	var (
 		req Ydb_Table.CreateSessionRequest
@@ -109,11 +110,12 @@ func (s *Session) Close(ctx context.Context) (err error) {
 	}
 	s.closed = true
 	s.c.traceDeleteSessionStart(ctx, s)
+	start := time.Now()
 	defer func() {
 		for _, cb := range s.onClose {
 			cb()
 		}
-		s.c.traceDeleteSessionDone(ctx, s, err)
+		s.c.traceDeleteSessionDone(ctx, s, time.Since(start), err)
 	}()
 	req := Ydb_Table.DeleteSessionRequest{
 		SessionId: s.ID,
@@ -1054,10 +1056,11 @@ func (t *Client) traceCreateSessionStart(ctx context.Context) {
 		b(x)
 	}
 }
-func (t *Client) traceCreateSessionDone(ctx context.Context, s *Session, err error) {
+func (t *Client) traceCreateSessionDone(ctx context.Context, s *Session, latency time.Duration, err error) {
 	x := CreateSessionDoneInfo{
 		Context: ctx,
 		Session: s,
+		Latency: latency,
 		Error:   err,
 	}
 	if s != nil && s.endpointInfo != nil {
@@ -1108,10 +1111,11 @@ func (t *Client) traceDeleteSessionStart(ctx context.Context, s *Session) {
 		b(x)
 	}
 }
-func (t *Client) traceDeleteSessionDone(ctx context.Context, s *Session, err error) {
+func (t *Client) traceDeleteSessionDone(ctx context.Context, s *Session, latency time.Duration, err error) {
 	x := DeleteSessionDoneInfo{
 		Context: ctx,
 		Session: s,
+		Latency: latency,
 		Error:   err,
 	}
 	if a := t.Trace.DeleteSessionDone; a != nil {

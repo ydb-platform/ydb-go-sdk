@@ -263,13 +263,18 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 	p.init()
 
+	var (
+		i     = 0
+		start = time.Now()
+	)
+
 	p.traceGetStart(ctx)
 	defer func() {
-		p.traceGetDone(ctx, s, err)
+		p.traceGetDone(ctx, s, time.Since(start), i, err)
 	}()
 
 	const maxAttempts = 100
-	for i := 0; s == nil && err == nil && i < maxAttempts; i++ {
+	for ; s == nil && err == nil && i < maxAttempts; i++ {
 		var (
 			ch *chan *Session
 			el *list.Element // Element in the wait queue.
@@ -1086,11 +1091,13 @@ func (p *SessionPool) traceGetStart(ctx context.Context) {
 		b(x)
 	}
 }
-func (p *SessionPool) traceGetDone(ctx context.Context, s *Session, err error) {
+func (p *SessionPool) traceGetDone(ctx context.Context, s *Session, latency time.Duration, attempts int, err error) {
 	x := SessionPoolGetDoneInfo{
-		Context: ctx,
-		Session: s,
-		Error:   err,
+		Context:       ctx,
+		Session:       s,
+		Latency:       latency,
+		RetryAttempts: attempts,
+		Error:         err,
 	}
 	if a := p.Trace.GetDone; a != nil {
 		a(x)

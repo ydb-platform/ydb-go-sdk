@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 )
@@ -110,27 +111,17 @@ func Retry(ctx context.Context, s SessionProvider, op Operation) error {
 	}).Do(ctx, op)
 }
 
-// RetryWithTrace calls Retryer.Do() configured with default values and custom tracer.
-func RetryWithTrace(ctx context.Context, s SessionProvider, op Operation, trace RetryTrace) error {
-	return (Retryer{
-		SessionProvider: s,
-		MaxRetries:      ydb.DefaultMaxRetries,
-		RetryChecker:    ydb.DefaultRetryChecker,
-		Backoff:         ydb.DefaultBackoff,
-		Trace:           trace,
-	}).Do(ctx, op)
-}
-
 // Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 	r.traceRetryLoopStart(ctx)
 	var (
-		s *Session
-		m ydb.RetryMode
-		i int
+		s     *Session
+		m     ydb.RetryMode
+		i     int
+		start = time.Now()
 	)
 	defer func() {
-		r.traceRetryLoopDone(ctx, op, i)
+		r.traceRetryLoopDone(ctx, op, i, time.Since(start))
 		if s != nil {
 			_ = r.SessionProvider.Put(ctx, s)
 		}
@@ -189,9 +180,10 @@ func (r Retryer) traceRetryLoopStart(ctx context.Context) {
 	}
 }
 
-func (r Retryer) traceRetryLoopDone(ctx context.Context, op Operation, attempts int) {
+func (r Retryer) traceRetryLoopDone(ctx context.Context, op Operation, attempts int, latency time.Duration) {
 	x := RetryLoopDoneInfo{
 		Context:  ctx,
+		Latency:  latency,
 		Attempts: attempts,
 	}
 	if a := r.Trace.RetryLoopDone; a != nil {
