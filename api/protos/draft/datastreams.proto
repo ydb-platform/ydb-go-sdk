@@ -320,7 +320,7 @@ message DescribeStreamResponse {
     Ydb.Operations.Operation operation = 1;
 }
 message DescribeStreamResult {
-    StreamDescription description = 1;
+    StreamDescription stream_description = 1;
 }
 
 
@@ -386,7 +386,7 @@ message PutRecordsResultEntry {
     string error_message = 2;
     string error_code = 3;
     string sequence_number = 4;
-    string shard = 5;
+    string shard_id = 5;
 }
 
 message GetRecordsRequest {
@@ -424,7 +424,7 @@ message PutRecordResponse {
 message PutRecordResult {
     EncryptionType encryption_type = 1;
     string sequence_number = 2;
-    string shard_name = 3;
+    string shard_id = 3;
 }
 
 

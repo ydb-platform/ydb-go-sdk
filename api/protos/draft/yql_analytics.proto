@@ -275,6 +275,8 @@ message GetResultDataRequest {
     int32 result_set_id = 3;
     int64 offset = 4;
     int64 limit = 5;
+    string folder_id = 6;
+    string cloud_id = 7;
 }
 
 message GetResultDataResponse {
