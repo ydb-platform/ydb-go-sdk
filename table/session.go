@@ -865,7 +865,15 @@ func (s *Session) StreamExecuteScanQuery(
 				select {
 				case <-ctx.Done():
 					once.Do(func() { close(ch) })
-				case ch <- resp.Result.ResultSet:
+				default:
+					if result := resp.Result; result != nil {
+						if result.ResultSet != nil {
+							ch <- resp.Result.ResultSet
+						}
+						// TODO: something
+						// if result.QueryStats != nil {
+						// }
+					}
 				}
 			},
 		),
