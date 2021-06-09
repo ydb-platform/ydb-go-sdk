@@ -791,7 +791,12 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 				select {
 				case <-ctx.Done():
 					once.Do(func() { close(ch) })
-				case ch <- resp.Result.ResultSet:
+				default:
+					if result := resp.Result; result != nil {
+						if result.ResultSet != nil {
+							ch <- resp.Result.ResultSet
+						}
+					}
 				}
 			},
 		),
