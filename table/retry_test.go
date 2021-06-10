@@ -63,26 +63,39 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 }
 
 func TestRetryerImmediateiRetry(t *testing.T) {
-	for _, testErr := range []error{
+	for testErr, session := range map[error]*Session{
+		&ydb.TransportError{
+			Reason: ydb.TransportErrorResourceExhausted,
+		}: nil,
+		&ydb.TransportError{
+			Reason: ydb.TransportErrorAborted,
+		}: nil,
 		&ydb.OpError{
 			Reason: ydb.StatusUnavailable,
-		},
+		}: new(Session),
+		&ydb.OpError{
+			Reason: ydb.StatusOverloaded,
+		}: new(Session),
 		&ydb.OpError{
 			Reason: ydb.StatusAborted,
-		},
+		}: new(Session),
 		&ydb.OpError{
 			Reason: ydb.StatusNotFound,
-		},
+		}: new(Session),
 		fmt.Errorf("wrap op error: %w", &ydb.OpError{
 			Reason: ydb.StatusAborted,
-		}),
+		}): new(Session),
 	} {
 		t.Run("", func(t *testing.T) {
 			var count int
 			r := Retryer{
-				MaxRetries:      1,
-				RetryChecker:    ydb.DefaultRetryChecker,
-				SessionProvider: SingleSession(new(Session)),
+				MaxRetries:   3,
+				RetryChecker: ydb.DefaultRetryChecker,
+				SessionProvider: SessionProviderFunc{
+					OnGet: func(ctx context.Context) (s *Session, err error) {
+						return session, nil
+					},
+				},
 			}
 			err := r.Do(
 				context.Background(),
@@ -95,7 +108,7 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 				t.Errorf("unexpected operation calls: %v; want %v", act, exp)
 			}
 			if err != testErr {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatalf("unexpected error: %v; want: %v", err, testErr)
 			}
 		})
 	}

@@ -166,6 +166,10 @@ func (p *SessionPool) init() {
 			go p.keeper()
 		}
 
+		if p.SizeLimit == 0 {
+			p.SizeLimit = DefaultSessionPoolSizeLimit
+		}
+
 		if p.KeepAliveMinSize < 0 {
 			p.KeepAliveMinSize = 0
 		} else if p.KeepAliveMinSize == 0 {
@@ -198,6 +202,20 @@ func (p *SessionPool) init() {
 			p.KeepAliveTimeout = DefaultSessionPoolKeepAliveTimeout
 		}
 	})
+}
+
+func isCreateSessionErrorRetriable(err error) bool {
+	switch {
+	case
+		errors.Is(err, ErrSessionPoolOverflow),
+		ydb.IsOpError(err, ydb.StatusOverloaded),
+		ydb.IsTransportError(err, ydb.TransportErrorResourceExhausted),
+		ydb.IsTransportError(err, ydb.TransportErrorDeadlineExceeded),
+		ydb.IsTransportError(err, ydb.TransportErrorUnavailable):
+		return true
+	default:
+		return false
+	}
 }
 
 // p.mu must NOT be held.
@@ -291,7 +309,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			// Try create new session without awaiting for reused one.
 			s, err = p.createSession(ctx)
 			// got session or err is not recoverable
-			if s != nil || err != nil && !errors.Is(err, ErrSessionPoolOverflow) {
+			if s != nil || err != nil && !isCreateSessionErrorRetriable(err) {
 				return s, err
 			}
 			err = nil
@@ -507,7 +525,7 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 		}
 
 		took, err := p.Take(ctx, s)
-		if err == nil && !took || err == ErrSessionUnknown {
+		if err == nil && !took || errors.Is(err, ErrSessionUnknown) {
 			// Session was marked for deletion or deleted by keeper() - race happen - retry
 			s = nil
 			err = nil
