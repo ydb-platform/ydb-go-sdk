@@ -18,7 +18,31 @@ import (
 
 const GeneratedFileSuffix = "_ydbgen"
 
-var DefaultImportPath = "a.yandex-team.ru/kikimr/public/sdk/go"
+var (
+	sdkImportPath = "github.com/yandex-cloud/ydb-go-sdk"
+
+	deps = []dep{
+		{
+			path:  "strconv",
+			ident: "strconv.Itoa",
+			std:   true,
+		},
+		{
+			path:  sdkImportPath,
+			ident: "ydb.StringValue",
+		},
+		{
+			path:  sdkImportPath + "/table",
+			ident: "table.NewQueryParameters",
+		},
+	}
+)
+
+type dep struct {
+	path  string
+	ident string
+	std   bool
+}
 
 func tab(n int) string {
 	return strings.Repeat("\t", n)
@@ -46,8 +70,7 @@ func (s *scope) add(name string) {
 }
 
 type Generator struct {
-	ImportPath string
-	Dir        string
+	Dir string
 
 	once        sync.Once
 	conversions map[string]ConversionTemplate
@@ -102,20 +125,10 @@ func (g *Generator) init() {
 	g.once.Do(func() {
 		g.conversions = make(map[string]ConversionTemplate)
 		g.seenConv = make(map[string]bool)
-		if g.ImportPath == "" {
-			g.ImportPath = DefaultImportPath
-		}
 	})
 }
 
-type dep struct {
-	path  string
-	name  string
-	ident string
-	std   bool
-}
-
-func (g *Generator) importDeps(bw *bufio.Writer, deps ...dep) {
+func (g *Generator) importDeps(bw *bufio.Writer) {
 	_, _ = bw.WriteString("import (\n")
 	prev := deps[0].std
 	for _, dep := range deps {
@@ -123,7 +136,7 @@ func (g *Generator) importDeps(bw *bufio.Writer, deps ...dep) {
 			prev = dep.std
 			line(bw)
 		}
-		line(bw, tab(1), `"`, path.Join(dep.path, dep.name), `"`)
+		line(bw, tab(1), `"`, dep.path, `"`)
 	}
 	line(bw, `)`)
 	line(bw)
@@ -132,7 +145,12 @@ func (g *Generator) importDeps(bw *bufio.Writer, deps ...dep) {
 	line(bw, "var (")
 	for _, dep := range deps {
 		if dep.ident != "" {
-			line(bw, tab(1), `_ = `, dep.name, `.`, dep.ident)
+			line(
+				bw,
+				tab(1),
+				`_ = `,
+				dep.ident,
+			)
 		}
 	}
 	line(bw, ")")
@@ -171,23 +189,7 @@ func (g *Generator) Generate(pkg Package) error {
 		g.fileHeader(bw, pkg.Name)
 		_ = bw.Flush() // Omit `... found EOF want package` error on panics.
 
-		g.importDeps(bw,
-			dep{
-				name:  "strconv",
-				ident: "Itoa",
-				std:   true,
-			},
-			dep{
-				name:  "ydb",
-				path:  g.ImportPath,
-				ident: "StringValue",
-			},
-			dep{
-				name:  "table",
-				path:  path.Join(g.ImportPath, "ydb"),
-				ident: "NewQueryParameters",
-			},
-		)
+		g.importDeps(bw)
 
 		for _, s := range f.Structs {
 			if s.Flags&GenScan != 0 {
