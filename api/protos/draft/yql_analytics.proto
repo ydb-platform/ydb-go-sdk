@@ -236,7 +236,8 @@ message ModifyHistoryRequest {
     Acl acl = 5;
     bool is_deleted = 6;
     string yql_text = 7;
-    Ydb.Operations.OperationParams operation_params = 8;
+    EQueryStatus status = 8;
+    Ydb.Operations.OperationParams operation_params = 9;
 }
 
 message ModifyHistoryResult{
