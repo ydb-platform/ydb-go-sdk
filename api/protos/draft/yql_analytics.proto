@@ -274,10 +274,11 @@ message GetResultDataRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string history_id = 2;
     int32 result_set_id = 3;
-    int64 offset = 4;
+    int64 offset = 4; // change
     int64 limit = 5;
     string folder_id = 6;
     string cloud_id = 7;
+    string page_token = 8;
 }
 
 message GetResultDataResponse {
@@ -286,6 +287,7 @@ message GetResultDataResponse {
 
 message GetResultDataResult {
     Ydb.ResultSet result_set = 1;
+    string next_page_token = 2;
 }
 
 message ResultSetHeader {

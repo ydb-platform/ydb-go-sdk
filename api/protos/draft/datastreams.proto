@@ -31,8 +31,8 @@ extend google.protobuf.FieldOptions {
 
 enum EncryptionType {
     ENCRYPTION_UNDEFINED = 0;
-    ENCRYPTION_KMS = 1;
-    ENCRYPTION_NONE = 2;
+    NONE = 1;
+    KMS = 2;
 }
 
 message EnhancedMetrics {
@@ -94,7 +94,7 @@ message Shard {
     string adjacent_parent_shard_id = 1;
     HashKeyRange hash_key_range = 2;
     string parent_shard_id = 3;
-    SequenceNumberRange partition_key_range = 4;
+    SequenceNumberRange sequence_number_range = 4;
     string shard_id = 5;
 }
 
@@ -117,11 +117,11 @@ message ConsumerDescription {
 
 enum ShardIteratorType {
     SHARD_ITERATOR_UNDEFINED = 0;
-    SHARD_ITERATOR_AT_SEQUENCE_NUMBER = 1;
-    SHARD_ITERATOR_AFTER_SEQUENCE_NUMBER = 2;
-    SHARD_ITERATOR_AT_TIMESTAMP = 3;
-    SHARD_ITERATOR_TRIM_HORIZON = 4;
-    SHARD_ITERATOR_LATEST = 5;
+    AT_SEQUENCE_NUMBER = 1;
+    AFTER_SEQUENCE_NUMBER = 2;
+    AT_TIMESTAMP = 3;
+    TRIM_HORIZON = 4;
+    LATEST = 5;
 }
 
 message ShardFilter {
@@ -137,7 +137,7 @@ message ShardFilter {
 
     string shard_id = 1;
     int64 timestamp = 2;
-    ShardIteratorType type = 3;
+    ShardFilterType type = 3;
 }
 message StartingPosition {
     int64 timestamp = 1;
