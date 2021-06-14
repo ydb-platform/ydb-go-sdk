@@ -6,6 +6,23 @@ import (
 	"testing"
 )
 
+func TestReturnedTrace(t *testing.T) {
+	var called bool
+	trace := TraceReturningTrace{
+		OnReturnedTrace: func() ReturnedTrace {
+			return ReturnedTrace{
+				OnSomething: func() {
+					called = true
+				},
+			}
+		},
+	}
+	trace.onReturnedTrace().onSomething()
+	if !called {
+		t.Fatalf("not called")
+	}
+}
+
 func TestConditional(t *testing.T) {
 	var called bool
 	trace := ConditionalBuildTrace{

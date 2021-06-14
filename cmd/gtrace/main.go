@@ -107,7 +107,7 @@ func main() {
 
 	var writers []*Writer
 	if isGoGenerate || write {
-		// We should support Go suffixes like `_linux.go` properly.
+		// We should respect Go suffixes like `_linux.go`.
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
 		if verbose {
 			log.Printf(
@@ -261,9 +261,7 @@ func main() {
 					text, ok := TrimConfigComment(c.Text)
 					if ok {
 						if item == nil {
-							item = &GenItem{
-								File: pkgFiles[i],
-							}
+							item = &GenItem{}
 						}
 						if err := item.ParseComment(text); err != nil {
 							log.Fatalf(
@@ -292,18 +290,24 @@ func main() {
 		Package:          pkg,
 		BuildConstraints: buildConstraints,
 	}
+	traces := make(map[string]*Trace)
 	for _, item := range items {
-		t := Trace{
+		t := &Trace{
 			Name: item.Ident.Name,
 			Flag: item.Flag,
 		}
+		p.Traces = append(p.Traces, t)
+		traces[item.Ident.Name] = t
+	}
+	for i, item := range items {
+		t := p.Traces[i]
 		for _, field := range item.StructType.Fields.List {
 			name := field.Names[0].Name
 			fn, ok := field.Type.(*ast.FuncType)
 			if !ok {
 				continue
 			}
-			f, err := buildFunc(info, fn)
+			f, err := buildFunc(info, traces, fn)
 			if err != nil {
 				log.Printf(
 					"skipping hook %s due to error: %v",
@@ -333,7 +337,6 @@ func main() {
 				Flag: item.GenConfig.Flag | config.Flag,
 			})
 		}
-		p.Traces = append(p.Traces, t)
 	}
 	for _, w := range writers {
 		if err := w.Write(p); err != nil {
@@ -344,7 +347,8 @@ func main() {
 	log.Println("OK")
 }
 
-func buildFunc(info types.Info, fn *ast.FuncType) (ret Func, err error) {
+func buildFunc(info types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {
+	ret = new(Func)
 	for _, p := range fn.Params.List {
 		t := info.TypeOf(p.Type)
 		if t == nil {
@@ -363,26 +367,34 @@ func buildFunc(info types.Info, fn *ast.FuncType) (ret Func, err error) {
 		return ret, nil
 	}
 	if len(fn.Results.List) > 1 {
-		return ret, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"unsupported number of function results",
 		)
 	}
 
-	p := fn.Results.List[0]
-	fn, ok := p.Type.(*ast.FuncType)
-	if !ok {
-		return ret, fmt.Errorf(
-			"unsupported function result type %s",
-			info.TypeOf(p.Type),
-		)
-	}
-	result, err := buildFunc(info, fn)
-	if err != nil {
-		return ret, err
-	}
-	ret.Result = append(ret.Result, result)
+	r := fn.Results.List[0]
 
-	return ret, nil
+	switch x := r.Type.(type) {
+	case *ast.FuncType:
+		result, err := buildFunc(info, traces, x)
+		if err != nil {
+			return nil, err
+		}
+		ret.Result = append(ret.Result, result)
+		return ret, nil
+
+	case *ast.Ident:
+		if t, ok := traces[x.Name]; ok {
+			t.Nested = true
+			ret.Result = append(ret.Result, t)
+			return ret, nil
+		}
+	}
+
+	return nil, fmt.Errorf(
+		"unsupported function result type %s",
+		info.TypeOf(r.Type),
+	)
 }
 
 func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
@@ -420,18 +432,21 @@ type Package struct {
 	*types.Package
 
 	BuildConstraints []string
-	Traces           []Trace
+	Traces           []*Trace
 }
 
 type Trace struct {
-	Name  string
-	Hooks []Hook
-	Flag  GenFlag
+	Name   string
+	Hooks  []Hook
+	Flag   GenFlag
+	Nested bool
 }
+
+func (*Trace) isFuncResult() bool { return true }
 
 type Hook struct {
 	Name string
-	Func Func
+	Func *Func
 	Flag GenFlag
 }
 
@@ -440,12 +455,18 @@ type Param struct {
 	Type types.Type
 }
 
-type Func struct {
-	Params []Param
-	Result []Func // 0 or 1.
+type FuncResult interface {
+	isFuncResult() bool
 }
 
-func (f Func) HasResult() bool {
+type Func struct {
+	Params []Param
+	Result []FuncResult // 0 or 1.
+}
+
+func (*Func) isFuncResult() bool { return true }
+
+func (f *Func) HasResult() bool {
 	return len(f.Result) > 0
 }
 
@@ -506,9 +527,7 @@ func (g *GenConfig) ParseParameter(text string) (err error) {
 
 type GenItem struct {
 	GenConfig
-	File       *os.File
 	Ident      *ast.Ident
-	TypeSpec   *ast.TypeSpec
 	StructType *ast.StructType
 }
 

@@ -75,6 +75,9 @@ func (w *Writer) Write(p Package) error {
 	w.newScope(func() {
 		for _, trace := range p.Traces {
 			w.compose(trace)
+			if trace.Nested {
+				w.isZero(trace)
+			}
 			if trace.Flag.Has(GenContext) {
 				w.context(trace)
 			}
@@ -203,7 +206,7 @@ func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 	return
 }
 
-func (w *Writer) funcImports(dst []dep, flag GenFlag, fn Func) []dep {
+func (w *Writer) funcImports(dst []dep, flag GenFlag, fn *Func) []dep {
 	for _, p := range fn.Params {
 		dst = w.typeImports(dst, p.Type)
 		if !flag.Has(GenShortcut) {
@@ -217,13 +220,15 @@ func (w *Writer) funcImports(dst []dep, flag GenFlag, fn Func) []dep {
 			})
 		}
 	}
-	for _, fn := range fn.Result {
-		dst = w.funcImports(dst, flag, fn)
+	for _, x := range fn.Result {
+		if fn, ok := x.(*Func); ok {
+			dst = w.funcImports(dst, flag, fn)
+		}
 	}
 	return dst
 }
 
-func (w *Writer) traceImports(dst []dep, t Trace) []dep {
+func (w *Writer) traceImports(dst []dep, t *Trace) []dep {
 	if t.Flag.Has(GenContext) {
 		dst = append(dst, dep{
 			pkgPath: "context",
@@ -327,7 +332,26 @@ func (w *Writer) call(args []string) {
 	w.line(`)`)
 }
 
-func (w *Writer) compose(trace Trace) {
+func (w *Writer) isZero(trace *Trace) {
+	w.newScope(func() {
+		t := w.declare("t")
+		w.line(`// isZero checks whether `, t, ` is empty`)
+		w.line(`func (`, t, ` `, trace.Name, `) isZero() bool {`)
+		w.block(func() {
+			for _, hook := range trace.Hooks {
+				w.line(`if `, t, `.`, hook.Name, ` != nil {`)
+				w.block(func() {
+					w.line(`return false`)
+				})
+				w.line(`}`)
+			}
+			w.line(`return true`)
+		})
+		w.line(`}`)
+	})
+}
+
+func (w *Writer) compose(trace *Trace) {
 	w.newScope(func() {
 		t := w.declare("t")
 		x := w.declare("x")
@@ -364,7 +388,7 @@ func (w *Writer) composeHook(hook Hook, t1, t2, dst string) {
 	w.line(`}`)
 }
 
-func (w *Writer) composeHookCall(fn Func, h1, h2 string) {
+func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 	w.newScope(func() {
 		w.capture(h1, h2)
 		w.block(func() {
@@ -392,20 +416,45 @@ func (w *Writer) composeHookCall(fn Func, h1, h2 string) {
 			}
 			if fn.HasResult() {
 				w.line(`switch {`)
-				w.line(`case `, r1, ` == nil:`)
+
+				w.code(`case `)
+				w.isEmptyResult(r1, fn.Result[0])
+				w.line(`:`)
 				w.line("\t", `return `, r2)
-				w.line(`case `, r2, ` == nil:`)
+
+				w.code(`case `)
+				w.isEmptyResult(r2, fn.Result[0])
+				w.line(`:`)
 				w.line("\t", `return `, r1)
+
 				w.line(`default:`)
 				w.block(func() {
 					w.code(`return `)
-					w.composeHookCall(fn.Result[0], r1, r2)
+					switch x := fn.Result[0].(type) {
+					case *Func:
+						w.composeHookCall(x, r1, r2)
+					case *Trace:
+						w.line(r1, `.Compose(`, r2, `)`)
+					default:
+						panic("unknown result type")
+					}
 				})
 				w.line(`}`)
 			}
 		})
 		w.line(`}`)
 	})
+}
+
+func (w *Writer) isEmptyResult(name string, r FuncResult) {
+	switch r.(type) {
+	case *Func:
+		w.code(name, ` == nil`)
+	case *Trace:
+		w.code(name, `.isZero()`)
+	default:
+		panic("unknown result type")
+	}
 }
 
 var contextType = (func() types.Type {
@@ -415,14 +464,21 @@ var contextType = (func() types.Type {
 	return types.NewNamed(name, typ, nil)
 })()
 
-func (w *Writer) stubFunc(id string, f Func) (name string) {
+func (w *Writer) stubFunc(id string, f *Func) (name string) {
 	name = funcName("gtrace", "noop", id)
 	name = unexported(name)
 	name = w.declare(name)
 
 	var res string
-	for _, f := range f.Result {
-		res = w.stubFunc(id, f)
+	for _, r := range f.Result {
+		switch x := r.(type) {
+		case *Func:
+			res = w.stubFunc(id, x)
+		case *Trace:
+			res = "WHOA TODO"
+		default:
+			panic("unknown result type")
+		}
 	}
 	w.newScope(func() {
 		w.code(`func `, name)
@@ -440,10 +496,17 @@ func (w *Writer) stubFunc(id string, f Func) (name string) {
 	return name
 }
 
-func (w *Writer) stubHook(trace Trace, hook Hook) {
+func (w *Writer) stubHook(trace *Trace, hook Hook) {
 	var stubName string
-	if hook.Func.HasResult() {
-		stubName = w.stubFunc(uniqueTraceHookID(trace, hook), hook.Func.Result[0])
+	for _, r := range hook.Func.Result {
+		switch x := r.(type) {
+		case *Func:
+			stubName = w.stubFunc(uniqueTraceHookID(trace, hook), x)
+		case *Trace:
+			stubName = "WHOA TODO"
+		default:
+			panic("unexpected result type")
+		}
 	}
 	haveNames := haveNames(hook.Func.Params)
 	w.newScope(func() {
@@ -478,14 +541,21 @@ func (w *Writer) stubHook(trace Trace, hook Hook) {
 	})
 }
 
-func (w *Writer) stubShortcutFunc(id string, f Func) (name string) {
+func (w *Writer) stubShortcutFunc(id string, f *Func) (name string) {
 	name = funcName("gtrace", "noop", id)
 	name = unexported(name)
 	name = w.declare(name)
 
 	var res string
-	for _, f := range f.Result {
-		res = w.stubShortcutFunc(id, f)
+	for _, r := range f.Result {
+		switch x := r.(type) {
+		case *Func:
+			res = w.stubShortcutFunc(id, x)
+		case *Trace:
+			res = "WHOA TODO"
+		default:
+			panic("unexpected result type")
+		}
 	}
 	w.newScope(func() {
 		w.code(`func `, name)
@@ -498,8 +568,15 @@ func (w *Writer) stubShortcutFunc(id string, f Func) (name string) {
 			w.code(w.typeString(p.Type))
 		}
 		w.code(`) `)
-		if f.HasResult() {
-			w.shortcutFuncSign(f.Result[0])
+		for _, r := range f.Result {
+			switch x := r.(type) {
+			case *Func:
+				w.shortcutFuncSign(x)
+			case *Trace:
+				// WHOA TODO
+			default:
+				panic("unexpected result type")
+			}
 		}
 		w.line(`{`)
 		if f.HasResult() {
@@ -513,17 +590,23 @@ func (w *Writer) stubShortcutFunc(id string, f Func) (name string) {
 	return name
 }
 
-func (w *Writer) stubHookShortcut(trace Trace, hook Hook) {
+func (w *Writer) stubHookShortcut(trace *Trace, hook Hook) {
 	name := funcName(trace.Name, hook.Name)
 	name = unexported(name)
 	w.mustDeclare(name)
 
+	id := uniqueTraceHookID(trace, hook)
+
 	var stubName string
-	if hook.Func.HasResult() {
-		stubName = w.stubShortcutFunc(
-			uniqueTraceHookID(trace, hook),
-			hook.Func.Result[0],
-		)
+	for _, r := range hook.Func.Result {
+		switch x := r.(type) {
+		case *Func:
+			stubName = w.stubShortcutFunc(id, x)
+		case *Trace:
+			stubName = "WHOA TODO"
+		default:
+			panic("unexpected result type")
+		}
 	}
 
 	params := flattenParams(nil, hook.Func.Params)
@@ -566,7 +649,7 @@ func (w *Writer) stubHookShortcut(trace Trace, hook Hook) {
 	})
 }
 
-func (w *Writer) hook(trace Trace, hook Hook) {
+func (w *Writer) hook(trace *Trace, hook Hook) {
 	w.newScope(func() {
 		t := w.declare("t")
 		x := w.declare("c") // For context's trace.
@@ -594,7 +677,7 @@ func (w *Writer) hook(trace Trace, hook Hook) {
 			if ctx != "" {
 				w.line(x, ` := Context`, trace.Name, `(`, ctx, `)`)
 				w.code(`var fn `)
-				w.funcSign(hook.Func)
+				w.funcSignature(hook.Func)
 				w.line()
 				w.composeHook(hook, t, x, fn)
 			} else {
@@ -612,7 +695,7 @@ func (w *Writer) hook(trace Trace, hook Hook) {
 	})
 }
 
-func (w *Writer) hookFuncCall(fn Func, name string, args []string) {
+func (w *Writer) hookFuncCall(fn *Func, name string, args []string) {
 	var res string
 	if fn.HasResult() {
 		res = w.declare("res")
@@ -622,30 +705,37 @@ func (w *Writer) hookFuncCall(fn Func, name string, args []string) {
 	w.code(name)
 	w.call(args)
 
-	if fn.HasResult() {
+	if !fn.HasResult() {
+		return
+	}
+
+	r, isFunc := fn.Result[0].(*Func)
+	if isFunc {
 		w.line(`if `, res, ` == nil {`)
 		w.block(func() {
 			w.zeroReturn(fn)
 		})
 		w.line(`}`)
-		if fn.Result[0].HasResult() {
+
+		if r.HasResult() {
 			w.newScope(func() {
 				w.code(`return func`)
-				args := w.funcParams(fn.Result[0].Params)
-				w.funcResults(fn.Result[0])
+				args := w.funcParams(r.Params)
+				w.funcResults(r)
 				w.line(`{`)
 				w.block(func() {
-					w.hookFuncCall(fn.Result[0], res, args)
+					w.hookFuncCall(r, res, args)
 				})
 				w.line(`}`)
 			})
-		} else {
-			w.line(`return `, res)
+			return
 		}
 	}
+
+	w.line(`return `, res)
 }
 
-func (w *Writer) context(trace Trace) {
+func (w *Writer) context(trace *Trace) {
 	w.line()
 	w.line(`type `, unexported(trace.Name), `ContextKey struct{}`)
 	w.line()
@@ -780,7 +870,7 @@ func (w *Writer) constructStruct(n *types.Named, s *types.Struct, vars []string)
 	return p, vars
 }
 
-func (w *Writer) hookShortcut(trace Trace, hook Hook) {
+func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 	name := funcName(trace.Name, hook.Name)
 	name = unexported(name)
 	w.mustDeclare(name)
@@ -825,14 +915,22 @@ func (w *Writer) hookShortcut(trace Trace, hook Hook) {
 			w.call(vars)
 			if hook.Func.HasResult() {
 				w.code(`return `)
-				w.hookFuncShortcut(hook.Func.Result[0], res)
+				r := hook.Func.Result[0]
+				switch x := r.(type) {
+				case *Func:
+					w.hookFuncShortcut(x, res)
+				case *Trace:
+					w.line(res)
+				default:
+					panic("unexpected result type")
+				}
 			}
 		})
 		w.line(`}`)
 	})
 }
 
-func (w *Writer) hookFuncShortcut(fn Func, name string) {
+func (w *Writer) hookFuncShortcut(fn *Func, name string) {
 	w.newScope(func() {
 		w.code(`func(`)
 		var (
@@ -861,27 +959,41 @@ func (w *Writer) hookFuncShortcut(fn Func, name string) {
 			w.code(name)
 			w.call(params)
 			if fn.HasResult() {
+				r := fn.Result[0]
 				w.code(`return `)
-				w.hookFuncShortcut(fn.Result[0], res)
+				switch x := r.(type) {
+				case *Func:
+					w.hookFuncShortcut(x, res)
+				case *Trace:
+					w.line(res)
+				default:
+					panic("unexpected result type")
+				}
 			}
 		})
 		w.line(`}`)
 	})
 }
 
-func (w *Writer) zeroReturn(fn Func) {
+func (w *Writer) zeroReturn(fn *Func) {
 	if !fn.HasResult() {
 		w.line(`return`)
 		return
 	}
-	fn = fn.Result[0]
 	w.code(`return `)
-	w.funcSign(fn)
-	w.line(`{`)
-	w.block(func() {
-		w.zeroReturn(fn)
-	})
-	w.line(`}`)
+	switch x := fn.Result[0].(type) {
+	case *Func:
+		w.funcSignature(x)
+		w.line(`{`)
+		w.block(func() {
+			w.zeroReturn(x)
+		})
+		w.line(`}`)
+	case *Trace:
+		w.line(x.Name, `{}`)
+	default:
+		panic("unexpected result type")
+	}
 }
 
 func (w *Writer) funcParams(params []Param) (vars []string) {
@@ -934,17 +1046,24 @@ const (
 	docs
 )
 
-func (w *Writer) funcResultsFlags(fn Func, flags flags) {
-	for _, fn := range fn.Result {
-		w.funcSignFlags(fn, flags)
+func (w *Writer) funcResultsFlags(fn *Func, flags flags) {
+	for _, r := range fn.Result {
+		switch x := r.(type) {
+		case *Func:
+			w.funcSignatureFlags(x, flags)
+		case *Trace:
+			w.code(x.Name, ` `)
+		default:
+			panic("unexpected result type")
+		}
 	}
 }
 
-func (w *Writer) funcResults(fn Func) {
+func (w *Writer) funcResults(fn *Func) {
 	w.funcResultsFlags(fn, 0)
 }
 
-func (w *Writer) funcSignFlags(fn Func, flags flags) {
+func (w *Writer) funcSignatureFlags(fn *Func, flags flags) {
 	haveNames := haveNames(fn.Params)
 	w.code(`func(`)
 	for i, p := range fn.Params {
@@ -961,11 +1080,11 @@ func (w *Writer) funcSignFlags(fn Func, flags flags) {
 	w.funcResultsFlags(fn, flags)
 }
 
-func (w *Writer) funcSign(fn Func) {
-	w.funcSignFlags(fn, 0)
+func (w *Writer) funcSignature(fn *Func) {
+	w.funcSignatureFlags(fn, 0)
 }
 
-func (w *Writer) shortcutFuncSignFlags(fn Func, flags flags) {
+func (w *Writer) shortcutFuncSignFlags(fn *Func, flags flags) {
 	var (
 		params    = flattenParams(nil, fn.Params)
 		haveNames = haveNames(params)
@@ -985,17 +1104,24 @@ func (w *Writer) shortcutFuncSignFlags(fn Func, flags flags) {
 	w.shortcutFuncResultsFlags(fn, flags)
 }
 
-func (w *Writer) shortcutFuncSign(fn Func) {
+func (w *Writer) shortcutFuncSign(fn *Func) {
 	w.shortcutFuncSignFlags(fn, 0)
 }
 
-func (w *Writer) shortcutFuncResultsFlags(fn Func, flags flags) {
-	for _, fn := range fn.Result {
-		w.shortcutFuncSignFlags(fn, flags)
+func (w *Writer) shortcutFuncResultsFlags(fn *Func, flags flags) {
+	for _, r := range fn.Result {
+		switch x := r.(type) {
+		case *Func:
+			w.shortcutFuncSignFlags(x, flags)
+		case *Trace:
+			w.code(x.Name, ` `)
+		default:
+			panic("unexpected result type")
+		}
 	}
 }
 
-func (w *Writer) shortcutFuncResults(fn Func) {
+func (w *Writer) shortcutFuncResults(fn *Func) {
 	w.shortcutFuncResultsFlags(fn, 0)
 }
 
@@ -1016,10 +1142,6 @@ func (w *Writer) typeString(t types.Type) string {
 		}
 		return pkg.Name()
 	})
-}
-
-func (w *Writer) tab(n int) {
-	w.depth += n
 }
 
 func (w *Writer) block(fn func()) {
@@ -1148,7 +1270,7 @@ func (s *scope) where(v string) string {
 	return d.where
 }
 
-func uniqueTraceHookID(t Trace, h Hook) string {
+func uniqueTraceHookID(t *Trace, h Hook) string {
 	hash := md5.New()
 	io.WriteString(hash, t.Name)
 	io.WriteString(hash, h.Name)
