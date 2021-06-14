@@ -354,14 +354,24 @@ func buildFunc(info types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret
 		if t == nil {
 			log.Fatalf("unknown type: %s", p.Type)
 		}
-		var name string
-		if len(p.Names) > 0 {
-			name = p.Names[0].Name
+		var names []string
+		for _, n := range p.Names {
+			name := n.Name
+			if name == "_" {
+				name = ""
+			}
+			names = append(names, name)
 		}
-		ret.Params = append(ret.Params, Param{
-			Name: name,
-			Type: t,
-		})
+		if len(names) == 0 {
+			// Case where arg is not named.
+			names = []string{""}
+		}
+		for _, name := range names {
+			ret.Params = append(ret.Params, Param{
+				Name: name,
+				Type: t,
+			})
+		}
 	}
 	if fn.Results == nil {
 		return ret, nil

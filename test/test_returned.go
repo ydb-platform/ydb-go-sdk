@@ -10,5 +10,9 @@ type TraceReturningTrace struct {
 
 //gtrace:gen
 type ReturnedTrace struct {
-	OnSomething func()
+	OnSomething func(a, b int)
+
+	OnFoo func(_ int, _ int)
+	OnBar func(_, _ int)
+	OnBaz func(int, int)
 }

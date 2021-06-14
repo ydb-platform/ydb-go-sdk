@@ -45,9 +45,48 @@ func (t ReturnedTrace) Compose(x ReturnedTrace) (ret ReturnedTrace) {
 	default:
 		h1 := t.OnSomething
 		h2 := x.OnSomething
-		ret.OnSomething = func() {
-			h1()
-			h2()
+		ret.OnSomething = func(a int, b int) {
+			h1(a, b)
+			h2(a, b)
+		}
+	}
+	switch {
+	case t.OnFoo == nil:
+		ret.OnFoo = x.OnFoo
+	case x.OnFoo == nil:
+		ret.OnFoo = t.OnFoo
+	default:
+		h1 := t.OnFoo
+		h2 := x.OnFoo
+		ret.OnFoo = func(i int, i1 int) {
+			h1(i, i1)
+			h2(i, i1)
+		}
+	}
+	switch {
+	case t.OnBar == nil:
+		ret.OnBar = x.OnBar
+	case x.OnBar == nil:
+		ret.OnBar = t.OnBar
+	default:
+		h1 := t.OnBar
+		h2 := x.OnBar
+		ret.OnBar = func(i int, i1 int) {
+			h1(i, i1)
+			h2(i, i1)
+		}
+	}
+	switch {
+	case t.OnBaz == nil:
+		ret.OnBaz = x.OnBaz
+	case x.OnBaz == nil:
+		ret.OnBaz = t.OnBaz
+	default:
+		h1 := t.OnBaz
+		h2 := x.OnBaz
+		ret.OnBaz = func(i int, i1 int) {
+			h1(i, i1)
+			h2(i, i1)
 		}
 	}
 	return ret
@@ -57,9 +96,24 @@ func (t ReturnedTrace) isZero() bool {
 	if t.OnSomething != nil {
 		return false
 	}
+	if t.OnFoo != nil {
+		return false
+	}
+	if t.OnBar != nil {
+		return false
+	}
+	if t.OnBaz != nil {
+		return false
+	}
 	return true
 }
-func (ReturnedTrace) onSomething() {
+func (ReturnedTrace) onSomething(int, int) {
+}
+func (ReturnedTrace) onFoo(int, int) {
+}
+func (ReturnedTrace) onBar(int, int) {
+}
+func (ReturnedTrace) onBaz(int, int) {
 }
 var gtraceNoopReturnedTraceE52570db ReturnedTrace
 func traceReturningTraceOnReturnedTrace(TraceReturningTrace) ReturnedTrace {

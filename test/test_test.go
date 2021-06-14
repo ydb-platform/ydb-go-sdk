@@ -11,13 +11,13 @@ func TestReturnedTrace(t *testing.T) {
 	trace := TraceReturningTrace{
 		OnReturnedTrace: func() ReturnedTrace {
 			return ReturnedTrace{
-				OnSomething: func() {
+				OnSomething: func(a, b int) {
 					called = true
 				},
 			}
 		},
 	}
-	trace.onReturnedTrace().onSomething()
+	trace.onReturnedTrace().onSomething(1, 2)
 	if !called {
 		t.Fatalf("not called")
 	}
