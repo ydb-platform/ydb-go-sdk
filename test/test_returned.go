@@ -1,6 +1,6 @@
 package test
 
-//go:generate gtrace -v
+//go:generate gtrace -v -tag debug
 
 //gtrace:gen
 //gtrace:set shortcut

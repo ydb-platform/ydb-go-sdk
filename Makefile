@@ -31,7 +31,7 @@ test: gtrace
 			fi; \
 		done; \
 	done
-	go test -v ./test
+	go test -v -tags debug ./test
 
 clean:
 	rm -f gtrace

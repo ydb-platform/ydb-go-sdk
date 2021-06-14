@@ -464,8 +464,16 @@ var contextType = (func() types.Type {
 	return types.NewNamed(name, typ, nil)
 })()
 
+func (w *Writer) stubTrace(id string, t *Trace) (name string) {
+	name = tempName("gtrace", "noop", t.Name, id)
+	name = unexported(name)
+	name = w.declare(name)
+	w.line(`var `, name, ` `, t.Name)
+	return name
+}
+
 func (w *Writer) stubFunc(id string, f *Func) (name string) {
-	name = funcName("gtrace", "noop", id)
+	name = tempName("gtrace", "noop", id)
 	name = unexported(name)
 	name = w.declare(name)
 
@@ -475,7 +483,7 @@ func (w *Writer) stubFunc(id string, f *Func) (name string) {
 		case *Func:
 			res = w.stubFunc(id, x)
 		case *Trace:
-			res = "WHOA TODO"
+			res = w.stubTrace(id, x)
 		default:
 			panic("unknown result type")
 		}
@@ -503,7 +511,7 @@ func (w *Writer) stubHook(trace *Trace, hook Hook) {
 		case *Func:
 			stubName = w.stubFunc(uniqueTraceHookID(trace, hook), x)
 		case *Trace:
-			stubName = "WHOA TODO"
+			stubName = w.stubTrace(uniqueTraceID(x), x)
 		default:
 			panic("unexpected result type")
 		}
@@ -542,8 +550,7 @@ func (w *Writer) stubHook(trace *Trace, hook Hook) {
 }
 
 func (w *Writer) stubShortcutFunc(id string, f *Func) (name string) {
-	name = funcName("gtrace", "noop", id)
-	name = unexported(name)
+	name = tempName("gtrace", "noop", id)
 	name = w.declare(name)
 
 	var res string
@@ -552,7 +559,7 @@ func (w *Writer) stubShortcutFunc(id string, f *Func) (name string) {
 		case *Func:
 			res = w.stubShortcutFunc(id, x)
 		case *Trace:
-			res = "WHOA TODO"
+			res = w.stubTrace(id, x)
 		default:
 			panic("unexpected result type")
 		}
@@ -573,7 +580,7 @@ func (w *Writer) stubShortcutFunc(id string, f *Func) (name string) {
 			case *Func:
 				w.shortcutFuncSign(x)
 			case *Trace:
-				// WHOA TODO
+				w.line(x.Name, ` `)
 			default:
 				panic("unexpected result type")
 			}
@@ -591,7 +598,7 @@ func (w *Writer) stubShortcutFunc(id string, f *Func) (name string) {
 }
 
 func (w *Writer) stubHookShortcut(trace *Trace, hook Hook) {
-	name := funcName(trace.Name, hook.Name)
+	name := tempName(trace.Name, hook.Name)
 	name = unexported(name)
 	w.mustDeclare(name)
 
@@ -603,7 +610,7 @@ func (w *Writer) stubHookShortcut(trace *Trace, hook Hook) {
 		case *Func:
 			stubName = w.stubShortcutFunc(id, x)
 		case *Trace:
-			stubName = "WHOA TODO"
+			stubName = w.stubTrace(id, x)
 		default:
 			panic("unexpected result type")
 		}
@@ -871,7 +878,7 @@ func (w *Writer) constructStruct(n *types.Named, s *types.Struct, vars []string)
 }
 
 func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
-	name := funcName(trace.Name, hook.Name)
+	name := tempName(trace.Name, hook.Name)
 	name = unexported(name)
 	w.mustDeclare(name)
 
@@ -1231,14 +1238,15 @@ func ident(s string) string {
 	return s
 }
 
-func funcName(names ...string) string {
+func tempName(names ...string) string {
 	var sb strings.Builder
 	for i, name := range names {
 		if i == 0 {
-			sb.WriteString(name)
+			name = unexported(name)
 		} else {
-			sb.WriteString(exported(name))
+			name = exported(name)
 		}
+		sb.WriteString(name)
 	}
 	return sb.String()
 }
@@ -1268,6 +1276,14 @@ func (s *scope) set(v string) bool {
 func (s *scope) where(v string) string {
 	d := s.vars[v]
 	return d.where
+}
+
+func uniqueTraceID(t *Trace) string {
+	hash := md5.New()
+	io.WriteString(hash, t.Name)
+	p := hash.Sum(nil)
+	s := hex.EncodeToString(p)
+	return s[:8]
 }
 
 func uniqueTraceHookID(t *Trace, h Hook) string {
