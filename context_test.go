@@ -45,7 +45,7 @@ func TestOperationParams(t *testing.T) {
 			ctxTimeout: time.Second,
 			opTimeout:  time.Hour,
 			exp: OperationParams{
-				Timeout: time.Hour,
+				Timeout: time.Second,
 			},
 		},
 		{
@@ -54,7 +54,7 @@ func TestOperationParams(t *testing.T) {
 			ctxTimeout: time.Second,
 			opCancel:   time.Hour,
 			exp: OperationParams{
-				CancelAfter: time.Hour,
+				CancelAfter: time.Second,
 			},
 		},
 		{

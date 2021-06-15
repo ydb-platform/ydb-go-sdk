@@ -1,3 +1,7 @@
+##1.0.1
+* Fix closing sessions on PutBusy()
+* Force setting operation timeout from client context timeout (if this timeout less then default operation timeout)
+
 ##1.0.0
 * SDK versioning switched to `Semantic Versioning 2.0.0`
 

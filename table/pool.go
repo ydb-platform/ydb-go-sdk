@@ -186,9 +186,7 @@ func (p *SessionPool) init() {
 		if p.BusyCheckInterval > 0 {
 			p.busyCheckerStop = make(chan struct{})
 			p.busyCheckerDone = make(chan struct{})
-			// NOTE: if we make this buffered we also must cork it inside
-			// Close().
-			p.busyCheck = make(chan *Session)
+			p.busyCheck = make(chan *Session, p.limit)
 			go p.busyChecker()
 		}
 
@@ -438,15 +436,18 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	p.notify(nil)
 	p.mu.Unlock()
 
-	select {
-	case p.busyCheck <- s:
+	go func() {
+		select {
+		case <-p.busyCheckerStop:
+			p.closeSession(ctx, s)
 
-	case <-p.busyCheckerDone:
-		p.closeSession(ctx, s)
+		case p.busyCheck <- s:
 
-	case <-ctx.Done():
-		err = ctx.Err()
-	}
+		default:
+			// if cannot push session into busyCheck channel (channel is fulled)
+			p.closeSession(ctx, s)
+		}
+	}()
 
 	return
 }
@@ -634,74 +635,58 @@ func (p *SessionPool) Stats() SessionPoolStats {
 	}
 }
 
+func (p *SessionPool) isValid(ctx context.Context, s *Session) bool {
+	var (
+		info        SessionInfo
+		err         error
+		enoughSpace bool
+	)
+	p.traceBusyCheckStart(ctx, s)
+	defer func() {
+		p.traceBusyCheckDone(ctx, s, enoughSpace, err)
+	}()
+	if info, err = p.keepAliveSession(ctx, s); err == nil && info.Status == SessionReady {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		enoughSpace = !p.closed && len(p.index) < p.limit
+		if enoughSpace {
+			p.index[s] = sessionInfo{}
+			if !p.notify(s) {
+				p.pushIdle(s, timeutil.Now())
+				p.pushReady(s)
+			}
+			return true
+		}
+	}
+	return false
+}
+
 func (p *SessionPool) busyChecker() {
 	defer close(p.busyCheckerDone)
 	var (
-		toCheck []*Session
-
-		active = false
-		timer  = timeutil.NewStoppedTimer()
-		ctx    = context.Background()
+		ctx     = context.Background()
+		readAll = func(closeAll bool) {
+			for {
+				select {
+				case s := <-p.busyCheck:
+					if closeAll || !p.isValid(ctx, s) {
+						p.closeSession(ctx, s)
+					}
+				default:
+					return
+				}
+			}
+		}
 	)
 	for {
 		select {
 		case <-p.busyCheckerStop:
-			for _, s := range toCheck {
-				p.closeSession(ctx, s)
-			}
+			readAll(true)
+			close(p.busyCheck)
 			return
 
-		case s := <-p.busyCheck:
-			p.traceBusyCheckStart(ctx, s)
-
-			if len(toCheck) >= p.limit {
-				// Do not check more sessions than pool's capacity.
-				p.closeSession(ctx, s)
-				p.traceBusyCheckDone(ctx, s, false, nil)
-				continue
-			}
-
-			toCheck = append(toCheck, s)
-			if !active {
-				active = true
-				timer.Reset(p.BusyCheckInterval)
-			}
-
-		case <-timer.C():
-			active = false
-			for i := 0; i < len(toCheck); {
-				s := toCheck[i]
-				info, err := p.keepAliveSession(ctx, s)
-				if err != nil || info.Status == SessionReady {
-					n := len(toCheck)
-					toCheck[i] = toCheck[n-1]
-					toCheck[n-1] = nil
-					toCheck = toCheck[:n-1]
-
-					p.mu.Lock()
-					enoughSpace := !p.closed && len(p.index) < p.limit
-					reuse := enoughSpace && err == nil
-					if reuse {
-						p.index[s] = sessionInfo{}
-						if !p.notify(s) {
-							p.pushIdle(s, timeutil.Now())
-							p.pushReady(s)
-						}
-					}
-					p.mu.Unlock()
-					if !reuse {
-						p.closeSession(ctx, s)
-					}
-
-					p.traceBusyCheckDone(ctx, s, reuse, err)
-				} else {
-					i++
-				}
-			}
-			if len(toCheck) > 0 {
-				// Timer is never active here.
-				timer.Reset(p.BusyCheckInterval)
-			}
+		case <-time.After(p.BusyCheckInterval):
+			readAll(false)
 		}
 	}
 }
@@ -957,7 +942,10 @@ func (p *SessionPool) notify(s *Session) (notified bool) {
 
 // p.mu must NOT be held.
 func (p *SessionPool) closeSession(ctx context.Context, s *Session) {
-	ctx, cancel := context.WithTimeout(ctx, p.DeleteTimeout)
+	ctx, cancel := context.WithTimeout(
+		ydb.ContextWithoutDeadline(ctx),
+		p.DeleteTimeout,
+	)
 	defer cancel()
 	_ = s.Close(ctx)
 }

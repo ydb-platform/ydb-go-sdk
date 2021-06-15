@@ -24,6 +24,17 @@ type (
 	}
 )
 
+type valueOnlyContext struct{ context.Context }
+
+func (valueOnlyContext) Deadline() (deadline time.Time, ok bool) { return }
+func (valueOnlyContext) Done() <-chan struct{}                   { return nil }
+func (valueOnlyContext) Err() error                              { return nil }
+
+// ContextWithoutDeadline helps to clear derived context from deadline
+func ContextWithoutDeadline(ctx context.Context) context.Context {
+	return valueOnlyContext{ctx}
+}
+
 // ContextDeadlineMapping describes how context.Context's deadline value is
 // used for YDB operation options.
 type ContextDeadlineMapping uint
@@ -184,18 +195,23 @@ func (p OperationParams) toYDB() *Ydb_Operations.OperationParams {
 
 func operationParams(ctx context.Context, dm ContextDeadlineMapping) (p OperationParams, ok bool) {
 	d, hasDeadline := contextUntilDeadline(ctx)
-	var has bool
+	var (
+		has     bool
+		timeout time.Duration
+	)
 	{
-		p.Timeout, has = ContextOperationTimeout(ctx)
-		if !has && hasDeadline && dm == ContextDeadlineOperationTimeout {
-			p.Timeout = d
+		timeout, has = ContextOperationTimeout(ctx)
+		if hasDeadline && dm == ContextDeadlineOperationTimeout || (has && d < timeout) {
+			timeout = d
 		}
+		p.Timeout = timeout
 	}
 	{
-		p.CancelAfter, has = ContextOperationCancelAfter(ctx)
-		if !has && hasDeadline && dm == ContextDeadlineOperationCancelAfter {
-			p.CancelAfter = d
+		timeout, has = ContextOperationCancelAfter(ctx)
+		if hasDeadline && dm == ContextDeadlineOperationCancelAfter || (has && d < timeout) {
+			timeout = d
 		}
+		p.CancelAfter = timeout
 	}
 	{
 		p.Mode, _ = ContextOperationMode(ctx)

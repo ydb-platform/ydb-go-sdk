@@ -266,14 +266,13 @@ func (d *driver) Call(ctx context.Context, op api.Operation) (info CallInfo, err
 		d.trace.getConnStart(rawCtx)
 		conn, err = d.cluster.Get(ctx)
 		d.trace.getConnDone(rawCtx, conn, err)
+		if err != nil {
+			return
+		}
 	}
 
 	info = &callInfo{
 		conn: conn,
-	}
-
-	if err != nil {
-		return
 	}
 
 	if conn.conn == nil {
