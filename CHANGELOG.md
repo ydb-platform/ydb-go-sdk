@@ -1,5 +1,8 @@
+##1.0.0
+* SDK versioning switched to `Semantic Versioning 2.0.0`
+
 ##2021.04.1
-* Added `table.TimeToLiveSSettings` struct and corresponding
+* Added `table.TimeToLiveSettings` struct and corresponding
   `table.WithTimeToLiveSettings`, `table.WithSetTimeToLive`
   and `table.WithDropTimeToLive` options.
 * Deprecated `table.TTLSettings` struct alongside with
