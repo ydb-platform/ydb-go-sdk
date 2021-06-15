@@ -7,6 +7,7 @@ option java_outer_classname = "AnalyticsProtos";
 
 import "kikimr/public/api/protos/ydb_operation.proto";
 import "kikimr/public/api/protos/ydb_value.proto";
+import "kikimr/public/api/protos/ydb_issue_message.proto";
 
 import "google/protobuf/timestamp.proto";
 
@@ -221,6 +222,7 @@ message GetHistoryResult {
         google.protobuf.Timestamp modification_time = 20;
 
         QueryStatistics statistics = 21;
+        repeated Ydb.Issue.IssueMessage issues = 22;
     }
 
     repeated HistoryEntity history = 1;
