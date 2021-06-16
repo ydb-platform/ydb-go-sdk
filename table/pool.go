@@ -436,20 +436,26 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	p.notify(nil)
 	p.mu.Unlock()
 
-	go func() {
-		select {
-		case <-p.busyCheckerStop:
-			p.closeSession(ctx, s)
-
-		case p.busyCheck <- s:
-
-		default:
-			// if cannot push session into busyCheck channel (channel is fulled)
-			p.closeSession(ctx, s)
-		}
-	}()
+	go p.putBusy(ctx, s)
 
 	return
+}
+
+// p.mu must NOT be held.
+func (p *SessionPool) putBusy(ctx context.Context, s *Session) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	select {
+	case <-p.busyCheckerStop:
+		close(p.busyCheck)
+		go p.closeSession(ctx, s)
+
+	case p.busyCheck <- s:
+
+	default:
+		// if cannot push session into busyCheck channel (channel is fulled)
+		go p.closeSession(ctx, s)
+	}
 }
 
 // Take removes session s from the pool and ensures that s will not be returned
@@ -682,7 +688,6 @@ func (p *SessionPool) busyChecker() {
 		select {
 		case <-p.busyCheckerStop:
 			readAll(true)
-			close(p.busyCheck)
 			return
 
 		case <-time.After(p.BusyCheckInterval):
