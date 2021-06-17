@@ -275,12 +275,11 @@ message ExecuteQueryResult {
 message GetResultDataRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string history_id = 2;
-    int32 result_set_id = 3;
-    int64 offset = 4; // change
-    int64 limit = 5;
-    string folder_id = 6;
-    string cloud_id = 7;
-    string page_token = 8;
+    uint32 result_set_id = 3;
+    uint64 limit = 4;
+    string folder_id = 5;
+    string cloud_id = 6;
+    string page_token = 7;
 }
 
 message GetResultDataResponse {
