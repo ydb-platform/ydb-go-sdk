@@ -135,9 +135,10 @@ type SessionPool struct {
 	touching     bool
 	touchingDone chan struct{}
 
-	busyCheck       chan *Session
-	busyCheckerStop chan struct{}
-	busyCheckerDone chan struct{}
+	busyCheck        chan *Session
+	busyCheckerStop  chan struct{}
+	busyCheckerDone  chan struct{}
+	busyCheckCounter int
 
 	closed bool
 
@@ -220,57 +221,92 @@ func isCreateSessionErrorRetriable(err error) bool {
 func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 	// pre-check the pool size
 	p.mu.Lock()
-	var s *Session
-	p.createInProgress++
-	enoughSpace := p.createInProgress+len(p.index) <= p.limit
-	defer func() {
-		p.createInProgress--
-		p.mu.Unlock()
-		if !enoughSpace && s != nil {
-			p.closeSession(ctx, s)
-		}
-	}()
-
-	if !enoughSpace {
-		return nil, ErrSessionPoolOverflow
+	enoughSpace := p.createInProgress+len(p.index) < p.limit
+	if enoughSpace {
+		p.createInProgress++
 	}
-
 	p.mu.Unlock()
-	ctx, cancel := context.WithTimeout(ctx, p.CreateSessionTimeout)
-	defer cancel()
-	s, err := p.Builder.CreateSession(ctx)
-	p.mu.Lock()
-	// while creating session pool may become full
-	enoughSpace = p.createInProgress+len(p.index) <= p.limit
-
-	if err != nil {
-		return nil, err
-	}
 	if !enoughSpace {
 		return nil, ErrSessionPoolOverflow
 	}
 
-	p.index[s] = sessionInfo{}
-	s.OnClose(func() {
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		info, has := p.index[s]
-		if !has {
+	type result struct {
+		s   *Session
+		err error
+	}
+	resCh := make(chan result)
+	go func() {
+		defer close(resCh)
+
+		ctx, cancel := context.WithTimeout(
+			ydb.ContextWithoutDeadline(ctx),
+			p.CreateSessionTimeout,
+		)
+		defer cancel()
+
+		var r result
+
+		r.s, r.err = p.Builder.CreateSession(ctx)
+		// if session not nil - error must be nil and vice versa
+		if r.err != nil {
+			p.mu.Lock()
+			p.createInProgress--
+			p.mu.Unlock()
+			select {
+			case resCh <- r:
+			default:
+			}
 			return
 		}
+		r.s.OnClose(func() {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			info, has := p.index[r.s]
+			if !has {
+				return
+			}
 
-		delete(p.index, s)
-		p.notify(nil)
+			delete(p.index, r.s)
+			p.notify(nil)
 
-		if info.idle != nil {
-			panic("ydb: table: session closed while still in idle pool")
+			if info.idle != nil {
+				panic("ydb: table: session closed while still in idle pool")
+			}
+			if info.ready != nil {
+				p.ready.Remove(info.ready)
+				info.ready = nil
+			}
+		})
+
+		// while creating session pool may become full
+		p.mu.Lock()
+		enoughSpace = p.createInProgress+len(p.index) < p.limit
+		if enoughSpace {
+			p.index[r.s] = sessionInfo{}
 		}
-		if info.ready != nil {
-			p.ready.Remove(info.ready)
-			info.ready = nil
+		p.createInProgress--
+		p.mu.Unlock()
+
+		if !enoughSpace {
+			p.putBusy(ctx, r.s)
+			r.s, r.err = nil, ErrSessionPoolOverflow
 		}
-	})
-	return s, nil
+
+		select {
+		case resCh <- r:
+		default:
+			if r.s != nil {
+				// if cannot put session into result channel - put session into pool for reuse
+				_ = p.Put(ctx, r.s)
+			}
+		}
+	}()
+	select {
+	case r := <-resCh:
+		return r.s, r.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 // Get returns first idle session from the SessionPool and removes it from
@@ -313,7 +349,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			err = nil
 		}
 
-		// get here after ErrSessionPoolOverflow error
+		// get here after check isCreateSessionErrorRetriable
 		if s == nil {
 			// Try to wait for a touched session - pool is full.
 			//
@@ -420,6 +456,7 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	p.mu.Lock()
 	if p.closed {
 		p.mu.Unlock()
+		p.closeSession(ctx, s)
 		return ErrSessionPoolClosed
 	}
 	info, has := p.index[s]
@@ -451,7 +488,7 @@ func (p *SessionPool) putBusy(ctx context.Context, s *Session) {
 		go p.closeSession(ctx, s)
 
 	case p.busyCheck <- s:
-
+		p.busyCheckCounter++
 	default:
 		// if cannot push session into busyCheck channel (channel is fulled)
 		go p.closeSession(ctx, s)
@@ -613,35 +650,34 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 }
 
 func (p *SessionPool) Stats() SessionPoolStats {
-	idleCount := 0
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	idleCount, readyCount, waitQCount, indexCount := 0, 0, 0, 0
 	if p.idle != nil {
 		idleCount = p.idle.Len()
 	}
-	readyCount := 0
 	if p.ready != nil {
 		readyCount = p.ready.Len()
 	}
-	indexCount := 0
-	waitQ := 0
-	p.mu.Lock()
+	if p.waitq != nil {
+		waitQCount = p.waitq.Len()
+	}
 	if p.index != nil {
 		indexCount = len(p.index)
 	}
-	p.mu.Unlock()
-	if p.waitq != nil {
-		waitQ = p.waitq.Len()
-	}
 	return SessionPoolStats{
-		Idle:    idleCount,
-		Ready:   readyCount,
-		Index:   indexCount,
-		WaitQ:   waitQ,
-		MinSize: p.KeepAliveMinSize,
-		MaxSize: p.limit,
+		Idle:             idleCount,
+		Ready:            readyCount,
+		Index:            indexCount,
+		WaitQ:            waitQCount,
+		CreateInProgress: p.createInProgress,
+		BusyCheck:        p.busyCheckCounter,
+		MinSize:          p.KeepAliveMinSize,
+		MaxSize:          p.limit,
 	}
 }
 
-func (p *SessionPool) isValid(ctx context.Context, s *Session) bool {
+func (p *SessionPool) reuse(ctx context.Context, s *Session) (reused bool) {
 	var (
 		info        SessionInfo
 		err         error
@@ -675,9 +711,12 @@ func (p *SessionPool) busyChecker() {
 			for {
 				select {
 				case s := <-p.busyCheck:
-					if closeAll || !p.isValid(ctx, s) {
+					if closeAll || !p.reuse(ctx, s) {
 						p.closeSession(ctx, s)
 					}
+					p.mu.Lock()
+					p.busyCheckCounter--
+					p.mu.Unlock()
 				default:
 					return
 				}
@@ -1267,10 +1306,12 @@ func panicLocked(mu sync.Locker, message string) {
 }
 
 type SessionPoolStats struct {
-	Idle    int
-	Ready   int
-	Index   int
-	WaitQ   int
-	MinSize int
-	MaxSize int
+	Idle             int
+	Ready            int
+	Index            int
+	WaitQ            int
+	MinSize          int
+	MaxSize          int
+	CreateInProgress int
+	BusyCheck        int
 }

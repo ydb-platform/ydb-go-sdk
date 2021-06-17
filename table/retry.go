@@ -147,7 +147,7 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 		m = r.RetryChecker.Check(err)
 		switch {
 		case m.MustDeleteSession():
-			defer s.Close(ctx)
+			defer s.Close(ydb.ContextWithoutDeadline(ctx))
 			s = nil
 
 		case m.MustCheckSession():

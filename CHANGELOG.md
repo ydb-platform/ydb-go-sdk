@@ -1,80 +1,85 @@
-##1.0.1
+## 1.0.2
+* Implements smart lazy createSession for best control of create/delete session balance. This feature fix leakage of forgotten sessions on server-side
+* Some imporvements of session pool stats
+
+## 1.0.1
 * Fix closing sessions on PutBusy()
 * Force setting operation timeout from client context timeout (if this timeout less then default operation timeout)
+* Added helper `ydb.ContextWithoutDeadline` for clearing existing context from any deadlines
 
-##1.0.0
+## 1.0.0
 * SDK versioning switched to `Semantic Versioning 2.0.0`
 
-##2021.04.1
+## 2021.04.1
 * Added `table.TimeToLiveSettings` struct and corresponding
   `table.WithTimeToLiveSettings`, `table.WithSetTimeToLive`
   and `table.WithDropTimeToLive` options.
 * Deprecated `table.TTLSettings` struct alongside with
   `table.WithTTL`, `table.WithSetTTL` and `table.WithDropTTL` functions.
 
-##2021.03.2
+## 2021.03.2
 * Add Truncated flag support.
 
-##2021.03.1
+## 2021.03.1
 * Fixed a race between `SessionPool.Put` and `SessionPool.Get`, where the latter
   would end up waiting forever for a session that is already in the pool.
 
-##2021.02.1
+## 2021.02.1
 * Changed semantics of `table.Result.O...` methods (e.g., `OUTF8`):
   it will not fail if current item is non-optional primitive.
 
-##2020.12.1
+## 2020.12.1
 * added CommitTx method, which returns QueryStats
 
-##2020.11.4
+## 2020.11.4
 * re-implementation of ydb.Value comparison
 * fix basic examples
 
-##2020.11.3
+## 2020.11.3
 * increase default and minimum `Dialer.KeepAlive` setting
 
-##2020.11.2
+## 2020.11.2
 * added `ydbsql/connector` options to configure default list of `ExecDataQueryOption`
 
-##2020.11.1
+## 2020.11.1
 * tune `grpc.Conn` behaviour
 
-##2020.10.4
+## 2020.10.4
 * function to compare two ydb.Value
 
-##2020.10.3
+## 2020.10.3
 * support scan query execution
 
-##2020.10.2
+## 2020.10.2
 * add table Ttl options
 
-##2020.10.1
+## 2020.10.1
 * added `KeyBloomFilter` support for `CreateTable`, `AlterTable` and `DescribeTalbe`
 * added `PartitioningSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`. Move to `PartitioningSettings` object
 
-##2020.09.3
+## 2020.09.3
 * add `FastDial` option to `DriverConfig`.
   This will allow `Dialer` to return `Driver` as soon as the 1st connection is ready.
 
-##2020.09.2
+## 2020.09.2
 * parallelize endpoint operations
 
-##2020.09.1
+## 2020.09.1
 * added `ProcessCPUTime` method to `QueryStats`
 * added `ReadReplicasSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`
 * added `StorageSettings` support for `CreateTable`, `AlterTable` and `DescribeTalbe`
 
-##2020.08.2
+## 2020.08.2
 * added `PartitioningSettings` support for `CreateTable` and `AlterTable`
 
-##2020.08.1
+## 2020.08.1
 * added `CPUTime` and `AffectedShards` fields to `QueryPhase` struct
 * added `CompilationStats` statistics
 
-##2020.07.7
+## 2020.07.7
 * support manage table attributes
 
-##2020.07.6
+## 2020.07.6
 * support Column Families
 
 ## 2020.07.5

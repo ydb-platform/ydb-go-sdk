@@ -610,7 +610,11 @@ func (s *Session) executeDataQuery(
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.ExecuteDataQuery, req, res))
+			Ydb_Table_V1.ExecuteDataQuery,
+			req,
+			res,
+		),
+	)
 	return
 }
 
@@ -909,7 +913,8 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) 
 		internal.Wrap(
 			Ydb_Table_V1.BulkUpsert,
 			&req, nil,
-		))
+		),
+	)
 	return err
 }
 
