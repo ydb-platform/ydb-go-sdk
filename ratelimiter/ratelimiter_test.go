@@ -72,7 +72,9 @@ func TestRateLimiter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer driver.Close()
+	defer func() {
+		_ = driver.Close()
+	}()
 
 	client := Client{Driver: driver}
 	coordClient := coordination.Client{Driver: driver}
