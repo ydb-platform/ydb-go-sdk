@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package YandexQuery.V1;
+option java_package = "com.yandex.query.v1";
+
+import "kikimr/public/api/protos/draft/yq.proto";
+
+service YandexQueryService {
+    // Operations
+    rpc ExecuteOperation(YandexQuery.ExecuteOperationRequest) returns (YandexQuery.ExecuteOperationResponse);
+
+    rpc ListOperations(YandexQuery.ListOperationsRequest) returns (YandexQuery.ListOperationsResponse);
+
+    rpc DescribeOperation(YandexQuery.DescribeOperationRequest) returns (YandexQuery.DescribeOperationResponse);
+
+    rpc DescribeOperationResult(YandexQuery.DescribeOperationResultRequest) returns (YandexQuery.DescribeOperationResultResponse);
+
+    rpc ModifyOperation(YandexQuery.ModifyOperationRequest) returns (YandexQuery.ModifyOperationResponse);
+
+    rpc DeleteOperation(YandexQuery.DeleteOperationRequest) returns (YandexQuery.DeleteOperationResponse);
+
+    rpc ManageOperation(YandexQuery.ManageOperationRequest) returns (YandexQuery.ManageOperationResponse);
+
+    // ResultSet
+    rpc GetResultData(YandexQuery.GetResultDataRequest) returns (YandexQuery.GetResultDataResponse);
+
+    // Connections
+    rpc CreateConnection(YandexQuery.CreateConnectionRequest) returns (YandexQuery.CreateConnectionResponse);
+
+    rpc ListConnections(YandexQuery.ListConnectionsRequest) returns (YandexQuery.ListConnectionsResponse);
+
+    rpc DescribeConnection(YandexQuery.DescribeConnectionRequest) returns (YandexQuery.DescribeConnectionResponse);
+
+    rpc ModifyConnection(YandexQuery.ModifyConnectionRequest) returns (YandexQuery.ModifyConnectionResponse);
+
+    rpc DeleteConnection(YandexQuery.DeleteConnectionRequest) returns (YandexQuery.DeleteConnectionResponse);
+
+    // Bindings
+    rpc CreateBinding(YandexQuery.CreateBindingRequest) returns (YandexQuery.CreateBindingResponse);
+
+    rpc ListBindings(YandexQuery.ListBindingsRequest) returns (YandexQuery.ListBindingsResponse);
+
+    rpc DescribeBinding(YandexQuery.DescribeBindingRequest) returns (YandexQuery.DescribeBindingResponse);
+
+    rpc ModifyBinding(YandexQuery.ModifyBindingRequest) returns (YandexQuery.ModifyBindingResponse);
+
+    rpc DeleteBinding(YandexQuery.DeleteBindingRequest) returns (YandexQuery.DeleteBindingResponse);
+}
