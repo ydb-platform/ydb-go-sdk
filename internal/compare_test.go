@@ -1,9 +1,10 @@
 package internal
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/golang/protobuf/ptypes/struct"
 	"testing"
+
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	structpb "github.com/golang/protobuf/ptypes/struct"
 )
 
 func TestUnwrapOptionalValue(t *testing.T) {

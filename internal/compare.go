@@ -1,11 +1,12 @@
 package internal
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 	"bytes"
 	"fmt"
 	"math/big"
 	"strings"
+
+	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
 )
 
 // Compare compares its operands.

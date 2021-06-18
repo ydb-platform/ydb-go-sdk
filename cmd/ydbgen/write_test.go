@@ -3,8 +3,9 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerator_importDeps(t *testing.T) {
