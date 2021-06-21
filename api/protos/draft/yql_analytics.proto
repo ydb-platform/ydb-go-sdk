@@ -64,8 +64,6 @@ message Acl {
 }
 
 message ConnectionEntity {
-    string cloud_id = 100;
-    string folder_id = 1;
     string connection_id = 2; // create new if connection_id is empty
     string created_by = 3;
     string modified_by = 4;
@@ -88,11 +86,14 @@ message GetConnectionsResponse {
 message ModifyConnectionsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     repeated ConnectionEntity connection = 2;
+    string cloud_id = 3;
+    string folder_id = 4;
+    string idempotency_key = 5;
 }
 
 message ModifyConnectionsResult {
     repeated string connection_id = 1;
- }
+}
 
 message ModifyConnectionsResponse {
     Ydb.Operations.Operation operation = 1; // ModifyConnectionsResult
@@ -240,6 +241,8 @@ message ModifyHistoryRequest {
     string yql_text = 7;
     EQueryStatus status = 8;
     Ydb.Operations.OperationParams operation_params = 9;
+
+    string idempotency_key = 10;
 }
 
 message ModifyHistoryResult{
