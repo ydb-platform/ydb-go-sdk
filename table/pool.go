@@ -482,6 +482,9 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 func (p *SessionPool) putBusy(ctx context.Context, s *Session) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.closed {
+		return
+	}
 	select {
 	case <-p.busyCheckerStop:
 		close(p.busyCheck)
