@@ -167,10 +167,6 @@ func (p *SessionPool) init() {
 			go p.keeper()
 		}
 
-		if p.SizeLimit == 0 {
-			p.SizeLimit = DefaultSessionPoolSizeLimit
-		}
-
 		if p.KeepAliveMinSize < 0 {
 			p.KeepAliveMinSize = 0
 		} else if p.KeepAliveMinSize == 0 {
