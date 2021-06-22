@@ -58,9 +58,7 @@ func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		ID:           res.SessionId,
 		endpointInfo: endpointInfo,
 		c:            *t,
-		qcache: lru.Cache{
-			MaxSize: t.cacheSize(),
-		},
+		qcache:       lru.New(t.cacheSize()),
 	}
 	return
 }

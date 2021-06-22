@@ -493,7 +493,7 @@ func (p *SessionPool) putBusy(ctx context.Context, s *Session) {
 	case p.busyCheck <- s:
 		p.busyCheckCounter++
 	default:
-		// if cannot push session into busyCheck channel (channel is fulled)
+		// if cannot push session into busyCheck (channel is full) - close session
 		go p.closeSession(ctx, s)
 	}
 }

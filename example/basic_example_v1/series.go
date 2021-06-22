@@ -97,7 +97,8 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	defer driver.Close()
 
 	tableClient := table.Client{
-		Driver: driver,
+		Driver:            driver,
+		MaxQueryCacheSize: -1, // disable client query cache
 	}
 	sp := table.SessionPool{
 		IdleThreshold: time.Second,

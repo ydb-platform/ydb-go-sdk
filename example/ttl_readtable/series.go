@@ -336,7 +336,9 @@ func readDocument(ctx context.Context, sp *table.SessionPool, prefix, url string
 			_, res, err = s.Execute(ctx, readTx, query, table.NewQueryParameters(
 				table.ValueParam("$url", ydb.UTF8Value(url))),
 				table.WithQueryCachePolicy(
-					table.WithQueryCachePolicyKeepInCache()))
+					table.WithQueryCachePolicyKeepInCache(),
+				),
+			)
 			return err
 		}),
 	)

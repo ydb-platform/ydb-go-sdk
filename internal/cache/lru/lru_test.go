@@ -1,17 +1,19 @@
 package lru
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCacheAddGet(t *testing.T) {
-	c := Cache{
-		MaxSize: 100,
-	}
+	maxSize := 100
+	c := New(maxSize)
 	rands := randStr()
-	pairs := make([]entry, c.MaxSize*100)
+	pairs := make([]entry, maxSize*100)
 	for i := range pairs {
 		var (
 			key   = rands()
@@ -20,7 +22,7 @@ func TestCacheAddGet(t *testing.T) {
 		c.Add(key, value)
 		pairs[i] = entry{key, value}
 	}
-	bound := len(pairs) - c.MaxSize
+	bound := len(pairs) - maxSize
 	for i, p := range pairs {
 		x, ok := c.Get(p.key)
 		switch {
@@ -40,9 +42,7 @@ func TestCacheAddRemove(t *testing.T) {
 		key   = rands()
 		val   = rands()
 	)
-	c := Cache{
-		MaxSize: 1,
-	}
+	c := New(1)
 	c.Add(key, val)
 	{
 		act, ok := c.Remove(key)
@@ -70,5 +70,22 @@ func randStr() func() string {
 				return s
 			}
 		}
+	}
+}
+
+func TestCacheZeroSize(t *testing.T) {
+	c := New(0)
+	for i := 0; i < 10; i++ {
+		c.Add(fmt.Sprintf("test%d", i), i)
+	}
+	for i := 0; i < 10; i++ {
+		v, has := c.Get(fmt.Sprintf("test%d", i))
+		require.False(t, has)
+		require.Nil(t, v)
+	}
+	for i := 0; i < 10; i++ {
+		v, has := c.Remove(fmt.Sprintf("test%d", i))
+		require.False(t, has)
+		require.Nil(t, v)
 	}
 }
