@@ -14,12 +14,9 @@ import "google/protobuf/timestamp.proto";
 
 ////////////////////////////////////////////////////////////
 
-// Operation API
+// Job API
 
-message StringsPair {
-    string key = 1 [(Ydb.length).le = 102400];
-    string value = 2 [(Ydb.length).le = 102400];
-}
+
 
 message Acl {
     enum Visibility {
@@ -60,7 +57,7 @@ enum ExecuteMode {
     REPLACE_CHECK = 8;
 }
 
-enum OperationAction {
+enum JobAction {
     OPERATION_ACTION_UNSPECIFIED = 0;
     PAUSE = 1;
     PAUSE_GRACEFULLY = 2;
@@ -75,15 +72,12 @@ message Query {
         ANALYTICS = 1;
         STREAMING = 2;
     }
-
-    string cloud_id = 1 [(Ydb.length).le = 1024];
-    string folder_id = 2 [(Ydb.length).range = {min: 1, max: 1024}]; // folder_id or ABC
-    QueryType type = 3; 
-    string name = 4 [(Ydb.length).le = 1024];
-    Acl acl = 5;
-    Limits limits = 6;
-    string content = 7 [(Ydb.length).range = {min: 1, max: 102400}];
-    google.protobuf.Timestamp expiration_deadline = 8;
+    QueryType type = 1; 
+    string name = 2 [(Ydb.length).le = 1024];
+    Acl acl = 3;
+    Limits limits = 4;
+    string content = 5 [(Ydb.length).range = {min: 1, max: 102400}];
+    google.protobuf.Timestamp expires_at = 6;
 }
 
 message CommonMeta {
@@ -95,119 +89,111 @@ message CommonMeta {
     int64 revision = 6 [(Ydb.value) = ">= 0"];
 }
 
-message OperationMeta {
+message JobMeta {
     enum ComputeState {
         COMPUTE_STATE_UNSPECIFIED = 0;
         STARTING = 1;
-        ABORTED = 2;
-        ABORTING = 3;
-        RUNNING = 4;
-        COMPLETED = 5;
-        ERROR = 6;
-        PAUSED = 7;
+        ABORTED_BY_USER = 2;
+        ABORTED_BY_SYSTEM = 3;
+        ABORTING_BY_USER = 4;
+        ABORTING_BY_SYSTEM = 5;
+        RESUMING = 6;
+        RUNNING = 7;
+        COMPLETED = 8;
+        FAILED = 9;
+        PAUSING = 10;
+        PAUSED = 11;
     }
 
     CommonMeta common = 1;
     google.protobuf.Timestamp started_at = 2;
     google.protobuf.Timestamp finished_at = 3;
-    OperationAction action = 5;
-    ExecuteMode mode = 6;
-    ComputeState status = 7;
+    JobAction last_action = 4;
+    ExecuteMode mode = 5;
+    ComputeState status = 6;
 }
 
-message OperationInfo {
+message BriefJob {
     Query.QueryType type = 1; 
     string name = 2 [(Ydb.length).le = 1024];
-    OperationMeta meta = 3;
+    JobMeta meta = 3;
 }
 
-message OperationEntry {
-    OperationMeta meta = 1;
+message JobPlan {
+    string json = 3 [(Ydb.length).le = 102400];
+}
+
+message Job {
+    JobMeta meta = 1;
     Query query = 2;
+    JobPlan plan = 3;
+    repeated Ydb.Issue.IssueMessage issue = 4;
+    JobStatistics statistics = 5;
+    int32 result_set_count = 6 [(Ydb.value) = ">= 0"];
 }
 
-message OperationStatistics {
-    string yson = 1 [(Ydb.length).le = 102400];
+message JobStatistics {
+    string json = 1 [(Ydb.length).le = 102400];
 }
 
-message OperationResult {
-    string plan = 1 [(Ydb.length).le = 102400];
-    repeated Ydb.Issue.IssueMessage issues = 2;
-    OperationStatistics statistics = 3;
-    int32 result_set_count = 4 [(Ydb.value) = ">= 0"];
-}
-
-message ExecuteOperationRequest {
+message CreateJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    Query query = 2;
-    ExecuteMode mode = 3;
-    string idempotency_key = 4 [(Ydb.length).le = 1024];
+    string cloud_id = 2 [(Ydb.length).le = 1024];
+    string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}]; // folder_id or ABC
+    Query query = 4;
+    ExecuteMode mode = 5;
+    string idempotency_key = 6 [(Ydb.length).le = 1024];
 }
 
-message ExecuteOperationResponse {
-    Ydb.Operations.Operation operation = 1; // ExecuteOperationResult
+message CreateJobResponse {
+    Ydb.Operations.Operation operation = 1; // CreateJobResult
 }
 
-message ExecuteOperationResult {
+message CreateJobResult {
     string operation_id = 1 [(Ydb.length).le = 1024];
 }
 
-message ListOperationsRequest {
+message ListJobsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string next_page_token = 4 [(Ydb.length).le = 1024];
+    string page_token = 4 [(Ydb.length).le = 1024];
     int32 limit = 5 [(Ydb.value) = "[0; 100]"];
 
     message Filter {
-        repeated OperationMeta.ComputeState statuses = 1 [(Ydb.size).le = 20];
-        repeated OperationAction actions = 2 [(Ydb.size).le = 20];
-        repeated ExecuteMode modes = 3 [(Ydb.size).le = 20];
+        repeated JobMeta.ComputeState status = 1 [(Ydb.size).le = 20];
+        repeated JobAction action = 2 [(Ydb.size).le = 20];
+        repeated ExecuteMode mode = 3 [(Ydb.size).le = 20];
         string name = 4 [(Ydb.length).le = 1024];
     }
     Filter filter = 6;
 }
 
-message ListOperationsResponse {
-    Ydb.Operations.Operation operation = 1; // ListOperationsResult
+message ListJobsResponse {
+    Ydb.Operations.Operation operation = 1; // ListJobsResult
 }
 
-message ListOperationsResult {
-    repeated OperationInfo operations = 1;
+message ListJobsResult {
+    repeated BriefJob operation = 1;
     string next_page_token = 2 [(Ydb.length).le = 1024];
 }
 
-message DescribeOperationRequest {
+message DescribeJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
     string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
 }
 
-message DescribeOperationResponse {
-    Ydb.Operations.Operation operation = 1; // DescribeOperationResult
+message DescribeJobResponse {
+    Ydb.Operations.Operation operation = 1; // DescribeJobResult
 }
 
-message DescribeOperationResult {
-    OperationEntry operation = 1;
+message DescribeJobResult {
+    Job operation = 1;
 }
 
-message DescribeOperationResultRequest {
-    Ydb.Operations.OperationParams operation_params = 1;
-    string cloud_id = 2 [(Ydb.length).le = 1024];
-    string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
-}
-
-message DescribeOperationResultResponse {
-    Ydb.Operations.Operation operation = 1; // DescribeOperationResultResult
-}
-
-message DescribeOperationResultResult {
-    OperationResult result = 1;
-}
-
-message DeleteOperationRequest {
+message DeleteJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -216,14 +202,14 @@ message DeleteOperationRequest {
     string idempotency_key = 6 [(Ydb.length).le = 1024];
 }
 
-message DeleteOperationResponse {
-    Ydb.Operations.Operation operation = 1; // DeleteOperationResult
+message DeleteJobResponse {
+    Ydb.Operations.Operation operation = 1; // DeleteJobResult
 }
 
-message DeleteOperationResult {
+message DeleteJobResult {
 }
 
-message ModifyOperationRequest {
+message ModifyJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -235,28 +221,28 @@ message ModifyOperationRequest {
     string idempotency_key = 9 [(Ydb.length).le = 1024];
 }
 
-message ModifyOperationResponse {
-    Ydb.Operations.Operation operation = 1; // ModifyOperationResult
+message ModifyJobResponse {
+    Ydb.Operations.Operation operation = 1; // ModifyJobResult
 }
 
-message ModifyOperationResult {
+message ModifyJobResult {
 }
 
-message ManageOperationRequest {
+message ControlJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
     string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
-    OperationAction action = 5;
+    JobAction action = 5;
     int64 previous_revision = 6 [(Ydb.value) = ">= 0"];
     string idempotency_key = 7 [(Ydb.length).le = 1024];
 }
 
-message ManageOperationResponse {
-    Ydb.Operations.Operation operation = 1; // ManageOperationResult
+message ControlJobResponse {
+    Ydb.Operations.Operation operation = 1; // ControlJobResult
 }
 
-message ManageOperationResult {
+message ControlJobResult {
 }
 
 // Connection API
@@ -313,22 +299,22 @@ message ConnectionSetting {
     }
 }
 
-message Connection {
-    string cloud_id = 1 [(Ydb.length).le = 1024];
-    string folder_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
-    string name = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    ConnectionSetting setting = 4;
-    Acl acl = 5;
+message ConnectionContent {
+    string name = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+    ConnectionSetting setting = 2;
+    Acl acl = 3;
 }
 
-message ConnectionEntry {
-    Connection connection = 1;
+message Connection {
+    ConnectionContent content = 1;
     CommonMeta meta = 2;
 }
 
 message CreateConnectionRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    Connection connection = 4;
+    string cloud_id = 2 [(Ydb.length).le = 1024];
+    string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
+    ConnectionContent content = 4;
     string idempotency_key = 5 [(Ydb.length).le = 1024];
 }
 
@@ -344,7 +330,7 @@ message ListConnectionsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string next_page_token = 4 [(Ydb.length).le = 1024];
+    string page_token = 4 [(Ydb.length).le = 1024];
     int32 limit = 5 [(Ydb.value) = "[0; 100]"];
 }
 
@@ -353,7 +339,7 @@ message ListConnectionsResponse {
 }
 
 message ListConnectionsResult {
-    repeated ConnectionEntry connections = 1;
+    repeated Connection connection = 1;
     string next_page_token = 2 [(Ydb.length).le = 1024];
 }
 
@@ -369,13 +355,15 @@ message DescribeConnectionResponse {
 }
 
 message DescribeConnectionResult {
-    ConnectionEntry connection = 1;
+    Connection connection = 1;
 }
 
 message ModifyConnectionRequest {
     Ydb.Operations.OperationParams operation_params = 1;
+    string cloud_id = 2 [(Ydb.length).le = 1024];
+    string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
     string connection_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
-    Connection connection = 5;
+    ConnectionContent content = 5;
     int64 previous_revision = 6 [(Ydb.value) = ">= 0"];
     string idempotency_key = 7 [(Ydb.length).le = 1024];
 }
@@ -411,7 +399,7 @@ message GetResultDataRequest {
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
     string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
     int32 result_set_index = 5 [(Ydb.value) = ">= 0"];
-    string next_page_token = 6 [(Ydb.length).le = 1024];
+    string page_token = 6 [(Ydb.length).le = 1024];
     int32 limit = 7 [(Ydb.value) = "[0; 100]"];
 }
 
@@ -426,7 +414,7 @@ message GetResultDataResult {
 // Binding API
 
 message Schema {
-    repeated Ydb.Column columns = 1 [(Ydb.size).le = 100];
+    repeated Ydb.Column column = 1 [(Ydb.size).le = 100];
 }
 
 message DataStreamsBinding {
@@ -440,12 +428,12 @@ message ObjectStorageBinding {
     message Subset {
         string path_pattern = 1 [(Ydb.length).range = {min: 1, max: 1024}];
         string format = 2 [(Ydb.length).le = 1024];
-        repeated StringsPair format_settings = 3 [(Ydb.size).le = 100];
+        map<string, string> format_setting = 3 [(Ydb.size).le = 100];
         string compression = 4 [(Ydb.length).le = 1024];
         Schema schema = 5;
     }
 
-    repeated Subset subsets = 1;
+    repeated Subset subset = 1;
 }
 
 message BindingSetting {
@@ -455,22 +443,35 @@ message BindingSetting {
     }
 }
 
-message Binding {
-    string cloud_id = 1 [(Ydb.length).le = 1024];
-    string folder_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
-    string name = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string connection_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
-    BindingSetting setting = 5;
+enum BindingType {
+    BINDING_TYPE_UNSPECIFIED = 0;
+    DATA_STREAMS = 1;
+    OBJECT_STORAGE = 2;
 }
 
-message BindingEntry {
-    Binding binding = 1;
+message BriefBinding {
+    string name = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+    string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    CommonMeta meta = 3;
+    BindingType type = 4;
+}
+
+message BindingContent {
+    string name = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+    string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    BindingSetting setting = 3;
+}
+
+message Binding {
+    BindingContent content = 1;
     CommonMeta meta = 2;
 }
 
 message CreateBindingRequest {
     Ydb.Operations.OperationParams operation_params = 1;
-    Binding binding = 4;
+    string cloud_id = 2 [(Ydb.length).le = 1024];
+    string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
+    BindingContent content = 4;
     string idempotency_key = 5 [(Ydb.length).le = 1024];
 }
 
@@ -486,7 +487,7 @@ message ListBindingsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string next_page_token = 4 [(Ydb.length).le = 1024];
+    string page_token = 4 [(Ydb.length).le = 1024];
     int32 limit = 5 [(Ydb.value) = "[0; 100]"];
 }
 
@@ -495,7 +496,7 @@ message ListBindingsResponse {
 }
 
 message ListBindingsResult {
-    repeated BindingEntry bindings = 1;
+    repeated BriefBinding binding = 1;
     string next_page_token = 2 [(Ydb.length).le = 1024];
 }
 
@@ -511,13 +512,15 @@ message DescribeBindingResponse {
 }
 
 message DescribeBindingResult {
-    BindingEntry binding = 1;
+    Binding binding = 1;
 }
 
 message ModifyBindingRequest {
     Ydb.Operations.OperationParams operation_params = 1;
+    string cloud_id = 2 [(Ydb.length).le = 1024];
+    string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
     string binding_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
-    Binding binding = 5;
+    BindingContent content = 5;
     int64 previous_revision = 6 [(Ydb.value) = ">= 0"];
     string idempotency_key = 7 [(Ydb.length).le = 1024];
 }
