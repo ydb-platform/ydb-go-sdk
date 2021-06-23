@@ -1,3 +1,8 @@
+## 1.0.3
+* Negative `table.Client.MaxQueryCacheSize` will disable a client query cache now
+* Refactoring of `meta.go` for simple adding in the future new headers to requests
+* Added support `x-ydb-trace-id` as standard SDK header
+
 ## 1.0.2
 * Implements smart lazy createSession for best control of create/delete session balance. This feature fix leakage of forgotten sessions on server-side
 * Some imporvements of session pool stats

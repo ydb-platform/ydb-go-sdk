@@ -6,15 +6,10 @@ import (
 )
 
 var (
-	// ErrCredentialsDropToken may be returned by Credentials implementations to
+	// ErrCredentialsNoCredentials may be returned by Credentials implementations to
 	// make driver act as if there no Credentials at all. That is, driver will
 	// not send any token meta information during request.
-	ErrCredentialsDropToken = errors.New("ydb: credentials: drop token")
-
-	// ErrCredentialsKeepToken may be returned by Credentials implementations to
-	// make driver act as if Token() returned previous token value without error.
-	// Note that if this error returned for the first time no token will be used.
-	ErrCredentialsKeepToken = errors.New("ydb: credentials: keep token")
+	ErrCredentialsNoCredentials = errors.New("ydb: credentials: no credentials")
 )
 
 // Credentials is an interface that contains options used to authorize a
@@ -43,26 +38,6 @@ func (a AuthTokenCredentials) Token(_ context.Context) (string, error) {
 	return a.AuthToken, nil
 }
 
-// DropTokenCredentials implements Credentials interface. Its Token() method
-// always returns ErrCredentialsDropToken which in turn leads driver to not use
-// token at all.
-type DropTokenCredentials struct{}
-
-// Token implements Credentials.
-func (DropTokenCredentials) Token(_ context.Context) (string, error) {
-	return "", ErrCredentialsDropToken
-}
-
-// KeepTokenCredentials implements Credentials interface. Its Token() method
-// always returns ErrCredentialsKeepToken which in turn leads driver to use
-// previous successful result of token obtaining (only if such result exists).
-type KeepTokenCredentials struct{}
-
-// Token implements Credentials.
-func (KeepTokenCredentials) Token(_ context.Context) (string, error) {
-	return "", ErrCredentialsKeepToken
-}
-
 type multiCredentials struct {
 	cs []Credentials
 }
@@ -75,7 +50,7 @@ func (m *multiCredentials) Token(ctx context.Context) (token string, err error) 
 		}
 	}
 	if err == nil {
-		err = ErrCredentialsDropToken
+		err = ErrCredentialsNoCredentials
 	}
 	return
 }

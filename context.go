@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 
@@ -52,15 +54,15 @@ const (
 	ContextDeadlineOperationCancelAfter
 )
 
-// WithOperationTimeout returns a copy of parent in which YDB operation timeout
-// parameter is set to d. If parent timeout is smaller than d, parent context
+// WithOperationTimeout returns a copy of parent context in which YDB operation timeout
+// parameter is set to d. If parent context timeout is smaller than d, parent context
 // is returned.
-func WithOperationTimeout(parent context.Context, d time.Duration) context.Context {
-	if cur, ok := ContextOperationTimeout(parent); ok && d >= cur {
+func WithOperationTimeout(ctx context.Context, d time.Duration) context.Context {
+	if cur, ok := ContextOperationTimeout(ctx); ok && d >= cur {
 		// The current timeout is already smaller than the new one.
-		return parent
+		return ctx
 	}
-	return context.WithValue(parent, ctxOpTimeoutKey{}, d)
+	return context.WithValue(ctx, ctxOpTimeoutKey{}, d)
 }
 
 // ContextOperationTimeout returns the timeout within given context after which
@@ -71,29 +73,39 @@ func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
 	return
 }
 
-// WithEndpointInfo returns a copy of parent with connection info
-func WithEndpointInfoAndPolicy(parent context.Context, endpointInfo EndpointInfo, policy ConnUsePolicy) context.Context {
+// WithEndpointInfo returns a copy of parent context with endopint info and custom connection use policy
+func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, policy ConnUsePolicy) context.Context {
 	if endpointInfo != nil {
-		return context.WithValue(parent, ctxEndpointInfoKey{}, ctxEndpointInfo{
+		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
 			conn:   endpointInfo.Conn(),
 			policy: policy,
 		})
 	}
-	return parent
+	return ctx
 }
 
-// WithEndpointInfo returns a copy of parent with connection info
-func WithEndpointInfo(parent context.Context, endpointInfo EndpointInfo) context.Context {
+// WithEndpointInfo returns a copy of parent context with endpoint info and default connection use policy
+func WithEndpointInfo(ctx context.Context, endpointInfo EndpointInfo) context.Context {
 	if endpointInfo != nil {
-		return context.WithValue(parent, ctxEndpointInfoKey{}, ctxEndpointInfo{
+		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
 			conn:   endpointInfo.Conn(),
 			policy: ConnUseSmart,
 		})
 	}
-	return parent
+	return ctx
 }
 
-// ContextConn returns the conn and conn use policy
+// WithTraceID returns a copy of parent context with traceID
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, metaTraceID, traceID)
+}
+
+// WithUserAgent returns a copy of parent context with custom user-agent info
+func WithUserAgent(ctx context.Context, userAgent string) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, metaUserAgent, userAgent)
+}
+
+// ContextConn returns the connection and connection use policy
 func ContextConn(ctx context.Context) (conn *conn, backoffUseBalancer bool) {
 	connInfo, ok := ctx.Value(ctxEndpointInfoKey{}).(ctxEndpointInfo)
 	if !ok {
@@ -102,15 +114,15 @@ func ContextConn(ctx context.Context) (conn *conn, backoffUseBalancer bool) {
 	return connInfo.conn, connInfo.policy != ConnUseEndpoint
 }
 
-// WithOperationCancelAfter returns a copy of parent in which YDB operation
-// cancel after parameter is set to d. If parent cancelation timeout is smaller
-// than d, parent context is returned.
-func WithOperationCancelAfter(parent context.Context, d time.Duration) context.Context {
-	if cur, ok := ContextOperationCancelAfter(parent); ok && d >= cur {
+// WithOperationCancelAfter returns a copy of parent context in which YDB operation
+// cancel after parameter is set to d. If parent context cancelation timeout is smaller
+// than d, parent context context is returned.
+func WithOperationCancelAfter(ctx context.Context, d time.Duration) context.Context {
+	if cur, ok := ContextOperationCancelAfter(ctx); ok && d >= cur {
 		// The current cancelation timeout is already smaller than the new one.
-		return parent
+		return ctx
 	}
-	return context.WithValue(parent, ctxOpCancelAfterKey{}, d)
+	return context.WithValue(ctx, ctxOpCancelAfterKey{}, d)
 }
 
 // ContextOperationTimeout returns the timeout within given context after which
@@ -121,20 +133,20 @@ func ContextOperationCancelAfter(ctx context.Context) (d time.Duration, ok bool)
 	return
 }
 
-// WithOperationMode returns a copy of parent in which YDB operation mode
-// parameter is set to m. If parent mode is set and is not equal to m,
+// WithOperationMode returns a copy of parent context in which YDB operation mode
+// parameter is set to m. If parent context mode is set and is not equal to m,
 // WithOperationMode will panic.
-func WithOperationMode(parent context.Context, m OperationMode) context.Context {
-	if cur, ok := ContextOperationMode(parent); ok {
+func WithOperationMode(ctx context.Context, m OperationMode) context.Context {
+	if cur, ok := ContextOperationMode(ctx); ok {
 		if cur != m {
 			panic(fmt.Sprintf(
 				"ydb: context already has different operation mode: %v; %v given",
 				cur, m,
 			))
 		}
-		return parent
+		return ctx
 	}
-	return context.WithValue(parent, ctxOpModeKey{}, m)
+	return context.WithValue(ctx, ctxOpModeKey{}, m)
 }
 
 // ContextOperationMode returns the mode of YDB operation within given context.

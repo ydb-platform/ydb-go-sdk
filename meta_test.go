@@ -2,90 +2,38 @@ package ydb
 
 import (
 	"context"
-	"testing"
-
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
+	"testing"
 )
 
-func TestMetaErrDropToken(t *testing.T) {
-	var call int
+func TestMetaRequiredHeaders(t *testing.T) {
 	m := &meta{
 		database:     "database",
 		requestsType: "requestType",
 		credentials: CredentialsFunc(func(context.Context) (string, error) {
-			if call == 0 {
-				call++
-				return "token", nil
-			}
-			return "", ErrCredentialsDropToken
+			return "token", nil
 		}),
 	}
 
-	md1, err := m.md(context.Background())
+	ctx := context.Background()
+
+	ctx = WithUserAgent(ctx, "userAgent")
+
+	ctx = WithTraceID(ctx, "traceID")
+
+	ctx = metadata.AppendToOutgoingContext(ctx, "some-user-header", "some-user-value")
+
+	md, err := m.md(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertMetaHasDatabase(t, md1)
-	assertMetaHasToken(t, md1)
-	assertMetaHasRequestType(t, md1)
 
-	md2, err := m.md(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertMetaHasDatabase(t, md2)
-	assertMetaHasNoToken(t, md2)
-	assertMetaHasRequestType(t, md2)
-}
-
-func TestMetaErrKeepToken(t *testing.T) {
-	var call int
-	m := &meta{
-		database:     "database",
-		requestsType: "requestType",
-		credentials: CredentialsFunc(func(context.Context) (string, error) {
-			if call == 0 {
-				call++
-				return "token", nil
-			}
-			return "", ErrCredentialsKeepToken
-		}),
-	}
-
-	md1, err := m.md(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertMetaHasDatabase(t, md1)
-	assertMetaHasToken(t, md1)
-	assertMetaHasRequestType(t, md1)
-
-	md2, err := m.md(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertMetaHasDatabase(t, md2)
-	assertMetaHasToken(t, md2)
-	assertMetaHasRequestType(t, md2)
-}
-
-func assertMetaHasDatabase(t *testing.T, md metadata.MD) {
-	if len(md.Get(metaDatabase)) == 0 {
-		t.Errorf("no database info in meta")
-	}
-}
-func assertMetaHasToken(t *testing.T, md metadata.MD) {
-	if len(md.Get(metaTicket)) == 0 {
-		t.Errorf("no token info in meta")
-	}
-}
-func assertMetaHasNoToken(t *testing.T, md metadata.MD) {
-	if len(md.Get(metaTicket)) != 0 {
-		t.Errorf("unexpected token info in meta")
-	}
-}
-func assertMetaHasRequestType(t *testing.T, md metadata.MD) {
-	if len(md.Get(metaRequestType)) == 0 {
-		t.Errorf("no request type info in meta")
-	}
+	require.Equal(t, []string{"database"}, md.Get(metaDatabase))
+	require.Equal(t, []string{"requestType"}, md.Get(metaRequestType))
+	require.Equal(t, []string{"token"}, md.Get(metaTicket))
+	require.Equal(t, []string{"userAgent"}, md.Get(metaUserAgent))
+	require.Equal(t, []string{"traceID"}, md.Get(metaTraceID))
+	require.Equal(t, []string{Version}, md.Get(metaVersion))
+	require.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
 }
