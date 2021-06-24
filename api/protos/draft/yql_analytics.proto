@@ -239,7 +239,6 @@ message ModifyHistoryRequest {
     Acl acl = 5;
     bool is_deleted = 6;
     string yql_text = 7;
-    EQueryStatus status = 8;
     Ydb.Operations.OperationParams operation_params = 9;
 
     string idempotency_key = 10;
@@ -251,28 +250,6 @@ message ModifyHistoryResult{
 
 message ModifyHistoryResponse {
     Ydb.Operations.Operation operation = 1; // ModifyHistoryResult
-}
-
-message ExecuteQueryRequest {
-    Ydb.Operations.OperationParams operation_params = 1;
-    string yql_text = 2;
-    EExecuteMode execute_mode = 3;
-    uint64 max_result_bytes = 4;
-    uint64 max_result_rows = 5;
-    uint32 expire_after_seconds = 6;
-    // Map of query parameters (optional)
-    map<string, Ydb.TypedValue> parameters = 7;
-    repeated Connection connections = 8;
-    string folder_id = 9;
-    string cloud_id = 10;
-}
-
-message ExecuteQueryResponse {
-    Ydb.Operations.Operation operation = 1; // ExecuteQueryResult
-}
-
-message ExecuteQueryResult {
-    string history_id = 1;
 }
 
 message GetResultDataRequest {

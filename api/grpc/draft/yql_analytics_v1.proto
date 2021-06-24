@@ -6,8 +6,6 @@ option java_package = "com.yandex.yql.analytics.v1";
 import "kikimr/public/api/protos/draft/yql_analytics.proto";
 
 service AnalyticsService {
-    rpc ExecuteQuery(Analytics.ExecuteQueryRequest) returns (Analytics.ExecuteQueryResponse);
-
     rpc GetResultData(Analytics.GetResultDataRequest) returns (Analytics.GetResultDataResponse);
 
     rpc GetConnections(Analytics.GetConnectionsRequest) returns (Analytics.GetConnectionsResponse);
