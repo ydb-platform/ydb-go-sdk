@@ -12,6 +12,10 @@ assignees: ""
 
 <!-- Please specify commit or tag version. -->
 
+**Environment**
+
+<!-- Please specify Operation System, CPU arcitecture -->
+
 **Current behavior:**
 
 <!-- Describe how the bug manifests. -->
