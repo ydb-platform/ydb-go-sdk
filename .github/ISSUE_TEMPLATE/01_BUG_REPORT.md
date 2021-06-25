@@ -4,6 +4,7 @@ about: Create a report to help YDB GO SDK to improve
 title: "bug: "
 labels: "bug"
 assignees: ""
+
 ---
 
 # Bug Report
