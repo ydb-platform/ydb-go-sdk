@@ -42,8 +42,11 @@ func ContextWithoutDeadline(ctx context.Context) context.Context {
 type ContextDeadlineMapping uint
 
 const (
+	// ContextDeadlineUnknown will induce usage of DefaultContextDeadlineMapping
+	ContextDeadlineUnknown ContextDeadlineMapping = iota
+
 	// ContextDeadlineNoMapping disables mapping of context's deadline value.
-	ContextDeadlineNoMapping ContextDeadlineMapping = iota
+	ContextDeadlineNoMapping
 
 	// ContextDeadlineOperationTimeout uses context's deadline value as
 	// operation timeout.
@@ -206,28 +209,28 @@ func (p OperationParams) toYDB() *Ydb_Operations.OperationParams {
 }
 
 func operationParams(ctx context.Context, dm ContextDeadlineMapping) (p OperationParams, ok bool) {
-	d, hasDeadline := contextUntilDeadline(ctx)
-	var (
-		has     bool
-		timeout time.Duration
-	)
-	{
-		timeout, has = ContextOperationTimeout(ctx)
-		if hasDeadline && dm == ContextDeadlineOperationTimeout || (has && d < timeout) {
-			timeout = d
+	var hasOpTimeout, hasOpCancelAfter bool
+
+	p.Mode, _ = ContextOperationMode(ctx)
+	p.Timeout, hasOpTimeout = ContextOperationTimeout(ctx)
+	p.CancelAfter, hasOpCancelAfter = ContextOperationCancelAfter(ctx)
+
+	if deadline, hasDeadline := contextUntilDeadline(ctx); hasDeadline {
+		switch dm {
+		case ContextDeadlineOperationTimeout:
+			if hasOpTimeout && (p.Mode != OperationModeSync || deadline >= p.Timeout) {
+				break
+			}
+			p.Timeout = deadline
+
+		case ContextDeadlineOperationCancelAfter:
+			if hasOpCancelAfter && (p.Mode != OperationModeSync || deadline >= p.CancelAfter) {
+				break
+			}
+			p.CancelAfter = deadline
 		}
-		p.Timeout = timeout
 	}
-	{
-		timeout, has = ContextOperationCancelAfter(ctx)
-		if hasDeadline && dm == ContextDeadlineOperationCancelAfter || (has && d < timeout) {
-			timeout = d
-		}
-		p.CancelAfter = timeout
-	}
-	{
-		p.Mode, _ = ContextOperationMode(ctx)
-	}
+
 	return p, !p.Empty()
 }
 

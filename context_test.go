@@ -11,12 +11,14 @@ import (
 
 func TestOperationParams(t *testing.T) {
 	for _, test := range []struct {
-		name       string
+		name string
+
 		ctxTimeout time.Duration
-		opTimeout  time.Duration
-		opCancel   time.Duration
-		opMode     OperationMode
 		ctxMapping ContextDeadlineMapping
+
+		opTimeout time.Duration
+		opCancel  time.Duration
+		opMode    OperationMode
 
 		exp OperationParams
 	}{
@@ -24,7 +26,7 @@ func TestOperationParams(t *testing.T) {
 			name: "nothing",
 		},
 		{
-			name:       "mapping timeout",
+			name:       "mode: unknown, mapping timeout",
 			ctxMapping: ContextDeadlineOperationTimeout,
 			ctxTimeout: time.Second,
 			exp: OperationParams{
@@ -32,7 +34,27 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mapping deadline",
+			name:       "mode: sync, mapping timeout",
+			ctxMapping: ContextDeadlineOperationTimeout,
+			ctxTimeout: time.Second,
+			opMode:     OperationModeSync,
+			exp: OperationParams{
+				Timeout: time.Second,
+				Mode:    OperationModeSync,
+			},
+		},
+		{
+			name:       "mode: async, mapping timeout",
+			ctxMapping: ContextDeadlineOperationTimeout,
+			ctxTimeout: time.Second,
+			opMode:     OperationModeAsync,
+			exp: OperationParams{
+				Timeout: time.Second,
+				Mode:    OperationModeAsync,
+			},
+		},
+		{
+			name:       "mode: unknown, mapping deadline",
 			ctxMapping: ContextDeadlineOperationCancelAfter,
 			ctxTimeout: time.Second,
 			exp: OperationParams{
@@ -40,28 +62,85 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "override context deadline",
+			name:       "mode: sync, mapping deadline",
+			ctxMapping: ContextDeadlineOperationCancelAfter,
+			ctxTimeout: time.Second,
+			opMode:     OperationModeSync,
+			exp: OperationParams{
+				CancelAfter: time.Second,
+				Mode:        OperationModeSync,
+			},
+		},
+		{
+			name:       "mode: async, mapping deadline",
+			ctxMapping: ContextDeadlineOperationCancelAfter,
+			opMode:     OperationModeAsync,
+			ctxTimeout: time.Second,
+			exp: OperationParams{
+				CancelAfter: time.Second,
+				Mode:        OperationModeAsync,
+			},
+		},
+		{
+			name:       "mode: unknown, override op timeout",
 			ctxMapping: ContextDeadlineOperationTimeout,
 			ctxTimeout: time.Second,
 			opTimeout:  time.Hour,
 			exp: OperationParams{
-				Timeout: time.Second,
+				Timeout: time.Hour,
 			},
 		},
 		{
-			name:       "override context deadline",
+			name:       "mode: sync, override op timeout",
+			ctxMapping: ContextDeadlineOperationTimeout,
+			ctxTimeout: time.Second,
+			opMode:     OperationModeSync,
+			opTimeout:  time.Hour,
+			exp: OperationParams{
+				Timeout: time.Second,
+				Mode:    OperationModeSync,
+			},
+		},
+		{
+			name:       "mode: async, override op timeout",
+			ctxMapping: ContextDeadlineOperationTimeout,
+			ctxTimeout: time.Second,
+			opMode:     OperationModeAsync,
+			opTimeout:  time.Hour,
+			exp: OperationParams{
+				Timeout: time.Hour,
+				Mode:    OperationModeAsync,
+			},
+		},
+		{
+			name:       "mode: unknown, override op deadline",
 			ctxMapping: ContextDeadlineOperationCancelAfter,
 			ctxTimeout: time.Second,
 			opCancel:   time.Hour,
 			exp: OperationParams{
-				CancelAfter: time.Second,
+				CancelAfter: time.Hour,
 			},
 		},
 		{
-			name:   "mode",
-			opMode: OperationModeAsync,
+			name:       "mode: sync, override op deadline",
+			ctxMapping: ContextDeadlineOperationCancelAfter,
+			ctxTimeout: time.Second,
+			opMode:     OperationModeSync,
+			opCancel:   time.Hour,
 			exp: OperationParams{
-				Mode: OperationModeAsync,
+				CancelAfter: time.Second,
+				Mode:        OperationModeSync,
+			},
+		},
+		{
+			name:       "mode: async, override op deadline",
+			ctxMapping: ContextDeadlineOperationCancelAfter,
+			ctxTimeout: time.Second,
+			opMode:     OperationModeAsync,
+			opCancel:   time.Hour,
+			exp: OperationParams{
+				CancelAfter: time.Hour,
+				Mode:        OperationModeAsync,
 			},
 		},
 	} {

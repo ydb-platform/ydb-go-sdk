@@ -1,3 +1,7 @@
+## 1.0.4
+* Fixed timeout and cancellation setting for YDB operations
+* Introduced possibility to use `ContextDeadlineNoMapping` once again
+
 ## 1.0.3
 * Negative `table.Client.MaxQueryCacheSize` will disable a client query cache now
 * Refactoring of `meta.go` for simple adding in the future new headers to requests
