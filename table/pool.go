@@ -276,7 +276,7 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 
 		// while creating session pool may become full
 		p.mu.Lock()
-		enoughSpace = p.createInProgress+len(p.index) < p.limit
+		enoughSpace = p.createInProgress+len(p.index) <= p.limit
 		if enoughSpace {
 			p.index[r.s] = sessionInfo{}
 		}
