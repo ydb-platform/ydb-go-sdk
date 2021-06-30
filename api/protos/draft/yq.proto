@@ -58,7 +58,7 @@ enum ExecuteMode {
 }
 
 enum JobAction {
-    OPERATION_ACTION_UNSPECIFIED = 0;
+    JOB_ACTION_UNSPECIFIED = 0;
     PAUSE = 1;
     PAUSE_GRACEFULLY = 2;
     ABORT = 3;
@@ -150,7 +150,7 @@ message CreateJobResponse {
 }
 
 message CreateJobResult {
-    string operation_id = 1 [(Ydb.length).le = 1024];
+    string job_id = 1 [(Ydb.length).le = 1024];
 }
 
 message ListJobsRequest {
@@ -174,7 +174,7 @@ message ListJobsResponse {
 }
 
 message ListJobsResult {
-    repeated BriefJob operation = 1;
+    repeated BriefJob job = 1;
     string next_page_token = 2 [(Ydb.length).le = 1024];
 }
 
@@ -182,7 +182,7 @@ message DescribeJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
+    string job_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
 }
 
 message DescribeJobResponse {
@@ -190,14 +190,14 @@ message DescribeJobResponse {
 }
 
 message DescribeJobResult {
-    Job operation = 1;
+    Job job = 1;
 }
 
 message DeleteJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
+    string job_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
     int64 previous_revision = 5 [(Ydb.value) = ">= 0"];
     string idempotency_key = 6 [(Ydb.length).le = 1024];
 }
@@ -213,7 +213,7 @@ message ModifyJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
+    string job_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
     Acl acl = 5;
     Limits limits = 6;
     string name = 7 [(Ydb.length).le = 1024];
@@ -232,7 +232,7 @@ message ControlJobRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
+    string job_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
     JobAction action = 5;
     int64 previous_revision = 6 [(Ydb.value) = ">= 0"];
     string idempotency_key = 7 [(Ydb.length).le = 1024];
@@ -397,7 +397,7 @@ message GetResultDataRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string cloud_id = 2 [(Ydb.length).le = 1024];
     string folder_id = 3 [(Ydb.length).range = {min: 1, max: 1024}];
-    string operation_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
+    string job_id = 4 [(Ydb.length).range = {min: 1, max: 1024}];
     int32 result_set_index = 5 [(Ydb.value) = ">= 0"];
     string page_token = 6 [(Ydb.length).le = 1024];
     int32 limit = 7 [(Ydb.value) = "[0; 100]"];
