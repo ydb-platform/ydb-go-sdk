@@ -197,6 +197,11 @@ func (t TableExecuteDataQueryRequest) TransactionID() (id string, ok bool) {
 	return
 }
 
+func (t TableExecuteDataQueryRequest) KeepInCache() (keepInCache bool, ok bool) {
+	ok = getField("QueryCachePolicy.KeepInCache", t.R, &keepInCache)
+	return
+}
+
 type TablePrepareDataQueryResult struct {
 	R interface{}
 }

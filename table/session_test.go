@@ -301,3 +301,61 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		require.NoError(t, err)
 	}
 }
+
+func TestClientCache(t *testing.T) {
+	for _, test := range [...]struct {
+		name                 string
+		cacheSize            int
+		prepareCount         int
+		prepareRequestsCount int
+	}{
+		{
+			name:                 "fixed query cache size, one request proxed to server",
+			cacheSize:            10,
+			prepareCount:         10,
+			prepareRequestsCount: 1,
+		},
+		{
+			name:                 "default query cache size, one request proxed to server",
+			cacheSize:            0,
+			prepareCount:         10,
+			prepareRequestsCount: 1,
+		},
+		{
+			name:                 "disabled query cache, all requests proxed to server",
+			cacheSize:            -1,
+			prepareCount:         10,
+			prepareRequestsCount: 10,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			prepareRequestsCount := 0
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			client := &Client{
+				Driver: &testutil.Driver{
+					OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
+						switch m {
+						case testutil.TableCreateSession:
+						case testutil.TablePrepareDataQuery:
+							prepareRequestsCount++
+						default:
+							t.Fatalf("Unexpected method %d", m)
+
+						}
+						return nil
+					},
+				},
+				MaxQueryCacheSize: test.cacheSize,
+			}
+			s, err := client.CreateSession(ctx)
+			require.NoError(t, err)
+			for i := 0; i < test.prepareCount; i++ {
+				stmt, err := s.Prepare(ctx, "SELECT 1")
+				require.NoError(t, err)
+				require.NotNil(t, stmt)
+			}
+			require.Equal(t, test.prepareRequestsCount, prepareRequestsCount)
+		})
+	}
+}

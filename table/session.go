@@ -25,8 +25,9 @@ type Client struct {
 	// MaxQueryCacheSize limits maximum number of queries which able to live in
 	// cache. Note that cache is not shared across sessions.
 	//
-	// If MaxQueryCacheSize is less than or equal to zero, then the
-	// DefaultMaxQueryCacheSize is used.
+	// If MaxQueryCacheSize equal to zero, then the DefaultMaxQueryCacheSize is used.
+	//
+	// If MaxQueryCacheSize is less than zero, then client not used query cache.
 	MaxQueryCacheSize int
 }
 
@@ -64,7 +65,7 @@ func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 }
 
 func (t *Client) cacheSize() int {
-	if t.MaxQueryCacheSize <= 0 {
+	if t.MaxQueryCacheSize == 0 {
 		return DefaultMaxQueryCacheSize
 	}
 	return t.MaxQueryCacheSize

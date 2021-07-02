@@ -1,9 +1,11 @@
 package ydbsql
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/testutil"
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/stretchr/testify/require"
 	"net"
 	"testing"
 	"time"
@@ -87,5 +89,104 @@ func TestConnectorRedialOnError(t *testing.T) {
 			t.Fatalf("no dial on re-ping at %v iteration", i)
 		}
 		dial = false
+	}
+}
+
+func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
+	for _, test := range [...]struct {
+		name                   string
+		cacheSize              int
+		prepareCount           int
+		prepareRequestsCount   int
+		queryCachePolicyOption []table.QueryCachePolicyOption
+	}{
+		{
+			name:                   "fixed query cache size, with server cache, one request proxed to server",
+			cacheSize:              10,
+			prepareCount:           10,
+			prepareRequestsCount:   1,
+			queryCachePolicyOption: []table.QueryCachePolicyOption{table.WithQueryCachePolicyKeepInCache()},
+		},
+		{
+			name:                   "default query cache size, with server cache, one request proxed to server",
+			cacheSize:              0,
+			prepareCount:           10,
+			prepareRequestsCount:   1,
+			queryCachePolicyOption: []table.QueryCachePolicyOption{table.WithQueryCachePolicyKeepInCache()},
+		},
+		{
+			name:                   "disabled query cache, with server cache, all requests proxed to server",
+			cacheSize:              -1,
+			prepareCount:           10,
+			prepareRequestsCount:   10,
+			queryCachePolicyOption: []table.QueryCachePolicyOption{table.WithQueryCachePolicyKeepInCache()},
+		},
+		{
+			name:                   "fixed query cache size, no server cache, one request proxed to server",
+			cacheSize:              10,
+			prepareCount:           10,
+			prepareRequestsCount:   1,
+			queryCachePolicyOption: []table.QueryCachePolicyOption{},
+		},
+		{
+			name:                   "default query cache size, no server cache, one request proxed to server",
+			cacheSize:              0,
+			prepareCount:           10,
+			prepareRequestsCount:   1,
+			queryCachePolicyOption: []table.QueryCachePolicyOption{},
+		},
+		{
+			name:                   "disabled query cache, no server cache, all requests proxed to server",
+			cacheSize:              -1,
+			prepareCount:           10,
+			prepareRequestsCount:   10,
+			queryCachePolicyOption: []table.QueryCachePolicyOption{},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client, server := net.Pipe()
+			defer client.Close()
+			defer server.Close()
+
+			c := Connector(
+				WithClient(&table.Client{
+					Driver: &testutil.Driver{
+						OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface {
+						}) error {
+							switch m {
+							case testutil.TableCreateSession:
+							case testutil.TableExecuteDataQuery:
+								r := testutil.TableExecuteDataQueryRequest{req}
+								if len(test.queryCachePolicyOption) > 0 {
+									keepInCache, ok := r.KeepInCache()
+									require.True(t, ok)
+									require.True(t, keepInCache)
+								} else {
+									keepInCache, ok := r.KeepInCache()
+									require.True(t, ok)
+									require.False(t, keepInCache)
+								}
+								{
+									r := testutil.TableExecuteDataQueryResult{res}
+									r.SetTransactionID("")
+								}
+								return nil
+							default:
+								t.Fatalf("Unexpected method %d", m)
+							}
+							return nil
+						},
+					},
+					MaxQueryCacheSize: test.cacheSize,
+				}),
+				WithDefaultExecDataQueryOption(table.WithQueryCachePolicy(test.queryCachePolicyOption...)),
+			)
+			db := sql.OpenDB(c)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+			defer cancel()
+			rows, err := db.QueryContext(ctx, "SELECT 1")
+			require.NoError(t, err)
+			require.NotNil(t, rows)
+		})
 	}
 }
