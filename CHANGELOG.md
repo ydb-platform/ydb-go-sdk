@@ -1,3 +1,8 @@
+## 1.0.5
+* Remove unused ContextDeadlineMapping driver config (always used default value)
+* Simplify operation params logic
+* Append SYNC Operation mode on ExecuteDataQuery call
+
 ## 1.0.4
 * Fixed timeout and cancellation setting for YDB operations
 * Introduced possibility to use `ContextDeadlineNoMapping` once again

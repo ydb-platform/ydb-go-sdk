@@ -88,7 +88,7 @@ func (b *DriverBuilder) Build() ydb.Driver {
 				sid = req.(*Ydb_Table.BeginTransactionRequest).SessionId
 				tid = fmt.Sprintf("test-tx/%d", atomic.AddInt32(&txID, 1))
 
-				r := testutil.TableBeginTransactionResult{res}
+				r := testutil.TableBeginTransactionResult{R: res}
 				r.SetTransactionID(tid)
 
 				b.log("[%q][%q] begin transaction", sid, tid)
@@ -212,7 +212,9 @@ func TestTxDoerStmt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer func() {
+		_ = c.Close()
+	}()
 
 	// Try to prepare statement on second session, which must fail due to our
 	// stub logic above.

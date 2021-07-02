@@ -32,10 +32,6 @@ var (
 	// DefaultBalancingMethod contains driver's default balancing algorithm.
 	DefaultBalancingMethod = BalancingRandomChoice
 
-	// DefaultContextDeadlineMapping contains driver's default behavior of how
-	// to use context's deadline value.
-	DefaultContextDeadlineMapping = ContextDeadlineOperationTimeout
-
 	// ErrClosed is returned when operation requested on a closed driver.
 	ErrClosed = errors.New("driver closed")
 
@@ -152,14 +148,6 @@ type DriverConfig struct {
 	// If OperationCancelAfter is zero then no timeout is used.
 	OperationCancelAfter time.Duration
 
-	// ContextDeadlineMapping describes how context.Context's deadline value is
-	// used for YDB operation options. That is, when neither OperationTimeout
-	// nor OperationCancelAfter defined as context's values or driver options.
-	//
-	// If ContextDeadlineMapping is zero then the DefaultContextDeadlineMapping
-	// value is used.
-	ContextDeadlineMapping ContextDeadlineMapping
-
 	// DiscoveryInterval is the frequency of background tasks of ydb endpoints
 	// discovery.
 	// If DiscoveryInterval is zero then the DefaultDiscoveryInterval is used.
@@ -212,9 +200,6 @@ func (d *DriverConfig) withDefaults() (c DriverConfig) {
 	if c.BalancingMethod == 0 {
 		c.BalancingMethod = DefaultBalancingMethod
 	}
-	if c.ContextDeadlineMapping == 0 {
-		c.ContextDeadlineMapping = DefaultContextDeadlineMapping
-	}
 	return c
 }
 
@@ -227,8 +212,6 @@ type driver struct {
 	streamTimeout        time.Duration
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
-
-	contextDeadlineMapping ContextDeadlineMapping
 }
 
 func (d *driver) Close() error {
@@ -284,8 +267,8 @@ func (d *driver) Call(ctx context.Context, op api.Operation) (info CallInfo, err
 		resp = internal.WrapOpResponse(&Ydb_Operations.GetOperationResponse{})
 	}
 
-	params, ok := operationParams(ctx, d.contextDeadlineMapping)
-	if ok {
+	params := operationParams(ctx)
+	if !params.Empty() {
 		setOperationParams(req, params)
 	}
 

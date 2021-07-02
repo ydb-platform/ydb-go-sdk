@@ -37,26 +37,6 @@ func ContextWithoutDeadline(ctx context.Context) context.Context {
 	return valueOnlyContext{ctx}
 }
 
-// ContextDeadlineMapping describes how context.Context's deadline value is
-// used for YDB operation options.
-type ContextDeadlineMapping uint
-
-const (
-	// ContextDeadlineUnknown will induce usage of DefaultContextDeadlineMapping
-	ContextDeadlineUnknown ContextDeadlineMapping = iota
-
-	// ContextDeadlineNoMapping disables mapping of context's deadline value.
-	ContextDeadlineNoMapping
-
-	// ContextDeadlineOperationTimeout uses context's deadline value as
-	// operation timeout.
-	ContextDeadlineOperationTimeout
-
-	// ContextDeadlineOperationCancelAfter uses context's deadline value as
-	// operation cancelation timeout.
-	ContextDeadlineOperationCancelAfter
-)
-
 // WithOperationTimeout returns a copy of parent context in which YDB operation timeout
 // parameter is set to d. If parent context timeout is smaller than d, parent context
 // is returned.
@@ -208,30 +188,29 @@ func (p OperationParams) toYDB() *Ydb_Operations.OperationParams {
 	}
 }
 
-func operationParams(ctx context.Context, dm ContextDeadlineMapping) (p OperationParams, ok bool) {
-	var hasOpTimeout, hasOpCancelAfter bool
+func operationParams(ctx context.Context) (p OperationParams) {
+	var hasOpTimeout bool
 
 	p.Mode, _ = ContextOperationMode(ctx)
 	p.Timeout, hasOpTimeout = ContextOperationTimeout(ctx)
-	p.CancelAfter, hasOpCancelAfter = ContextOperationCancelAfter(ctx)
+	p.CancelAfter, _ = ContextOperationCancelAfter(ctx)
 
-	if deadline, hasDeadline := contextUntilDeadline(ctx); hasDeadline {
-		switch dm {
-		case ContextDeadlineOperationTimeout:
-			if hasOpTimeout && (p.Mode != OperationModeSync || deadline >= p.Timeout) {
-				break
-			}
-			p.Timeout = deadline
-
-		case ContextDeadlineOperationCancelAfter:
-			if hasOpCancelAfter && (p.Mode != OperationModeSync || deadline >= p.CancelAfter) {
-				break
-			}
-			p.CancelAfter = deadline
-		}
+	if p.Mode != OperationModeSync {
+		return
 	}
 
-	return p, !p.Empty()
+	deadline, hasDeadline := contextUntilDeadline(ctx)
+	if !hasDeadline {
+		return
+	}
+
+	if hasOpTimeout && p.Timeout <= deadline {
+		return
+	}
+
+	p.Timeout = deadline
+
+	return
 }
 
 func setOperationParams(req interface{}, params OperationParams) {

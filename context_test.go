@@ -10,11 +10,10 @@ import (
 )
 
 func TestOperationParams(t *testing.T) {
-	for _, test := range []struct {
+	for _, test := range [...]struct {
 		name string
 
 		ctxTimeout time.Duration
-		ctxMapping ContextDeadlineMapping
 
 		opTimeout time.Duration
 		opCancel  time.Duration
@@ -26,16 +25,12 @@ func TestOperationParams(t *testing.T) {
 			name: "nothing",
 		},
 		{
-			name:       "mode: unknown, mapping timeout",
-			ctxMapping: ContextDeadlineOperationTimeout,
+			name:       "mode: unknown, context timeout",
 			ctxTimeout: time.Second,
-			exp: OperationParams{
-				Timeout: time.Second,
-			},
+			exp:        OperationParams{},
 		},
 		{
-			name:       "mode: sync, mapping timeout",
-			ctxMapping: ContextDeadlineOperationTimeout,
+			name:       "mode: sync, context timeout applied to operation timeout",
 			ctxTimeout: time.Second,
 			opMode:     OperationModeSync,
 			exp: OperationParams{
@@ -44,46 +39,15 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mode: async, mapping timeout",
-			ctxMapping: ContextDeadlineOperationTimeout,
+			name:       "mode: async, context timeout not applied to operation timeout",
 			ctxTimeout: time.Second,
 			opMode:     OperationModeAsync,
 			exp: OperationParams{
-				Timeout: time.Second,
-				Mode:    OperationModeAsync,
+				Mode: OperationModeAsync,
 			},
 		},
 		{
-			name:       "mode: unknown, mapping deadline",
-			ctxMapping: ContextDeadlineOperationCancelAfter,
-			ctxTimeout: time.Second,
-			exp: OperationParams{
-				CancelAfter: time.Second,
-			},
-		},
-		{
-			name:       "mode: sync, mapping deadline",
-			ctxMapping: ContextDeadlineOperationCancelAfter,
-			ctxTimeout: time.Second,
-			opMode:     OperationModeSync,
-			exp: OperationParams{
-				CancelAfter: time.Second,
-				Mode:        OperationModeSync,
-			},
-		},
-		{
-			name:       "mode: async, mapping deadline",
-			ctxMapping: ContextDeadlineOperationCancelAfter,
-			opMode:     OperationModeAsync,
-			ctxTimeout: time.Second,
-			exp: OperationParams{
-				CancelAfter: time.Second,
-				Mode:        OperationModeAsync,
-			},
-		},
-		{
-			name:       "mode: unknown, override op timeout",
-			ctxMapping: ContextDeadlineOperationTimeout,
+			name:       "mode: unknown, context timeout not override operation timeout",
 			ctxTimeout: time.Second,
 			opTimeout:  time.Hour,
 			exp: OperationParams{
@@ -91,8 +55,7 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mode: sync, override op timeout",
-			ctxMapping: ContextDeadlineOperationTimeout,
+			name:       "mode: sync, context timeout override operation timeout",
 			ctxTimeout: time.Second,
 			opMode:     OperationModeSync,
 			opTimeout:  time.Hour,
@@ -102,8 +65,7 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mode: async, override op timeout",
-			ctxMapping: ContextDeadlineOperationTimeout,
+			name:       "mode: async, context timeout not override operation timeout",
 			ctxTimeout: time.Second,
 			opMode:     OperationModeAsync,
 			opTimeout:  time.Hour,
@@ -113,34 +75,11 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mode: unknown, override op deadline",
-			ctxMapping: ContextDeadlineOperationCancelAfter,
+			name:       "mode: unknown, cancel after timeout",
 			ctxTimeout: time.Second,
 			opCancel:   time.Hour,
 			exp: OperationParams{
 				CancelAfter: time.Hour,
-			},
-		},
-		{
-			name:       "mode: sync, override op deadline",
-			ctxMapping: ContextDeadlineOperationCancelAfter,
-			ctxTimeout: time.Second,
-			opMode:     OperationModeSync,
-			opCancel:   time.Hour,
-			exp: OperationParams{
-				CancelAfter: time.Second,
-				Mode:        OperationModeSync,
-			},
-		},
-		{
-			name:       "mode: async, override op deadline",
-			ctxMapping: ContextDeadlineOperationCancelAfter,
-			ctxTimeout: time.Second,
-			opMode:     OperationModeAsync,
-			opCancel:   time.Hour,
-			exp: OperationParams{
-				CancelAfter: time.Hour,
-				Mode:        OperationModeAsync,
 			},
 		},
 	} {
@@ -164,7 +103,7 @@ func TestOperationParams(t *testing.T) {
 				defer cancel()
 			}
 
-			act, _ := operationParams(ctx, test.ctxMapping)
+			act := operationParams(ctx)
 
 			if exp := test.exp; !reflect.DeepEqual(act, exp) {
 				t.Fatalf(
@@ -174,4 +113,8 @@ func TestOperationParams(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestContextOperationMode(t *testing.T) {
+
 }

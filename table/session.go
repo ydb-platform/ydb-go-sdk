@@ -602,6 +602,9 @@ func (s *Session) executeDataQuery(
 	for _, opt := range opts {
 		opt((*executeDataQueryDesc)(req))
 	}
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	}
 	_, err = s.c.Driver.Call(
 		ydb.WithEndpointInfo(
 			ctx,

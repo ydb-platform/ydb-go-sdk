@@ -195,14 +195,13 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		}
 	}
 	return &driver{
-		cluster:                &cluster,
-		meta:                   d.meta,
-		trace:                  d.config.Trace,
-		requestTimeout:         d.config.RequestTimeout,
-		streamTimeout:          d.config.StreamTimeout,
-		operationTimeout:       d.config.OperationTimeout,
-		operationCancelAfter:   d.config.OperationCancelAfter,
-		contextDeadlineMapping: d.config.ContextDeadlineMapping,
+		cluster:              &cluster,
+		meta:                 d.meta,
+		trace:                d.config.Trace,
+		requestTimeout:       d.config.RequestTimeout,
+		streamTimeout:        d.config.StreamTimeout,
+		operationTimeout:     d.config.OperationTimeout,
+		operationCancelAfter: d.config.OperationCancelAfter,
 	}, nil
 }
 

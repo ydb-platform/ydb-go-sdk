@@ -1,5 +1,5 @@
 package ydb
 
 const (
-	Version = "ydb-go-sdk/1.0.4"
+	Version = "ydb-go-sdk/1.0.5"
 )

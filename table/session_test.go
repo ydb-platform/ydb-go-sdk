@@ -1,8 +1,10 @@
 package table
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/internal/cache/lru"
 	"context"
 	"errors"
+	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
 	"time"
@@ -242,5 +244,60 @@ func TestSessionDescribeTable(t *testing.T) {
 		if !reflect.DeepEqual(d, expect) {
 			t.Fatalf("Result %+v differ from, expectd %+v", d, expect)
 		}
+	}
+}
+
+func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
+	for _, c := range []struct {
+		srcMode ydb.OperationMode
+		dstMode ydb.OperationMode
+	}{
+		{
+			srcMode: ydb.OperationModeUnknown,
+			dstMode: ydb.OperationModeSync,
+		},
+		{
+			srcMode: ydb.OperationModeSync,
+			dstMode: ydb.OperationModeSync,
+		},
+		{
+			srcMode: ydb.OperationModeAsync,
+			dstMode: ydb.OperationModeAsync,
+		},
+	} {
+		s := Session{
+			c: Client{
+				Driver: &testutil.Driver{
+					OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
+						require.Equal(t, testutil.TableExecuteDataQuery, m)
+						mode, ok := ydb.ContextOperationMode(ctx)
+						require.True(t, ok)
+						require.Equal(t, c.dstMode, mode)
+						r := testutil.TableBeginTransactionResult{R: res}
+						r.SetTransactionID("")
+						return nil
+					},
+				},
+			},
+			qcache: lru.New(0),
+		}
+		ctx, cancel := context.WithTimeout(
+			context.Background(),
+			time.Second,
+		)
+		if c.srcMode != 0 {
+			ctx = ydb.WithOperationMode(
+				ctx,
+				c.srcMode,
+			)
+		}
+		defer cancel()
+		_, _, err := s.Execute(
+			ctx,
+			TxControl(),
+			"",
+			NewQueryParameters(),
+		)
+		require.NoError(t, err)
 	}
 }
