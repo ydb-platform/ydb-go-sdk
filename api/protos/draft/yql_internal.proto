@@ -1,0 +1,82 @@
+syntax = "proto3";
+option cc_enable_arenas = true;
+
+package Yql.Analytics;
+option java_package = "com.yandex.yql.analytics";
+option java_outer_classname = "AnalyticsProtos";
+
+import "kikimr/public/api/protos/ydb_operation.proto";
+import "kikimr/public/api/protos/ydb_value.proto";
+import "kikimr/public/api/protos/ydb_issue_message.proto";
+
+import "kikimr/public/api/protos/draft/yq.proto";
+
+import "google/protobuf/timestamp.proto";
+
+////////////////////////////////////////////////////////////
+
+message GetTaskRequest {
+}
+
+message GetTaskResult {
+    bool has_task = 1;
+    string result_id = 2;
+    string result_id_signature = 3;
+
+    string operation_id = 2;
+    string operation_id_signature = 3;
+
+    string content = 4;
+    repeated YandexQuery.Connection connection = 5;
+    repeated Binding binding = 6;
+
+    string user_token = 7; // TODO: move to impersonation service
+    string token = 8;
+}
+
+message GetTaskResponse {
+    Ydb.Operations.Operation operation = 1; // GetTaskResult
+}
+
+message PingTaskRequest {
+    string operation_id = 1;
+    string operation_id_signature = 2;
+    string result_id = 3;
+    string result_id_signature = 4;
+    EQueryStatus status = 5;
+    repeated Ydb.Issue.IssueMessage issues = 6;
+    uint32 result_set_count = 7;
+    string statistics = 8;
+    string serialized_headers = 9;
+    string executer_info = 10;
+    string ast = 11;
+    string plan = 12;
+
+    string token = 100;
+}
+
+message PingTaskResult {
+
+}
+
+message PingTaskResponse {
+    Ydb.Operations.Operation operation = 1; // PingTaskResult
+}
+
+message WriteRowsResultRequest {
+    string result_id = 1;
+    string result_id_signature = 2;
+    Ydb.ResultSet result_set = 3;
+    uint32 result_set_id = 4;
+    uint64 offset = 5;
+
+    string token = 100;
+}
+
+message WriteRowsResultResult {
+
+}
+
+message WriteRowsResultResponse {
+    Ydb.Operations.Operation operation = 1; // WriteRowsResultResult
+}

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package Yql.Analytics.V1;
+option java_package = "com.yandex.yql.analytics.v1";
+
+import "kikimr/public/api/protos/draft/yql_internal.proto";
+
+service YqlInternalTaskService {
+    // gets new task
+    rpc GetTask(Analytics.GetTaskRequest) returns (Analytics.GetTaskResponse);
+
+    // pings new task (also can update metadata)
+    rpc PingTask(Analytics.PingTaskRequest) returns (Analytics.PingTaskResponse);
+
+    // writes rows
+    rpc WriteTaskResult(Analytics.WriteTaskResultRequest) returns (Analytics.WriteTaskResultResponse);
+}
