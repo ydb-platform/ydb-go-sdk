@@ -459,6 +459,10 @@ func (s *Statement) NumInput() int {
 	return len(s.params)
 }
 
+func (s *Statement) Text() string {
+	return s.query.YQL()
+}
+
 // Prepare prepares data query within session s.
 func (s *Session) Prepare(
 	ctx context.Context, query string,

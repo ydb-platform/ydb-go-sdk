@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"io"
 	"log"
 	"os"
 	"testing"
@@ -11,10 +12,12 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/internal/traceutil"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
+	"github.com/yandex-cloud/ydb-go-sdk/testutil"
 )
 
 // Interface checks.
@@ -179,6 +182,103 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 	))
 
 	return db, db.PingContext(ctx)
+}
+
+func TestQuery(t *testing.T) {
+	c := Connector(
+		WithClient(&table.Client{
+			Driver: &testutil.Driver{
+				OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
+					switch m {
+					case testutil.TableCreateSession:
+					case testutil.TableExecuteDataQuery:
+						r := testutil.TableExecuteDataQueryResult{R: res}
+						r.SetTransactionID("")
+					case testutil.TablePrepareDataQuery:
+					default:
+						t.Fatalf("Unexpected method %d", m)
+					}
+					return nil
+				},
+				OnStreamRead: func(ctx context.Context, m testutil.MethodCode, req, res interface{}, process func(error)) error {
+					switch m {
+					case testutil.TableCreateSession:
+					case testutil.TableStreamExecuteScanQuery:
+						process(io.EOF)
+					default:
+						t.Fatalf("Unexpected method %d", m)
+					}
+					return nil
+				},
+			},
+		}),
+		WithDefaultExecDataQueryOption(),
+	)
+
+	for _, test := range [...]struct {
+		subName       string
+		scanQueryMode bool
+	}{
+		{
+			subName:       "Legacy",
+			scanQueryMode: false,
+		},
+		{
+			subName:       "WithScanQuery",
+			scanQueryMode: true,
+		},
+	} {
+		t.Run("QueryContext/Conn/"+test.subName, func(t *testing.T) {
+			db := sql.OpenDB(c)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+			defer cancel()
+			if test.scanQueryMode {
+				ctx = WithScanQuery(ctx)
+			}
+			rows, err := db.QueryContext(ctx, "SELECT 1")
+			require.NoError(t, err)
+			require.NotNil(t, rows)
+		})
+		t.Run("QueryContext/STMT/"+test.subName, func(t *testing.T) {
+			db := sql.OpenDB(c)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+			defer cancel()
+			stmt, err := db.PrepareContext(ctx, "SELECT 1")
+			require.NoError(t, err)
+			defer stmt.Close()
+			if test.scanQueryMode {
+				ctx = WithScanQuery(ctx)
+			}
+			rows, err := stmt.QueryContext(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, rows)
+		})
+		t.Run("ExecContext/Conn/"+test.subName, func(t *testing.T) {
+			db := sql.OpenDB(c)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+			defer cancel()
+			if test.scanQueryMode {
+				ctx = WithScanQuery(ctx)
+			}
+			rows, err := db.ExecContext(ctx, "SELECT 1")
+			require.NoError(t, err)
+			require.NotNil(t, rows)
+		})
+		t.Run("ExecContext/STMT/"+test.subName, func(t *testing.T) {
+			db := sql.OpenDB(c)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+			defer cancel()
+			stmt, err := db.PrepareContext(ctx, "SELECT 1")
+			require.NoError(t, err)
+			defer stmt.Close()
+			if test.scanQueryMode {
+				ctx = WithScanQuery(ctx)
+			}
+			rows, err := stmt.ExecContext(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, rows)
+		})
+	}
 }
 
 func TestDatabaseSelect(t *testing.T) {

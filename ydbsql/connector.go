@@ -135,7 +135,13 @@ func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
 
 func WithDefaultExecDataQueryOption(opts ...table.ExecuteDataQueryOption) ConnectorOption {
 	return func(c *connector) {
-		c.execOpts = append(c.execOpts, opts...)
+		c.dataOpts = append(c.dataOpts, opts...)
+	}
+}
+
+func WithDefaultExecScanQueryOption(opts ...table.ExecuteScanQueryOption) ConnectorOption {
+	return func(c *connector) {
+		c.scanOpts = append(c.scanOpts, opts...)
 	}
 }
 
@@ -187,7 +193,8 @@ type connector struct {
 	retryConfig      RetryConfig
 	defaultTxControl *table.TransactionControl
 
-	execOpts []table.ExecuteDataQueryOption
+	dataOpts []table.ExecuteDataQueryOption
+	scanOpts []table.ExecuteScanQueryOption
 }
 
 func (c *connector) init(ctx context.Context) (err error) {
@@ -238,11 +245,8 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		panic("ydbsql: abnormal result of pool.Create()")
 	}
 	return &conn{
-		session:     s,
-		pool:        &c.pool,
-		retryConfig: &c.retryConfig,
-		defaultTxc:  c.defaultTxControl,
-		execOpts:    c.execOpts,
+		connector: c,
+		session:   s,
 	}, nil
 }
 

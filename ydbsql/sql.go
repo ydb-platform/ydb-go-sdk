@@ -18,29 +18,26 @@ var (
 	ErrActiveTransaction   = errors.New("ydbsql: can not begin tx within active tx")
 	ErrNoActiveTransaction = errors.New("ydbsql: no active tx to work with")
 	ErrSessionBusy         = errors.New("ydbsql: session is busy")
+	ErrResultTruncated     = errors.New("ydbsql: result set has been truncated")
 )
 
 // conn is a connection to the ydb.
 type conn struct {
+	connector *connector     // Immutable and r/o usage.
+	session   *table.Session // Immutable and r/o usage.
+
 	idle bool
 	busy bool
 
-	retryConfig *RetryConfig
-	session     *table.Session
-	pool        *table.SessionPool
-	defaultTxc  *table.TransactionControl
-
 	tx  *table.Transaction
 	txc *table.TransactionControl
-
-	execOpts []table.ExecuteDataQueryOption
 }
 
 func (c *conn) takeSession(ctx context.Context) bool {
 	if !c.idle {
 		return true
 	}
-	if has, _ := c.pool.Take(ctx, c.session); !has {
+	if has, _ := c.pool().Take(ctx, c.session); !has {
 		return false
 	}
 	c.idle = false
@@ -51,7 +48,7 @@ func (c *conn) putSession(ctx context.Context) {
 	if c.idle {
 		return
 	}
-	err := c.pool.Put(ctx, c.session)
+	err := c.pool().Put(ctx, c.session)
 	if err != nil {
 		panic(fmt.Sprintf("ydbsql: put session error: %v", err))
 	}
@@ -60,7 +57,7 @@ func (c *conn) putSession(ctx context.Context) {
 
 func (c *conn) ResetSession(ctx context.Context) error {
 	if c.busy {
-		_ = c.pool.PutBusy(ctx, c.session)
+		_ = c.pool().PutBusy(ctx, c.session)
 		return driver.ErrBadConn
 	}
 	c.putSession(ctx)
@@ -203,11 +200,7 @@ func (c *conn) Commit() error {
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	txc := c.txc
-	if txc == nil {
-		txc = c.defaultTxc
-	}
-	_, err := c.exec(ctx, txc, exec{text: query, opts: c.execOpts}, params(args))
+	_, err := c.exec(ctx, &reqQuery{text: query}, params(args))
 	if err != nil {
 		return nil, err
 	}
@@ -215,16 +208,29 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 }
 
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	txc := c.txc
-	if txc == nil {
-		txc = c.defaultTxc
+	if ContextScanQueryMode(ctx) {
+		// Allow to use scanQuery only through QueryContext API.
+		return c.scanQueryContext(ctx, query, args)
 	}
-	res, err := c.exec(ctx, txc, exec{text: query, opts: c.execOpts}, params(args))
+	return c.queryContext(ctx, query, args)
+}
+
+func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	res, err := c.exec(ctx, &reqQuery{text: query}, params(args))
 	if err != nil {
 		return nil, err
 	}
 	res.NextSet()
 	return &rows{res: res}, nil
+}
+
+func (c *conn) scanQueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	res, err := c.exec(ctx, &reqScanQuery{text: query}, params(args))
+	if err != nil {
+		return nil, err
+	}
+	res.NextStreamSet(ctx)
+	return &stream{ctx: ctx, res: res}, res.Err()
 }
 
 func (c *conn) CheckNamedValue(v *driver.NamedValue) error {
@@ -261,30 +267,12 @@ func (c *conn) Begin() (driver.Tx, error) {
 	return nil, ErrDeprecated
 }
 
-// exec is a helper struct for generalization of data query execution.
-type exec struct {
-	stmt *table.Statement
-	text string
-	opts []table.ExecuteDataQueryOption
-}
-
-func (r exec) do(
-	ctx context.Context, tx *table.TransactionControl,
-	session *table.Session, params *table.QueryParameters,
-) (
-	*table.Transaction, *table.Result, error,
-) {
-	if r.stmt != nil {
-		return r.stmt.Execute(ctx, tx, params, r.opts...)
-	}
-	return session.Execute(ctx, tx, r.text, params, r.opts...)
-}
-
-func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec, params *table.QueryParameters) (res *table.Result, err error) {
+func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParameters) (res *table.Result, err error) {
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
-	maxRetries := c.retryConfig.MaxRetries
+	rc := c.retryConfig()
+	maxRetries := rc.MaxRetries
 	if c.tx != nil {
 		// NOTE: when under transaction, no retries must be done.
 		maxRetries = 0
@@ -292,19 +280,19 @@ func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec
 	var m ydb.RetryMode
 	for i := 0; i <= maxRetries; i++ {
 		if m.MustBackoff() {
-			e := ydb.WaitBackoff(ctx, c.retryConfig.Backoff, i-1)
+			e := ydb.WaitBackoff(ctx, rc.Backoff, i-1)
 			if e != nil {
 				// Use original error to make it possible to lay on for the
 				// client.
 				break
 			}
 		}
-		_, res, err = exec.do(ctx, tx, c.session, params)
+		res, err = req.process(ctx, c, params)
 		if err == nil {
 			return res, nil
 		}
 
-		m = c.retryConfig.RetryChecker.Check(err)
+		m = rc.RetryChecker.Check(err)
 
 		if c.busy = m.MustCheckSession(); c.busy {
 			if m.Retriable() {
@@ -336,6 +324,59 @@ func (c *conn) exec(ctx context.Context, tx *table.TransactionControl, exec exec
 		}
 	}
 	return nil, err
+}
+
+func (c *conn) txControl() *table.TransactionControl {
+	if c.txc == nil {
+		return c.connector.defaultTxControl
+	}
+	return c.txc
+}
+
+func (c *conn) dataOpts() []table.ExecuteDataQueryOption {
+	return c.connector.dataOpts
+}
+
+func (c *conn) scanOpts() []table.ExecuteScanQueryOption {
+	return c.connector.scanOpts
+}
+
+func (c *conn) pool() *table.SessionPool {
+	return &c.connector.pool
+}
+
+func (c *conn) retryConfig() *RetryConfig {
+	return &c.connector.retryConfig
+}
+
+type processor interface {
+	process(context.Context, *conn, *table.QueryParameters) (*table.Result, error)
+}
+
+type reqStmt struct {
+	stmt *table.Statement
+}
+
+func (o *reqStmt) process(ctx context.Context, c *conn, params *table.QueryParameters) (*table.Result, error) {
+	_, res, err := o.stmt.Execute(ctx, c.txControl(), params, c.dataOpts()...)
+	return res, err
+}
+
+type reqQuery struct {
+	text string
+}
+
+func (o *reqQuery) process(ctx context.Context, c *conn, params *table.QueryParameters) (*table.Result, error) {
+	_, res, err := c.session.Execute(ctx, c.txControl(), o.text, params, c.dataOpts()...)
+	return res, err
+}
+
+type reqScanQuery struct {
+	text string
+}
+
+func (o *reqScanQuery) process(ctx context.Context, c *conn, params *table.QueryParameters) (*table.Result, error) {
+	return c.session.StreamExecuteScanQuery(ctx, o.text, params, c.scanOpts()...)
 }
 
 type TxOperationFunc func(context.Context, *sql.Tx) error
@@ -465,11 +506,7 @@ func (s *stmt) CheckNamedValue(v *driver.NamedValue) error {
 }
 
 func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	txc := s.conn.txc
-	if txc == nil {
-		txc = s.conn.defaultTxc
-	}
-	_, err := s.conn.exec(ctx, txc, exec{stmt: s.stmt}, params(args))
+	_, err := s.conn.exec(ctx, &reqStmt{stmt: s.stmt}, params(args))
 	if err != nil {
 		return nil, err
 	}
@@ -477,16 +514,29 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 }
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	txc := s.conn.txc
-	if txc == nil {
-		txc = s.conn.defaultTxc
+	if ContextScanQueryMode(ctx) {
+		// Allow to use scanQuery only through QueryContext API.
+		return s.scanQueryContext(ctx, args)
 	}
-	res, err := s.conn.exec(ctx, txc, exec{stmt: s.stmt}, params(args))
+	return s.queryContext(ctx, args)
+}
+
+func (s *stmt) queryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	res, err := s.conn.exec(ctx, &reqStmt{stmt: s.stmt}, params(args))
 	if err != nil {
 		return nil, err
 	}
 	res.NextSet()
 	return &rows{res: res}, nil
+}
+
+func (s *stmt) scanQueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	res, err := s.conn.exec(ctx, &reqScanQuery{text: s.stmt.Text()}, params(args))
+	if err != nil {
+		return nil, err
+	}
+	res.NextStreamSet(ctx)
+	return &stream{ctx: ctx, res: res}, res.Err()
 }
 
 func checkNamedValue(v *driver.NamedValue) (err error) {
@@ -619,6 +669,65 @@ func (r *rows) Next(dst []driver.Value) error {
 }
 
 func (r *rows) Close() error {
+	return r.res.Close()
+}
+
+type stream struct {
+	res *table.Result
+	ctx context.Context
+}
+
+func (r *stream) Columns() []string {
+	var i int
+	cs := make([]string, r.res.ColumnCount())
+	r.res.Columns(func(m table.Column) {
+		cs[i] = m.Name
+		i++
+	})
+	return cs
+}
+
+func (r *stream) Next(dst []driver.Value) error {
+	if !r.res.HasNextRow() {
+		if !r.res.NextStreamSet(r.ctx) {
+			err := r.res.Err()
+			if err != nil {
+				return err
+			}
+			return io.EOF
+		}
+	}
+	if !r.res.NextRow() {
+		return io.EOF
+	}
+	for i := range dst {
+		// NOTE: for queries like "SELECT * FROM xxx" order of columns is
+		// undefined.
+		if !r.res.NextItem() {
+			err := r.res.Err()
+			if err == nil {
+				err = io.ErrUnexpectedEOF
+			}
+			return err
+		}
+		if r.res.IsOptional() {
+			r.res.Unwrap()
+		}
+		if r.res.IsDecimal() {
+			b, p, s := r.res.UnwrapDecimal()
+			dst[i] = Decimal{
+				Bytes:     b,
+				Precision: p,
+				Scale:     s,
+			}
+		} else {
+			dst[i] = r.res.Any()
+		}
+	}
+	return r.res.Err()
+}
+
+func (r *stream) Close() error {
 	return r.res.Close()
 }
 

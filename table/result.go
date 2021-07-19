@@ -134,8 +134,7 @@ func (r *Result) Truncated() bool {
 
 // NextStreamSet selects next result set from the result of streaming operation.
 // It returns false if stream is closed or ctx is canceled.
-// Note that in case of context cancelation it does not marks whole result as
-// failed.
+// Note that in case of context cancelation it marks via error set.
 func (r *Result) NextStreamSet(ctx context.Context) bool {
 	if r.inactive() || r.setCh == nil {
 		return false
@@ -150,6 +149,9 @@ func (r *Result) NextStreamSet(ctx context.Context) bool {
 		return true
 
 	case <-ctx.Done():
+		if r.err == nil {
+			r.err = ctx.Err()
+		}
 		result.Reset(&r.Scanner, nil)
 		return false
 	}
