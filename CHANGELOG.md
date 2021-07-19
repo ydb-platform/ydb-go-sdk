@@ -1,6 +1,9 @@
 ## 1.1.0
 * Support scan-query method in ydbsql (database.sql api)
 
+## 1.0.7
+* Use github.com/golang-jwt/jwt instead of github.com/dgrijalva/jwt-go
+
 ## 1.0.6
 * Append (if not exits) SYNC Operation mode on table calls: *Session, *DataQuery, *Transaction, KeepAlive
 
