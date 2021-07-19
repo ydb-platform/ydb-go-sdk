@@ -1,3 +1,6 @@
+## 1.1.0
+* Support scan-query method in ydbsql (database.sql api)
+
 ## 1.0.6
 * Append (if not exits) SYNC Operation mode on table calls: *Session, *DataQuery, *Transaction, KeepAlive
 
