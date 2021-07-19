@@ -244,6 +244,10 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 
 		r.s, r.err = p.Builder.CreateSession(ctx)
 		// if session not nil - error must be nil and vice versa
+		if r.s == nil && r.err == nil {
+			panic("ydb: abnormal result of pool.Builder.CreateSession()")
+		}
+
 		if r.err != nil {
 			p.mu.Lock()
 			p.createInProgress--
@@ -299,6 +303,9 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 	}()
 	select {
 	case r := <-resCh:
+		if r.s == nil && r.err == nil {
+			panic("ydb: abnormal result of pool.createSession()")
+		}
 		return r.s, r.err
 	case <-ctx.Done():
 		return nil, ctx.Err()

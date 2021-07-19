@@ -234,6 +234,9 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+	if s == nil {
+		panic("ydbsql: abnormal result of pool.Create()")
+	}
 	return &conn{
 		session:     s,
 		pool:        &c.pool,
