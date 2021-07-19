@@ -26,7 +26,6 @@ message Acl {
         PRIVATE = 1;
         SCOPE = 2;
     }
-    
     Visibility visibility = 1;
 }
 
@@ -89,7 +88,7 @@ message QueryContent {
         ANALYTICS = 1;
         STREAMING = 2;
     }
-    QueryType type = 1; 
+    QueryType type = 1;
     string name = 2 [(Ydb.length).range = {min: 1, max: 1024}];
     Acl acl = 3;
     Limits limits = 4;
@@ -131,7 +130,7 @@ message QueryMeta {
 }
 
 message BriefQuery {
-    QueryContent.QueryType type = 1; 
+    QueryContent.QueryType type = 1;
     string name = 2 [(Ydb.length).range = {min: 1, max: 1024}];
     QueryMeta meta = 3;
 }
