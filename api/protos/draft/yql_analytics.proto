@@ -209,7 +209,7 @@ message GetHistoryResult {
         string query_id = 9;
 
         repeated bool truncated = 10;
-        repeated int64 rows_count = 11;
+        repeated uint64 rows_count = 11;
         EQueryStatus status = 12;
         EExecuteMode execute_mode = 13;
 

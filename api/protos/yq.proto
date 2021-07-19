@@ -1,0 +1,579 @@
+syntax = "proto3";
+option cc_enable_arenas = true;
+
+package YandexQuery;
+option java_package = "com.yandex.query";
+option java_outer_classname = "YandexQueryProtos";
+
+import "kikimr/public/api/protos/validation/validation.proto";
+import "kikimr/public/api/protos/ydb_operation.proto";
+import "kikimr/public/api/protos/ydb_value.proto";
+import "kikimr/public/api/protos/ydb_issue_message.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+////////////////////////////////////////////////////////////
+
+// === Query API ===
+
+// Header: x-yq-scope => yandexcloud://cloud_id/folder_id
+
+message Acl {
+    enum Visibility {
+        VISIBILITY_UNSPECIFIED = 0;
+        PRIVATE = 1;
+        SCOPE = 2;
+    }
+    
+    Visibility visibility = 1;
+}
+
+message Limits {
+    int64 vcpu_rate_limit = 1 [(Ydb.value) = ">= 0"];
+    int64 flow_rate_limit = 2 [(Ydb.value) = ">= 0"];
+    int64 vcpu_time_limit = 3 [(Ydb.value) = ">= 0"];
+    int64 max_result_size = 4 [(Ydb.value) = ">= 0"];
+    int64 max_result_rows = 5 [(Ydb.value) = ">= 0"];
+    int64 memory_limit = 6 [(Ydb.value) = ">= 0"];
+    google.protobuf.Duration result_ttl = 7;
+}
+
+enum ExecuteMode {
+    EXECUTE_MODE_UNSPECIFIED = 0;
+    SAVE = 1;
+    PARSE = 2;
+    COMPILE = 3;
+    VALIDATE = 4;
+    EXPLAIN = 5;
+    RUN = 6;
+}
+
+enum QueryAction {
+    QUERY_ACTION_UNSPECIFIED = 0;
+    PAUSE = 1;
+    PAUSE_GRACEFULLY = 2;
+    ABORT = 3;
+    ABORT_GRACEFULLY = 4;
+    RESUME = 5;
+}
+
+enum StateLoadMode {
+    STATE_LOAD_MODE_UNSPECIFIED = 0;
+    EMPTY = 1;
+    FROM_LAST_CHECKPOINT = 2;
+}
+
+message StreamingDisposition {
+    message FromTime {
+        google.protobuf.Timestamp timestamp = 1;
+    }
+
+    message TimeAgo {
+        google.protobuf.Duration duration = 1;
+    }
+
+    oneof disposition {
+        google.protobuf.Empty oldest = 1;
+        google.protobuf.Empty fresh = 2;
+        FromTime from_time = 3;
+        TimeAgo time_ago = 4;
+        google.protobuf.Empty from_last_checkpoint = 5;
+    }
+}
+
+message QueryContent {
+    enum QueryType {
+        QUERY_TYPE_UNSPECIFIED = 0;
+        ANALYTICS = 1;
+        STREAMING = 2;
+    }
+    QueryType type = 1; 
+    string name = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    Acl acl = 3;
+    Limits limits = 4;
+    string text = 5 [(Ydb.length).le = 102400];
+    bool automatic = 6;
+    string description = 7 [(Ydb.length).le = 10240];
+}
+
+message CommonMeta {
+    string id = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+    string created_by = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    string modified_by = 3 [(Ydb.length).range = {min: 1, max: 1024}];
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp modified_at = 5;
+    int64 revision = 6 [(Ydb.value) = ">= 0"];
+}
+
+message QueryMeta {
+    enum ComputeStatus {
+        COMPUTE_STATUS_UNSPECIFIED = 0;
+        STARTING = 1;
+        ABORTED_BY_USER = 2;
+        ABORTED_BY_SYSTEM = 3;
+        ABORTING_BY_USER = 4;
+        ABORTING_BY_SYSTEM = 5;
+        RESUMING = 6;
+        RUNNING = 7;
+        COMPLETED = 8;
+        FAILED = 9;
+        PAUSING = 10;
+        PAUSED = 11;
+    }
+
+    CommonMeta common = 1;
+    google.protobuf.Timestamp started_at = 2;
+    google.protobuf.Timestamp finished_at = 3;
+    ExecuteMode execute_mode = 4;
+    ComputeStatus status = 5;
+}
+
+message BriefQuery {
+    QueryContent.QueryType type = 1; 
+    string name = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    QueryMeta meta = 3;
+}
+
+message QueryPlan {
+    string json = 1; // no validation because generated on server side
+}
+
+message ResultSetMeta {
+    repeated Ydb.Column column = 1;
+    int64 rows_count = 2 [(Ydb.value) = ">= 0"];
+    bool truncated = 3;
+}
+
+message Query {
+    QueryMeta meta = 1;
+    QueryContent content = 2;
+    QueryPlan plan = 3;
+    repeated Ydb.Issue.IssueMessage issue = 4;
+    repeated Ydb.Issue.IssueMessage transient_issue = 5;
+    QueryStatistics statistics = 6;
+    repeated ResultSetMeta result_set_meta = 7;
+}
+
+message QueryStatistics {
+    string json = 1; // no validation because generated on server side
+}
+
+message CreateQueryRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    QueryContent content = 2;
+    ExecuteMode execute_mode = 3;
+    StreamingDisposition disposition = 4;
+    string idempotency_key = 5 [(Ydb.length).le = 1024];
+}
+
+message CreateQueryResponse {
+    Ydb.Operations.Operation operation = 1; // CreateQueryResult
+}
+
+message CreateQueryResult {
+    string query_id = 1 [(Ydb.length).le = 1024];
+}
+
+message ListQueriesRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string page_token = 2 [(Ydb.length).le = 1024];
+    int32 limit = 3 [(Ydb.value) = "[1; 100]"];
+
+    message Filter {
+        QueryContent.QueryType query_type = 1;
+        repeated QueryMeta.ComputeStatus status = 2 [(Ydb.size).le = 20];
+        repeated ExecuteMode mode = 3 [(Ydb.size).le = 20];
+        string name = 4 [(Ydb.length).le = 1024];
+    }
+    Filter filter = 4;
+}
+
+message ListQueriesResponse {
+    Ydb.Operations.Operation operation = 1; // ListQueriesResult
+}
+
+message ListQueriesResult {
+    repeated BriefQuery query = 1;
+    string next_page_token = 2 [(Ydb.length).le = 1024];
+}
+
+message DescribeQueryRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+}
+
+message DescribeQueryResponse {
+    Ydb.Operations.Operation operation = 1; // DescribeQueryResult
+}
+
+message DescribeQueryResult {
+    Query query = 1;
+}
+
+message DeleteQueryRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    int64 previous_revision = 3 [(Ydb.value) = ">= 0"];
+    string idempotency_key = 4 [(Ydb.length).le = 1024];
+}
+
+message DeleteQueryResponse {
+    Ydb.Operations.Operation operation = 1; // DeleteQueryResult
+}
+
+message DeleteQueryResult {
+}
+
+message ModifyQueryRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    QueryContent content = 3;
+    ExecuteMode execute_mode = 4;
+    StreamingDisposition disposition = 5;
+    StateLoadMode state_mode = 6;
+    int64 previous_revision = 7 [(Ydb.value) = ">= 0"];
+    string idempotency_key = 8 [(Ydb.length).le = 1024];
+}
+
+message ModifyQueryResponse {
+    Ydb.Operations.Operation operation = 1; // ModifyQueryResult
+}
+
+message ModifyQueryResult {
+}
+
+message ControlQueryRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    QueryAction action = 3;
+    int64 previous_revision = 4 [(Ydb.value) = ">= 0"];
+    string idempotency_key = 5 [(Ydb.length).le = 1024];
+}
+
+message ControlQueryResponse {
+    Ydb.Operations.Operation operation = 1; // ControlQueryResult
+}
+
+message ControlQueryResult {
+}
+
+// === Job API ===
+
+message Job {
+    CommonMeta meta = 1;
+    string text = 2;
+    QueryMeta query_meta = 3;
+    QueryPlan plan = 4;
+    repeated Ydb.Issue.IssueMessage issue = 5;
+    QueryStatistics statistics = 6;
+    repeated ResultSetMeta result_set_meta = 7;
+}
+
+message ListJobsRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    string page_token = 3 [(Ydb.length).le = 1024];
+    int32 limit = 4 [(Ydb.value) = "[1; 100]"];
+}
+
+message ListJobsResponse {
+    Ydb.Operations.Operation operation = 1; // ListJobsResult
+}
+
+message ListJobsResult {
+    repeated Job job = 1;
+    string next_page_token = 2 [(Ydb.length).le = 1024];
+}
+
+// === Connection API ===
+
+message CurrentIAMTokenAuth {
+}
+
+message ServiceAccountAuth {
+    string id = 1 [(Ydb.length).le = 1024];
+}
+
+message IamAuth {
+    oneof identity {
+        CurrentIAMTokenAuth current_iam = 1;
+        ServiceAccountAuth service_account = 2;
+    }
+}
+
+message DataStreams {
+    string database_id = 1 [(Ydb.length).le = 1024];
+    IamAuth auth = 2;
+
+    // for internal usage
+    string endpoint = 3 [(Ydb.length).le = 1024];
+    string database = 4 [(Ydb.length).le = 1024];
+    bool secure = 5;
+}
+
+message YdbDatabase {
+    string database_id = 1 [(Ydb.length).le = 1024];
+    IamAuth auth = 2;
+
+    // for internal usage
+    string endpoint = 3 [(Ydb.length).le = 1024];
+    string database = 4 [(Ydb.length).le = 1024];
+    bool secure = 5;
+}
+
+message ClickHouseCluster {
+    string database_id = 1 [(Ydb.length).le = 1024];
+    string login = 2 [(Ydb.length).le = 1024];
+    string password = 3 [(Ydb.length).le = 1024];
+
+    // for internal usage
+    string host = 4 [(Ydb.length).le = 1024];
+    int32 port = 5 [(Ydb.value) = "[0; 65536]"];
+    bool secure = 6;
+}
+
+message ObjectStorageConnection {
+    string bucket = 1 [(Ydb.length).le = 1024];
+    IamAuth auth = 2;
+}
+
+message ConnectionSetting {
+    oneof connection {
+        YdbDatabase ydb_database = 1;
+        ClickHouseCluster clickhouse_cluster = 2;
+        DataStreams data_streams = 3;
+        ObjectStorageConnection object_storage = 4;
+    }
+}
+
+message ConnectionContent {
+    string name = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+    ConnectionSetting setting = 2;
+    Acl acl = 3;
+    string description = 4 [(Ydb.length).le = 10240];
+}
+
+message Connection {
+    ConnectionContent content = 1;
+    CommonMeta meta = 2;
+}
+
+message CreateConnectionRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    ConnectionContent content = 2;
+    string idempotency_key = 3 [(Ydb.length).le = 1024];
+}
+
+message CreateConnectionResponse {
+    Ydb.Operations.Operation operation = 1; // CreateConnectionResult
+}
+
+message CreateConnectionResult {
+    string connection_id = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+}
+
+message ListConnectionsRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string page_token = 2 [(Ydb.length).le = 1024];
+    int32 limit = 3 [(Ydb.value) = "[1; 100]"];
+}
+
+message ListConnectionsResponse {
+    Ydb.Operations.Operation operation = 1; // ListConnectionsResult
+}
+
+message ListConnectionsResult {
+    repeated Connection connection = 1;
+    string next_page_token = 2 [(Ydb.length).le = 1024];
+}
+
+message DescribeConnectionRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+}
+
+message DescribeConnectionResponse {
+    Ydb.Operations.Operation operation = 1; // DescribeConnectionResult
+}
+
+message DescribeConnectionResult {
+    Connection connection = 1;
+}
+
+message ModifyConnectionRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    ConnectionContent content = 3;
+    int64 previous_revision = 4 [(Ydb.value) = ">= 0"];
+    string idempotency_key = 5 [(Ydb.length).le = 1024];
+}
+
+message ModifyConnectionResponse {
+    Ydb.Operations.Operation operation = 1; // ModifyConnectionResult
+}
+
+message ModifyConnectionResult {
+}
+
+message DeleteConnectionRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    int64 previous_revision = 3 [(Ydb.value) = ">= 0"];
+    string idempotency_key = 4 [(Ydb.length).le = 1024];
+}
+
+message DeleteConnectionResponse {
+    Ydb.Operations.Operation operation = 1; // DeleteConnectionResult
+}
+
+message DeleteConnectionResult {
+}
+
+// ResultSet API
+
+message GetResultDataRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    int32 result_set_index = 3 [(Ydb.value) = ">= 0"];
+    int64 offset = 4 [(Ydb.value) = ">= 0"];
+    int64 limit = 5 [(Ydb.value) = "[1; 100]"];
+}
+
+message GetResultDataResponse {
+    Ydb.Operations.Operation operation = 1; // GetResultDataResult
+}
+
+message GetResultDataResult {
+    Ydb.ResultSet result_set = 1;
+}
+
+// Binding API
+
+message Schema {
+    repeated Ydb.Column column = 1 [(Ydb.size).le = 100];
+}
+
+message DataStreamsBinding {
+    string stream_name = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+    string format = 2 [(Ydb.length).le = 1024];
+    string compression = 3 [(Ydb.length).le = 1024];
+    Schema schema = 4;
+}
+
+message ObjectStorageBinding {
+    message Subset {
+        string path_pattern = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+        string format = 2 [(Ydb.length).le = 1024];
+        map<string, string> format_setting = 3 [(Ydb.size).le = 100];
+        string compression = 4 [(Ydb.length).le = 1024];
+        Schema schema = 5;
+    }
+
+    repeated Subset subset = 1;
+}
+
+message BindingSetting {
+    oneof binding {
+        DataStreamsBinding data_streams = 1;
+        ObjectStorageBinding object_storage = 2;
+    }
+}
+
+enum BindingType {
+    BINDING_TYPE_UNSPECIFIED = 0;
+    DATA_STREAMS = 1;
+    OBJECT_STORAGE = 2;
+}
+
+message BriefBinding {
+    string name = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+    string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    CommonMeta meta = 3;
+    BindingType type = 4;
+}
+
+message BindingContent {
+    string name = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+    string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    BindingSetting setting = 3;
+    Acl acl = 4;
+    string description = 5 [(Ydb.length).le = 10240];
+}
+
+message Binding {
+    BindingContent content = 1;
+    CommonMeta meta = 2;
+}
+
+message CreateBindingRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    BindingContent content = 2;
+    string idempotency_key = 3 [(Ydb.length).le = 1024];
+}
+
+message CreateBindingResponse {
+    Ydb.Operations.Operation operation = 1; // CreateBindingResult
+}
+
+message CreateBindingResult {
+    string binding_id = 1 [(Ydb.length).range = {min: 1, max: 1024}];
+}
+
+message ListBindingsRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string page_token = 2 [(Ydb.length).le = 1024];
+    int32 limit = 3 [(Ydb.value) = "[1; 100]"];
+}
+
+message ListBindingsResponse {
+    Ydb.Operations.Operation operation = 1; // ListBindingsResult
+}
+
+message ListBindingsResult {
+    repeated BriefBinding binding = 1;
+    string next_page_token = 2 [(Ydb.length).le = 1024];
+}
+
+message DescribeBindingRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string binding_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+}
+
+message DescribeBindingResponse {
+    Ydb.Operations.Operation operation = 1; // DescribeBindingResult
+}
+
+message DescribeBindingResult {
+    Binding binding = 1;
+}
+
+message ModifyBindingRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string binding_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    BindingContent content = 3;
+    int64 previous_revision = 4 [(Ydb.value) = ">= 0"];
+    string idempotency_key = 5 [(Ydb.length).le = 1024];
+}
+
+message ModifyBindingResponse {
+    Ydb.Operations.Operation operation = 1; // ModifyBindingResult
+}
+
+message ModifyBindingResult {
+}
+
+message DeleteBindingRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string binding_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    int64 previous_revision = 3 [(Ydb.value) = ">= 0"];
+    string idempotency_key = 4 [(Ydb.length).le = 1024];
+}
+
+message DeleteBindingResponse {
+    Ydb.Operations.Operation operation = 1; // DeleteBindingResult
+}
+
+message DeleteBindingResult {
+}

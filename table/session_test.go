@@ -248,7 +248,7 @@ func TestSessionDescribeTable(t *testing.T) {
 }
 
 func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
-	for _, c := range []struct {
+	fromTo := [...]struct {
 		srcMode ydb.OperationMode
 		dstMode ydb.OperationMode
 	}{
@@ -264,41 +264,150 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			srcMode: ydb.OperationModeAsync,
 			dstMode: ydb.OperationModeAsync,
 		},
-	} {
-		s := Session{
-			c: Client{
-				Driver: &testutil.Driver{
-					OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-						require.Equal(t, testutil.TableExecuteDataQuery, m)
-						mode, ok := ydb.ContextOperationMode(ctx)
-						require.True(t, ok)
-						require.Equal(t, c.dstMode, mode)
-						r := testutil.TableBeginTransactionResult{R: res}
-						r.SetTransactionID("")
-						return nil
-					},
-				},
+	}
+	for _, test := range []struct {
+		method testutil.MethodCode
+		do     func(t *testing.T, ctx context.Context, c Client)
+	}{
+		{
+			method: testutil.TableExecuteDataQuery,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				s := &Session{
+					c:      c,
+					qcache: lru.New(0),
+				}
+				_, _, err := s.Execute(ctx, TxControl(), "", NewQueryParameters())
+				require.NoError(t, err)
 			},
-			qcache: lru.New(0),
-		}
-		ctx, cancel := context.WithTimeout(
-			context.Background(),
-			time.Second,
+		},
+		{
+			method: testutil.TableExplainDataQuery,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				s := &Session{
+					c:      c,
+					qcache: lru.New(0),
+				}
+				_, err := s.Explain(ctx, "")
+				require.NoError(t, err)
+			},
+		},
+		{
+			method: testutil.TablePrepareDataQuery,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				s := &Session{
+					c:      c,
+					qcache: lru.New(0),
+				}
+				_, err := s.Prepare(ctx, "")
+				require.NoError(t, err)
+			},
+		},
+		{
+			method: testutil.TableCreateSession,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				_, err := c.CreateSession(ctx)
+				require.NoError(t, err)
+			},
+		},
+		{
+			method: testutil.TableDeleteSession,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				s := &Session{
+					c:      c,
+					qcache: lru.New(0),
+				}
+				require.NoError(t, s.Close(ctx))
+			},
+		},
+		{
+			method: testutil.TableBeginTransaction,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				s := &Session{
+					c:      c,
+					qcache: lru.New(0),
+				}
+				_, err := s.BeginTransaction(ctx, TxSettings())
+				require.NoError(t, err)
+			},
+		},
+		{
+			method: testutil.TableCommitTransaction,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				tx := &Transaction{
+					s: &Session{
+						c:      c,
+						qcache: lru.New(0),
+					},
+				}
+				_, err := tx.CommitTx(ctx)
+				require.NoError(t, err)
+			},
+		},
+		{
+			method: testutil.TableRollbackTransaction,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				tx := &Transaction{
+					s: &Session{
+						c:      c,
+						qcache: lru.New(0),
+					},
+				}
+				err := tx.Rollback(ctx)
+				require.NoError(t, err)
+			},
+		},
+		{
+			method: testutil.TableKeepAlive,
+			do: func(t *testing.T, ctx context.Context, c Client) {
+				s := &Session{
+					c:      c,
+					qcache: lru.New(0),
+				}
+				_, err := s.KeepAlive(ctx)
+				require.NoError(t, err)
+			},
+		},
+	} {
+		t.Run(
+			test.method.String(),
+			func(t *testing.T) {
+				for _, srcDst := range fromTo {
+					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
+						client := Client{
+							Driver: &testutil.Driver{
+								OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
+									require.Equal(t, test.method, m)
+									mode, ok := ydb.ContextOperationMode(ctx)
+									require.True(t, ok)
+									require.Equal(t, srcDst.dstMode, mode)
+									switch m {
+									case testutil.TableExecuteDataQuery:
+										r := testutil.TableExecuteDataQueryResult{R: res}
+										r.SetTransactionID("")
+									case testutil.TableBeginTransaction:
+										r := testutil.TableBeginTransactionResult{R: res}
+										r.SetTransactionID("")
+									}
+									return nil
+								},
+							},
+						}
+						ctx, cancel := context.WithTimeout(
+							context.Background(),
+							time.Second,
+						)
+						if srcDst.srcMode != 0 {
+							ctx = ydb.WithOperationMode(
+								ctx,
+								srcDst.srcMode,
+							)
+						}
+						defer cancel()
+						test.do(t, ctx, client)
+					})
+				}
+			},
 		)
-		if c.srcMode != 0 {
-			ctx = ydb.WithOperationMode(
-				ctx,
-				c.srcMode,
-			)
-		}
-		defer cancel()
-		_, _, err := s.Execute(
-			ctx,
-			TxControl(),
-			"",
-			NewQueryParameters(),
-		)
-		require.NoError(t, err)
 	}
 }
 

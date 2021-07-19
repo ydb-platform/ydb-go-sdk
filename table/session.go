@@ -44,6 +44,9 @@ func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		res Ydb_Table.CreateSessionResult
 	)
 	var endpointInfo ydb.EndpointInfo
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	}
 	endpointInfo, err = t.Driver.Call(
 		ctx,
 		internal.Wrap(
@@ -119,6 +122,9 @@ func (s *Session) Close(ctx context.Context) (err error) {
 	req := Ydb_Table.DeleteSessionRequest{
 		SessionId: s.ID,
 	}
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	}
 	_, err = s.c.Driver.Call(
 		ydb.WithEndpointInfo(
 			ctx,
@@ -149,6 +155,9 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 	var res Ydb_Table.KeepAliveResult
 	req := Ydb_Table.KeepAliveRequest{
 		SessionId: s.ID,
+	}
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
 	_, err = s.c.Driver.Call(
 		ydb.WithEndpointInfoAndPolicy(
@@ -381,6 +390,9 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 		SessionId: s.ID,
 		YqlText:   query,
 	}
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	}
 	_, err = s.c.Driver.Call(
 		ydb.WithEndpointInfo(
 			ctx,
@@ -473,6 +485,9 @@ func (s *Session) Prepare(
 	req := Ydb_Table.PrepareDataQueryRequest{
 		SessionId: s.ID,
 		YqlText:   query,
+	}
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
 	_, err = s.c.Driver.Call(
 		ydb.WithEndpointInfo(
@@ -932,6 +947,9 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 		SessionId:  s.ID,
 		TxSettings: &tx.settings,
 	}
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	}
 	_, err = s.c.Driver.Call(
 		ydb.WithEndpointInfo(
 			ctx,
@@ -1020,6 +1038,9 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOp
 	for _, opt := range opts {
 		opt((*commitTransactionDesc)(req))
 	}
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	}
 	_, err = tx.s.c.Driver.Call(
 		ydb.WithEndpointInfo(
 			ctx,
@@ -1043,6 +1064,9 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	req := Ydb_Table.RollbackTransactionRequest{
 		SessionId: tx.s.ID,
 		TxId:      tx.id,
+	}
+	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
+		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
 	_, err = tx.s.c.Driver.Call(
 		ydb.WithEndpointInfo(
