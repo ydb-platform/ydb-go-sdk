@@ -1,3 +1,6 @@
+## 1.2.0
+* Load YDB certificates by default with TLS connection
+
 ## 1.1.0
 * Support scan-query method in ydbsql (database.sql api)
 

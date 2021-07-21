@@ -279,6 +279,16 @@ func (c *client) init() (err error) {
 		if c.TokenTTL == 0 {
 			c.TokenTTL = DefaultTokenTTL
 		}
+		if !c.InsecureSkipVerify {
+			if c.CertPool == nil {
+				err := WithSystemCertPool()(c)
+				if err != nil {
+					c.err = fmt.Errorf("iam: system certpool cannot loaded: %+w", err)
+					return
+				}
+			}
+			c.CertPool.AppendCertsFromPEM(ydbCertificateAuthority)
+		}
 		if c.transport == nil {
 			c.transport = &grpcTransport{
 				endpoint:           c.Endpoint,
