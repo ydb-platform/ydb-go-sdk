@@ -24,8 +24,7 @@ func (o *Optional) Scan(res *table.Result) (err error) {
 	}
 
 	res.SeekItem("str")
-	res.Unwrap()
-	if !res.IsNull() {
+	{
 		x0 := string(res.String())
 		o.Str.Set(x0)
 	}
@@ -53,9 +52,9 @@ func (o *Optional) QueryParameters() *table.QueryParameters {
 		var v2 ydb.Value
 		x0, ok0 := o.Str.Get()
 		if ok0 {
-			v2 = ydb.OptionalValue(ydb.StringValue([]uint8(x0)))
+			v2 = ydb.StringValue([]uint8(x0))
 		} else {
-			v2 = ydb.NullValue(ydb.TypeString)
+			panic("ydbgen: no value for non-optional type")
 		}
 		v1 = v2
 	}
@@ -90,9 +89,9 @@ func (o *Optional) StructValue() ydb.Value {
 			var v3 ydb.Value
 			x0, ok0 := o.Str.Get()
 			if ok0 {
-				v3 = ydb.OptionalValue(ydb.StringValue([]uint8(x0)))
+				v3 = ydb.StringValue([]uint8(x0))
 			} else {
-				v3 = ydb.NullValue(ydb.TypeString)
+				panic("ydbgen: no value for non-optional type")
 			}
 			v2 = v3
 		}
@@ -123,7 +122,7 @@ func (o *Optional) StructType() ydb.Type {
 		var t2 ydb.Type
 		{
 			tp0 := ydb.TypeString
-			t2 = ydb.Optional(tp0)
+			t2 = tp0
 		}
 		fs0[1] = ydb.StructField("str", t2)
 		var t3 ydb.Type
@@ -156,3 +155,4 @@ func ydbConvI64ToI16(x int64) int16 {
 	}
 	return int16(x)
 }
+

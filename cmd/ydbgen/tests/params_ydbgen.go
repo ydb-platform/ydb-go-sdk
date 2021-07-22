@@ -23,12 +23,12 @@ func (p *Params) QueryParameters() *table.QueryParameters {
 	}
 	var v1 ydb.Value
 	{
-		vp0 := ydb.OptionalValue(ydb.Uint32Value(ydbConvI16ToU32(p.Int16ToUint32)))
+		vp0 := ydb.Uint32Value(ydbConvI16ToU32(p.Int16ToUint32))
 		v1 = vp0
 	}
 	var v2 ydb.Value
 	{
-		vp0 := ydb.OptionalValue(ydb.Int64Value(int64(p.IntToInt64)))
+		vp0 := ydb.Int64Value(int64(p.IntToInt64))
 		v2 = vp0
 	}
 	return table.NewQueryParameters(
@@ -44,3 +44,4 @@ func ydbConvI16ToU32(x int16) uint32 {
 	}
 	return uint32(x)
 }
+

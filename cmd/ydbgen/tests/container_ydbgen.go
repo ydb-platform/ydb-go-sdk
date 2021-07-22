@@ -71,7 +71,7 @@ func (c *Container) Scan(res *table.Result) (err error) {
 	for i0 := 0; i0 < n1; i0++ {
 		res.ListItem(i0)
 		var x0 byte
-		x0 = ydbConvU32ToB(res.OUint32())
+		x0 = ydbConvU32ToB(res.Uint32())
 		xs1[i0] = x0
 	}
 	c.Bytes = xs1
@@ -83,7 +83,7 @@ func (c *Container) Scan(res *table.Result) (err error) {
 	for i0 := 0; i0 < n2; i0++ {
 		res.ListItem(i0)
 		var x0 string
-		x0 = string(res.OString())
+		x0 = string(res.String())
 		xs2[i0] = x0
 	}
 	c.Strings = xs2
@@ -226,7 +226,7 @@ func (c *Container) QueryParameters() *table.QueryParameters {
 		for i0, item0 := range c.Bytes {
 			var v3 ydb.Value
 			{
-				vp0 := ydb.OptionalValue(ydb.Uint32Value(uint32(item0)))
+				vp0 := ydb.Uint32Value(uint32(item0))
 				v3 = vp0
 			}
 			vs0[i0] = v3
@@ -235,7 +235,7 @@ func (c *Container) QueryParameters() *table.QueryParameters {
 			var t1 ydb.Type
 			{
 				tp0 := ydb.TypeUint32
-				t1 = ydb.Optional(tp0)
+				t1 = tp0
 			}
 			t0 := ydb.List(t1)
 			list0 = ydb.ZeroValue(t0)
@@ -251,7 +251,7 @@ func (c *Container) QueryParameters() *table.QueryParameters {
 		for i0, item0 := range c.Strings {
 			var v4 ydb.Value
 			{
-				vp0 := ydb.OptionalValue(ydb.StringValue([]uint8(item0)))
+				vp0 := ydb.StringValue([]uint8(item0))
 				v4 = vp0
 			}
 			vs0[i0] = v4
@@ -260,7 +260,7 @@ func (c *Container) QueryParameters() *table.QueryParameters {
 			var t1 ydb.Type
 			{
 				tp0 := ydb.TypeString
-				t1 = ydb.Optional(tp0)
+				t1 = tp0
 			}
 			t0 := ydb.List(t1)
 			list0 = ydb.ZeroValue(t0)
@@ -416,7 +416,7 @@ func (c *Container) StructValue() ydb.Value {
 			for i0, item0 := range c.Bytes {
 				var v4 ydb.Value
 				{
-					vp0 := ydb.OptionalValue(ydb.Uint32Value(uint32(item0)))
+					vp0 := ydb.Uint32Value(uint32(item0))
 					v4 = vp0
 				}
 				vs0[i0] = v4
@@ -425,7 +425,7 @@ func (c *Container) StructValue() ydb.Value {
 				var t1 ydb.Type
 				{
 					tp0 := ydb.TypeUint32
-					t1 = ydb.Optional(tp0)
+					t1 = tp0
 				}
 				t0 := ydb.List(t1)
 				list0 = ydb.ZeroValue(t0)
@@ -441,7 +441,7 @@ func (c *Container) StructValue() ydb.Value {
 			for i0, item0 := range c.Strings {
 				var v5 ydb.Value
 				{
-					vp0 := ydb.OptionalValue(ydb.StringValue([]uint8(item0)))
+					vp0 := ydb.StringValue([]uint8(item0))
 					v5 = vp0
 				}
 				vs0[i0] = v5
@@ -450,7 +450,7 @@ func (c *Container) StructValue() ydb.Value {
 				var t1 ydb.Type
 				{
 					tp0 := ydb.TypeString
-					t1 = ydb.Optional(tp0)
+					t1 = tp0
 				}
 				t0 := ydb.List(t1)
 				list0 = ydb.ZeroValue(t0)
@@ -543,7 +543,7 @@ func (c *Container) StructType() ydb.Type {
 			var t5 ydb.Type
 			{
 				tp0 := ydb.TypeUint32
-				t5 = ydb.Optional(tp0)
+				t5 = tp0
 			}
 			t4 := ydb.List(t5)
 			t3 = t4
@@ -554,7 +554,7 @@ func (c *Container) StructType() ydb.Type {
 			var t6 ydb.Type
 			{
 				tp0 := ydb.TypeString
-				t6 = ydb.Optional(tp0)
+				t6 = tp0
 			}
 			t5 := ydb.List(t6)
 			t4 = t5
@@ -743,3 +743,4 @@ func ydbConvU32ToB(x uint32) byte {
 	}
 	return byte(x)
 }
+
