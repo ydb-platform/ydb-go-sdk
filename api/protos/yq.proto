@@ -23,47 +23,53 @@ import "google/protobuf/empty.proto";
 message Acl {
     enum Visibility {
         VISIBILITY_UNSPECIFIED = 0;
-        PRIVATE = 1;
-        SCOPE = 2;
+        PRIVATE = 1; // Visibility only for the creator of the entity
+        SCOPE = 2; // Visibility for subjects within scope
     }
     Visibility visibility = 1;
 }
 
 message Limits {
+    // Used only for streaming queries
     int64 vcpu_rate_limit = 1 [(Ydb.value) = ">= 0"];
     int64 flow_rate_limit = 2 [(Ydb.value) = ">= 0"];
     int64 vcpu_time_limit = 3 [(Ydb.value) = ">= 0"];
+
+    // Used only for analytics queries
     int64 max_result_size = 4 [(Ydb.value) = ">= 0"];
     int64 max_result_rows = 5 [(Ydb.value) = ">= 0"];
+
+    // Common limits
     int64 memory_limit = 6 [(Ydb.value) = ">= 0"];
     google.protobuf.Duration result_ttl = 7;
 }
 
 enum ExecuteMode {
     EXECUTE_MODE_UNSPECIFIED = 0;
-    SAVE = 1;
-    PARSE = 2;
-    COMPILE = 3;
-    VALIDATE = 4;
-    EXPLAIN = 5;
-    RUN = 6;
+    SAVE = 1; // Save a query without changing its state
+    PARSE = 2; // Parse the query
+    COMPILE = 3; // Parse and compile the query
+    VALIDATE = 4; // Parse, compile and validate the query
+    EXPLAIN = 5; // High-level query plan that specifies only physical operations and non-temporary table names
+    RUN = 6; // Do all the previous + execution of the query
 }
 
 enum QueryAction {
     QUERY_ACTION_UNSPECIFIED = 0;
-    PAUSE = 1;
-    PAUSE_GRACEFULLY = 2;
-    ABORT = 3;
-    ABORT_GRACEFULLY = 4;
-    RESUME = 5;
+    PAUSE = 1; // Pause the query, with the possibility of its quick resumption
+    PAUSE_GRACEFULLY = 2; // Similar to PAUSE, only suspends the query allowing it to pause in checkpoint. Can work for a long time 
+    ABORT = 3; // Stop the query
+    ABORT_GRACEFULLY = 4; // Similar to STOP, only stops the query in checkpoint
+    RESUME = 5; // Resumes the execution of the query. Works only for PAUSE queries
 }
 
 enum StateLoadMode {
     STATE_LOAD_MODE_UNSPECIFIED = 0;
-    EMPTY = 1;
-    FROM_LAST_CHECKPOINT = 2;
+    EMPTY = 1; // Start the query with an empty state 
+    FROM_LAST_CHECKPOINT = 2; // Start the query with the state that is saved in the last checkpoint
 }
 
+// For streaming queries only
 message StreamingDisposition {
     message FromTime {
         google.protobuf.Timestamp timestamp = 1;
@@ -74,27 +80,28 @@ message StreamingDisposition {
     }
 
     oneof disposition {
-        google.protobuf.Empty oldest = 1;
-        google.protobuf.Empty fresh = 2;
-        FromTime from_time = 3;
-        TimeAgo time_ago = 4;
-        google.protobuf.Empty from_last_checkpoint = 5;
+        google.protobuf.Empty oldest = 1; // Start processing with the oldest offset 
+        google.protobuf.Empty fresh = 2; // Start processing with the fresh offset 
+        FromTime from_time = 3; // Start processing with offset from the specified time
+        TimeAgo time_ago = 4; // Start processing with offset some time ago
+        google.protobuf.Empty from_last_checkpoint = 5; // Start processing with offset which corresponds to the last checkpoint
     }
 }
 
+// Query information that the subject can change
 message QueryContent {
     enum QueryType {
         QUERY_TYPE_UNSPECIFIED = 0;
-        ANALYTICS = 1;
-        STREAMING = 2;
+        ANALYTICS = 1; // Analytical query (used for analytical data processing for example to work with YDB, ClickHouse, ...)
+        STREAMING = 2; // Streaming query (used for streaming data processing, such as working with YDS)
     }
     QueryType type = 1;
     string name = 2 [(Ydb.length).range = {min: 1, max: 1024}];
     Acl acl = 3;
     Limits limits = 4;
-    string text = 5 [(Ydb.length).le = 102400];
-    bool automatic = 6;
-    string description = 7 [(Ydb.length).le = 10240];
+    string text = 5 [(Ydb.length).le = 102400]; // The text of the query itself
+    bool automatic = 6; // Is used for queries that are created by automatic systems (robots, jdbc driver, ...)
+    string description = 7 [(Ydb.length).le = 10240]; // Description of the query, there can be any text
 }
 
 message CommonMeta {
@@ -103,23 +110,23 @@ message CommonMeta {
     string modified_by = 3 [(Ydb.length).range = {min: 1, max: 1024}];
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp modified_at = 5;
-    int64 revision = 6 [(Ydb.value) = ">= 0"];
+    int64 revision = 6 [(Ydb.value) = ">= 0"]; // Entity version, increases with each change
 }
 
 message QueryMeta {
     enum ComputeStatus {
         COMPUTE_STATUS_UNSPECIFIED = 0;
-        STARTING = 1;
-        ABORTED_BY_USER = 2;
-        ABORTED_BY_SYSTEM = 3;
-        ABORTING_BY_USER = 4;
-        ABORTING_BY_SYSTEM = 5;
-        RESUMING = 6;
-        RUNNING = 7;
-        COMPLETED = 8;
-        FAILED = 9;
-        PAUSING = 10;
-        PAUSED = 11;
+        STARTING = 1; // Start execution of the action on query
+        ABORTED_BY_USER = 2; // Query aborted by user
+        ABORTED_BY_SYSTEM = 3; // Query aborted by system
+        ABORTING_BY_USER = 4; // Query aborting by user
+        ABORTING_BY_SYSTEM = 5; // Query aborting by system
+        RESUMING = 6; // Resuming query execution from PAUSED status
+        RUNNING = 7; // Query started for execution
+        COMPLETED = 8; // Query completed successfully
+        FAILED = 9; // Query completed with errors
+        PAUSING = 10; // Query starts pausing
+        PAUSED = 11; // Query paused
     }
 
     CommonMeta common = 1;
@@ -136,7 +143,7 @@ message BriefQuery {
 }
 
 message QueryPlan {
-    string json = 1; // no validation because generated on server side
+    string json = 1; // No validation because generated on server side
 }
 
 message ResultSetMeta {
@@ -156,14 +163,15 @@ message Query {
 }
 
 message QueryStatistics {
-    string json = 1; // no validation because generated on server side
+    string json = 1; // No validation because generated on server side
 }
 
+// Create a new query
 message CreateQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     QueryContent content = 2;
     ExecuteMode execute_mode = 3;
-    StreamingDisposition disposition = 4;
+    StreamingDisposition disposition = 4; // Only for streaming queries
     string idempotency_key = 5 [(Ydb.length).le = 1024];
 }
 
@@ -175,6 +183,7 @@ message CreateQueryResult {
     string query_id = 1 [(Ydb.length).le = 1024];
 }
 
+// Getting brief information about queries
 message ListQueriesRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string page_token = 2 [(Ydb.length).le = 1024];
@@ -198,6 +207,7 @@ message ListQueriesResult {
     string next_page_token = 2 [(Ydb.length).le = 1024];
 }
 
+// Getting complete information about the query
 message DescribeQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -211,6 +221,7 @@ message DescribeQueryResult {
     Query query = 1;
 }
 
+// Complete removal of query. Recovery of the query after this operation is not possible
 message DeleteQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -225,6 +236,7 @@ message DeleteQueryResponse {
 message DeleteQueryResult {
 }
 
+// Change query information with launch policy option. All fields must be filled in the request. The query changes completely
 message ModifyQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -243,6 +255,7 @@ message ModifyQueryResponse {
 message ModifyQueryResult {
 }
 
+// Managing query status (pause, abort, resume, ...)
 message ControlQueryRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -270,6 +283,7 @@ message Job {
     repeated ResultSetMeta result_set_meta = 7;
 }
 
+// Information about recent query runs
 message ListJobsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -359,6 +373,7 @@ message Connection {
     CommonMeta meta = 2;
 }
 
+// Create a new connection
 message CreateConnectionRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     ConnectionContent content = 2;
@@ -373,6 +388,7 @@ message CreateConnectionResult {
     string connection_id = 1 [(Ydb.length).range = {min: 1, max: 1024}];
 }
 
+// Getting information about connections
 message ListConnectionsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string page_token = 2 [(Ydb.length).le = 1024];
@@ -388,6 +404,7 @@ message ListConnectionsResult {
     string next_page_token = 2 [(Ydb.length).le = 1024];
 }
 
+// Getting information about the connection
 message DescribeConnectionRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -401,6 +418,7 @@ message DescribeConnectionResult {
     Connection connection = 1;
 }
 
+// Change connection information. All fields must be filled in the request. The connection changes completely
 message ModifyConnectionRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -416,6 +434,7 @@ message ModifyConnectionResponse {
 message ModifyConnectionResult {
 }
 
+// Complete removal of connection. Recovery of the connection after this operation is not possible
 message DeleteConnectionRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -432,6 +451,7 @@ message DeleteConnectionResult {
 
 // ResultSet API
 
+// Getting the result of the query execution
 message GetResultDataRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -506,6 +526,7 @@ message Binding {
     CommonMeta meta = 2;
 }
 
+// Create a new binding
 message CreateBindingRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     BindingContent content = 2;
@@ -520,6 +541,7 @@ message CreateBindingResult {
     string binding_id = 1 [(Ydb.length).range = {min: 1, max: 1024}];
 }
 
+// Getting information about bindings
 message ListBindingsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string page_token = 2 [(Ydb.length).le = 1024];
@@ -535,6 +557,7 @@ message ListBindingsResult {
     string next_page_token = 2 [(Ydb.length).le = 1024];
 }
 
+// Getting information about the binding
 message DescribeBindingRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string binding_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -548,6 +571,7 @@ message DescribeBindingResult {
     Binding binding = 1;
 }
 
+// Change binding information. All fields must be filled in the request. The binding changes completely
 message ModifyBindingRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string binding_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
@@ -563,6 +587,7 @@ message ModifyBindingResponse {
 message ModifyBindingResult {
 }
 
+// Complete removal of binding. Recovery of the binding after this operation is not possible
 message DeleteBindingRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string binding_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
