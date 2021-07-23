@@ -340,11 +340,12 @@ message ClickHouseCluster {
     string database_id = 1 [(Ydb.length).le = 1024];
     string login = 2 [(Ydb.length).le = 1024];
     string password = 3 [(Ydb.length).le = 1024];
+    IamAuth auth = 4;
 
     // for internal usage
-    string host = 4 [(Ydb.length).le = 1024];
-    int32 port = 5 [(Ydb.value) = "[0; 65536]"];
-    bool secure = 6;
+    string host = 5 [(Ydb.length).le = 1024];
+    int32 port = 6 [(Ydb.value) = "[0; 65536]"];
+    bool secure = 7;
 }
 
 message ObjectStorageConnection {
