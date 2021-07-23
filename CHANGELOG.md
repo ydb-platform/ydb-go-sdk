@@ -1,3 +1,6 @@
+## 1.3.0
+* Added Compose method to traces
+
 ## 1.2.0
 * Load YDB certificates by default with TLS connection
 

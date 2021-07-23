@@ -38,43 +38,43 @@ type DriverTrace struct {
 	StreamDone      func(StreamDoneInfo)
 }
 
-func (d DriverTrace) dialStart(ctx context.Context, addr string) {
+func (t DriverTrace) dialStart(ctx context.Context, addr string) {
 	x := DialStartInfo{
 		Context: ctx,
 		Address: addr,
 	}
-	if f := d.DialStart; f != nil {
+	if f := t.DialStart; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).DialStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) dialDone(ctx context.Context, addr string, err error) {
+func (t DriverTrace) dialDone(ctx context.Context, addr string, err error) {
 	x := DialDoneInfo{
 		Context: ctx,
 		Address: addr,
 		Error:   err,
 	}
-	if f := d.DialDone; f != nil {
+	if f := t.DialDone; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).DialDone; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) getConnStart(ctx context.Context) {
+func (t DriverTrace) getConnStart(ctx context.Context) {
 	x := GetConnStartInfo{
 		Context: ctx,
 	}
-	if f := d.GetConnStart; f != nil {
+	if f := t.GetConnStart; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).GetConnStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) getConnDone(ctx context.Context, conn *conn, err error) {
+func (t DriverTrace) getConnDone(ctx context.Context, conn *conn, err error) {
 	x := GetConnDoneInfo{
 		Context: ctx,
 		Error:   err,
@@ -82,118 +82,118 @@ func (d DriverTrace) getConnDone(ctx context.Context, conn *conn, err error) {
 	if conn != nil {
 		x.Address = conn.addr.String()
 	}
-	if f := d.GetConnDone; f != nil {
+	if f := t.GetConnDone; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).GetConnDone; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) trackConnStart(conn *conn) {
+func (t DriverTrace) trackConnStart(conn *conn) {
 	x := TrackConnStartInfo{
 		Address: conn.addr.String(),
 	}
-	if f := d.TrackConnStart; f != nil {
+	if f := t.TrackConnStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) trackConnDone(conn *conn) {
+func (t DriverTrace) trackConnDone(conn *conn) {
 	x := TrackConnDoneInfo{
 		Address: conn.addr.String(),
 	}
-	if f := d.TrackConnDone; f != nil {
+	if f := t.TrackConnDone; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) pessimizationStart(ctx context.Context, addr *connAddr, cause error) {
+func (t DriverTrace) pessimizationStart(ctx context.Context, addr *connAddr, cause error) {
 	x := PessimizationStartInfo{
 		Context: ctx,
 		Address: addr.String(),
 		Cause:   cause,
 	}
-	if f := d.PessimizationStart; f != nil {
+	if f := t.PessimizationStart; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).PessimizationStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) pessimizationDone(ctx context.Context, addr *connAddr, err error) {
+func (t DriverTrace) pessimizationDone(ctx context.Context, addr *connAddr, err error) {
 	x := PessimizationDoneInfo{
 		Context: ctx,
 		Address: addr.String(),
 		Error:   err,
 	}
-	if f := d.PessimizationDone; f != nil {
+	if f := t.PessimizationDone; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).PessimizationDone; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) getCredentialsStart(ctx context.Context) {
+func (t DriverTrace) getCredentialsStart(ctx context.Context) {
 	x := GetCredentialsStartInfo{
 		Context: ctx,
 	}
-	if f := d.GetCredentialsStart; f != nil {
+	if f := t.GetCredentialsStart; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).GetCredentialsStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) getCredentialsDone(ctx context.Context, token bool, err error) {
+func (t DriverTrace) getCredentialsDone(ctx context.Context, token bool, err error) {
 	x := GetCredentialsDoneInfo{
 		Context: ctx,
 		Token:   token,
 		Error:   err,
 	}
-	if f := d.GetCredentialsDone; f != nil {
+	if f := t.GetCredentialsDone; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).GetCredentialsDone; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) discoveryStart(ctx context.Context) {
+func (t DriverTrace) discoveryStart(ctx context.Context) {
 	x := DiscoveryStartInfo{
 		Context: ctx,
 	}
-	if f := d.DiscoveryStart; f != nil {
+	if f := t.DiscoveryStart; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).DiscoveryStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) discoveryDone(ctx context.Context, es []Endpoint, err error) {
+func (t DriverTrace) discoveryDone(ctx context.Context, es []Endpoint, err error) {
 	x := DiscoveryDoneInfo{
 		Context:   ctx,
 		Endpoints: es,
 		Error:     err,
 	}
-	if f := d.DiscoveryDone; f != nil {
+	if f := t.DiscoveryDone; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).DiscoveryDone; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) operationStart(ctx context.Context, conn *conn, method string, params OperationParams) {
+func (t DriverTrace) operationStart(ctx context.Context, conn *conn, method string, params OperationParams) {
 	x := OperationStartInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
 		Method:  Method(method),
 		Params:  params,
 	}
-	if f := d.OperationStart; f != nil {
+	if f := t.OperationStart; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).OperationStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method string, params OperationParams, resp internal.Response, err error) {
+func (t DriverTrace) operationDone(ctx context.Context, conn *conn, method string, params OperationParams, resp internal.Response, err error) {
 	x := OperationDoneInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
@@ -205,7 +205,7 @@ func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method strin
 	if resp != nil {
 		x.Issues = resp.GetIssues()
 	}
-	if f := d.OperationDone; f != nil {
+	if f := t.OperationDone; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).OperationDone; f != nil {
@@ -213,47 +213,47 @@ func (d DriverTrace) operationDone(ctx context.Context, conn *conn, method strin
 	}
 }
 
-func (d DriverTrace) streamStart(ctx context.Context, conn *conn, method string) {
+func (t DriverTrace) streamStart(ctx context.Context, conn *conn, method string) {
 	x := StreamStartInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
 		Method:  Method(method),
 	}
-	if f := d.StreamStart; f != nil {
+	if f := t.StreamStart; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).StreamStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) streamDone(ctx context.Context, conn *conn, method string, err error) {
+func (t DriverTrace) streamDone(ctx context.Context, conn *conn, method string, err error) {
 	x := StreamDoneInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
 		Method:  Method(method),
 		Error:   err,
 	}
-	if f := d.StreamDone; f != nil {
+	if f := t.StreamDone; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).StreamDone; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) streamRecvStart(ctx context.Context, conn *conn, method string) {
+func (t DriverTrace) streamRecvStart(ctx context.Context, conn *conn, method string) {
 	x := StreamRecvStartInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
 		Method:  Method(method),
 	}
-	if f := d.StreamRecvStart; f != nil {
+	if f := t.StreamRecvStart; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).StreamRecvStart; f != nil {
 		f(x)
 	}
 }
-func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method string, resp internal.StreamOperationResponse, err error) {
+func (t DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method string, resp internal.StreamOperationResponse, err error) {
 	x := StreamRecvDoneInfo{
 		Context: ctx,
 		Address: conn.addr.String(),
@@ -263,12 +263,15 @@ func (d DriverTrace) streamRecvDone(ctx context.Context, conn *conn, method stri
 	if resp != nil {
 		x.Issues = resp.GetIssues()
 	}
-	if f := d.StreamRecvDone; f != nil {
+	if f := t.StreamRecvDone; f != nil {
 		f(x)
 	}
 	if f := ContextDriverTrace(ctx).StreamRecvDone; f != nil {
 		f(x)
 	}
+}
+func (t DriverTrace) Compose(rhs DriverTrace) DriverTrace {
+	return composeDriverTrace(t, rhs)
 }
 
 // Method represents rpc method.

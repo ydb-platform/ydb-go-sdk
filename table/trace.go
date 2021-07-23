@@ -38,10 +38,18 @@ type ClientTrace struct {
 	RollbackTransactionDone  func(RollbackTransactionDoneInfo)
 }
 
+func (t ClientTrace) Compose(rhs ClientTrace) ClientTrace {
+	return composeClientTrace(t, rhs)
+}
+
 // RetryTrace contains options for tracing retry client activity.
 type RetryTrace struct {
 	RetryLoopStart func(RetryLoopStartInfo)
 	RetryLoopDone  func(RetryLoopDoneInfo)
+}
+
+func (t RetryTrace) Compose(rhs RetryTrace) RetryTrace {
+	return composeRetryTrace(t, rhs)
 }
 
 type (
@@ -470,6 +478,10 @@ type SessionPoolTrace struct {
 	PutDone        func(SessionPoolPutDoneInfo)
 	CloseStart     func(SessionPoolCloseStartInfo)
 	CloseDone      func(SessionPoolCloseDoneInfo)
+}
+
+func (t SessionPoolTrace) Compose(rhs SessionPoolTrace) SessionPoolTrace {
+	return composeSessionPoolTrace(t, rhs)
 }
 
 type (
