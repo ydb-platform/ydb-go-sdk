@@ -11,6 +11,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -25,165 +26,23 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal/ydbtypes"
 )
 
-func main() {
-	log.SetFlags(0)
-	log.SetPrefix("ydbgen: ")
-
-	var (
-		wrapMode = flag.String("wrap", "optional", "default type wrapping mode")
-		convMode = flag.String("conv", "safe", "default conv mode")
-		seekMode = flag.String("seek", "column", "default seek mode")
-
-		dir     = flag.String("dir", "", "directory to generate code for")
-		out     = flag.String("out", "", "directory to put results to")
-		exclude = flag.String("exclude", "", "regular expression to exclude files from build")
-		gentype = flag.String("type", "", "comma-separated list of types to generate code for")
-		all     = flag.Bool("all", false, "generate code for all found types")
-
-		goroot       = flag.String("goroot", "", "replace go/build GOROOT path")
-		sourceLookup = flag.String("lookup", "", "mapping of base import path to directory in form of import:dir")
-
-		force   = flag.Bool("force", false, "ignore type errors")
-		verbose = flag.Bool("verbose", false, "print debug info")
-	)
-	flag.Parse()
-
-	// TODO(kamardin): add default GenFlags to use with `-all` flag for example.
-	var DefaultMode GenMode
-	{
-		var err error
-		DefaultMode.Wrap, err = ParseWrapMode(*wrapMode)
-		if err != nil {
-			log.Fatal(err)
-		}
-		DefaultMode.Conv, err = ParseConvMode(*convMode)
-		if err != nil {
-			log.Fatal(err)
-		}
-		DefaultMode.Seek, err = ParseSeekMode(*seekMode)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	workDir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	var (
-		sourceDir = *dir
-		outputDir = *out
-	)
-	for _, d := range []*string{&sourceDir, &outputDir} {
-		if *d == "" {
-			*d = "."
-		}
-		if !path.IsAbs(*d) {
-			*d = path.Join(workDir, *d)
-		}
-	}
-
-	var (
-		processFile = func(string) bool { return true }
-		excludeFile = func(string) bool { return false }
-	)
-	if gofile := os.Getenv("GOFILE"); gofile != "" && *dir == "" {
-		// Running from `go generate` and no dir is given.
-		// Thus, process only marked file.
-		want := path.Join(sourceDir, gofile)
-		processFile = func(name string) bool {
-			return name == want
-		}
-	}
-	if *exclude != "" {
-		re, err := regexp.Compile(*exclude)
-		if err != nil {
-			log.Fatalf("compile ignore regexp error: %v", err)
-		}
-		excludeFile = re.MatchString
-	}
-	matches, err := filepath.Glob(path.Join(sourceDir, "*.go"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	wantType := map[string]bool{}
-	for _, t := range strings.Split(*gentype, ",") {
-		wantType[t] = true
-	}
-
-	var (
-		files    = make([]*os.File, 0, len(matches))
-		astFiles = make([]*ast.File, 0, len(matches))
-	)
+func generate(sourceToOutput []pipeline, cfg cfg) error {
+	astFiles := make([]*ast.File, 0, len(sourceToOutput))
 	fset := token.NewFileSet()
-	for _, fpath := range matches {
-		if strings.HasSuffix(fpath, GeneratedFileSuffix+".go") {
-			continue
-		}
-		if excludeFile(fpath) {
-			continue
-		}
-
-		file, err := os.Open(fpath)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer file.Close()
-
+	for _, sourceFile := range sourceToOutput {
 		// Parse the input string, []byte, or io.Reader,
 		// recording position information in fset.
 		// ParseFile returns an *ast.File, a syntax tree.
-		f, err := parser.ParseFile(fset, file.Name(), file, parser.ParseComments)
+		f, err := parser.ParseFile(fset, "", sourceFile.r, parser.ParseComments)
 		if err != nil {
-			log.Fatalf("parse %q error: %v", file.Name(), err)
+			return err
 		}
-
-		files = append(files, file)
 		astFiles = append(astFiles, f)
 	}
-	if *sourceLookup != "" {
-		// We are given some base import path to be searchable by type checker.
-		// That is, we expand default GOPATH variable with temporary directory
-		// with GOPATH friendly layout which src directory contains only base
-		// import path node which is a symbolic link to the given source base
-		// directory.
-		var paths []string
-		for _, pair := range strings.Split(*sourceLookup, ",") {
-			tmp, err := ioutil.TempDir("", "ydbgen")
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer os.RemoveAll(tmp)
-			if err := os.Mkdir(path.Join(tmp, "src"), 0700); err != nil {
-				log.Fatal(err)
-			}
-			base, dir := splitPair(strings.TrimSpace(pair), ':')
-			err = os.Symlink(dir, path.Join(tmp, "src", base))
-			if err != nil {
-				log.Fatal(err)
-			}
-			paths = append(paths, tmp)
-		}
-		if dir := os.Getenv("GOPATH"); dir != "" {
-			paths = append(paths, dir)
-		}
-		build.Default.GOPATH = strings.Join(
-			paths, string(filepath.ListSeparator),
-		)
+	wantType := map[string]bool{}
+	for _, t := range strings.Split(cfg.gentype, ",") {
+		wantType[t] = true
 	}
-	if *goroot != "" {
-		build.Default.GOROOT = *goroot
-		expPath := fmt.Sprintf("%s%cbin", *goroot, os.PathSeparator)
-		if os.Getenv("PATH") != "" {
-			expPath = fmt.Sprintf("%s%c%s", os.Getenv("PATH"), os.PathListSeparator, expPath)
-		}
-		err = os.Setenv("PATH", expPath)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
 	// A Config controls various options of the type checker.
 	// The defaults work fine except for one setting:
 	// we must specify how to deal with imports.
@@ -191,7 +50,7 @@ func main() {
 		IgnoreFuncBodies: true,
 		Importer:         importer.ForCompiler(fset, "source", nil),
 	}
-	if *force {
+	if cfg.force {
 		conf.Error = func(err error) {
 			log.Printf("suppressing error: %v", err)
 		}
@@ -205,11 +64,15 @@ func main() {
 		Uses:  make(map[*ast.Ident]types.Object),
 	}
 	p, err := conf.Check(".", fset, astFiles, &info)
-	if err != nil && !*force {
-		log.Fatalf("type error: %v", err)
+	if err != nil && !cfg.force {
+		return fmt.Errorf("type error: %v", err)
 	}
 	pkg := Package{
 		Name: p.Name(),
+		Pipelines: make([]struct {
+			f *File
+			w func() io.Writer
+		}, 0, len(sourceToOutput)),
 	}
 	for i, astFile := range astFiles {
 		var (
@@ -219,14 +82,11 @@ func main() {
 			item  *GenItem
 
 			astLog = func(s string, args ...interface{}) {
-				if *verbose {
+				if cfg.verbose {
 					log.Print(strings.Repeat(" ", depth*4), fmt.Sprintf(s, args...))
 				}
 			}
 		)
-		if name := files[i].Name(); !processFile(name) {
-			continue
-		}
 		ast.Inspect(astFile, func(n ast.Node) (dig bool) {
 			astLog("%T", n)
 			if depth == reset && item != nil {
@@ -266,8 +126,8 @@ func main() {
 					if c.Text != text {
 						if item == nil {
 							item = &GenItem{
-								File: files[i],
-								Mode: DefaultMode,
+								File: sourceToOutput[i].r,
+								Mode: cfg.genMode,
 							}
 						}
 						if err := item.ParseComment(text); err != nil {
@@ -281,10 +141,10 @@ func main() {
 				return false
 
 			case *ast.TypeSpec:
-				if item == nil && (*all || wantType[v.Name.Name]) {
+				if item == nil && (cfg.all || wantType[v.Name.Name]) {
 					item = &GenItem{
-						File:  files[i],
-						Mode:  DefaultMode,
+						File:  sourceToOutput[i].r,
+						Mode:  cfg.genMode,
 						Flags: GenAll,
 					}
 				}
@@ -401,9 +261,7 @@ func main() {
 			return nil
 		}
 
-		file := &File{
-			Name: files[i].Name(),
-		}
+		file := &File{}
 		for _, item := range items {
 			switch {
 			case item.ArrayType != nil:
@@ -412,7 +270,7 @@ func main() {
 					Flags: item.Flags,
 				}
 				if err := inferType(&s.T, item.ArrayType.Elt); err != nil {
-					log.Fatalf("%s: %v", s.Name, err)
+					return fmt.Errorf("%s: %v", s.Name, err)
 				}
 				file.Slices = append(file.Slices, s)
 
@@ -433,16 +291,16 @@ func main() {
 						Position: i,
 					}
 					if err := field.ParseTags(decl.Tag(i)); err != nil {
-						log.Fatalf("%s.%s: %v", s.Name, field.Name, err)
+						return fmt.Errorf("%s.%s: %v", s.Name, field.Name, err)
 					}
 					if field.Ignore {
 						continue
 					}
 					if err := inferType(&field.T, f.Type); err != nil {
-						log.Fatalf("%s.%s: %v", s.Name, field.Name, err)
+						return fmt.Errorf("%s.%s: %v", s.Name, field.Name, err)
 					}
 					// Do not handle errors here due to the late binding.
-					err := dig(&field.T, func(t *T) {
+					_ = dig(&field.T, func(t *T) {
 						if t.Basic == nil {
 							return
 						}
@@ -453,9 +311,6 @@ func main() {
 							t.Optional = item.Mode.Wrap == WrapOptional
 						}
 					})
-					if err != nil {
-						log.Fatalf("%s.%s: %v", s.Name, field.Name, err)
-					}
 					s.Fields = append(s.Fields, field)
 				}
 				if s.SeekMode == SeekPosition {
@@ -470,15 +325,17 @@ func main() {
 				file.Structs = append(file.Structs, s)
 			}
 		}
-
-		pkg.Files = append(pkg.Files, file)
+		pkg.Pipelines = append(pkg.Pipelines, struct {
+			f *File
+			w func() io.Writer
+		}{f: file, w: sourceToOutput[i].createWriter})
 	}
 
 	if err := pkg.Finalize(); err != nil {
-		log.Fatal(err)
+		return err
 	}
-	for _, file := range pkg.Files {
-		for _, s := range file.Structs {
+	for _, p := range pkg.Pipelines {
+		for _, s := range p.f.Structs {
 			for _, f := range s.Fields {
 				if f.T.Slice != nil || f.T.Struct != nil || f.T.Container {
 					// Slices or structs for fields are always containers
@@ -490,17 +347,17 @@ func main() {
 						t.Container = true
 					})
 					if err != nil {
-						log.Fatalf(
+						return fmt.Errorf(
 							"generate struct %q field %q error: %v",
 							s.Name, f.Name, err,
 						)
 					}
 				}
-				if *verbose {
+				if cfg.verbose {
 					log.Printf("%s.%s: %s", s.Name, f.Name, f.T.String())
 				}
 				if err := f.Validate(); err != nil {
-					log.Fatalf(
+					return fmt.Errorf(
 						"generate struct %q field %q error: %v",
 						s.Name, f.Name, err,
 					)
@@ -508,10 +365,164 @@ func main() {
 			}
 		}
 	}
-	g := Generator{
-		Dir: outputDir,
-	}
+	g := Generator{}
 	if err := g.Generate(pkg); err != nil {
+		return err
+	}
+	return nil
+}
+func main() {
+	log.SetFlags(0)
+	log.SetPrefix("ydbgen: ")
+	var (
+		wrapMode = flag.String("wrap", "optional", "default type wrapping mode")
+		convMode = flag.String("conv", "safe", "default conv mode")
+		seekMode = flag.String("seek", "column", "default seek mode")
+
+		dir     = flag.String("dir", "", "directory to generate code for")
+		out     = flag.String("out", "", "directory to put results to")
+		exclude = flag.String("exclude", "", "regular expression to exclude files from build")
+		gentype = flag.String("type", "", "comma-separated list of types to generate code for")
+		all     = flag.Bool("all", false, "generate code for all found types")
+
+		goroot       = flag.String("goroot", "", "replace go/build GOROOT path")
+		sourceLookup = flag.String("lookup", "", "mapping of base import path to directory in form of import:dir")
+
+		force   = flag.Bool("force", false, "ignore type errors")
+		verbose = flag.Bool("verbose", false, "print debug info")
+	)
+	flag.Parse()
+	// TODO(kamardin): add default GenFlags to use with `-all` flag for example.
+	var genMode GenMode
+	{
+		var err error
+		genMode.Wrap, err = ParseWrapMode(*wrapMode)
+		if err != nil {
+			log.Fatal(err)
+		}
+		genMode.Conv, err = ParseConvMode(*convMode)
+		if err != nil {
+			log.Fatal(err)
+		}
+		genMode.Seek, err = ParseSeekMode(*seekMode)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if *sourceLookup != "" {
+		// We are given some base import path to be searchable by type checker.
+		// That is, we expand default GOPATH variable with temporary directory
+		// with GOPATH friendly layout which src directory contains only base
+		// import path node which is a symbolic link to the given source base
+		// directory.
+		var paths []string
+		for _, pair := range strings.Split(*sourceLookup, ",") {
+			tmp, err := ioutil.TempDir("", "ydbgen")
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer os.RemoveAll(tmp)
+			if err := os.Mkdir(path.Join(tmp, "src"), 0700); err != nil {
+				log.Fatal(err)
+			}
+			base, dir := splitPair(strings.TrimSpace(pair), ':')
+			err = os.Symlink(dir, path.Join(tmp, "src", base))
+			if err != nil {
+				log.Fatal(err)
+			}
+			paths = append(paths, tmp)
+		}
+		if dir := os.Getenv("GOPATH"); dir != "" {
+			paths = append(paths, dir)
+		}
+		build.Default.GOPATH = strings.Join(
+			paths, string(filepath.ListSeparator),
+		)
+	}
+	if *goroot != "" {
+		build.Default.GOROOT = *goroot
+		expPath := fmt.Sprintf("%s%cbin", *goroot, os.PathSeparator)
+		if os.Getenv("PATH") != "" {
+			expPath = fmt.Sprintf("%s%c%s", os.Getenv("PATH"), os.PathListSeparator, expPath)
+		}
+		err := os.Setenv("PATH", expPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	workDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	var (
+		sourceDir = *dir
+		outputDir = *out
+	)
+	for _, d := range []*string{&sourceDir, &outputDir} {
+		if !path.IsAbs(*d) {
+			*d = path.Join(workDir, *d)
+		}
+	}
+	var (
+		processFile = func(string) bool { return true }
+		excludeFile = func(string) bool { return false }
+	)
+	if gofile := os.Getenv("GOFILE"); gofile != "" && *dir == "" {
+		// Running from `go generate` and no dir is given.
+		// Thus, process only marked file.
+		want := path.Join(sourceDir, gofile)
+		processFile = func(name string) bool {
+			return name == want
+		}
+	}
+	if *exclude != "" {
+		re, err := regexp.Compile(*exclude)
+		if err != nil {
+			log.Fatalf("compile ignore regexp error: %v", err)
+		}
+		excludeFile = re.MatchString
+	}
+
+	matches, err := filepath.Glob(path.Join(sourceDir, "*.go"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var (
+		sourceToOutput = make([]pipeline, 0, len(matches))
+	)
+
+	for _, fpath := range matches {
+		if strings.HasSuffix(fpath, GeneratedFileSuffix+".go") {
+			continue
+		}
+		if excludeFile(fpath) {
+			continue
+		}
+		if !processFile(fpath) {
+			continue
+		}
+		file, err := os.Open(fpath)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer file.Close()
+
+		sourceToOutput = append(sourceToOutput, pipeline{
+			r:            file,
+			createWriter: createWriter(fpath, outputDir),
+		})
+	}
+	err = generate(sourceToOutput, cfg{
+		genMode: genMode,
+		gentype: *gentype,
+		all:     *all,
+		force:   *force,
+		verbose: *verbose,
+	})
+	if err != nil {
 		log.Fatal(err)
 	}
 }
@@ -536,9 +547,11 @@ func ParseSeekMode(s string) (SeekMode, error) {
 }
 
 type Package struct {
-	Name  string
-	Files []*File
-
+	Name      string
+	Pipelines []struct {
+		f *File
+		w func() io.Writer
+	}
 	Known     map[string]interface{}
 	Container map[string]*list.List
 }
@@ -584,6 +597,35 @@ func (p *Package) Finalize() error {
 	return nil
 }
 
+type cfg struct {
+	genMode GenMode
+	gentype string
+	all     bool
+	force   bool
+	verbose bool
+}
+
+func createWriter(fpath, outputDir string) func() io.Writer {
+	return func() io.Writer {
+		var (
+			base    = path.Base(fpath)
+			ext     = path.Ext(base)
+			name    = strings.TrimSuffix(base, ext)
+			outPath = path.Join(outputDir, name+GeneratedFileSuffix+ext)
+		)
+		outFile, err := os.OpenFile(outPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return outFile
+	}
+}
+
+type pipeline struct {
+	r            io.Reader
+	createWriter func() io.Writer
+}
+
 type WrapMode uint
 
 const (
@@ -610,7 +652,7 @@ type GenMode struct {
 }
 
 type GenItem struct {
-	File       *os.File
+	File       io.Reader
 	Ident      *ast.Ident
 	TypeSpec   *ast.TypeSpec
 	StructType *ast.StructType
@@ -685,7 +727,6 @@ const (
 )
 
 type File struct {
-	Name    string
 	Structs []*Struct
 	Slices  []*Slice
 }
@@ -986,7 +1027,7 @@ func (f *Field) ParseTags(tags string) (err error) {
 			f.T.Container = true
 
 		default:
-			err = fmt.Errorf("unexpected tag key: %q", key)
+			err = fmt.Errorf("this tag key: %q is not supported use space delimiter for other non-generation tags https://pkg.go.dev/reflect#StructTag", key)
 			return
 		}
 	}

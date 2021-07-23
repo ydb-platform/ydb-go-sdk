@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"go/types"
 	"log"
-	"os"
-	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,8 +68,6 @@ func (s *scope) add(name string) {
 }
 
 type Generator struct {
-	Dir string
-
 	once        sync.Once
 	conversions map[string]ConversionTemplate
 	seenConv    map[string]bool
@@ -167,31 +163,19 @@ func (g *Generator) fileHeader(bw *bufio.Writer, pkg string) {
 func (g *Generator) Generate(pkg Package) error {
 	g.init()
 
-	for _, f := range pkg.Files {
-		if f.Empty() {
+	for _, p := range pkg.Pipelines {
+		if p.f.Empty() {
 			continue
 		}
-		var (
-			base = path.Base(f.Name)
-			ext  = path.Ext(base)
-			name = strings.TrimSuffix(base, ext)
 
-			fpath = path.Join(g.Dir, name+GeneratedFileSuffix+ext)
-		)
-		file, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		bw := bufio.NewWriter(file)
+		bw := bufio.NewWriter(p.w())
 
 		g.fileHeader(bw, pkg.Name)
 		_ = bw.Flush() // Omit `... found EOF want package` error on panics.
 
 		g.importDeps(bw)
 
-		for _, s := range f.Structs {
+		for _, s := range p.f.Structs {
 			if s.Flags&GenScan != 0 {
 				g.generateStructScan(bw, s)
 			}
@@ -206,7 +190,7 @@ func (g *Generator) Generate(pkg Package) error {
 			}
 			log.Printf("%s struct", s.Name)
 		}
-		for _, s := range f.Slices {
+		for _, s := range p.f.Slices {
 			if s.Flags&GenScan != 0 {
 				g.generateSliceScan(bw, s)
 			}
@@ -233,7 +217,6 @@ func (g *Generator) Generate(pkg Package) error {
 			g.seenConv[name] = true
 		}
 		if err := bw.Flush(); err != nil {
-			_ = os.Remove(file.Name())
 			return err
 		}
 	}
