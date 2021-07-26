@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"path"
 	"runtime"
 	"sync"
@@ -16,6 +17,48 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil/timetest"
 )
+
+func TestSessionPoolCreateAbnormalResult(t *testing.T) {
+	p := &SessionPool{
+		limit: 1000,
+		index: make(map[*Session]sessionInfo),
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 1000,
+			Handler: methodHandlers{
+				testutil.TableDeleteSession: okHandler,
+			},
+		},
+	}
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
+	for i := 0; i < 10000; i++ {
+		t.Run("", func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(
+				context.Background(),
+				time.Duration(rand.Float32()+float32(time.Second)),
+			)
+			defer cancel()
+			s, err := p.createSession(ctx, createSessionTrace{
+				onStartSelect: func() {
+					runtime.Gosched() // for force run create session goroutine
+				},
+				onReadResult: func(r createSessionResult) {
+					if r.s == nil && r.err == nil {
+						t.Fatalf("unexpected result: <%v, %vz>", r.s, r.err)
+					}
+				},
+				onPutSession: func(s *Session, err error) {
+					fmt.Println("put session", s, err)
+				},
+			})
+			if s == nil && err == nil {
+				t.Fatalf("unexpected result: <%v, %vz>", s, err)
+			}
+		})
+	}
+}
 
 func TestSessionPoolTakeBusy(t *testing.T) {
 	timer := timetest.StubSingleTimer(t)
@@ -40,7 +83,9 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 			},
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	s1 := mustCreateSession(t, p)
 
@@ -87,7 +132,9 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 			},
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	closed := make(chan struct{})
 	s1 := mustGetSession(t, p)
@@ -146,7 +193,9 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 			},
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	s1 := mustGetSession(t, p)
 	_ = p.PutBusy(context.Background(), s1)
@@ -220,7 +269,9 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 			},
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	s := mustGetSession(t, p)
 
@@ -268,7 +319,9 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 					Limit: 1,
 				},
 			}
-			defer p.Close(context.Background())
+			defer func() {
+				_ = p.Close(context.Background())
+			}()
 
 			mustGetSession(t, p)
 
@@ -337,7 +390,9 @@ func TestSessionPoolClose(t *testing.T) {
 			Limit: 3,
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	s1 := mustGetSession(t, p)
 	s2 := mustGetSession(t, p)
@@ -403,7 +458,9 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 					Limit: 2,
 				},
 			}
-			defer p.Close(context.Background())
+			defer func() {
+				_ = p.Close(context.Background())
+			}()
 			s := mustGetSession(t, p)
 			var (
 				get  = make(chan struct{})
@@ -578,7 +635,9 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 					Limit: 1,
 				},
 			}
-			defer p.Close(context.Background())
+			defer func() {
+				_ = p.Close(context.Background())
+			}()
 			s := mustGetSession(t, p)
 			{
 				ctx, cancel := context.WithCancel(context.Background())
@@ -676,7 +735,9 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 			},
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	touched := p.touchCond()
 
@@ -770,7 +831,9 @@ func TestSessionPoolGetPut(t *testing.T) {
 			},
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	s := mustGetSession(t, p)
 	assertCreated(1)
@@ -842,7 +905,9 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 			},
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	s1 := mustGetSession(t, p)
 	s2 := mustGetSession(t, p)
@@ -912,7 +977,9 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 			},
 		},
 	}
-	defer p.Close(context.Background())
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
 
 	s1 := mustGetSession(t, p)
 	s2 := mustGetSession(t, p)

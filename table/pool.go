@@ -213,8 +213,23 @@ func isCreateSessionErrorRetriable(err error) bool {
 	}
 }
 
+type createSessionResult struct {
+	s   *Session
+	err error
+}
+
+type createSessionTrace struct {
+	onCheckEnoughSpace           func(enoughSpace bool)
+	onRunCreateSessionGoroutine  func()
+	onDoneCreateSessionGoroutine func(r createSessionResult)
+	onStartSelect                func()
+	onReadResult                 func(r createSessionResult)
+	onContextDone                func()
+	onPutSession                 func(session *Session, err error)
+}
+
 // p.mu must NOT be held.
-func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
+func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrace) (*Session, error) {
 	// pre-check the pool size
 	p.mu.Lock()
 	enoughSpace := p.createInProgress+len(p.index) < p.limit
@@ -222,17 +237,23 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 		p.createInProgress++
 	}
 	p.mu.Unlock()
+
+	if trace.onCheckEnoughSpace != nil {
+		trace.onCheckEnoughSpace(enoughSpace)
+	}
+
 	if !enoughSpace {
 		return nil, ErrSessionPoolOverflow
 	}
 
-	type result struct {
-		s   *Session
-		err error
-	}
-	resCh := make(chan result)
+	resCh := make(chan createSessionResult, 1) // for non-block write
+
 	go func() {
 		defer close(resCh)
+
+		if trace.onRunCreateSessionGoroutine != nil {
+			trace.onRunCreateSessionGoroutine()
+		}
 
 		ctx, cancel := context.WithTimeout(
 			ydb.ContextWithoutDeadline(ctx),
@@ -240,7 +261,13 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 		)
 		defer cancel()
 
-		var r result
+		var r createSessionResult
+
+		defer func() {
+			if trace.onDoneCreateSessionGoroutine != nil {
+				trace.onDoneCreateSessionGoroutine(r)
+			}
+		}()
 
 		r.s, r.err = p.Builder.CreateSession(ctx)
 		// if session not nil - error must be nil and vice versa
@@ -252,10 +279,7 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 			p.mu.Lock()
 			p.createInProgress--
 			p.mu.Unlock()
-			select {
-			case resCh <- r:
-			default:
-			}
+			resCh <- r
 			return
 		}
 		r.s.OnClose(func() {
@@ -278,36 +302,42 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 			}
 		})
 
-		// while creating session pool may become full
+		// Slot for session already reserved early
 		p.mu.Lock()
-		enoughSpace = p.createInProgress+len(p.index) <= p.limit
-		if enoughSpace {
-			p.index[r.s] = sessionInfo{}
-		}
+		p.index[r.s] = sessionInfo{}
 		p.createInProgress--
 		p.mu.Unlock()
 
-		if !enoughSpace {
-			p.putBusy(ctx, r.s)
-			r.s, r.err = nil, ErrSessionPoolOverflow
-		}
-
-		select {
-		case resCh <- r:
-		default:
-			if r.s != nil {
-				// if cannot put session into result channel - put session into pool for reuse
-				_ = p.Put(ctx, r.s)
-			}
-		}
+		resCh <- r
 	}()
+
+	if trace.onStartSelect != nil {
+		trace.onStartSelect()
+	}
+
 	select {
 	case r := <-resCh:
+		if trace.onReadResult != nil {
+			trace.onReadResult(r)
+		}
 		if r.s == nil && r.err == nil {
 			panic("ydb: abnormal result of pool.createSession()")
 		}
 		return r.s, r.err
 	case <-ctx.Done():
+		if trace.onContextDone != nil {
+			trace.onContextDone()
+		}
+		// read result from resCh for prevention of forgetting session
+		go func() {
+			if r, ok := <-resCh; ok && r.s != nil {
+				// if cannot put session into result channel - put session into pool for reuse
+				err := p.Put(ctx, r.s)
+				if trace.onPutSession != nil {
+					trace.onPutSession(r.s, err)
+				}
+			}
+		}()
 		return nil, ctx.Err()
 	}
 }
@@ -344,7 +374,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 
 		if s == nil {
 			// Try create new session without awaiting for reused one.
-			s, err = p.createSession(ctx)
+			s, err = p.createSession(ctx, createSessionTrace{})
 			// got session or err is not recoverable
 			if s != nil || err != nil && !isCreateSessionErrorRetriable(err) {
 				return s, err
@@ -571,7 +601,7 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 		p.mu.Unlock()
 
 		if s == nil {
-			return p.createSession(ctx)
+			return p.createSession(ctx, createSessionTrace{})
 		}
 
 		took, err := p.Take(ctx, s)
@@ -696,7 +726,7 @@ func (p *SessionPool) reuse(ctx context.Context, s *Session) (reused bool) {
 	if info, err = p.keepAliveSession(ctx, s); err == nil && info.Status == SessionReady {
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		enoughSpace = !p.closed && len(p.index) < p.limit
+		enoughSpace = !p.closed && p.createInProgress+len(p.index) < p.limit
 		if enoughSpace {
 			p.index[s] = sessionInfo{}
 			if !p.notify(s) {
@@ -799,11 +829,12 @@ func (p *SessionPool) keeper() {
 
 				p.mu.Lock()
 				keepAliveCount := p.incrementKeepAlive(s)
+				lenIndex := len(p.index)
 				p.mu.Unlock()
 				// if keepAlive was called more than the corresponding limit for the session to be alive and more
 				// sessions are open than the lower limit of continuously kept sessions
 				if p.IdleKeepAliveThreshold > 0 && keepAliveCount > p.IdleKeepAliveThreshold &&
-					p.KeepAliveMinSize < len(p.index) {
+					p.KeepAliveMinSize < lenIndex {
 
 					toDelete = append(toDelete, s)
 					continue
