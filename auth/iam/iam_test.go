@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt"
 
 	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
 )
