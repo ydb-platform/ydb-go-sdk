@@ -1,3 +1,9 @@
+## 1.4.0
+* Added helper for create credentials from environ
+* Added anonymous credentials
+* Move YDB Certificate Authority from auth/iam package to root  package. YDB CA need to dial with
+  dedicated YDB and not need to dial with IAM. YDB CA automatically added to all grpc calling
+
 ## 1.3.0
 * Added Compose method to traces
 

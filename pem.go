@@ -1,7 +1,9 @@
-package iam
+package ydb
+
+import "crypto/x509"
 
 // content of https://storage.yandexcloud.net/cloud-certs/CA.pem
-var ydbCertificateAuthority = []byte(`
+var ydbPEM = []byte(`
 -----BEGIN CERTIFICATE-----
 MIIE3TCCAsWgAwIBAgIKPxb5sAAAAAAAFzANBgkqhkiG9w0BAQ0FADAfMR0wGwYD
 VQQDExRZYW5kZXhJbnRlcm5hbFJvb3RDQTAeFw0xNzA2MjAxNjQ0MzdaFw0yNzA2
@@ -62,3 +64,8 @@ Pj78bnC5yCw8P5YylR45LdxLzLO68unoXOyFz1etGXzszw8lJI9LNubYxk77mK8H
 LpuQKbSbIERsmR+QqQ==
 -----END CERTIFICATE-----
 `)
+
+func WithYdbCA(certPool *x509.CertPool) *x509.CertPool {
+	certPool.AppendCertsFromPEM(ydbPEM)
+	return certPool
+}

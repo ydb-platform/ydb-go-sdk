@@ -72,6 +72,14 @@ func WithDefaultEndpoint() ClientOption {
 	}
 }
 
+// WithSourceInfo set sourceInfo
+func WithSourceInfo(sourceInfo string) ClientOption {
+	return func(c *client) error {
+		c.sourceInfo = sourceInfo
+		return nil
+	}
+}
+
 // WithCertPool set provided certPool.
 func WithCertPool(certPool *x509.CertPool) ClientOption {
 	return func(c *client) error {
@@ -265,6 +273,8 @@ type client struct {
 
 	// transport is a stub used for tests.
 	transport transport
+
+	sourceInfo string
 }
 
 func (c *client) init() (err error) {
@@ -279,16 +289,6 @@ func (c *client) init() (err error) {
 		if c.TokenTTL == 0 {
 			c.TokenTTL = DefaultTokenTTL
 		}
-		if !c.InsecureSkipVerify {
-			if c.CertPool == nil {
-				err := WithSystemCertPool()(c)
-				if err != nil {
-					c.err = fmt.Errorf("iam: system certpool cannot loaded: %+w", err)
-					return
-				}
-			}
-			c.CertPool.AppendCertsFromPEM(ydbCertificateAuthority)
-		}
 		if c.transport == nil {
 			c.transport = &grpcTransport{
 				endpoint:           c.Endpoint,
@@ -298,6 +298,13 @@ func (c *client) init() (err error) {
 		}
 	})
 	return c.err
+}
+
+func (c *client) String() string {
+	if c.sourceInfo == "" {
+		return "iam.Client"
+	}
+	return "iam.Client created from " + c.sourceInfo
 }
 
 // Token returns cached token if no c.TokenTTL time has passed or no token

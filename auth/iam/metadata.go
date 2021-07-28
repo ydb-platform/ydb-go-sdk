@@ -23,6 +23,8 @@ type instanceServiceAccountCredentials struct {
 	timer  *time.Timer
 
 	metadataURL string
+
+	caller string
 }
 
 // Returns cached token if it is valid. Otherwise, will try to renew.
@@ -44,6 +46,13 @@ func (m *instanceServiceAccountCredentials) Token(ctx context.Context) (token st
 			// not yet initialized, wait
 		}
 	}
+}
+
+func (m *instanceServiceAccountCredentials) String() string {
+	if m.caller == "" {
+		return "InstanceServiceAccountCredentials (metadataURL=" + m.metadataURL + ")"
+	}
+	return "InstanceServiceAccountCredentials created from " + m.caller + " (metadataURL=" + m.metadataURL + ")"
 }
 
 func (m *instanceServiceAccountCredentials) refreshLoop() {
@@ -108,11 +117,13 @@ func (m *instanceServiceAccountCredentials) refreshOnce() {
 // Cancelling context will lead to credentials refresh halt.
 // It should be used during application stop or credentials recreation.
 func InstanceServiceAccountURL(ctx context.Context, url string) ydb.Credentials {
+	caller, _ := ydb.ContextCredentialsSourceInfo(ctx)
 	credentials := &instanceServiceAccountCredentials{
 		metadataURL: url,
 		mu:          &sync.RWMutex{},
 		ctx:         ctx,
 		timer:       time.NewTimer(0), // Allocate expired
+		caller:      caller,
 	}
 	// Start refresh loop.
 	go credentials.refreshLoop()

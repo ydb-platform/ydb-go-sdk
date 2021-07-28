@@ -27,15 +27,61 @@ func (f CredentialsFunc) Token(ctx context.Context) (string, error) {
 	return f(ctx)
 }
 
+// Token implements Credentials.
+func (f CredentialsFunc) String() string {
+	return "CredentialsFunc"
+}
+
 // AuthTokenCredentials implements Credentials interface with static
 // authorization parameters.
 type AuthTokenCredentials struct {
 	AuthToken string
+
+	sourceInfo string
+}
+
+func NewAuthTokenCredentials(authToken string, sourceInfo string) *AuthTokenCredentials {
+	return &AuthTokenCredentials{
+		AuthToken:  authToken,
+		sourceInfo: sourceInfo,
+	}
 }
 
 // Token implements Credentials.
 func (a AuthTokenCredentials) Token(_ context.Context) (string, error) {
 	return a.AuthToken, nil
+}
+
+// Token implements Credentials.
+func (a AuthTokenCredentials) String() string {
+	if a.sourceInfo == "" {
+		return "AuthTokenCredentials"
+	}
+	return "AuthTokenCredentials created from " + a.sourceInfo
+}
+
+// anonymousCredentials implements Credentials interface with anonymous access
+type anonymousCredentials struct {
+	sourceInfo string
+}
+
+func NewAnonymousCredentials(sourceInfo string) *anonymousCredentials {
+	return &anonymousCredentials{
+		sourceInfo: sourceInfo,
+	}
+}
+
+// Token implements Credentials.
+func (a anonymousCredentials) Token(_ context.Context) (string, error) {
+	return "", nil
+}
+
+// Token implements Credentials.
+func (a anonymousCredentials) String() string {
+	if a.sourceInfo == "" {
+		return "anonymousCredentials"
+	}
+	return "anonymousCredentials created from " + a.sourceInfo
 }
 
 type multiCredentials struct {

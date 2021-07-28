@@ -237,3 +237,14 @@ func contextUntilDeadline(ctx context.Context) (time.Duration, bool) {
 	}
 	return 0, false
 }
+
+type credentialsSourceInfoContextKey struct{}
+
+func WithCredentialsSourceInfo(ctx context.Context, sourceInfo string) context.Context {
+	return context.WithValue(ctx, credentialsSourceInfoContextKey{}, sourceInfo)
+}
+
+func ContextCredentialsSourceInfo(ctx context.Context) (sourceInfo string, ok bool) {
+	sourceInfo, ok = ctx.Value(credentialsSourceInfoContextKey{}).(string)
+	return
+}

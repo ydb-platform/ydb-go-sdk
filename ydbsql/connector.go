@@ -3,10 +3,11 @@ package ydbsql
 import (
 	"context"
 	"database/sql/driver"
+	"fmt"
 	"sync"
 	"time"
 
-	ydb "github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
@@ -225,7 +226,10 @@ func (c *connector) init(ctx context.Context) (err error) {
 func (c *connector) dial(ctx context.Context) (*table.Client, error) {
 	d, err := c.dialer.Dial(ctx, c.endpoint)
 	if err != nil {
-		return nil, err
+		if stringer, ok := c.dialer.DriverConfig.Credentials.(fmt.Stringer); ok {
+			return nil, fmt.Errorf("dial error: %w (credentials: %s)", err, stringer.String())
+		}
+		return nil, fmt.Errorf("dial error: %w", err)
 	}
 	return &table.Client{
 		Driver: d,

@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"fmt"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -39,6 +40,9 @@ func (m *meta) md(ctx context.Context) (md metadata.MD, err error) {
 		}()
 		token, err = m.credentials.Token(ctx)
 		if err != nil {
+			if stringer, ok := m.credentials.(fmt.Stringer); ok {
+				return nil, fmt.Errorf("%s: %w", stringer.String(), err)
+			}
 			return nil, err
 		}
 		md.Set(metaTicket, token)

@@ -61,10 +61,13 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	} else if grpcKeepalive < MinKeepaliveInterval {
 		grpcKeepalive = MinKeepaliveInterval
 	}
-
+	tlsConfig := d.TLSConfig
+	if tlsConfig != nil {
+		tlsConfig.RootCAs = WithYdbCA(tlsConfig.RootCAs)
+	}
 	return (&dialer{
 		netDial:   d.NetDial,
-		tlsConfig: d.TLSConfig,
+		tlsConfig: tlsConfig,
 		keepalive: grpcKeepalive,
 		timeout:   d.Timeout,
 		config:    config,

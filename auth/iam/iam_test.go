@@ -78,7 +78,7 @@ func TestClientToken(t *testing.T) {
 				t.Errorf("unexpected \"kid\" header: %+q; want %+q", act, exp)
 			}
 
-			// Get the "now" moment. Note that this is the same as for caller –
+			// Get the "now" moment. Note that this is the same as for sourceInfo –
 			// we stubbed time above.
 			now := timeutil.Now()
 
