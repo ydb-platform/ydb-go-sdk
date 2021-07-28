@@ -17,22 +17,33 @@ import "google/protobuf/timestamp.proto";
 ////////////////////////////////////////////////////////////
 
 message GetTaskRequest {
+    string tenant = 1;
+    string owner_id = 2; // guid, should be refreshed on node restart
+    string host = 3;
+}
+
+message SignedIdentity {
+    string value = 1;
+    string signature = 2;
 }
 
 message GetTaskResult {
     bool has_task = 1;
-    string result_id = 2;
-    string result_id_signature = 3;
+    // come back later in 10 sec ?
+    SignedIdentity result_id = 2;
+    SignedIdentity query_id = 3;
+    SignedIdentity job_id = 4;
+    uint64 generation = 5;
 
-    string operation_id = 4;
-    string operation_id_signature = 5;
+    bool streaming = 6;
+    string dq_graph = 7;
+    // text, connection and binding are empty if dq_graph is not empty
+    string text = 8;
+    repeated YandexQuery.Connection connection = 9;
+    repeated YandexQuery.Binding binding = 10;
 
-    string content = 6;
-    repeated YandexQuery.Connection connection = 7;
-    repeated YandexQuery.Binding binding = 8;
-
-    string user_token = 9; // TODO: move to impersonation service
-    string token = 10;
+    string user_token = 11; // IAM token for debug
+    repeated SignedIdentity service_accounts = 12;
 }
 
 message GetTaskResponse {
@@ -40,24 +51,26 @@ message GetTaskResponse {
 }
 
 message PingTaskRequest {
-    string operation_id = 1;
-    string operation_id_signature = 2;
-    string result_id = 3;
-    string result_id_signature = 4;
-    Yql.Analytics.EQueryStatus status = 5;
+    string owner_id = 1;
+    SignedIdentity query_id = 2;
+    SignedIdentity job_id = 3;
+    SignedIdentity result_id = 4;
+    YandexQuery.QueryMeta.ComputeStatus status = 5;
     repeated Ydb.Issue.IssueMessage issues = 6;
     uint32 result_set_count = 7;
     string statistics = 8;
     string serialized_headers = 9;
     string executer_info = 10;
-    string ast = 11;
-    string plan = 12;
-
-    string token = 100;
+    string dq_graph = 11;
+    string ast = 12;
+    string plan = 13;
+    bool resign_query = 14;
+    Ydb.Operations.OperationParams operation_params = 15;
+    string scope = 100; // TODO: delete
 }
 
 message PingTaskResult {
-
+    YandexQuery.QueryAction action = 1;
 }
 
 message PingTaskResponse {
@@ -65,13 +78,11 @@ message PingTaskResponse {
 }
 
 message WriteTaskResultRequest {
-    string result_id = 1;
-    string result_id_signature = 2;
+    string owner_id = 1;
+    SignedIdentity result_id = 2;
     Ydb.ResultSet result_set = 3;
     uint32 result_set_id = 4;
     uint64 offset = 5;
-
-    string token = 100;
 }
 
 message WriteTaskResultResult {
