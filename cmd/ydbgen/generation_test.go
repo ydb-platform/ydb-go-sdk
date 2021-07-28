@@ -11,7 +11,7 @@ import (
 func generateFromString(src string) (bytes.Buffer, error) {
 	in := bytes.NewReader([]byte(src))
 	out := bytes.Buffer{}
-	err := generate([]pipeline{{in, func() io.Writer { return &out }}}, cfg{
+	err := generate([]pair{{in, func() io.Writer { return &out }}}, cfg{
 		genMode: GenMode{
 			Wrap: WrapOptional,
 			Seek: SeekColumn,

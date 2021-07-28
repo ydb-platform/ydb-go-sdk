@@ -259,7 +259,7 @@ func (c *conn) Close() error {
 	return mapBadSessionError(err)
 }
 
-func (c *conn) Prepare(query string) (driver.Stmt, error) {
+func (c *conn) Prepare(string) (driver.Stmt, error) {
 	return nil, ErrDeprecated
 }
 
@@ -415,8 +415,7 @@ type TxDoer struct {
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 	rc := d.RetryConfig
 	if rc == nil {
-		driver := d.DB.Driver().(*Driver)
-		rc = &driver.c.retryConfig
+		rc = &d.DB.Driver().(*Driver).c.retryConfig
 	}
 	for i := 0; i <= rc.MaxRetries; i++ {
 		if err = d.do(ctx, f); err == nil {
@@ -547,7 +546,7 @@ func checkNamedValue(v *driver.NamedValue) (err error) {
 	if valuer, ok := v.Value.(driver.Valuer); ok {
 		v.Value, err = valuer.Value()
 		if err != nil {
-			return fmt.Errorf("ydbsql: driver.Valuer error: %v", err)
+			return fmt.Errorf("ydbsql: driver.Valuer error: %w", err)
 		}
 	}
 

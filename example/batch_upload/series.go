@@ -50,7 +50,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	driver, err := dialer.Dial(ctx, params.Endpoint)
 	if err != nil {
-		return fmt.Errorf("dial error: %v", err)
+		return fmt.Errorf("dial error: %w", err)
 	}
 
 	tableClient := table.Client{
@@ -78,7 +78,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	err = createTable(ctx, &sp, name)
 	if err != nil {
-		return fmt.Errorf("create tables error: %v", err)
+		return fmt.Errorf("create tables error: %w", err)
 	}
 
 	// make input generator of count

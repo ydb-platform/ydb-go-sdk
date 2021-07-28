@@ -46,7 +46,7 @@ func (cmd *Command) prepareTest(ctx context.Context, params cli.Parameters) (ydb
 	}
 	driver, err := dialer.Dial(ctx, params.Endpoint)
 	if err != nil {
-		return nil, nil, fmt.Errorf("dial error: %v", err)
+		return nil, nil, fmt.Errorf("dial error: %w", err)
 	}
 
 	tableClient := table.Client{
@@ -71,12 +71,12 @@ func (cmd *Command) prepareTest(ctx context.Context, params cli.Parameters) (ydb
 
 	err = createTables(ctx, &sp, prefix)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create tables error: %v", err)
+		return nil, nil, fmt.Errorf("create tables error: %w", err)
 	}
 
 	err = fillTablesWithData(ctx, &sp, prefix)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fill tables with data error: %v", err)
+		return nil, nil, fmt.Errorf("fill tables with data error: %w", err)
 	}
 	return driver, &sp, nil
 }

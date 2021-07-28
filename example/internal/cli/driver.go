@@ -107,7 +107,7 @@ func credentials(ctx context.Context) ydb.Credentials {
 
 		c, err := iam.NewClient(opts...)
 		if err != nil {
-			panic(fmt.Errorf("configure credentials error: %v", err))
+			panic(fmt.Errorf("configure credentials error: %w", err))
 		}
 		return c
 	}
@@ -149,7 +149,7 @@ func readRootCerts(path string) (*x509.CertPool, error) {
 func mustReadRootCerts(path string) *x509.CertPool {
 	roots, err := readRootCerts(path)
 	if err != nil {
-		panic(fmt.Errorf("read root certs error: %v", err))
+		panic(fmt.Errorf("read root certs error: %w", err))
 	}
 	return roots
 }

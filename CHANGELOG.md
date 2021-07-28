@@ -1,3 +1,6 @@
+## 1.4.1
+* Fixed fmt.Errorf error wrapping and some linter issues
+
 ## 1.4.0
 * Added helper for create credentials from environ
 * Added anonymous credentials

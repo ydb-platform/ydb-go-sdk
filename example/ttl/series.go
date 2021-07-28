@@ -38,7 +38,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	driver, err := dialer.Dial(ctx, params.Endpoint)
 	if err != nil {
-		return fmt.Errorf("dial error: %v", err)
+		return fmt.Errorf("dial error: %w", err)
 	}
 	defer driver.Close()
 
@@ -69,7 +69,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	err = createTables(ctx, &sp, prefix)
 	if err != nil {
-		return fmt.Errorf("create tables error: %v", err)
+		return fmt.Errorf("create tables error: %w", err)
 	}
 
 	err = addDocument(ctx, &sp, prefix,
@@ -77,7 +77,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		"<html><body><h1>Yandex</h1></body></html>",
 		1)
 	if err != nil {
-		return fmt.Errorf("add document failed: %v", err)
+		return fmt.Errorf("add document failed: %w", err)
 	}
 
 	err = addDocument(ctx, &sp, prefix,
@@ -85,27 +85,27 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		"<html><body><h1>Yandex</h1></body></html>",
 		2)
 	if err != nil {
-		return fmt.Errorf("add document failed: %v", err)
+		return fmt.Errorf("add document failed: %w", err)
 	}
 
 	err = readDocument(ctx, &sp, prefix, "https://yandex.ru/")
 	if err != nil {
-		return fmt.Errorf("read document failed: %v", err)
+		return fmt.Errorf("read document failed: %w", err)
 	}
 	err = readDocument(ctx, &sp, prefix, "https://ya.ru/")
 	if err != nil {
-		return fmt.Errorf("read document failed: %v", err)
+		return fmt.Errorf("read document failed: %w", err)
 	}
 
 	for i := uint64(0); i < ExpirationQueueCount; i++ {
 		if err = deleteExpired(ctx, &sp, prefix, i, 1); err != nil {
-			return fmt.Errorf("delete expired failed: %v", err)
+			return fmt.Errorf("delete expired failed: %w", err)
 		}
 	}
 
 	err = readDocument(ctx, &sp, prefix, "https://ya.ru/")
 	if err != nil {
-		return fmt.Errorf("read document failed: %v", err)
+		return fmt.Errorf("read document failed: %w", err)
 	}
 
 	err = addDocument(ctx, &sp, prefix,
@@ -113,7 +113,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		"<html><body><h1>Yandex</h1></body></html>",
 		2)
 	if err != nil {
-		return fmt.Errorf("add document failed: %v", err)
+		return fmt.Errorf("add document failed: %w", err)
 	}
 
 	err = addDocument(ctx, &sp, prefix,
@@ -121,22 +121,22 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		"<html><body><h1>Yandex</h1></body></html>",
 		3)
 	if err != nil {
-		return fmt.Errorf("add document failed: %v", err)
+		return fmt.Errorf("add document failed: %w", err)
 	}
 
 	for i := uint64(0); i < ExpirationQueueCount; i++ {
 		if err = deleteExpired(ctx, &sp, prefix, i, 2); err != nil {
-			return fmt.Errorf("delete expired failed: %v", err)
+			return fmt.Errorf("delete expired failed: %w", err)
 		}
 	}
 
 	err = readDocument(ctx, &sp, prefix, "https://yandex.ru/")
 	if err != nil {
-		return fmt.Errorf("read document failed: %v", err)
+		return fmt.Errorf("read document failed: %w", err)
 	}
 	err = readDocument(ctx, &sp, prefix, "https://ya.ru/")
 	if err != nil {
-		return fmt.Errorf("read document failed: %v", err)
+		return fmt.Errorf("read document failed: %w", err)
 	}
 
 	return nil

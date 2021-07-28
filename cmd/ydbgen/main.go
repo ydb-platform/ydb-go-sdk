@@ -26,14 +26,14 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal/ydbtypes"
 )
 
-func generate(sourceToOutput []pipeline, cfg cfg) error {
-	astFiles := make([]*ast.File, 0, len(sourceToOutput))
+func generate(pairs []pair, cfg cfg) error {
+	astFiles := make([]*ast.File, 0, len(pairs))
 	fset := token.NewFileSet()
-	for _, sourceFile := range sourceToOutput {
+	for _, sourceFile := range pairs {
 		// Parse the input string, []byte, or io.Reader,
 		// recording position information in fset.
 		// ParseFile returns an *ast.File, a syntax tree.
-		f, err := parser.ParseFile(fset, "", sourceFile.r, parser.ParseComments)
+		f, err := parser.ParseFile(fset, "", sourceFile.src, parser.ParseComments)
 		if err != nil {
 			return err
 		}
@@ -65,14 +65,17 @@ func generate(sourceToOutput []pipeline, cfg cfg) error {
 	}
 	p, err := conf.Check(".", fset, astFiles, &info)
 	if err != nil && !cfg.force {
-		return fmt.Errorf("type error: %v", err)
+		return fmt.Errorf("type error: %w", err)
+	}
+	if p == nil {
+		return fmt.Errorf("nil package")
 	}
 	pkg := Package{
 		Name: p.Name(),
 		Pipelines: make([]struct {
 			f *File
 			w func() io.Writer
-		}, 0, len(sourceToOutput)),
+		}, 0, len(pairs)),
 	}
 	for i, astFile := range astFiles {
 		var (
@@ -126,7 +129,7 @@ func generate(sourceToOutput []pipeline, cfg cfg) error {
 					if c.Text != text {
 						if item == nil {
 							item = &GenItem{
-								File: sourceToOutput[i].r,
+								File: pairs[i].src,
 								Mode: cfg.genMode,
 							}
 						}
@@ -143,7 +146,7 @@ func generate(sourceToOutput []pipeline, cfg cfg) error {
 			case *ast.TypeSpec:
 				if item == nil && (cfg.all || wantType[v.Name.Name]) {
 					item = &GenItem{
-						File:  sourceToOutput[i].r,
+						File:  pairs[i].src,
 						Mode:  cfg.genMode,
 						Flags: GenAll,
 					}
@@ -270,7 +273,7 @@ func generate(sourceToOutput []pipeline, cfg cfg) error {
 					Flags: item.Flags,
 				}
 				if err := inferType(&s.T, item.ArrayType.Elt); err != nil {
-					return fmt.Errorf("%s: %v", s.Name, err)
+					return fmt.Errorf("%s: %w", s.Name, err)
 				}
 				file.Slices = append(file.Slices, s)
 
@@ -291,13 +294,13 @@ func generate(sourceToOutput []pipeline, cfg cfg) error {
 						Position: i,
 					}
 					if err := field.ParseTags(decl.Tag(i)); err != nil {
-						return fmt.Errorf("%s.%s: %v", s.Name, field.Name, err)
+						return fmt.Errorf("%s.%s: %w", s.Name, field.Name, err)
 					}
 					if field.Ignore {
 						continue
 					}
 					if err := inferType(&field.T, f.Type); err != nil {
-						return fmt.Errorf("%s.%s: %v", s.Name, field.Name, err)
+						return fmt.Errorf("%s.%s: %w", s.Name, field.Name, err)
 					}
 					// Do not handle errors here due to the late binding.
 					_ = dig(&field.T, func(t *T) {
@@ -328,7 +331,7 @@ func generate(sourceToOutput []pipeline, cfg cfg) error {
 		pkg.Pipelines = append(pkg.Pipelines, struct {
 			f *File
 			w func() io.Writer
-		}{f: file, w: sourceToOutput[i].createWriter})
+		}{f: file, w: pairs[i].dst})
 	}
 
 	if err := pkg.Finalize(); err != nil {
@@ -416,22 +419,28 @@ func main() {
 		// with GOPATH friendly layout which src directory contains only base
 		// import path node which is a symbolic link to the given source base
 		// directory.
-		var paths []string
-		for _, pair := range strings.Split(*sourceLookup, ",") {
+		paths := make([]string, 0)
+		tmps := make([]string, 0)
+		defer func() {
+			for _, tmp := range tmps {
+				_ = os.RemoveAll(tmp)
+			}
+		}()
+		for _, p := range strings.Split(*sourceLookup, ",") {
 			tmp, err := ioutil.TempDir("", "ydbgen")
 			if err != nil {
 				log.Fatal(err)
 			}
-			defer os.RemoveAll(tmp)
 			if err := os.Mkdir(path.Join(tmp, "src"), 0700); err != nil {
 				log.Fatal(err)
 			}
-			base, dir := splitPair(strings.TrimSpace(pair), ':')
+			base, dir := splitPair(strings.TrimSpace(p), ':')
 			err = os.Symlink(dir, path.Join(tmp, "src", base))
 			if err != nil {
 				log.Fatal(err)
 			}
 			paths = append(paths, tmp)
+			tmps = append(tmps, tmp)
 		}
 		if dir := os.Getenv("GOPATH"); dir != "" {
 			paths = append(paths, dir)
@@ -489,9 +498,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var (
-		sourceToOutput = make([]pipeline, 0, len(matches))
-	)
+	pairs := make([]pair, 0, len(matches))
+	files := make([]*os.File, 0, len(matches))
+	defer func() {
+		for _, file := range files {
+			_ = file.Close()
+		}
+	}()
 
 	for _, fpath := range matches {
 		if strings.HasSuffix(fpath, GeneratedFileSuffix+".go") {
@@ -507,15 +520,13 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		defer file.Close()
-
-		sourceToOutput = append(sourceToOutput, pipeline{
-			r:            file,
-			createWriter: createWriter(fpath, outputDir),
+		files = append(files, file)
+		pairs = append(pairs, pair{
+			src: file,
+			dst: createWriter(fpath, outputDir),
 		})
 	}
-	err = generate(sourceToOutput, cfg{
+	err = generate(pairs, cfg{
 		genMode: genMode,
 		gentype: *gentype,
 		all:     *all,
@@ -576,22 +587,22 @@ func (p *Package) Register(id string, x interface{}) {
 	}
 	p.Known[id] = x
 
-	list := p.Container[id]
-	if list == nil {
+	l := p.Container[id]
+	if l == nil {
 		return
 	}
 
 	delete(p.Container, id)
-	for el := list.Front(); el != nil; el = el.Next() {
+	for el := l.Front(); el != nil; el = el.Next() {
 		el.Value.(func(interface{}))(x)
 	}
 }
 
 func (p *Package) Finalize() error {
-	for id, list := range p.Container {
+	for id, l := range p.Container {
 		return fmt.Errorf(
 			"type dependency not met: %d container type(s) want type %s to be generated",
-			list.Len(), id,
+			l.Len(), id,
 		)
 	}
 	return nil
@@ -621,9 +632,9 @@ func createWriter(fpath, outputDir string) func() io.Writer {
 	}
 }
 
-type pipeline struct {
-	r            io.Reader
-	createWriter func() io.Writer
+type pair struct {
+	src io.Reader
+	dst func() io.Writer
 }
 
 type WrapMode uint
@@ -1141,10 +1152,10 @@ func checkInterface(typ *types.Named, flags GenFlag) (_ *types.Basic, err error)
 	if flags = flags & (GenGet | GenSet); flags != 0 {
 		var buf bytes.Buffer
 		if flags&GenGet != 0 {
-			fmt.Fprintf(&buf, "\n\twant %s() (T, bool)", getter)
+			_, _ = fmt.Fprintf(&buf, "\n\twant %s() (T, bool)", getter)
 		}
 		if flags&GenSet != 0 {
-			fmt.Fprintf(&buf, "\n\twant %s(T)", setter)
+			_, _ = fmt.Fprintf(&buf, "\n\twant %s(T)", setter)
 		}
 		return nil, fmt.Errorf("not enough methods: %s", buf.Bytes())
 	}
@@ -1226,13 +1237,13 @@ func resultWithFlag(f *types.Func) (*types.Basic, error) {
 		)
 	}
 
-	flag := r.At(1)
-	fb, ok := flag.Type().(*types.Basic)
+	v := r.At(1)
+	fb, ok := v.Type().(*types.Basic)
 	if !ok {
 		return nil, fmt.Errorf(
 			"unexpected type of method %q result value: "+
 				"%s; only basic types are supported",
-			f.Name(), flag.Type(),
+			f.Name(), v.Type(),
 		)
 	}
 	if fb.Kind() != types.Bool {

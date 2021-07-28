@@ -38,7 +38,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		prefix, tableName,
 	))
 	if err != nil {
-		return fmt.Errorf("read table error: %v", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("Sorted by composite primary key:")
@@ -46,7 +46,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		prefix, tableName,
 	), table.ReadOrdered())
 	if err != nil {
-		return fmt.Errorf("read table error: %v", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("Any five rows:")
@@ -54,7 +54,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		prefix, tableName,
 	), table.ReadRowLimit(5))
 	if err != nil {
-		return fmt.Errorf("read table error: %v", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("First five rows by PK (ascending) with subset of columns:")
@@ -64,7 +64,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		table.ReadColumn("order_id"),
 		table.ReadColumn("order_date"), table.ReadOrdered())
 	if err != nil {
-		return fmt.Errorf("read table error: %v", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("Read all rows with first PK component (customer_id,) greater or equal than 2 and less then 3:")
@@ -76,7 +76,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		prefix, tableName,
 	), table.ReadKeyRange(keyRange))
 	if err != nil {
-		return fmt.Errorf("read table error: %v", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("Read all rows with composite PK lexicographically less or equal than (1,4):")
@@ -84,7 +84,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		prefix, tableName,
 	), table.ReadLessOrEqual(ydb.TupleValue(ydb.OptionalValue(ydb.Uint64Value(1)), ydb.OptionalValue(ydb.Uint64Value(4)))))
 	if err != nil {
-		return fmt.Errorf("read table error: %v", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("Read all rows with composite PK lexicographically greater or equal than (1,2) and less than (3,4):")
@@ -96,7 +96,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		prefix, tableName,
 	), table.ReadKeyRange(keyRange))
 	if err != nil {
-		return fmt.Errorf("read table error: %v", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	return nil

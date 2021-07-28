@@ -92,7 +92,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	driver, err := dialer.Dial(ctx, params.Endpoint)
 	if err != nil {
-		return fmt.Errorf("dial error: %v", err)
+		return fmt.Errorf("dial error: %w", err)
 	}
 	defer driver.Close()
 
@@ -118,36 +118,36 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	err = describeTableOptions(ctx, &sp)
 	if err != nil {
-		return fmt.Errorf("describe table options error: %v", err)
+		return fmt.Errorf("describe table options error: %w", err)
 	}
 
 	err = createTables(ctx, &sp, prefix)
 	if err != nil {
-		return fmt.Errorf("create tables error: %v", err)
+		return fmt.Errorf("create tables error: %w", err)
 	}
 
 	err = describeTable(ctx, &sp, path.Join(
 		prefix, "series",
 	))
 	if err != nil {
-		return fmt.Errorf("describe table error: %v", err)
+		return fmt.Errorf("describe table error: %w", err)
 	}
 
 	err = fillTablesWithData(ctx, &sp, prefix)
 	if err != nil {
-		return fmt.Errorf("fill tables with data error: %v", err)
+		return fmt.Errorf("fill tables with data error: %w", err)
 	}
 
 	err = selectSimple(ctx, &sp, prefix)
 	if err != nil {
-		return fmt.Errorf("select simple error: %v", err)
+		return fmt.Errorf("select simple error: %w", err)
 	}
 
 	err = scanQuerySelect(ctx, &sp, prefix)
 	if err != nil {
 		var te *ydb.TransportError
 		if !errors.As(err, &te) || te.Reason != ydb.TransportErrorUnimplemented {
-			return fmt.Errorf("scan query select error: %v", err)
+			return fmt.Errorf("scan query select error: %w", err)
 		}
 	}
 
@@ -155,7 +155,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		prefix, "episodes",
 	))
 	if err != nil {
-		return fmt.Errorf("read table error: %v", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	return nil
@@ -309,13 +309,13 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 			i, phase.Duration,
 		)
 		for {
-			table, ok := phase.NextTableAccess()
+			tbl, ok := phase.NextTableAccess()
 			if !ok {
 				break
 			}
 			log.Printf(
 				"#  accessed %s: read=(%drows, %dbytes)",
-				table.Name, table.Reads.Rows, table.Reads.Bytes,
+				tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
 			)
 		}
 	}

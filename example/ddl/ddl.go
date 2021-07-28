@@ -105,7 +105,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	driver, err := dialer.Dial(ctx, params.Endpoint)
 	if err != nil {
-		return fmt.Errorf("dial error: %v", err)
+		return fmt.Errorf("dial error: %w", err)
 	}
 	defer driver.Close()
 	tableClient := table.Client{

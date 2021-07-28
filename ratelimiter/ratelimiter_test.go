@@ -56,7 +56,7 @@ func openDB(ctx context.Context) (ydb.Driver, error) {
 	}
 	driver, err := dialer.Dial(ctx, "localhost:2135")
 	if err != nil {
-		return nil, fmt.Errorf("dial error: %v", err)
+		return nil, fmt.Errorf("dial error: %w", err)
 	}
 
 	return driver, nil

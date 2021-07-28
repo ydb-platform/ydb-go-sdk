@@ -32,7 +32,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 	driver, err := dialer.Dial(ctx, params.Endpoint)
 	if err != nil {
-		return fmt.Errorf("dial error: %v", err)
+		return fmt.Errorf("dial error: %w", err)
 	}
 	defer driver.Close()
 
@@ -58,12 +58,12 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	err = createTable(ctx, &sp, path.Join(prefix, "schools"))
 	if err != nil {
-		return fmt.Errorf("create tables error: %v", err)
+		return fmt.Errorf("create tables error: %w", err)
 	}
 
 	err = fillTableWithData(ctx, &sp, prefix)
 	if err != nil {
-		return fmt.Errorf("fill tables with data error: %v", err)
+		return fmt.Errorf("fill tables with data error: %w", err)
 	}
 
 	lastNum := 0
@@ -74,7 +74,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		fmt.Printf("> Page %v:\n", i+1)
 		empty, err = selectPaging(ctx, &sp, prefix, limit, &lastNum, &lastCity)
 		if err != nil {
-			return fmt.Errorf("get page %v error: %v", i, err)
+			return fmt.Errorf("get page %v error: %w", i, err)
 		}
 	}
 
