@@ -1,3 +1,6 @@
+## 1.5.0
+* Added ydbx package
+
 ## 1.4.1
 * Fixed fmt.Errorf error wrapping and some linter issues
 
