@@ -134,6 +134,8 @@ message QueryMeta {
     google.protobuf.Timestamp finished_at = 3;
     ExecuteMode execute_mode = 4;
     ComputeStatus status = 5;
+    int64 last_job_query_revision = 6;
+    string last_job_id = 7;
 }
 
 message BriefQuery {
@@ -305,6 +307,9 @@ message ListJobsResult {
 message CurrentIAMTokenAuth {
 }
 
+message NoneAuth {
+}
+
 message ServiceAccountAuth {
     string id = 1 [(Ydb.length).le = 1024];
 }
@@ -313,6 +318,7 @@ message IamAuth {
     oneof identity {
         CurrentIAMTokenAuth current_iam = 1;
         ServiceAccountAuth service_account = 2;
+        NoneAuth none = 3;
     }
 }
 

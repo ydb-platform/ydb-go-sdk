@@ -30,10 +30,17 @@ message ClickHouseCluster {
    string password = 6;
 }
 
+message ObjectStorage {
+   string name = 1;
+   string bucket = 2;
+   bool is_public = 3;
+}
+
 message Connection {
     oneof connection {
         YdbDatabase ydb_database = 1;
         ClickHouseCluster clickhouse_cluster = 2;
+        ObjectStorage object_storage = 3;
     }
 }
 
