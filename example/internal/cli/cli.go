@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 )
 
 var ErrPrintUsage = fmt.Errorf("")
@@ -16,7 +17,10 @@ var ErrPrintUsage = fmt.Errorf("")
 type Parameters struct {
 	Endpoint string
 	Database string
+	TLS      bool
 	Path     string
+
+	ConnectTimeout time.Duration
 
 	Args []string
 }
@@ -35,29 +39,34 @@ func (f CommandFunc) Run(ctx context.Context, params Parameters) error {
 func (f CommandFunc) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func Run(cmd Command) {
-	flag := flag.NewFlagSet("example", flag.ExitOnError)
+	flagSet := flag.NewFlagSet("example", flag.ExitOnError)
 
 	var params Parameters
-	flag.StringVar(&params.Endpoint,
+	flagSet.StringVar(&params.Endpoint,
 		"endpoint", "",
 		"endpoint url to use",
 	)
-	flag.StringVar(&params.Path,
+	flagSet.StringVar(&params.Path,
 		"path", "",
 		"tables path",
 	)
-	flag.StringVar(&params.Database,
+	flagSet.StringVar(&params.Database,
 		"database", "",
 		"name of the database to use",
+	)
+	flagSet.BoolVar(&params.TLS,
+		"tls", true,
+		"use TLS connection",
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cmd.ExportFlags(ctx, flag)
+	cmd.ExportFlags(ctx, flagSet)
 
-	_ = flag.Parse(os.Args[1:])
-	params.Args = flag.Args()
+	_ = flagSet.Parse(os.Args[1:])
+
+	params.Args = flagSet.Args()
 
 	quit := make(chan error)
 	go processSignals(map[os.Signal]func(){
@@ -89,7 +98,7 @@ func Run(cmd Command) {
 	case err = <-quit:
 	}
 	if err == ErrPrintUsage {
-		flag.Usage()
+		flagSet.Usage()
 		os.Exit(1)
 	}
 	if err != nil {
