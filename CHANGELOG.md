@@ -1,3 +1,6 @@
+## 1.5.1
+* Fixed package name of ydbx
+
 ## 1.5.0
 * Added ydbx package
 

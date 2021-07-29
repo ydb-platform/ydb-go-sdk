@@ -1,4 +1,4 @@
-package runtime
+package ydbx
 
 import (
 	"github.com/yandex-cloud/ydb-go-sdk"
