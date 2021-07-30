@@ -19,7 +19,7 @@ func generateFromString(src string) (bytes.Buffer, error) {
 		},
 		all:     false,
 		force:   true,
-		verbose: true,
+		verbose: false,
 	})
 	return out, err
 }
