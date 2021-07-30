@@ -14,11 +14,11 @@ type Command struct {
 }
 
 func (cmd *Command) Run(ctx context.Context, parameters cli.Parameters) error {
-	h, err := NewHandler(ctx, parameters.Endpoint, parameters.Database, parameters.TLS)
+	h, err := NewURLShortener(ctx, parameters.Endpoint, parameters.Database, parameters.TLS)
 	if err != nil {
 		return fmt.Errorf("error on create handler: %w", err)
 	}
-	fmt.Printf("Running server on port %d...\n", cmd.port)
+	defer h.Close()
 	return http.ListenAndServe(":"+strconv.Itoa(cmd.port), http.HandlerFunc(h.Handle))
 }
 

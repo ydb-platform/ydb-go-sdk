@@ -90,12 +90,12 @@ var (
 	long  = regexp.MustCompile("https?://(?:[-\\w.]|(?:%[\\da-fA-F]{2}))+")
 )
 
-type Handler struct {
+type urlShortener struct {
 	database string
 	db       *ydbx.Client
 }
 
-func NewHandler(ctx context.Context, endpoint string, database string, tls bool) (h *Handler, err error) {
+func NewURLShortener(ctx context.Context, endpoint string, database string, tls bool) (h *urlShortener, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	db, err := ydbx.NewClient(
@@ -107,17 +107,25 @@ func NewHandler(ctx context.Context, endpoint string, database string, tls bool)
 		),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error on create YDB client: %w", err)
 	}
-	h = &Handler{
+	h = &urlShortener{
 		database: database,
 		db:       db,
 	}
 	err = h.createTable(ctx)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("error on create table: %w", err)
+	}
 	return h, nil
 }
 
-func (h *Handler) createTable(ctx context.Context) (err error) {
+func (h *urlShortener) Close() {
+	h.db.Close()
+}
+
+func (h *urlShortener) createTable(ctx context.Context) (err error) {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -141,7 +149,7 @@ func (h *Handler) createTable(ctx context.Context) (err error) {
 	)
 }
 
-func (h *Handler) insertShort(ctx context.Context, url string) (hash string, err error) {
+func (h *urlShortener) insertShort(ctx context.Context, url string) (hash string, err error) {
 	hash = Hash(url)
 	query := render(
 		template.Must(template.New("").Parse(`
@@ -179,7 +187,7 @@ func (h *Handler) insertShort(ctx context.Context, url string) (hash string, err
 	)
 }
 
-func (h *Handler) selectLong(ctx context.Context, hash string) (url string, err error) {
+func (h *urlShortener) selectLong(ctx context.Context, hash string) (url string, err error) {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -234,7 +242,7 @@ func (h *Handler) selectLong(ctx context.Context, hash string) (url string, err 
 	return "", fmt.Errorf(hashNotFound, hash)
 }
 
-func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
+func (h *urlShortener) Handle(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimLeft(r.URL.Path, "/")
 	switch {
 	case path == "":
@@ -278,7 +286,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func Handle(w http.ResponseWriter, r *http.Request) {
-	h, err := NewHandler(
+	h, err := NewURLShortener(
 		r.Context(),
 		os.Getenv("YDB_ENDPOINT"),
 		os.Getenv("YDB_DATABASE"),
