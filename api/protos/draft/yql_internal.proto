@@ -59,7 +59,7 @@ message PingTaskRequest {
     repeated Ydb.Issue.IssueMessage issues = 6;
     uint32 result_set_count = 7;
     string statistics = 8;
-    string serialized_headers = 9;
+    bytes serialized_headers = 9;
     string executer_info = 10;
     string dq_graph = 11;
     string ast = 12;
