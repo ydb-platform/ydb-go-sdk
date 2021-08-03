@@ -53,7 +53,7 @@ type Dialer struct {
 }
 
 // Dial dials given addr and initializes driver instance on success.
-func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
+func (d *Dialer) Dial(ctx context.Context, addr string) (_ Driver, err error) {
 	config := d.DriverConfig.withDefaults()
 	grpcKeepalive := d.Keepalive
 	if grpcKeepalive == 0 {
@@ -63,7 +63,10 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (Driver, error) {
 	}
 	tlsConfig := d.TLSConfig
 	if tlsConfig != nil {
-		tlsConfig.RootCAs = WithYdbCA(tlsConfig.RootCAs)
+		tlsConfig.RootCAs, err = WithYdbCA(tlsConfig.RootCAs)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return (&dialer{
 		netDial:   d.NetDial,

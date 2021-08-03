@@ -65,7 +65,13 @@ LpuQKbSbIERsmR+QqQ==
 -----END CERTIFICATE-----
 `)
 
-func WithYdbCA(certPool *x509.CertPool) *x509.CertPool {
+func WithYdbCA(certPool *x509.CertPool) (_ *x509.CertPool, err error) {
+	if certPool == nil {
+		certPool, err = x509.SystemCertPool()
+		if err != nil {
+			return nil, err
+		}
+	}
 	certPool.AppendCertsFromPEM(ydbPEM)
-	return certPool
+	return certPool, nil
 }

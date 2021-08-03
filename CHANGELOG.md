@@ -1,3 +1,6 @@
+## 1.5.2
+* Fixed WithYdbCA at nil certPool case 
+
 ## 1.5.1
 * Fixed package name of ydbx
 
