@@ -12,6 +12,13 @@ PEERDIR(
     ${GOSTD}/context
     vendor/google.golang.org/grpc
 )
+
+IF (OS_WINDOWS)
+    SET(exe_ext .exe)
+ELSE()
+    SET(exe_ext)
+ENDIF()
+
 RUN_PROGRAM(
     kikimr/public/sdk/go/ydb/internal/cmd/make
     -import="${protobuf_import_dirs}"
@@ -20,8 +27,8 @@ RUN_PROGRAM(
     -strip=${api_spec_root}
     -destination=${api_generated_root}
     -repository=a.yandex-team.ru/${api_generated_suffix}
-    -compiler=contrib/tools/protoc/protoc
-    -custom=kikimr/public/sdk/go/ydb/internal/cmd/protoc-gen/protoc-gen
+    -compiler=contrib/tools/protoc/protoc${exe_ext}
+    -custom=kikimr/public/sdk/go/ydb/internal/cmd/protoc-gen/protoc-gen${exe_ext}
     -plugins=ydb
 
     TOOL contrib/tools/protoc
