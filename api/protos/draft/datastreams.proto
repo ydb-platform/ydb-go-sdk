@@ -229,6 +229,9 @@ message ListStreamsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string exclusive_start_stream_name = 2; // name of stream to start from
     int32 limit = 3; // max number of entries to return
+
+    // Will make recurse listing if set to true. Otherwise will return only streams from root directory.
+    bool recurse = 4;
 }
 message ListStreamsResponse {
     // Result of request will be inside operation.
