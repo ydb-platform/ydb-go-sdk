@@ -1,0 +1,32 @@
+PEERDIR(
+    ${GOSTD}/fmt
+    ${GOSTD}/math
+    vendor/github.com/golang/protobuf/proto
+    vendor/github.com/golang/protobuf/protoc-gen-go/descriptor
+    vendor/github.com/golang/protobuf/protoc-gen-go/grpc
+    vendor/google.golang.org/protobuf/types/known/anypb
+    vendor/github.com/golang/protobuf/ptypes/empty
+    vendor/google.golang.org/protobuf/types/known/durationpb
+    vendor/google.golang.org/protobuf/types/known/timestamppb
+    contrib/libs/protobuf
+    ${GOSTD}/context
+    vendor/google.golang.org/grpc
+)
+RUN_PROGRAM(
+    kikimr/public/sdk/go/ydb/v2/internal/cmd/make
+    -import="${protobuf_import_dirs}"
+    -source="${api_spec_dirs}"
+    -source-base=${ARCADIA_ROOT}
+    -strip=${api_spec_root}
+    -destination=${api_generated_root}
+    -repository=a.yandex-team.ru/${api_generated_suffix}
+    -compiler=contrib/tools/protoc/protoc
+    -custom=kikimr/public/sdk/go/ydb/v2/internal/cmd/protoc-gen/protoc-gen
+    -plugins=ydb
+
+    TOOL contrib/tools/protoc
+    TOOL kikimr/public/sdk/go/ydb/v2/internal/cmd/protoc-gen
+    IN ${api_spec_files}
+    OUT ${api_generated_files}
+    CWD ${ARCADIA_BUILD_ROOT}
+)
