@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -14,7 +14,6 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
@@ -75,75 +74,58 @@ FROM AS_TABLE($episodesData);
 `))
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
-	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return fmt.Errorf("dial error: %w", err)
+		return fmt.Errorf("connect error: %w", err)
 	}
-	defer driver.Close()
+	defer db.Close()
 
-	tableClient := table.Client{
-		Driver: driver,
-	}
-	sp := table.SessionPool{
-		IdleThreshold: time.Second,
-		Builder:       &tableClient,
-	}
-	defer sp.Close(ctx)
-
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, "series", "episodes", "seasons")
-	if err != nil {
-		return err
-	}
-	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	err = db.CleanupDatabase(ctx, params.Prefix(), "series", "episodes", "seasons")
 	if err != nil {
 		return err
 	}
 
-	prefix := path.Join(params.Database, params.Path)
+	err = db.EnsurePathExists(ctx, params.Prefix())
+	if err != nil {
+		return err
+	}
 
-	err = describeTableOptions(ctx, &sp)
+	err = describeTableOptions(ctx, db.Table().Pool())
 	if err != nil {
 		return fmt.Errorf("describe table options error: %w", err)
 	}
 
-	err = createTables(ctx, &sp, prefix)
+	err = createTables(ctx, db.Table().Pool(), params.Prefix())
 	if err != nil {
 		return fmt.Errorf("create tables error: %w", err)
 	}
 
-	err = describeTable(ctx, &sp, path.Join(
-		prefix, "series",
+	err = describeTable(ctx, db.Table().Pool(), path.Join(
+		params.Prefix(), "series",
 	))
 	if err != nil {
 		return fmt.Errorf("describe table error: %w", err)
 	}
 
-	err = fillTablesWithData(ctx, &sp, prefix)
+	err = fillTablesWithData(ctx, db.Table().Pool(), params.Prefix())
 	if err != nil {
 		return fmt.Errorf("fill tables with data error: %w", err)
 	}
 
-	err = selectSimple(ctx, &sp, prefix)
+	err = selectSimple(ctx, db.Table().Pool(), params.Prefix())
 	if err != nil {
 		return fmt.Errorf("select simple error: %w", err)
 	}
 
-	err = scanQuerySelect(ctx, &sp, prefix)
+	err = scanQuerySelect(ctx, db.Table().Pool(), params.Prefix())
 	if err != nil {
 		var te *ydb.TransportError
 		if !errors.As(err, &te) || te.Reason != ydb.TransportErrorUnimplemented {
@@ -151,8 +133,8 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		}
 	}
 
-	err = readTable(ctx, &sp, path.Join(
-		prefix, "episodes",
+	err = readTable(ctx, db.Table().Pool(), path.Join(
+		params.Prefix(), "episodes",
 	))
 	if err != nil {
 		return fmt.Errorf("read table error: %w", err)

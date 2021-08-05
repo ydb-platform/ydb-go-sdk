@@ -2,65 +2,53 @@ package main
 
 import (
 	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
 	"path"
+	"time"
 )
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
 }
 
 func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-
-	driver, sp, err := cmd.prepareTest(ctx, params)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return err
+		return fmt.Errorf("connect error: %w", err)
 	}
-	defer driver.Close()
-	defer sp.Close(ctx)
+	defer db.Close()
 
-	prefix := path.Join(params.Database, params.Path)
 	tableName := "orders"
 	fmt.Println("Read whole table, unsorted:")
-	err = readTable(ctx, sp, path.Join(
-		prefix, tableName,
-	))
+	err = readTable(ctx, db.Table().Pool(), path.Join(params.Prefix(), tableName))
 	if err != nil {
 		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("Sorted by composite primary key:")
-	err = readTable(ctx, sp, path.Join(
-		prefix, tableName,
-	), table.ReadOrdered())
+	err = readTable(ctx, db.Table().Pool(), path.Join(params.Prefix(), tableName), table.ReadOrdered())
 	if err != nil {
 		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("Any five rows:")
-	err = readTable(ctx, sp, path.Join(
-		prefix, tableName,
-	), table.ReadRowLimit(5))
+	err = readTable(ctx, db.Table().Pool(), path.Join(params.Prefix(), tableName), table.ReadRowLimit(5))
 	if err != nil {
 		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("First five rows by PK (ascending) with subset of columns:")
-	err = readTable(ctx, sp, path.Join(
-		prefix, tableName,
-	), table.ReadRowLimit(5), table.ReadColumn("customer_id"),
+	err = readTable(ctx, db.Table().Pool(), path.Join(params.Prefix(), tableName), table.ReadRowLimit(5), table.ReadColumn("customer_id"),
 		table.ReadColumn("order_id"),
 		table.ReadColumn("order_date"), table.ReadOrdered())
 	if err != nil {
@@ -72,17 +60,13 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		From: ydb.TupleValue(ydb.OptionalValue(ydb.Uint64Value(2))),
 		To:   ydb.TupleValue(ydb.OptionalValue(ydb.Uint64Value(3))),
 	}
-	err = readTable(ctx, sp, path.Join(
-		prefix, tableName,
-	), table.ReadKeyRange(keyRange))
+	err = readTable(ctx, db.Table().Pool(), path.Join(params.Prefix(), tableName), table.ReadKeyRange(keyRange))
 	if err != nil {
 		return fmt.Errorf("read table error: %w", err)
 	}
 
 	fmt.Println("Read all rows with composite PK lexicographically less or equal than (1,4):")
-	err = readTable(ctx, sp, path.Join(
-		prefix, tableName,
-	), table.ReadLessOrEqual(ydb.TupleValue(ydb.OptionalValue(ydb.Uint64Value(1)), ydb.OptionalValue(ydb.Uint64Value(4)))))
+	err = readTable(ctx, db.Table().Pool(), path.Join(params.Prefix(), tableName), table.ReadLessOrEqual(ydb.TupleValue(ydb.OptionalValue(ydb.Uint64Value(1)), ydb.OptionalValue(ydb.Uint64Value(4)))))
 	if err != nil {
 		return fmt.Errorf("read table error: %w", err)
 	}
@@ -92,9 +76,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		From: ydb.TupleValue(ydb.OptionalValue(ydb.Uint64Value(1)), ydb.OptionalValue(ydb.Uint64Value(2))),
 		To:   ydb.TupleValue(ydb.OptionalValue(ydb.Uint64Value(3)), ydb.OptionalValue(ydb.Uint64Value(1))),
 	}
-	err = readTable(ctx, sp, path.Join(
-		prefix, tableName,
-	), table.ReadKeyRange(keyRange))
+	err = readTable(ctx, db.Table().Pool(), path.Join(params.Prefix(), tableName), table.ReadKeyRange(keyRange))
 	if err != nil {
 		return fmt.Errorf("read table error: %w", err)
 	}
@@ -122,7 +104,7 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string, opts ...
 			id := res.OUint64()
 
 			res.SeekItem("order_id")
-			orderId := res.OUint64()
+			orderID := res.OUint64()
 
 			res.SeekItem("order_date")
 			date := res.ODate()
@@ -130,9 +112,9 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string, opts ...
 			if res.ColumnCount() == 4 {
 				res.SeekItem("description")
 				description := res.OUTF8()
-				log.Printf("#  Order, CustomerId: %d, OrderId: %d, Description: %s, Order date: %s", id, orderId, description, intToStringDate(date))
+				log.Printf("#  Order, CustomerId: %d, OrderId: %d, Description: %s, Order date: %s", id, orderID, description, time.Unix(int64(date)*24*60*60, 0).Format("2006-01-02"))
 			} else {
-				log.Printf("#  Order, CustomerId: %d, OrderId: %d, Order date: %s", id, orderId, intToStringDate(date))
+				log.Printf("#  Order, CustomerId: %d, OrderId: %d, Order date: %s", id, orderID, time.Unix(int64(date)*24*60*60, 0).Format("2006-01-02"))
 			}
 		}
 	}

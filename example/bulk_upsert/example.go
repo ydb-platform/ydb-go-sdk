@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/ydbsql"
-
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
@@ -21,10 +19,8 @@ import (
 const BatchSize = 1000
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
-	table  string
-	count  int
+	table string
+	count int
 }
 
 type logMessage struct {
@@ -96,44 +92,33 @@ func (cmd *Command) writeLogBatch(ctx context.Context, sp table.SessionProvider,
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
+	if err != nil {
+		return fmt.Errorf("connect error: %w", err)
 	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
-	prefix := path.Join(params.Database, params.Path)
+	defer db.Close()
+
 	tableName := cmd.table
-	cmd.table = path.Join(prefix, cmd.table)
+	cmd.table = path.Join(params.Prefix(), cmd.table)
 
-	if err != nil {
-		return err // handle error
-	}
-	tc := table.Client{
-		Driver: driver,
-	}
-	sp := &table.SessionPool{
-		IdleThreshold: time.Second,
-		Builder:       &tc,
-	}
-	defer sp.Close(ctx)
-
-	err = ydbutil.CleanupDatabase(ctx, driver, sp, params.Database, tableName)
+	err = db.CleanupDatabase(ctx, params.Prefix(), tableName)
 	if err != nil {
 		return err
 	}
-	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	err = db.EnsurePathExists(ctx, params.Prefix())
 	if err != nil {
 		return err
 	}
 
-	if err := cmd.createLogTable(ctx, sp); err != nil {
+	if err := cmd.createLogTable(ctx, db.Table().Pool()); err != nil {
 		return wrap(err, "failed to create table")
 	}
 	var logs []logMessage
 	for offset := 0; offset < cmd.count; offset++ {
 		logs = getLogBatch(logs, offset)
-		if err := cmd.writeLogBatch(ctx, sp, logs); err != nil {
+		if err := cmd.writeLogBatch(ctx, db.Table().Pool(), logs); err != nil {
 			return wrap(err, fmt.Sprintf("failed to write batch offset %d", offset))
 		}
 		fmt.Print(".")
@@ -145,8 +130,6 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 }
 
 func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
 	flag.IntVar(&cmd.count, "count", 1000, "count requests")
 	flag.StringVar(&cmd.table, "table", "bulk_upsert_example", "Path for table")
 }

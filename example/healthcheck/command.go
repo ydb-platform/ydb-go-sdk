@@ -5,20 +5,33 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"time"
 )
 
 type Command struct {
+	urls string
 }
 
 func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
+	flagSet.StringVar(&cmd.urls, "urls", "", "URLs for check")
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) (err error) {
-	h, err := NewHealthcheck(ctx, params.Endpoint, params.Database, params.TLS)
+	service, err := NewService(ctx, params.ConnectParams)
 	if err != nil {
-		return fmt.Errorf("error on create healthcheck: %w", err)
+		return fmt.Errorf("error on create service: %w", err)
 	}
-	defer h.Close()
-	return h.check(ctx, params.Args)
+	fmt.Println(params.Args)
+	defer service.Close()
+	for {
+		if err := service.check(ctx, params.Args); err != nil {
+			return fmt.Errorf("error on check URLS [%v]: %w", params.Args, err)
+		}
+		select {
+		case <-time.After(time.Minute):
+			continue
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }
-

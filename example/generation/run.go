@@ -1,15 +1,16 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"path"
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 	"github.com/yandex-cloud/ydb-go-sdk/opt"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
@@ -26,42 +27,38 @@ var (
 )
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	driver, err := (&ydb.Dialer{
-		DriverConfig: cmd.config(params),
-	}).Dial(ctx, params.Endpoint)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return err
+		return fmt.Errorf("connect error: %w", err)
 	}
+	defer db.Close()
 
-	c := table.Client{Driver: driver}
-	session, err := c.CreateSession(ctx)
+	session, err := db.Table().CreateSession(ctx)
 	if err != nil {
 		return err
 	}
 	defer session.Close(context.Background())
 
-	prefix := path.Join(params.Database, params.Path)
-
-	err = ydbutil.CleanupDatabase(ctx, driver, table.SingleSession(session), params.Database, "users")
+	err = db.CleanupDatabase(ctx, params.Prefix(), "users")
 	if err != nil {
 		return err
 	}
-	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	err = db.EnsurePathExists(ctx, params.Prefix())
 	if err != nil {
 		return err
 	}
 
 	err = table.Retry(ctx, table.SingleSession(session),
 		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
-			return s.CreateTable(ctx, path.Join(prefix, "users"),
+			return s.CreateTable(ctx, path.Join(params.Prefix(), "users"),
 				table.WithColumn("id", ydb.Optional(ydb.TypeUint64)),
 				table.WithColumn("username", ydb.Optional(ydb.TypeUTF8)),
 				table.WithColumn("mode", ydb.Optional(ydb.TypeUint64)),

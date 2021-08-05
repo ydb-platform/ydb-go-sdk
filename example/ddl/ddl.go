@@ -1,14 +1,12 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
-	"path"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
@@ -73,17 +71,12 @@ ALTER TABLE small_table3 SET (TTL = Interval("PT3H") ON d);
 )
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
 }
 
 func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
 }
 
 func executeQuery(ctx context.Context, sp *table.SessionPool, prefix string, query string) (err error) {
-
 	err = table.Retry(ctx, sp,
 		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
 			err := s.ExecuteSchemeQuery(ctx, fmt.Sprintf(query, prefix))
@@ -97,66 +90,52 @@ func executeQuery(ctx context.Context, sp *table.SessionPool, prefix string, que
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
-	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return fmt.Errorf("dial error: %w", err)
+		return fmt.Errorf("connect error: %w", err)
 	}
-	defer driver.Close()
-	tableClient := table.Client{
-		Driver:            driver,
-		MaxQueryCacheSize: -1,
-	}
-	sp := table.SessionPool{
-		IdleThreshold: time.Second,
-		Builder:       &tableClient,
-	}
-	defer sp.Close(ctx)
-	prefix := path.Join(params.Database, params.Path)
+	defer db.Close()
 
 	//simple creation with composite primary key
-	err = executeQuery(ctx, &sp, prefix, simpleCreateQuery)
+	err = executeQuery(ctx, db.Table().Pool(), params.Prefix(), simpleCreateQuery)
 	if err != nil {
 		return err
 	}
 
 	//creation with column family
-	err = executeQuery(ctx, &sp, prefix, familyCreateQuery)
+	err = executeQuery(ctx, db.Table().Pool(), params.Prefix(), familyCreateQuery)
 	if err != nil {
 		return err
 	}
 
 	//creation with table settings
-	err = executeQuery(ctx, &sp, prefix, settingsCreateQuery)
+	err = executeQuery(ctx, db.Table().Pool(), params.Prefix(), settingsCreateQuery)
 	if err != nil {
 		return err
 	}
 
 	//add column and drop column.
-	err = executeQuery(ctx, &sp, prefix, alterQuery)
+	err = executeQuery(ctx, db.Table().Pool(), params.Prefix(), alterQuery)
 	if err != nil {
 		return err
 	}
 
 	//change AUTO_PARTITIONING_BY_SIZE setting.
-	err = executeQuery(ctx, &sp, prefix, alterSettingsQuery)
+	err = executeQuery(ctx, db.Table().Pool(), params.Prefix(), alterSettingsQuery)
 	if err != nil {
 		return err
 	}
 
 	//add TTL. Clear the old data after the three-hour interval has expired.
-	err = executeQuery(ctx, &sp, prefix, alterTTLQuery)
+	err = executeQuery(ctx, db.Table().Pool(), params.Prefix(), alterTTLQuery)
 	if err != nil {
 		return err
 	}
 
 	//drop tables small_table,small_table2,small_table3.
-	err = executeQuery(ctx, &sp, prefix, dropQuery)
+	err = executeQuery(ctx, db.Table().Pool(), params.Prefix(), dropQuery)
 	if err != nil {
 		return err
 	}

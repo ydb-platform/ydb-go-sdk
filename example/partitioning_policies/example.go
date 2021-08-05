@@ -1,16 +1,14 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"context"
-	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"path"
 	"time"
-
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
@@ -19,7 +17,6 @@ import (
 
 type Command struct {
 	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
 	table  string
 }
 
@@ -98,47 +95,36 @@ func (cmd *Command) testExplicitPartitions(ctx context.Context, sp table.Session
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
+	if err != nil {
+		return fmt.Errorf("connect error: %w", err)
 	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
-	prefix := path.Join(params.Database, params.Path)
+	defer db.Close()
+
 	tableName := cmd.table
-	cmd.table = path.Join(prefix, cmd.table)
+	cmd.table = path.Join(params.Prefix(), cmd.table)
 
-	if err != nil {
-		return err // handle error
-	}
-	tc := table.Client{
-		Driver: driver,
-	}
-	sp := &table.SessionPool{
-		IdleThreshold: time.Second,
-		Builder:       &tc,
-	}
-	defer sp.Close(ctx)
-
-	err = ydbutil.CleanupDatabase(ctx, driver, sp, params.Database, tableName)
+	err = db.CleanupDatabase(ctx, params.Prefix(), tableName)
 	if err != nil {
 		return err
 	}
-	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	err = db.EnsurePathExists(ctx, params.Prefix())
 	if err != nil {
 		return err
 	}
 
-	if err := cmd.testUniformPartitions(ctx, sp); err != nil {
+	if err := cmd.testUniformPartitions(ctx, db.Table().Pool()); err != nil {
 		return wrap(err, "failed to test uniform partitions")
 	}
 
-	err = ydbutil.CleanupDatabase(ctx, driver, sp, params.Database, tableName)
+	err = db.CleanupDatabase(ctx, params.Prefix(), tableName)
 	if err != nil {
 		return err
 	}
 
-	if err := cmd.testExplicitPartitions(ctx, sp); err != nil {
+	if err := cmd.testExplicitPartitions(ctx, db.Table().Pool()); err != nil {
 		return wrap(err, "failed to test explicit partitions")
 	}
 
@@ -146,7 +132,5 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 }
 
 func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
 	flag.StringVar(&cmd.table, "table", "explicit_partitions_example", "Path for table")
 }

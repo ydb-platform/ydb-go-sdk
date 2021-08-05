@@ -1,4 +1,4 @@
-package ydbx
+package connect
 
 import (
 	"errors"
@@ -30,7 +30,11 @@ func parseConnectionString(connection string) (schema string, endpoint string, d
 	if _, has := validSchemas[uri.Scheme]; !has {
 		return "", "", "", fmt.Errorf("%s: %w", uri.Scheme, errSchemeNotValid)
 	}
-	return uri.Scheme, uri.Host, uri.Query().Get("database"), err
+	database = uri.Query().Get("database")
+	if database == "" {
+		database = uri.Path
+	}
+	return uri.Scheme, uri.Host, database, err
 }
 
 type ConnectParams interface {

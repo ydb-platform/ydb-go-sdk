@@ -13,13 +13,13 @@ type Command struct {
 	port int
 }
 
-func (cmd *Command) Run(ctx context.Context, parameters cli.Parameters) error {
-	h, err := NewURLShortener(ctx, parameters.Endpoint, parameters.Database, parameters.TLS)
+func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
+	service, err := NewService(ctx, params.ConnectParams)
 	if err != nil {
-		return fmt.Errorf("error on create handler: %w", err)
+		return fmt.Errorf("error on create service: %w", err)
 	}
-	defer h.Close()
-	return http.ListenAndServe(":"+strconv.Itoa(cmd.port), http.HandlerFunc(h.Handle))
+	defer service.Close()
+	return http.ListenAndServe(":"+strconv.Itoa(cmd.port), http.HandlerFunc(service.Router))
 }
 
 func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {

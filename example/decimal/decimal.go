@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"bytes"
 	"context"
 	"flag"
@@ -8,6 +9,7 @@ import (
 	"math/big"
 	"path"
 	"text/template"
+	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/decimal"
@@ -39,30 +41,28 @@ SELECT value FROM decimals;
 `))
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	driver, err := (&ydb.Dialer{
-		DriverConfig: cmd.config(params),
-	}).Dial(ctx, params.Endpoint)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return err
+		return fmt.Errorf("connect error: %w", err)
 	}
+	defer db.Close()
 
-	c := table.Client{Driver: driver}
-	session, err := c.CreateSession(ctx)
+	session, err := db.Table().CreateSession(ctx)
 	if err != nil {
 		return err
 	}
 	defer session.Close(context.Background())
 
 	var (
-		tablePathPrefix = path.Join(params.Database, params.Path)
+		tablePathPrefix = path.Join(params.Database(), params.Prefix())
 		tablePath       = path.Join(tablePathPrefix, "decimals")
 	)
 	err = session.CreateTable(ctx, tablePath,

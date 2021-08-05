@@ -2,46 +2,55 @@ package main
 
 import (
 	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
-	"github.com/yandex-cloud/ydb-go-sdk/ydbx"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/go-cmd/cmd"
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
 )
 
-type healthCheck struct {
-	db       *ydbx.Client
+func render(t *template.Template, data interface{}) string {
+	var buf bytes.Buffer
+	err := t.Execute(&buf, data)
+	if err != nil {
+		panic(err)
+	}
+	return buf.String()
+}
+
+type templateConfig struct {
+	TablePathPrefix string
+}
+
+type result struct {
+	code int
+	err  string
+}
+
+type service struct {
+	db       *connect.Connection
 	database string
 	client   *http.Client
 }
 
-func NewHealthcheck(ctx context.Context, endpoint string, database string, secure bool) (h *healthCheck, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second)
+func NewService(ctx context.Context, connectParams connect.ConnectParams) (h *service, err error) {
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	db, err := ydbx.NewClient(
-		ctx,
-		ydbx.EndpointDatabase(
-			endpoint,
-			database,
-			secure,
-		),
-	)
+	db, err := connect.New(connectCtx, connectParams)
 	if err != nil {
-		return nil, fmt.Errorf("error on create YDB client: %w", err)
+		return nil, fmt.Errorf("connect error: %w", err)
 	}
-	h = &healthCheck{
+	h = &service{
 		db:       db,
-		database: database,
+		database: connectParams.Database(),
 		client: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -59,11 +68,11 @@ func NewHealthcheck(ctx context.Context, endpoint string, database string, secur
 	return h, nil
 }
 
-func (h *healthCheck) Close() {
-	h.db.Close()
+func (s *service) Close() {
+	s.db.Close()
 }
 
-func (h *healthCheck) createTable(ctx context.Context) (err error) {
+func (s *service) createTable(ctx context.Context) (err error) {
 	query := render(
 		template.Must(template.New("").Parse(`
 			CREATE TABLE healthchecks (
@@ -76,10 +85,10 @@ func (h *healthCheck) createTable(ctx context.Context) (err error) {
 			);
 		`)),
 		templateConfig{
-			TablePathPrefix: h.database,
+			TablePathPrefix: s.database,
 		},
 	)
-	return table.Retry(ctx, h.db.Table().Pool(),
+	return table.Retry(ctx, s.db.Table().Pool(),
 		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
 			err := s.ExecuteSchemeQuery(ctx, query)
 			return err
@@ -87,7 +96,7 @@ func (h *healthCheck) createTable(ctx context.Context) (err error) {
 	)
 }
 
-func (h *healthCheck) ping(path string) result {
+func (s *service) ping(path string) result {
 	url, err := url.Parse(path)
 	if err != nil {
 		return result{
@@ -105,7 +114,7 @@ func (h *healthCheck) ping(path string) result {
 			err:  err.Error(),
 		}
 	}
-	response, err := h.client.Do(request)
+	response, err := s.client.Do(request)
 	if err != nil {
 		return result{
 			code: -1,
@@ -117,7 +126,7 @@ func (h *healthCheck) ping(path string) result {
 	}
 }
 
-func (h *healthCheck) check(ctx context.Context, urls []string) (err error) {
+func (s *service) check(ctx context.Context, urls []string) (err error) {
 	if len(urls) == 0 {
 		return nil
 	}
@@ -127,15 +136,15 @@ func (h *healthCheck) check(ctx context.Context, urls []string) (err error) {
 	for _, url := range urls {
 		go func(url string) {
 			defer wg.Done()
-			codes.Store(url, h.ping(url))
+			codes.Store(url, s.ping(url))
 		}(url)
 	}
 	wg.Wait()
 
-	return h.saveCodes(ctx, codes)
+	return s.saveCodes(ctx, codes)
 }
 
-func (h *healthCheck) saveCodes(ctx context.Context, codes *sync.Map) (err error) {
+func (s *service) saveCodes(ctx context.Context, codes *sync.Map) (err error) {
 	query := fmt.Sprintf(`
         PRAGMA TablePathPrefix("%s");
 
@@ -146,7 +155,7 @@ func (h *healthCheck) saveCodes(ctx context.Context, codes *sync.Map) (err error
 
         UPSERT INTO healthchecks ( url, code, ts, error )
         VALUES ($url, $code, $ts, $error);`,
-		h.database,
+		s.database,
 	)
 	errs := make(chan error)
 	go func() {
@@ -156,7 +165,7 @@ func (h *healthCheck) saveCodes(ctx context.Context, codes *sync.Map) (err error
 				writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
 				err := table.Retry(
 					ctx,
-					h.db.Table().Pool(),
+					s.db.Table().Pool(),
 					table.OperationFunc(
 						func(ctx context.Context, s *table.Session) (err error) {
 							_, _, err = s.Execute(
@@ -193,13 +202,12 @@ func (h *healthCheck) saveCodes(ctx context.Context, codes *sync.Map) (err error
 	return fmt.Errorf("errors: [%s]", strings.Join(ee, ","))
 }
 
-// Check is a entrypoint for serverless yandex function
-func Check(ctx context.Context) error {
-	return (&Command{}).run(
-		ctx,
-		os.Getenv("YDB_ENDPOINT"),
-		os.Getenv("YDB_DATABASE"),
-		os.Getenv("YDB_TABLE_PREFIX"),
-		strings.Split(os.Getenv("HEALTHCHECK_URLS"), ","),
-	)
+// Serverless is an entrypoint for serverless yandex function
+func Serverless(ctx context.Context) error {
+	s, err := NewService(ctx, connect.MustConnectionString(os.Getenv("YDB_LINK")))
+	if err != nil {
+		return fmt.Errorf("error on create service: %w", err)
+	}
+	defer s.Close()
+	return s.check(ctx, strings.Split(os.Getenv("URLS"), ","))
 }

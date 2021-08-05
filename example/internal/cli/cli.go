@@ -1,28 +1,40 @@
 package cli
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
+	"github.com/yandex-cloud/ydb-go-sdk/internal/traceutil"
+	"github.com/yandex-cloud/ydb-go-sdk/table"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"path"
 	"runtime"
 	"syscall"
-	"time"
 )
 
 var ErrPrintUsage = fmt.Errorf("")
 
 type Parameters struct {
-	Endpoint string
-	Database string
-	TLS      bool
-	Path     string
+	Args          []string
+	ConnectParams connect.ConnectParams
 
-	ConnectTimeout time.Duration
+	link                  string
+	prefix                string
+	driverTrace           bool
+	tableClientTrace      bool
+	tableSessionPoolTrace bool
+}
 
-	Args []string
+func (p *Parameters) Database() string {
+	return p.ConnectParams.Database()
+}
+
+func (p *Parameters) Prefix() string {
+	return path.Join(p.Database(), p.prefix)
 }
 
 type Command interface {
@@ -39,24 +51,35 @@ func (f CommandFunc) Run(ctx context.Context, params Parameters) error {
 func (f CommandFunc) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func Run(cmd Command) {
-	flagSet := flag.NewFlagSet("example", flag.ExitOnError)
+	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+	flagSet.Usage = func() {
+		out := flagSet.Output()
+		_, _ = fmt.Fprintf(out, "Usage:\n%s command [options]\n", os.Args[0])
+		_, _ = fmt.Fprintf(out, "\nOptions:\n")
+		flagSet.PrintDefaults()
+	}
 
 	var params Parameters
-	flagSet.StringVar(&params.Endpoint,
-		"endpoint", "",
-		"endpoint url to use",
+	flagSet.StringVar(&params.link,
+		"link", "",
+		"YDB connection string",
 	)
-	flagSet.StringVar(&params.Path,
-		"path", "",
-		"tables path",
+	flagSet.StringVar(&params.prefix,
+		"prefix", "",
+		"tables prefix",
 	)
-	flagSet.StringVar(&params.Database,
-		"database", "",
-		"name of the database to use",
+	flagSet.BoolVar(&params.driverTrace,
+		"driver-trace", false,
+		"trace all driver events",
 	)
-	flagSet.BoolVar(&params.TLS,
-		"tls", true,
-		"use TLS connection",
+	flagSet.BoolVar(&params.tableClientTrace,
+		"table-client-trace", false,
+		"trace all table client events",
+	)
+	flagSet.BoolVar(&params.tableSessionPoolTrace,
+		"table-session-pool-trace", false,
+		"trace all table session pool events",
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -67,6 +90,41 @@ func Run(cmd Command) {
 	_ = flagSet.Parse(os.Args[1:])
 
 	params.Args = flagSet.Args()
+
+	params.ConnectParams = connect.MustConnectionString(params.link)
+
+	if params.driverTrace {
+		var trace ydb.DriverTrace
+		traceutil.Stub(&trace, func(name string, args ...interface{}) {
+			log.Printf(
+				"[driver] %s: %+v",
+				name, traceutil.ClearContext(args),
+			)
+		})
+		ctx = ydb.WithDriverTrace(ctx, trace)
+	}
+
+	if params.tableClientTrace {
+		var trace table.ClientTrace
+		traceutil.Stub(&trace, func(name string, args ...interface{}) {
+			log.Printf(
+				"[table client] %s: %+v",
+				name, traceutil.ClearContext(args),
+			)
+		})
+		ctx = table.WithClientTrace(ctx, trace)
+	}
+
+	if params.tableSessionPoolTrace {
+		var trace table.SessionPoolTrace
+		traceutil.Stub(&trace, func(name string, args ...interface{}) {
+			log.Printf(
+				"[table session pool] %s: %+v",
+				name, traceutil.ClearContext(args),
+			)
+		})
+		ctx = table.WithSessionPoolTrace(ctx, trace)
+	}
 
 	quit := make(chan error)
 	go processSignals(map[os.Signal]func(){

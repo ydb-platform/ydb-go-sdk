@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"path"
@@ -10,58 +10,39 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
-	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return fmt.Errorf("dial error: %w", err)
+		return fmt.Errorf("connect error: %w", err)
 	}
-	defer driver.Close()
+	defer db.Close()
 
-	tableClient := table.Client{
-		Driver: driver,
-	}
-	sp := table.SessionPool{
-		IdleThreshold: time.Second,
-		Builder:       &tableClient,
-	}
-	defer sp.Close(ctx)
-
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, "schools")
+	err = db.CleanupDatabase(ctx, params.Prefix(), "schools")
 	if err != nil {
 		return err
 	}
-	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	err = db.EnsurePathExists(ctx, params.Prefix())
 	if err != nil {
 		return err
 	}
 
-	prefix := path.Join(params.Database, params.Path)
-
-	err = createTable(ctx, &sp, path.Join(prefix, "schools"))
+	err = createTable(ctx, db.Table().Pool(), path.Join(params.Prefix(), "schools"))
 	if err != nil {
 		return fmt.Errorf("create tables error: %w", err)
 	}
 
-	err = fillTableWithData(ctx, &sp, prefix)
+	err = fillTableWithData(ctx, db.Table().Pool(), params.Prefix())
 	if err != nil {
 		return fmt.Errorf("fill tables with data error: %w", err)
 	}
@@ -72,7 +53,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	maxPages := 10
 	for i, empty := 0, false; i < maxPages && !empty; i++ {
 		fmt.Printf("> Page %v:\n", i+1)
-		empty, err = selectPaging(ctx, &sp, prefix, limit, &lastNum, &lastCity)
+		empty, err = selectPaging(ctx, db.Table().Pool(), params.Prefix(), limit, &lastNum, &lastCity)
 		if err != nil {
 			return fmt.Errorf("get page %v error: %w", i, err)
 		}

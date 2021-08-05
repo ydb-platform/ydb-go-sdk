@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
@@ -21,58 +20,40 @@ const (
 )
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
-	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return fmt.Errorf("dial error: %w", err)
+		return fmt.Errorf("connect error: %w", err)
 	}
-	defer driver.Close()
-
-	tableClient := table.Client{
-		Driver: driver,
-	}
-	sp := table.SessionPool{
-		IdleThreshold: time.Second,
-		Builder:       &tableClient,
-	}
-	defer sp.Close(ctx)
+	defer db.Close()
 
 	cleanupDBs := []string{"documents"}
 	for i := 0; i < ExpirationQueueCount; i++ {
 		cleanupDBs = append(cleanupDBs, fmt.Sprintf("expiration_queue_%v", i))
 	}
 
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, cleanupDBs...)
+	err = db.CleanupDatabase(ctx, params.Prefix(), cleanupDBs...)
 	if err != nil {
 		return err
 	}
-	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	err = db.EnsurePathExists(ctx, params.Prefix())
 	if err != nil {
 		return err
 	}
 
-	prefix := path.Join(params.Database, params.Path)
-
-	err = createTables(ctx, &sp, prefix)
+	err = createTables(ctx, db.Table().Pool(), params.Prefix())
 	if err != nil {
 		return fmt.Errorf("create tables error: %w", err)
 	}
 
-	err = addDocument(ctx, &sp, prefix,
+	err = addDocument(ctx, db.Table().Pool(), params.Prefix(),
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		1)
@@ -80,7 +61,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		return fmt.Errorf("add document failed: %w", err)
 	}
 
-	err = addDocument(ctx, &sp, prefix,
+	err = addDocument(ctx, db.Table().Pool(), params.Prefix(),
 		"https://ya.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		2)
@@ -88,27 +69,27 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		return fmt.Errorf("add document failed: %w", err)
 	}
 
-	err = readDocument(ctx, &sp, prefix, "https://yandex.ru/")
+	err = readDocument(ctx, db.Table().Pool(), params.Prefix(), "https://yandex.ru/")
 	if err != nil {
 		return fmt.Errorf("read document failed: %w", err)
 	}
-	err = readDocument(ctx, &sp, prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Table().Pool(), params.Prefix(), "https://ya.ru/")
 	if err != nil {
 		return fmt.Errorf("read document failed: %w", err)
 	}
 
 	for i := uint64(0); i < ExpirationQueueCount; i++ {
-		if err = deleteExpired(ctx, &sp, prefix, i, 1); err != nil {
+		if err = deleteExpired(ctx, db.Table().Pool(), params.Prefix(), i, 1); err != nil {
 			return fmt.Errorf("delete expired failed: %w", err)
 		}
 	}
 
-	err = readDocument(ctx, &sp, prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Table().Pool(), params.Prefix(), "https://ya.ru/")
 	if err != nil {
 		return fmt.Errorf("read document failed: %w", err)
 	}
 
-	err = addDocument(ctx, &sp, prefix,
+	err = addDocument(ctx, db.Table().Pool(), params.Prefix(),
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		2)
@@ -116,7 +97,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		return fmt.Errorf("add document failed: %w", err)
 	}
 
-	err = addDocument(ctx, &sp, prefix,
+	err = addDocument(ctx, db.Table().Pool(), params.Prefix(),
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
 		3)
@@ -125,16 +106,16 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	}
 
 	for i := uint64(0); i < ExpirationQueueCount; i++ {
-		if err = deleteExpired(ctx, &sp, prefix, i, 2); err != nil {
+		if err = deleteExpired(ctx, db.Table().Pool(), params.Prefix(), i, 2); err != nil {
 			return fmt.Errorf("delete expired failed: %w", err)
 		}
 	}
 
-	err = readDocument(ctx, &sp, prefix, "https://yandex.ru/")
+	err = readDocument(ctx, db.Table().Pool(), params.Prefix(), "https://yandex.ru/")
 	if err != nil {
 		return fmt.Errorf("read document failed: %w", err)
 	}
-	err = readDocument(ctx, &sp, prefix, "https://ya.ru/")
+	err = readDocument(ctx, db.Table().Pool(), params.Prefix(), "https://ya.ru/")
 	if err != nil {
 		return fmt.Errorf("read document failed: %w", err)
 	}

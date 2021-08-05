@@ -23,28 +23,30 @@ go get -u github.com/yandex-cloud/ydb-go-sdk
 The straightforward example of querying data may looks similar to this:
 
 ```go
-dialer := &ydb.Dialer{
-    DriverConfig: &ydb.DriverConfig{
-        Database: "/ru/home/username/db",
-        Credentials: ydb.AuthTokenCredentials{
-            AuthToken: os.Getenv("YDB_TOKEN"),
-        },
-    },
-    TLSConfig:    &tls.Config{/*...*/},
-    Timeout:      time.Second,
+// Determine timeout for connect or do nothing
+connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+defer cancel()
+
+// connect package helps to connect to database, returns connection object which
+// provide necessary clients such as table.Client, scheme.Client, etc.
+// All manipulations with the connection could be done without the connect package
+db, err := connect.New(
+    connectCtx,
+    connect.MustConnectionString(
+    	"grpcs://ydb-ru.yandex.net:2135/?database=/ru/home/username/db",
+    ),
+)
+if err != nil {
+    return fmt.Errorf("connect error: %w", err)
 }
-driver, err := dialer.Dial(ctx, "ydb-ru.yandex.net:2135")
+defer db.Close()
+
+// Create session for execute queries
+session, err := db.Table().CreateSession(ctx)
 if err != nil {
     // handle error
 }
-tc := table.Client{
-    Driver: driver,
-}
-s, err := tc.CreateSession(ctx)
-if err != nil {
-    // handle error
-}
-defer s.Close(ctx)
+defer session.Close(ctx)
 
 // Prepare transaction control for upcoming query execution.
 // NOTE: result of TxControl() may be reused.
@@ -58,9 +60,11 @@ txc := table.TxControl(
 // additional calls. Notice the "_" unused variable – it stands for created
 // transaction during execution, but as said above, transaction is commited
 // for us and we do not want to do anything with it.
-_, res, err := s.Execute(ctx, txc,
+_, res, err := session.Execute(ctx, txc,
     `--!syntax_v1
-DECLARE $mystr AS Utf8?; SELECT 42 as id, $mystr as mystr`,
+        DECLARE $mystr AS Utf8?;
+        SELECT 42 as id, $mystr as mystr
+    `,
     table.NewQueryParameters(
         table.ValueParam("$mystr", ydb.OptionalValue(ydb.UTF8Value("test"))),
     ),
@@ -109,15 +113,6 @@ YDB sessions may become staled and appropriate error will be returned. To
 reduce boilerplate overhead for such cases `ydb` provides generic retry logic:
 
 ```go
-	// Prepare session pool to be used during retries.
-	sp := table.SessionPool{
-		SizeLimit:          -1,          // No limits for pool size.
-		KeepAliveBatchSize: -1,          // Keep alive as much as possible number of sessions.
-		IdleThreshold:      time.Second, // Keep alive idle session every second.
-		Builder:            &tc,         // Create new sessions within tc.
-	}
-	defer sp.Reset(ctx) // Close all sessions within pool.
-
 	var res *table.Result
 	// Retry() will call given OperationFunc with the following invariants:
 	//  - previous operation failed with retriable error;
@@ -125,7 +120,7 @@ reduce boilerplate overhead for such cases `ydb` provides generic retry logic:
 	//
 	// Note that in case of prepared statements call to Prepare() must be made
 	// inside the Operation body.
-	err = table.Retry(ctx, sp,
+	err = table.Retry(ctx, db.Table().Pool(),
 		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
 			res, err = s.Execute(...)
 			return

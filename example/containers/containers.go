@@ -1,13 +1,15 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"bytes"
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"text/template"
+	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
@@ -49,23 +51,21 @@ var query = template.Must(template.New("fill database").Parse(`
 `))
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
 }
 
 func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	driver, err := (&ydb.Dialer{
-		DriverConfig: cmd.config(params),
-	}).Dial(ctx, params.Endpoint)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return err
+		return fmt.Errorf("connect error: %w", err)
 	}
+	defer db.Close()
 
-	c := table.Client{Driver: driver}
-	session, err := c.CreateSession(ctx)
+	session, err := db.Table().CreateSession(ctx)
 	if err != nil {
 		return err
 	}

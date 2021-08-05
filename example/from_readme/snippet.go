@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"time"
@@ -13,44 +13,34 @@ import (
 )
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
 }
 
-func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
-	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
-	/**
-	Snippet has this dialer instead
+type UInt8 uint8
 
-	```go
-	dialer := &ydb.Dialer{
-		DriverConfig: &ydb.DriverConfig{
-			Database: "/ru/home/username/db",
-			Credentials: ydb.AuthTokenCredentials{
-				AuthToken: os.Getenv("YDB_TOKEN"),
-			},
-		},
-		TLSConfig:    &tls.Config{},
-		Timeout:      time.Second,
-	}
-	driver, err := dialer.Dial(ctx, "ydb-ru.yandex.net:2135")
-	```
-	*/
+func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return err // handle error
+		return fmt.Errorf("connect error: %w", err)
 	}
-	tc := table.Client{
-		Driver: driver,
-	}
-	s, err := tc.CreateSession(ctx)
+	defer db.Close()
+
+	err = prepareScheme(ctx, db, params.Prefix())
 	if err != nil {
-		return err // handle error
+		return fmt.Errorf("error on prepare scheme: %w", err)
 	}
+
+	err = prepareData(ctx, db, params.Prefix())
+	if err != nil {
+		return fmt.Errorf("error on prepare data: %w", err)
+	}
+
+	s, err := db.Table().CreateSession(ctx)
+	if err != nil {
+		return fmt.Errorf("error on create session: %w", err)
+	}
+
 	defer func() {
 		_ = s.Close(ctx)
 	}()
@@ -68,7 +58,10 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	// for us and we do not want to do anything with it.
 	_, res, err := s.Execute(ctx, txc,
 		`
-DECLARE $mystr AS Utf8?; SELECT 42 as id, $mystr as mystr`,
+			DECLARE $mystr AS Utf8?;
+
+			SELECT 42 as id, $mystr as mystr;
+		`,
 		table.NewQueryParameters(
 			table.ValueParam("$mystr", ydb.OptionalValue(ydb.UTF8Value("test"))),
 		),
@@ -113,7 +106,5 @@ DECLARE $mystr AS Utf8?; SELECT 42 as id, $mystr as mystr`,
 	return nil
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
+func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
 }

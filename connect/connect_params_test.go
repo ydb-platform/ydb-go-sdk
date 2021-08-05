@@ -1,4 +1,4 @@
-package ydbx
+package connect
 
 import (
 	"errors"
@@ -22,6 +22,13 @@ func TestParseConnectionString(t *testing.T) {
 			nil,
 		},
 		{
+			"grpc://ydb-ru.yandex.net:2135/ru/home/gvit/mydb",
+			"grpc",
+			"ydb-ru.yandex.net:2135",
+			"/ru/home/gvit/mydb",
+			nil,
+		},
+		{
 			"grpcs://ydb.serverless.yandexcloud.net:2135/?database=/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
 			"grpcs",
 			"ydb.serverless.yandexcloud.net:2135",
@@ -29,7 +36,21 @@ func TestParseConnectionString(t *testing.T) {
 			nil,
 		},
 		{
+			"grpcs://ydb.serverless.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
+			"grpcs",
+			"ydb.serverless.yandexcloud.net:2135",
+			"/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
+			nil,
+		},
+		{
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/?database=/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
+			"grpcs",
+			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
+			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
+			nil,
+		},
+		{
+			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 			"grpcs",
 			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",

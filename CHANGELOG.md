@@ -1,5 +1,11 @@
+## 2.0.0
+* Renamed package ydbx to connect. New usage semantic: connect.New() instead ydbx.Connect()
+* Added healthcheck example
+* Fixed all examples with usage connect package
+* Dropped example/internal/ydbutil package
+
 ## 1.5.2
-* Fixed WithYdbCA at nil certPool case 
+* Fixed WithYdbCA at nil certPool case
 
 ## 1.5.1
 * Fixed package name of ydbx

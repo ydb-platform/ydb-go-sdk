@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"context"
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"hash/fnv"
@@ -14,69 +14,42 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk"
 	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 )
 
 type Command struct {
-	config func(cli.Parameters) *ydb.DriverConfig
-	tls    func() *tls.Config
-	rps    int
-	infly  int
-	count  int
+	rps   int
+	infly int
+	count int
 }
 
 func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	flag.Usage = func() {
-		out := flag.Output()
-		_, _ = fmt.Fprintf(out, "Usage:\n%s command [options]\n", os.Args[0])
-		_, _ = fmt.Fprintf(out, "\nOptions:\n")
-		flag.PrintDefaults()
-	}
-
-	cmd.config = cli.ExportDriverConfig(ctx, flag)
-	cmd.tls = cli.ExportTLSConfig(flag)
-
 	flag.IntVar(&cmd.rps, "rps", 100, "limit write rate")
 	flag.IntVar(&cmd.infly, "infly", 10, "limit infly requests")
 	flag.IntVar(&cmd.count, "count", 1000, "count requests")
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
-	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
-		return fmt.Errorf("dial error: %w", err)
+		return fmt.Errorf("connect error: %w", err)
 	}
+	defer db.Close()
 
-	tableClient := table.Client{
-		Driver: driver,
-	}
-	defer driver.Close()
+	name := path.Join(params.Prefix(), "upload_example")
 
-	sp := table.SessionPool{
-		IdleThreshold: time.Second,
-		Builder:       &tableClient,
-	}
-	defer sp.Close(ctx)
-
-	prefix := path.Join(params.Database, params.Path)
-	name := path.Join(prefix, "upload_example")
-
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, "upload_example")
+	err = db.CleanupDatabase(ctx, params.Prefix(), "upload_example")
 	if err != nil {
 		return err
 	}
-	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
+	err = db.EnsurePathExists(ctx, params.Prefix())
 	if err != nil {
 		return err
 	}
 
-	err = createTable(ctx, &sp, name)
+	err = createTable(ctx, db.Table().Pool(), name)
 	if err != nil {
 		return fmt.Errorf("create tables error: %w", err)
 	}
@@ -96,7 +69,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	t := initTracker(cmd.count, cmd.infly)
 	jobs := make(chan ItemList)
 	for i := 0; i < cmd.infly; i++ {
-		go uploadWorker(ctx, &sp, cmd.rps, query, jobs, t.track)
+		go uploadWorker(ctx, db.Table().Pool(), cmd.rps, query, jobs, t.track)
 	}
 
 	fmt.Printf(`Uploading...

@@ -5,7 +5,9 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
+	"hash/fnv"
 	"net/http"
 	"os"
 	"regexp"
@@ -13,7 +15,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/ydbx"
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 )
 
 const (
@@ -28,7 +30,7 @@ var (
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>shortener</title>
+    <title>URL shortener</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
     <script src="http://code.jquery.com/jquery-3.5.0.min.js" integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ=" crossorigin="anonymous"></script>
     <style>
@@ -86,31 +88,54 @@ var (
 </body>
 </html>`
 
-	short = regexp.MustCompile("[a-zA-Z0-9]")
-	long  = regexp.MustCompile("https?://(?:[-\\w.]|(?:%[\\da-fA-F]{2}))+")
+	short = regexp.MustCompile(`[a-zA-Z0-9]`)
+	long  = regexp.MustCompile(`https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+`)
 )
 
-type urlShortener struct {
-	database string
-	db       *ydbx.Client
+func Hash(s string) (string, error) {
+	hasher := fnv.New32a()
+	_, err := hasher.Write([]byte(s))
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-func NewURLShortener(ctx context.Context, endpoint string, database string, tls bool) (h *urlShortener, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second)
-	defer cancel()
-	db, err := ydbx.NewClient(
-		ctx,
-		ydbx.EndpointDatabase(
-			endpoint,
-			database,
-			tls,
-		),
-	)
+func isShortCorrect(link string) bool {
+	return short.FindStringIndex(link) != nil
+}
+
+func isLongCorrect(link string) bool {
+	return long.FindStringIndex(link) != nil
+}
+
+func render(t *template.Template, data interface{}) string {
+	var buf bytes.Buffer
+	err := t.Execute(&buf, data)
 	if err != nil {
-		return nil, fmt.Errorf("error on create YDB client: %w", err)
+		panic(err)
 	}
-	h = &urlShortener{
-		database: database,
+	return buf.String()
+}
+
+type templateConfig struct {
+	TablePathPrefix string
+}
+
+type service struct {
+	database string
+	db       *connect.Connection
+}
+
+func NewService(ctx context.Context, connectParams connect.ConnectParams) (h *service, err error) {
+	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	db, err := connect.New(connectCtx, connectParams)
+	if err != nil {
+		return nil, fmt.Errorf("connect error: %w", err)
+	}
+	h = &service{
+		database: connectParams.Database(),
 		db:       db,
 	}
 	err = h.createTable(ctx)
@@ -121,11 +146,11 @@ func NewURLShortener(ctx context.Context, endpoint string, database string, tls 
 	return h, nil
 }
 
-func (h *urlShortener) Close() {
-	h.db.Close()
+func (s *service) Close() {
+	s.db.Close()
 }
 
-func (h *urlShortener) createTable(ctx context.Context) (err error) {
+func (s *service) createTable(ctx context.Context) (err error) {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -138,10 +163,10 @@ func (h *urlShortener) createTable(ctx context.Context) (err error) {
 			);
 		`)),
 		templateConfig{
-			TablePathPrefix: h.database,
+			TablePathPrefix: s.database,
 		},
 	)
-	return table.Retry(ctx, h.db.Table().Pool(),
+	return table.Retry(ctx, s.db.Table().Pool(),
 		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
 			err := s.ExecuteSchemeQuery(ctx, query)
 			return err
@@ -149,8 +174,11 @@ func (h *urlShortener) createTable(ctx context.Context) (err error) {
 	)
 }
 
-func (h *urlShortener) insertShort(ctx context.Context, url string) (hash string, err error) {
-	hash = Hash(url)
+func (s *service) insertShort(ctx context.Context, url string) (hash string, err error) {
+	hash, err = Hash(url)
+	if err != nil {
+		return "", err
+	}
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -164,7 +192,7 @@ func (h *urlShortener) insertShort(ctx context.Context, url string) (hash string
 				($hash, $src);
 		`)),
 		templateConfig{
-			TablePathPrefix: h.database,
+			TablePathPrefix: s.database,
 		},
 	)
 	writeTx := table.TxControl(
@@ -173,7 +201,7 @@ func (h *urlShortener) insertShort(ctx context.Context, url string) (hash string
 		),
 		table.CommitTx(),
 	)
-	return hash, table.Retry(ctx, h.db.Table().Pool(),
+	return hash, table.Retry(ctx, s.db.Table().Pool(),
 		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
 			_, _, err = s.Execute(ctx, writeTx, query,
 				table.NewQueryParameters(
@@ -187,7 +215,7 @@ func (h *urlShortener) insertShort(ctx context.Context, url string) (hash string
 	)
 }
 
-func (h *urlShortener) selectLong(ctx context.Context, hash string) (url string, err error) {
+func (s *service) selectLong(ctx context.Context, hash string) (url string, err error) {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -202,7 +230,7 @@ func (h *urlShortener) selectLong(ctx context.Context, hash string) (url string,
 				hash = $hash;
 		`)),
 		templateConfig{
-			TablePathPrefix: h.database,
+			TablePathPrefix: s.database,
 		},
 	)
 	readTx := table.TxControl(
@@ -212,7 +240,7 @@ func (h *urlShortener) selectLong(ctx context.Context, hash string) (url string,
 		table.CommitTx(),
 	)
 	var res *table.Result
-	err = table.Retry(ctx, h.db.Table().Pool(),
+	err = table.Retry(ctx, s.db.Table().Pool(),
 		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
 			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
@@ -242,7 +270,12 @@ func (h *urlShortener) selectLong(ctx context.Context, hash string) (url string,
 	return "", fmt.Errorf(hashNotFound, hash)
 }
 
-func (h *urlShortener) Handle(w http.ResponseWriter, r *http.Request) {
+func (s *service) writeResponse(w http.ResponseWriter, statusCode int, body string) {
+	w.WriteHeader(statusCode)
+	_, _ = w.Write([]byte(body))
+}
+
+func (s *service) Router(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimLeft(r.URL.Path, "/")
 	switch {
 	case path == "":
@@ -250,52 +283,40 @@ func (h *urlShortener) Handle(w http.ResponseWriter, r *http.Request) {
 	case path == "url":
 		url := r.URL.Query().Get("url")
 		if !isLongCorrect(url) {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(fmt.Sprintf(invalidURLError, url)))
+			s.writeResponse(w, http.StatusBadRequest, fmt.Sprintf(invalidURLError, url))
 			return
 		}
-		hash, err := h.insertShort(r.Context(), url)
+		hash, err := s.insertShort(r.Context(), url)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
+			s.writeResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/text")
-		protocol := func() string {
-			if r.TLS == nil {
-				return "http://"
-			}
-			return "https://"
-		}()
-		w.Write([]byte(protocol + r.Host + "/" + hash))
+		protocol := "http://"
+		if r.TLS == nil {
+			protocol = "http://"
+		}
+		s.writeResponse(w, http.StatusOK, protocol+r.Host+"/"+hash)
 	default:
 		if !isShortCorrect(path) {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(fmt.Sprintf(invalidHashError, path)))
+			s.writeResponse(w, http.StatusBadRequest, fmt.Sprintf(invalidHashError, path))
 			return
 		}
-		url, err := h.selectLong(r.Context(), path)
+		url, err := s.selectLong(r.Context(), path)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
+			s.writeResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		http.Redirect(w, r, url, http.StatusSeeOther)
 	}
 }
 
-func Handle(w http.ResponseWriter, r *http.Request) {
-	h, err := NewURLShortener(
-		r.Context(),
-		os.Getenv("YDB_ENDPOINT"),
-		os.Getenv("YDB_DATABASE"),
-		true,
-	)
+// Serverless is an entrypoint for serverless yandex function
+func Serverless(w http.ResponseWriter, r *http.Request) {
+	service, err := NewService(r.Context(), connect.MustConnectionString(os.Getenv("YDB_LINK")))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		service.writeResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	h.Handle(w, r)
+	service.Router(w, r)
 }

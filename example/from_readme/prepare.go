@@ -1,8 +1,7 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/ydbutil"
+	"github.com/yandex-cloud/ydb-go-sdk/connect"
 	"github.com/yandex-cloud/ydb-go-sdk/table"
 	"bytes"
 	"context"
@@ -20,14 +19,11 @@ type templateConfig struct {
 
 var fill = template.Must(template.New("fill database").Parse(`
 PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-
 DECLARE $ordersData AS List<Struct<
 	customer_id: Uint64,
 	order_id: Uint64,
 	description: Utf8,
 	order_date: Date>>;
-
-
 REPLACE INTO orders
 SELECT
 	customer_id,
@@ -35,55 +31,35 @@ SELECT
 	description,
     order_date
 FROM AS_TABLE($ordersData);
-
 `))
 
-func (cmd *Command) prepareTest(ctx context.Context, params cli.Parameters) (ydb.Driver, *table.SessionPool, error) {
-	dialer := &ydb.Dialer{
-		DriverConfig: cmd.config(params),
-		TLSConfig:    cmd.tls(),
-		Timeout:      time.Second,
-	}
-	driver, err := dialer.Dial(ctx, params.Endpoint)
+func prepareScheme(ctx context.Context, db *connect.Connection, prefix string) (err error) {
+	err = db.CleanupDatabase(ctx, prefix, "orders")
 	if err != nil {
-		return nil, nil, fmt.Errorf("dial error: %w", err)
+		return err
+	}
+	err = db.EnsurePathExists(ctx, prefix)
+	if err != nil {
+		return err
 	}
 
-	tableClient := table.Client{
-		Driver:            driver,
-		MaxQueryCacheSize: -1,
-	}
-	sp := table.SessionPool{
-		IdleThreshold: time.Second,
-		Builder:       &tableClient,
-	}
-
-	err = ydbutil.CleanupDatabase(ctx, driver, &sp, params.Database, "orders")
+	err = createTables(ctx, db.Table().Pool(), prefix)
 	if err != nil {
-		return nil, nil, err
+		return fmt.Errorf("create tables error: %w", err)
 	}
-	err = ydbutil.EnsurePathExists(ctx, driver, params.Database, params.Path)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	prefix := path.Join(params.Database, params.Path)
-
-	err = createTables(ctx, &sp, prefix)
-	if err != nil {
-		return nil, nil, fmt.Errorf("create tables error: %w", err)
-	}
-
-	err = fillTablesWithData(ctx, &sp, prefix)
-	if err != nil {
-		return nil, nil, fmt.Errorf("fill tables with data error: %w", err)
-	}
-	return driver, &sp, nil
+	return nil
 }
 
-func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (err error) {
+func prepareData(ctx context.Context, db *connect.Connection, prefix string) (err error) {
+	err = fillTablesWithData(ctx, db.Table().Pool(), prefix)
+	if err != nil {
+		return fmt.Errorf("fill tables with data error: %w", err)
+	}
+	return nil
+}
 
-	err = table.Retry(ctx, sp,
+func createTables(ctx context.Context, sessionPool *table.SessionPool, prefix string) (err error) {
+	err = table.Retry(ctx, sessionPool,
 		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
 			return s.CreateTable(ctx, path.Join(prefix, "orders"),
 				table.WithColumn("customer_id", ydb.Optional(ydb.TypeUint64)),
