@@ -1,4 +1,4 @@
-module github.com/yandex-cloud/ydb-go-sdk
+module github.com/yandex-cloud/ydb-go-sdk/v2
 
 go 1.13
 
