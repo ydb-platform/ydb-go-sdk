@@ -41,15 +41,15 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 			)
 			defer cancel()
 			s, err := p.createSession(ctx, createSessionTrace{
-				onStartSelect: func() {
+				OnStartSelect: func() {
 					runtime.Gosched() // for force run create session goroutine
 				},
-				onReadResult: func(r createSessionResult) {
+				OnReadResult: func(r createSessionResult) {
 					if r.s == nil && r.err == nil {
 						t.Fatalf("unexpected result: <%v, %vz>", r.s, r.err)
 					}
 				},
-				onPutSession: func(s *Session, err error) {
+				OnPutSession: func(s *Session, err error) {
 					fmt.Println("put session", s, err)
 				},
 			})
@@ -332,11 +332,13 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			)
 			go func() {
 				_, err := p.Get(WithSessionPoolTrace(context.Background(), SessionPoolTrace{
-					GetStart: func(SessionPoolGetStartInfo) {
+					OnGet: func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
 						get <- struct{}{}
+						return nil
 					},
-					WaitStart: func(SessionPoolWaitStartInfo) {
+					OnWait: func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
+						return nil
 					},
 				}))
 				got <- err
@@ -472,11 +474,13 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 					close(got)
 				}()
 				_, _ = p.Get(WithSessionPoolTrace(context.Background(), SessionPoolTrace{
-					GetStart: func(SessionPoolGetStartInfo) {
+					OnGet: func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
 						get <- struct{}{}
+						return nil
 					},
-					WaitStart: func(SessionPoolWaitStartInfo) {
+					OnWait: func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
+						return nil
 					},
 				}))
 			}()
@@ -656,11 +660,13 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			)
 			go func() {
 				ctx := WithSessionPoolTrace(context.Background(), SessionPoolTrace{
-					GetStart: func(SessionPoolGetStartInfo) {
+					OnGet: func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
 						get <- struct{}{}
+						return nil
 					},
-					WaitStart: func(SessionPoolWaitStartInfo) {
+					OnWait: func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
+						return nil
 					},
 				})
 				s, err := p.Get(ctx)

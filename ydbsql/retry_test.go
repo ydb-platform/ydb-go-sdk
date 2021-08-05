@@ -182,9 +182,10 @@ func TestTxDoerStmt(t *testing.T) {
 	db := sql.OpenDB(Connector(
 		WithSessionPoolIdleThreshold(time.Hour),
 		WithSessionPoolTrace(table.SessionPoolTrace{
-			BusyCheckStart: func(info table.SessionPoolBusyCheckStartInfo) {
+			OnBusyCheck: func(info table.SessionPoolBusyCheckStartInfo) func(table.SessionPoolBusyCheckDoneInfo){
 				busyChecking <- struct{}{}
 				t.Logf("busy checking session %q", info.Session.ID)
+				return nil
 			},
 		}),
 		WithClient(&table.Client{

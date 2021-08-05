@@ -6,6 +6,6 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal/tracetest"
 )
 
-func TestDriverTraceCompose(t *testing.T) {
-	tracetest.TestCompose(t, composeDriverTrace, DriverTrace{})
+func TestDriverTrace(t *testing.T) {
+	tracetest.TestSingleTrace(t, DriverTrace{}, "DriverTrace")
 }

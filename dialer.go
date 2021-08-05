@@ -223,11 +223,11 @@ func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn
 		port: port,
 	}
 	s := addr.String()
-	d.config.Trace.dialStart(rawctx, s)
+	driverTraceDialDone := driverTraceOnDial(ctx, d.config.Trace, ctx, s)
 
 	cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
 
-	d.config.Trace.dialDone(rawctx, s, err)
+	driverTraceDialDone(rawctx, s, err)
 	if err != nil {
 		return nil, err
 	}
@@ -244,9 +244,9 @@ func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
 }
 
 func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoint, err error) {
-	d.config.Trace.discoveryStart(ctx)
+	driverTraceDiscoveryDone := driverTraceOnDiscovery(ctx, d.config.Trace, ctx)
 	defer func() {
-		d.config.Trace.discoveryDone(ctx, endpoints, err)
+		driverTraceDiscoveryDone(ctx, endpoints, err)
 	}()
 
 	var conn *conn

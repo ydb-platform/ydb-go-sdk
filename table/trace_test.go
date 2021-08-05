@@ -6,10 +6,14 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/internal/tracetest"
 )
 
-func TestComposeClientTrace(t *testing.T) {
-	tracetest.TestCompose(t, composeClientTrace, ClientTrace{})
+func TestClientTrace(t *testing.T) {
+	tracetest.TestSingleTrace(t, ClientTrace{}, "ClientTrace")
 }
 
-func TestComposeSessionPoolTrace(t *testing.T) {
-	tracetest.TestCompose(t, composeSessionPoolTrace, SessionPoolTrace{})
+func TestRetryTrace(t *testing.T) {
+	tracetest.TestSingleTrace(t, RetryTrace{}, "RetryTrace")
+}
+
+func TestSessionPoolTrace(t *testing.T) {
+	tracetest.TestSingleTrace(t, SessionPoolTrace{}, "SessionPoolTrace")
 }

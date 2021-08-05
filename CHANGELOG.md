@@ -3,6 +3,7 @@
 * Added healthcheck example
 * Fixed all examples with usage connect package
 * Dropped example/internal/ydbutil package
+* Simplified API of Traces, world trend.
 
 ## 1.5.2
 * Fixed WithYdbCA at nil certPool case

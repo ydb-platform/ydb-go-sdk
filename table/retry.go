@@ -113,7 +113,7 @@ func Retry(ctx context.Context, s SessionProvider, op Operation) error {
 
 // Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
-	r.traceRetryLoopStart(ctx)
+	retryTraceLoopDone := retryTraceOnLoop(ctx, r.Trace, ctx)
 	var (
 		s     *Session
 		m     ydb.RetryMode
@@ -121,7 +121,7 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 		start = time.Now()
 	)
 	defer func() {
-		r.traceRetryLoopDone(ctx, op, i, time.Since(start))
+		retryTraceLoopDone(ctx, time.Since(start), i)
 		if s != nil {
 			_ = r.SessionProvider.Put(ctx, s)
 		}
@@ -166,32 +166,6 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 		}
 	}
 	return err
-}
-
-func (r Retryer) traceRetryLoopStart(ctx context.Context) {
-	x := RetryLoopStartInfo{
-		Context: ctx,
-	}
-	if a := r.Trace.RetryLoopStart; a != nil {
-		a(x)
-	}
-	if b := ContextRetryTrace(ctx).RetryLoopStart; b != nil {
-		b(x)
-	}
-}
-
-func (r Retryer) traceRetryLoopDone(ctx context.Context, op Operation, attempts int, latency time.Duration) {
-	x := RetryLoopDoneInfo{
-		Context:  ctx,
-		Latency:  latency,
-		Attempts: attempts,
-	}
-	if a := r.Trace.RetryLoopDone; a != nil {
-		a(x)
-	}
-	if b := ContextRetryTrace(ctx).RetryLoopDone; b != nil {
-		b(x)
-	}
 }
 
 var (

@@ -1,11 +1,17 @@
 package ydbsql
 
+//go:generate gtrace
+
 import "context"
 
-type Trace struct {
-	DialStart func(DialStartInfo)
-	DialDone  func(DialDoneInfo)
-}
+type (
+	//gtrace:gen
+	//gtrace:set shortcut
+	//gtrace:set context
+	Trace struct {
+		OnDial func(DialStartInfo) func(DialDoneInfo)
+	}
+)
 
 type (
 	DialStartInfo struct {

@@ -48,6 +48,12 @@ func TestCompose(t *testing.T, compose, x interface{}) {
 	callEachFunc(r[0])
 }
 
+func TestSingleTrace(t *testing.T, x interface{}, traceName string) {
+	a := reflect.New(reflect.TypeOf(x))
+	defer assertCalled(t, traceName, stubEachFunc(a))
+	callEachFunc(a.Elem())
+}
+
 func assertCalled(t *testing.T, prefix string, called map[string]bool) {
 	for name, called := range called {
 		if !called {
@@ -56,7 +62,7 @@ func assertCalled(t *testing.T, prefix string, called map[string]bool) {
 	}
 }
 
-func stubEachFunc(x reflect.Value) (called map[string]bool) {
+func stubEachFunc(x reflect.Value) map[string]bool {
 	fs := make(map[string]bool)
 	(traceutil.FieldStubber{
 		OnStub: func(name string) {

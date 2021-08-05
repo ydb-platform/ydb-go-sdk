@@ -55,16 +55,21 @@ func (f FieldStubber) Stub(x reflect.Value) {
 		if f.OnStub != nil {
 			f.OnStub(name)
 		}
+		out := []reflect.Value{}
+		for i := 0; i < ft.NumOut(); i++ {
+			ti := reflect.New(ft.Out(i)).Elem()
+			out = append(out, ti)
+		}
 		fn := reflect.MakeFunc(ft, func(args []reflect.Value) []reflect.Value {
 			if f.OnCall == nil {
-				return nil
+				return out
 			}
 			params := make([]interface{}, len(args))
 			for i, arg := range args {
 				params[i] = arg.Interface()
 			}
 			f.OnCall(name, params...)
-			return nil
+			return out
 		})
 		fx.Set(fn)
 	}

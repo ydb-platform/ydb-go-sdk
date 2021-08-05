@@ -34,10 +34,14 @@ type Client struct {
 // CreateSession creates new session instance.
 // Unused sessions must be destroyed.
 func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
-	t.traceCreateSessionStart(ctx)
+	clientTraceCreateSessionDone := clientTraceOnCreateSession(ctx, t.Trace, ctx)
 	start := time.Now()
 	defer func() {
-		t.traceCreateSessionDone(ctx, s, time.Since(start), err)
+		endpoint := ""
+		if s != nil && s.endpointInfo != nil {
+			endpoint = s.endpointInfo.Address()
+		}
+		clientTraceCreateSessionDone(ctx, s, endpoint, time.Since(start), err)
 	}()
 	var (
 		req Ydb_Table.CreateSessionRequest
@@ -111,13 +115,13 @@ func (s *Session) Close(ctx context.Context) (err error) {
 		return nil
 	}
 	s.closed = true
-	s.c.traceDeleteSessionStart(ctx, s)
+	clientTraceDeleteSessionDone := clientTraceOnDeleteSession(ctx, s.c.Trace, ctx, s)
 	start := time.Now()
 	defer func() {
 		for _, cb := range s.onClose {
 			cb()
 		}
-		s.c.traceDeleteSessionDone(ctx, s, time.Since(start), err)
+		clientTraceDeleteSessionDone(ctx, s, time.Since(start), err)
 	}()
 	req := Ydb_Table.DeleteSessionRequest{
 		SessionId: s.ID,
@@ -148,9 +152,9 @@ func (s *Session) Address() string {
 
 // KeepAlive keeps idle session alive.
 func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
-	s.c.traceKeepAliveStart(ctx, s)
+	clientTraceKeepAliveDone := clientTraceOnKeepAlive(ctx, s.c.Trace, ctx, s)
 	defer func() {
-		s.c.traceKeepAliveDone(ctx, s, info, err)
+		clientTraceKeepAliveDone(ctx, s, info, err)
 	}()
 	var res Ydb_Table.KeepAliveResult
 	req := Ydb_Table.KeepAliveRequest{
@@ -430,9 +434,9 @@ func (s *Statement) Execute(
 ) (
 	txr *Transaction, r *Result, err error,
 ) {
-	s.session.c.traceExecuteDataQueryStart(ctx, s.session, tx, s.query, params)
+	clientTraceExecuteDataQueryDone := clientTraceOnExecuteDataQuery(ctx, s.session.c.Trace, ctx, s.session, tx.id(), s.query, params)
 	defer func() {
-		s.session.c.traceExecuteDataQueryDone(ctx, s.session, tx, s.query, params, true, txr, r, err)
+		clientTraceExecuteDataQueryDone(ctx, s.session, GetTransactionID(txr), s.query, params, true, r, err)
 	}()
 	return s.execute(ctx, tx, params, opts...)
 }
@@ -473,9 +477,9 @@ func (s *Session) Prepare(
 		cached bool
 		q      *DataQuery
 	)
-	s.c.tracePrepareDataQueryStart(ctx, s, query)
+	clientTracePrepareDataQueryDone := clientTraceOnPrepareDataQuery(ctx, s.c.Trace, ctx, s, query)
 	defer func() {
-		s.c.tracePrepareDataQueryDone(ctx, s, query, q, cached, err)
+		clientTracePrepareDataQueryDone(ctx, s, query, q, cached, err)
 	}()
 
 	cacheKey := s.qhash.hash(query)
@@ -547,9 +551,9 @@ func (s *Session) Execute(
 	q.initFromText(query)
 
 	var cached bool
-	s.c.traceExecuteDataQueryStart(ctx, s, tx, q, params)
+	clientTraceExecuteDataQueryDone := clientTraceOnExecuteDataQuery(ctx, s.c.Trace, ctx, s, tx.id(), q, params)
 	defer func() {
-		s.c.traceExecuteDataQueryDone(ctx, s, tx, q, params, cached, txr, r, err)
+		clientTraceExecuteDataQueryDone(ctx, s, GetTransactionID(txr), q, params, true, r, err)
 	}()
 
 	cacheKey := s.qhash.hash(query)
@@ -776,9 +780,9 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextStreamSet() calls.
 func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...ReadTableOption) (r *Result, err error) {
-	s.c.traceStreamReadTableStart(ctx, s)
+	clientTraceStreamReadTableDone := clientTraceOnStreamReadTable(ctx, s.c.Trace, ctx, s)
 	defer func() {
-		s.c.traceStreamReadTableDone(ctx, s, r, err)
+		clientTraceStreamReadTableDone(ctx, s, r, err)
 	}()
 
 	var resp Ydb_Table.ReadTableResponse
@@ -853,10 +857,9 @@ func (s *Session) StreamExecuteScanQuery(
 ) {
 	q := new(DataQuery)
 	q.initFromText(query)
-
-	s.c.traceStreamExecuteScanQueryStart(ctx, s, q, params)
+	clientTraceStreamExecuteScanQueryDone := clientTraceOnStreamExecuteScanQuery(ctx, s.c.Trace, ctx, s, q, params)
 	defer func() {
-		s.c.traceStreamExecuteScanQueryDone(ctx, s, q, params, r, err)
+		clientTraceStreamExecuteScanQueryDone(ctx, s, q, params, r, err)
 	}()
 
 	var resp Ydb_Table.ExecuteScanQueryPartialResponse
@@ -942,9 +945,9 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) 
 // BeginTransaction begins new transaction within given session with given
 // settings.
 func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings) (x *Transaction, err error) {
-	s.c.traceBeginTransactionStart(ctx, s)
+	clientTraceBeginTransactionDone := clientTraceOnBeginTransaction(ctx, s.c.Trace, ctx, s)
 	defer func() {
-		s.c.traceBeginTransactionDone(ctx, s, x, err)
+		clientTraceBeginTransactionDone(ctx, s, GetTransactionID(x), err)
 	}()
 	var res Ydb_Table.BeginTransactionResult
 	req := Ydb_Table.BeginTransactionRequest{
@@ -1006,9 +1009,9 @@ func (tx *Transaction) ExecuteStatement(
 // Deprecated: Use CommitTx instead
 // Commit commits specified active transaction.
 func (tx *Transaction) Commit(ctx context.Context) (err error) {
-	tx.s.c.traceCommitTransactionStart(ctx, tx)
+	clientTraceCommitTransactionDone := clientTraceOnCommitTransaction(ctx, tx.s.c.Trace, ctx, tx.s, tx.id)
 	defer func() {
-		tx.s.c.traceCommitTransactionDone(ctx, tx, err)
+		clientTraceCommitTransactionDone(ctx, tx.s, tx.id, err)
 	}()
 	req := Ydb_Table.CommitTransactionRequest{
 		SessionId: tx.s.ID,
@@ -1030,9 +1033,9 @@ func (tx *Transaction) Commit(ctx context.Context) (err error) {
 
 // CommitTx commits specified active transaction.
 func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOption) (result *Result, err error) {
-	tx.s.c.traceCommitTransactionStart(ctx, tx)
+	clientTraceCommitTransactionDone := clientTraceOnCommitTransaction(ctx, tx.s.c.Trace, ctx, tx.s, tx.id)
 	defer func() {
-		tx.s.c.traceCommitTransactionDone(ctx, tx, err)
+		clientTraceCommitTransactionDone(ctx, tx.s, tx.id, err)
 	}()
 	res := new(Ydb_Table.CommitTransactionResult)
 	req := &Ydb_Table.CommitTransactionRequest{
@@ -1061,9 +1064,9 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOp
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *Transaction) Rollback(ctx context.Context) (err error) {
-	tx.s.c.traceRollbackTransactionStart(ctx, tx)
+	clientTraceRollbackTransactionDone := clientTraceOnRollbackTransaction(ctx, tx.s.c.Trace, ctx, tx.s, tx.id)
 	defer func() {
-		tx.s.c.traceRollbackTransactionDone(ctx, tx, err)
+		clientTraceRollbackTransactionDone(ctx, tx.s, tx.id, err)
 	}()
 	req := Ydb_Table.RollbackTransactionRequest{
 		SessionId: tx.s.ID,
@@ -1091,307 +1094,6 @@ func (tx *Transaction) txc() *TransactionControl {
 		tx.c = TxControl(WithTx(tx))
 	}
 	return tx.c
-}
-
-func (t *Client) traceCreateSessionStart(ctx context.Context) {
-	x := CreateSessionStartInfo{
-		Context: ctx,
-	}
-	if a := t.Trace.CreateSessionStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).CreateSessionStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceCreateSessionDone(ctx context.Context, s *Session, latency time.Duration, err error) {
-	x := CreateSessionDoneInfo{
-		Context: ctx,
-		Session: s,
-		Latency: latency,
-		Error:   err,
-	}
-	if s != nil && s.endpointInfo != nil {
-		x.Endpoint = s.endpointInfo.Address()
-	}
-	if a := t.Trace.CreateSessionDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).CreateSessionDone; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceKeepAliveStart(ctx context.Context, s *Session) {
-	x := KeepAliveStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := t.Trace.KeepAliveStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).KeepAliveStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceKeepAliveDone(ctx context.Context, s *Session, info SessionInfo, err error) {
-	x := KeepAliveDoneInfo{
-		Context:     ctx,
-		Session:     s,
-		SessionInfo: info,
-		Error:       err,
-	}
-	if a := t.Trace.KeepAliveDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).KeepAliveDone; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceDeleteSessionStart(ctx context.Context, s *Session) {
-	x := DeleteSessionStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := t.Trace.DeleteSessionStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).DeleteSessionStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceDeleteSessionDone(ctx context.Context, s *Session, latency time.Duration, err error) {
-	x := DeleteSessionDoneInfo{
-		Context: ctx,
-		Session: s,
-		Latency: latency,
-		Error:   err,
-	}
-	if a := t.Trace.DeleteSessionDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).DeleteSessionDone; b != nil {
-		b(x)
-	}
-}
-func (t *Client) tracePrepareDataQueryStart(ctx context.Context, s *Session, query string) {
-	x := PrepareDataQueryStartInfo{
-		Context: ctx,
-		Session: s,
-		Query:   query,
-	}
-	if a := t.Trace.PrepareDataQueryStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).PrepareDataQueryStart; b != nil {
-		b(x)
-	}
-}
-
-func (t *Client) tracePrepareDataQueryDone(ctx context.Context, s *Session, query string, q *DataQuery, cached bool, err error) {
-	x := PrepareDataQueryDoneInfo{
-		Context: ctx,
-		Session: s,
-		Query:   query,
-		Result:  q,
-		Cached:  cached,
-		Error:   err,
-	}
-	if a := t.Trace.PrepareDataQueryDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).PrepareDataQueryDone; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceExecuteDataQueryStart(ctx context.Context, s *Session, tx *TransactionControl, query *DataQuery, params *QueryParameters) {
-	x := ExecuteDataQueryStartInfo{
-		Context:    ctx,
-		Session:    s,
-		TxID:       tx.id(),
-		Query:      query,
-		Parameters: params,
-	}
-	if a := t.Trace.ExecuteDataQueryStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).ExecuteDataQueryStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceExecuteDataQueryDone(
-	ctx context.Context, s *Session, _ *TransactionControl, query *DataQuery,
-	params *QueryParameters, prepared bool, txr *Transaction, r *Result, err error,
-) {
-	x := ExecuteDataQueryDoneInfo{
-		Context:    ctx,
-		Session:    s,
-		Query:      query,
-		Parameters: params,
-		Prepared:   prepared,
-		Result:     r,
-		Error:      err,
-	}
-	if txr != nil {
-		x.TxID = txr.id
-	}
-	if a := t.Trace.ExecuteDataQueryDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).ExecuteDataQueryDone; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceStreamReadTableStart(ctx context.Context, s *Session) {
-	x := StreamReadTableStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := t.Trace.StreamReadTableStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).StreamReadTableStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceStreamReadTableDone(
-	ctx context.Context, s *Session, r *Result, err error,
-) {
-	x := StreamReadTableDoneInfo{
-		Context: ctx,
-		Session: s,
-		Result:  r,
-		Error:   err,
-	}
-	if a := t.Trace.StreamReadTableDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).StreamReadTableDone; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceStreamExecuteScanQueryStart(ctx context.Context, s *Session, query *DataQuery, params *QueryParameters) {
-	x := StreamExecuteScanQueryStartInfo{
-		Context:    ctx,
-		Session:    s,
-		Query:      query,
-		Parameters: params,
-	}
-	if a := t.Trace.StreamExecuteScanQueryStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).StreamExecuteScanQueryStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceStreamExecuteScanQueryDone(
-	ctx context.Context, s *Session, query *DataQuery,
-	params *QueryParameters, r *Result, err error,
-) {
-	x := StreamExecuteScanQueryDoneInfo{
-		Context:    ctx,
-		Session:    s,
-		Query:      query,
-		Parameters: params,
-		Result:     r,
-		Error:      err,
-	}
-	if a := t.Trace.StreamExecuteScanQueryDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).StreamExecuteScanQueryDone; b != nil {
-		b(x)
-	}
-}
-
-func (t *Client) traceBeginTransactionStart(ctx context.Context, s *Session) {
-	x := BeginTransactionStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := t.Trace.BeginTransactionStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).BeginTransactionStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceBeginTransactionDone(ctx context.Context, s *Session, tx *Transaction, err error) {
-	x := BeginTransactionDoneInfo{
-		Context: ctx,
-		Session: s,
-		Error:   err,
-	}
-	if tx != nil {
-		x.TxID = tx.id
-	}
-	if a := t.Trace.BeginTransactionDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).BeginTransactionDone; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceCommitTransactionStart(ctx context.Context, tx *Transaction) {
-	x := CommitTransactionStartInfo{
-		Context: ctx,
-	}
-	if tx != nil {
-		x.Session = tx.s
-		x.TxID = tx.id
-	}
-	if a := t.Trace.CommitTransactionStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).CommitTransactionStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceCommitTransactionDone(ctx context.Context, tx *Transaction, err error) {
-	x := CommitTransactionDoneInfo{
-		Context: ctx,
-		Error:   err,
-	}
-	if tx != nil {
-		x.Session = tx.s
-		x.TxID = tx.id
-	}
-	if a := t.Trace.CommitTransactionDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).CommitTransactionDone; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceRollbackTransactionStart(ctx context.Context, tx *Transaction) {
-	x := RollbackTransactionStartInfo{
-		Context: ctx,
-	}
-	if tx != nil {
-		x.Session = tx.s
-		x.TxID = tx.id
-	}
-	if a := t.Trace.RollbackTransactionStart; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).RollbackTransactionStart; b != nil {
-		b(x)
-	}
-}
-func (t *Client) traceRollbackTransactionDone(ctx context.Context, tx *Transaction, err error) {
-	x := RollbackTransactionDoneInfo{
-		Context: ctx,
-		Error:   err,
-	}
-	if tx != nil {
-		x.Session = tx.s
-		x.TxID = tx.id
-	}
-	if a := t.Trace.RollbackTransactionDone; a != nil {
-		a(x)
-	}
-	if b := ContextClientTrace(ctx).RollbackTransactionDone; b != nil {
-		b(x)
-	}
 }
 
 type DataQuery struct {
@@ -1498,4 +1200,11 @@ func ValueParam(name string, v ydb.Value) ParameterOption {
 	return func(q queryParams) {
 		q[name] = internal.ValueToYDB(v)
 	}
+}
+
+func GetTransactionID(txr *Transaction) string {
+	if txr != nil {
+		return txr.id
+	}
+	return ""
 }

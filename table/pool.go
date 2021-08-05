@@ -1,5 +1,7 @@
 package table
 
+//go:generate gtrace
+
 import (
 	"container/list"
 	"context"
@@ -213,21 +215,6 @@ func isCreateSessionErrorRetriable(err error) bool {
 	}
 }
 
-type createSessionResult struct {
-	s   *Session
-	err error
-}
-
-type createSessionTrace struct {
-	onCheckEnoughSpace           func(enoughSpace bool)
-	onRunCreateSessionGoroutine  func()
-	onDoneCreateSessionGoroutine func(r createSessionResult)
-	onStartSelect                func()
-	onReadResult                 func(r createSessionResult)
-	onContextDone                func()
-	onPutSession                 func(session *Session, err error)
-}
-
 // p.mu must NOT be held.
 func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrace) (*Session, error) {
 	// pre-check the pool size
@@ -237,10 +224,7 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 		p.createInProgress++
 	}
 	p.mu.Unlock()
-
-	if trace.onCheckEnoughSpace != nil {
-		trace.onCheckEnoughSpace(enoughSpace)
-	}
+	trace.onCheckEnoughSpace(enoughSpace)
 
 	if !enoughSpace {
 		return nil, ErrSessionPoolOverflow
@@ -251,9 +235,7 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 	go func() {
 		defer close(resCh)
 
-		if trace.onRunCreateSessionGoroutine != nil {
-			trace.onRunCreateSessionGoroutine()
-		}
+		createSessionGoroutineDone := trace.onCreateSessionGoroutineStart()
 
 		ctx, cancel := context.WithTimeout(
 			ydb.ContextWithoutDeadline(ctx),
@@ -264,9 +246,7 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 		var r createSessionResult
 
 		defer func() {
-			if trace.onDoneCreateSessionGoroutine != nil {
-				trace.onDoneCreateSessionGoroutine(r)
-			}
+			createSessionGoroutineDone(r)
 		}()
 
 		r.s, r.err = p.Builder.CreateSession(ctx)
@@ -311,31 +291,23 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 		resCh <- r
 	}()
 
-	if trace.onStartSelect != nil {
-		trace.onStartSelect()
-	}
+	trace.onStartSelect()
 
 	select {
 	case r := <-resCh:
-		if trace.onReadResult != nil {
-			trace.onReadResult(r)
-		}
+		trace.onReadResult(r)
 		if r.s == nil && r.err == nil {
 			panic("ydb: abnormal result of pool.createSession()")
 		}
 		return r.s, r.err
 	case <-ctx.Done():
-		if trace.onContextDone != nil {
-			trace.onContextDone()
-		}
+		trace.onContextDone()
 		// read result from resCh for prevention of forgetting session
 		go func() {
 			if r, ok := <-resCh; ok && r.s != nil {
 				// if cannot put session into result channel - put session into pool for reuse
 				err := p.Put(ctx, r.s)
-				if trace.onPutSession != nil {
-					trace.onPutSession(r.s, err)
-				}
+				trace.onPutSession(r.s, err)
 			}
 		}()
 		return nil, ctx.Err()
@@ -352,10 +324,9 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		i     = 0
 		start = time.Now()
 	)
-
-	p.traceGetStart(ctx)
+	sessionPoolTraceGetDone := sessionPoolTraceOnGet(ctx, p.Trace, ctx)
 	defer func() {
-		p.traceGetDone(ctx, s, time.Since(start), i, err)
+		sessionPoolTraceGetDone(ctx, s, time.Since(start), i, err)
 	}()
 
 	const maxAttempts = 100
@@ -404,7 +375,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		if ch == nil {
 			continue
 		}
-		p.traceWaitStart(ctx)
+		sessionPoolTraceWaitDone := sessionPoolTraceOnWait(ctx, p.Trace, ctx)
 		var ok bool
 		select {
 		case s, ok = <-*ch:
@@ -430,7 +401,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			p.mu.Unlock()
 			err = ctx.Err()
 		}
-		p.traceWaitDone(ctx, s, err)
+		sessionPoolTraceWaitDone(ctx, s, err)
 	}
 	if s == nil && err == nil {
 		err = ErrNoProgress
@@ -448,10 +419,9 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 // panic.
 func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 	p.init()
-
-	p.tracePutStart(ctx, s)
+	sessionPoolTracePutDone := sessionPoolTraceOnPut(ctx, p.Trace, ctx, s)
 	defer func() {
-		p.tracePutDone(ctx, s, err)
+		sessionPoolTracePutDone(ctx, s, err)
 	}()
 
 	p.mu.Lock()
@@ -546,10 +516,9 @@ func (p *SessionPool) putBusy(ctx context.Context, s *Session) {
 // It is assumed that Take() callers never call Get() method.
 func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err error) {
 	p.init()
-
-	p.traceTakeStart(ctx, s)
+	sessionPoolTraceTakeDone := sessionPoolTraceOnTake(ctx, p.Trace, ctx, s)
 	defer func() {
-		p.traceTakeDone(ctx, s, took, err)
+		sessionPoolTraceTakeDone(ctx, s, took, err)
 	}()
 
 	p.mu.Lock()
@@ -561,8 +530,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
-
-		p.traceTakeWait(ctx, s)
+		sessionPoolTraceOnTakeWait(ctx, p.Trace, ctx, s)
 
 		// Keepalive processing takes place right now.
 		// Try to await touched session before creation of new one.
@@ -632,10 +600,9 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 // Note that even on error it calls Close() on each session.
 func (p *SessionPool) Close(ctx context.Context) (err error) {
 	p.init()
-
-	p.traceCloseStart(ctx)
+	sessionPoolTraceCloseDone := sessionPoolTraceOnClose(ctx, p.Trace, ctx)
 	defer func() {
-		p.traceCloseDone(ctx, err)
+		sessionPoolTraceCloseDone(ctx, err)
 	}()
 
 	p.mu.Lock()
@@ -719,9 +686,9 @@ func (p *SessionPool) reuse(ctx context.Context, s *Session) (reused bool) {
 		err         error
 		enoughSpace bool
 	)
-	p.traceBusyCheckStart(ctx, s)
+	sessionPoolTraceBusyCheckDone := sessionPoolTraceOnBusyCheck(ctx, p.Trace, ctx, s)
 	defer func() {
-		p.traceBusyCheckDone(ctx, s, enoughSpace, err)
+		sessionPoolTraceBusyCheckDone(ctx, s, enoughSpace, err)
 	}()
 	if info, err = p.keepAliveSession(ctx, s); err == nil && info.Status == SessionReady {
 		p.mu.Lock()
@@ -1165,169 +1132,6 @@ func (p *SessionPool) pushReady(s *Session) {
 	}
 	info.ready = p.ready.PushBack(s)
 	p.index[s] = info
-}
-
-func (p *SessionPool) traceGetStart(ctx context.Context) {
-	x := SessionPoolGetStartInfo{
-		Context: ctx,
-	}
-	if a := p.Trace.GetStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).GetStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceGetDone(ctx context.Context, s *Session, latency time.Duration, attempts int, err error) {
-	x := SessionPoolGetDoneInfo{
-		Context:       ctx,
-		Session:       s,
-		Latency:       latency,
-		RetryAttempts: attempts,
-		Error:         err,
-	}
-	if a := p.Trace.GetDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).GetDone; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceWaitStart(ctx context.Context) {
-	x := SessionPoolWaitStartInfo{
-		Context: ctx,
-	}
-	if a := p.Trace.WaitStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).WaitStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceWaitDone(ctx context.Context, s *Session, err error) {
-	x := SessionPoolWaitDoneInfo{
-		Context: ctx,
-		Session: s,
-		Error:   err,
-	}
-	if a := p.Trace.WaitDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).WaitDone; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceBusyCheckStart(ctx context.Context, s *Session) {
-	x := SessionPoolBusyCheckStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := p.Trace.BusyCheckStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).BusyCheckStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceBusyCheckDone(ctx context.Context, s *Session, reused bool, err error) {
-	x := SessionPoolBusyCheckDoneInfo{
-		Context: ctx,
-		Session: s,
-		Reused:  reused,
-		Error:   err,
-	}
-	if a := p.Trace.BusyCheckDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).BusyCheckDone; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceTakeStart(ctx context.Context, s *Session) {
-	x := SessionPoolTakeStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := p.Trace.TakeStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).TakeStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceTakeWait(ctx context.Context, s *Session) {
-	x := SessionPoolTakeWaitInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := p.Trace.TakeWait; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).TakeWait; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceTakeDone(ctx context.Context, s *Session, took bool, err error) {
-	x := SessionPoolTakeDoneInfo{
-		Context: ctx,
-		Session: s,
-		Took:    took,
-		Error:   err,
-	}
-	if a := p.Trace.TakeDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).TakeDone; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) tracePutStart(ctx context.Context, s *Session) {
-	x := SessionPoolPutStartInfo{
-		Context: ctx,
-		Session: s,
-	}
-	if a := p.Trace.PutStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).PutStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) tracePutDone(ctx context.Context, s *Session, err error) {
-	x := SessionPoolPutDoneInfo{
-		Context: ctx,
-		Session: s,
-		Error:   err,
-	}
-	if a := p.Trace.PutDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).PutDone; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceCloseStart(ctx context.Context) {
-	x := SessionPoolCloseStartInfo{
-		Context: ctx,
-	}
-	if a := p.Trace.CloseStart; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).CloseStart; b != nil {
-		b(x)
-	}
-}
-func (p *SessionPool) traceCloseDone(ctx context.Context, err error) {
-	x := SessionPoolCloseDoneInfo{
-		Context: ctx,
-		Error:   err,
-	}
-	if a := p.Trace.CloseDone; a != nil {
-		a(x)
-	}
-	if b := ContextSessionPoolTrace(ctx).CloseDone; b != nil {
-		b(x)
-	}
 }
 
 type sessionInfo struct {

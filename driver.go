@@ -246,9 +246,13 @@ func (d *driver) Call(ctx context.Context, op api.Operation) (info CallInfo, err
 
 	conn, backoffUseBalancer := ContextConn(rawCtx)
 	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
-		d.trace.getConnStart(rawCtx)
+		driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
 		conn, err = d.cluster.Get(ctx)
-		d.trace.getConnDone(rawCtx, conn, err)
+		addr := ""
+		if conn != nil {
+			addr = conn.addr.String()
+		}
+		driverTraceGetConnDone(rawCtx, addr, err)
 		if err != nil {
 			return
 		}
@@ -274,7 +278,7 @@ func (d *driver) Call(ctx context.Context, op api.Operation) (info CallInfo, err
 
 	start := timeutil.Now()
 	conn.runtime.operationStart(start)
-	d.trace.operationStart(rawCtx, conn, method, params)
+	driverTraceOperationDone := driverTraceOnOperation(ctx, d.trace, ctx, conn.addr.String(), Method(method), params)
 
 	err = invoke(ctx, conn.conn, resp, method, req, res)
 
@@ -282,13 +286,13 @@ func (d *driver) Call(ctx context.Context, op api.Operation) (info CallInfo, err
 		start, timeutil.Now(),
 		errIf(isTimeoutError(err), err),
 	)
-	d.trace.operationDone(rawCtx, conn, method, params, resp, err)
+	driverTraceOperationDone(rawCtx, conn.addr.String(), Method(method), params, resp.GetOpID(), resp.GetIssues(), err)
 
 	if err != nil {
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			d.trace.pessimizationStart(rawCtx, &conn.addr, err)
-			d.trace.pessimizationDone(rawCtx, &conn.addr, d.cluster.Pessimize(conn.addr))
+			driverTracePessimizationDone := driverTraceOnPessimization(ctx, d.trace, ctx, conn.addr.String(), err)
+			driverTracePessimizationDone(rawCtx, conn.addr.String(), d.cluster.Pessimize(conn.addr))
 		}
 	}
 
@@ -343,9 +347,13 @@ func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (info C
 
 	conn, backoffUseBalancer := ContextConn(rawCtx)
 	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
-		d.trace.getConnStart(rawCtx)
+		driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
 		conn, err = d.cluster.Get(ctx)
-		d.trace.getConnDone(rawCtx, conn, err)
+		addr := ""
+		if conn != nil {
+			addr = conn.addr.String()
+		}
+		driverTraceGetConnDone(rawCtx, addr, err)
 	}
 
 	info = &callInfo{
@@ -363,11 +371,11 @@ func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (info C
 	}
 
 	conn.runtime.streamStart(timeutil.Now())
-	d.trace.streamStart(rawCtx, conn, method)
+	driverTraceStreamDone := driverTraceOnStream(ctx, d.trace, ctx, conn.addr.String(), Method(method))
 	defer func() {
 		if err != nil {
 			conn.runtime.streamDone(timeutil.Now(), err)
-			d.trace.streamDone(rawCtx, conn, method, err)
+			driverTraceStreamDone(rawCtx, conn.addr.String(), Method(method), err)
 		}
 	}()
 
@@ -388,18 +396,21 @@ func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (info C
 		var err error
 		defer func() {
 			conn.runtime.streamDone(timeutil.Now(), hideEOF(err))
-			d.trace.streamDone(rawCtx, conn, method, hideEOF(err))
+			driverTraceStreamDone(rawCtx, conn.addr.String(), Method(method), hideEOF(err))
 			if cancel != nil {
 				cancel()
 			}
 		}()
 		for err == nil {
 			conn.runtime.streamRecv(timeutil.Now())
-			d.trace.streamRecvStart(rawCtx, conn, method)
+			driverTraceStreamRecvDone := driverTraceOnStreamRecv(ctx, d.trace, ctx, conn.addr.String(), Method(method))
 
 			err = s.RecvMsg(resp)
-
-			d.trace.streamRecvDone(rawCtx, conn, method, resp, hideEOF(err))
+			if resp != nil {
+				driverTraceStreamRecvDone(rawCtx, conn.addr.String(), Method(method), resp.GetIssues(), hideEOF(err))
+			} else {
+				driverTraceStreamRecvDone(rawCtx, conn.addr.String(), Method(method), nil, hideEOF(err))
+			}
 			if err != nil {
 				err = mapGRPCError(err)
 			} else {

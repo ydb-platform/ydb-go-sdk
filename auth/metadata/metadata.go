@@ -164,17 +164,17 @@ func (c *Client) request(ctx context.Context) (
 		cancel := setupDeadline(ctx, conn)
 		defer cancel(&err)
 	}
-	c.traceWriteRequestStart(conn)
+	clientTraceWriteRequestDone := clientTraceOnWriteRequest(c.Trace, conn)
 	_, err = conn.Write(c.reqBytes)
-	c.traceWriteRequestDone(conn, err)
+	clientTraceWriteRequestDone(conn, err)
 	if err != nil {
 		return
 	}
 
 	var res response
-	c.traceReadResponseStart(conn)
+	clientTraceReadResponseDone := clientTraceOnReadResponse(c.Trace, conn)
 	defer func() {
-		c.traceReadResponseDone(conn, res.Code, expires, err)
+		clientTraceReadResponseDone(conn, res.Code, expires, err)
 	}()
 
 	buf := bufio.NewReader(conn)
@@ -208,10 +208,9 @@ func (c *Client) dial(ctx context.Context) (net.Conn, error) {
 	if dial == nil {
 		dial = zeroDialer.DialContext
 	}
-
-	c.traceDialStart("tcp", c.addr)
+	clientTraceDialDone := clientTraceOnDial(c.Trace, "tcp", c.addr)
 	conn, err := dial(ctx, "tcp", c.addr)
-	c.traceDialDone("tcp", c.addr, conn, err)
+	clientTraceDialDone("tcp", c.addr, conn, err)
 
 	return conn, err
 }
