@@ -47,7 +47,7 @@ message ChildShard {
 
 message Consumer {
     string consumer_arn = 1;
-    int32 consumer_creation_timestamp = 2;
+    uint64 consumer_creation_timestamp = 2;
     string consumer_name = 3;
     ConsumerDescription.ConsumerStatus consumer_status = 4;
 }
