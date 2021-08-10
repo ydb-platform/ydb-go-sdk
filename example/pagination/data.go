@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
 )
 
 func schoolData(city string, num uint32, addr string) ydb.Value {

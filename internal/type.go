@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strconv"
 
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
 )
 
 type T interface {

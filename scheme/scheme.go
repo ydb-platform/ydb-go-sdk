@@ -3,10 +3,10 @@ package scheme
 import (
 	"context"
 
-	ydb "github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Scheme_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Scheme"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	ydb "github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Scheme_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Scheme"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 type EntryType uint

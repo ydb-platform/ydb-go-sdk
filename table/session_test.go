@@ -1,7 +1,7 @@
 package table
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/internal/cache/lru"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/cache/lru"
 	"context"
 	"errors"
 	"github.com/stretchr/testify/require"
@@ -11,12 +11,12 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Scheme"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/testutil"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Scheme"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
 )
 
 func TestStatementRemoveNotFound(t *testing.T) {

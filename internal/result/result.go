@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 func Reset(s *Scanner, set *Ydb.ResultSet) {

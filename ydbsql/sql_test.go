@@ -14,10 +14,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/traceutil"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
-	"github.com/yandex-cloud/ydb-go-sdk/testutil"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/traceutil"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
 )
 
 // Interface checks.

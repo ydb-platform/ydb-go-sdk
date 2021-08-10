@@ -1,7 +1,7 @@
 package ydbsql
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/testutil"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
 	"context"
 	"database/sql"
 	"errors"
@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 )
 
 func TestConnectorDialOnPing(t *testing.T) {

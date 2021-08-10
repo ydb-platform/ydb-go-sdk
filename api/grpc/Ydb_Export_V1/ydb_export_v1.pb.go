@@ -4,7 +4,7 @@
 package Ydb_Export_V1
 
 import (
-	_ "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Export"
+	_ "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Export"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	math "math"

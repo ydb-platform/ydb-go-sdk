@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/connect"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
 	"bytes"
 	"context"
 	"flag"
@@ -10,8 +10,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 )
 
 var query = template.Must(template.New("fill database").Parse(`

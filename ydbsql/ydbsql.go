@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
 )
 
 func init() {

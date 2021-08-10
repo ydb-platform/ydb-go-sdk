@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api"
-	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/draft/Ydb_Experimental_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Experimental"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/draft/Ydb_Experimental_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Experimental"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 type Client struct {

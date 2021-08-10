@@ -6,10 +6,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 func TestSessionOptionsProfile(t *testing.T) {

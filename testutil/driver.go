@@ -7,12 +7,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
 
-	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Table_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")

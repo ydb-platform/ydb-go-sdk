@@ -3,10 +3,10 @@ package table
 import (
 	"context"
 
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_TableStats"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/result"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_TableStats"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/result"
 )
 
 // Result is a result of a query.

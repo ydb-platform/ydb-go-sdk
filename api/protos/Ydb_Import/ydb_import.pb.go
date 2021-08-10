@@ -4,7 +4,7 @@
 package Ydb_Import
 
 import (
-	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
+	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"

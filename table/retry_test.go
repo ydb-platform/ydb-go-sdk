@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	ydb "github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/testutil"
+	ydb "github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {

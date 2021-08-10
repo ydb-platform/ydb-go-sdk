@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 type valuer interface {

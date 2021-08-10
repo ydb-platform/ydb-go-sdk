@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
-	"github.com/yandex-cloud/ydb-go-sdk/testutil"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
 )
 
 type DriverBuilder struct {

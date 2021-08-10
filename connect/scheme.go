@@ -1,8 +1,8 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/scheme"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/scheme"
 	"context"
 	"sync"
 )

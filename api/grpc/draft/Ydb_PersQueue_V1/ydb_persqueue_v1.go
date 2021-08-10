@@ -7,7 +7,7 @@
 //	-source="/arcadia/kikimr/public/api/protos /arcadia/kikimr/public/api/grpc/draft"
 //	-source-base=~/arcadia -strip=~/arcadia/kikimr/public/api
 //	-destination=kikimr/public/sdk/go/ydb/api
-//	-repository=github.com/yandex-cloud/ydb-go-sdk/api
+//	-repository=github.com/yandex-cloud/ydb-go-sdk/v2/api
 //	-compiler=contrib/tools/protoc/protoc
 //	-custom=kikimr/public/sdk/go/ydb/internal/cmd/protoc-gen/protoc-gen
 //	-plugins=ydb
@@ -23,8 +23,8 @@ import (
 	fmt "fmt"
 	math "math"
 
-	Ydb_PersQueue_ClusterDiscovery "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_PersQueue_ClusterDiscovery"
-	Ydb_Persqueue_V1 "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_PersQueue_V1"
+	Ydb_PersQueue_ClusterDiscovery "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_PersQueue_ClusterDiscovery"
+	Ydb_Persqueue_V1 "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_PersQueue_V1"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"

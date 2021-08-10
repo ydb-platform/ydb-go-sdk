@@ -4,11 +4,11 @@
 package Ydb_Scripting
 
 import (
-	Ydb "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	Ydb_Issue "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Issue"
-	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
-	Ydb_Table "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
-	Ydb_TableStats "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_TableStats"
+	Ydb "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	Ydb_Issue "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Issue"
+	Ydb_Operations "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
+	Ydb_Table "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
+	Ydb_TableStats "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_TableStats"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	math "math"

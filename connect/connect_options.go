@@ -1,7 +1,7 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
 )
 
 type ConnectOption func(client *Connection) error

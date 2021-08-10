@@ -4,7 +4,7 @@
 package Ydb_Scripting_V1
 
 import (
-	_ "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Scripting"
+	_ "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Scripting"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	math "math"

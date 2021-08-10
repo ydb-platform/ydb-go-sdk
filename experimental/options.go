@@ -1,6 +1,6 @@
 package experimental
 
-import "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Experimental"
+import "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Experimental"
 
 type StreamQueryProfile uint
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 )
 
 func doInsert(

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
 )
 
 var _ ydb.Credentials = &instanceServiceAccountCredentials{}

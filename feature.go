@@ -1,6 +1,6 @@
 package ydb
 
-import "github.com/yandex-cloud/ydb-go-sdk/internal"
+import "github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 
 type FeatureFlag = internal.FeatureFlag
 

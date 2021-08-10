@@ -1,9 +1,9 @@
 package internal
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Issue"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Issue"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
 )

@@ -16,12 +16,12 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/yandex-cloud/ydb-go-sdk/api"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/stats"
-	"github.com/yandex-cloud/ydb-go-sdk/timeutil"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/stats"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
 )
 
 var (

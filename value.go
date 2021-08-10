@@ -1,7 +1,7 @@
 package ydb
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 type Value interface {

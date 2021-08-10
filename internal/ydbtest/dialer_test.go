@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Table_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/traceutil"
-	"github.com/yandex-cloud/ydb-go-sdk/internal/ydbtest"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Table_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/traceutil"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/ydbtest"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 )
 
 func TestClusterTracking(t *testing.T) {

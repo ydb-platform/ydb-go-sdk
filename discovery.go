@@ -5,10 +5,10 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	discovery "github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_Discovery_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Discovery"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	discovery "github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Discovery_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Discovery"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 type Endpoint struct {

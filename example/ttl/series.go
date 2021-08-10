@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/connect"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
 	"context"
 	"flag"
 	"fmt"
@@ -9,9 +9,9 @@ import (
 	"path"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/table"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 )
 
 const (

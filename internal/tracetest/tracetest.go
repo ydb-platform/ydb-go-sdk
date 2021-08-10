@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/yandex-cloud/ydb-go-sdk/internal/traceutil"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/traceutil"
 )
 
 // TestCompose is a generic function for testing trace composing.

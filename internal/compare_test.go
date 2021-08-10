@@ -3,7 +3,7 @@ package internal
 import (
 	"testing"
 
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
 	structpb "github.com/golang/protobuf/ptypes/struct"
 )
 

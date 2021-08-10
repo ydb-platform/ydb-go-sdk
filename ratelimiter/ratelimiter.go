@@ -3,10 +3,10 @@ package ratelimiter
 import (
 	"context"
 
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/api"
-	"github.com/yandex-cloud/ydb-go-sdk/api/grpc/Ydb_RateLimiter_V1"
-	"github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_RateLimiter"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_RateLimiter_V1"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_RateLimiter"
 )
 
 type HierarchicalDrrSettings struct {

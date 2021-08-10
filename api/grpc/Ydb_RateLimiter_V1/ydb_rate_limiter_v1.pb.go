@@ -4,7 +4,7 @@
 package Ydb_RateLimiter_V1
 
 import (
-	_ "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_RateLimiter"
+	_ "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_RateLimiter"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	math "math"

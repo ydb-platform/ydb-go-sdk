@@ -1,8 +1,8 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk"
-	"github.com/yandex-cloud/ydb-go-sdk/auth"
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/auth"
 	"context"
 	"crypto/tls"
 )

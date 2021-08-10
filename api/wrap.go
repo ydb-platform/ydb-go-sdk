@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/internal"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 	"github.com/golang/protobuf/proto"
 )
 

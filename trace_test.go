@@ -3,7 +3,7 @@ package ydb
 import (
 	"testing"
 
-	"github.com/yandex-cloud/ydb-go-sdk/internal/tracetest"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/tracetest"
 )
 
 func TestDriverTrace(t *testing.T) {

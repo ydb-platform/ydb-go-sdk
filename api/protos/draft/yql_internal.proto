@@ -84,10 +84,11 @@ message WriteTaskResultRequest {
     Ydb.ResultSet result_set = 3;
     uint32 result_set_id = 4;
     uint64 offset = 5;
+    uint64 cookie = 6;
 }
 
 message WriteTaskResultResult {
-
+    uint64 cookie = 1;
 }
 
 message WriteTaskResultResponse {

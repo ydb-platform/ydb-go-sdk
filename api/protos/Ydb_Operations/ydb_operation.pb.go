@@ -4,8 +4,8 @@
 package Ydb_Operations
 
 import (
-	Ydb "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb"
-	Ydb_Issue "github.com/yandex-cloud/ydb-go-sdk/api/protos/Ydb_Issue"
+	Ydb "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	Ydb_Issue "github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Issue"
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
