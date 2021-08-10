@@ -1,3 +1,6 @@
+## 2.0.2
+* Fixed infinite keep alive session on transport errors Cancelled and DeadlineExceeded 
+
 ## 2.0.1
 * Fixed parser of connection string
 * Fixed EnsurePathExists and CleanupDatabase methods

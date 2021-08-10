@@ -809,10 +809,13 @@ func (p *SessionPool) keeper() {
 
 				_, err := p.keepAliveSession(context.Background(), s)
 				if err != nil {
-					opErr, ok := err.(*ydb.OpError)
-					if ok && opErr.Reason == ydb.StatusBadSession {
+					switch {
+					case
+						ydb.IsOpError(err, ydb.StatusBadSession),
+						ydb.IsTransportError(err, ydb.TransportErrorCanceled),
+						ydb.IsTransportError(err, ydb.TransportErrorDeadlineExceeded):
 						toDelete = append(toDelete, s)
-					} else {
+					default:
 						toTryAgain = append(toTryAgain, s)
 					}
 					continue
