@@ -38,7 +38,7 @@ func (c *Connection) EnsurePathExists(ctx context.Context, path string) error {
 	for i := 0; i < len(path); i++ {
 		x := strings.IndexByte(path[i:], '/')
 		if x == -1 {
-			x = len(path[i:])
+			x = len(path[i:]) - 1
 		}
 		i += x
 		sub := path[:i+1]
@@ -77,6 +77,10 @@ func (c *Connection) CleanupDatabase(ctx context.Context, prefix string, names .
 	var list func(int, string) error
 	list = func(i int, p string) error {
 		dir, err := c.Scheme().ListDirectory(ctx, p)
+		operr, ok := err.(*ydb.OpError)
+		if ok && operr.Reason == ydb.StatusSchemeError {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -111,5 +115,5 @@ func (c *Connection) CleanupDatabase(ctx context.Context, prefix string, names .
 		}
 		return nil
 	}
-	return list(0, path.Join(c.driverConfig.Database, prefix))
+	return list(0, prefix)
 }

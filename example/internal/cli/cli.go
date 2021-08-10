@@ -62,7 +62,7 @@ func Run(cmd Command) {
 
 	var params Parameters
 	flagSet.StringVar(&params.link,
-		"link", "",
+		"ydb", "",
 		"YDB connection string",
 	)
 	flagSet.StringVar(&params.prefix,
