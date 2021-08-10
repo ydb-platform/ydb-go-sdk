@@ -127,8 +127,8 @@ type service struct {
 	db       *connect.Connection
 }
 
-func NewService(ctx context.Context, connectParams connect.ConnectParams) (h *service, err error) {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+func NewService(ctx context.Context, connectParams connect.ConnectParams, connectTimeout time.Duration) (h *service, err error) {
+	connectCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, connectParams)
 	if err != nil {
@@ -270,7 +270,7 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 	return "", fmt.Errorf(hashNotFound, hash)
 }
 
-func (s *service) writeResponse(w http.ResponseWriter, statusCode int, body string) {
+func writeResponse(w http.ResponseWriter, statusCode int, body string) {
 	w.WriteHeader(statusCode)
 	_, _ = w.Write([]byte(body))
 }
@@ -283,12 +283,12 @@ func (s *service) Router(w http.ResponseWriter, r *http.Request) {
 	case path == "url":
 		url := r.URL.Query().Get("url")
 		if !isLongCorrect(url) {
-			s.writeResponse(w, http.StatusBadRequest, fmt.Sprintf(invalidURLError, url))
+			writeResponse(w, http.StatusBadRequest, fmt.Sprintf(invalidURLError, url))
 			return
 		}
 		hash, err := s.insertShort(r.Context(), url)
 		if err != nil {
-			s.writeResponse(w, http.StatusInternalServerError, err.Error())
+			writeResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		w.Header().Set("Content-Type", "application/text")
@@ -296,15 +296,15 @@ func (s *service) Router(w http.ResponseWriter, r *http.Request) {
 		if r.TLS == nil {
 			protocol = "http://"
 		}
-		s.writeResponse(w, http.StatusOK, protocol+r.Host+"/"+hash)
+		writeResponse(w, http.StatusOK, protocol+r.Host+"/"+hash)
 	default:
 		if !isShortCorrect(path) {
-			s.writeResponse(w, http.StatusBadRequest, fmt.Sprintf(invalidHashError, path))
+			writeResponse(w, http.StatusBadRequest, fmt.Sprintf(invalidHashError, path))
 			return
 		}
 		url, err := s.selectLong(r.Context(), path)
 		if err != nil {
-			s.writeResponse(w, http.StatusInternalServerError, err.Error())
+			writeResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		http.Redirect(w, r, url, http.StatusSeeOther)
@@ -313,9 +313,9 @@ func (s *service) Router(w http.ResponseWriter, r *http.Request) {
 
 // Serverless is an entrypoint for serverless yandex function
 func Serverless(w http.ResponseWriter, r *http.Request) {
-	service, err := NewService(r.Context(), connect.MustConnectionString(os.Getenv("YDB_LINK")))
+	service, err := NewService(r.Context(), connect.MustConnectionString(os.Getenv("YDB")), time.Second)
 	if err != nil {
-		service.writeResponse(w, http.StatusInternalServerError, err.Error())
+		writeResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	service.Router(w, r)

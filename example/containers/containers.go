@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"text/template"
-	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
@@ -53,11 +52,10 @@ var query = template.Must(template.New("fill database").Parse(`
 type Command struct {
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-}
+func (cmd *Command) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
@@ -69,7 +67,9 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	if err != nil {
 		return err
 	}
-	defer session.Close(context.Background())
+	defer func() {
+		_ = session.Close(context.Background())
+	}()
 
 	tx, err := session.BeginTransaction(ctx, table.TxSettings(
 		table.WithSerializableReadWrite(),
@@ -77,13 +77,15 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(context.Background())
+	defer func() {
+		_ = tx.Rollback(context.Background())
+	}()
 
 	res, err := tx.Execute(ctx, render(query, nil), nil)
 	if err != nil {
 		return err
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if _, err = tx.CommitTx(ctx); err != nil {
 		return err
 	}
 

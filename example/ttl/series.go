@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"path"
-	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
@@ -22,11 +21,10 @@ const (
 type Command struct {
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
-}
+func (cmd *Command) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {

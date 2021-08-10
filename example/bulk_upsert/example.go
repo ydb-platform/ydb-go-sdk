@@ -92,7 +92,7 @@ func (cmd *Command) writeLogBatch(ctx context.Context, sp table.SessionProvider,
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
@@ -129,7 +129,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	return nil
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	flag.IntVar(&cmd.count, "count", 1000, "count requests")
-	flag.StringVar(&cmd.table, "table", "bulk_upsert_example", "Path for table")
+func (cmd *Command) ExportFlags(_ context.Context, flagSet *flag.FlagSet) {
+	flagSet.IntVar(&cmd.count, "count", 1000, "count requests")
+	flagSet.StringVar(&cmd.table, "table", "bulk_upsert_example", "Path for table")
 }

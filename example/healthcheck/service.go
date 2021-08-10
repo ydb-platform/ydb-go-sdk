@@ -41,8 +41,8 @@ type service struct {
 	client   *http.Client
 }
 
-func NewService(ctx context.Context, connectParams connect.ConnectParams) (h *service, err error) {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+func NewService(ctx context.Context, connectParams connect.ConnectParams, connectTimeout time.Duration) (h *service, err error) {
+	connectCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, connectParams)
 	if err != nil {
@@ -97,17 +97,17 @@ func (s *service) createTable(ctx context.Context) (err error) {
 }
 
 func (s *service) ping(path string) result {
-	url, err := url.Parse(path)
+	uri, err := url.Parse(path)
 	if err != nil {
 		return result{
 			code: -1,
 			err:  err.Error(),
 		}
 	}
-	if url.Scheme == "" {
-		url.Scheme = "http"
+	if uri.Scheme == "" {
+		uri.Scheme = "http"
 	}
-	request, err := http.NewRequest(http.MethodGet, url.String(), nil)
+	request, err := http.NewRequest(http.MethodGet, uri.String(), nil)
 	if err != nil {
 		return result{
 			code: -1,
@@ -133,11 +133,11 @@ func (s *service) check(ctx context.Context, urls []string) (err error) {
 	codes := &sync.Map{}
 	wg := &sync.WaitGroup{}
 	wg.Add(len(urls))
-	for _, url := range urls {
-		go func(url string) {
+	for _, u := range urls {
+		go func(u string) {
 			defer wg.Done()
-			codes.Store(url, s.ping(url))
-		}(url)
+			codes.Store(u, s.ping(u))
+		}(u)
 	}
 	wg.Wait()
 
@@ -204,7 +204,7 @@ func (s *service) saveCodes(ctx context.Context, codes *sync.Map) (err error) {
 
 // Serverless is an entrypoint for serverless yandex function
 func Serverless(ctx context.Context) error {
-	s, err := NewService(ctx, connect.MustConnectionString(os.Getenv("YDB_LINK")))
+	s, err := NewService(ctx, connect.MustConnectionString(os.Getenv("YDB")), time.Second)
 	if err != nil {
 		return fmt.Errorf("error on create service: %w", err)
 	}

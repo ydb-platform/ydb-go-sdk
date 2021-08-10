@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"path"
 	"text/template"
-	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/decimal"
@@ -43,11 +42,10 @@ SELECT value FROM decimals;
 type Command struct {
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
-}
+func (cmd *Command) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
@@ -59,7 +57,9 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	if err != nil {
 		return err
 	}
-	defer session.Close(context.Background())
+	defer func() {
+		_ = session.Close(context.Background())
+	}()
 
 	var (
 		tablePathPrefix = path.Join(params.Database(), params.Prefix())

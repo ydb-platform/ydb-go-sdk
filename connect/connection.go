@@ -35,7 +35,7 @@ func (c *Connection) Driver() ydb.Driver {
 }
 
 func (c *Connection) EnsurePathExists(ctx context.Context, path string) error {
-	for i := 0; i < len(path); i++ {
+	for i := len(c.driverConfig.Database); i < len(path); i++ {
 		x := strings.IndexByte(path[i:], '/')
 		if x == -1 {
 			x = len(path[i:]) - 1

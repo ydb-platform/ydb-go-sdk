@@ -30,11 +30,7 @@ func parseConnectionString(connection string) (schema string, endpoint string, d
 	if _, has := validSchemas[uri.Scheme]; !has {
 		return "", "", "", fmt.Errorf("%s: %w", uri.Scheme, errSchemeNotValid)
 	}
-	database = uri.Query().Get("database")
-	if database == "" {
-		database = uri.Path
-	}
-	return uri.Scheme, uri.Host, database, err
+	return uri.Scheme, uri.Host, uri.Query().Get("database"), err
 }
 
 type ConnectParams interface {

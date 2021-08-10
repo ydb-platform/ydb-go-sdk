@@ -18,7 +18,7 @@ Open http://localhost/ in browse and use URL shortener web interface
 ### Running as serverless function
 Yandex function needs a go module project. First you must create go.mod file.
 ```bash
-go mod init example && go mod tidy 
+go mod init example && go mod tidy
 zip archive.zip service.go go.mod
 yc sls fn version create \
    --service-account-id=aje46n285h0re8nmm5u6 \
@@ -26,7 +26,7 @@ yc sls fn version create \
    --entrypoint=main.Serverless \
    --memory=128m \
    --execution-timeout=1s \
-   --environment YDB_LINK=grpcs://ydb.serverless.yandexcloud.net:2135/?database=/ru-central1/b1g8skpblkos03malf3s/etn01f8gv9an9sedo9fu \
+   --environment YDB=grpcs://ydb.serverless.yandexcloud.net:2135/?database=/ru-central1/b1g8skpblkos03malf3s/etn01f8gv9an9sedo9fu \
    --source-path=./archive.zip \
    --function-id=d4euc5gp5614b56crpnj
 ```

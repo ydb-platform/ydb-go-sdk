@@ -14,7 +14,7 @@ type Command struct {
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	service, err := NewService(ctx, params.ConnectParams)
+	service, err := NewService(ctx, params.ConnectParams, params.ConnectTimeout)
 	if err != nil {
 		return fmt.Errorf("error on create service: %w", err)
 	}

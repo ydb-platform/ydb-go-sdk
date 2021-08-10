@@ -17,7 +17,7 @@ func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) (err error) {
-	service, err := NewService(ctx, params.ConnectParams)
+	service, err := NewService(ctx, params.ConnectParams, params.ConnectTimeout)
 	if err != nil {
 		return fmt.Errorf("error on create service: %w", err)
 	}

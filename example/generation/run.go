@@ -29,11 +29,10 @@ var (
 type Command struct {
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
-}
+func (cmd *Command) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
@@ -45,7 +44,9 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	if err != nil {
 		return err
 	}
-	defer session.Close(context.Background())
+	defer func() {
+		_ = session.Close(context.Background())
+	}()
 
 	err = db.CleanupDatabase(ctx, params.Prefix(), "users")
 	if err != nil {
@@ -96,7 +97,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 			{ID: 0, Username: "Randy", Mode: 042},
 			{ID: 1, Username: "Leo", Score: opt.OInt64(42)},
 		}
-		stmt, err := session.Prepare(ctx, withPragma(prefix, fill))
+		stmt, err := session.Prepare(ctx, withPragma(params.Prefix(), fill))
 		if err != nil {
 			return err
 		}
@@ -128,7 +129,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 			Score:    opt.OInt64(43),
 			Updated:  time.Now(),
 		}
-		stmt, err := session.Prepare(ctx, withPragma(prefix, insert))
+		stmt, err := session.Prepare(ctx, withPragma(params.Prefix(), insert))
 		if err != nil {
 			return err
 		}
@@ -141,7 +142,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		const query = `
 			SELECT * FROM users;`
 
-		stmt, err := session.Prepare(ctx, withPragma(prefix, query))
+		stmt, err := session.Prepare(ctx, withPragma(params.Prefix(), query))
 		if err != nil {
 			return err
 		}
@@ -170,7 +171,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 			GROUP BY
 				magic;`
 
-		stmt, err := session.Prepare(ctx, withPragma(prefix, query))
+		stmt, err := session.Prepare(ctx, withPragma(params.Prefix(), query))
 		if err != nil {
 			return err
 		}

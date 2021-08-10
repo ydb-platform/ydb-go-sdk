@@ -14,13 +14,15 @@ import (
 	"path"
 	"runtime"
 	"syscall"
+	"time"
 )
 
 var ErrPrintUsage = fmt.Errorf("")
 
 type Parameters struct {
-	Args          []string
-	ConnectParams connect.ConnectParams
+	Args           []string
+	ConnectParams  connect.ConnectParams
+	ConnectTimeout time.Duration
 
 	link                  string
 	prefix                string
@@ -68,6 +70,10 @@ func Run(cmd Command) {
 	flagSet.StringVar(&params.prefix,
 		"prefix", "",
 		"tables prefix",
+	)
+	flagSet.DurationVar(&params.ConnectTimeout,
+		"connect-timeout", time.Second,
+		"connect timeout",
 	)
 	flagSet.BoolVar(&params.driverTrace,
 		"driver-trace", false,
@@ -160,7 +166,7 @@ func Run(cmd Command) {
 		os.Exit(1)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }

@@ -1,3 +1,11 @@
+## 2.0.1
+* Fixed parser of connection string
+* Fixed EnsurePathExists and CleanupDatabase methods
+* Fixed basic_example_v1
+* Renamed example cli flag `-link=connectionString` to `-ydb=connectionString` for connection string to YDB
+* Added `-connect-timeout` flag to example cli
+* Fixed some linter issues
+
 ## 2.0.0
 * Renamed package ydbx to connect. New usage semantic: connect.New() instead ydbx.Connect()
 * Added healthcheck example

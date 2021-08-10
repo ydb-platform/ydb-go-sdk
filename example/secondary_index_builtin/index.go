@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
@@ -25,7 +24,7 @@ var actions = map[string]func(context.Context, *table.SessionPool, string, ...st
 type Command struct {
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
+func (cmd *Command) ExportFlags(_ context.Context, flagSet *flag.FlagSet) {
 	flagSet.Usage = func() {
 		out := flagSet.Output()
 		_, _ = fmt.Fprintf(out, "Usage:\n%s command [options]\n", os.Args[0])
@@ -52,7 +51,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		return cli.ErrPrintUsage
 	}
 
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {

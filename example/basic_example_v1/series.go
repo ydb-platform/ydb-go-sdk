@@ -1,7 +1,10 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"bytes"
 	"context"
 	"errors"
@@ -10,11 +13,6 @@ import (
 	"log"
 	"path"
 	"text/template"
-	"time"
-
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 )
 
 type templateConfig struct {
@@ -76,11 +74,10 @@ FROM AS_TABLE($episodesData);
 type Command struct {
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flagSet *flag.FlagSet) {
-}
+func (cmd *Command) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
@@ -161,16 +158,16 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 	}
 	log.Printf("\n> read_table:")
 	// TODO(kamardin): truncated flag.
-	for res.NextSet() {
+	for res.NextStreamSet(ctx) {
 		for res.NextRow() {
 			res.NextItem()
-			id := res.Uint64()
+			id := res.OUint64()
 
 			res.NextItem()
-			title := res.UTF8()
+			title := res.OUTF8()
 
 			res.NextItem()
-			date := res.String()
+			date := res.OUint64()
 
 			log.Printf("#  %d %s %d", id, title, date)
 		}

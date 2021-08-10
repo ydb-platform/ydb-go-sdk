@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
@@ -95,7 +94,7 @@ func (cmd *Command) testExplicitPartitions(ctx context.Context, sp table.Session
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
@@ -131,6 +130,6 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	return nil
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	flag.StringVar(&cmd.table, "table", "explicit_partitions_example", "Path for table")
+func (cmd *Command) ExportFlags(_ context.Context, flagSet *flag.FlagSet) {
+	flagSet.StringVar(&cmd.table, "table", "explicit_partitions_example", "Path for table")
 }

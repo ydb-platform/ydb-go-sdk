@@ -5,7 +5,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
@@ -73,8 +72,7 @@ ALTER TABLE small_table3 SET (TTL = Interval("PT3H") ON d);
 type Command struct {
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-}
+func (cmd *Command) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func executeQuery(ctx context.Context, sp *table.SessionPool, prefix string, query string) (err error) {
 	err = table.Retry(ctx, sp,
@@ -90,7 +88,7 @@ func executeQuery(ctx context.Context, sp *table.SessionPool, prefix string, que
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {

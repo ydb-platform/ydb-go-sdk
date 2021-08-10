@@ -23,14 +23,14 @@ type Command struct {
 	count int
 }
 
-func (cmd *Command) ExportFlags(ctx context.Context, flag *flag.FlagSet) {
-	flag.IntVar(&cmd.rps, "rps", 100, "limit write rate")
-	flag.IntVar(&cmd.infly, "infly", 10, "limit infly requests")
-	flag.IntVar(&cmd.count, "count", 1000, "count requests")
+func (cmd *Command) ExportFlags(_ context.Context, flagSet *flag.FlagSet) {
+	flagSet.IntVar(&cmd.rps, "rps", 100, "limit write rate")
+	flagSet.IntVar(&cmd.infly, "infly", 10, "limit infly requests")
+	flagSet.IntVar(&cmd.count, "count", 1000, "count requests")
 }
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
 	db, err := connect.New(connectCtx, params.ConnectParams)
 	if err != nil {
