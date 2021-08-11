@@ -27,7 +27,7 @@ func (c *Connection) Table() *tableWrapper {
 }
 
 func (c *Connection) Scheme() *scheme.Client {
-	return c.scheme.singleton()
+	return c.scheme.client
 }
 
 func (c *Connection) Driver() ydb.Driver {

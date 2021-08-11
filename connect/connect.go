@@ -9,7 +9,10 @@ import (
 
 // New connects to database and return database connection
 func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *Connection, err error) {
-	c = &Connection{}
+	c = &Connection{
+		table:  newTableWrapper(ctx),
+		scheme: newSchemeWrapper(ctx),
+	}
 	for _, opt := range opts {
 		err := opt(c)
 		if err != nil {
@@ -37,7 +40,7 @@ func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *C
 	if err != nil {
 		return nil, err
 	}
-	c.table = newTableWrapper(ctx, c.driver)
-	c.scheme = newSchemeWrapper(ctx, c.driver)
+	c.table.client.Driver = c.driver
+	c.scheme.client.Driver = c.driver
 	return c, nil
 }

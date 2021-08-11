@@ -945,7 +945,7 @@ func (p *SessionPool) removeFirstIdle() *Session {
 // p.mu must be held.
 func (p *SessionPool) incrementKeepAlive(s *Session) int {
 	info, has := p.index[s]
-	if !has || info.idle == nil {
+	if !has {
 		return -1
 	}
 	ret := info.keepAliveCount

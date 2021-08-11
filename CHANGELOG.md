@@ -1,3 +1,7 @@
+## 2.1.0
+* Fixed erasing session from pool if session heep-alive count great then IdleKeepAliveThreshold
+* Add major session pool config params as connect.WithSessionPool*() options
+
 ## 2.0.3
 * Added panic for wrong NextSet/NextStreamSet call
 

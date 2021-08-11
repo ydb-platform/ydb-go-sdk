@@ -13,6 +13,7 @@ import (
 	"log"
 	"path"
 	"text/template"
+	"time"
 )
 
 type templateConfig struct {
@@ -79,7 +80,12 @@ func (cmd *Command) ExportFlags(context.Context, *flag.FlagSet) {}
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	connectCtx, cancel := context.WithTimeout(ctx, params.ConnectTimeout)
 	defer cancel()
-	db, err := connect.New(connectCtx, params.ConnectParams)
+	db, err := connect.New(
+		connectCtx,
+		params.ConnectParams,
+		connect.WithSessionPoolIdleThreshold(time.Second*5),
+		connect.WithSessionPoolKeepAliveMinSize(-1),
+	)
 	if err != nil {
 		return fmt.Errorf("connect error: %w", err)
 	}

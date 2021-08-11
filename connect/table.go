@@ -1,25 +1,26 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"context"
-	"sync"
 )
 
 type tableWrapper struct {
-	ctx             context.Context
-	client          *table.Client
-	sessionPoolOnce sync.Once
-	sessionPool     *table.SessionPool
+	ctx         context.Context
+	client      *table.Client
+	sessionPool *table.SessionPool
 }
 
-func newTableWrapper(ctx context.Context, driver ydb.Driver) *tableWrapper {
+func newTableWrapper(ctx context.Context) *tableWrapper {
+	tableClient := &table.Client{
+		Trace: table.ContextClientTrace(ctx),
+	}
 	return &tableWrapper{
-		ctx: ctx,
-		client: &table.Client{
-			Driver: driver,
-			Trace:  table.ContextClientTrace(ctx),
+		ctx:    ctx,
+		client: tableClient,
+		sessionPool: &table.SessionPool{
+			Builder: tableClient,
+			Trace:   table.ContextSessionPoolTrace(ctx),
 		},
 	}
 }
@@ -29,11 +30,5 @@ func (t *tableWrapper) CreateSession(ctx context.Context) (*table.Session, error
 }
 
 func (t *tableWrapper) Pool() *table.SessionPool {
-	t.sessionPoolOnce.Do(func() {
-		t.sessionPool = &table.SessionPool{
-			Builder: t.client,
-			Trace:   table.ContextSessionPoolTrace(t.ctx),
-		}
-	})
 	return t.sessionPool
 }
