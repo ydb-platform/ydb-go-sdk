@@ -1,12 +1,11 @@
 package table
 
 import (
-	"context"
-
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_TableStats"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/result"
+	"context"
 )
 
 // Result is a result of a query.
@@ -110,6 +109,9 @@ func (r *Result) inactive() bool {
 //
 // Note that it does not work with sets from stream.
 func (r *Result) HasNextSet() bool {
+	if r.setCh != nil {
+		panic("HasNextSet must be called only from non streaming operation")
+	}
 	if r.inactive() || r.nextSet == len(r.sets) {
 		return false
 	}
@@ -119,6 +121,9 @@ func (r *Result) HasNextSet() bool {
 // NextSet selects next result set in the result.
 // It returns false if there are no more result sets.
 func (r *Result) NextSet() bool {
+	if r.setCh != nil {
+		panic("NextSet must be called only from non streaming operation")
+	}
 	if !r.HasNextSet() {
 		return false
 	}
@@ -136,7 +141,10 @@ func (r *Result) Truncated() bool {
 // It returns false if stream is closed or ctx is canceled.
 // Note that in case of context cancelation it marks via error set.
 func (r *Result) NextStreamSet(ctx context.Context) bool {
-	if r.inactive() || r.setCh == nil {
+	if r.setCh == nil {
+		panic("NextStreamSet must be called only from streaming operation")
+	}
+	if r.inactive() {
 		return false
 	}
 	select {

@@ -1,3 +1,6 @@
+## 2.0.3
+* Added panic for wrong NextSet/NextStreamSet call
+
 ## 2.0.2
 * Fixed infinite keep alive session on transport errors Cancelled and DeadlineExceeded 
 
