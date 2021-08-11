@@ -96,7 +96,7 @@ message QueryContent {
         STREAMING = 2; // Streaming query (used for streaming data processing, such as working with YDS)
     }
     QueryType type = 1;
-    string name = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    string name = 2 [(Ydb.length).le = 1024];
     Acl acl = 3;
     Limits limits = 4;
     string text = 5 [(Ydb.length).le = 102400]; // The text of the query itself
@@ -140,7 +140,7 @@ message QueryMeta {
 
 message BriefQuery {
     QueryContent.QueryType type = 1;
-    string name = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+    string name = 2 [(Ydb.length).le = 1024];
     QueryMeta meta = 3;
 }
 
