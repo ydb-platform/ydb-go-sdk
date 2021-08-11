@@ -30,6 +30,14 @@ message ClickHouseCluster {
    string password = 6;
 }
 
+message DataStreams {
+   string endpoint = 1;
+   string database = 2;
+   string name = 3;
+   string id = 4;
+   bool secure = 5;
+}
+
 message ObjectStorage {
    string name = 1;
    string bucket = 2;
@@ -40,6 +48,7 @@ message Connection {
     oneof connection {
         YdbDatabase ydb_database = 1;
         ClickHouseCluster clickhouse_cluster = 2;
+        DataStreams data_streams = 4;
         ObjectStorage object_storage = 3;
     }
 }
