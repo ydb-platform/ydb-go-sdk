@@ -60,26 +60,3 @@ var fileDescriptor_d67561c16f71e10d = []byte{
 	0xea, 0x37, 0x6f, 0x35, 0x8e, 0xaf, 0x57, 0xef, 0xde, 0xbb, 0xab, 0x00, 0x00, 0x00, 0xff, 0xff,
 	0x98, 0x9b, 0x45, 0x3a, 0x45, 0x07, 0x00, 0x00,
 }
-
-const (
-	CreateSession          = "/Ydb.Table.V1.TableService/CreateSession"
-	DeleteSession          = "/Ydb.Table.V1.TableService/DeleteSession"
-	KeepAlive              = "/Ydb.Table.V1.TableService/KeepAlive"
-	CreateTable            = "/Ydb.Table.V1.TableService/CreateTable"
-	DropTable              = "/Ydb.Table.V1.TableService/DropTable"
-	AlterTable             = "/Ydb.Table.V1.TableService/AlterTable"
-	CopyTable              = "/Ydb.Table.V1.TableService/CopyTable"
-	CopyTables             = "/Ydb.Table.V1.TableService/CopyTables"
-	DescribeTable          = "/Ydb.Table.V1.TableService/DescribeTable"
-	ExplainDataQuery       = "/Ydb.Table.V1.TableService/ExplainDataQuery"
-	PrepareDataQuery       = "/Ydb.Table.V1.TableService/PrepareDataQuery"
-	ExecuteDataQuery       = "/Ydb.Table.V1.TableService/ExecuteDataQuery"
-	ExecuteSchemeQuery     = "/Ydb.Table.V1.TableService/ExecuteSchemeQuery"
-	BeginTransaction       = "/Ydb.Table.V1.TableService/BeginTransaction"
-	CommitTransaction      = "/Ydb.Table.V1.TableService/CommitTransaction"
-	RollbackTransaction    = "/Ydb.Table.V1.TableService/RollbackTransaction"
-	DescribeTableOptions   = "/Ydb.Table.V1.TableService/DescribeTableOptions"
-	StreamReadTable        = "/Ydb.Table.V1.TableService/StreamReadTable"
-	BulkUpsert             = "/Ydb.Table.V1.TableService/BulkUpsert"
-	StreamExecuteScanQuery = "/Ydb.Table.V1.TableService/StreamExecuteScanQuery"
-)

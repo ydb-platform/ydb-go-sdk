@@ -5,7 +5,6 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	discovery "github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Discovery_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Discovery"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
@@ -41,7 +40,7 @@ func (d *discoveryClient) Discover(ctx context.Context, database string, ssl boo
 	}
 	err = invoke(
 		ctx, d.conn.conn, internal.WrapOpResponse(&resp),
-		discovery.ListEndpoints, &req, &res,
+		"/Ydb.Discovery.V1.DiscoveryService/ListEndpoints", &req, &res,
 	)
 	if err != nil {
 		return nil, err

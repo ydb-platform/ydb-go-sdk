@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Table_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
@@ -54,7 +53,7 @@ func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 	endpointInfo, err = t.Driver.Call(
 		ctx,
 		internal.Wrap(
-			Ydb_Table_V1.CreateSession,
+			"/Ydb.Table.V1.TableService/CreateSession",
 			&req,
 			&res,
 		),
@@ -135,7 +134,7 @@ func (s *Session) Close(ctx context.Context) (err error) {
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.DeleteSession,
+			"/Ydb.Table.V1.TableService/DeleteSession",
 			&req,
 			nil,
 		),
@@ -170,7 +169,7 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 			ydb.ConnUseEndpoint,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.KeepAlive,
+			"/Ydb.Table.V1.TableService/KeepAlive",
 			&req,
 			&res,
 		),
@@ -202,7 +201,7 @@ func (s *Session) CreateTable(ctx context.Context, path string, opts ...CreateTa
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.CreateTable,
+			"/Ydb.Table.V1.TableService/CreateTable",
 			&req,
 			nil,
 		),
@@ -226,7 +225,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.DescribeTable,
+			"/Ydb.Table.V1.TableService/DescribeTable",
 			&req,
 			&res,
 		),
@@ -329,7 +328,7 @@ func (s *Session) DropTable(ctx context.Context, path string, opts ...DropTableO
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.DropTable,
+			"/Ydb.Table.V1.TableService/DropTable",
 			&req,
 			nil,
 		),
@@ -352,7 +351,7 @@ func (s *Session) AlterTable(ctx context.Context, path string, opts ...AlterTabl
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.AlterTable,
+			"/Ydb.Table.V1.TableService/AlterTable",
 			&req,
 			nil,
 		),
@@ -373,7 +372,7 @@ func (s *Session) CopyTable(ctx context.Context, dst, src string, _ ...CopyTable
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.CopyTable,
+			"/Ydb.Table.V1.TableService/CopyTable",
 			&req,
 			nil,
 		),
@@ -403,7 +402,7 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.ExplainDataQuery,
+			"/Ydb.Table.V1.TableService/ExplainDataQuery",
 			&req,
 			&res,
 		),
@@ -503,7 +502,7 @@ func (s *Session) Prepare(
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.PrepareDataQuery,
+			"/Ydb.Table.V1.TableService/PrepareDataQuery",
 			&req,
 			&res,
 		),
@@ -635,7 +634,7 @@ func (s *Session) executeDataQuery(
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.ExecuteDataQuery,
+			"/Ydb.Table.V1.TableService/ExecuteDataQuery",
 			req,
 			res,
 		),
@@ -661,7 +660,7 @@ func (s *Session) ExecuteSchemeQuery(
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.ExecuteSchemeQuery,
+			"/Ydb.Table.V1.TableService/ExecuteSchemeQuery",
 			&req,
 			nil,
 		),
@@ -679,7 +678,7 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.DescribeTableOptions,
+			"/Ydb.Table.V1.TableService/DescribeTableOptions",
 			&req,
 			&res,
 		),
@@ -806,7 +805,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 			s.endpointInfo,
 		),
 		internal.WrapStreamOperation(
-			Ydb_Table_V1.StreamReadTable,
+			"/Ydb.Table.V1.TableService/StreamReadTable",
 			&req,
 			&resp,
 			func(err error) {
@@ -884,7 +883,7 @@ func (s *Session) StreamExecuteScanQuery(
 			s.endpointInfo,
 		),
 		internal.WrapStreamOperation(
-			Ydb_Table_V1.StreamExecuteScanQuery,
+			"/Ydb.Table.V1.TableService/StreamExecuteScanQuery",
 			&req,
 			&resp,
 			func(err error) {
@@ -935,7 +934,7 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) 
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.BulkUpsert,
+			"/Ydb.Table.V1.TableService/BulkUpsert",
 			&req, nil,
 		),
 	)
@@ -963,7 +962,7 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 			s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.BeginTransaction,
+			"/Ydb.Table.V1.TableService/BeginTransaction",
 			&req,
 			&res,
 		),
@@ -1023,7 +1022,7 @@ func (tx *Transaction) Commit(ctx context.Context) (err error) {
 			tx.s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.CommitTransaction,
+			"/Ydb.Table.V1.TableService/CommitTransaction",
 			&req,
 			nil,
 		),
@@ -1054,7 +1053,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOp
 			tx.s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.CommitTransaction,
+			"/Ydb.Table.V1.TableService/CommitTransaction",
 			req,
 			res,
 		),
@@ -1081,7 +1080,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 			tx.s.endpointInfo,
 		),
 		internal.Wrap(
-			Ydb_Table_V1.RollbackTransaction,
+			"/Ydb.Table.V1.TableService/RollbackTransaction",
 			&req,
 			nil,
 		),

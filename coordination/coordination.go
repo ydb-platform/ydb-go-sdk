@@ -5,7 +5,6 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Coordination_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Coordination"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/scheme"
 )
@@ -78,7 +77,7 @@ func (c *Client) CreateNode(ctx context.Context, path string, config Config) (er
 		},
 	}
 	_, err = c.Driver.Call(ctx, api.Wrap(
-		Ydb_Coordination_V1.CreateNode, &req, nil,
+		"/Ydb.Coordination.V1.CoordinationService/CreateNode", &req, nil,
 	))
 	return
 }
@@ -96,7 +95,7 @@ func (c *Client) AlterNode(ctx context.Context, path string, config Config) (err
 		},
 	}
 	_, err = c.Driver.Call(ctx, api.Wrap(
-		Ydb_Coordination_V1.AlterNode, &req, nil,
+		"/Ydb.Coordination.V1.CoordinationService/AlterNode", &req, nil,
 	))
 	return
 }
@@ -106,7 +105,7 @@ func (c *Client) DropNode(ctx context.Context, path string) (err error) {
 		Path: path,
 	}
 	_, err = c.Driver.Call(ctx, api.Wrap(
-		Ydb_Coordination_V1.DropNode, &req, nil,
+		"/Ydb.Coordination.V1.CoordinationService/DropNode", &req, nil,
 	))
 	return
 }
@@ -118,7 +117,7 @@ func (c *Client) DescribeNode(ctx context.Context, path string) (*scheme.Entry, 
 		Path: path,
 	}
 	_, err := c.Driver.Call(ctx, api.Wrap(
-		Ydb_Coordination_V1.DescribeNode, &req, &res,
+		"/Ydb.Coordination.V1.CoordinationService/DescribeNode", &req, &res,
 	))
 	if err != nil {
 		return nil, nil, err

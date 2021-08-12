@@ -44,11 +44,3 @@ var fileDescriptor_20087c3a500ad53a = []byte{
 	0xed, 0xf2, 0x25, 0x5c, 0x7f, 0x05, 0x00, 0x00, 0xff, 0xff, 0x9b, 0xf0, 0xc7, 0x86, 0x6c, 0x02,
 	0x00, 0x00,
 }
-
-const (
-	Session      = "/Ydb.Coordination.V1.CoordinationService/Session"
-	CreateNode   = "/Ydb.Coordination.V1.CoordinationService/CreateNode"
-	AlterNode    = "/Ydb.Coordination.V1.CoordinationService/AlterNode"
-	DropNode     = "/Ydb.Coordination.V1.CoordinationService/DropNode"
-	DescribeNode = "/Ydb.Coordination.V1.CoordinationService/DescribeNode"
-)

@@ -7463,8 +7463,6 @@ var fileDescriptor_c34299dbed9da419 = []byte{
 	0x37, 0x00, 0x00, 0xff, 0xff, 0x22, 0xef, 0x97, 0x6f, 0x60, 0x5a, 0x00, 0x00,
 }
 
-const ()
-
 // SetOperationParams implements ydb generic interface for setting
 // operation parameters inside driver implementation.
 func (m *ReadInfoRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {

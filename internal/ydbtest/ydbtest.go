@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Discovery_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Discovery"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
@@ -198,7 +197,7 @@ func (s *YDB) StartBalancer() *Balancer {
 
 	ln := NewListener()
 	srv := grpc.NewServer()
-	m := ydb.Method(Ydb_Discovery_V1.ListEndpoints)
+	m := ydb.Method("/Ydb.Discovery.V1.DiscoveryService/ListEndpoints")
 
 	service, method := m.Split()
 	srv.RegisterService(&grpc.ServiceDesc{

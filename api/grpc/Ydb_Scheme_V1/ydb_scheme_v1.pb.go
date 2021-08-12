@@ -43,11 +43,3 @@ var fileDescriptor_b970ce7111d762d2 = []byte{
 	0x4b, 0xf8, 0x5c, 0x8a, 0xee, 0xda, 0x75, 0x2a, 0x0f, 0x9b, 0x8b, 0xdf, 0xff, 0x04, 0x00, 0x00,
 	0xff, 0xff, 0xa5, 0xb3, 0x41, 0x9c, 0x42, 0x02, 0x00, 0x00,
 }
-
-const (
-	MakeDirectory     = "/Ydb.Scheme.V1.SchemeService/MakeDirectory"
-	RemoveDirectory   = "/Ydb.Scheme.V1.SchemeService/RemoveDirectory"
-	ListDirectory     = "/Ydb.Scheme.V1.SchemeService/ListDirectory"
-	DescribePath      = "/Ydb.Scheme.V1.SchemeService/DescribePath"
-	ModifyPermissions = "/Ydb.Scheme.V1.SchemeService/ModifyPermissions"
-)

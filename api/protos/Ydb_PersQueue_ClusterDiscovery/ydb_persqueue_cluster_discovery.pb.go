@@ -590,8 +590,6 @@ var fileDescriptor_5cad171f92634c39 = []byte{
 	0xff, 0xff, 0xb8, 0xc5, 0xe9, 0x85, 0xec, 0x06, 0x00, 0x00,
 }
 
-const ()
-
 // SetOperationParams implements ydb generic interface for setting
 // operation parameters inside driver implementation.
 func (m *DiscoverClustersRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {

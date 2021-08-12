@@ -677,8 +677,6 @@ var fileDescriptor_ac21a693e2c386a5 = []byte{
 	0xff, 0xff, 0x97, 0x72, 0x8d, 0xff, 0x2e, 0x07, 0x00, 0x00,
 }
 
-const ()
-
 // SetOperationParams implements ydb generic interface for setting
 // operation parameters inside driver implementation.
 func (m *UploadRowsRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {

@@ -40,9 +40,3 @@ var fileDescriptor_22c21ee75a346f15 = []byte{
 	0x2b, 0x33, 0x4c, 0x62, 0x03, 0x07, 0xa1, 0x31, 0x20, 0x00, 0x00, 0xff, 0xff, 0xe7, 0x45, 0x8e,
 	0x13, 0x9c, 0x01, 0x00, 0x00,
 }
-
-const (
-	ExecuteYql       = "/Ydb.Scripting.V1.ScriptingService/ExecuteYql"
-	StreamExecuteYql = "/Ydb.Scripting.V1.ScriptingService/StreamExecuteYql"
-	ExplainYql       = "/Ydb.Scripting.V1.ScriptingService/ExplainYql"
-)

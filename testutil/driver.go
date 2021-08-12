@@ -10,7 +10,6 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Table_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
@@ -46,45 +45,45 @@ const (
 )
 
 var grpcMethodToCode = map[string]MethodCode{
-	Ydb_Table_V1.CreateSession:          TableCreateSession,
-	Ydb_Table_V1.DeleteSession:          TableDeleteSession,
-	Ydb_Table_V1.KeepAlive:              TableKeepAlive,
-	Ydb_Table_V1.CreateTable:            TableCreateTable,
-	Ydb_Table_V1.DropTable:              TableDropTable,
-	Ydb_Table_V1.AlterTable:             TableAlterTable,
-	Ydb_Table_V1.CopyTable:              TableCopyTable,
-	Ydb_Table_V1.DescribeTable:          TableDescribeTable,
-	Ydb_Table_V1.ExplainDataQuery:       TableExplainDataQuery,
-	Ydb_Table_V1.PrepareDataQuery:       TablePrepareDataQuery,
-	Ydb_Table_V1.ExecuteDataQuery:       TableExecuteDataQuery,
-	Ydb_Table_V1.ExecuteSchemeQuery:     TableExecuteSchemeQuery,
-	Ydb_Table_V1.BeginTransaction:       TableBeginTransaction,
-	Ydb_Table_V1.CommitTransaction:      TableCommitTransaction,
-	Ydb_Table_V1.RollbackTransaction:    TableRollbackTransaction,
-	Ydb_Table_V1.DescribeTableOptions:   TableDescribeTableOptions,
-	Ydb_Table_V1.StreamReadTable:        TableStreamReadTable,
-	Ydb_Table_V1.StreamExecuteScanQuery: TableStreamExecuteScanQuery,
+	"/Ydb.Table.V1.TableService/CreateSession":          TableCreateSession,
+	"/Ydb.Table.V1.TableService/DeleteSession":          TableDeleteSession,
+	"/Ydb.Table.V1.TableService/KeepAlive":              TableKeepAlive,
+	"/Ydb.Table.V1.TableService/CreateTable":            TableCreateTable,
+	"/Ydb.Table.V1.TableService/DropTable":              TableDropTable,
+	"/Ydb.Table.V1.TableService/AlterTable":             TableAlterTable,
+	"/Ydb.Table.V1.TableService/CopyTable":              TableCopyTable,
+	"/Ydb.Table.V1.TableService/DescribeTable":          TableDescribeTable,
+	"/Ydb.Table.V1.TableService/ExplainDataQuery":       TableExplainDataQuery,
+	"/Ydb.Table.V1.TableService/PrepareDataQuery":       TablePrepareDataQuery,
+	"/Ydb.Table.V1.TableService/ExecuteDataQuery":       TableExecuteDataQuery,
+	"/Ydb.Table.V1.TableService/ExecuteSchemeQuery":     TableExecuteSchemeQuery,
+	"/Ydb.Table.V1.TableService/BeginTransaction":       TableBeginTransaction,
+	"/Ydb.Table.V1.TableService/CommitTransaction":      TableCommitTransaction,
+	"/Ydb.Table.V1.TableService/RollbackTransaction":    TableRollbackTransaction,
+	"/Ydb.Table.V1.TableService/DescribeTableOptions":   TableDescribeTableOptions,
+	"/Ydb.Table.V1.TableService/StreamReadTable":        TableStreamReadTable,
+	"/Ydb.Table.V1.TableService/StreamExecuteScanQuery": TableStreamExecuteScanQuery,
 }
 
 var codeToString = map[MethodCode]string{
-	TableCreateSession:          lastSegment(Ydb_Table_V1.CreateSession),
-	TableDeleteSession:          lastSegment(Ydb_Table_V1.DeleteSession),
-	TableKeepAlive:              lastSegment(Ydb_Table_V1.KeepAlive),
-	TableCreateTable:            lastSegment(Ydb_Table_V1.CreateTable),
-	TableDropTable:              lastSegment(Ydb_Table_V1.DropTable),
-	TableAlterTable:             lastSegment(Ydb_Table_V1.AlterTable),
-	TableCopyTable:              lastSegment(Ydb_Table_V1.CopyTable),
-	TableDescribeTable:          lastSegment(Ydb_Table_V1.DescribeTable),
-	TableExplainDataQuery:       lastSegment(Ydb_Table_V1.ExplainDataQuery),
-	TablePrepareDataQuery:       lastSegment(Ydb_Table_V1.PrepareDataQuery),
-	TableExecuteDataQuery:       lastSegment(Ydb_Table_V1.ExecuteDataQuery),
-	TableExecuteSchemeQuery:     lastSegment(Ydb_Table_V1.ExecuteSchemeQuery),
-	TableBeginTransaction:       lastSegment(Ydb_Table_V1.BeginTransaction),
-	TableCommitTransaction:      lastSegment(Ydb_Table_V1.CommitTransaction),
-	TableRollbackTransaction:    lastSegment(Ydb_Table_V1.RollbackTransaction),
-	TableDescribeTableOptions:   lastSegment(Ydb_Table_V1.DescribeTableOptions),
-	TableStreamReadTable:        lastSegment(Ydb_Table_V1.StreamReadTable),
-	TableStreamExecuteScanQuery: lastSegment(Ydb_Table_V1.StreamExecuteScanQuery),
+	TableCreateSession:          lastSegment("/Ydb.Table.V1.TableService/CreateSession"),
+	TableDeleteSession:          lastSegment("/Ydb.Table.V1.TableService/DeleteSession"),
+	TableKeepAlive:              lastSegment("/Ydb.Table.V1.TableService/KeepAlive"),
+	TableCreateTable:            lastSegment("/Ydb.Table.V1.TableService/CreateTable"),
+	TableDropTable:              lastSegment("/Ydb.Table.V1.TableService/DropTable"),
+	TableAlterTable:             lastSegment("/Ydb.Table.V1.TableService/AlterTable"),
+	TableCopyTable:              lastSegment("/Ydb.Table.V1.TableService/CopyTable"),
+	TableDescribeTable:          lastSegment("/Ydb.Table.V1.TableService/DescribeTable"),
+	TableExplainDataQuery:       lastSegment("/Ydb.Table.V1.TableService/ExplainDataQuery"),
+	TablePrepareDataQuery:       lastSegment("/Ydb.Table.V1.TableService/PrepareDataQuery"),
+	TableExecuteDataQuery:       lastSegment("/Ydb.Table.V1.TableService/ExecuteDataQuery"),
+	TableExecuteSchemeQuery:     lastSegment("/Ydb.Table.V1.TableService/ExecuteSchemeQuery"),
+	TableBeginTransaction:       lastSegment("/Ydb.Table.V1.TableService/BeginTransaction"),
+	TableCommitTransaction:      lastSegment("/Ydb.Table.V1.TableService/CommitTransaction"),
+	TableRollbackTransaction:    lastSegment("/Ydb.Table.V1.TableService/RollbackTransaction"),
+	TableDescribeTableOptions:   lastSegment("/Ydb.Table.V1.TableService/DescribeTableOptions"),
+	TableStreamReadTable:        lastSegment("/Ydb.Table.V1.TableService/StreamReadTable"),
+	TableStreamExecuteScanQuery: lastSegment("/Ydb.Table.V1.TableService/StreamExecuteScanQuery"),
 }
 
 func setField(name string, dst, value interface{}) {

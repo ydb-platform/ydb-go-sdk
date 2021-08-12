@@ -6767,8 +6767,6 @@ var fileDescriptor_1b2e4c4d1a772d33 = []byte{
 	0xa8, 0x87, 0x50, 0x00, 0x00,
 }
 
-const ()
-
 // SetOperationParams implements ydb generic interface for setting
 // operation parameters inside driver implementation.
 func (m *CreateSessionRequest) SetOperationParams(v *Ydb_Operations.OperationParams) {

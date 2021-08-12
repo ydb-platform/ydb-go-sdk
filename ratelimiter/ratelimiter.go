@@ -5,7 +5,6 @@ import (
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_RateLimiter_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_RateLimiter"
 )
 
@@ -39,7 +38,7 @@ func (c *Client) CreateResource(ctx context.Context, coordinationNodePath string
 		},
 	}
 	_, err = c.Driver.Call(ctx, api.Wrap(
-		Ydb_RateLimiter_V1.CreateResource, &req, nil,
+		"/Ydb.RateLimiter.V1.RateLimiterService/CreateResource", &req, nil,
 	))
 	return
 }
@@ -58,7 +57,7 @@ func (c *Client) AlterResource(ctx context.Context, coordinationNodePath string,
 		},
 	}
 	_, err = c.Driver.Call(ctx, api.Wrap(
-		Ydb_RateLimiter_V1.AlterResource, &req, nil,
+		"/Ydb.RateLimiter.V1.RateLimiterService/AlterResource", &req, nil,
 	))
 	return
 }
@@ -70,7 +69,7 @@ func (c *Client) DropResource(ctx context.Context, coordinationNodePath string, 
 		ResourcePath:         resourcePath,
 	}
 	_, err = c.Driver.Call(ctx, api.Wrap(
-		Ydb_RateLimiter_V1.DropResource, &req, nil,
+		"/Ydb.RateLimiter.V1.RateLimiterService/DropResource", &req, nil,
 	))
 	return
 }
@@ -82,7 +81,7 @@ func (c *Client) ListResource(ctx context.Context, coordinationNodePath string, 
 		ResourcePath:         resourcePath,
 	}
 	_, err := c.Driver.Call(ctx, api.Wrap(
-		Ydb_RateLimiter_V1.ListResources, &req, &res,
+		"/Ydb.RateLimiter.V1.RateLimiterService/ListResources", &req, &res,
 	))
 	if err != nil {
 		return nil, err
@@ -97,7 +96,7 @@ func (c *Client) DescribeResource(ctx context.Context, coordinationNodePath stri
 		ResourcePath:         resourcePath,
 	}
 	_, err := c.Driver.Call(ctx, api.Wrap(
-		Ydb_RateLimiter_V1.DescribeResource, &req, &res,
+		"/Ydb.RateLimiter.V1.RateLimiterService/DescribeResource", &req, &res,
 	))
 	if err != nil {
 		return nil, err
@@ -135,7 +134,7 @@ func (c *Client) AcquireResource(ctx context.Context, coordinationNodePath strin
 		}
 	}
 	_, err = c.Driver.Call(ctx, api.Wrap(
-		Ydb_RateLimiter_V1.AcquireResource, &req, nil,
+		"/Ydb.RateLimiter.V1.RateLimiterService/AcquireResource", &req, nil,
 	))
 	return
 }

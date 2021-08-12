@@ -796,8 +796,6 @@ var fileDescriptor_e301fc7fa8cff831 = []byte{
 	0xfd, 0xe4, 0xef, 0x00, 0x00, 0x00, 0xff, 0xff, 0xb3, 0x61, 0xaa, 0x90, 0xd2, 0x07, 0x00, 0x00,
 }
 
-const ()
-
 // SetOperationParams implements ydb generic interface for setting
 // operation parameters inside driver implementation.
 func (m *ImportFromS3Request) SetOperationParams(v *Ydb_Operations.OperationParams) {

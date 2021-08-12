@@ -4,7 +4,6 @@ import (
 	"context"
 
 	ydb "github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Scheme_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Scheme"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
@@ -69,7 +68,7 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
 	req := Ydb_Scheme.MakeDirectoryRequest{
 		Path: path,
 	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(Ydb_Scheme_V1.MakeDirectory, &req, nil))
+	_, err = c.Driver.Call(ctx, internal.Wrap("/Ydb.Scheme.V1.SchemeService/MakeDirectory", &req, nil))
 	return
 }
 
@@ -78,7 +77,7 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
 		Path: path,
 	}
 	_, err = c.Driver.Call(ctx, internal.Wrap(
-		Ydb_Scheme_V1.RemoveDirectory, &req, nil,
+		"/Ydb.Scheme.V1.SchemeService/RemoveDirectory", &req, nil,
 	))
 	return
 }
@@ -89,7 +88,7 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, e
 		Path: path,
 	}
 	_, err = c.Driver.Call(ctx, internal.Wrap(
-		Ydb_Scheme_V1.ListDirectory, &req, &res,
+		"/Ydb.Scheme.V1.SchemeService/ListDirectory", &req, &res,
 	))
 	if err != nil {
 		return d, err
@@ -106,7 +105,7 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err er
 		Path: path,
 	}
 	_, err = c.Driver.Call(ctx, internal.Wrap(
-		Ydb_Scheme_V1.DescribePath, &req, &res,
+		"/Ydb.Scheme.V1.SchemeService/DescribePath", &req, &res,
 	))
 	if err == nil {
 		e.from(res.Self)
@@ -125,7 +124,7 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...Per
 		ClearPermissions: desc.clear,
 	}
 	_, err = c.Driver.Call(ctx, internal.Wrap(
-		Ydb_Scheme_V1.ModifyPermissions, &req, nil,
+		"/Ydb.Scheme.V1.SchemeService/ModifyPermissions", &req, nil,
 	))
 	return
 }

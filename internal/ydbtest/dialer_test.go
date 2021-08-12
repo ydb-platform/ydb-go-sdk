@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/grpc/Ydb_Table_V1"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/traceutil"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/ydbtest"
@@ -23,7 +22,7 @@ func TestClusterTracking(t *testing.T) {
 	db := ydbtest.YDB{
 		Database: "xxx",
 		Handlers: ydbtest.Handlers{
-			Ydb_Table_V1.CreateSession: ydbtest.SuccessHandler(
+			"/Ydb.Table.V1.TableService/CreateSession": ydbtest.SuccessHandler(
 				ydbtest.Ident(&Ydb_Table.CreateSessionResult{}),
 			),
 		},

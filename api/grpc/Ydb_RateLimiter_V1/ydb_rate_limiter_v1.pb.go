@@ -45,12 +45,3 @@ var fileDescriptor_707f032cadb35942 = []byte{
 	0x88, 0xb3, 0xc3, 0x0f, 0x5d, 0xfc, 0x04, 0x00, 0x00, 0xff, 0xff, 0x02, 0x6b, 0x3b, 0xcc, 0x03,
 	0x03, 0x00, 0x00,
 }
-
-const (
-	CreateResource   = "/Ydb.RateLimiter.V1.RateLimiterService/CreateResource"
-	AlterResource    = "/Ydb.RateLimiter.V1.RateLimiterService/AlterResource"
-	DropResource     = "/Ydb.RateLimiter.V1.RateLimiterService/DropResource"
-	ListResources    = "/Ydb.RateLimiter.V1.RateLimiterService/ListResources"
-	DescribeResource = "/Ydb.RateLimiter.V1.RateLimiterService/DescribeResource"
-	AcquireResource  = "/Ydb.RateLimiter.V1.RateLimiterService/AcquireResource"
-)
