@@ -45,6 +45,8 @@ message GetTaskResult {
 
     string user_token = 11; // IAM token for debug
     repeated SignedIdentity service_accounts = 12;
+    string user_id = 13;
+    string scope = 14;
 }
 
 message GetTaskResponse {
