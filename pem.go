@@ -1,6 +1,11 @@
 package ydb
 
-import "crypto/x509"
+import (
+	"crypto/x509"
+	"fmt"
+	"io/ioutil"
+	"os"
+)
 
 // content of https://storage.yandexcloud.net/cloud-certs/CA.pem
 var ydbPEM = []byte(`
@@ -65,6 +70,18 @@ LpuQKbSbIERsmR+QqQ==
 -----END CERTIFICATE-----
 `)
 
+func AppendCertsFromFile(certPool *x509.CertPool, caFile string) error {
+	pem, err := ioutil.ReadFile(caFile)
+	if err != nil {
+		return err
+	}
+	if ok := certPool.AppendCertsFromPEM(pem); !ok {
+		return fmt.Errorf("certificates file '%s' can not be append: %w", caFile, err)
+	}
+	return nil
+
+}
+
 func WithYdbCA(certPool *x509.CertPool) (_ *x509.CertPool, err error) {
 	if certPool == nil {
 		certPool, err = x509.SystemCertPool()
@@ -72,6 +89,15 @@ func WithYdbCA(certPool *x509.CertPool) (_ *x509.CertPool, err error) {
 			return nil, err
 		}
 	}
-	certPool.AppendCertsFromPEM(ydbPEM)
+	// append user defined certs
+	if caFile, ok := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); ok {
+		if err := AppendCertsFromFile(certPool, caFile); err != nil {
+			return nil, err
+		}
+	}
+	// append internal YDB certs
+	if ok := certPool.AppendCertsFromPEM(ydbPEM); !ok {
+		return nil, fmt.Errorf("internal YDB certs can not be append")
+	}
 	return certPool, nil
 }

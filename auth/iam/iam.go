@@ -29,10 +29,9 @@ const (
 )
 
 var (
-	ErrServiceFileInvalid       = errors.New("service account file is not valid")
-	ErrKeyCannotBeParsed        = errors.New("private key can not be parsed")
-	ErrPemCertKeyCannotBeAppend = errors.New("pem cert can not be append")
-	ErrEndpointRequired         = errors.New("iam: endpoint required")
+	ErrServiceFileInvalid = errors.New("service account file is not valid")
+	ErrKeyCannotBeParsed  = errors.New("private key can not be parsed")
+	ErrEndpointRequired   = errors.New("iam: endpoint required")
 )
 
 // CreateTokenError contains reason of token creation failure.
@@ -89,17 +88,12 @@ func WithCertPool(certPool *x509.CertPool) ClientOption {
 }
 
 // WithCertPoolFile try set root certPool from provided cert file path.
-func WithCertPoolFile(path string) ClientOption {
+func WithCertPoolFile(caFile string) ClientOption {
 	return func(c *client) error {
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
+		cp := x509.NewCertPool()
+		if err := ydb.AppendCertsFromFile(cp, caFile); err != nil {
 			return err
 		}
-		cp := x509.NewCertPool()
-		if ok := cp.AppendCertsFromPEM(data); !ok {
-			return ErrPemCertKeyCannotBeAppend
-		}
-
 		c.CertPool = cp
 		return nil
 	}
