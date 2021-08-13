@@ -7,7 +7,6 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"bytes"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -130,8 +129,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	err = scanQuerySelect(ctx, db.Table().Pool(), params.Prefix())
 	if err != nil {
-		var te *ydb.TransportError
-		if !errors.As(err, &te) || te.Reason != ydb.TransportErrorUnimplemented {
+		if !ydb.IsTransportError(err, ydb.TransportErrorUnimplemented) {
 			return fmt.Errorf("scan query select error: %w", err)
 		}
 	}
