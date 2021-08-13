@@ -852,15 +852,10 @@ func (s *Session) StreamExecuteScanQuery(
 	params *QueryParameters,
 	opts ...ExecuteScanQueryOption,
 ) (
-	r *Result, err error,
+	_ *Result, err error,
 ) {
 	q := new(DataQuery)
 	q.initFromText(query)
-	clientTraceStreamExecuteScanQueryDone := clientTraceOnStreamExecuteScanQuery(ctx, s.c.Trace, ctx, s, q, params)
-	defer func() {
-		clientTraceStreamExecuteScanQueryDone(ctx, s, q, params, r, err)
-	}()
-
 	var resp Ydb_Table.ExecuteScanQueryPartialResponse
 	req := Ydb_Table.ExecuteScanQueryRequest{
 		Query:      &q.query,
@@ -873,10 +868,18 @@ func (s *Session) StreamExecuteScanQuery(
 
 	ctx, cancel := context.WithCancel(ctx)
 	var (
-		ch   = make(chan *Ydb.ResultSet, 1)
-		ce   = new(error)
 		once = sync.Once{}
+		r    = &Result{
+			setCh:       make(chan *Ydb.ResultSet, 1),
+			setChCancel: cancel,
+		}
 	)
+
+	clientTraceStreamExecuteScanQueryDone := clientTraceOnStreamExecuteScanQuery(ctx, s.c.Trace, ctx, s, q, params)
+	defer func() {
+		clientTraceStreamExecuteScanQueryDone(ctx, s, q, params, r, err)
+	}()
+
 	_, err = s.c.Driver.StreamRead(
 		ydb.WithEndpointInfo(
 			ctx,
@@ -888,19 +891,19 @@ func (s *Session) StreamExecuteScanQuery(
 			&resp,
 			func(err error) {
 				if err != io.EOF {
-					*ce = err
+					r.setChErr = &err
 				}
 				if err != nil {
-					once.Do(func() { close(ch) })
+					once.Do(func() { close(r.setCh) })
 					return
 				}
 				select {
 				case <-ctx.Done():
-					once.Do(func() { close(ch) })
+					once.Do(func() { close(r.setCh) })
 				default:
 					if result := resp.Result; result != nil {
 						if result.ResultSet != nil {
-							ch <- resp.Result.ResultSet
+							r.setCh <- resp.Result.ResultSet
 						}
 						// TODO: something
 						// if result.QueryStats != nil {
@@ -913,11 +916,6 @@ func (s *Session) StreamExecuteScanQuery(
 	if err != nil {
 		cancel()
 		return
-	}
-	r = &Result{
-		setCh:       ch,
-		setChErr:    ce,
-		setChCancel: cancel,
 	}
 	return r, nil
 }

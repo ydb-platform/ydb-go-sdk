@@ -150,7 +150,9 @@ func (r *Result) NextStreamSet(ctx context.Context) bool {
 	select {
 	case s, ok := <-r.setCh:
 		if !ok {
-			r.err = *r.setChErr
+			if r.setChErr != nil {
+				r.err = *r.setChErr
+			}
 			return false
 		}
 		result.Reset(&r.Scanner, s)

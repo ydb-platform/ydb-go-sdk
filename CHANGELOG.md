@@ -1,8 +1,11 @@
+## 2.2.1
+* Fixed returning error from table.StreamExecuteScanQuery 
+
 ## 2.2.0
 * Supported loading certs from file using `YDB_SSL_ROOT_CERTIFICATES_FILE` environment variable
 
 ## 2.1.0
-* Fixed erasing session from pool if session heep-alive count great then IdleKeepAliveThreshold
+* Fixed erasing session from pool if session keep-alive count great then IdleKeepAliveThreshold
 * Add major session pool config params as connect.WithSessionPool*() options
 
 ## 2.0.3
