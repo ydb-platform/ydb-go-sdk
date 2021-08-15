@@ -1,7 +1,5 @@
 package table
 
-//go:generate gtrace
-
 import (
 	"container/list"
 	"context"
