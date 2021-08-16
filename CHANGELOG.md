@@ -1,5 +1,18 @@
+## 2.3.0
+* Added credentials connect options:
+  - `connect.WithAccessTokenCredentials(accessToken)`
+  - `connect.WithAnonymousCredentials()`
+  - `connect.WithMetadataCredentials(ctx)`
+  - `connect.WithServiceAccountKeyFileCredentiials(serviceAccountKeyFile)`
+* Added auth examples:
+  - `example/auth/environ`
+  - `example/auth/access_token_credentials`
+  - `example/auth/anonymous_credentials`
+  - `example/auth/metadata_credentials`
+  - `example/auth/service_account_credentials`
+
 ## 2.2.1
-* Fixed returning error from table.StreamExecuteScanQuery 
+* Fixed returning error from table.StreamExecuteScanQuery
 
 ## 2.2.0
 * Supported loading certs from file using `YDB_SSL_ROOT_CERTIFICATES_FILE` environment variable
