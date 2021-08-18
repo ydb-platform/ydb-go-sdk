@@ -9,7 +9,6 @@ import "kikimr/public/api/protos/ydb_operation.proto";
 import "kikimr/public/api/protos/ydb_value.proto";
 import "kikimr/public/api/protos/ydb_issue_message.proto";
 
-import "kikimr/public/api/protos/draft/yql_analytics.proto";
 import "kikimr/public/api/protos/yq.proto";
 
 import "google/protobuf/timestamp.proto";
@@ -63,14 +62,17 @@ message PingTaskRequest {
     repeated Ydb.Issue.IssueMessage issues = 6;
     uint32 result_set_count = 7;
     string statistics = 8;
-    bytes serialized_headers = 9;
+    repeated YandexQuery.ResultSetMeta result_set_meta = 9;
     string executer_info = 10;
     string dq_graph = 11;
     string ast = 12;
     string plan = 13;
     bool resign_query = 14;
     Ydb.Operations.OperationParams operation_params = 15;
-    string scope = 100; // TODO: delete
+    string scope = 100; //TODO remove
+    google.protobuf.Timestamp started_at = 101;
+    google.protobuf.Timestamp finished_at = 102;
+
 }
 
 message PingTaskResult {
