@@ -70,7 +70,7 @@ type SessionPool struct {
 
 	// IdleKeepAliveThreshold is a number of keepAlive messages to call before the
 	// Session is removed if it is an excess session (see KeepAliveMinSize)
-	// This means session lifetime = IdleThreshold * IdleKeepAliveThreshold
+	// This means that session will be deleted after the expiration of lifetime = IdleThreshold * IdleKeepAliveThreshold
 	// If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
 	// be removed ever.
 	// If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
@@ -96,14 +96,15 @@ type SessionPool struct {
 	// DefaultSessionPoolBusyCheckInterval value is used.
 	BusyCheckInterval time.Duration
 
+	// Deprecated: unnecessary parameter
+	// it will be removed at next major release
 	// KeepAliveBatchSize is a maximum number sessions taken from the pool to
 	// prepare KeepAlive() call on them in background.
 	// If KeepAliveBatchSize is less than or equal to zero, then there is no
 	// batch limit.
 	KeepAliveBatchSize int
 
-	// KeepAliveTimeout limits maximum time spent on KeepAlive request for
-	// KeepAliveBatchSize number of sessions.
+	// KeepAliveTimeout limits maximum time spent on KeepAlive request
 	// If KeepAliveTimeout is less than or equal to zero then the
 	// DefaultSessionPoolKeepAliveTimeout is used.
 	KeepAliveTimeout time.Duration
@@ -113,8 +114,7 @@ type SessionPool struct {
 	// DefaultSessionPoolCreateSessionTimeout is used.
 	CreateSessionTimeout time.Duration
 
-	// DeleteTimeout limits maximum time spent on Delete request for
-	// KeepAliveBatchSize number of sessions.
+	// DeleteTimeout limits maximum time spent on Delete request
 	// If DeleteTimeout is less than or equal to zero then the
 	// DefaultSessionPoolDeleteTimeout is used.
 	DeleteTimeout time.Duration
@@ -455,8 +455,8 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	p.init()
 
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.closed {
-		p.mu.Unlock()
 		p.closeSession(ctx, s)
 		return ErrSessionPoolClosed
 	}
@@ -472,31 +472,19 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	}
 	delete(p.index, s)
 	p.notify(nil)
-	p.mu.Unlock()
 
-	go p.putBusy(ctx, s)
-
-	return
-}
-
-// p.mu must NOT be held.
-func (p *SessionPool) putBusy(ctx context.Context, s *Session) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.closed {
-		return
-	}
 	select {
 	case <-p.busyCheckerStop:
 		close(p.busyCheck)
-		go p.closeSession(ctx, s)
+		p.closeSession(ctx, s)
 
 	case p.busyCheck <- s:
 		p.busyCheckCounter++
 	default:
 		// if cannot push session into busyCheck (channel is full) - close session
-		go p.closeSession(ctx, s)
+		p.closeSession(ctx, s)
 	}
+	return
 }
 
 // Take removes session s from the pool and ensures that s will not be returned
@@ -772,12 +760,7 @@ func (p *SessionPool) keeper() {
 			p.mu.Lock()
 			{
 				p.touching = true
-				// Iterate over n most idle items.
-				n := p.KeepAliveBatchSize
-				if n <= 0 {
-					n = p.idle.Len()
-				}
-				for i := 0; i < n; i++ {
+				for p.idle.Len() > 0 {
 					s, touched := p.peekFirstIdle()
 					if s == nil || now.Sub(touched) < p.IdleThreshold {
 						break
@@ -798,8 +781,8 @@ func (p *SessionPool) keeper() {
 				p.mu.Unlock()
 				// if keepAlive was called more than the corresponding limit for the session to be alive and more
 				// sessions are open than the lower limit of continuously kept sessions
-				if p.IdleKeepAliveThreshold > 0 && keepAliveCount > p.IdleKeepAliveThreshold &&
-					p.KeepAliveMinSize < lenIndex {
+				if p.IdleKeepAliveThreshold > 0 && keepAliveCount >= p.IdleKeepAliveThreshold &&
+					p.KeepAliveMinSize < lenIndex-len(toDelete) {
 
 					toDelete = append(toDelete, s)
 					continue

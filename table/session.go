@@ -14,6 +14,7 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/cache/lru"
 )
 
+// Deprecated: use server-side query cache with keep-in-memory flag control instead
 var DefaultMaxQueryCacheSize = 1000
 
 // Client contains logic of creation of ydb table sessions.
@@ -21,6 +22,7 @@ type Client struct {
 	Driver ydb.Driver
 	Trace  ClientTrace
 
+	// Deprecated: use server-side query cache with keep-in-memory flag control instead
 	// MaxQueryCacheSize limits maximum number of queries which able to live in
 	// cache. Note that cache is not shared across sessions.
 	//

@@ -64,10 +64,10 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
-	keepalive := make(chan struct{})
+	keepalive := make(chan struct{}, 1)
 	p := &SessionPool{
 		SizeLimit:         1,
-		BusyCheckInterval: time.Hour,
+		BusyCheckInterval: 1 * time.Second,
 		IdleThreshold:     -1,
 		Builder: &StubBuilder{
 			T:     t,
@@ -80,6 +80,10 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 					return nil
 				},
 				testutil.TableDeleteSession: okHandler,
+				testutil.TableCreateSession: func(req, res interface{}) error {
+					timer.Created <- time.Second
+					return nil
+				},
 			},
 		},
 	}
@@ -95,13 +99,7 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 	mustTakeSession(t, p, s1)
 	mustPutBusySession(t, p, s1)
 
-	<-timer.Reset
-	timer.C <- timeutil.Now()
 	<-keepalive
-
-	// Burn one busy checker iteration to be sure that session has been
-	// returned.
-	timer.C <- time.Unix(0, 0)
 
 	s2 := mustCreateSession(t, p)
 	if s2 != s1 {
@@ -116,7 +114,7 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 	keepalive := make(chan struct{})
 	p := &SessionPool{
 		SizeLimit:         1,
-		BusyCheckInterval: time.Hour,
+		BusyCheckInterval: time.Second,
 		IdleThreshold:     -1,
 		Builder: &StubBuilder{
 			T:     t,
@@ -129,6 +127,10 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 					return nil
 				},
 				testutil.TableDeleteSession: okHandler,
+				testutil.TableCreateSession: func(req, res interface{}) error {
+					timer.Created <- time.Second
+					return nil
+				},
 			},
 		},
 	}
@@ -144,7 +146,6 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 	_ = p.PutBusy(context.Background(), s1)
 
 	<-timer.Created
-	<-timer.Reset
 
 	// Create the second session making first session redundant.
 	//
@@ -155,7 +156,6 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 	// Trigger busy checker iteration.
 	// This will make s1 ready, but since s2 is already created, busy checker
 	// must delete s1.
-	timer.C <- time.Unix(0, 0)
 	<-keepalive
 	<-closed
 
@@ -171,23 +171,23 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
-	keepalive := make(chan chan bool)
+	keepalive := make(chan bool, 1)
 	p := &SessionPool{
 		SizeLimit:         2,
-		BusyCheckInterval: time.Hour,
+		BusyCheckInterval: 10 * time.Second,
 		IdleThreshold:     -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
 			Handler: methodHandlers{
 				testutil.TableKeepAlive: func(req, res interface{}) error {
-					ch := make(chan bool)
-					keepalive <- ch
-					ready := <-ch
-
 					r := testutil.TableKeepAliveResult{R: res}
-					r.SetSessionStatus(ready)
-
+					r.SetSessionStatus(true)
+					keepalive <- true
+					return nil
+				},
+				testutil.TableCreateSession: func(req, res interface{}) error {
+					timer.Created <- time.Second
 					return nil
 				},
 			},
@@ -198,22 +198,15 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 	}()
 
 	s1 := mustGetSession(t, p)
-	_ = p.PutBusy(context.Background(), s1)
-
-	s2 := mustGetSession(t, p)
-	mustPutSession(t, p, s2)
-
 	<-timer.Created
-	<-timer.Reset
+	_ = p.PutBusy(context.Background(), s1)
+	s2 := mustGetSession(t, p)
+	<-timer.Created
+	mustPutSession(t, p, s2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	{
-		timer.C <- time.Unix(0, 0) // Trigger busy checker iteration.
-		res := <-keepalive
-		res <- false // Session is not ready yet.
-		<-timer.Reset
-
 		act, err := p.Get(ctx)
 		if err != nil {
 			t.Fatalf("unexpected Get() error: %v", err)
@@ -223,16 +216,9 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 		}
 	}
 	{
-		timer.C <- time.Unix(0, 0) // Trigger busy checker iteration.
-		res := <-keepalive
-		res <- true // Session is ready now.
-
-		// Burn one busy checker iteration to be sure that session has been
-		// returned.
-		timer.C <- time.Unix(0, 0)
-
+		<-keepalive
 		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
+		defer cancel()
 		act, err := p.Get(ctx)
 		if err != nil {
 			t.Fatalf("unexpected Get() error: %v", err)
@@ -1133,6 +1119,152 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	// fulfilled.
 	deleteSessionResult <- nil
 	assertFilled(true)
+}
+
+func TestSessionPoolKeepAliveMinSize(t *testing.T) {
+	keepAliveCnt := 0
+	allKeepAlive := make(chan int)
+	p := &SessionPool{
+		Trace: SessionPoolTrace{},
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 4,
+			Handler: methodHandlers{
+				testutil.TableDeleteSession: okHandler,
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					keepAliveCnt++
+					if keepAliveCnt%3 == 0 {
+						allKeepAlive <- keepAliveCnt
+					}
+					return nil
+				},
+			},
+		},
+		SizeLimit:              3,
+		KeepAliveMinSize:       1,
+		IdleKeepAliveThreshold: 2,
+		IdleThreshold:          2 * time.Second,
+	}
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
+	sessionBuilder := func(t *testing.T, poll *SessionPool) (*Session, chan bool) {
+		s := mustCreateSession(t, poll)
+		mustPutSession(t, p, s)
+		closed := make(chan bool)
+		s.OnClose(func() {
+			close(closed)
+		})
+		return s, closed
+	}
+	_, c1 := sessionBuilder(t, p)
+	_, c2 := sessionBuilder(t, p)
+	s3, c3 := sessionBuilder(t, p)
+	<-allKeepAlive
+	<-allKeepAlive
+	<-c1
+	<-c2
+
+	if s3.closed {
+		t.Fatalf("lower bound for sessions in the pool is not equal KeepAliveMinSize")
+	}
+
+	s4, c4 := sessionBuilder(t, p)
+	<-c3
+
+	s := mustGetSession(t, p)
+	if s != s4 {
+		t.Fatalf("session is not reused")
+	}
+	_ = s.Close(context.Background())
+	<-c4
+}
+
+func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
+	p := &SessionPool{
+		Trace: SessionPoolTrace{},
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 4,
+			Handler: methodHandlers{
+				testutil.TableDeleteSession: okHandler,
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					return &ydb.OpError{
+						Reason: ydb.StatusBadSession,
+					}
+				},
+			},
+		},
+		SizeLimit:     3,
+		IdleThreshold: 2 * time.Second,
+	}
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
+	s := mustCreateSession(t, p)
+	closed := make(chan bool)
+	s.OnClose(func() {
+		close(closed)
+	})
+	mustPutSession(t, p, s)
+	<-closed
+}
+
+func TestSessionPoolKeeperRetry(t *testing.T) {
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
+	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
+	defer cleanupNow()
+
+	retry := true
+	p := &SessionPool{
+		Trace: SessionPoolTrace{},
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 2,
+			Handler: methodHandlers{
+				testutil.TableDeleteSession: okHandler,
+				testutil.TableKeepAlive: func(req, res interface{}) error {
+					if retry {
+						retry = false
+						return context.DeadlineExceeded
+					}
+					return nil
+				},
+			},
+		},
+		IdleKeepAliveThreshold: -1,
+		SizeLimit:              3,
+		IdleThreshold:          3 * time.Second,
+	}
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
+	s := mustCreateSession(t, p)
+	mustPutSession(t, p, s)
+	<-timer.Created
+	s2 := mustCreateSession(t, p)
+	mustPutSession(t, p, s2)
+	//retry
+	shiftTime(p.IdleThreshold)
+	timer.C <- timeutil.Now()
+	<-timer.Reset
+	//get first session
+	s1 := mustGetSession(t, p)
+	if s2 == s1 {
+		t.Fatalf("retry session is not returned")
+	}
+	mustPutSession(t, p, s1)
+	//keepalive success
+	shiftTime(p.IdleThreshold)
+	timer.C <- timeutil.Now()
+	<-timer.Reset
+
+	// get retry session
+	s1 = mustGetSession(t, p)
+	if s == s1 {
+		t.Fatalf("second session is not returned")
+	}
 }
 
 func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {

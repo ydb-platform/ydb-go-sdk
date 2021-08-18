@@ -1,3 +1,7 @@
+## 2.3.1
+* Correct session pool tests
+* Fixed conditions with KeepAliveMinSize and IdleKeepAliveThreshold
+
 ## 2.3.0
 * Added credentials connect options:
   - `connect.WithAccessTokenCredentials(accessToken)`
