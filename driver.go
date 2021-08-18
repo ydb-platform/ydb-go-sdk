@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
@@ -74,8 +73,8 @@ const (
 
 // Driver is an interface of YDB driver.
 type Driver interface {
-	Call(context.Context, api.Operation) (CallInfo, error)
-	StreamRead(context.Context, api.StreamOperation) (CallInfo, error)
+	Call(context.Context, Operation) (CallInfo, error)
+	StreamRead(context.Context, StreamOperation) (CallInfo, error)
 	Close() error
 }
 
@@ -218,7 +217,7 @@ func (d *driver) Close() error {
 	return d.cluster.Close()
 }
 
-func (d *driver) Call(ctx context.Context, op api.Operation) (info CallInfo, err error) {
+func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 
@@ -322,7 +321,7 @@ func errIf(cond bool, err error) error {
 	return nil
 }
 
-func (d *driver) StreamRead(ctx context.Context, op api.StreamOperation) (info CallInfo, err error) {
+func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallInfo, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 

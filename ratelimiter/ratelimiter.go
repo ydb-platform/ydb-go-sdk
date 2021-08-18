@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_RateLimiter"
 )
 
@@ -37,7 +36,7 @@ func (c *Client) CreateResource(ctx context.Context, coordinationNodePath string
 			}},
 		},
 	}
-	_, err = c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.RateLimiter.V1.RateLimiterService/CreateResource", &req, nil,
 	))
 	return
@@ -56,7 +55,7 @@ func (c *Client) AlterResource(ctx context.Context, coordinationNodePath string,
 			}},
 		},
 	}
-	_, err = c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.RateLimiter.V1.RateLimiterService/AlterResource", &req, nil,
 	))
 	return
@@ -68,7 +67,7 @@ func (c *Client) DropResource(ctx context.Context, coordinationNodePath string, 
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 	}
-	_, err = c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.RateLimiter.V1.RateLimiterService/DropResource", &req, nil,
 	))
 	return
@@ -80,7 +79,7 @@ func (c *Client) ListResource(ctx context.Context, coordinationNodePath string, 
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 	}
-	_, err := c.Driver.Call(ctx, api.Wrap(
+	_, err := c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.RateLimiter.V1.RateLimiterService/ListResources", &req, &res,
 	))
 	if err != nil {
@@ -95,7 +94,7 @@ func (c *Client) DescribeResource(ctx context.Context, coordinationNodePath stri
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 	}
-	_, err := c.Driver.Call(ctx, api.Wrap(
+	_, err := c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.RateLimiter.V1.RateLimiterService/DescribeResource", &req, &res,
 	))
 	if err != nil {
@@ -133,7 +132,7 @@ func (c *Client) AcquireResource(ctx context.Context, coordinationNodePath strin
 			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Required{Required: amount},
 		}
 	}
-	_, err = c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.RateLimiter.V1.RateLimiterService/AcquireResource", &req, nil,
 	))
 	return

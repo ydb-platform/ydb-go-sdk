@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Coordination"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/scheme"
 )
@@ -76,7 +75,7 @@ func (c *Client) CreateNode(ctx context.Context, path string, config Config) (er
 			RateLimiterCountersMode:  config.RateLimiterCountersMode.to(),
 		},
 	}
-	_, err = c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.Coordination.V1.CoordinationService/CreateNode", &req, nil,
 	))
 	return
@@ -94,7 +93,7 @@ func (c *Client) AlterNode(ctx context.Context, path string, config Config) (err
 			RateLimiterCountersMode:  config.RateLimiterCountersMode.to(),
 		},
 	}
-	_, err = c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.Coordination.V1.CoordinationService/AlterNode", &req, nil,
 	))
 	return
@@ -104,7 +103,7 @@ func (c *Client) DropNode(ctx context.Context, path string) (err error) {
 	req := Ydb_Coordination.DropNodeRequest{
 		Path: path,
 	}
-	_, err = c.Driver.Call(ctx, api.Wrap(
+	_, err = c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.Coordination.V1.CoordinationService/DropNode", &req, nil,
 	))
 	return
@@ -116,7 +115,7 @@ func (c *Client) DescribeNode(ctx context.Context, path string) (*scheme.Entry, 
 	req := Ydb_Coordination.DescribeNodeRequest{
 		Path: path,
 	}
-	_, err := c.Driver.Call(ctx, api.Wrap(
+	_, err := c.Driver.Call(ctx, ydb.Wrap(
 		"/Ydb.Coordination.V1.CoordinationService/DescribeNode", &req, &res,
 	))
 	if err != nil {

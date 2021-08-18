@@ -1,3 +1,6 @@
+## 2.3.2
+* Moved api/wrap.go to root for next replacement api package to external genproto
+
 ## 2.3.1
 * Correct session pool tests
 * Fixed conditions with KeepAliveMinSize and IdleKeepAliveThreshold

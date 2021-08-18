@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
-
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
@@ -218,7 +216,7 @@ type Driver struct {
 	OnClose      func() error
 }
 
-func (d *Driver) Call(ctx context.Context, op api.Operation) (ydb.CallInfo, error) {
+func (d *Driver) Call(ctx context.Context, op ydb.Operation) (ydb.CallInfo, error) {
 	if d.OnCall == nil {
 		return nil, ErrNotImplemented
 	}
@@ -230,7 +228,7 @@ func (d *Driver) Call(ctx context.Context, op api.Operation) (ydb.CallInfo, erro
 	return nil, d.OnCall(ctx, code, req, res)
 }
 
-func (d *Driver) StreamRead(ctx context.Context, op api.StreamOperation) (ydb.CallInfo, error) {
+func (d *Driver) StreamRead(ctx context.Context, op ydb.StreamOperation) (ydb.CallInfo, error) {
 	if d.OnStreamRead == nil {
 		return nil, ErrNotImplemented
 	}

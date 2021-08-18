@@ -5,7 +5,6 @@ import (
 	"context"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Experimental"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
@@ -22,7 +21,7 @@ func (c *Client) UploadRows(ctx context.Context, tableName string, typ ydb.Value
 		Rows:            internal.ValueToYDB(typ),
 		OperationParams: nil,
 	}
-	_, err = c.Driver.Call(ctx, api.Wrap("/Ydb.Experimental.V1.ExperimentalService/UploadRows", &req, nil))
+	_, err = c.Driver.Call(ctx, ydb.Wrap("/Ydb.Experimental.V1.ExperimentalService/UploadRows", &req, nil))
 	return
 }
 
@@ -36,7 +35,7 @@ func (c *Client) ExecuteStreamQuery(ctx context.Context, query string, params *Q
 	for _, opt := range opts {
 		opt((*streamQueryDesc)(&req))
 	}
-	_, err := c.Driver.Call(ctx, api.Wrap("/Ydb.Experimental.V1.ExperimentalService/ExecuteStreamQuery", &req, &res))
+	_, err := c.Driver.Call(ctx, ydb.Wrap("/Ydb.Experimental.V1.ExperimentalService/ExecuteStreamQuery", &req, &res))
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +49,7 @@ func (c *Client) GetDiskSpaceUsage(ctx context.Context, database string) (*DiskS
 		OperationParams: nil,
 		Database:        database,
 	}
-	_, err := c.Driver.Call(ctx, api.Wrap("/Ydb.Experimental.V1.ExperimentalService/GetDiskSpaceUsage", &req, &res))
+	_, err := c.Driver.Call(ctx, ydb.Wrap("/Ydb.Experimental.V1.ExperimentalService/GetDiskSpaceUsage", &req, &res))
 	if err != nil {
 		return nil, err
 	}
