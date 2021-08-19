@@ -3,7 +3,7 @@ package table
 import (
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_TableStats"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_TableStats"
 )
 
 // QueryStats holds query execution statistics.

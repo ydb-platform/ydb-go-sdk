@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
 	"context"
 	"errors"
 	"flag"
@@ -9,9 +8,10 @@ import (
 	"log"
 	"path"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
-	table "github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/connect"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/example/internal/cli"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 type Command struct {

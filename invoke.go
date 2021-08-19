@@ -2,11 +2,11 @@ package ydb
 
 import (
 	"context"
-	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 )
 
 func invoke(

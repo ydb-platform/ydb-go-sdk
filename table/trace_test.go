@@ -3,7 +3,7 @@ package table
 import (
 	"testing"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/tracetest"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/tracetest"
 )
 
 func TestClientTrace(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strconv"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
 )
 
 type T interface {
@@ -466,7 +466,6 @@ var (
 	void = &Ydb.Type{
 		Type: &Ydb.Type_VoidType{},
 	}
-	optionalVoid = (OptionalType{VoidType{}}).toYDB()
 )
 
 type OptionalType struct {

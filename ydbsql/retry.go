@@ -1,8 +1,6 @@
 package ydbsql
 
-import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-)
+import "github.com/YandexDatabase/ydb-go-sdk/v2"
 
 type RetryConfig struct {
 	// MaxRetries is a number of maximum attempts to retry a failed operation.

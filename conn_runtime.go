@@ -1,8 +1,8 @@
 package ydb
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/stats"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/stats"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 	"sync"
 	"time"
 )

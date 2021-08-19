@@ -1,8 +1,8 @@
 package ydb
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
-	"github.com/golang/protobuf/proto"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"google.golang.org/protobuf/proto"
 )
 
 type Operation = internal.Operation

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 )
 
 func Reset(s *Scanner, set *Ydb.ResultSet, columnNames ...string) {

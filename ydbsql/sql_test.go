@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/traceutil"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/traceutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
 )
 
 // Interface checks.

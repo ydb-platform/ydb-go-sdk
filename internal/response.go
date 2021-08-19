@@ -1,11 +1,12 @@
 package internal
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Issue"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes/any"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Issue"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
 )
 
 type Response interface {
@@ -13,7 +14,7 @@ type Response interface {
 	GetOpID() string
 	GetStatus() Ydb.StatusIds_StatusCode
 	GetIssues() []*Ydb_Issue.IssueMessage
-	GetResult() *any.Any
+	GetResult() *anypb.Any
 	GetResponseProto() proto.Message
 }
 
@@ -48,7 +49,7 @@ func (r *opResponseWrapper) GetIssues() []*Ydb_Issue.IssueMessage {
 	return r.response.GetOperation().GetIssues()
 }
 
-func (r *opResponseWrapper) GetResult() *any.Any {
+func (r *opResponseWrapper) GetResult() *anypb.Any {
 	return r.response.GetOperation().GetResult()
 }
 
@@ -88,7 +89,7 @@ func (r *noOpResponseWrapper) GetResponseProto() proto.Message {
 	return r.response
 }
 
-func (r *noOpResponseWrapper) GetResult() *any.Any {
+func (r *noOpResponseWrapper) GetResult() *anypb.Any {
 	return nil
 }
 

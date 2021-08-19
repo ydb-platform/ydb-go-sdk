@@ -1,8 +1,8 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"context"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 type tableWrapper struct {
