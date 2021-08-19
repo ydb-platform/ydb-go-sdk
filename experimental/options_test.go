@@ -3,7 +3,7 @@ package experimental
 import (
 	"testing"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Experimental"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Experimental"
 )
 
 func TestOptionsStreamQueryRequest(t *testing.T) {

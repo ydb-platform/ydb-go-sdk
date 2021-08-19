@@ -7,11 +7,10 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/duration"
+	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 )
 
 type (
@@ -223,9 +222,9 @@ func setOperationParams(req interface{}, params OperationParams) {
 	x.SetOperationParams(params.toYDB())
 }
 
-func timeoutParam(d time.Duration) *duration.Duration {
+func timeoutParam(d time.Duration) *durationpb.Duration {
 	if d > 0 {
-		return ptypes.DurationProto(d)
+		return durationpb.New(d)
 	}
 	return nil
 }

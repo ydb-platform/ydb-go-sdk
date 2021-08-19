@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/yandex-cloud/go-genproto/yandex/cloud/iam/v1"
 )
@@ -18,10 +18,7 @@ func TestGRPCCreateToken(t *testing.T) {
 		token = "foo"
 	)
 	expires := time.Unix(0, 0)
-	exp, err := ptypes.TimestampProto(expires)
-	if err != nil {
-		t.Fatal(err)
-	}
+	exp := timestamppb.New(expires)
 	s := StubTokenService{
 		OnCreate: func(ctx context.Context, req *v1.CreateIamTokenRequest) (
 			res *v1.CreateIamTokenResponse, err error,
@@ -36,7 +33,11 @@ func TestGRPCCreateToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stop()
+	defer func() {
+		if err := stop(); err != nil {
+			t.Fatalf("stop failed: %v", err)
+		}
+	}()
 
 	gt := grpcTransport{
 		endpoint: addr.String(),

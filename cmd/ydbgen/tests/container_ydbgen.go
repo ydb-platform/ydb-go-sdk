@@ -5,8 +5,8 @@ package tests
 import (
 	"strconv"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 var (
@@ -743,4 +743,3 @@ func ydbConvU32ToB(x uint32) byte {
 	}
 	return byte(x)
 }
-

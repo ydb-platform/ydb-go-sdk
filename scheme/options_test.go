@@ -3,7 +3,7 @@ package scheme
 import (
 	"testing"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Scheme"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
 )
 
 func TestSchemeOptions(t *testing.T) {

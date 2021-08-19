@@ -4,15 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
 )
 
 type DriverBuilder struct {
@@ -182,7 +182,7 @@ func TestTxDoerStmt(t *testing.T) {
 	db := sql.OpenDB(Connector(
 		WithSessionPoolIdleThreshold(time.Hour),
 		WithSessionPoolTrace(table.SessionPoolTrace{
-			OnBusyCheck: func(info table.SessionPoolBusyCheckStartInfo) func(table.SessionPoolBusyCheckDoneInfo){
+			OnBusyCheck: func(info table.SessionPoolBusyCheckStartInfo) func(table.SessionPoolBusyCheckDoneInfo) {
 				busyChecking <- struct{}{}
 				t.Logf("busy checking session %q", info.Session.ID)
 				return nil

@@ -1,11 +1,12 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/auth/iam"
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/auth/iam"
 )
 
 type ConnectOption func(client *Connection) error

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
 	"context"
 	"flag"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/example/internal/cli"
 	"net/http"
 	"strconv"
 )

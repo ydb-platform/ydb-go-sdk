@@ -1,3 +1,7 @@
+## 3.0.0
+* Replaced internal api codegen package to external ydb-go-genproto
+* Replaced old proto and grpc libraries to 
+
 ## 2.3.3
 * Fixed internal/stats/series.go (index out of range)
 * Optimized rotate buckets in the Series

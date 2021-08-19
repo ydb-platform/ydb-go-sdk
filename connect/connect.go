@@ -1,10 +1,11 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/auth"
 	"context"
 	"crypto/tls"
+
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/auth"
 )
 
 // New connects to database and return database connection

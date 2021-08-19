@@ -7,7 +7,7 @@ URL shortener is an application which provide make short URL and store results i
 ### Running as http-server
 
 ```bash
-go get -u github.com/yandex-cloud/ydb-go-sdk/v2/example/url-shortener
+go get -u github.com/YandexDatabase/ydb-go-sdk/v2/example/url-shortener
 YDB_SERVICE_ACCOUNT_KEY_FILE_CREDENTIALS=/path/to/sa/key/file \
 url-shortener \
    -link=grpcs://ydb.serverless.yandexcloud.net:2135/?database=/ru-central1/b1g8skpblkos03malf3s/etn01f8gv9an9sedo9fu \

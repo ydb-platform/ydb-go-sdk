@@ -11,16 +11,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/stats"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/stats"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 )
 
 var (
@@ -460,7 +460,7 @@ func invoke(
 		// implementation will lag some time – no strict behavior is possible.
 		return nil
 	}
-	return proto.Unmarshal(resp.GetResult().Value, res)
+	return proto.Unmarshal(resp.GetResult().GetValue(), res)
 }
 
 func mapGRPCError(err error) error {
