@@ -1,8 +1,6 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"bytes"
 	"context"
 	"fmt"
@@ -10,7 +8,9 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/connect"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 type templateConfig struct {

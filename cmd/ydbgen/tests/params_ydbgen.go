@@ -5,8 +5,8 @@ package tests
 import (
 	"strconv"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 var (
@@ -44,4 +44,3 @@ func ydbConvI16ToU32(x int16) uint32 {
 	}
 	return uint32(x)
 }
-

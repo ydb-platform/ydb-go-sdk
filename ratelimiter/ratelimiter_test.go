@@ -3,15 +3,15 @@ package ratelimiter
 import (
 	"context"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"log"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/coordination"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/traceutil"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/coordination"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/traceutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 const (

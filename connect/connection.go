@@ -1,12 +1,13 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/scheme"
 	"context"
 	"fmt"
 	"path"
 	"strings"
+
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/scheme"
 )
 
 type Connection struct {
