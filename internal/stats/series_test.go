@@ -1,6 +1,9 @@
 package stats
 
 import (
+	"context"
+	"math/rand"
+	"sync"
 	"testing"
 	"time"
 )
@@ -59,10 +62,9 @@ func TestSeries(t *testing.T) {
 			}
 			for i := time.Duration(0); i <= max; i += test.step {
 				now := time.Unix(0, 0).Add(i)
-				s.Add(now, 1)
 				if exp, ok := test.exp[i]; ok {
 					t.Logf("%s", s)
-					sum, cnt := s.Get(now)
+					sum, cnt := s.Get(now.Add(-time.Nanosecond))
 					act := result{
 						sum: sum,
 						cnt: cnt,
@@ -74,6 +76,7 @@ func TestSeries(t *testing.T) {
 						)
 					}
 				}
+				s.Add(now, 1)
 			}
 		})
 	}
@@ -90,19 +93,19 @@ func TestSeriesRareEvents(t *testing.T) {
 		{
 			time:   time.Unix(0, 0),
 			x:      1,
-			expSum: 0,
-			expCnt: 0,
+			expSum: 1,
+			expCnt: 1,
 		},
 		{
 			time:   time.Unix(5, 0),
 			x:      2,
-			expSum: 1,
+			expSum: 2,
 			expCnt: 1,
 		},
 		{
 			time:   time.Unix(8, 0),
 			x:      3,
-			expSum: 2,
+			expSum: 3,
 			expCnt: 1,
 		},
 	} {
@@ -122,4 +125,32 @@ func TestSeriesRareEvents(t *testing.T) {
 			)
 		}
 	}
+}
+
+func TestSeriesAddConcurrent(t *testing.T) {
+	cuncurrency := 10
+	s := NewSeries(time.Minute, 12)
+	m := sync.Mutex{}
+	wg := sync.WaitGroup{}
+	wg.Add(cuncurrency)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	for i := 0; i < cuncurrency; i++ {
+		go func() {
+			defer wg.Done()
+			r := rand.New(rand.NewSource(time.Now().Unix()))
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					now := time.Now().Add(time.Duration(r.Int63n(int64(time.Minute))) - 30*time.Second)
+					m.Lock()
+					s.Add(now, r.Float64())
+					m.Unlock()
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }

@@ -1,3 +1,7 @@
+## 2.3.3
+* Fixed internal/stats/series.go (index out of range)
+* Optimized rotate buckets in the Series
+
 ## 2.3.2
 * Moved api/wrap.go to root for next replacement api package to external genproto
 
