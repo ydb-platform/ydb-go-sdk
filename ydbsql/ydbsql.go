@@ -4,9 +4,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"net/url"
-
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
 )
 
 func init() {

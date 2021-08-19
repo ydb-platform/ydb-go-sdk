@@ -4,7 +4,7 @@ import (
 	"google.golang.org/grpc"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/stats"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/stats"
 )
 
 type conn struct {
