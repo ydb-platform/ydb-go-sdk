@@ -61,9 +61,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 }
 
 func TestSessionPoolTakeBusy(t *testing.T) {
-	timer := timetest.StubSingleTimer(t)
-	defer timer.Cleanup()
-
+	timer := &time.Timer{}
 	keepalive := make(chan struct{}, 1)
 	p := &SessionPool{
 		SizeLimit:         1,
@@ -74,16 +72,13 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 			Limit: 1,
 			Handler: methodHandlers{
 				testutil.TableKeepAlive: func(req, res interface{}) error {
-					keepalive <- struct{}{}
 					r := testutil.TableKeepAliveResult{R: res}
 					r.SetSessionStatus(true)
+					timer = time.NewTimer(time.Second)
+					keepalive <- struct{}{}
 					return nil
 				},
 				testutil.TableDeleteSession: okHandler,
-				testutil.TableCreateSession: func(req, res interface{}) error {
-					timer.Created <- time.Second
-					return nil
-				},
 			},
 		},
 	}
@@ -93,14 +88,12 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 
 	s1 := mustCreateSession(t, p)
 
-	<-timer.Created
-
 	mustPutSession(t, p, s1)
 	mustTakeSession(t, p, s1)
 	mustPutBusySession(t, p, s1)
 
 	<-keepalive
-
+	<-timer.C
 	s2 := mustCreateSession(t, p)
 	if s2 != s1 {
 		t.Fatalf("ready session is not reused")
