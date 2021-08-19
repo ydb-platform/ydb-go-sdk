@@ -8,6 +8,8 @@ option java_outer_classname = "LogStoreProtos";
 import "kikimr/public/api/protos/ydb_operation.proto";
 import "kikimr/public/api/protos/ydb_value.proto";
 import "kikimr/public/api/protos/ydb_scheme.proto";
+import "kikimr/public/api/protos/ydb_table.proto";
+import "google/protobuf/empty.proto";
 
 message ColumnMeta {
     string name = 1;
@@ -24,13 +26,9 @@ message SchemaPreset {
     Schema schema = 2;
 }
 
-message TtlSettings {
-    // TODO: can we reuse Table TTL settings?
-}
-
 message TtlSettingsPreset {
     string name = 1;
-    TtlSettings ttl_settings = 2;
+    Ydb.Table.TtlSettings ttl_settings = 2;
 }
 
 message CreateLogStoreRequest {
@@ -39,7 +37,7 @@ message CreateLogStoreRequest {
     string path = 2;        // Full path
     uint32 column_shard_count = 3;
     repeated SchemaPreset schema_presets = 4;
-    repeated TtlSettingsPreset ttl_settings_presets = 5;
+    // repeated TtlSettingsPreset ttl_settings_presets = 5; // Unimplemented
 }
 
 message CreateLogStoreResponse {
@@ -57,7 +55,7 @@ message DescribeLogStoreResult {
 
     uint32 column_shard_count = 2;
     repeated SchemaPreset schema_presets = 3;
-    repeated TtlSettingsPreset ttl_settings_presets = 4;
+    // repeated TtlSettingsPreset ttl_settings_presets = 4; // Unimplemented
 }
 
 message DescribeLogStoreResponse {
@@ -84,8 +82,8 @@ message CreateLogTableRequest {
         Schema schema = 4;
     };
     oneof ttl_specification {
-        string ttl_settings_preset_name = 5;    // From LogStore
-        TtlSettings ttl_settings = 6;
+        Ydb.Table.TtlSettings ttl_settings = 5;
+        // string ttl_settings_preset_name = 6;    // Unimplemented for now
     };
 
     // Specifies the desired number of ColumnShards for this table
@@ -110,7 +108,7 @@ message DescribeLogTableResult {
     string schema_preset_name = 2;
     Schema schema = 3;
     string ttl_settings_preset_name = 4;
-    TtlSettings ttl_settings = 5;
+    Ydb.Table.TtlSettings ttl_settings = 5;
 
     // Specifies the desired number of ColumnShards for this table
     uint32 column_shard_count = 6;
@@ -130,5 +128,21 @@ message DropLogTableRequest {
 }
 
 message DropLogTableResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
+message AlterLogTableRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+
+    string path = 2;        // Full path
+
+    oneof ttl_action {
+        google.protobuf.Empty drop_ttl_settings = 3;
+        Ydb.Table.TtlSettings set_ttl_settings = 4;
+        // string set_ttl_preset_name = 5;    // Unimplemened for now
+    }
+}
+
+message AlterLogTableResponse {
     Ydb.Operations.Operation operation = 1;
 }
