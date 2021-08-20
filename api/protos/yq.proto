@@ -560,6 +560,11 @@ message ListBindingsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string page_token = 2 [(Ydb.length).le = 1024];
     int32 limit = 3 [(Ydb.value) = "[1; 100]"];
+
+    message Filter {
+        string connection_id = 2 [(Ydb.length).le = 1024];
+    }
+    Filter filter = 4;
 }
 
 message ListBindingsResponse {
