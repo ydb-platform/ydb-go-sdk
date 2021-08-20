@@ -78,6 +78,11 @@ type Driver interface {
 	Close() error
 }
 
+type Cluster interface {
+	Get(ctx context.Context) (grpcConn grpc.ClientConnInterface, err error)
+	Close() error
+}
+
 // BalancingMethod encodes balancing method for driver configuration.
 type BalancingMethod uint
 
@@ -215,6 +220,23 @@ type driver struct {
 
 func (d *driver) Close() error {
 	return d.cluster.Close()
+}
+
+func (d *driver) Get(ctx context.Context) (grpcConn grpc.ClientConnInterface, err error) {
+	conn, backoffUseBalancer := ContextConn(ctx)
+	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
+		driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
+		conn, err = d.cluster.Get(ctx)
+		addr := ""
+		if conn != nil {
+			addr = conn.addr.String()
+		}
+		driverTraceGetConnDone(ctx, addr, err)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return conn, nil
 }
 
 func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err error) {
@@ -489,6 +511,16 @@ type conn struct {
 	addr connAddr
 
 	runtime connRuntime
+}
+
+// Invoke performs a unary RPC and returns after the response is received into reply
+func (c *conn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	return c.conn.Invoke(ctx, method, args, reply, opts...)
+}
+
+// NewStream begins a streaming RPC
+func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return c.conn.NewStream(ctx, desc, method, opts...)
 }
 
 func newConn(cc *grpc.ClientConn, addr connAddr) *conn {

@@ -2,6 +2,8 @@ package coordination
 
 import (
 	"context"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Coordination_V1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Coordination"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
@@ -59,12 +61,16 @@ type Config struct {
 	RateLimiterCountersMode  RateLimiterCountersMode
 }
 
-type Client struct {
-	Driver ydb.Driver
+type client struct {
+	cluster ydb.Cluster
 }
 
-func (c *Client) CreateNode(ctx context.Context, path string, config Config) (err error) {
-	req := Ydb_Coordination.CreateNodeRequest{
+func NewClient(cluster ydb.Cluster) *client {
+	return &client{cluster: cluster}
+}
+
+func (c *client) CreateNode(ctx context.Context, path string, config Config) (err error) {
+	request := Ydb_Coordination.CreateNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
 			Path:                     config.Path,
@@ -75,14 +81,14 @@ func (c *Client) CreateNode(ctx context.Context, path string, config Config) (er
 			RateLimiterCountersMode:  config.RateLimiterCountersMode.to(),
 		},
 	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.Coordination.V1.CoordinationService/CreateNode", &req, nil,
-	))
-	return
+	conn, err := c.cluster.Get(ctx)
+	if err != nil { return err }
+	_, err = Ydb_Coordination_V1.NewCoordinationServiceClient(conn).CreateNode(ctx, &request)
+	return err
 }
 
-func (c *Client) AlterNode(ctx context.Context, path string, config Config) (err error) {
-	req := Ydb_Coordination.AlterNodeRequest{
+func (c *client) AlterNode(ctx context.Context, path string, config Config) (err error) {
+	request := Ydb_Coordination.AlterNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
 			Path:                     config.Path,
@@ -93,41 +99,50 @@ func (c *Client) AlterNode(ctx context.Context, path string, config Config) (err
 			RateLimiterCountersMode:  config.RateLimiterCountersMode.to(),
 		},
 	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.Coordination.V1.CoordinationService/AlterNode", &req, nil,
-	))
-	return
+	conn, err := c.cluster.Get(ctx)
+	if err != nil { return err }
+	_, err = Ydb_Coordination_V1.NewCoordinationServiceClient(conn).AlterNode(ctx, &request)
+	return err
 }
 
-func (c *Client) DropNode(ctx context.Context, path string) (err error) {
-	req := Ydb_Coordination.DropNodeRequest{
+func (c *client) DropNode(ctx context.Context, path string) (err error) {
+	request := Ydb_Coordination.DropNodeRequest{
 		Path: path,
 	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.Coordination.V1.CoordinationService/DropNode", &req, nil,
-	))
-	return
+	conn, err := c.cluster.Get(ctx)
+	if err != nil { return err }
+	_, err = Ydb_Coordination_V1.NewCoordinationServiceClient(conn).DropNode(ctx, &request)
+	return err
 }
 
 // Describes a coordination node
-func (c *Client) DescribeNode(ctx context.Context, path string) (*scheme.Entry, *Config, error) {
-	var res Ydb_Coordination.DescribeNodeResult
-	req := Ydb_Coordination.DescribeNodeRequest{
+func (c *client) DescribeNode(ctx context.Context, path string) (*scheme.Entry, *Config, error) {
+	var describeNodeResult Ydb_Coordination.DescribeNodeResult
+	request := Ydb_Coordination.DescribeNodeRequest{
 		Path: path,
 	}
-	_, err := c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.Coordination.V1.CoordinationService/DescribeNode", &req, &res,
-	))
+	conn, err := c.cluster.Get(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	return scheme.InnerConvertEntry(res.Self), &Config{
-		Path:                     res.Config.Path,
-		SelfCheckPeriodMillis:    res.Config.SelfCheckPeriodMillis,
-		SessionGracePeriodMillis: res.Config.SessionGracePeriodMillis,
-		ReadConsistencyMode:      consistencyMode(res.Config.ReadConsistencyMode),
-		AttachConsistencyMode:    consistencyMode(res.Config.AttachConsistencyMode),
-		RateLimiterCountersMode:  rateLimiterCountersMode(res.Config.RateLimiterCountersMode),
+	response, err := Ydb_Coordination_V1.NewCoordinationServiceClient(conn).DescribeNode(ctx, &request)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &describeNodeResult)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	return scheme.InnerConvertEntry(describeNodeResult.GetSelf()), &Config{
+		Path:                     describeNodeResult.GetConfig().GetPath(),
+		SelfCheckPeriodMillis:    describeNodeResult.GetConfig().GetSelfCheckPeriodMillis(),
+		SessionGracePeriodMillis: describeNodeResult.GetConfig().GetSessionGracePeriodMillis(),
+		ReadConsistencyMode:      consistencyMode(describeNodeResult.GetConfig().GetReadConsistencyMode()),
+		AttachConsistencyMode:    consistencyMode(describeNodeResult.GetConfig().GetAttachConsistencyMode()),
+		RateLimiterCountersMode:  rateLimiterCountersMode(describeNodeResult.GetConfig().GetRateLimiterCountersMode()),
 	}, nil
 
 }
