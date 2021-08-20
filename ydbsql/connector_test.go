@@ -71,6 +71,7 @@ func TestConnectorRedialOnError(t *testing.T) {
 					return nil, errors.New("any error")
 				}
 			},
+			DriverConfig: &ydb.DriverConfig{},
 		}),
 		WithDefaultTxControl(table.TxControl(
 			table.BeginTx(
