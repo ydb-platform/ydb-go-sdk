@@ -1,4 +1,6 @@
 # Breaking changes for the next major release
+- [ ] Delete deprecated api package
+- [ ] Delete deprecated internalapi package
 - [ ] Delete deprecated parameter KeepAliveBatchSize from session pool
 - [ ] Delete deprecated client option DefaultMaxQueryCacheSize, MaxQueryCacheSize and client query cache
 - [ ] Change `proto` codegen from `internal/cmd/protoc-gen` to standard `protoc-gen-go`. This need for change
