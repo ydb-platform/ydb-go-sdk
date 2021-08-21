@@ -4,7 +4,7 @@ import (
 	"context"
 	"path"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 

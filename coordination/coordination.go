@@ -6,7 +6,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Coordination"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/scheme"
 )
 
@@ -82,7 +82,9 @@ func (c *client) CreateNode(ctx context.Context, path string, config Config) (er
 		},
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = Ydb_Coordination_V1.NewCoordinationServiceClient(conn).CreateNode(ctx, &request)
 	return err
 }
@@ -100,7 +102,9 @@ func (c *client) AlterNode(ctx context.Context, path string, config Config) (err
 		},
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = Ydb_Coordination_V1.NewCoordinationServiceClient(conn).AlterNode(ctx, &request)
 	return err
 }
@@ -110,7 +114,9 @@ func (c *client) DropNode(ctx context.Context, path string) (err error) {
 		Path: path,
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = Ydb_Coordination_V1.NewCoordinationServiceClient(conn).DropNode(ctx, &request)
 	return err
 }

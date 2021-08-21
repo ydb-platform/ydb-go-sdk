@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 	"sync"
 	"time"
 

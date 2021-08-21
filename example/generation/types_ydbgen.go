@@ -5,7 +5,7 @@ package main
 import (
 	"strconv"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
@@ -429,4 +429,3 @@ func ydbConvU64ToU8(x uint64) uint8 {
 	}
 	return uint8(x)
 }
-

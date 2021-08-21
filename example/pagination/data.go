@@ -1,6 +1,6 @@
 package main
 
-import "github.com/YandexDatabase/ydb-go-sdk/v2"
+import ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 
 func schoolData(city string, num uint32, addr string) ydb.Value {
 	return ydb.StructValue(

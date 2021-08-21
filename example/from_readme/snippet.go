@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/connect"
 
 	"github.com/YandexDatabase/ydb-go-sdk/v2/example/internal/cli"

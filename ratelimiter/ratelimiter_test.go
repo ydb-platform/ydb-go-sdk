@@ -3,7 +3,7 @@ package ratelimiter
 import (
 	"context"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 	"log"
 	"os"
 	"testing"

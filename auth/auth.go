@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/auth/iam"
 	"os"
 )

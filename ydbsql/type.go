@@ -3,7 +3,7 @@ package ydbsql
 import (
 	"database/sql"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 	"time"
 
 	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"

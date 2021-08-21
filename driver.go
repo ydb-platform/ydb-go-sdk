@@ -223,7 +223,32 @@ func (d *driver) Close() error {
 }
 
 func (d *driver) Get(ctx context.Context) (grpcConn grpc.ClientConnInterface, err error) {
-	conn, backoffUseBalancer := ContextConn(ctx)
+	// Remember raw context to pass it for the tracing functions.
+	rawCtx := ctx
+
+	if t := d.requestTimeout; t > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, t)
+		defer cancel()
+	}
+	if t := d.operationTimeout; t > 0 {
+		ctx = WithOperationTimeout(ctx, t)
+	}
+	if t := d.operationCancelAfter; t > 0 {
+		ctx = WithOperationCancelAfter(ctx, t)
+	}
+
+	// Get credentials (token actually) for the request.
+	var md metadata.MD
+	md, err = d.meta.md(ctx)
+	if err != nil {
+		return
+	}
+	if len(md) > 0 {
+		ctx = metadata.NewOutgoingContext(ctx, md)
+	}
+
+	conn, backoffUseBalancer := ContextConn(rawCtx)
 	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
 		driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
 		conn, err = d.cluster.Get(ctx)
@@ -231,9 +256,9 @@ func (d *driver) Get(ctx context.Context) (grpcConn grpc.ClientConnInterface, er
 		if conn != nil {
 			addr = conn.addr.String()
 		}
-		driverTraceGetConnDone(ctx, addr, err)
+		driverTraceGetConnDone(rawCtx, addr, err)
 		if err != nil {
-			return nil, err
+			return
 		}
 	}
 	return conn, nil
@@ -507,15 +532,42 @@ func (c connAddr) String() string {
 }
 
 type conn struct {
-	conn *grpc.ClientConn
-	addr connAddr
-
+	addr    connAddr
+	conn    *grpc.ClientConn
 	runtime connRuntime
+
+	pessimize func() error
 }
 
 // Invoke performs a unary RPC and returns after the response is received into reply
-func (c *conn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-	return c.conn.Invoke(ctx, method, args, reply, opts...)
+func (c *conn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) (err error) {
+	operationResponse := reply.(*Ydb_Operations.GetOperationResponse)
+	params := operationParams(ctx)
+	if !params.Empty() {
+		setOperationParams(args, params)
+	}
+	trace := ContextDriverTrace(ctx)
+	start := timeutil.Now()
+	c.runtime.operationStart(start)
+	done := driverTraceOnOperation(ctx, trace, ctx, c.addr.String(), Method(method), params)
+	err = c.conn.Invoke(ctx, method, args, reply, opts...)
+	c.runtime.operationDone(
+		start, timeutil.Now(),
+		errIf(isTimeoutError(err), err),
+	)
+	done(ctx, c.addr.String(), Method(method), params, operationResponse.GetOperation().GetId(), operationResponse.GetOperation().GetIssues(), err)
+	if err != nil {
+		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
+			// remove node from discovery cache on any transport error
+			driverTraceOnPessimization(
+				ctx, trace, ctx, c.addr.String(), err,
+			)(
+				ctx, c.addr.String(), c.pessimize(),
+			)
+		}
+	}
+
+	return
 }
 
 // NewStream begins a streaming RPC

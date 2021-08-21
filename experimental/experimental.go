@@ -3,7 +3,7 @@ package experimental
 import (
 	"bytes"
 	"context"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Experimental"

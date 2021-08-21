@@ -5,7 +5,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/YandexDatabase/ydb-go-genproto/Ydb_RateLimiter_V1"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_RateLimiter"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 )
 
 type HierarchicalDrrSettings struct {
@@ -42,7 +43,9 @@ func (c *client) CreateResource(ctx context.Context, coordinationNodePath string
 		},
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = Ydb_RateLimiter_V1.NewRateLimiterServiceClient(conn).CreateResource(ctx, &request)
 	return err
 }
@@ -61,7 +64,9 @@ func (c *client) AlterResource(ctx context.Context, coordinationNodePath string,
 		},
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = Ydb_RateLimiter_V1.NewRateLimiterServiceClient(conn).AlterResource(ctx, &request)
 	return err
 }
@@ -73,7 +78,9 @@ func (c *client) DropResource(ctx context.Context, coordinationNodePath string, 
 		ResourcePath:         resourcePath,
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = Ydb_RateLimiter_V1.NewRateLimiterServiceClient(conn).DropResource(ctx, &request)
 	return err
 }
@@ -85,11 +92,17 @@ func (c *client) ListResource(ctx context.Context, coordinationNodePath string, 
 		ResourcePath:         resourcePath,
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	response, err := Ydb_RateLimiter_V1.NewRateLimiterServiceClient(conn).ListResources(ctx, &request)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &resourceList)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return resourceList.GetResourcePaths(), nil
 }
 
@@ -100,11 +113,17 @@ func (c *client) DescribeResource(ctx context.Context, coordinationNodePath stri
 		ResourcePath:         resourcePath,
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	response, err := Ydb_RateLimiter_V1.NewRateLimiterServiceClient(conn).DescribeResource(ctx, &request)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &resourceResult)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	result := &Resource{
 		ResourcePath: resourceResult.Resource.ResourcePath,
 	}
@@ -135,7 +154,9 @@ func (c *client) AcquireResource(ctx context.Context, coordinationNodePath strin
 		}
 	}
 	conn, err := c.cluster.Get(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = Ydb_RateLimiter_V1.NewRateLimiterServiceClient(conn).AcquireResource(ctx, &request)
 	return err
 }
