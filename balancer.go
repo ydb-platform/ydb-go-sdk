@@ -3,7 +3,19 @@ package ydb
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
+)
+
+// BalancingMethod encodes balancing method for driver configuration.
+type BalancingMethod uint
+
+const (
+	BalancingUnknown BalancingMethod = iota
+	BalancingRoundRobin
+	BalancingP2C
+	BalancingRandomChoice
 )
 
 var (
@@ -44,6 +56,29 @@ type balancer interface {
 
 	// Contains returns true if balancer contains requested element.
 	Contains(balancerElement) bool
+}
+
+var balancers = map[BalancingMethod]func(interface{}) balancer{
+	BalancingRoundRobin: func(_ interface{}) balancer {
+		return new(roundRobin)
+	},
+	BalancingP2C: func(c interface{}) balancer {
+		if c == nil {
+			return new(p2c)
+		}
+		config := c.(*P2CConfig)
+		return &p2c{
+			Criterion: connRuntimeCriterion{
+				PreferLocal:     config.PreferLocal,
+				OpTimeThreshold: config.OpTimeThreshold,
+			},
+		}
+	},
+	BalancingRandomChoice: func(_ interface{}) balancer {
+		return &randomChoice{
+			r: rand.New(rand.NewSource(time.Now().UnixNano())),
+		}
+	},
 }
 
 type multiHandle struct {

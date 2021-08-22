@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -186,7 +187,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 			e   Endpoint
 			err error
 		)
-		e.Addr, e.Port, err = splitHostPort(addr)
+		e.Addr, e.Port, err = d.splitHostPort(addr)
 		if err != nil {
 			return nil, err
 		}
@@ -236,7 +237,7 @@ func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn
 }
 
 func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
-	host, port, err := splitHostPort(addr)
+	host, port, err := d.splitHostPort(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -302,4 +303,27 @@ func (d *dialer) newBalancer() balancer {
 
 func (d *dialer) useTLS() bool {
 	return d.tlsConfig != nil
+}
+
+func (d *dialer) splitHostPort(addr string) (host string, port int, err error) {
+	var prt string
+	host, prt, err = net.SplitHostPort(addr)
+	if err != nil {
+		return
+	}
+	port, err = strconv.Atoi(prt)
+	return
+}
+
+// withContextDialer is an adapter to allow the use of normal go-world net dial
+// function as WithDialer option argument for grpc Dial().
+func withContextDialer(f func(context.Context, string) (net.Conn, error)) func(string, time.Duration) (net.Conn, error) {
+	if f == nil {
+		return nil
+	}
+	return func(addr string, timeout time.Duration) (net.Conn, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		return f(ctx, addr)
+	}
 }

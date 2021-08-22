@@ -57,16 +57,6 @@ func (t *TransportError) Unwrap() error {
 	return t.err
 }
 
-// IsTransportError reports whether err is TransportError with given code as
-// the Reason.
-func IsTransportError(err error, code TransportErrorCode) bool {
-	var t *TransportError
-	if !errors.As(err, &t) {
-		return false
-	}
-	return t.Reason == code
-}
-
 // OpError reports about operation fail.
 type OpError struct {
 	Reason StatusCode
@@ -90,15 +80,6 @@ func (e *OpError) Error() string {
 		dumpIssues(&buf, e.issues)
 	}
 	return buf.String()
-}
-
-// IsOpError reports whether err is OpError with given code as the Reason.
-func IsOpError(err error, code StatusCode) bool {
-	var op *OpError
-	if !errors.As(err, &op) {
-		return false
-	}
-	return op.Reason == code
 }
 
 func iterateIssues(issues []*Ydb_Issue.IssueMessage, it func(Issue)) {
