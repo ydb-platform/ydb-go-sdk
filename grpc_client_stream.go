@@ -2,12 +2,12 @@ package ydb
 
 import (
 	"context"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 )
 
@@ -54,7 +54,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	if err != nil {
 		err = mapGRPCError(err)
 	} else {
-		operationResponse := m.(*Ydb_Operations.GetOperationResponse)
+		operationResponse := m.(internal.OpResponse)
 		if operationResponse != nil {
 			driverTraceStreamRecvDone(s.ctx, s.c.conn.addr.String(), s.method, operationResponse.GetOperation().GetIssues(), hideEOF(err))
 		} else {

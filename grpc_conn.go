@@ -2,11 +2,11 @@ package ydb
 
 import (
 	"context"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 )
 
@@ -41,9 +41,9 @@ func (c *grpcConn) Invoke(ctx context.Context, method string, request interface{
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	operationResponse := response.(*Ydb_Operations.GetOperationResponse)
+	operationResponse, ok := response.(internal.OpResponse)
 	params := operationParams(ctx)
-	if !params.Empty() {
+	if ok && !params.Empty() {
 		setOperationParams(request, params)
 	}
 

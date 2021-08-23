@@ -104,6 +104,15 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 			_ = cluster.Close()
 		}
 	}()
+	driver := &driver{
+		cluster:              &cluster,
+		meta:                 d.meta,
+		trace:                d.config.Trace,
+		requestTimeout:       d.config.RequestTimeout,
+		streamTimeout:        d.config.StreamTimeout,
+		operationTimeout:     d.config.OperationTimeout,
+		operationCancelAfter: d.config.OperationCancelAfter,
+	}
 	if d.config.DiscoveryInterval > 0 {
 		if d.config.PreferLocalEndpoints {
 			cluster.balancer = newMultiBalancer(
@@ -139,9 +148,14 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		} else {
 			wg.Wait()
 		}
+		discoveryClient := &discoveryClient{
+			cluster:  driver,
+			database: d.config.Database,
+			ssl:      d.useTLS(),
+		}
 		cluster.explorer = NewRepeater(d.config.DiscoveryInterval, 0,
 			func(ctx context.Context) {
-				next, err := d.discover(ctx, addr)
+				next, err := discoveryClient.Discover(ctx)
 				if err != nil {
 					return
 				}
@@ -201,15 +215,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 			return nil, err
 		}
 	}
-	return &driver{
-		cluster:              &cluster,
-		meta:                 d.meta,
-		trace:                d.config.Trace,
-		requestTimeout:       d.config.RequestTimeout,
-		streamTimeout:        d.config.StreamTimeout,
-		operationTimeout:     d.config.OperationTimeout,
-		operationCancelAfter: d.config.OperationCancelAfter,
-	}, nil
+	return driver, nil
 }
 
 func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn, error) {
@@ -259,17 +265,26 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 		_ = conn.conn.Close()
 	}()
 
-	subctx := ctx
+	var cancel context.CancelFunc
 	if d.timeout > 0 {
-		var cancel context.CancelFunc
-		subctx, cancel = context.WithTimeout(ctx, d.timeout)
-		defer cancel()
+		ctx, cancel = context.WithTimeout(ctx, d.timeout)
 	}
+	defer func() {
+		if cancel != nil {
+			cancel()
+		}
+	}()
 
-	return (&discoveryClient{
-		conn: conn,
-		meta: d.meta,
-	}).Discover(subctx, d.config.Database, d.useTLS())
+	return discover(
+		ctx,
+		d.config.Database,
+		d.useTLS(), &grpcConn{
+			conn: conn,
+			d: &driver{
+				meta: d.meta,
+			},
+		},
+	)
 }
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
