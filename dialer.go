@@ -54,7 +54,7 @@ type Dialer struct {
 }
 
 // Dial dials given addr and initializes driver instance on success.
-func (d *Dialer) Dial(ctx context.Context, addr string) (_ Driver, err error) {
+func (d *Dialer) Dial(ctx context.Context, addr string) (_ *driver, err error) {
 	config := d.DriverConfig.withDefaults()
 	grpcKeepalive := d.Keepalive
 	if grpcKeepalive == 0 {
@@ -94,7 +94,7 @@ type dialer struct {
 	meta      *meta
 }
 
-func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
+func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 	cluster := cluster{
 		dial:  d.dialHostPort,
 		trace: d.config.Trace,
