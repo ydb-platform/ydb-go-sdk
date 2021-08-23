@@ -90,12 +90,6 @@ func WithSessionPoolBusyCheckInterval(d time.Duration) ConnectorOption {
 	}
 }
 
-func WithSessionPoolKeepAliveBatchSize(n int) ConnectorOption {
-	return func(c *connector) {
-		c.pool.KeepAliveBatchSize = n
-	}
-}
-
 func WithSessionPoolKeepAliveTimeout(d time.Duration) ConnectorOption {
 	return func(c *connector) {
 		c.pool.KeepAliveTimeout = d

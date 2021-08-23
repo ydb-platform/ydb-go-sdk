@@ -96,14 +96,6 @@ type SessionPool struct {
 	// DefaultSessionPoolBusyCheckInterval value is used.
 	BusyCheckInterval time.Duration
 
-	// Deprecated: unnecessary parameter
-	// it will be removed at next major release
-	// KeepAliveBatchSize is a maximum number sessions taken from the pool to
-	// prepare KeepAlive() call on them in background.
-	// If KeepAliveBatchSize is less than or equal to zero, then there is no
-	// batch limit.
-	KeepAliveBatchSize int
-
 	// KeepAliveTimeout limits maximum time spent on KeepAlive request
 	// If KeepAliveTimeout is less than or equal to zero then the
 	// DefaultSessionPoolKeepAliveTimeout is used.

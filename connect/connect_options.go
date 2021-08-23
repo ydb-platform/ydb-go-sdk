@@ -118,13 +118,6 @@ func WithSessionPoolBusyCheckInterval(busyCheckInterval time.Duration) ConnectOp
 	}
 }
 
-func WithSessionPoolKeepAliveBatchSize(keepAliveBatchSize int) ConnectOption {
-	return func(c *Connection) error {
-		c.table.sessionPool.KeepAliveBatchSize = keepAliveBatchSize
-		return nil
-	}
-}
-
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) ConnectOption {
 	return func(c *Connection) error {
 		c.table.sessionPool.KeepAliveTimeout = keepAliveTimeout

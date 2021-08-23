@@ -898,8 +898,7 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 	s2 := mustGetSession(t, p)
 
 	// Put both session at the absolutely same time.
-	// That is, both sessions must be keepalived by a single tick (due to
-	// KeepAliveBatchSize is unlimited).
+	// That is, both sessions must be keepalived by a single tick.
 	mustPutSession(t, p, s1)
 	mustPutSession(t, p, s2)
 
