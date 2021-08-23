@@ -11,25 +11,12 @@ import (
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/cache/lru"
 )
-
-// Deprecated: use server-side query cache with keep-in-memory flag control instead
-var DefaultMaxQueryCacheSize = 1000
 
 // Client contains logic of creation of ydb table sessions.
 type Client struct {
 	Driver ydb.Driver
 	Trace  ClientTrace
-
-	// Deprecated: use server-side query cache with keep-in-memory flag control instead
-	// MaxQueryCacheSize limits maximum number of queries which able to live in
-	// cache. Note that cache is not shared across sessions.
-	//
-	// If MaxQueryCacheSize equal to zero, then the DefaultMaxQueryCacheSize is used.
-	//
-	// If MaxQueryCacheSize is less than zero, then client not used query cache.
-	MaxQueryCacheSize int
 }
 
 // CreateSession creates new session instance.
@@ -67,16 +54,8 @@ func (t *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		ID:           res.SessionId,
 		endpointInfo: endpointInfo,
 		c:            *t,
-		qcache:       lru.New(t.cacheSize()),
 	}
 	return
-}
-
-func (t *Client) cacheSize() int {
-	if t.MaxQueryCacheSize == 0 {
-		return DefaultMaxQueryCacheSize
-	}
-	return t.MaxQueryCacheSize
 }
 
 // Session represents a single table API session.
@@ -91,9 +70,6 @@ type Session struct {
 	endpointInfo ydb.EndpointInfo
 
 	c Client
-
-	qcache lru.Cache
-	qhash  queryHasher
 
 	closeMux sync.Mutex
 	closed   bool
@@ -423,7 +399,6 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 type Statement struct {
 	session *Session
 	query   *DataQuery
-	qhash   queryHash
 	params  map[string]*Ydb.Type
 }
 
@@ -451,9 +426,6 @@ func (s *Statement) execute(
 	txr *Transaction, r *Result, err error,
 ) {
 	_, res, err := s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
-	if ydb.IsOpError(err, ydb.StatusNotFound) {
-		s.session.qcache.Remove(s.qhash)
-	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -483,13 +455,6 @@ func (s *Session) Prepare(
 		clientTracePrepareDataQueryDone(ctx, s, query, q, cached, err)
 	}()
 
-	cacheKey := s.qhash.hash(query)
-	stmt, cached = s.getQueryFromCache(cacheKey)
-	if cached {
-		q = stmt.query
-		return stmt, nil
-	}
-
 	var res Ydb_Table.PrepareQueryResult
 	req := Ydb_Table.PrepareDataQueryRequest{
 		SessionId: s.ID,
@@ -518,24 +483,10 @@ func (s *Session) Prepare(
 	stmt = &Statement{
 		session: s,
 		query:   q,
-		qhash:   cacheKey,
 		params:  res.ParametersTypes,
 	}
-	s.addQueryToCache(cacheKey, stmt)
 
 	return stmt, nil
-}
-
-func (s *Session) getQueryFromCache(key queryHash) (*Statement, bool) {
-	v, cached := s.qcache.Get(key)
-	if cached {
-		return v.(*Statement), true
-	}
-	return nil, false
-}
-
-func (s *Session) addQueryToCache(key queryHash, stmt *Statement) {
-	s.qcache.Add(key, stmt)
 }
 
 // Execute executes given data query represented by text.
@@ -551,19 +502,11 @@ func (s *Session) Execute(
 	q := new(DataQuery)
 	q.initFromText(query)
 
-	var cached bool
 	clientTraceExecuteDataQueryDone := clientTraceOnExecuteDataQuery(ctx, s.c.Trace, ctx, s, tx.id(), q, params)
 	defer func() {
 		clientTraceExecuteDataQueryDone(ctx, s, GetTransactionID(txr), q, params, true, r, err)
 	}()
 
-	cacheKey := s.qhash.hash(query)
-	stmt, cached := s.getQueryFromCache(cacheKey)
-	if cached {
-		// Supplement q with ID for tracing.
-		q.initPreparedText(query, stmt.query.ID())
-		return stmt.execute(ctx, tx, params, opts...)
-	}
 	req, res, err := s.executeDataQuery(ctx, tx, q, params, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -576,13 +519,6 @@ func (s *Session) Execute(
 		// string within statement.
 		subq := new(DataQuery)
 		subq.initPrepared(queryID)
-		stmt = &Statement{
-			session: s,
-			query:   subq,
-			qhash:   cacheKey,
-			params:  res.QueryMeta.ParametersTypes,
-		}
-		s.addQueryToCache(cacheKey, stmt)
 	}
 
 	return s.executeQueryResult(res)
