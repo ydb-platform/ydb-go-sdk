@@ -5,7 +5,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+type ClientConnInterface interface {
+	grpc.ClientConnInterface
+
+	Address() string
+}
+
 type Cluster interface {
-	Get(ctx context.Context) (grpcConn grpc.ClientConnInterface, err error)
+	Get(ctx context.Context) (conn ClientConnInterface, err error)
 	Close() error
 }

@@ -19,8 +19,7 @@ func newTableWrapper(ctx context.Context) *tableWrapper {
 		ctx:    ctx,
 		client: tableClient,
 		sessionPool: &table.SessionPool{
-			Builder: tableClient,
-			Trace:   table.ContextSessionPoolTrace(ctx),
+			Trace: table.ContextSessionPoolTrace(ctx),
 		},
 	}
 }

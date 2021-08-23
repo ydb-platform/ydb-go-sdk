@@ -72,7 +72,7 @@ func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err err
 		conn: conn,
 	}
 
-	if conn.conn == nil {
+	if conn.raw == nil {
 		return info, ErrNilConnection
 	}
 
@@ -90,7 +90,7 @@ func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err err
 	conn.runtime.operationStart(start)
 	driverTraceOperationDone := driverTraceOnOperation(ctx, d.trace, ctx, conn.addr.String(), Method(method), params)
 
-	err = invoke(ctx, conn.conn, resp, method, req, res)
+	err = invoke(ctx, conn.raw, resp, method, req, res)
 
 	conn.runtime.operationDone(
 		start, timeutil.Now(),
@@ -166,7 +166,7 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallI
 		}
 	}()
 
-	s, err := grpc.NewClientStream(ctx, &desc, conn.conn, method,
+	s, err := grpc.NewClientStream(ctx, &desc, conn.raw, method,
 		grpc.MaxCallRecvMsgSize(50*1024*1024), // 50MB
 	)
 	if err != nil {

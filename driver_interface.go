@@ -1,6 +1,8 @@
 package ydb
 
-import "context"
+import (
+	"context"
+)
 
 // Driver is an interface of YDB driver.
 type Driver interface {

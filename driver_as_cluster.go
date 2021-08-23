@@ -2,11 +2,10 @@ package ydb
 
 import (
 	"context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
-func (d *driver) Get(ctx context.Context) (_ grpc.ClientConnInterface, err error) {
+func (d *driver) Get(ctx context.Context) (_ ClientConnInterface, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 

@@ -138,7 +138,7 @@ func (c *cluster) Close() (err error) {
 		if c == nil {
 			continue
 		}
-		if cc := c.conn; cc != nil {
+		if cc := c.raw; cc != nil {
 			_ = cc.Close()
 		}
 	}
@@ -223,14 +223,14 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 }
 
 func isReady(conn *conn) bool {
-	return conn != nil && conn.conn != nil && conn.conn.GetState() == connectivity.Ready
+	return conn != nil && conn.raw != nil && conn.raw.GetState() == connectivity.Ready
 }
 
 func isBroken(conn *conn) bool {
-	if conn == nil || conn.conn == nil {
+	if conn == nil || conn.raw == nil {
 		return true
 	}
-	state := conn.conn.GetState()
+	state := conn.raw.GetState()
 
 	return state == connectivity.Shutdown || state == connectivity.TransientFailure
 }
@@ -253,7 +253,7 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...WG) {
 		conn = newConn(nil, addr)
 		err = nil
 	}
-	cc := conn.conn
+	cc := conn.raw
 	var wait chan struct{}
 	defer func() {
 		if err != nil && cc != nil {
@@ -293,7 +293,7 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...WG) {
 
 // Update updates existing connection's runtime stats such that load factor and
 // others.
-func (c *cluster) Update(ctx context.Context, ep Endpoint, wg ...WG) {
+func (c *cluster) Update(_ context.Context, ep Endpoint, wg ...WG) {
 	if len(wg) > 0 {
 		defer wg[0].Done()
 	}
@@ -358,7 +358,7 @@ func (c *cluster) Remove(_ context.Context, e Endpoint, wg ...WG) {
 	if entry.conn != nil {
 		// entry.conn may be nil when connection is being tracked after
 		// unsuccessful dial().
-		_ = entry.conn.conn.Close()
+		_ = entry.conn.raw.Close()
 	}
 }
 
@@ -477,17 +477,17 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 			ctx, cancel := context.WithTimeout(c.trackerCtx, time.Second)
 			for _, el := range queue {
 				conn := el.Value.(*conn)
-				if conn.conn != nil && (isBroken(conn) || conn.runtime.offlineCount%ConnResetOfflineRate == 0) {
-					co := conn.conn
-					conn.conn = nil
+				if conn.raw != nil && (isBroken(conn) || conn.runtime.offlineCount%ConnResetOfflineRate == 0) {
+					co := conn.raw
+					conn.raw = nil
 					go func() { _ = co.Close() }()
 				}
 
 				addr := conn.addr
-				if conn.conn == nil {
+				if conn.raw == nil {
 					x, err := c.dial(ctx, addr.addr, addr.port)
 					if err == nil {
-						conn.conn = x.conn
+						conn.raw = x.raw
 					}
 				}
 				if !isReady(conn) {
@@ -523,7 +523,7 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 				}
 				c.mu.Unlock()
 				if !actual {
-					_ = conn.conn.Close()
+					_ = conn.raw.Close()
 				}
 				if wait != nil {
 					close(wait)
@@ -538,8 +538,8 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 			queue = fetchQueue(queue[:0])
 			for _, el := range queue {
 				conn := el.Value.(*conn)
-				if conn.conn != nil {
-					_ = conn.conn.Close()
+				if conn.raw != nil {
+					_ = conn.raw.Close()
 				}
 			}
 			return
@@ -651,15 +651,15 @@ func (cs *connList) Insert(conn *conn, info connInfo) *connListElement {
 }
 
 func (cs *connList) Remove(x *connListElement) {
-	list := *cs
+	l := *cs
 	var (
-		n    = len(list)
-		last = list[n-1]
+		n    = len(l)
+		last = l[n-1]
 	)
 	last.index = x.index
-	list[x.index], list[n-1] = list[n-1], nil
-	list = list[:n-1]
-	*cs = list
+	l[x.index], l[n-1] = l[n-1], nil
+	l = l[:n-1]
+	*cs = l
 }
 
 func (cs *connList) Contains(x *connListElement) bool {

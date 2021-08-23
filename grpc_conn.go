@@ -2,6 +2,8 @@ package ydb
 
 import (
 	"context"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Issue"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 
 	"google.golang.org/grpc"
@@ -15,15 +17,27 @@ type grpcConn struct {
 	d    *driver
 }
 
+func (c *grpcConn) Address() string {
+	return c.conn.addr.String()
+}
+
 func (c *grpcConn) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 
+	var (
+		cancel context.CancelFunc
+		opId   string
+		issues []*Ydb_Issue.IssueMessage
+	)
 	if t := c.d.requestTimeout; t > 0 {
-		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t)
-		defer cancel()
 	}
+	defer func() {
+		if cancel != nil {
+			cancel()
+		}
+	}()
 	if t := c.d.operationTimeout; t > 0 {
 		ctx = WithOperationTimeout(ctx, t)
 	}
@@ -41,29 +55,45 @@ func (c *grpcConn) Invoke(ctx context.Context, method string, request interface{
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	operationResponse, ok := response.(internal.OpResponse)
 	params := operationParams(ctx)
-	if ok && !params.Empty() {
+	if !params.Empty() {
 		setOperationParams(request, params)
 	}
 
 	start := timeutil.Now()
 	c.conn.runtime.operationStart(start)
 	driverTraceOperationDone := driverTraceOnOperation(ctx, c.d.trace, ctx, c.conn.addr.String(), Method(method), params)
+	defer func() {
+		driverTraceOperationDone(rawCtx, c.conn.addr.String(), Method(method), params, opId, issues, err)
+		c.conn.runtime.operationDone(
+			start, timeutil.Now(),
+			errIf(isTimeoutError(err), err),
+		)
+	}()
 
-	err = c.conn.conn.Invoke(ctx, method, request, response, opts...)
-
-	c.conn.runtime.operationDone(
-		start, timeutil.Now(),
-		errIf(isTimeoutError(err), err),
-	)
-	driverTraceOperationDone(rawCtx, c.conn.addr.String(), Method(method), params, operationResponse.GetOperation().GetId(), operationResponse.GetOperation().GetIssues(), err)
+	err = c.conn.raw.Invoke(ctx, method, request, response, opts...)
 
 	if err != nil {
+		err = mapGRPCError(err)
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
 			driverTracePessimizationDone := driverTraceOnPessimization(ctx, c.d.trace, ctx, c.conn.addr.String(), err)
-			driverTracePessimizationDone(rawCtx, c.conn.addr.String(), c.d.cluster.Pessimize(c.conn.addr))
+			driverTracePessimizationDone(ctx, c.conn.addr.String(), c.d.cluster.Pessimize(c.conn.addr))
+		}
+		return
+	}
+	if operation, ok := response.(internal.OpResponse); ok {
+		opId = operation.GetOperation().GetId()
+		issues = operation.GetOperation().GetIssues()
+		switch {
+		case !operation.GetOperation().GetReady():
+			err = ErrOperationNotReady
+
+		case operation.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
+			err = &OpError{
+				Reason: statusCode(operation.GetOperation().GetStatus()),
+				issues: operation.GetOperation().GetIssues(),
+			}
 		}
 	}
 
@@ -102,7 +132,7 @@ func (c *grpcConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method 
 		}
 	}()
 
-	s, err := c.conn.conn.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
+	s, err := c.conn.raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}
