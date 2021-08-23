@@ -85,6 +85,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		params.ConnectParams,
 		connect.WithSessionPoolIdleThreshold(time.Second*5),
 		connect.WithSessionPoolKeepAliveMinSize(-1),
+		connect.WithDiscoveryInterval(5*time.Second),
 	)
 	if err != nil {
 		return fmt.Errorf("connect error: %w", err)

@@ -8,7 +8,7 @@ import (
 )
 
 type conn struct {
-	conn *grpc.ClientConn
+	raw  *grpc.ClientConn
 	addr connAddr
 
 	runtime connRuntime
@@ -20,7 +20,7 @@ func newConn(cc *grpc.ClientConn, addr connAddr) *conn {
 		statsBuckets  = 12
 	)
 	return &conn{
-		conn: cc,
+		raw:  cc,
 		addr: addr,
 		runtime: connRuntime{
 			opTime:  stats.NewSeries(statsDuration, statsBuckets),

@@ -83,13 +83,6 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) ConnectOption {
 	}
 }
 
-func withDriver(driver ydb.Driver) ConnectOption {
-	return func(c *Connection) error {
-		c.table.client.Driver = driver
-		return nil
-	}
-}
-
 func WithSessionPoolSizeLimit(sizeLimit int) ConnectOption {
 	return func(c *Connection) error {
 		c.table.sessionPool.SizeLimit = sizeLimit

@@ -262,7 +262,7 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 		return nil, err
 	}
 	defer func() {
-		_ = conn.conn.Close()
+		_ = conn.raw.Close()
 	}()
 
 	var cancel context.CancelFunc

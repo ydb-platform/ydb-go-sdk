@@ -96,10 +96,10 @@ func (c ColumnFamily) toYDB() *Ydb_Table.ColumnFamily {
 
 func columnFamily(c *Ydb_Table.ColumnFamily) ColumnFamily {
 	return ColumnFamily{
-		Name:         c.Name,
+		Name:         c.GetName(),
 		Data:         storagePool(c.GetData()),
-		Compression:  columnFamilyCompression(c.Compression),
-		KeepInMemory: internal.FeatureFlagFromYDB(c.KeepInMemory),
+		Compression:  columnFamilyCompression(c.GetCompression()),
+		KeepInMemory: internal.FeatureFlagFromYDB(c.GetKeepInMemory()),
 	}
 }
 
