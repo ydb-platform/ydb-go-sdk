@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"crypto/tls"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/scheme"
 
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/auth"
@@ -41,7 +42,7 @@ func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *C
 	if err != nil {
 		return nil, err
 	}
-	c.table.client.Driver = c.driver
-	c.scheme.client.Driver = c.driver
+	c.table.client.Driver = c.driver.(ydb.Driver)
+	c.scheme.client = scheme.NewClient(c.driver)
 	return c, nil
 }

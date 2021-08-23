@@ -12,7 +12,7 @@ import (
 
 type Connection struct {
 	driverConfig *ydb.DriverConfig
-	driver       ydb.Driver
+	driver       ydb.Cluster
 	credentials  ydb.Credentials
 	table        *tableWrapper
 	scheme       *schemeWrapper
@@ -29,10 +29,6 @@ func (c *Connection) Table() *tableWrapper {
 
 func (c *Connection) Scheme() *scheme.Client {
 	return c.scheme.client
-}
-
-func (c *Connection) Driver() ydb.Driver {
-	return c.driver
 }
 
 func (c *Connection) EnsurePathExists(ctx context.Context, path string) error {

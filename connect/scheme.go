@@ -13,6 +13,5 @@ type schemeWrapper struct {
 func newSchemeWrapper(ctx context.Context) *schemeWrapper {
 	return &schemeWrapper{
 		ctx:    ctx,
-		client: &scheme.Client{},
 	}
 }

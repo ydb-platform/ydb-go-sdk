@@ -2,10 +2,11 @@ package scheme
 
 import (
 	"context"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Scheme_V1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
 	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 )
 
 type EntryType uint
@@ -61,56 +62,87 @@ type Directory struct {
 }
 
 type Client struct {
-	Driver ydb.Driver
+	cluster ydb.Cluster
+}
+
+func NewClient(cluster ydb.Cluster) *Client {
+	return &Client{
+		cluster: cluster,
+	}
 }
 
 func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
-	req := Ydb_Scheme.MakeDirectoryRequest{
+	request := Ydb_Scheme.MakeDirectoryRequest{
 		Path: path,
 	}
-	_, err = c.Driver.Call(ctx, internal.Wrap("/Ydb.Scheme.V1.SchemeService/MakeDirectory", &req, nil))
-	return
+	conn, err := c.cluster.Get(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).MakeDirectory(ctx, &request)
+	return err
 }
 
 func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
-	req := Ydb_Scheme.RemoveDirectoryRequest{
+	request := Ydb_Scheme.RemoveDirectoryRequest{
 		Path: path,
 	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(
-		"/Ydb.Scheme.V1.SchemeService/RemoveDirectory", &req, nil,
-	))
-	return
+	conn, err := c.cluster.Get(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).RemoveDirectory(ctx, &request)
+	return err
 }
 
 func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, err error) {
-	var res Ydb_Scheme.ListDirectoryResult
-	req := Ydb_Scheme.ListDirectoryRequest{
+	var (
+		response            *Ydb_Scheme.ListDirectoryResponse
+		listDirectoryResult Ydb_Scheme.ListDirectoryResult
+	)
+	request := Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
 	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(
-		"/Ydb.Scheme.V1.SchemeService/ListDirectory", &req, &res,
-	))
+	conn, err := c.cluster.Get(ctx)
 	if err != nil {
 		return d, err
 	}
-	d.Entry.from(res.Self)
-	d.Children = make([]Entry, len(res.Children))
-	putEntry(d.Children, res.Children)
+	response, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).ListDirectory(ctx, &request)
+	if err != nil {
+		return d, err
+	}
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &listDirectoryResult)
+	if err != nil {
+		return d, err
+	}
+	d.Entry.from(listDirectoryResult.Self)
+	d.Children = make([]Entry, len(listDirectoryResult.Children))
+	putEntry(d.Children, listDirectoryResult.Children)
 	return d, nil
 }
 
 func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err error) {
-	var res Ydb_Scheme.DescribePathResult
-	req := Ydb_Scheme.DescribePathRequest{
+	var (
+		response           *Ydb_Scheme.DescribePathResponse
+		describePathResult Ydb_Scheme.DescribePathResult
+	)
+	request := Ydb_Scheme.DescribePathRequest{
 		Path: path,
 	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(
-		"/Ydb.Scheme.V1.SchemeService/DescribePath", &req, &res,
-	))
-	if err == nil {
-		e.from(res.Self)
+	conn, err := c.cluster.Get(ctx)
+	if err != nil {
+		return e, err
 	}
-	return e, err
+	response, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).DescribePath(ctx, &request)
+	if err != nil {
+		return e, err
+	}
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &describePathResult)
+	if err != nil {
+		return e, err
+	}
+	e.from(describePathResult.Self)
+	return e, nil
 }
 
 func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...PermissionsOption) (err error) {
@@ -118,15 +150,17 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...Per
 	for _, opt := range opts {
 		opt(&desc)
 	}
-	req := Ydb_Scheme.ModifyPermissionsRequest{
+	request := Ydb_Scheme.ModifyPermissionsRequest{
 		Path:             path,
 		Actions:          desc.actions,
 		ClearPermissions: desc.clear,
 	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(
-		"/Ydb.Scheme.V1.SchemeService/ModifyPermissions", &req, nil,
-	))
-	return
+	conn, err := c.cluster.Get(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).ModifyPermissions(ctx, &request)
+	return err
 }
 
 func (e *Entry) from(y *Ydb_Scheme.Entry) {
