@@ -2,12 +2,11 @@ package ydb
 
 import (
 	"context"
-
-	"google.golang.org/grpc/metadata"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Discovery_V1"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Discovery"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 )
 
 type Endpoint struct {
@@ -18,42 +17,42 @@ type Endpoint struct {
 }
 
 type discoveryClient struct {
-	conn *conn
-	meta *meta
+	cluster  Cluster
+	database string
+	ssl      bool
 }
 
-func (d *discoveryClient) Discover(ctx context.Context, database string, ssl bool) ([]Endpoint, error) {
-	var (
-		resp Ydb_Operations.GetOperationResponse
-		res  Ydb_Discovery.ListEndpointsResult
-	)
-	req := Ydb_Discovery.ListEndpointsRequest{
+func discover(ctx context.Context, database string, ssl bool, conn grpc.ClientConnInterface) ([]Endpoint, error) {
+	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: database,
 	}
-	// Get credentials (token actually) for the request.
-	md, err := d.meta.md(ctx)
+	discoveryServiceClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(conn)
+	response, err := discoveryServiceClient.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, err
 	}
-	if len(md) > 0 {
-		ctx = metadata.NewOutgoingContext(ctx, md)
-	}
-	err = invoke(
-		ctx, d.conn.conn, internal.WrapOpResponse(&resp),
-		"/Ydb.Discovery.V1.DiscoveryService/ListEndpoints", &req, &res,
-	)
+	listEndpointsResult := Ydb_Discovery.ListEndpointsResult{}
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &listEndpointsResult)
 	if err != nil {
 		return nil, err
 	}
-	es := make([]Endpoint, 0, len(res.Endpoints))
-	for _, e := range res.Endpoints {
+	endpoints := make([]Endpoint, 0, len(listEndpointsResult.Endpoints))
+	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == ssl {
-			es = append(es, Endpoint{
+			endpoints = append(endpoints, Endpoint{
 				Addr:  e.Address,
 				Port:  int(e.Port),
-				Local: e.Location == res.SelfLocation,
+				Local: e.Location == listEndpointsResult.SelfLocation,
 			})
 		}
 	}
-	return es, nil
+	return endpoints, nil
+}
+
+func (d *discoveryClient) Discover(ctx context.Context) ([]Endpoint, error) {
+	conn, err := d.cluster.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return discover(ctx, d.database, d.ssl, conn)
 }

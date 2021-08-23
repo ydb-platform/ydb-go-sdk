@@ -73,6 +73,16 @@ func WithDriverConfig(config *ydb.DriverConfig) ConnectOption {
 	}
 }
 
+func WithDiscoveryInterval(discoveryInterval time.Duration) ConnectOption {
+	return func(c *Connection) error {
+		if c.driverConfig == nil {
+			c.driverConfig = &ydb.DriverConfig{}
+		}
+		c.driverConfig.DiscoveryInterval = discoveryInterval
+		return nil
+	}
+}
+
 func withDriver(driver ydb.Driver) ConnectOption {
 	return func(c *Connection) error {
 		c.table.client.Driver = driver
