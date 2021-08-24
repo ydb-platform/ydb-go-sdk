@@ -7,11 +7,11 @@ import (
 
 type ClientConnInterface interface {
 	grpc.ClientConnInterface
-
 	Address() string
 }
 
 type Cluster interface {
 	Get(ctx context.Context) (conn ClientConnInterface, err error)
+	GetLazy() (conn ClientConnInterface)
 	Close() error
 }

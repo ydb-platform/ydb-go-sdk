@@ -5,6 +5,12 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+func (d *driver) GetLazy() ClientConnInterface {
+	return &grpcConn{
+		d: d,
+	}
+}
+
 func (d *driver) Get(ctx context.Context) (_ ClientConnInterface, err error) {
 	c, err := d.getConn(ctx)
 	if err != nil {
