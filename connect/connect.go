@@ -3,9 +3,6 @@ package connect
 import (
 	"context"
 	"crypto/tls"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/scheme"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
-
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/auth"
 )
@@ -17,7 +14,7 @@ func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *C
 		scheme: newSchemeWrapper(ctx),
 	}
 	for _, opt := range opts {
-		err := opt(c)
+		err = opt(c)
 		if err != nil {
 			return nil, err
 		}
@@ -43,8 +40,7 @@ func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *C
 	if err != nil {
 		return nil, err
 	}
-	c.table.client = table.NewClient(c.driver)
-	c.table.sessionPool.Builder = c.table.client
-	c.scheme.client = scheme.NewClient(c.driver)
+	c.table.set(c.driver)
+	c.scheme.set(c.driver)
 	return c, nil
 }

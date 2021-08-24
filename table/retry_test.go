@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -116,9 +117,13 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 
 func TestRetryerBadSession(t *testing.T) {
 	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				return nil
+		cluster: &testutil.Cluster{
+			OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+				return &testutil.ClientConn{
+					OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+						return nil
+					},
+				}, nil
 			},
 		},
 	}
@@ -160,9 +165,13 @@ func TestRetryerBadSession(t *testing.T) {
 
 func TestRetryerBadSessionReuse(t *testing.T) {
 	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				return nil
+		cluster: &testutil.Cluster{
+			OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+				return &testutil.ClientConn{
+					OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+						return nil
+					},
+				}, nil
 			},
 		},
 	}

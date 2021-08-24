@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"google.golang.org/grpc"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -15,19 +16,19 @@ import (
 	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
 )
 
-type DriverBuilder struct {
+type ClusterBuilder struct {
 	Logf  func(string, ...interface{})
 	Error func(context.Context, testutil.MethodCode) error
 }
 
-func (b *DriverBuilder) log(msg string, args ...interface{}) {
+func (b *ClusterBuilder) log(msg string, args ...interface{}) {
 	if b.Logf == nil {
 		return
 	}
 	b.Logf(fmt.Sprint("db stub: ", fmt.Sprintf(msg, args...)))
 }
 
-func (b *DriverBuilder) Build() ydb.Driver {
+func (b *ClusterBuilder) Build() ydb.Cluster {
 	type session struct {
 		sync.Mutex
 		busy bool
@@ -39,129 +40,134 @@ func (b *DriverBuilder) Build() ydb.Driver {
 
 		sessions = map[string]*session{}
 	)
-	return &testutil.Driver{
-		OnCall: func(ctx context.Context, method testutil.MethodCode, req, res interface{}) (err error) {
-			var (
-				sid string
-				tid string
-			)
-			switch method {
-			case testutil.TableCreateSession:
-				sid = fmt.Sprintf("ydb://test-session/%d", atomic.AddInt32(&sessionID, 1))
-				b.log("[%q] create session", sid)
+	return &testutil.Cluster{
+		OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+			return &testutil.ClientConn{
+				OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) (err error) {
+					var (
+						sid string
+						tid string
+					)
+					m := testutil.Method(method).Code()
+					switch m {
+					case testutil.TableCreateSession:
+						sid = fmt.Sprintf("ydb://test-session/%d", atomic.AddInt32(&sessionID, 1))
+						b.log("[%q] create session", sid)
 
-				mu.Lock()
-				sessions[sid] = new(session)
-				mu.Unlock()
+						mu.Lock()
+						sessions[sid] = new(session)
+						mu.Unlock()
 
-				r := testutil.TableCreateSessionResult{res}
-				r.SetSessionID(sid)
+						r := testutil.TableCreateSessionResult{reply}
+						r.SetSessionID(sid)
 
-			case testutil.TableKeepAlive:
-				sid = req.(*Ydb_Table.KeepAliveRequest).SessionId
-				b.log("[%q] keepalive session", sid)
+					case testutil.TableKeepAlive:
+						sid = args.(*Ydb_Table.KeepAliveRequest).SessionId
+						b.log("[%q] keepalive session", sid)
 
-				mu.RLock()
-				s := sessions[sid]
-				mu.RUnlock()
+						mu.RLock()
+						s := sessions[sid]
+						mu.RUnlock()
 
-				s.Lock()
-				s.busy = false
-				s.Unlock()
+						s.Lock()
+						s.busy = false
+						s.Unlock()
 
-				r := testutil.TableKeepAliveResult{res}
-				r.SetSessionStatus(true)
+						r := testutil.TableKeepAliveResult{reply}
+						r.SetSessionStatus(true)
 
-				return
+						return
 
-			case testutil.TableDeleteSession:
-				sid = req.(*Ydb_Table.DeleteSessionRequest).SessionId
-				b.log("[%q] delete session", sid)
+					case testutil.TableDeleteSession:
+						sid = args.(*Ydb_Table.DeleteSessionRequest).SessionId
+						b.log("[%q] delete session", sid)
 
-				mu.Lock()
-				delete(sessions, sid)
-				mu.Unlock()
+						mu.Lock()
+						delete(sessions, sid)
+						mu.Unlock()
 
-				return
+						return
 
-			case testutil.TableBeginTransaction:
-				sid = req.(*Ydb_Table.BeginTransactionRequest).SessionId
-				tid = fmt.Sprintf("test-tx/%d", atomic.AddInt32(&txID, 1))
+					case testutil.TableBeginTransaction:
+						sid = args.(*Ydb_Table.BeginTransactionRequest).SessionId
+						tid = fmt.Sprintf("test-tx/%d", atomic.AddInt32(&txID, 1))
 
-				r := testutil.TableBeginTransactionResult{R: res}
-				r.SetTransactionID(tid)
+						r := testutil.TableBeginTransactionResult{R: reply}
+						r.SetTransactionID(tid)
 
-				b.log("[%q][%q] begin transaction", sid, tid)
+						b.log("[%q][%q] begin transaction", sid, tid)
 
-			case testutil.TableCommitTransaction:
-				r := req.(*Ydb_Table.CommitTransactionRequest)
-				sid = r.SessionId
-				tid = r.TxId
+					case testutil.TableCommitTransaction:
+						r := args.(*Ydb_Table.CommitTransactionRequest)
+						sid = r.SessionId
+						tid = r.TxId
 
-				b.log("[%q][%q] commit transaction", sid, tid)
+						b.log("[%q][%q] commit transaction", sid, tid)
 
-			case testutil.TableRollbackTransaction:
-				r := req.(*Ydb_Table.RollbackTransactionRequest)
-				sid = r.SessionId
-				tid = r.TxId
+					case testutil.TableRollbackTransaction:
+						r := args.(*Ydb_Table.RollbackTransactionRequest)
+						sid = r.SessionId
+						tid = r.TxId
 
-				b.log("[%q][%q] rollback transaction", sid, tid)
+						b.log("[%q][%q] rollback transaction", sid, tid)
 
-			case testutil.TablePrepareDataQuery:
-				r := req.(*Ydb_Table.PrepareDataQueryRequest)
-				sid = r.SessionId
+					case testutil.TablePrepareDataQuery:
+						r := args.(*Ydb_Table.PrepareDataQueryRequest)
+						sid = r.SessionId
 
-				b.log("[%q] prepare data query", sid)
+						b.log("[%q] prepare data query", sid)
 
-			case testutil.TableExecuteDataQuery:
-				{
-					r := testutil.TableExecuteDataQueryRequest{req}
-					sid = r.SessionID()
-					tid, _ = r.TransactionID()
-				}
-				{
-					r := testutil.TableExecuteDataQueryResult{res}
-					r.SetTransactionID(tid)
-				}
+					case testutil.TableExecuteDataQuery:
+						{
+							r := testutil.TableExecuteDataQueryRequest{args}
+							sid = r.SessionID()
+							tid, _ = r.TransactionID()
+						}
+						{
+							r := testutil.TableExecuteDataQueryResult{reply}
+							r.SetTransactionID(tid)
+						}
 
-				b.log("[%q][%q] execute data query", sid, tid)
+						b.log("[%q][%q] execute data query", sid, tid)
 
-			default:
-				return fmt.Errorf("db stub: not implemented")
-			}
+					default:
+						return fmt.Errorf("db stub: not implemented")
+					}
 
-			mu.RLock()
-			s := sessions[sid]
-			mu.RUnlock()
+					mu.RLock()
+					s := sessions[sid]
+					mu.RUnlock()
 
-			if s == nil {
-				return &ydb.OpError{
-					Reason: ydb.StatusSessionExpired,
-				}
-			}
+					if s == nil {
+						return &ydb.OpError{
+							Reason: ydb.StatusSessionExpired,
+						}
+					}
 
-			s.Lock()
-			defer s.Unlock()
+					s.Lock()
+					defer s.Unlock()
 
-			if s.busy {
-				return &ydb.OpError{
-					Reason: ydb.StatusPreconditionFailed,
-				}
-			}
-			if b.Error != nil {
-				err = b.Error(ctx, method)
-			}
+					if s.busy {
+						return &ydb.OpError{
+							Reason: ydb.StatusPreconditionFailed,
+						}
+					}
+					if b.Error != nil {
+						err = b.Error(ctx, m)
+					}
 
-			s.busy = isBusy(err)
+					s.busy = isBusy(err)
 
-			return
+					return
+				},
+			}, nil
 		},
 	}
 }
 
 func TestTxDoerStmt(t *testing.T) {
 	var count int
-	b := DriverBuilder{
+	b := ClusterBuilder{
 		Error: func(_ context.Context, method testutil.MethodCode) (err error) {
 			if method != testutil.TablePrepareDataQuery {
 				return nil
@@ -176,7 +182,7 @@ func TestTxDoerStmt(t *testing.T) {
 		},
 		Logf: t.Logf,
 	}
-	driver := b.Build()
+	cluster := b.Build()
 
 	busyChecking := make(chan struct{})
 	db := sql.OpenDB(Connector(
@@ -188,9 +194,7 @@ func TestTxDoerStmt(t *testing.T) {
 				return nil
 			},
 		}),
-		WithClient(&table.Client{
-			Driver: driver,
-		}),
+		WithClient(table.NewClient(cluster)),
 	))
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)

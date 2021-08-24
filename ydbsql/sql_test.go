@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"google.golang.org/grpc"
 	"io"
 	"log"
 	"os"
@@ -186,32 +187,44 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 
 func TestQuery(t *testing.T) {
 	c := Connector(
-		WithClient(&table.Client{
-			Driver: &testutil.Driver{
-				OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-					switch m {
-					case testutil.TableCreateSession:
-					case testutil.TableExecuteDataQuery:
-						r := testutil.TableExecuteDataQueryResult{R: res}
-						r.SetTransactionID("")
-					case testutil.TablePrepareDataQuery:
-					default:
-						t.Fatalf("Unexpected method %d", m)
-					}
-					return nil
+		WithClient(
+			table.NewClient(
+				&testutil.Cluster{
+					OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+						return &testutil.ClientConn{
+							OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+								m := testutil.Method(method).Code()
+								switch m {
+								case testutil.TableCreateSession:
+								case testutil.TableExecuteDataQuery:
+									r := testutil.TableExecuteDataQueryResult{R: reply}
+									r.SetTransactionID("")
+								case testutil.TablePrepareDataQuery:
+								default:
+									t.Fatalf("Unexpected method %d", m)
+								}
+								return nil
+							},
+							OnNewStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+								m := testutil.Method(method).Code()
+								switch m {
+								case testutil.TableCreateSession:
+								case testutil.TableStreamExecuteScanQuery:
+									return &testutil.ClientStream{
+										OnRecvMsg: func(m interface{}) error {
+											return io.EOF
+										},
+									}, nil
+								default:
+									t.Fatalf("Unexpected method %d", m)
+								}
+								return nil, nil
+							},
+						}, nil
+					},
 				},
-				OnStreamRead: func(ctx context.Context, m testutil.MethodCode, req, res interface{}, process func(error)) error {
-					switch m {
-					case testutil.TableCreateSession:
-					case testutil.TableStreamExecuteScanQuery:
-						process(io.EOF)
-					default:
-						t.Fatalf("Unexpected method %d", m)
-					}
-					return nil
-				},
-			},
-		}),
+			),
+		),
 		WithDefaultExecDataQueryOption(),
 	)
 

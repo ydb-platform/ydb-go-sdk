@@ -86,9 +86,7 @@ func TestClusterTracking(t *testing.T) {
 	// trying to connect to them (and is not able until we put ticket into the
 	// dialTicket channel).
 
-	tc := table.Client{
-		Driver: d,
-	}
+	tc := table.NewClient(d)
 	mustCreateSession := func() {
 		sub, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()

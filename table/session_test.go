@@ -3,8 +3,8 @@ package table
 import (
 	"context"
 	"errors"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/cache/lru"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"reflect"
 	"testing"
 	"time"
@@ -214,8 +214,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExecuteDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c: c,
 				}
 				_, _, err := s.Execute(ctx, TxControl(), "", NewQueryParameters())
 				require.NoError(t, err)
@@ -225,8 +224,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExplainDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c: c,
 				}
 				_, err := s.Explain(ctx, "")
 				require.NoError(t, err)
@@ -236,8 +234,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TablePrepareDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c: c,
 				}
 				_, err := s.Prepare(ctx, "")
 				require.NoError(t, err)
@@ -254,8 +251,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableDeleteSession,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c: c,
 				}
 				require.NoError(t, s.Close(ctx))
 			},
@@ -264,8 +260,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableBeginTransaction,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c: c,
 				}
 				_, err := s.BeginTransaction(ctx, TxSettings())
 				require.NoError(t, err)
@@ -276,8 +271,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				tx := &Transaction{
 					s: &Session{
-						c:      c,
-						qcache: lru.New(0),
+						c: c,
 					},
 				}
 				_, err := tx.CommitTx(ctx)
@@ -289,8 +283,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				tx := &Transaction{
 					s: &Session{
-						c:      c,
-						qcache: lru.New(0),
+						c: c,
 					},
 				}
 				err := tx.Rollback(ctx)
@@ -301,8 +294,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableKeepAlive,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c: c,
 				}
 				_, err := s.KeepAlive(ctx)
 				require.NoError(t, err)
@@ -315,21 +307,25 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := Client{
-							Driver: &testutil.Driver{
-								OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-									require.Equal(t, test.method, m)
-									mode, ok := ydb.ContextOperationMode(ctx)
-									require.True(t, ok)
-									require.Equal(t, srcDst.dstMode, mode)
-									switch m {
-									case testutil.TableExecuteDataQuery:
-										r := testutil.TableExecuteDataQueryResult{R: res}
-										r.SetTransactionID("")
-									case testutil.TableBeginTransaction:
-										r := testutil.TableBeginTransactionResult{R: res}
-										r.SetTransactionID("")
-									}
-									return nil
+							cluster: &testutil.Cluster{
+								OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+									return &testutil.ClientConn{
+										OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+											require.Equal(t, test.method, method)
+											mode, ok := ydb.ContextOperationMode(ctx)
+											require.True(t, ok)
+											require.Equal(t, srcDst.dstMode, mode)
+											switch testutil.Method(method).Code() {
+											case testutil.TableExecuteDataQuery:
+												r := testutil.TableExecuteDataQueryResult{R: args}
+												r.SetTransactionID("")
+											case testutil.TableBeginTransaction:
+												r := testutil.TableBeginTransactionResult{R: args}
+												r.SetTransactionID("")
+											}
+											return nil
+										},
+									}, nil
 								},
 							},
 						}
@@ -383,20 +379,23 @@ func TestClientCache(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			client := &Client{
-				Driver: &testutil.Driver{
-					OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-						switch m {
-						case testutil.TableCreateSession:
-						case testutil.TablePrepareDataQuery:
-							prepareRequestsCount++
-						default:
-							t.Fatalf("Unexpected method %d", m)
+				cluster: &testutil.Cluster{
+					OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+						return &testutil.ClientConn{
+							OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+								switch testutil.Method(method).Code() {
+								case testutil.TableCreateSession:
+								case testutil.TablePrepareDataQuery:
+									prepareRequestsCount++
+								default:
+									t.Fatalf("Unexpected method %s", method)
 
-						}
-						return nil
+								}
+								return nil
+							},
+						}, nil
 					},
 				},
-				MaxQueryCacheSize: test.cacheSize,
 			}
 			s, err := client.CreateSession(ctx)
 			require.NoError(t, err)

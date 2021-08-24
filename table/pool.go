@@ -698,7 +698,13 @@ func (p *SessionPool) busyChecker() {
 		readAll = func(closeAll bool) {
 			for {
 				select {
-				case s := <-p.busyCheck:
+				case s, ok := <-p.busyCheck:
+					if !ok {
+						return
+					}
+					if s == nil {
+						panic("nil session")
+					}
 					if closeAll || !p.reuse(ctx, s) {
 						p.closeSession(ctx, s)
 					}
