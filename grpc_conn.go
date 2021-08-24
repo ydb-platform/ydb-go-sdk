@@ -13,12 +13,12 @@ import (
 )
 
 type grpcConn struct {
-	conn *conn
-	d    *driver
+	c *conn
+	d *driver
 }
 
 func (c *grpcConn) Address() string {
-	return c.conn.addr.String()
+	return c.c.addr.String()
 }
 
 func (c *grpcConn) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
@@ -60,25 +60,33 @@ func (c *grpcConn) Invoke(ctx context.Context, method string, request interface{
 		setOperationParams(request, params)
 	}
 
+	cc := c.c
+	if cc == nil {
+		cc, err = c.d.getConn(ctx)
+		if err != nil {
+			return
+		}
+	}
+
 	start := timeutil.Now()
-	c.conn.runtime.operationStart(start)
-	driverTraceOperationDone := driverTraceOnOperation(ctx, c.d.trace, ctx, c.conn.addr.String(), Method(method), params)
+	cc.runtime.operationStart(start)
+	driverTraceOperationDone := driverTraceOnOperation(ctx, c.d.trace, ctx, cc.addr.String(), Method(method), params)
 	defer func() {
-		driverTraceOperationDone(rawCtx, c.conn.addr.String(), Method(method), params, opId, issues, err)
-		c.conn.runtime.operationDone(
+		driverTraceOperationDone(rawCtx, cc.addr.String(), Method(method), params, opId, issues, err)
+		cc.runtime.operationDone(
 			start, timeutil.Now(),
 			errIf(isTimeoutError(err), err),
 		)
 	}()
 
-	err = c.conn.raw.Invoke(ctx, method, request, response, opts...)
+	err = cc.raw.Invoke(ctx, method, request, response, opts...)
 
 	if err != nil {
 		err = mapGRPCError(err)
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			driverTracePessimizationDone := driverTraceOnPessimization(ctx, c.d.trace, ctx, c.conn.addr.String(), err)
-			driverTracePessimizationDone(ctx, c.conn.addr.String(), c.d.cluster.Pessimize(c.conn.addr))
+			driverTracePessimizationDone := driverTraceOnPessimization(ctx, c.d.trace, ctx, cc.addr.String(), err)
+			driverTracePessimizationDone(ctx, cc.addr.String(), c.d.cluster.Pessimize(cc.addr))
 		}
 		return
 	}
@@ -123,16 +131,24 @@ func (c *grpcConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method 
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	c.conn.runtime.streamStart(timeutil.Now())
-	driverTraceStreamDone := driverTraceOnStream(ctx, c.d.trace, ctx, c.conn.addr.String(), Method(method))
+	cc := c.c
+	if cc == nil {
+		cc, err = c.d.getConn(ctx)
+		if err != nil {
+			return
+		}
+	}
+
+	cc.runtime.streamStart(timeutil.Now())
+	driverTraceStreamDone := driverTraceOnStream(ctx, c.d.trace, ctx, cc.addr.String(), Method(method))
 	defer func() {
 		if err != nil {
-			c.conn.runtime.streamDone(timeutil.Now(), err)
-			driverTraceStreamDone(rawCtx, c.conn.addr.String(), Method(method), err)
+			cc.runtime.streamDone(timeutil.Now(), err)
+			driverTraceStreamDone(rawCtx, cc.addr.String(), Method(method), err)
 		}
 	}()
 
-	s, err := c.conn.raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
+	s, err := cc.raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 	if err != nil {
 		return nil, mapGRPCError(err)
 	}

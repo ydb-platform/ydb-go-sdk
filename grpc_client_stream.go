@@ -33,8 +33,8 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	if err != nil {
 		err = mapGRPCError(err)
 	}
-	s.c.conn.runtime.streamDone(timeutil.Now(), hideEOF(err))
-	s.done(s.ctx, s.c.conn.addr.String(), s.method, hideEOF(err))
+	s.c.c.runtime.streamDone(timeutil.Now(), hideEOF(err))
+	s.done(s.ctx, s.c.c.addr.String(), s.method, hideEOF(err))
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -58,11 +58,11 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		issues []*Ydb_Issue.IssueMessage
 	)
 
-	s.c.conn.runtime.streamRecv(timeutil.Now())
+	s.c.c.runtime.streamRecv(timeutil.Now())
 
 	driverTraceStreamRecvDone := driverTraceOnStreamRecv(s.ctx, s.c.d.trace, s.Context(), s.c.Address(), s.method)
 	defer func() {
-		driverTraceStreamRecvDone(s.ctx, s.c.conn.addr.String(), s.method, issues, hideEOF(err))
+		driverTraceStreamRecvDone(s.ctx, s.c.c.addr.String(), s.method, issues, hideEOF(err))
 	}()
 
 	err = s.s.RecvMsg(m)
@@ -72,7 +72,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
 			driverTracePessimizationDone := driverTraceOnPessimization(s.ctx, s.c.d.trace, s.ctx, s.c.Address(), err)
-			driverTracePessimizationDone(s.ctx, s.c.Address(), s.c.d.cluster.Pessimize(s.c.conn.addr))
+			driverTracePessimizationDone(s.ctx, s.c.Address(), s.c.d.cluster.Pessimize(s.c.c.addr))
 		}
 		return
 	}

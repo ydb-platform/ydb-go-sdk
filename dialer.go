@@ -256,13 +256,13 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 		driverTraceDiscoveryDone(ctx, endpoints, err)
 	}()
 
-	var conn *conn
-	conn, err = d.dialAddr(ctx, addr)
+	var c *conn
+	c, err = d.dialAddr(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		_ = conn.raw.Close()
+		_ = c.raw.Close()
 	}()
 
 	var cancel context.CancelFunc
@@ -279,7 +279,7 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 		ctx,
 		d.config.Database,
 		d.useTLS(), &grpcConn{
-			conn: conn,
+			c: c,
 			d: &driver{
 				meta: d.meta,
 			},
