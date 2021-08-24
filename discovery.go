@@ -3,7 +3,6 @@ package ydb
 import (
 	"context"
 	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Discovery_V1"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Discovery"
@@ -17,17 +16,16 @@ type Endpoint struct {
 }
 
 type discoveryClient struct {
-	cluster  Cluster
-	database string
-	ssl      bool
+	discoveryService Ydb_Discovery_V1.DiscoveryServiceClient
+	database         string
+	ssl              bool
 }
 
-func discover(ctx context.Context, database string, ssl bool, conn grpc.ClientConnInterface) ([]Endpoint, error) {
+func discover(ctx context.Context, discoveryService Ydb_Discovery_V1.DiscoveryServiceClient, database string, ssl bool) ([]Endpoint, error) {
 	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: database,
 	}
-	discoveryServiceClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(conn)
-	response, err := discoveryServiceClient.ListEndpoints(ctx, &request)
+	response, err := discoveryService.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, err
 	}
@@ -50,9 +48,5 @@ func discover(ctx context.Context, database string, ssl bool, conn grpc.ClientCo
 }
 
 func (d *discoveryClient) Discover(ctx context.Context) ([]Endpoint, error) {
-	conn, err := d.cluster.Get(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return discover(ctx, d.database, d.ssl, conn)
+	return discover(ctx, d.discoveryService, d.database, d.ssl)
 }
