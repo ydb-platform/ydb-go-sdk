@@ -1,5 +1,6 @@
 package ydb
 
+// Deprecated: no need to use connection preferring policy
 type ConnUsePolicy uint8
 
 const (

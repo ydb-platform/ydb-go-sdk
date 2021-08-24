@@ -10,7 +10,10 @@ func (d *driver) Get(ctx context.Context) (_ ClientConnInterface, err error) {
 	rawCtx := ctx
 
 	// Get credentials (token actually) for the request.
-	var md metadata.MD
+	var (
+		md   metadata.MD
+		conn *conn
+	)
 	md, err = d.meta.md(ctx)
 	if err != nil {
 		return
@@ -19,18 +22,12 @@ func (d *driver) Get(ctx context.Context) (_ ClientConnInterface, err error) {
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	conn, backoffUseBalancer := ContextConn(rawCtx)
-	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
-		driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
-		conn, err = d.cluster.Get(ctx)
-		addr := ""
-		if conn != nil {
-			addr = conn.addr.String()
-		}
-		driverTraceGetConnDone(rawCtx, addr, err)
-		if err != nil {
-			return
-		}
+	driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
+	conn, err = d.cluster.Get(ctx)
+	driverTraceGetConnDone(rawCtx, conn.Address(), err)
+
+	if err != nil {
+		return
 	}
 
 	return &grpcConn{
