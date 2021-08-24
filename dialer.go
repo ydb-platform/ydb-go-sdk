@@ -279,7 +279,7 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 	return discover(
 		ctx,
 		Ydb_Discovery_V1.NewDiscoveryServiceClient(&grpcConn{
-			c: c,
+			c: &singleConn{c: c},
 			d: &driver{
 				meta: d.meta,
 			},

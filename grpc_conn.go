@@ -12,9 +12,42 @@ import (
 	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 )
 
-type grpcConn struct {
+type connWrapper interface {
+	Get(ctx context.Context) (*conn, error)
+	Address() string
+}
+
+type singleConn struct {
 	c *conn
+}
+
+func (c *singleConn) Get(ctx context.Context) (*conn, error) {
+	return c.c, nil
+}
+
+func (c *singleConn) Address() string {
+	return c.c.Address()
+}
+
+type multiConn struct {
 	d *driver
+}
+
+func (c *multiConn) Get(ctx context.Context) (*conn, error) {
+	return c.d.getConn(ctx)
+}
+
+func (c *multiConn) Address() string {
+	return ""
+}
+
+type grpcConn struct {
+	c connWrapper
+	d *driver
+}
+
+func newGrpcConn(c connWrapper, d *driver) *grpcConn {
+	return &grpcConn{c: c, d: d}
 }
 
 func (c *grpcConn) Address() string {
@@ -63,12 +96,9 @@ func (c *grpcConn) Invoke(ctx context.Context, method string, request interface{
 		setOperationParams(request, params)
 	}
 
-	cc := c.c
-	if cc == nil {
-		cc, err = c.d.getConn(ctx)
-		if err != nil {
-			return
-		}
+	cc, err := c.c.Get(ctx)
+	if err != nil {
+		return
 	}
 
 	start := timeutil.Now()
@@ -134,12 +164,9 @@ func (c *grpcConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method 
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	cc := c.c
-	if cc == nil {
-		cc, err = c.d.getConn(ctx)
-		if err != nil {
-			return
-		}
+	cc, err := c.c.Get(ctx)
+	if err != nil {
+		return
 	}
 
 	cc.runtime.streamStart(timeutil.Now())
@@ -158,7 +185,8 @@ func (c *grpcConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method 
 
 	return &grpcClientStream{
 		ctx:    rawCtx,
-		c:      c,
+		c:      cc,
+		d:      c.d,
 		s:      s,
 		cancel: cancel,
 		done:   driverTraceStreamDone,

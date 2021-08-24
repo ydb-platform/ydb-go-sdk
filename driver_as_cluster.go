@@ -6,9 +6,7 @@ import (
 )
 
 func (d *driver) GetLazy() ClientConnInterface {
-	return &grpcConn{
-		d: d,
-	}
+	return newGrpcConn(&multiConn{d: d}, d)
 }
 
 func (d *driver) Get(ctx context.Context) (_ ClientConnInterface, err error) {
@@ -16,10 +14,7 @@ func (d *driver) Get(ctx context.Context) (_ ClientConnInterface, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return &grpcConn{
-		c: c,
-		d: d,
-	}, nil
+	return newGrpcConn(&singleConn{c: c}, d), nil
 }
 
 func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
