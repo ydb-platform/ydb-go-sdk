@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"reflect"
 	"strings"
 
@@ -18,6 +20,12 @@ type MethodCode uint
 
 func (m MethodCode) String() string {
 	return codeToString[m]
+}
+
+type Method string
+
+func (m Method) Code() MethodCode {
+	return grpcMethodToCode[m]
 }
 
 const (
@@ -42,7 +50,7 @@ const (
 	TableStreamExecuteScanQuery
 )
 
-var grpcMethodToCode = map[string]MethodCode{
+var grpcMethodToCode = map[Method]MethodCode{
 	"/Ydb.Table.V1.TableService/CreateSession":          TableCreateSession,
 	"/Ydb.Table.V1.TableService/DeleteSession":          TableDeleteSession,
 	"/Ydb.Table.V1.TableService/KeepAlive":              TableKeepAlive,
@@ -210,6 +218,112 @@ func (t TablePrepareDataQueryResult) SetQueryID(id string) {
 	setField("QueryId", t.R, id)
 }
 
+type Cluster struct {
+	OnGet     func(ctx context.Context) (conn ydb.ClientConnInterface, err error)
+	OnGetLazy func() (conn ydb.ClientConnInterface)
+	OnClose   func() error
+}
+
+func (c *Cluster) Get(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+	if c.OnGet == nil {
+		return nil, ErrNotImplemented
+	}
+	return c.OnGet(ctx)
+}
+
+func (c *Cluster) GetLazy() (conn ydb.ClientConnInterface) {
+	if c.OnGetLazy == nil {
+		return &ClientConn{}
+	}
+	return c.OnGetLazy()
+}
+
+func (c *Cluster) Close() error {
+	if c.OnClose == nil {
+		return ErrNotImplemented
+	}
+	return c.OnClose()
+}
+
+type ClientConn struct {
+	OnInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
+	OnNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	OnAddress   func() string
+}
+
+func (c *ClientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	if c.OnInvoke == nil {
+		return ErrNotImplemented
+	}
+	return c.OnInvoke(ctx, method, args, reply, opts...)
+}
+
+func (c *ClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	if c.OnNewStream == nil {
+		return nil, ErrNotImplemented
+	}
+	return c.OnNewStream(ctx, desc, method, opts...)
+}
+
+func (c *ClientConn) Address() string {
+	if c.OnAddress == nil {
+		return ""
+	}
+	return c.OnAddress()
+}
+
+type ClientStream struct {
+	OnHeader    func() (metadata.MD, error)
+	OnTrailer   func() metadata.MD
+	OnCloseSend func() error
+	OnContext   func() context.Context
+	OnSendMsg   func(m interface{}) error
+	OnRecvMsg   func(m interface{}) error
+}
+
+func (s *ClientStream) Header() (metadata.MD, error) {
+	if s.OnHeader == nil {
+		return nil, ErrNotImplemented
+	}
+	return s.OnHeader()
+}
+
+func (s *ClientStream) Trailer() metadata.MD {
+	if s.OnTrailer == nil {
+		return nil
+	}
+	return s.OnTrailer()
+}
+
+func (s *ClientStream) CloseSend() error {
+	if s.OnCloseSend == nil {
+		return ErrNotImplemented
+	}
+	return s.OnCloseSend()
+}
+
+func (s *ClientStream) Context() context.Context {
+	if s.OnContext == nil {
+		return nil
+	}
+	return s.OnContext()
+}
+
+func (s *ClientStream) SendMsg(m interface{}) error {
+	if s.OnSendMsg == nil {
+		return ErrNotImplemented
+	}
+	return s.OnSendMsg(m)
+
+}
+
+func (s *ClientStream) RecvMsg(m interface{}) error {
+	if s.OnRecvMsg == nil {
+		return ErrNotImplemented
+	}
+	return s.OnRecvMsg(m)
+}
+
 type Driver struct {
 	OnCall       func(ctx context.Context, code MethodCode, req, res interface{}) error
 	OnStreamRead func(ctx context.Context, code MethodCode, req, res interface{}, process func(error)) error
@@ -221,7 +335,7 @@ func (d *Driver) Call(ctx context.Context, op ydb.Operation) (ydb.CallInfo, erro
 		return nil, ErrNotImplemented
 	}
 	method, req, res, _ := internal.Unwrap(op)
-	code := grpcMethodToCode[method]
+	code := grpcMethodToCode[Method(method)]
 
 	// NOTE: req and res may be converted to testutil inner structs, which are
 	// mirrors of grpc api envelopes.
@@ -233,7 +347,7 @@ func (d *Driver) StreamRead(ctx context.Context, op ydb.StreamOperation) (ydb.Ca
 		return nil, ErrNotImplemented
 	}
 	method, req, res, processor := internal.UnwrapStreamOperation(op)
-	code := grpcMethodToCode[method]
+	code := grpcMethodToCode[Method(method)]
 
 	return nil, d.OnStreamRead(ctx, code, req, res, processor)
 }

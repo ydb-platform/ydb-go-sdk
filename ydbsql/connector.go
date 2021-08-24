@@ -220,15 +220,21 @@ func (c *connector) init(ctx context.Context) (err error) {
 func (c *connector) dial(ctx context.Context) (*table.Client, error) {
 	d, err := c.dialer.Dial(ctx, c.endpoint)
 	if err != nil {
+		if c == nil {
+			panic("nil connector")
+		}
+		if c.dialer.DriverConfig == nil {
+			panic("nil driver config")
+		}
+		if c.dialer.DriverConfig.Credentials == nil {
+			panic("nil credentials")
+		}
 		if stringer, ok := c.dialer.DriverConfig.Credentials.(fmt.Stringer); ok {
 			return nil, fmt.Errorf("dial error: %w (credentials: %s)", err, stringer.String())
 		}
 		return nil, fmt.Errorf("dial error: %w", err)
 	}
-	return &table.Client{
-		Driver: d,
-		Trace:  c.clientTrace,
-	}, nil
+	return table.NewClient(d, table.WithClientTraceOption(c.clientTrace)), nil
 }
 
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -268,7 +274,7 @@ type Driver struct {
 
 func (d *Driver) Close() error {
 	_ = d.c.pool.Close(context.Background())
-	return d.c.client.Driver.Close()
+	return d.c.client.Close()
 }
 
 // Open returns a new connection to the ydb.

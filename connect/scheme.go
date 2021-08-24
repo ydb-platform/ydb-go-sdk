@@ -2,6 +2,7 @@ package connect
 
 import (
 	"context"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/scheme"
 )
 
@@ -12,6 +13,10 @@ type schemeWrapper struct {
 
 func newSchemeWrapper(ctx context.Context) *schemeWrapper {
 	return &schemeWrapper{
-		ctx:    ctx,
+		ctx: ctx,
 	}
+}
+
+func (s *schemeWrapper) set(cluster ydb.Cluster) {
+	s.client = scheme.NewClient(cluster)
 }

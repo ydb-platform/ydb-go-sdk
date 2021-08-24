@@ -3,7 +3,9 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"google.golang.org/grpc"
 	"math/rand"
 	"path"
 	"runtime"
@@ -1327,21 +1329,27 @@ func simpleSession() *Session {
 }
 
 func newSession(t *testing.T, h methodHandlers) *Session {
-	return &Session{
-		c: Client{
-			Driver: &testutil.Driver{
-				OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
+	cluster := &testutil.Cluster{
+		OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+			return &testutil.ClientConn{
+				OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 					if h == nil {
 						return nil
 					}
-					f := h[m]
+					f := h[testutil.Method(method).Code()]
 					if f == nil {
-						t.Fatalf("unexpected operation: %s", m)
+						t.Fatalf("unexpected operation: %s", method)
 					}
-					return f(req, res)
+					return f(args, reply)
 				},
-			},
+			}, nil
 		},
+	}
+	return &Session{
+		c: Client{
+			cluster: cluster,
+		},
+		tableService: Ydb_Table_V1.NewTableServiceClient(cluster.GetLazy()),
 	}
 }
 
