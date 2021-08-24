@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Discovery_V1"
 	"net"
 	"strconv"
 	"sync"
@@ -149,9 +150,9 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 			wg.Wait()
 		}
 		discoveryClient := &discoveryClient{
-			cluster:  driver,
-			database: d.config.Database,
-			ssl:      d.useTLS(),
+			discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(driver.GetLazy()),
+			database:         d.config.Database,
+			ssl:              d.useTLS(),
 		}
 		cluster.explorer = NewRepeater(d.config.DiscoveryInterval, 0,
 			func(ctx context.Context) {
@@ -277,13 +278,14 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 
 	return discover(
 		ctx,
-		d.config.Database,
-		d.useTLS(), &grpcConn{
+		Ydb_Discovery_V1.NewDiscoveryServiceClient(&grpcConn{
 			c: c,
 			d: &driver{
 				meta: d.meta,
 			},
-		},
+		}),
+		d.config.Database,
+		d.useTLS(),
 	)
 }
 
