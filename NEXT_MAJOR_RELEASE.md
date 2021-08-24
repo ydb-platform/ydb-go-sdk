@@ -1,4 +1,6 @@
 # Breaking changes for the next major release
+- [ ] Delete deprecated ConnUsePolicy, EndpointInfo, WithEndpointInfo, WithEndpointInfoAndPolicy, ContextConn
+- [ ] Delete deprecated Driver interface
 - [ ] Delete deprecated api package
 - [ ] Delete deprecated internalapi package
 - [ ] Delete deprecated parameter KeepAliveBatchSize from session pool

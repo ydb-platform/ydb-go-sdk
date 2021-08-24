@@ -17,8 +17,11 @@ type (
 	ctxOpTimeoutKey     struct{}
 	ctxOpCancelAfterKey struct{}
 	ctxOpModeKey        struct{}
-	ctxEndpointInfoKey  struct{}
 
+	// Deprecated: no need to append endpoint info
+	ctxEndpointInfoKey struct{}
+
+	// Deprecated: no need to append endpoint info
 	ctxEndpointInfo struct {
 		conn   *conn
 		policy ConnUsePolicy
@@ -56,6 +59,7 @@ func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
 }
 
 // WithEndpointInfo returns a copy of parent context with endopint info and custom connection use policy
+// Deprecated: no need to append endpoint info
 func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, policy ConnUsePolicy) context.Context {
 	if endpointInfo != nil {
 		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
@@ -67,6 +71,7 @@ func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, p
 }
 
 // WithEndpointInfo returns a copy of parent context with endpoint info and default connection use policy
+// Deprecated: no need to append endpoint info
 func WithEndpointInfo(ctx context.Context, endpointInfo EndpointInfo) context.Context {
 	if endpointInfo != nil {
 		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
@@ -88,6 +93,7 @@ func WithUserAgent(ctx context.Context, userAgent string) context.Context {
 }
 
 // ContextConn returns the connection and connection use policy
+// Deprecated: no need to use endpoint info from context
 func ContextConn(ctx context.Context) (conn *conn, backoffUseBalancer bool) {
 	connInfo, ok := ctx.Value(ctxEndpointInfoKey{}).(ctxEndpointInfo)
 	if !ok {
