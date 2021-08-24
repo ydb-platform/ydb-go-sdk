@@ -19,7 +19,7 @@ const (
 	testResource             = "test_res"
 )
 
-func openDB(ctx context.Context) (ydb.Driver, error) {
+func openDB(ctx context.Context) (ydb.Cluster, error) {
 	var (
 		dtrace ydb.DriverTrace
 		ctrace table.ClientTrace
@@ -54,12 +54,12 @@ func openDB(ctx context.Context) (ydb.Driver, error) {
 		TLSConfig: nil,
 		Timeout:   time.Second * 2,
 	}
-	driver, err := dialer.Dial(ctx, "localhost:2135")
+	cluster, err := dialer.Dial(ctx, "localhost:2135")
 	if err != nil {
 		return nil, fmt.Errorf("dial error: %w", err)
 	}
 
-	return driver, nil
+	return cluster, nil
 }
 
 func TestRateLimiter(t *testing.T) {
@@ -68,19 +68,19 @@ func TestRateLimiter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
-	driver, err := openDB(ctx)
+	cluster, err := openDB(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = driver.Close()
+		_ = cluster.Close()
 	}()
 
-	client := Client{Driver: driver}
-	coordClient := coordination.Client{Driver: driver}
+	client := NewClient(cluster)
+	coordinationClient := coordination.NewClient(cluster)
 
-	err = coordClient.DropNode(ctx, testCoordinationNodePath)
-	err = coordClient.CreateNode(ctx, testCoordinationNodePath, coordination.Config{
+	err = coordinationClient.DropNode(ctx, testCoordinationNodePath)
+	err = coordinationClient.CreateNode(ctx, testCoordinationNodePath, coordination.Config{
 		Path:                     "",
 		SelfCheckPeriodMillis:    1000,
 		SessionGracePeriodMillis: 1000,
@@ -92,7 +92,7 @@ func TestRateLimiter(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		err = coordClient.DropNode(ctx, testCoordinationNodePath)
+		err = coordinationClient.DropNode(ctx, testCoordinationNodePath)
 		if err != nil {
 			t.Fatal(err)
 		}

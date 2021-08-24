@@ -2,9 +2,11 @@ package ratelimiter
 
 import (
 	"context"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"google.golang.org/protobuf/proto"
 
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_RateLimiter_V1"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_RateLimiter"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
 )
 
 type HierarchicalDrrSettings struct {
@@ -20,11 +22,17 @@ type Resource struct {
 }
 
 type Client struct {
-	Driver ydb.Driver
+	ratelimiterService Ydb_RateLimiter_V1.RateLimiterServiceClient
+}
+
+func NewClient(cluster ydb.Cluster) *Client {
+	return &Client{
+		ratelimiterService: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cluster.GetLazy()),
+	}
 }
 
 func (c *Client) CreateResource(ctx context.Context, coordinationNodePath string, resource Resource) (err error) {
-	req := Ydb_RateLimiter.CreateResourceRequest{
+	_, err = c.ratelimiterService.CreateResource(ctx, &Ydb_RateLimiter.CreateResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
 			ResourcePath: resource.ResourcePath,
@@ -35,15 +43,12 @@ func (c *Client) CreateResource(ctx context.Context, coordinationNodePath string
 				PrefetchWatermark:       resource.HierarchicalDrr.PrefetchWatermark,
 			}},
 		},
-	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.RateLimiter.V1.RateLimiterService/CreateResource", &req, nil,
-	))
+	})
 	return
 }
 
 func (c *Client) AlterResource(ctx context.Context, coordinationNodePath string, resource Resource) (err error) {
-	req := Ydb_RateLimiter.AlterResourceRequest{
+	_, err = c.ratelimiterService.AlterResource(ctx, &Ydb_RateLimiter.AlterResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
 			ResourcePath: resource.ResourcePath,
@@ -54,86 +59,86 @@ func (c *Client) AlterResource(ctx context.Context, coordinationNodePath string,
 				PrefetchWatermark:       resource.HierarchicalDrr.PrefetchWatermark,
 			}},
 		},
-	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.RateLimiter.V1.RateLimiterService/AlterResource", &req, nil,
-	))
+	})
 	return
 }
 
 func (c *Client) DropResource(ctx context.Context, coordinationNodePath string, resourcePath string) (err error) {
-	req := Ydb_RateLimiter.DropResourceRequest{
+	_, err = c.ratelimiterService.DropResource(ctx, &Ydb_RateLimiter.DropResourceRequest{
 		OperationParams:      nil,
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
-	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.RateLimiter.V1.RateLimiterService/DropResource", &req, nil,
-	))
+	})
 	return
 }
 
-func (c *Client) ListResource(ctx context.Context, coordinationNodePath string, resourcePath string, recursive bool) ([]string, error) {
-	var res Ydb_RateLimiter.ListResourcesResult
-	req := Ydb_RateLimiter.ListResourcesRequest{
+func (c *Client) ListResource(ctx context.Context, coordinationNodePath string, resourcePath string, recursive bool) (_ []string, err error) {
+	var (
+		response *Ydb_RateLimiter.ListResourcesResponse
+		result   Ydb_RateLimiter.ListResourcesResult
+	)
+	response, err = c.ratelimiterService.ListResources(ctx, &Ydb_RateLimiter.ListResourcesRequest{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
-	}
-	_, err := c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.RateLimiter.V1.RateLimiterService/ListResources", &req, &res,
-	))
+	})
 	if err != nil {
 		return nil, err
 	}
-	return res.ResourcePaths, nil
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	if err != nil {
+		return nil, err
+	}
+	return result.GetResourcePaths(), nil
 }
 
-func (c *Client) DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (*Resource, error) {
-	var res Ydb_RateLimiter.DescribeResourceResult
-	req := Ydb_RateLimiter.DescribeResourceRequest{
+func (c *Client) DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (_ *Resource, err error) {
+	var (
+		response *Ydb_RateLimiter.DescribeResourceResponse
+		result   Ydb_RateLimiter.DescribeResourceResult
+	)
+	response, err = c.ratelimiterService.DescribeResource(ctx, &Ydb_RateLimiter.DescribeResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
+	})
+	if err != nil {
+		return nil, err
 	}
-	_, err := c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.RateLimiter.V1.RateLimiterService/DescribeResource", &req, &res,
-	))
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &Resource{
-		ResourcePath: res.Resource.ResourcePath,
+	resource := &Resource{
+		ResourcePath: result.GetResource().GetResourcePath(),
 	}
 
-	if res.Resource.GetHierarchicalDrr() != nil {
-		result.HierarchicalDrr = HierarchicalDrrSettings{
-			MaxUnitsPerSecond:       res.Resource.GetHierarchicalDrr().MaxUnitsPerSecond,
-			MaxBurstSizeCoefficient: res.Resource.GetHierarchicalDrr().MaxBurstSizeCoefficient,
-			PrefetchCoefficient:     res.Resource.GetHierarchicalDrr().PrefetchCoefficient,
-			PrefetchWatermark:       res.Resource.GetHierarchicalDrr().PrefetchWatermark,
+	if result.GetResource().GetHierarchicalDrr() != nil {
+		resource.HierarchicalDrr = HierarchicalDrrSettings{
+			MaxUnitsPerSecond:       result.GetResource().GetHierarchicalDrr().GetMaxUnitsPerSecond(),
+			MaxBurstSizeCoefficient: result.GetResource().GetHierarchicalDrr().GetMaxBurstSizeCoefficient(),
+			PrefetchCoefficient:     result.GetResource().GetHierarchicalDrr().GetPrefetchCoefficient(),
+			PrefetchWatermark:       result.GetResource().GetHierarchicalDrr().GetPrefetchWatermark(),
 		}
 	}
 
-	return result, nil
+	return resource, nil
 }
 
 func (c *Client) AcquireResource(ctx context.Context, coordinationNodePath string, resourcePath string, amount uint64, isUsedAmount bool) (err error) {
-	var req Ydb_RateLimiter.AcquireResourceRequest
+	var request Ydb_RateLimiter.AcquireResourceRequest
 	if isUsedAmount {
-		req = Ydb_RateLimiter.AcquireResourceRequest{
+		request = Ydb_RateLimiter.AcquireResourceRequest{
 			CoordinationNodePath: coordinationNodePath,
 			ResourcePath:         resourcePath,
 			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Used{Used: amount},
 		}
 	} else {
-		req = Ydb_RateLimiter.AcquireResourceRequest{
+		request = Ydb_RateLimiter.AcquireResourceRequest{
 			CoordinationNodePath: coordinationNodePath,
 			ResourcePath:         resourcePath,
 			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Required{Required: amount},
 		}
 	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.RateLimiter.V1.RateLimiterService/AcquireResource", &req, nil,
-	))
+	_, err = c.ratelimiterService.AcquireResource(ctx, &request)
 	return
 }
