@@ -115,3 +115,7 @@ const (
 func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
 	internal.WriteTypeStringTo(buf, t)
 }
+
+type YdbScanner interface {
+	Scan(src interface{}) error
+}

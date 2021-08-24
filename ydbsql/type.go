@@ -40,7 +40,7 @@ func (d *Date) Scan(x interface{}) error {
 }
 
 func (d Date) Value() ydb.Value {
-	return ydb.DateValue(internal.MarshalDate(time.Time(d)))
+	return ydb.DateValueFromTime(time.Time(d))
 }
 
 type Datetime time.Time
@@ -55,7 +55,7 @@ func (d *Datetime) Scan(x interface{}) error {
 }
 
 func (d Datetime) Value() ydb.Value {
-	return ydb.DatetimeValue(internal.MarshalDatetime(time.Time(d)))
+	return ydb.DatetimeValueFromTime(time.Time(d))
 }
 
 type Timestamp time.Time
@@ -70,7 +70,7 @@ func (d *Timestamp) Scan(x interface{}) error {
 }
 
 func (d Timestamp) Value() ydb.Value {
-	return ydb.TimestampValue(internal.MarshalTimestamp(time.Time(d)))
+	return ydb.TimestampValueFromTime(time.Time(d))
 }
 
 type Interval time.Duration
@@ -85,7 +85,7 @@ func (d *Interval) Scan(x interface{}) error {
 }
 
 func (d Interval) Value() ydb.Value {
-	return ydb.IntervalValue(internal.MarshalInterval(time.Duration(d)))
+	return ydb.IntervalValueFromDuration(time.Duration(d))
 }
 
 type TzDate time.Time
@@ -104,7 +104,7 @@ func (d *TzDate) Scan(x interface{}) error {
 }
 
 func (d TzDate) Value() ydb.Value {
-	return ydb.TzDateValue(internal.MarshalTzDate(time.Time(d)))
+	return ydb.TzDateValueFromTime(time.Time(d))
 }
 
 type TzDatetime time.Time
@@ -123,7 +123,7 @@ func (d *TzDatetime) Scan(x interface{}) error {
 }
 
 func (d TzDatetime) Value() ydb.Value {
-	return ydb.TzDatetimeValue(internal.MarshalTzDatetime(time.Time(d)))
+	return ydb.TzDatetimeValueFromTime(time.Time(d))
 }
 
 type TzTimestamp time.Time
@@ -142,7 +142,7 @@ func (d *TzTimestamp) Scan(x interface{}) error {
 }
 
 func (d TzTimestamp) Value() ydb.Value {
-	return ydb.TzTimestampValue(internal.MarshalTzTimestamp(time.Time(d)))
+	return ydb.TzTimestampValueFromTime(time.Time(d))
 }
 
 type Decimal struct {

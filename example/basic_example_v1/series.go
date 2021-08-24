@@ -161,19 +161,17 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 		return err
 	}
 	log.Printf("\n> read_table:")
+	var (
+		id    *uint64
+		title *string
+		date  *uint64
+	)
 	// TODO(kamardin): truncated flag.
-	for res.NextStreamSet(ctx) {
+	for res.NextStreamSet(ctx, "series_id", "title", "release_date") {
 		for res.NextRow() {
-			res.NextItem()
-			id := res.OUint64()
+			_ = res.Scan(&id, &title, &date)
 
-			res.NextItem()
-			title := res.OUTF8()
-
-			res.NextItem()
-			date := res.OUint64()
-
-			log.Printf("#  %d %s %d", id, title, date)
+			log.Printf("#  %d %s %d", *id, *title, *date)
 		}
 	}
 	if err := res.Err(); err != nil {
@@ -284,21 +282,21 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 	if err != nil {
 		return err
 	}
+
+	var (
+		id    *uint64
+		title *string
+		date  *[]byte
+	)
 	// TODO(kamardin): truncated flag.
-	for res.NextSet() {
+	for res.NextSet("series_id", "title", "release_date") {
 		for res.NextRow() {
-			res.SeekItem("series_id")
-			id := res.OUint64()
 
-			res.NextItem()
-			title := res.OUTF8()
-
-			res.NextItem()
-			date := res.OString()
+			_ = res.Scan(&id, &title, &date)
 
 			log.Printf(
 				"\n> select_simple_transaction: %d %s %s",
-				id, title, date,
+				*id, *title, *date,
 			)
 		}
 	}

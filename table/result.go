@@ -10,7 +10,7 @@ import (
 
 // Result is a result of a query.
 //
-// Use NextSet(), NextRow() and NextItem() to advance through the result sets,
+// Use NextSet(), NextRow() and Scan() to advance through the result sets,
 // its rows and row's items.
 //
 //     res, err := s.Execute(ctx, txc, "SELECT ...")
@@ -18,21 +18,17 @@ import (
 //     for res.NextSet() {
 //         for res.NextRow() {
 //             var id int64
-//             var name string
-//             res.NextItem()
-//             id = res.OInt64()  // Optional<Int64> type.
-//             name = res.OUTF8() // Optional<Utf8> type.
+//             var name *string //optional value
+//             res.Scan(&id,&name)
 //         }
 //     }
 //     if err := res.Err() { // get any error encountered during iteration
 //         // handle error
 //     }
 //
-// Note that value getters (res.OInt64() and res.OUTF8() as in the example
-// above) may fail the result iteration. That is, if current value under scan
-// is not of requested type, then appropriate zero value will be returned from
-// getter and res.Err() become non-nil. After that, NextSet(), NextRow() and
-// NextItem() will return false.
+// If current value under scan
+// is not requested type, then res.Err() become non-nil.
+// After that, NextSet(), NextRow() will return false.
 type Result struct {
 	result.Scanner
 
@@ -119,15 +115,16 @@ func (r *Result) HasNextSet() bool {
 }
 
 // NextSet selects next result set in the result.
+// columns - names of columns in the resultSet that will be scanned
 // It returns false if there are no more result sets.
-func (r *Result) NextSet() bool {
+func (r *Result) NextSet(columns ...string) bool {
 	if r.setCh != nil {
 		panic("NextSet must be called only from non streaming operation")
 	}
 	if !r.HasNextSet() {
 		return false
 	}
-	result.Reset(&r.Scanner, r.sets[r.nextSet])
+	result.Reset(&r.Scanner, r.sets[r.nextSet], columns...)
 	r.nextSet++
 	return true
 }
@@ -138,9 +135,10 @@ func (r *Result) Truncated() bool {
 }
 
 // NextStreamSet selects next result set from the result of streaming operation.
+// columns - names of columns in the resultSet that will be scanned
 // It returns false if stream is closed or ctx is canceled.
 // Note that in case of context cancelation it marks via error set.
-func (r *Result) NextStreamSet(ctx context.Context) bool {
+func (r *Result) NextStreamSet(ctx context.Context, columns ...string) bool {
 	if r.setCh == nil {
 		panic("NextStreamSet must be called only from streaming operation")
 	}
@@ -155,7 +153,7 @@ func (r *Result) NextStreamSet(ctx context.Context) bool {
 			}
 			return false
 		}
-		result.Reset(&r.Scanner, s)
+		result.Reset(&r.Scanner, s, columns...)
 		return true
 
 	case <-ctx.Done():

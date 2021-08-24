@@ -1,3 +1,7 @@
+## 2.4.0
+* Added new scanner API.
+* Fixed dualism of interpret data (default values were deprecated for optional values)
+
 ## 2.3.3
 * Fixed internal/stats/series.go (index out of range)
 * Optimized rotate buckets in the Series

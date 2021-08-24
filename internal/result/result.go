@@ -8,14 +8,16 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
-func Reset(s *Scanner, set *Ydb.ResultSet) {
+func Reset(s *Scanner, set *Ydb.ResultSet, columnNames ...string) {
 	s.reset(set)
+	s.setColumnIndexes(columnNames)
 }
 
 func Columns(s *Scanner, it func(name string, typ internal.T)) {
@@ -31,6 +33,7 @@ type Scanner struct {
 	nextItem int
 
 	setColumnIndex map[string]int
+	columnIndexes  []int
 
 	err error
 }
@@ -42,7 +45,39 @@ func (s *Scanner) reset(set *Ydb.ResultSet) {
 	s.nextRow = 0
 	s.nextItem = 0
 	s.setColumnIndex = nil
+	s.columnIndexes = nil
 	s.stack.reset()
+}
+
+func (s *Scanner) seekItemByID(id int) {
+	if !s.HasItems() || id >= len(s.set.Columns) {
+		s.noValueError()
+		return
+	}
+	s.nextItem = id + 1
+	s.stack.reset()
+	col := s.set.Columns[id]
+	s.stack.set(item{
+		name: col.Name,
+		i:    id,
+		t:    col.Type,
+		v:    s.row.Items[id],
+	})
+}
+
+func (s *Scanner) setColumnIndexes(columns []string) {
+	s.indexSetColumns()
+	if columns != nil {
+		s.columnIndexes = make([]int, 0, len(columns))
+		for _, col := range columns {
+			colIndex, ok := s.setColumnIndex[col]
+			if !ok {
+				s.noColumnError(col)
+				return
+			}
+			s.columnIndexes = append(s.columnIndexes, colIndex)
+		}
+	}
 }
 
 // ColumnCount returns number of columns in the current result set.
@@ -136,10 +171,11 @@ func (s *Scanner) NextItem() (ok bool) {
 	s.nextItem = i + 1
 
 	s.stack.reset()
+	col := s.set.Columns[i]
 	s.stack.set(item{
-		name: s.set.Columns[i].Name,
+		name: col.Name,
 		i:    i,
-		t:    s.set.Columns[i].Type,
+		t:    col.Type,
 		v:    s.row.Items[i],
 	})
 
@@ -164,10 +200,11 @@ func (s *Scanner) SeekItem(name string) bool {
 	s.nextItem = i + 1
 
 	s.stack.reset()
+	col := s.set.Columns[i]
 	s.stack.set(item{
-		name: s.set.Columns[i].Name,
+		name: col.Name,
 		i:    i,
-		t:    s.set.Columns[i].Type,
+		t:    col.Type,
 		v:    s.row.Items[i],
 	})
 
@@ -462,157 +499,6 @@ func (s *Scanner) Unwrap() {
 	})
 }
 
-func (s *Scanner) Bool() (v bool) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_BOOL) {
-		return
-	}
-	return s.bool()
-}
-func (s *Scanner) Int8() (v int8) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INT8) {
-		return
-	}
-	return s.int8()
-}
-func (s *Scanner) Uint8() (v uint8) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UINT8) {
-		return
-	}
-	return s.uint8()
-}
-func (s *Scanner) Int16() (v int16) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INT16) {
-		return
-	}
-	return s.int16()
-}
-func (s *Scanner) Uint16() (v uint16) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UINT16) {
-		return
-	}
-	return s.uint16()
-}
-func (s *Scanner) Int32() (v int32) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INT32) {
-		return
-	}
-	return s.int32()
-}
-func (s *Scanner) Uint32() (v uint32) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UINT32) {
-		return
-	}
-	return s.uint32()
-}
-func (s *Scanner) Int64() (v int64) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INT64) {
-		return
-	}
-	return s.int64()
-}
-func (s *Scanner) Uint64() (v uint64) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UINT64) {
-		return
-	}
-	return s.uint64()
-}
-func (s *Scanner) Float() (v float32) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_FLOAT) {
-		return
-	}
-	return s.float()
-}
-func (s *Scanner) Double() (v float64) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DOUBLE) {
-		return
-	}
-	return s.double()
-}
-func (s *Scanner) Date() (v uint32) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DATE) {
-		return
-	}
-	return s.uint32()
-}
-func (s *Scanner) Datetime() (v uint32) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DATETIME) {
-		return
-	}
-	return s.uint32()
-}
-func (s *Scanner) Timestamp() (v uint64) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_TIMESTAMP) {
-		return
-	}
-	return s.uint64()
-}
-func (s *Scanner) Interval() (v int64) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INTERVAL) {
-		return
-	}
-	return s.int64()
-}
-func (s *Scanner) TzDate() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_TZ_DATE) {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) TzDatetime() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_TZ_DATETIME) {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) TzTimestamp() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_TZ_TIMESTAMP) {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) String() (v []byte) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_STRING) {
-		return
-	}
-	return s.bytes()
-}
-func (s *Scanner) UTF8() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UTF8) {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) YSON() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_YSON) {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) JSON() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_JSON) {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) UUID() (v [16]byte) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UUID) {
-		return
-	}
-	return s.uint128()
-}
-func (s *Scanner) JSONDocument() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_JSON_DOCUMENT) {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) DyNumber() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DYNUMBER) {
-		return
-	}
-	return s.text()
-}
-
 // Decimal returns decimal value represented by big-endian 128 bit signed
 // integes.
 func (s *Scanner) Decimal(t ydb.Type) (v [16]byte) {
@@ -632,231 +518,6 @@ func (s *Scanner) UnwrapDecimal() (v [16]byte, precision, scale uint32) {
 	return s.uint128(), d.DecimalType.Precision, d.DecimalType.Scale
 }
 
-func (s *Scanner) OBool() (v bool) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_BOOL) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.bool()
-}
-func (s *Scanner) OInt8() (v int8) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INT8) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.int8()
-}
-func (s *Scanner) OUint8() (v uint8) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UINT8) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.uint8()
-}
-func (s *Scanner) OInt16() (v int16) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INT16) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.int16()
-}
-func (s *Scanner) OUint16() (v uint16) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UINT16) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.uint16()
-}
-func (s *Scanner) OInt32() (v int32) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INT32) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.int32()
-}
-func (s *Scanner) OUint32() (v uint32) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UINT32) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.uint32()
-}
-func (s *Scanner) OInt64() (v int64) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INT64) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.int64()
-}
-func (s *Scanner) OUint64() (v uint64) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UINT64) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.uint64()
-}
-func (s *Scanner) OFloat() (v float32) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_FLOAT) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.float()
-}
-func (s *Scanner) ODouble() (v float64) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DOUBLE) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.double()
-}
-func (s *Scanner) ODate() (v uint32) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DATE) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.uint32()
-}
-func (s *Scanner) ODatetime() (v uint32) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DATETIME) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.uint32()
-}
-func (s *Scanner) OTimestamp() (v uint64) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_TIMESTAMP) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.uint64()
-}
-func (s *Scanner) OInterval() (v int64) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INTERVAL) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.int64()
-}
-func (s *Scanner) OTzDate() (v string) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_TZ_DATE) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) OTzDatetime() (v string) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_TZ_DATETIME) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) OTzTimestamp() (v string) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_TZ_TIMESTAMP) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) OString() (v []byte) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_STRING) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.bytes()
-}
-func (s *Scanner) OUTF8() (v string) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UTF8) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) OYSON() (v string) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_YSON) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) OJSON() (v string) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_JSON) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) OUUID() (v [16]byte) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UUID) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.uint128()
-}
-func (s *Scanner) OJSONDocument() (v string) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_JSON_DOCUMENT) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.text()
-}
-func (s *Scanner) ODyNumber() (v string) {
-	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DYNUMBER) {
-		return
-	}
-	if s.isNull() {
-		return
-	}
-	return s.text()
-}
 func (s *Scanner) ODecimal(t ydb.Type) (v [16]byte) {
 	if s.err != nil || !s.assertCurrentTypeOptionalDecimal(t) {
 		return
@@ -952,7 +613,7 @@ func (s *Scanner) Any() interface{} {
 }
 
 // Value returns current item under scan as ydb.Value type.
-func (s *Scanner) Value() ydb.Value {
+func (s *Scanner) value() ydb.Value {
 	if s.err != nil {
 		return nil
 	}
@@ -1414,6 +1075,438 @@ func (s *Scanner) uint128() (v [16]byte) {
 	lo := s.low128()
 	hi := c.v.High_128
 	return internal.BigEndianUint128(hi, lo)
+}
+
+func (s *Scanner) setTime(dst *time.Time) {
+	switch t := s.stack.current().t.GetTypeId(); t {
+	case Ydb.Type_DATE:
+		*dst = internal.UnmarshalDate(s.uint32())
+	case Ydb.Type_DATETIME:
+		*dst = internal.UnmarshalDatetime(s.uint32())
+	case Ydb.Type_TIMESTAMP:
+		*dst = internal.UnmarshalTimestamp(s.uint64())
+	case Ydb.Type_TZ_DATE:
+		src, err := internal.UnmarshalTzDate(s.text())
+		if err != nil {
+			s.errorf("scan row failed: %w", err)
+		}
+		*dst = src
+	case Ydb.Type_TZ_DATETIME:
+		src, err := internal.UnmarshalTzDatetime(s.text())
+		if err != nil {
+			s.errorf("scan row failed: %w", err)
+		}
+		*dst = src
+	case Ydb.Type_TZ_TIMESTAMP:
+		src, err := internal.UnmarshalTzTimestamp(s.text())
+		if err != nil {
+			s.errorf("scan row failed: %w", err)
+		}
+		*dst = src
+	default:
+		s.errorf("scan row failed: incorrect source type %s", t)
+	}
+}
+
+func (s *Scanner) setString(dst *string) {
+	switch t := s.stack.current().t.GetTypeId(); t {
+	case Ydb.Type_STRING:
+		*dst = string(s.bytes())
+	case Ydb.Type_UTF8:
+		*dst = s.text()
+	default:
+		s.errorf("scan row failed: incorrect source type %s", t)
+	}
+}
+
+func (s *Scanner) setByte(dst *[]byte) {
+	switch t := s.stack.current().t.GetTypeId(); t {
+	case Ydb.Type_UUID:
+		src := s.uint128()
+		*dst = src[:]
+	case Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT, Ydb.Type_DYNUMBER:
+		*dst = []byte(s.text())
+	case Ydb.Type_STRING:
+		*dst = s.bytes()
+	default:
+		s.errorf("scan row failed: incorrect source type %s", t)
+	}
+}
+
+// ReadSingleRow scan one row
+func (s *Scanner) ReadSingleRow(values ...interface{}) error {
+	if s.err != nil {
+		return s.err
+	}
+	if s.NextRow() {
+		return s.Scan(values...)
+	}
+	s.errorf("scan row failed: no data")
+	return s.err
+}
+
+func (s *Scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	if rv.Kind() == reflect.Ptr {
+		if !optional {
+			return false
+		}
+		if s.isNull() {
+			rv.Set(reflect.Zero(rv.Type()))
+			return true
+		}
+		if rv.IsZero() {
+			nv := reflect.New(rv.Type().Elem())
+			rv.Set(nv)
+		}
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Array {
+		return false
+	}
+	if rv.Type().Elem().Kind() != reflect.Uint8 {
+		return false
+	}
+	if def {
+		rv.Set(reflect.Zero(rv.Type()))
+		return true
+	}
+	dst := []byte{}
+	s.setByte(&dst)
+	if rv.Len() != len(dst) {
+		return false
+	}
+	reflect.Copy(rv, reflect.ValueOf(dst))
+	return true
+}
+
+func (s *Scanner) scanNonOptional(value interface{}) {
+	switch v := value.(type) {
+	case *bool:
+		*v = s.bool()
+	case *int8:
+		*v = s.int8()
+	case *int16:
+		*v = s.int16()
+	case *int32:
+		*v = s.int32()
+	case *int64:
+		*v = s.int64()
+	case *uint8:
+		*v = s.uint8()
+	case *uint16:
+		*v = s.uint16()
+	case *uint32:
+		*v = s.uint32()
+	case *uint64:
+		*v = s.uint64()
+	case *float32:
+		*v = s.float()
+	case *float64:
+		*v = s.double()
+	case *time.Time:
+		s.setTime(v)
+	case *time.Duration:
+		*v = internal.UnmarshalInterval(s.int64())
+	case *string:
+		s.setString(v)
+	case *[]byte:
+		s.setByte(v)
+	case *[16]byte:
+		*v = s.uint128()
+	case *interface{}:
+		*v = s.Any()
+	case ydb.YdbScanner:
+		err := v.Scan(s.Any())
+		if err != nil {
+			s.errorf("scan row failed: %w", err)
+		}
+	case *ydb.Value:
+		*v = s.value()
+	default:
+		ok := s.trySetByteArray(v, false, false)
+		if !ok {
+			s.errorf("scan row failed: type %T is unknown", v)
+		}
+	}
+}
+
+func (s *Scanner) scanOptional(value interface{}) {
+	switch v := value.(type) {
+	case **bool:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.bool()
+			*v = &src
+		}
+	case **int8:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.int8()
+			*v = &src
+		}
+	case **int16:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.int16()
+			*v = &src
+		}
+	case **int32:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.int32()
+			*v = &src
+		}
+	case **int64:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.int64()
+			*v = &src
+		}
+	case **uint8:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.uint8()
+			*v = &src
+		}
+	case **uint16:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.uint16()
+			*v = &src
+		}
+	case **uint32:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.uint32()
+			*v = &src
+		}
+	case **uint64:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.uint64()
+			*v = &src
+		}
+	case **float32:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.float()
+			*v = &src
+		}
+	case **float64:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.double()
+			*v = &src
+		}
+	case **time.Time:
+		if s.isNull() {
+			*v = nil
+		} else {
+			s.Unwrap()
+			var src time.Time
+			s.setTime(&src)
+			*v = &src
+		}
+	case **time.Duration:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := internal.UnmarshalInterval(s.int64())
+			*v = &src
+		}
+	case **string:
+		if s.isNull() {
+			*v = nil
+		} else {
+			s.Unwrap()
+			var src string
+			s.setString(&src)
+			*v = &src
+		}
+	case **[]byte:
+		if s.isNull() {
+			*v = nil
+		} else {
+			s.Unwrap()
+			var src []byte
+			s.setByte(&src)
+			*v = &src
+		}
+	case **[16]byte:
+		if s.isNull() {
+			*v = nil
+		} else {
+			src := s.uint128()
+			*v = &src
+		}
+	case **interface{}:
+		if s.isNull() {
+			*v = nil
+		} else {
+			s.Unwrap()
+			src := s.Any()
+			*v = &src
+		}
+	default:
+		s.Unwrap()
+		ok := s.trySetByteArray(v, true, false)
+		if !ok {
+			rv := reflect.TypeOf(v)
+			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Ptr {
+				s.errorf("scan row failed: type %T is unknown", v)
+			} else {
+				s.errorf("scan row failed: type %T is not optional! use double pointer.", v)
+			}
+		}
+	}
+}
+
+func (s *Scanner) setDefaultValue(dst interface{}) {
+	switch v := dst.(type) {
+	case *bool:
+		*v = false
+	case *int8:
+		*v = 0
+	case *int16:
+		*v = 0
+	case *int32:
+		*v = 0
+	case *int64:
+		*v = 0
+	case *uint8:
+		*v = 0
+	case *uint16:
+		*v = 0
+	case *uint32:
+		*v = 0
+	case *uint64:
+		*v = 0
+	case *float32:
+		*v = 0
+	case *float64:
+		*v = 0
+	case *time.Time:
+		*v = time.Time{}
+	case *time.Duration:
+		*v = 0
+	case *string:
+		*v = ""
+	case *[]byte:
+		*v = nil
+	case *[16]byte:
+		*v = [16]byte{}
+	case *interface{}:
+		*v = nil
+	case ydb.YdbScanner:
+		err := v.Scan(nil)
+		if err != nil {
+			s.errorf("scan row failed: %w", err)
+		}
+	case *ydb.Value:
+		*v = s.value()
+	default:
+		ok := s.trySetByteArray(v, false, true)
+		if !ok {
+			s.errorf("scan row failed: type %T is unknown", v)
+		}
+	}
+}
+
+// ScanWithDefaults scan with default type values.
+// Nil values applied as default value type
+// Input params - pointers to types.
+func (s *Scanner) ScanWithDefaults(values ...interface{}) error {
+	return s.scan(true, values)
+}
+
+// Scan values.
+// Input params - pointers to types:
+//   bool
+//   int8
+//   uint8
+//   int16
+//   uint16
+//   int32
+//   uint32
+//   int64
+//   uint64
+//   float32
+//   float64
+//   []byte
+//   [16]byte
+//   string
+//   time.Time
+//   time.Duration
+//   ydb.Value
+// For custom types implement ydb.YdbScanner interface.
+// For optional type use double pointer construction.
+// For unknown types use interface type.
+// Supported scanning byte arrays of various length.
+// See examples for more detailed information.
+// Output param - scanner error
+func (s *Scanner) Scan(values ...interface{}) error {
+	return s.scan(false, values)
+}
+
+func (s *Scanner) scan(defaultValuesForOptional bool, values []interface{}) error {
+	if s.err != nil {
+		return s.err
+	}
+	if s.columnIndexes != nil {
+		if len(s.columnIndexes) != len(values) {
+			s.errorf("scan row failed: count of values and column are different")
+			return s.err
+		}
+	}
+	for i, value := range values {
+		if s.columnIndexes == nil {
+			s.NextItem()
+		} else {
+			s.seekItemByID(s.columnIndexes[i])
+		}
+		if s.err != nil {
+			return s.err
+		}
+		if s.isCurrentTypeOptional() {
+			v, ok := value.(ydb.YdbScanner)
+			switch {
+			case ok:
+				s.Unwrap()
+				err := v.Scan(s.Any())
+				if err != nil {
+					s.errorf(err.Error())
+					return err
+				}
+			case defaultValuesForOptional:
+				if s.isNull() {
+					s.setDefaultValue(value)
+				} else {
+					s.Unwrap()
+					s.scanNonOptional(value)
+				}
+			default:
+				s.scanOptional(value)
+			}
+		} else {
+			s.scanNonOptional(value)
+		}
+	}
+	return s.err
 }
 
 const tinyStack = 8

@@ -6,6 +6,8 @@ import (
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
+// Deprecated: Use standard time.Time instead
+// This type will be removed at next major release
 type Time time.Time
 
 //func (t Time) String() string {
@@ -64,6 +66,8 @@ func (t *Time) FromTzTimestamp(x string) error {
 	return err
 }
 
+// Deprecated: Use standard time.Time instead
+// This type will be removed at next major release
 type Duration time.Duration
 
 func (d Duration) Interval() int64 {

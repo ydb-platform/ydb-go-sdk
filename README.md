@@ -73,33 +73,24 @@ if err != nil {
     return err // handle error
 }
 // Scan for received values within the result set(s).
-// Note that Next*() methods report about success of advancing, while
 // res.Err() reports the reason of last unsuccessful one.
-for res.NextSet() {
+var (
+    id    int32
+    myStr *string //optional value
+)
+for res.NextSet("id", "mystr") {
     for res.NextRow() {
         // Suppose our "users" table has two rows: id and age.
         // Thus, current row will contain two appropriate items with
         // exactly the same order.
-        //
-        // Note the O*() getters. "O" stands for Optional. That is,
-        // currently, all columns in tables are optional types.
-        res.NextItem()
-        id := res.Int32()
+        err := res.Scan(&id, &myStr)
 
-        res.NextItem()
-        myStr := res.OUTF8()
-
-        // Note that any value getter (such that OUTF8() and Int32()
-        // above) may fail the result scanning. When this happens, getter
-        // function returns zero value of requested type and marks result
-        // scanning as failed, preventing any further scanning. In this
-        // case res.Err() will return the cause of fail.
-        if res.Err() == nil {
-            // do something with data
-            fmt.Printf("got id %v, got mystr: %v\n", id, myStr)
-        } else {
-            return res.Err() // handle error
+        // Error handling.
+        if err != nil {
+            return err
         }
+        // do something with data
+        fmt.Printf("got id %v, got mystr: %v\n", id, *myStr)
     }
 }
 if res.Err() != nil {
