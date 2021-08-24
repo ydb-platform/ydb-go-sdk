@@ -18,7 +18,10 @@ type grpcConn struct {
 }
 
 func (c *grpcConn) Address() string {
-	return c.c.addr.String()
+	if c.c != nil {
+		return c.c.Address()
+	}
+	return ""
 }
 
 func (c *grpcConn) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
