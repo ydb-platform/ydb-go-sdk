@@ -35,16 +35,11 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 	clientTraceCreateSessionDone := clientTraceOnCreateSession(ctx, c.Trace, ctx)
 	start := time.Now()
 	defer func() {
-		endpoint := ""
-		if s != nil && s.conn != nil {
-			endpoint = s.conn.Address()
-		}
-		clientTraceCreateSessionDone(ctx, s, endpoint, time.Since(start), err)
+		clientTraceCreateSessionDone(ctx, s, s.Address(), time.Since(start), err)
 	}()
 	var (
-		request             Ydb_Table.CreateSessionRequest
-		response            *Ydb_Table.CreateSessionResponse
-		createSessionResult Ydb_Table.CreateSessionResult
+		response *Ydb_Table.CreateSessionResponse
+		result   Ydb_Table.CreateSessionResult
 	)
 	conn, err := c.cluster.Get(ctx)
 	if err != nil {
@@ -53,16 +48,16 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	response, err = Ydb_Table_V1.NewTableServiceClient(conn).CreateSession(ctx, &request)
+	response, err = Ydb_Table_V1.NewTableServiceClient(conn).CreateSession(ctx, &Ydb_Table.CreateSessionRequest{})
 	if err != nil {
 		return nil, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &createSessionResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return nil, err
 	}
 	s = &Session{
-		ID:           createSessionResult.SessionId,
+		ID:           result.SessionId,
 		conn:         conn,
 		tableService: Ydb_Table_V1.NewTableServiceClient(conn),
 		c:            *c,
@@ -112,18 +107,17 @@ func (s *Session) Close(ctx context.Context) (err error) {
 		}
 		clientTraceDeleteSessionDone(ctx, s, time.Since(start), err)
 	}()
-	request := Ydb_Table.DeleteSessionRequest{
-		SessionId: s.ID,
-	}
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	_, err = s.tableService.DeleteSession(ctx, &request)
+	_, err = s.tableService.DeleteSession(ctx, &Ydb_Table.DeleteSessionRequest{
+		SessionId: s.ID,
+	})
 	return err
 }
 
 func (s *Session) Address() string {
-	if s.conn != nil {
+	if s != nil && s.conn != nil {
 		return s.conn.Address()
 	}
 	return ""
@@ -135,18 +129,17 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 	defer func() {
 		clientTraceKeepAliveDone(ctx, s, info, err)
 	}()
-	var res Ydb_Table.KeepAliveResult
-	request := Ydb_Table.KeepAliveRequest{
-		SessionId: s.ID,
-	}
+	var result Ydb_Table.KeepAliveResult
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	_, err = s.tableService.KeepAlive(ctx, &request)
+	_, err = s.tableService.KeepAlive(ctx, &Ydb_Table.KeepAliveRequest{
+		SessionId: s.ID,
+	})
 	if err != nil {
 		return
 	}
-	switch res.SessionStatus {
+	switch result.SessionStatus {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
 		info.Status = SessionReady
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
@@ -171,8 +164,8 @@ func (s *Session) CreateTable(ctx context.Context, path string, opts ...CreateTa
 // DescribeTable describes table at given path.
 func (s *Session) DescribeTable(ctx context.Context, path string, opts ...DescribeTableOption) (desc Description, err error) {
 	var (
-		response            *Ydb_Table.DescribeTableResponse
-		describeTableResult Ydb_Table.DescribeTableResult
+		response *Ydb_Table.DescribeTableResponse
+		result   Ydb_Table.DescribeTableResult
 	)
 	request := Ydb_Table.DescribeTableRequest{
 		SessionId: s.ID,
@@ -185,13 +178,13 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 	if err != nil {
 		return desc, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &describeTableResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return
 	}
 
-	cs := make([]Column, len(describeTableResult.GetColumns()))
-	for i, c := range describeTableResult.Columns {
+	cs := make([]Column, len(result.GetColumns()))
+	for i, c := range result.Columns {
 		cs[i] = Column{
 			Name:   c.GetName(),
 			Type:   internal.TypeFromYDB(c.GetType()),
@@ -199,9 +192,9 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		}
 	}
 
-	rs := make([]KeyRange, len(describeTableResult.GetShardKeyBounds())+1)
+	rs := make([]KeyRange, len(result.GetShardKeyBounds())+1)
 	var last ydb.Value
-	for i, b := range describeTableResult.GetShardKeyBounds() {
+	for i, b := range result.GetShardKeyBounds() {
 		if last != nil {
 			rs[i].From = last
 		}
@@ -217,10 +210,10 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 	}
 
 	var stats *TableStats
-	if describeTableResult.GetTableStats() != nil {
-		resStats := describeTableResult.GetTableStats()
-		partStats := make([]PartitionStats, len(describeTableResult.GetTableStats().GetPartitionStats()))
-		for i, v := range describeTableResult.TableStats.PartitionStats {
+	if result.GetTableStats() != nil {
+		resStats := result.GetTableStats()
+		partStats := make([]PartitionStats, len(result.GetTableStats().GetPartitionStats()))
+		for i, v := range result.TableStats.PartitionStats {
 			partStats[i].RowsEstimate = v.GetRowsEstimate()
 			partStats[i].StoreSize = v.GetStoreSize()
 		}
@@ -242,30 +235,30 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		}
 	}
 
-	cf := make([]ColumnFamily, len(describeTableResult.GetColumnFamilies()))
-	for i, c := range describeTableResult.GetColumnFamilies() {
+	cf := make([]ColumnFamily, len(result.GetColumnFamilies()))
+	for i, c := range result.GetColumnFamilies() {
 		cf[i] = columnFamily(c)
 	}
 
-	attrs := make(map[string]string, len(describeTableResult.GetAttributes()))
-	for k, v := range describeTableResult.GetAttributes() {
+	attrs := make(map[string]string, len(result.GetAttributes()))
+	for k, v := range result.GetAttributes() {
 		attrs[k] = v
 	}
 
 	return Description{
-		Name:                 describeTableResult.GetSelf().GetName(),
-		PrimaryKey:           describeTableResult.GetPrimaryKey(),
+		Name:                 result.GetSelf().GetName(),
+		PrimaryKey:           result.GetPrimaryKey(),
 		Columns:              cs,
 		KeyRanges:            rs,
 		Stats:                stats,
 		ColumnFamilies:       cf,
 		Attributes:           attrs,
-		ReadReplicaSettings:  readReplicasSettings(describeTableResult.GetReadReplicasSettings()),
-		StorageSettings:      storageSettings(describeTableResult.GetStorageSettings()),
-		KeyBloomFilter:       internal.FeatureFlagFromYDB(describeTableResult.GetKeyBloomFilter()),
-		PartitioningSettings: partitioningSettings(describeTableResult.GetPartitioningSettings()),
-		TTLSettings:          ttlSettings(describeTableResult.GetTtlSettings()),
-		TimeToLiveSettings:   timeToLiveSettings(describeTableResult.GetTtlSettings()),
+		ReadReplicaSettings:  readReplicasSettings(result.GetReadReplicasSettings()),
+		StorageSettings:      storageSettings(result.GetStorageSettings()),
+		KeyBloomFilter:       internal.FeatureFlagFromYDB(result.GetKeyBloomFilter()),
+		PartitioningSettings: partitioningSettings(result.GetPartitioningSettings()),
+		TTLSettings:          ttlSettings(result.GetTtlSettings()),
+		TimeToLiveSettings:   timeToLiveSettings(result.GetTtlSettings()),
 	}, nil
 }
 
@@ -296,11 +289,14 @@ func (s *Session) AlterTable(ctx context.Context, path string, opts ...AlterTabl
 }
 
 // CopyTable creates copy of table at given path.
-func (s *Session) CopyTable(ctx context.Context, dst, src string, _ ...CopyTableOption) (err error) {
+func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...CopyTableOption) (err error) {
 	request := Ydb_Table.CopyTableRequest{
 		SessionId:       s.ID,
 		SourcePath:      src,
 		DestinationPath: dst,
+	}
+	for _, opt := range opts {
+		opt((*copyTableDesc)(&request))
 	}
 	_, err = s.tableService.CopyTable(ctx, &request)
 	return err
@@ -315,27 +311,26 @@ type DataQueryExplanation struct {
 // Explain explains data query represented by text.
 func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExplanation, err error) {
 	var (
-		explainQueryResult Ydb_Table.ExplainQueryResult
-		response           *Ydb_Table.ExplainDataQueryResponse
+		result   Ydb_Table.ExplainQueryResult
+		response *Ydb_Table.ExplainDataQueryResponse
 	)
-	request := Ydb_Table.ExplainDataQueryRequest{
-		SessionId: s.ID,
-		YqlText:   query,
-	}
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	response, err = s.tableService.ExplainDataQuery(ctx, &request)
+	response, err = s.tableService.ExplainDataQuery(ctx, &Ydb_Table.ExplainDataQueryRequest{
+		SessionId: s.ID,
+		YqlText:   query,
+	})
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &explainQueryResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return
 	}
 	return DataQueryExplanation{
-		AST:  explainQueryResult.QueryAst,
-		Plan: explainQueryResult.QueryPlan,
+		AST:  result.QueryAst,
+		Plan: result.QueryPlan,
 	}, nil
 }
 
@@ -392,38 +387,37 @@ func (s *Session) Prepare(
 	stmt *Statement, err error,
 ) {
 	var (
-		cached             bool
-		q                  *DataQuery
-		response           *Ydb_Table.PrepareDataQueryResponse
-		prepareQueryResult Ydb_Table.PrepareQueryResult
+		cached   bool
+		q        *DataQuery
+		response *Ydb_Table.PrepareDataQueryResponse
+		result   Ydb_Table.PrepareQueryResult
 	)
 	clientTracePrepareDataQueryDone := clientTraceOnPrepareDataQuery(ctx, s.c.Trace, ctx, s, query)
 	defer func() {
 		clientTracePrepareDataQueryDone(ctx, s, query, q, cached, err)
 	}()
 
-	request := Ydb_Table.PrepareDataQueryRequest{
-		SessionId: s.ID,
-		YqlText:   query,
-	}
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	response, err = s.tableService.PrepareDataQuery(ctx, &request)
+	response, err = s.tableService.PrepareDataQuery(ctx, &Ydb_Table.PrepareDataQueryRequest{
+		SessionId: s.ID,
+		YqlText:   query,
+	})
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &prepareQueryResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return
 	}
 
 	q = new(DataQuery)
-	q.initPrepared(prepareQueryResult.QueryId)
+	q.initPrepared(result.QueryId)
 	stmt = &Statement{
 		session: s,
 		query:   q,
-		params:  prepareQueryResult.ParametersTypes,
+		params:  result.ParametersTypes,
 	}
 
 	return stmt, nil
@@ -447,12 +441,12 @@ func (s *Session) Execute(
 		clientTraceExecuteDataQueryDone(ctx, s, GetTransactionID(txr), q, params, true, r, err)
 	}()
 
-	req, res, err := s.executeDataQuery(ctx, tx, q, params, opts...)
+	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
 	if err != nil {
 		return nil, nil, err
 	}
-	if keepInCache(req) && res.QueryMeta != nil {
-		queryID := res.QueryMeta.Id
+	if keepInCache(request) && result.QueryMeta != nil {
+		queryID := result.QueryMeta.Id
 		// Supplement q with ID for tracing.
 		q.initPreparedText(query, queryID)
 		// Create new DataQuery instead of q above to not store the whole query
@@ -461,7 +455,7 @@ func (s *Session) Execute(
 		subq.initPrepared(queryID)
 	}
 
-	return s.executeQueryResult(res)
+	return s.executeQueryResult(result)
 }
 
 func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
@@ -490,13 +484,13 @@ func (s *Session) executeDataQuery(
 	opts ...ExecuteDataQueryOption,
 ) (
 	request *Ydb_Table.ExecuteDataQueryRequest,
-	executeQueryResult *Ydb_Table.ExecuteQueryResult,
+	result *Ydb_Table.ExecuteQueryResult,
 	err error,
 ) {
 	var (
 		response *Ydb_Table.ExecuteDataQueryResponse
 	)
-	executeQueryResult = new(Ydb_Table.ExecuteQueryResult)
+	result = &Ydb_Table.ExecuteQueryResult{}
 	request = &Ydb_Table.ExecuteDataQueryRequest{
 		SessionId:  s.ID,
 		TxControl:  &tx.desc,
@@ -513,7 +507,7 @@ func (s *Session) executeDataQuery(
 	if err != nil {
 		return nil, nil, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), executeQueryResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), result)
 	return
 }
 
@@ -522,35 +516,35 @@ func (s *Session) ExecuteSchemeQuery(
 	ctx context.Context, query string,
 	opts ...ExecuteSchemeQueryOption,
 ) (err error) {
-	req := Ydb_Table.ExecuteSchemeQueryRequest{
+	request := Ydb_Table.ExecuteSchemeQueryRequest{
 		SessionId: s.ID,
 		YqlText:   query,
 	}
 	for _, opt := range opts {
-		opt((*executeSchemeQueryDesc)(&req))
+		opt((*executeSchemeQueryDesc)(&request))
 	}
-	_, err = s.tableService.ExecuteSchemeQuery(ctx, &req)
+	_, err = s.tableService.ExecuteSchemeQuery(ctx, &request)
 	return err
 }
 
 // DescribeTableOptions describes supported table options.
 func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDescription, err error) {
 	var (
-		response                   *Ydb_Table.DescribeTableOptionsResponse
-		describeTableOptionsResult Ydb_Table.DescribeTableOptionsResult
+		response *Ydb_Table.DescribeTableOptionsResponse
+		result   Ydb_Table.DescribeTableOptionsResult
 	)
 	request := Ydb_Table.DescribeTableOptionsRequest{}
 	response, err = s.tableService.DescribeTableOptions(ctx, &request)
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &describeTableOptionsResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return
 	}
 	{
-		xs := make([]TableProfileDescription, len(describeTableOptionsResult.GetTableProfilePresets()))
-		for i, p := range describeTableOptionsResult.GetTableProfilePresets() {
+		xs := make([]TableProfileDescription, len(result.GetTableProfilePresets()))
+		for i, p := range result.GetTableProfilePresets() {
 			xs[i] = TableProfileDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
@@ -573,8 +567,8 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 		desc.TableProfilePresets = xs
 	}
 	{
-		xs := make([]StoragePolicyDescription, len(describeTableOptionsResult.GetStoragePolicyPresets()))
-		for i, p := range describeTableOptionsResult.GetStoragePolicyPresets() {
+		xs := make([]StoragePolicyDescription, len(result.GetStoragePolicyPresets()))
+		for i, p := range result.GetStoragePolicyPresets() {
 			xs[i] = StoragePolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
@@ -583,8 +577,8 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 		desc.StoragePolicyPresets = xs
 	}
 	{
-		xs := make([]CompactionPolicyDescription, len(describeTableOptionsResult.GetCompactionPolicyPresets()))
-		for i, p := range describeTableOptionsResult.GetCompactionPolicyPresets() {
+		xs := make([]CompactionPolicyDescription, len(result.GetCompactionPolicyPresets()))
+		for i, p := range result.GetCompactionPolicyPresets() {
 			xs[i] = CompactionPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
@@ -593,8 +587,8 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 		desc.CompactionPolicyPresets = xs
 	}
 	{
-		xs := make([]PartitioningPolicyDescription, len(describeTableOptionsResult.GetPartitioningPolicyPresets()))
-		for i, p := range describeTableOptionsResult.GetPartitioningPolicyPresets() {
+		xs := make([]PartitioningPolicyDescription, len(result.GetPartitioningPolicyPresets()))
+		for i, p := range result.GetPartitioningPolicyPresets() {
 			xs[i] = PartitioningPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
@@ -603,8 +597,8 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 		desc.PartitioningPolicyPresets = xs
 	}
 	{
-		xs := make([]ExecutionPolicyDescription, len(describeTableOptionsResult.GetExecutionPolicyPresets()))
-		for i, p := range describeTableOptionsResult.GetExecutionPolicyPresets() {
+		xs := make([]ExecutionPolicyDescription, len(result.GetExecutionPolicyPresets()))
+		for i, p := range result.GetExecutionPolicyPresets() {
 			xs[i] = ExecutionPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
@@ -613,8 +607,8 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 		desc.ExecutionPolicyPresets = xs
 	}
 	{
-		xs := make([]ReplicationPolicyDescription, len(describeTableOptionsResult.GetReplicationPolicyPresets()))
-		for i, p := range describeTableOptionsResult.GetReplicationPolicyPresets() {
+		xs := make([]ReplicationPolicyDescription, len(result.GetReplicationPolicyPresets()))
+		for i, p := range result.GetReplicationPolicyPresets() {
 			xs[i] = ReplicationPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
@@ -623,8 +617,8 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 		desc.ReplicationPolicyPresets = xs
 	}
 	{
-		xs := make([]CachingPolicyDescription, len(describeTableOptionsResult.GetCachingPolicyPresets()))
-		for i, p := range describeTableOptionsResult.GetCachingPolicyPresets() {
+		xs := make([]CachingPolicyDescription, len(result.GetCachingPolicyPresets()))
+		for i, p := range result.GetCachingPolicyPresets() {
 			xs[i] = CachingPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
@@ -774,11 +768,10 @@ func (s *Session) StreamExecuteScanQuery(
 
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) (err error) {
-	req := Ydb_Table.BulkUpsertRequest{
+	_, err = s.tableService.BulkUpsert(ctx, &Ydb_Table.BulkUpsertRequest{
 		Table: table,
 		Rows:  internal.ValueToYDB(rows),
-	}
-	_, err = s.tableService.BulkUpsert(ctx, &req)
+	})
 	return err
 }
 
@@ -790,26 +783,25 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 		clientTraceBeginTransactionDone(ctx, s, GetTransactionID(x), err)
 	}()
 	var (
-		beginTransactionResult Ydb_Table.BeginTransactionResult
-		response               *Ydb_Table.BeginTransactionResponse
-		request                = Ydb_Table.BeginTransactionRequest{
-			SessionId:  s.ID,
-			TxSettings: &tx.settings,
-		}
+		result   Ydb_Table.BeginTransactionResult
+		response *Ydb_Table.BeginTransactionResponse
 	)
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	response, err = s.tableService.BeginTransaction(ctx, &request)
+	response, err = s.tableService.BeginTransaction(ctx, &Ydb_Table.BeginTransactionRequest{
+		SessionId:  s.ID,
+		TxSettings: &tx.settings,
+	})
 	if err != nil {
 		return nil, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &beginTransactionResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return
 	}
 	return &Transaction{
-		id: beginTransactionResult.GetTxMeta().GetId(),
+		id: result.GetTxMeta().GetId(),
 		s:  s,
 	}, nil
 }
@@ -850,16 +842,15 @@ func (tx *Transaction) Commit(ctx context.Context) (err error) {
 	defer func() {
 		clientTraceCommitTransactionDone(ctx, tx.s, tx.id, err)
 	}()
-	req := Ydb_Table.CommitTransactionRequest{
+	_, err = tx.s.tableService.CommitTransaction(ctx, &Ydb_Table.CommitTransactionRequest{
 		SessionId: tx.s.ID,
 		TxId:      tx.id,
-	}
-	_, err = Ydb_Table_V1.NewTableServiceClient(tx.s.conn).CommitTransaction(ctx, &req)
+	})
 	return err
 }
 
 // CommitTx commits specified active transaction.
-func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOption) (result *Result, err error) {
+func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOption) (r *Result, err error) {
 	clientTraceCommitTransactionDone := clientTraceOnCommitTransaction(ctx, tx.s.c.Trace, ctx, tx.s, tx.id)
 	defer func() {
 		clientTraceCommitTransactionDone(ctx, tx.s, tx.id, err)
@@ -869,8 +860,8 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOp
 			SessionId: tx.s.ID,
 			TxId:      tx.id,
 		}
-		response                *Ydb_Table.CommitTransactionResponse
-		commitTransactionResult = new(Ydb_Table.CommitTransactionResult)
+		response *Ydb_Table.CommitTransactionResponse
+		result   = new(Ydb_Table.CommitTransactionResult)
 	)
 	for _, opt := range opts {
 		opt((*commitTransactionDesc)(request))
@@ -878,15 +869,15 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOp
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	response, err = Ydb_Table_V1.NewTableServiceClient(tx.s.conn).CommitTransaction(ctx, request)
+	response, err = tx.s.tableService.CommitTransaction(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), commitTransactionResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), result)
 	if err != nil {
 		return nil, err
 	}
-	return &Result{stats: commitTransactionResult.QueryStats}, nil
+	return &Result{stats: result.GetQueryStats()}, nil
 }
 
 // Rollback performs a rollback of the specified active transaction.
@@ -895,14 +886,13 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	defer func() {
 		clientTraceRollbackTransactionDone(ctx, tx.s, tx.id, err)
 	}()
-	req := Ydb_Table.RollbackTransactionRequest{
-		SessionId: tx.s.ID,
-		TxId:      tx.id,
-	}
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	_, err = Ydb_Table_V1.NewTableServiceClient(tx.s.conn).RollbackTransaction(ctx, &req)
+	_, err = tx.s.tableService.RollbackTransaction(ctx, &Ydb_Table.RollbackTransactionRequest{
+		SessionId: tx.s.ID,
+		TxId:      tx.id,
+	})
 	return err
 }
 

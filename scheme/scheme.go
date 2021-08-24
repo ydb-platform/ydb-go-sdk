@@ -72,60 +72,56 @@ func NewClient(cluster ydb.Cluster) *Client {
 }
 
 func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
-	request := Ydb_Scheme.MakeDirectoryRequest{
+	_, err = c.schemeService.MakeDirectory(ctx, &Ydb_Scheme.MakeDirectoryRequest{
 		Path: path,
-	}
-	_, err = c.schemeService.MakeDirectory(ctx, &request)
+	})
 	return err
 }
 
 func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
-	request := Ydb_Scheme.RemoveDirectoryRequest{
+	_, err = c.schemeService.RemoveDirectory(ctx, &Ydb_Scheme.RemoveDirectoryRequest{
 		Path: path,
-	}
-	_, err = c.schemeService.RemoveDirectory(ctx, &request)
+	})
 	return err
 }
 
 func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, err error) {
 	var (
-		response            *Ydb_Scheme.ListDirectoryResponse
-		listDirectoryResult Ydb_Scheme.ListDirectoryResult
+		response *Ydb_Scheme.ListDirectoryResponse
+		result   Ydb_Scheme.ListDirectoryResult
 	)
-	request := Ydb_Scheme.ListDirectoryRequest{
+	response, err = c.schemeService.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
-	}
-	response, err = c.schemeService.ListDirectory(ctx, &request)
+	})
 	if err != nil {
 		return d, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &listDirectoryResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return d, err
 	}
-	d.Entry.from(listDirectoryResult.Self)
-	d.Children = make([]Entry, len(listDirectoryResult.Children))
-	putEntry(d.Children, listDirectoryResult.Children)
+	d.Entry.from(result.Self)
+	d.Children = make([]Entry, len(result.Children))
+	putEntry(d.Children, result.Children)
 	return d, nil
 }
 
 func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err error) {
 	var (
-		response           *Ydb_Scheme.DescribePathResponse
-		describePathResult Ydb_Scheme.DescribePathResult
+		response *Ydb_Scheme.DescribePathResponse
+		result   Ydb_Scheme.DescribePathResult
 	)
-	request := Ydb_Scheme.DescribePathRequest{
+	response, err = c.schemeService.DescribePath(ctx, &Ydb_Scheme.DescribePathRequest{
 		Path: path,
-	}
-	response, err = c.schemeService.DescribePath(ctx, &request)
+	})
 	if err != nil {
 		return e, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &describePathResult)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return e, err
 	}
-	e.from(describePathResult.Self)
+	e.from(result.Self)
 	return e, nil
 }
 
@@ -134,12 +130,11 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...Per
 	for _, opt := range opts {
 		opt(&desc)
 	}
-	request := Ydb_Scheme.ModifyPermissionsRequest{
+	_, err = c.schemeService.ModifyPermissions(ctx, &Ydb_Scheme.ModifyPermissionsRequest{
 		Path:             path,
 		Actions:          desc.actions,
 		ClearPermissions: desc.clear,
-	}
-	_, err = c.schemeService.ModifyPermissions(ctx, &request)
+	})
 	return err
 }
 
