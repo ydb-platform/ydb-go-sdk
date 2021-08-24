@@ -417,7 +417,7 @@ message PutRecordRequest {
     string explicit_hash_key = 3; // explicit hash key. If empty hash is calculated as md5(partitionKey)
     string partition_key = 4; // partition key
     // Кажется в нашей модели поле не нужно. Нужно только валидировать его
-    string sequence_number = 5;
+    string sequence_number_for_ordering = 5;
     string stream_name = 6; // stream name
 }
 message PutRecordResponse {
@@ -462,7 +462,7 @@ message GetShardIteratorResponse {
     Ydb.Operations.Operation operation = 1;
 }
 message GetShardIteratorResult {
-    string iterator = 1;
+    string shard_iterator = 1;
 }
 
 

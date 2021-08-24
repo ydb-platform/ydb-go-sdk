@@ -80,6 +80,7 @@ message ComputeTabletStatus {
     string type = 2;
     string state = 3;
     uint32 count = 4;
+    repeated string id = 5;
 }
 
 message ThreadPoolStatus {
