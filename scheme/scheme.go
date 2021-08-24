@@ -62,12 +62,12 @@ type Directory struct {
 }
 
 type Client struct {
-	cluster ydb.Cluster
+	schemeService Ydb_Scheme_V1.SchemeServiceClient
 }
 
 func NewClient(cluster ydb.Cluster) *Client {
 	return &Client{
-		cluster: cluster,
+		schemeService: Ydb_Scheme_V1.NewSchemeServiceClient(cluster.GetLazy()),
 	}
 }
 
@@ -75,11 +75,7 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
 	request := Ydb_Scheme.MakeDirectoryRequest{
 		Path: path,
 	}
-	conn, err := c.cluster.Get(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).MakeDirectory(ctx, &request)
+	_, err = c.schemeService.MakeDirectory(ctx, &request)
 	return err
 }
 
@@ -87,11 +83,7 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	request := Ydb_Scheme.RemoveDirectoryRequest{
 		Path: path,
 	}
-	conn, err := c.cluster.Get(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).RemoveDirectory(ctx, &request)
+	_, err = c.schemeService.RemoveDirectory(ctx, &request)
 	return err
 }
 
@@ -103,11 +95,7 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, e
 	request := Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
 	}
-	conn, err := c.cluster.Get(ctx)
-	if err != nil {
-		return d, err
-	}
-	response, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).ListDirectory(ctx, &request)
+	response, err = c.schemeService.ListDirectory(ctx, &request)
 	if err != nil {
 		return d, err
 	}
@@ -129,11 +117,7 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err er
 	request := Ydb_Scheme.DescribePathRequest{
 		Path: path,
 	}
-	conn, err := c.cluster.Get(ctx)
-	if err != nil {
-		return e, err
-	}
-	response, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).DescribePath(ctx, &request)
+	response, err = c.schemeService.DescribePath(ctx, &request)
 	if err != nil {
 		return e, err
 	}
@@ -155,11 +139,7 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...Per
 		Actions:          desc.actions,
 		ClearPermissions: desc.clear,
 	}
-	conn, err := c.cluster.Get(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = Ydb_Scheme_V1.NewSchemeServiceClient(conn).ModifyPermissions(ctx, &request)
+	_, err = c.schemeService.ModifyPermissions(ctx, &request)
 	return err
 }
 
