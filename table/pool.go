@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -213,13 +214,31 @@ func isCreateSessionErrorRetriable(err error) bool {
 }
 
 // p.mu must NOT be held.
-func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrace) (*Session, error) {
+func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrace) (session *Session, err error) {
 	// pre-check the pool size
 	p.mu.Lock()
 	enoughSpace := p.createInProgress+len(p.index) < p.limit
 	if enoughSpace {
 		p.createInProgress++
+		defer func() {
+			p.mu.Lock()
+			p.createInProgress--
+			if session == nil && err == nil {
+				panic("ydb: abnormal result of pool.createSession()")
+			}
+			if session != nil {
+				fmt.Println("defer: store session to index: before: ", len(p.index))
+				p.index[session] = sessionInfo{}
+				fmt.Println("defer: store session to index: after: ", len(p.index))
+			}
+			if err != nil {
+				fmt.Println("defer err:", err)
+			}
+			fmt.Println("defer:", p.createInProgress, len(p.index), p.limit, enoughSpace)
+			p.mu.Unlock()
+		}()
 	}
+	fmt.Println("createSession: ", p.createInProgress, len(p.index), p.limit, enoughSpace)
 	p.mu.Unlock()
 	trace.onCheckEnoughSpace(enoughSpace)
 
@@ -253,9 +272,6 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 		}
 
 		if r.err != nil {
-			p.mu.Lock()
-			p.createInProgress--
-			p.mu.Unlock()
 			resCh <- r
 			return
 		}
@@ -267,7 +283,9 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 				return
 			}
 
+			fmt.Println("createSession -> session.onClose() : delete session from index: before: ", len(p.index))
 			delete(p.index, r.s)
+			fmt.Println("createSession -> session.onClose() : delete session from index: after: ", len(p.index))
 			p.notify(nil)
 
 			if info.idle != nil {
@@ -279,12 +297,6 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 			}
 		})
 
-		// Slot for session already reserved early
-		p.mu.Lock()
-		p.index[r.s] = sessionInfo{}
-		p.createInProgress--
-		p.mu.Unlock()
-
 		resCh <- r
 	}()
 
@@ -293,9 +305,6 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 	select {
 	case r := <-resCh:
 		trace.onReadResult(r)
-		if r.s == nil && r.err == nil {
-			panic("ydb: abnormal result of pool.createSession()")
-		}
 		return r.s, r.err
 	case <-ctx.Done():
 		trace.onContextDone()
@@ -469,7 +478,9 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	if p.busyCheck == nil {
 		panicLocked(&p.mu, "ydb: table: PutBusy() session into the pool without busy checker")
 	}
+	fmt.Println("PutBusy delete session from index: before: ", len(p.index))
 	delete(p.index, s)
+	fmt.Println("PutBusy delete session from index: after: ", len(p.index))
 	p.notify(nil)
 
 	select {
