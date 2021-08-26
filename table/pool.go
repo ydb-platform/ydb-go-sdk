@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
@@ -138,9 +139,9 @@ type SessionPool struct {
 	busyCheck        chan *Session
 	busyCheckerStop  chan struct{}
 	busyCheckerDone  chan struct{}
-	busyCheckCounter int
+	busyCheckCounter int32
 
-	closed bool
+	closed uint32
 
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
@@ -333,11 +334,11 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			ch *chan *Session
 			el *list.Element // Element in the wait queue.
 		)
-		p.mu.Lock()
-		if p.closed {
-			p.mu.Unlock()
+
+		if atomic.LoadUint32(&p.closed) == 1 {
 			return nil, ErrSessionPoolClosed
 		}
+		p.mu.Lock()
 		s = p.removeFirstIdle()
 		p.mu.Unlock()
 
@@ -424,7 +425,7 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 
 	p.mu.Lock()
 	switch {
-	case p.closed:
+	case atomic.LoadUint32(&p.closed) == 1:
 		err = ErrSessionPoolClosed
 
 	case p.idle.Len() >= p.limit:
@@ -454,12 +455,11 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	p.init()
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.closed {
+	if atomic.LoadUint32(&p.closed) == 1 {
 		p.closeSession(ctx, s)
 		return ErrSessionPoolClosed
 	}
+	p.mu.Lock()
 	info, has := p.index[s]
 	if !has {
 		panicLocked(&p.mu, "ydb: table: PutBusy() unknown session")
@@ -472,14 +472,14 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	}
 	delete(p.index, s)
 	p.notify(nil)
-
+	p.mu.Unlock()
 	select {
 	case <-p.busyCheckerStop:
 		close(p.busyCheck)
 		p.closeSession(ctx, s)
 
 	case p.busyCheck <- s:
-		p.busyCheckCounter++
+		atomic.AddInt32(&p.busyCheckCounter, 1)
 	default:
 		// if cannot push session into busyCheck (channel is full) - close session
 		p.closeSession(ctx, s)
@@ -507,12 +507,11 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 		sessionPoolTraceTakeDone(ctx, s, took, err)
 	}()
 
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
+	if atomic.LoadUint32(&p.closed) == 1 {
 		return false, ErrSessionPoolClosed
 	}
 	var has bool
+	p.mu.Lock()
 	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
@@ -566,11 +565,11 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 			continue
 		}
 		if err != nil {
-			p.mu.Lock()
-			if !p.closed {
+			if atomic.LoadUint32(&p.closed) == 0 {
+				p.mu.Lock()
 				p.pushReady(s)
+				p.mu.Unlock()
 			}
-			p.mu.Unlock()
 			return nil, err
 		}
 
@@ -590,13 +589,11 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	defer func() {
 		sessionPoolTraceCloseDone(ctx, err)
 	}()
-
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
+	if atomic.LoadUint32(&p.closed) == 1 {
 		return
 	}
-	p.closed = true
+	atomic.SwapUint32(&p.closed, 1)
+	p.mu.Lock()
 
 	keeperDone := p.keeperDone
 	if ch := p.keeperStop; ch != nil {
@@ -660,7 +657,7 @@ func (p *SessionPool) Stats() SessionPoolStats {
 		Index:            indexCount,
 		WaitQ:            waitQCount,
 		CreateInProgress: p.createInProgress,
-		BusyCheck:        p.busyCheckCounter,
+		BusyCheck:        int(p.busyCheckCounter),
 		MinSize:          p.KeepAliveMinSize,
 		MaxSize:          p.limit,
 	}
@@ -679,7 +676,7 @@ func (p *SessionPool) reuse(ctx context.Context, s *Session) (reused bool) {
 	if info, err = p.keepAliveSession(ctx, s); err == nil && info.Status == SessionReady {
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		enoughSpace = !p.closed && p.createInProgress+len(p.index) < p.limit
+		enoughSpace = atomic.LoadUint32(&p.closed) == 0 && p.createInProgress+len(p.index) < p.limit
 		if enoughSpace {
 			p.index[s] = sessionInfo{}
 			if !p.notify(s) {
@@ -703,9 +700,7 @@ func (p *SessionPool) busyChecker() {
 					if closeAll || !p.reuse(ctx, s) {
 						p.closeSession(ctx, s)
 					}
-					p.mu.Lock()
-					p.busyCheckCounter--
-					p.mu.Unlock()
+					atomic.AddInt32(&p.busyCheckCounter, -1)
 				default:
 					return
 				}

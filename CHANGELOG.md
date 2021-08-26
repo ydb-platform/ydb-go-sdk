@@ -1,3 +1,6 @@
+## 2.4.1
+* Fixed deadlock in the session pool
+
 ## 2.4.0
 * Added new scanner API.
 * Fixed dualism of interpret data (default values were deprecated for optional values)
