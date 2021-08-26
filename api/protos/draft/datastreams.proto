@@ -385,7 +385,6 @@ message PutRecordsRequestEntry {
 }
 
 message PutRecordsResultEntry {
-    StatusIds.StatusCode code = 1;
     string error_message = 2;
     string error_code = 3;
     string sequence_number = 4;

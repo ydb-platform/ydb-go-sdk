@@ -515,6 +515,28 @@ message CopyTablesResponse {
     Ydb.Operations.Operation operation = 1;
 }
 
+message RenameTableItem {
+    // Full path
+    string source_path = 1;
+    // Full path
+    string destination_path = 2;
+    // Move options
+    bool replace_destination = 3;
+}
+
+// Moves given tables
+message RenameTablesRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    // Session identifier
+    string session_id = 2;
+    // Source and destination paths inside RenameTableItem describe rename actions
+    repeated RenameTableItem tables = 3;
+}
+
+message RenameTablesResponse {
+    Ydb.Operations.Operation operation = 1;
+}
+
 // Describe table with given path
 message DescribeTableRequest {
     // Session identifier

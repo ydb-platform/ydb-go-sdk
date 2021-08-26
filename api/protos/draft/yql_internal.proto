@@ -100,3 +100,25 @@ message WriteTaskResultResult {
 message WriteTaskResultResponse {
     Ydb.Operations.Operation operation = 1; // WriteRowsResultResult
 }
+
+message NodesHealthCheckRequest {
+    string tenant = 1;
+    uint32 node_id = 2;
+    string instance_id = 3;
+    string hostname = 4;
+    uint64 active_workers = 5;
+    Ydb.Operations.OperationParams operation_params = 6;
+}
+
+message NodesHealthCheckResult {
+    message NodeInfo {
+        uint32 node_id = 1;
+        string instance_id = 2;
+        string hostname = 3;
+    }
+    repeated NodeInfo nodes = 1;
+}
+
+message NodesHealthCheckResponse {
+    Ydb.Operations.Operation operation = 1; // NodesHealthCheckResult
+}

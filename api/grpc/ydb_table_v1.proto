@@ -37,6 +37,9 @@ service TableService {
     // Creates consistent copy of given tables.
     rpc CopyTables(Table.CopyTablesRequest) returns (Table.CopyTablesResponse);
 
+    // Creates consistent move of given tables.
+    rpc RenameTables(Table.RenameTablesRequest) returns (Table.RenameTablesResponse);
+
     // Returns information about given table (metadata).
     rpc DescribeTable(Table.DescribeTableRequest) returns (Table.DescribeTableResponse);
 

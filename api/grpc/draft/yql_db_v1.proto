@@ -14,4 +14,7 @@ service YqlInternalTaskService {
 
     // writes rows
     rpc WriteTaskResult(Yql.Analytics.WriteTaskResultRequest) returns (Yql.Analytics.WriteTaskResultResponse);
+
+    //Nodes
+    rpc NodesHealthCheck(Yql.Analytics.NodesHealthCheckRequest) returns (Yql.Analytics.NodesHealthCheckResponse);
 }
