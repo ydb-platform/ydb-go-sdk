@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"math/rand"
 	"path"
 	"runtime"
@@ -27,9 +27,9 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1000,
-			Handler: methodHandlers{
+			Cluster: testutil.NewCluster(testutil.Handlers{
 				testutil.TableDeleteSession: okHandler,
-			},
+			}),
 		},
 	}
 	defer func() {
@@ -56,7 +56,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 				},
 			})
 			if s == nil && err == nil {
-				t.Fatalf("unexpected result: <%v, %vz>", s, err)
+				t.Fatalf("unexpected result: <%v, %v>", s, err)
 			}
 		})
 	}
@@ -72,16 +72,20 @@ func TestSessionPoolTakeBusy(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Handler: methodHandlers{
-				testutil.TableKeepAlive: func(req, res interface{}) error {
-					r := testutil.TableKeepAliveResult{R: res}
-					r.SetSessionStatus(true)
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				},
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+					r := &Ydb_Table.KeepAliveResult{
+						SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
+					}
 					timer = time.NewTimer(time.Second)
 					keepalive <- struct{}{}
-					return nil
+					return r, nil
 				},
 				testutil.TableDeleteSession: okHandler,
-			},
+			}),
 		},
 	}
 	defer func() {
@@ -114,19 +118,19 @@ func TestSessionPoolBusyCheckerCloseOverflow(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Handler: methodHandlers{
-				testutil.TableKeepAlive: func(req, res interface{}) error {
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					keepalive <- struct{}{}
-					r := testutil.TableKeepAliveResult{R: res}
-					r.SetSessionStatus(true)
-					return nil
+					return &Ydb_Table.KeepAliveResult{
+						SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
+					}, nil
 				},
 				testutil.TableDeleteSession: okHandler,
-				testutil.TableCreateSession: func(req, res interface{}) error {
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 					timer.Created <- time.Second
-					return nil
+					return &Ydb_Table.CreateSessionResult{}, nil
 				},
-			},
+			}),
 		},
 	}
 	defer func() {
@@ -174,18 +178,19 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Handler: methodHandlers{
-				testutil.TableKeepAlive: func(req, res interface{}) error {
-					r := testutil.TableKeepAliveResult{R: res}
-					r.SetSessionStatus(true)
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					keepalive <- true
-					return nil
+					r := &Ydb_Table.KeepAliveResult{
+						SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
+					}
+					return r, nil
 				},
-				testutil.TableCreateSession: func(req, res interface{}) error {
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 					timer.Created <- time.Second
-					return nil
+					return &Ydb_Table.CreateSessionResult{}, nil
 				},
-			},
+			}),
 		},
 	}
 	defer func() {
@@ -194,7 +199,10 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 
 	s1 := mustGetSession(t, p)
 	<-timer.Created
-	_ = p.PutBusy(context.Background(), s1)
+	err := p.PutBusy(context.Background(), s1)
+	if err != nil {
+		t.Errorf("PutBusy() returns error: %v", err)
+	}
 	s2 := mustGetSession(t, p)
 	<-timer.Created
 	mustPutSession(t, p, s2)
@@ -241,17 +249,23 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Handler: methodHandlers{
-				testutil.TableKeepAlive: func(req, res interface{}) error {
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				},
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					keepalive <- struct{}{}
-					return nil
+					return nil, nil
 				},
 				testutil.TableDeleteSession: okHandler,
-			},
+			}),
 		},
 	}
 	defer func() {
-		_ = p.Close(context.Background())
+		err := p.Close(context.Background())
+		if err != nil {
+			t.Errorf("unexpected error on close: %v", err)
+		}
 	}()
 
 	s := mustGetSession(t, p)
@@ -260,7 +274,7 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 	<-timer.Created
 
 	// Trigger keepalive timer event.
-	// NOTE: code below would blocked if KeepAlive() call will happen for this
+	// NOTE: code below would be blocked if KeepAlive() call will happen for this
 	// event.
 	done := p.touchCond()
 	shiftTime(p.IdleThreshold)
@@ -325,19 +339,19 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				got <- err
 			}()
 
-			regwait := whenWantWaitCh(p)
+			regWait := whenWantWaitCh(p)
 			<-get     // Await for getter blocked on awaiting session.
-			<-regwait // Let the getter register itself in the wait queue.
+			<-regWait // Let the getter register itself in the wait queue.
 
 			if test.racy {
-				// We testing the case, when session consumer registered
+				// We are testing the case, when session consumer registered
 				// himself in the wait queue, but not ready to receive the
 				// session when session arrives (that is, stuck between
 				// pushing channel in the list and reading from the channel).
 				_ = p.Close(context.Background())
 				<-wait
 			} else {
-				// We testing the normal case, when session consumer registered
+				// We are testing the normal case, when session consumer registered
 				// himself in the wait queue and successfully blocked on
 				// reading from signaling channel.
 				<-wait
@@ -466,19 +480,19 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				}))
 			}()
 
-			regwait := whenWantWaitCh(p)
+			regWait := whenWantWaitCh(p)
 			<-get     // Await for getter blocked on awaiting session.
-			<-regwait // Let the getter register itself in the wait queue.
+			<-regWait // Let the getter register itself in the wait queue.
 
 			if test.racy {
-				// We testing the case, when session consumer registered
+				// We are testing the case, when session consumer registered
 				// himself in the wait queue, but not ready to receive the
-				// session when session arrives (that is, stucked between
+				// session when session arrives (that is, it was stucked between
 				// pushing channel in the list and reading from the channel).
 				_ = s.Close(context.Background())
 				<-wait
 			} else {
-				// We testing the normal case, when session consumer registered
+				// We are testing the normal case, when session consumer registered
 				// himself in the wait queue and successfully blocked on
 				// reading from signaling channel.
 				<-wait
@@ -654,19 +668,19 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				got <- sessionAndError{s, err}
 			}()
 
-			regwait := whenWantWaitCh(p)
+			regWait := whenWantWaitCh(p)
 			<-get     // Await for getter blocked on awaiting session.
-			<-regwait // Let the getter register itself in the wait queue.
+			<-regWait // Let the getter register itself in the wait queue.
 
 			if test.racy {
-				// We testing the case, when session consumer registered
+				// We are testing the case, when session consumer registered
 				// himself in the wait queue, but not ready to receive the
-				// session when session arrives (that is, stucked between
+				// session when session arrives (that is, it was stucked between
 				// pushing channel in the list and reading from the channel).
 				_ = p.Put(context.Background(), s)
 				<-wait
 			} else {
-				// We testing the normal case, when session consumer registered
+				// We are testing the normal case, when session consumer registered
 				// himself in the wait queue and successfully blocked on
 				// reading from signaling channel.
 				<-wait
@@ -692,7 +706,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 }
 
 // TestSessionPoolGetDisconnected tests case when session successfully created,
-// but after that connection become broken and cant be reestablished.
+// but after that connection become broken and cannot be reestablished.
 func TestSessionPoolGetDisconnected(t *testing.T) {
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
@@ -711,15 +725,15 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Handler: methodHandlers{
-				testutil.TableKeepAlive: func(req, res interface{}) error {
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					keepalive <- struct{}{}
-					// Here we emulating blocked connection initialization.
+					// Here we are emulating blocked connection initialization.
 					<-release
-					return nil
+					return nil, nil
 				},
 				testutil.TableDeleteSession: okHandler,
-			},
+			}),
 		},
 	}
 	defer func() {
@@ -741,7 +755,7 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 	// Here we are in touching state. That is, there are no session in the pool
 	// – it is removed for keepalive operation.
 	//
-	// We expect that Get() method will fail on ctx cancelation.
+	// We expect that Get() method will fail on ctx cancellation.
 	ctx1, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(500*time.Millisecond, cancel)
 
@@ -806,16 +820,16 @@ func TestSessionPoolGetPut(t *testing.T) {
 	p := &SessionPool{
 		SizeLimit: 1,
 		Builder: &StubBuilder{
-			Handler: methodHandlers{
-				testutil.TableCreateSession: func(req, res interface{}) error {
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 					created++
-					return nil
+					return nil, nil
 				},
-				testutil.TableDeleteSession: func(req, res interface{}) error {
+				testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
 					deleted++
-					return nil
+					return nil, nil
 				},
-			},
+			}),
 		},
 	}
 	defer func() {
@@ -849,7 +863,7 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 		Builder: &StubBuilder{
 			T:       t,
 			Limit:   1,
-			Handler: methodHandlers{},
+			Cluster: testutil.NewCluster(testutil.Handlers{}),
 		},
 	}
 
@@ -883,13 +897,13 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Handler: methodHandlers{
-				testutil.TableKeepAlive: func(req, res interface{}) error {
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					atomic.AddUint32(&keepAliveCount, 1)
-					return nil
+					return nil, nil
 				},
 				testutil.TableDeleteSession: okHandler,
-			},
+			}),
 		},
 	}
 	defer func() {
@@ -952,15 +966,15 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Handler: methodHandlers{
-				testutil.TableKeepAlive: func(req, res interface{}) error {
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					done := make(chan struct{})
 					keepalive <- done
 					<-done
-					return nil
+					return nil, nil
 				},
 				testutil.TableDeleteSession: okHandler,
-			},
+			}),
 		},
 	}
 	defer func() {
@@ -987,7 +1001,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 
 	touchDone := p.touchCond()
 
-	// Now keeper routine sticked on awaiting result of keep alive request.
+	// Now keeper routine must be sticked on awaiting result of keep alive request.
 	// That is perfect time to emulate race condition of pushing s2 back to the
 	// pool with time, that is greater than `now` of s1 being touched.
 	shiftTime(idleThreshold / 2)
@@ -1007,7 +1021,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 
 func TestSessionPoolDoublePut(t *testing.T) {
 	p := &SessionPool{
-		SizeLimit:         2, // Skip panic on full pool.
+		SizeLimit:         2, // Skip a panic on full pool.
 		IdleThreshold:     -1,
 		BusyCheckInterval: -1,
 		Builder: &StubBuilder{
@@ -1057,16 +1071,16 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Handler: methodHandlers{
-				testutil.TableKeepAlive: func(req, res interface{}) error {
-					keepalive <- res
-					return <-keepaliveResult
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+					keepalive <- request
+					return nil, <-keepaliveResult
 				},
-				testutil.TableDeleteSession: func(req, res interface{}) error {
-					deleteSession <- res
-					return <-deleteSessionResult
+				testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+					deleteSession <- request
+					return nil, <-deleteSessionResult
 				},
-			},
+			}),
 		},
 	}
 
@@ -1123,16 +1137,16 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 4,
-			Handler: methodHandlers{
-				testutil.TableDeleteSession: okHandler,
-				testutil.TableKeepAlive: func(req, res interface{}) error {
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					keepAliveCnt++
 					if keepAliveCnt%3 == 0 {
 						allKeepAlive <- keepAliveCnt
 					}
-					return nil
+					return nil, nil
 				},
-			},
+				testutil.TableDeleteSession: okHandler,
+			}),
 		},
 		SizeLimit:              3,
 		KeepAliveMinSize:       1,
@@ -1180,14 +1194,14 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 4,
-			Handler: methodHandlers{
-				testutil.TableDeleteSession: okHandler,
-				testutil.TableKeepAlive: func(req, res interface{}) error {
-					return &ydb.OpError{
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+					return nil, &ydb.OpError{
 						Reason: ydb.StatusBadSession,
 					}
 				},
-			},
+				testutil.TableDeleteSession: okHandler,
+			}),
 		},
 		SizeLimit:     3,
 		IdleThreshold: 2 * time.Second,
@@ -1216,16 +1230,16 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Handler: methodHandlers{
-				testutil.TableDeleteSession: okHandler,
-				testutil.TableKeepAlive: func(req, res interface{}) error {
+			Cluster: testutil.NewCluster(testutil.Handlers{
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					if retry {
 						retry = false
-						return context.DeadlineExceeded
+						return nil, context.DeadlineExceeded
 					}
-					return nil
+					return nil, nil
 				},
-			},
+				testutil.TableDeleteSession: okHandler,
+			}),
 		},
 		IdleKeepAliveThreshold: -1,
 		SizeLimit:              3,
@@ -1315,37 +1329,17 @@ func caller() string {
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
 }
 
-type (
-	methodHandler  func(req, res interface{}) error
-	methodHandlers map[testutil.MethodCode]methodHandler
-)
-
-var okHandler = func(req, res interface{}) error {
-	return nil
+var okHandler = func(request interface{}) (proto.Message, error) {
+	return nil, nil
 }
 
 func simpleSession() *Session {
-	return newSession(nil, nil)
+	return newSession(testutil.NewCluster(nil), "")
 }
 
-func newSession(t *testing.T, h methodHandlers) *Session {
-	cluster := &testutil.Cluster{
-		OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-			return &testutil.ClientConn{
-				OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-					if h == nil {
-						return nil
-					}
-					f := h[testutil.Method(method).Code()]
-					if f == nil {
-						t.Fatalf("unexpected operation: %s", method)
-					}
-					return f(args, reply)
-				},
-			}, nil
-		},
-	}
+func newSession(cluster ydb.Cluster, id string) *Session {
 	return &Session{
+		ID: id,
 		c: Client{
 			cluster: cluster,
 		},
@@ -1356,7 +1350,7 @@ func newSession(t *testing.T, h methodHandlers) *Session {
 type StubBuilder struct {
 	OnCreateSession func(ctx context.Context) (*Session, error)
 
-	Handler methodHandlers
+	Cluster ydb.Cluster
 	Limit   int
 	T       *testing.T
 
@@ -1364,37 +1358,59 @@ type StubBuilder struct {
 	actual int
 }
 
-func (s *StubBuilder) CreateSession(ctx context.Context) (*Session, error) {
+func (s *StubBuilder) CreateSession(ctx context.Context) (session *Session, err error) {
+	defer func() {
+		s.mu.Lock()
+		if s.T != nil {
+			s.T.Log("defer:", session != nil, err)
+		}
+		if session == nil {
+			if s.T != nil {
+				s.T.Log("defer: append session to actual discarded")
+			}
+		}
+		if session != nil {
+			s.actual++
+			if s.T != nil {
+				s.T.Log("defer: append session to actual")
+			}
+		}
+		s.mu.Unlock()
+	}()
 	s.mu.Lock()
+	if s.T != nil {
+		s.T.Log(s.actual, s.Limit)
+	}
 	if s.Limit > 0 && s.actual == s.Limit {
 		if s.T != nil {
 			s.T.Errorf("create session limit overflow")
 		}
+		s.mu.Unlock()
 		return nil, fmt.Errorf("stub builder: limit overflow")
 	}
-	s.actual++
 	s.mu.Unlock()
 
 	if f := s.OnCreateSession; f != nil {
 		return f(ctx)
 	}
 
-	if s.Handler == nil || s.Handler[testutil.TableCreateSession] == nil {
-		return newSession(s.T, s.Handler), nil
-	}
-	var (
-		req Ydb_Table.CreateSessionRequest
-		res Ydb_Table.CreateSessionResult
-	)
-	err := s.Handler[testutil.TableCreateSession](&req, &res)
+	conn, err := s.Cluster.Get(ctx)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	r := newSession(s.T, s.Handler)
-	r.ID = res.SessionId
+	response, err := Ydb_Table_V1.NewTableServiceClient(conn).CreateSession(ctx, &Ydb_Table.CreateSessionRequest{})
+	if err != nil {
+		return
+	}
 
-	return r, nil
+	result := Ydb_Table.CreateSessionResult{}
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	if err != nil {
+		return
+	}
+
+	return newSession(s.Cluster, result.SessionId), nil
 }
 
 func (p *SessionPool) debug() {

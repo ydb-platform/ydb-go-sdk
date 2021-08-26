@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 	"reflect"
 	"testing"
 	"time"
@@ -29,14 +28,11 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Handler: methodHandlers{
-			testutil.TableKeepAlive: func(req, res interface{}) error {
-				r, _ := res.(*Ydb_Table.KeepAliveResult)
-				r.SessionStatus = status
-
-				return e
+		Cluster: testutil.NewCluster(testutil.Handlers{
+			testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
+				return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
 			},
-		},
+		}),
 	}
 	s, err := b.CreateSession(ctx)
 	if err != nil {
@@ -82,14 +78,13 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Handler: methodHandlers{
-			testutil.TableDescribeTable: func(req, res interface{}) error {
-				r, _ := res.(*Ydb_Table.DescribeTableResult)
-				r.Reset()
+		Cluster: testutil.NewCluster(testutil.Handlers{
+			testutil.TableDescribeTable: func(request interface{}) (proto.Message, error) {
+				r := &Ydb_Table.DescribeTableResult{}
 				proto.Merge(r, result)
-				return e
+				return r, e
 			},
-		},
+		}),
 	}
 	s, err := b.CreateSession(ctx)
 	if err != nil {
@@ -307,27 +302,22 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := Client{
-							cluster: &testutil.Cluster{
-								OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-									return &testutil.ClientConn{
-										OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-											require.Equal(t, test.method, method)
-											mode, ok := ydb.ContextOperationMode(ctx)
-											require.True(t, ok)
-											require.Equal(t, srcDst.dstMode, mode)
-											switch testutil.Method(method).Code() {
-											case testutil.TableExecuteDataQuery:
-												r := testutil.TableExecuteDataQueryResult{R: args}
-												r.SetTransactionID("")
-											case testutil.TableBeginTransaction:
-												r := testutil.TableBeginTransactionResult{R: args}
-												r.SetTransactionID("")
-											}
-											return nil
+							cluster: testutil.NewCluster(testutil.Handlers{
+								testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+									return &Ydb_Table.ExecuteQueryResult{
+										TxMeta: &Ydb_Table.TransactionMeta{
+											Id: "",
 										},
 									}, nil
 								},
-							},
+								testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
+									return &Ydb_Table.BeginTransactionResult{
+										TxMeta: &Ydb_Table.TransactionMeta{
+											Id: "",
+										},
+									}, nil
+								},
+							}),
 						}
 						ctx, cancel := context.WithTimeout(
 							context.Background(),
@@ -356,19 +346,19 @@ func TestClientCache(t *testing.T) {
 		prepareRequestsCount int
 	}{
 		{
-			name:                 "fixed query cache size, one request proxed to server",
+			name:                 "fixed query cache size, one request must be proxed to server",
 			cacheSize:            10,
 			prepareCount:         10,
 			prepareRequestsCount: 1,
 		},
 		{
-			name:                 "default query cache size, one request proxed to server",
+			name:                 "default query cache size, one request must be proxed to server",
 			cacheSize:            0,
 			prepareCount:         10,
 			prepareRequestsCount: 1,
 		},
 		{
-			name:                 "disabled query cache, all requests proxed to server",
+			name:                 "disabled query cache, all requests must be proxed to server",
 			cacheSize:            -1,
 			prepareCount:         10,
 			prepareRequestsCount: 10,
@@ -379,23 +369,15 @@ func TestClientCache(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			client := &Client{
-				cluster: &testutil.Cluster{
-					OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-						return &testutil.ClientConn{
-							OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-								switch testutil.Method(method).Code() {
-								case testutil.TableCreateSession:
-								case testutil.TablePrepareDataQuery:
-									prepareRequestsCount++
-								default:
-									t.Fatalf("Unexpected method %s", method)
-
-								}
-								return nil
-							},
-						}, nil
+				cluster: testutil.NewCluster(testutil.Handlers{
+					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						return &Ydb_Table.CreateSessionResult{}, nil
 					},
-				},
+					testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+						prepareRequestsCount++
+						return &Ydb_Table.PrepareQueryResult{}, nil
+					},
+				}),
 			}
 			s, err := client.CreateSession(ctx)
 			require.NoError(t, err)

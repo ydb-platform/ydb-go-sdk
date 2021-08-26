@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-	"reflect"
-	"strings"
-
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"reflect"
+	"strings"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -219,9 +221,8 @@ func (t TablePrepareDataQueryResult) SetQueryID(id string) {
 }
 
 type Cluster struct {
-	OnGet     func(ctx context.Context) (conn ydb.ClientConnInterface, err error)
-	OnGetLazy func() (conn ydb.ClientConnInterface)
-	OnClose   func() error
+	OnGet   func(ctx context.Context) (conn ydb.ClientConnInterface, err error)
+	OnClose func() error
 }
 
 func (c *Cluster) Get(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
@@ -232,10 +233,15 @@ func (c *Cluster) Get(ctx context.Context) (conn ydb.ClientConnInterface, err er
 }
 
 func (c *Cluster) GetLazy() (conn ydb.ClientConnInterface) {
-	if c.OnGetLazy == nil {
-		return &ClientConn{}
+	if c.OnGet == nil {
+		panic(ErrNotImplemented)
 	}
-	return c.OnGetLazy()
+	var err error
+	conn, err = c.OnGet(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	return conn
 }
 
 func (c *Cluster) Close() error {
@@ -243,6 +249,42 @@ func (c *Cluster) Close() error {
 		return ErrNotImplemented
 	}
 	return c.OnClose()
+}
+
+type (
+	Handler  func(request interface{}) (result proto.Message, err error)
+	Handlers map[MethodCode]Handler
+)
+
+func NewCluster(handlers Handlers) *Cluster {
+	return &Cluster{
+		OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+			return &ClientConn{
+				OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+					if handler, ok := handlers[Method(method).Code()]; ok {
+						result, err := handler(args)
+						if err != nil {
+							return err
+						}
+						anyResult, err := anypb.New(result)
+						if err != nil {
+							return err
+						}
+						setField(
+							"Operation",
+							reply,
+							&Ydb_Operations.Operation{
+								Result: anyResult,
+							},
+						)
+						return nil
+					}
+					return fmt.Errorf("testutil: method '%s' not implemented", method)
+				},
+			}, nil
+		},
+	}
+
 }
 
 type ClientConn struct {
@@ -253,14 +295,14 @@ type ClientConn struct {
 
 func (c *ClientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 	if c.OnInvoke == nil {
-		return ErrNotImplemented
+		return fmt.Errorf("OnInvoke not implemented (method: %s, request: %v, response: %v)", method, args, reply)
 	}
 	return c.OnInvoke(ctx, method, args, reply, opts...)
 }
 
 func (c *ClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 	if c.OnNewStream == nil {
-		return nil, ErrNotImplemented
+		return nil, fmt.Errorf("OnInvoke not implemented (method: %s, desc: %v)", method, desc)
 	}
 	return c.OnNewStream(ctx, desc, method, opts...)
 }
