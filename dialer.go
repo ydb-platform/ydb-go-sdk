@@ -150,7 +150,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 			wg.Wait()
 		}
 		discoveryClient := &discoveryClient{
-			discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(driver.GetLazy()),
+			discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(driver),
 			database:         d.config.Database,
 			ssl:              d.useTLS(),
 		}

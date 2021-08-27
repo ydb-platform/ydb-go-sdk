@@ -66,7 +66,7 @@ type Client struct {
 
 func NewClient(cluster ydb.Cluster) *Client {
 	return &Client{
-		coordinationService: Ydb_Coordination_V1.NewCoordinationServiceClient(cluster.GetLazy()),
+		coordinationService: Ydb_Coordination_V1.NewCoordinationServiceClient(cluster),
 	}
 }
 

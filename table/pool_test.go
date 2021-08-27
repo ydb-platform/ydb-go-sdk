@@ -1343,7 +1343,7 @@ func newSession(cluster ydb.Cluster, id string) *Session {
 		c: Client{
 			cluster: cluster,
 		},
-		tableService: Ydb_Table_V1.NewTableServiceClient(cluster.GetLazy()),
+		tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 	}
 }
 

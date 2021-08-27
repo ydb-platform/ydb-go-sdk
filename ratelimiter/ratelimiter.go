@@ -27,7 +27,7 @@ type Client struct {
 
 func NewClient(cluster ydb.Cluster) *Client {
 	return &Client{
-		ratelimiterService: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cluster.GetLazy()),
+		ratelimiterService: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cluster),
 	}
 }
 

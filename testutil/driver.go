@@ -221,34 +221,8 @@ func (t TablePrepareDataQueryResult) SetQueryID(id string) {
 }
 
 type Cluster struct {
-	OnGet   func(ctx context.Context) (conn ydb.ClientConnInterface, err error)
-	OnClose func() error
-}
-
-func (c *Cluster) Get(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-	if c.OnGet == nil {
-		return nil, ErrNotImplemented
-	}
-	return c.OnGet(ctx)
-}
-
-func (c *Cluster) GetLazy() (conn ydb.ClientConnInterface) {
-	if c.OnGet == nil {
-		panic(ErrNotImplemented)
-	}
-	var err error
-	conn, err = c.OnGet(context.Background())
-	if err != nil {
-		panic(err)
-	}
-	return conn
-}
-
-func (c *Cluster) Close() error {
-	if c.OnClose == nil {
-		return ErrNotImplemented
-	}
-	return c.OnClose()
+	OnInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
+	OnNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
 }
 
 type (
@@ -258,30 +232,26 @@ type (
 
 func NewCluster(handlers Handlers) *Cluster {
 	return &Cluster{
-		OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-			return &ClientConn{
-				OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-					if handler, ok := handlers[Method(method).Code()]; ok {
-						result, err := handler(args)
-						if err != nil {
-							return err
-						}
-						anyResult, err := anypb.New(result)
-						if err != nil {
-							return err
-						}
-						setField(
-							"Operation",
-							reply,
-							&Ydb_Operations.Operation{
-								Result: anyResult,
-							},
-						)
-						return nil
-					}
-					return fmt.Errorf("testutil: method '%s' not implemented", method)
-				},
-			}, nil
+		OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+			if handler, ok := handlers[Method(method).Code()]; ok {
+				result, err := handler(args)
+				if err != nil {
+					return err
+				}
+				anyResult, err := anypb.New(result)
+				if err != nil {
+					return err
+				}
+				setField(
+					"Operation",
+					reply,
+					&Ydb_Operations.Operation{
+						Result: anyResult,
+					},
+				)
+				return nil
+			}
+			return fmt.Errorf("testutil: method '%s' not implemented", method)
 		},
 	}
 

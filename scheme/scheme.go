@@ -67,7 +67,7 @@ type Client struct {
 
 func NewClient(cluster ydb.Cluster) *Client {
 	return &Client{
-		schemeService: Ydb_Scheme_V1.NewSchemeServiceClient(cluster.GetLazy()),
+		schemeService: Ydb_Scheme_V1.NewSchemeServiceClient(cluster),
 	}
 }
 
