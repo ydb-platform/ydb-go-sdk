@@ -16,3 +16,4 @@
 - [ ] Extract coordination package to neighbour project as plugin over ydb-go-sdk
 - [ ] Extract ratelimiter package to neighbour project as plugin over ydb-go-sdk
 - [ ] Extract experimental package to neighbour project as plugin over ydb-go-sdk
+- [ ] Refactoring Trace API: exclude duplicates of data from closure Trace functions
