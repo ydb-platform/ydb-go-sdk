@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -40,129 +40,100 @@ func (b *ClusterBuilder) Build() ydb.Cluster {
 
 		sessions = map[string]*session{}
 	)
-	return &testutil.Cluster{
-		OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-			return &testutil.ClientConn{
-				OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) (err error) {
-					var (
-						sid string
-						tid string
-					)
-					m := testutil.Method(method).Code()
-					switch m {
-					case testutil.TableCreateSession:
-						sid = fmt.Sprintf("ydb://test-session/%d", atomic.AddInt32(&sessionID, 1))
-						b.log("[%q] create session", sid)
+	return testutil.NewCluster(
+		testutil.WithInvokeHandlers(
+			testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					sid := fmt.Sprintf("ydb://test-session/%d", atomic.AddInt32(&sessionID, 1))
+					b.log("[%q] create session", sid)
 
-						mu.Lock()
-						sessions[sid] = new(session)
-						mu.Unlock()
+					mu.Lock()
+					sessions[sid] = new(session)
+					mu.Unlock()
 
-						r := testutil.TableCreateSessionResult{reply}
-						r.SetSessionID(sid)
-
-					case testutil.TableKeepAlive:
-						sid = args.(*Ydb_Table.KeepAliveRequest).SessionId
-						b.log("[%q] keepalive session", sid)
-
-						mu.RLock()
-						s := sessions[sid]
-						mu.RUnlock()
-
-						s.Lock()
-						s.busy = false
-						s.Unlock()
-
-						r := testutil.TableKeepAliveResult{reply}
-						r.SetSessionStatus(true)
-
-						return
-
-					case testutil.TableDeleteSession:
-						sid = args.(*Ydb_Table.DeleteSessionRequest).SessionId
-						b.log("[%q] delete session", sid)
-
-						mu.Lock()
-						delete(sessions, sid)
-						mu.Unlock()
-
-						return
-
-					case testutil.TableBeginTransaction:
-						sid = args.(*Ydb_Table.BeginTransactionRequest).SessionId
-						tid = fmt.Sprintf("test-tx/%d", atomic.AddInt32(&txID, 1))
-
-						r := testutil.TableBeginTransactionResult{R: reply}
-						r.SetTransactionID(tid)
-
-						b.log("[%q][%q] begin transaction", sid, tid)
-
-					case testutil.TableCommitTransaction:
-						r := args.(*Ydb_Table.CommitTransactionRequest)
-						sid = r.SessionId
-						tid = r.TxId
-
-						b.log("[%q][%q] commit transaction", sid, tid)
-
-					case testutil.TableRollbackTransaction:
-						r := args.(*Ydb_Table.RollbackTransactionRequest)
-						sid = r.SessionId
-						tid = r.TxId
-
-						b.log("[%q][%q] rollback transaction", sid, tid)
-
-					case testutil.TablePrepareDataQuery:
-						r := args.(*Ydb_Table.PrepareDataQueryRequest)
-						sid = r.SessionId
-
-						b.log("[%q] prepare data query", sid)
-
-					case testutil.TableExecuteDataQuery:
-						{
-							r := testutil.TableExecuteDataQueryRequest{args}
-							sid = r.SessionID()
-							tid, _ = r.TransactionID()
-						}
-						{
-							r := testutil.TableExecuteDataQueryResult{reply}
-							r.SetTransactionID(tid)
-						}
-
-						b.log("[%q][%q] execute data query", sid, tid)
-
-					default:
-						return fmt.Errorf("db stub: not implemented")
-					}
+					return &Ydb_Table.CreateSessionResult{
+						SessionId: sid,
+					}, nil
+				},
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+					sid := request.(*Ydb_Table.KeepAliveRequest).SessionId
+					b.log("[%q] keepalive session", sid)
 
 					mu.RLock()
 					s := sessions[sid]
 					mu.RUnlock()
 
-					if s == nil {
-						return &ydb.OpError{
-							Reason: ydb.StatusSessionExpired,
-						}
-					}
-
 					s.Lock()
-					defer s.Unlock()
+					s.busy = false
+					s.Unlock()
 
-					if s.busy {
-						return &ydb.OpError{
-							Reason: ydb.StatusPreconditionFailed,
-						}
-					}
-					if b.Error != nil {
-						err = b.Error(ctx, m)
-					}
-
-					s.busy = isBusy(err)
-
-					return
+					return &Ydb_Table.KeepAliveResult{
+						SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
+					}, nil
 				},
-			}, nil
-		},
-	}
+				testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+					sid := request.(*Ydb_Table.DeleteSessionRequest).SessionId
+					b.log("[%q] delete session", sid)
+
+					mu.Lock()
+					delete(sessions, sid)
+					mu.Unlock()
+
+					return nil, nil
+				},
+				testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
+					sid := request.(*Ydb_Table.BeginTransactionRequest).SessionId
+					tid := fmt.Sprintf("test-tx/%d", atomic.AddInt32(&txID, 1))
+
+					b.log("[%q][%q] begin transaction", sid, tid)
+
+					return &Ydb_Table.BeginTransactionResult{
+						TxMeta: &Ydb_Table.TransactionMeta{
+							Id: tid,
+						},
+					}, nil
+				},
+				testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+					r := request.(*Ydb_Table.CommitTransactionRequest)
+					sid := r.SessionId
+					tid := r.TxId
+
+					b.log("[%q][%q] commit transaction", sid, tid)
+
+					return &Ydb_Table.CommitTransactionResult{}, nil
+				},
+				testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+					r := request.(*Ydb_Table.RollbackTransactionRequest)
+					sid := r.SessionId
+					tid := r.TxId
+
+					b.log("[%q][%q] rollback transaction", sid, tid)
+
+					return nil, nil
+				},
+				testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+					r := request.(*Ydb_Table.PrepareDataQueryRequest)
+					sid := r.SessionId
+
+					b.log("[%q] prepare data query", sid)
+
+					return &Ydb_Table.PrepareQueryResult{}, nil
+				},
+				testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+					r := request.(*Ydb_Table.ExecuteDataQueryRequest)
+					sid := r.SessionId
+					tid := r.TxControl.TxSelector.(*Ydb_Table.TransactionControl_TxId).TxId
+					b.log("[%q][%q] execute data query", sid, tid)
+
+					return &Ydb_Table.ExecuteQueryResult{
+						TxMeta: &Ydb_Table.TransactionMeta{
+							Id: tid,
+						},
+					}, nil
+				},
+			},
+		),
+	)
 }
 
 func TestTxDoerStmt(t *testing.T) {

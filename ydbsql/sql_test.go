@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"io"
 	"log"
@@ -189,40 +190,36 @@ func TestQuery(t *testing.T) {
 	c := Connector(
 		WithClient(
 			table.NewClient(
-				&testutil.Cluster{
-					OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-						return &testutil.ClientConn{
-							OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-								m := testutil.Method(method).Code()
-								switch m {
-								case testutil.TableCreateSession:
-								case testutil.TableExecuteDataQuery:
-									r := testutil.TableExecuteDataQueryResult{R: reply}
-									r.SetTransactionID("")
-								case testutil.TablePrepareDataQuery:
-								default:
-									t.Fatalf("Unexpected method %d", m)
-								}
-								return nil
+				testutil.NewCluster(
+					testutil.WithInvokeHandlers(
+						testutil.InvokeHandlers{
+							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.CreateSessionResult{}, nil
 							},
-							OnNewStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-								m := testutil.Method(method).Code()
-								switch m {
-								case testutil.TableCreateSession:
-								case testutil.TableStreamExecuteScanQuery:
-									return &testutil.ClientStream{
-										OnRecvMsg: func(m interface{}) error {
-											return io.EOF
-										},
-									}, nil
-								default:
-									t.Fatalf("Unexpected method %d", m)
-								}
-								return nil, nil
+							testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.ExecuteQueryResult{
+									TxMeta: &Ydb_Table.TransactionMeta{
+										Id: "",
+									},
+								}, nil
 							},
-						}, nil
-					},
-				},
+							testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.PrepareQueryResult{}, nil
+							},
+						},
+					),
+					testutil.WithNewStreamHandlers(
+						testutil.NewStreamHandlers{
+							testutil.TableStreamExecuteScanQuery: func(desc *grpc.StreamDesc) (grpc.ClientStream, error) {
+								return &testutil.ClientStream{
+									OnRecvMsg: func(m interface{}) error {
+										return io.EOF
+									},
+								}, nil
+							},
+						},
+					),
+				),
 			),
 		),
 		WithDefaultExecDataQueryOption(),

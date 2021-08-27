@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 	"google.golang.org/grpc"
@@ -151,89 +150,51 @@ func getField(name string, src, dst interface{}) bool {
 	return fn(reflect.ValueOf(src).Elem(), strings.Split(name, ".")...)
 }
 
-type TableCreateSessionResult struct {
-	R interface{}
-}
-
-func (t TableCreateSessionResult) SetSessionID(id string) {
-	setField("SessionId", t.R, id)
-}
-
-type TableKeepAliveResult struct {
-	R interface{}
-}
-
-func (t TableKeepAliveResult) SetSessionStatus(ready bool) {
-	var status Ydb_Table.KeepAliveResult_SessionStatus
-	if ready {
-		status = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY
-	} else {
-		status = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY
-	}
-	setField("SessionStatus", t.R, status)
-}
-
-type TableBeginTransactionResult struct {
-	R interface{}
-}
-
-func (t TableBeginTransactionResult) SetTransactionID(id string) {
-	setField("TxMeta", t.R, &Ydb_Table.TransactionMeta{
-		Id: id,
-	})
-}
-
-type TableExecuteDataQueryResult struct {
-	R interface{}
-}
-
-func (t TableExecuteDataQueryResult) SetTransactionID(id string) {
-	setField("TxMeta", t.R, &Ydb_Table.TransactionMeta{
-		Id: id,
-	})
-}
-
-type TableExecuteDataQueryRequest struct {
-	R interface{}
-}
-
-func (t TableExecuteDataQueryRequest) SessionID() (id string) {
-	getField("SessionId", t.R, &id)
-	return
-}
-
-func (t TableExecuteDataQueryRequest) TransactionID() (id string, ok bool) {
-	ok = getField("TxControl.TxSelector.TxId", t.R, &id)
-	return
-}
-
-func (t TableExecuteDataQueryRequest) KeepInCache() (keepInCache bool, ok bool) {
-	ok = getField("QueryCachePolicy.KeepInCache", t.R, &keepInCache)
-	return
-}
-
-type TablePrepareDataQueryResult struct {
-	R interface{}
-}
-
-func (t TablePrepareDataQueryResult) SetQueryID(id string) {
-	setField("QueryId", t.R, id)
-}
-
 type Cluster struct {
-	OnInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
-	OnNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
+	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	onClose     func() error
+}
+
+func (c *Cluster) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	if c.onInvoke == nil {
+		return fmt.Errorf("Cluster.onInvoke() not implemented")
+	}
+	return c.onInvoke(ctx, method, args, reply, opts...)
+}
+
+func (c *Cluster) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	if c.onNewStream == nil {
+		return nil, fmt.Errorf("Cluster.onNewStream() not implemented")
+	}
+	return c.onNewStream(ctx, desc, method, opts...)
+}
+
+func (c *Cluster) Get(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+	return &clientConn{
+		onInvoke:    c.onInvoke,
+		onNewStream: c.onNewStream,
+	}, nil
+}
+
+func (c *Cluster) Close() error {
+	if c.onClose == nil {
+		return fmt.Errorf("Cluster.Close() not implemented")
+	}
+	return c.onClose()
 }
 
 type (
-	Handler  func(request interface{}) (result proto.Message, err error)
-	Handlers map[MethodCode]Handler
+	InvokeHandlers    map[MethodCode]func(request interface{}) (result proto.Message, err error)
+	NewStreamHandlers map[MethodCode]func(desc *grpc.StreamDesc) (grpc.ClientStream, error)
 )
 
-func NewCluster(handlers Handlers) *Cluster {
-	return &Cluster{
-		OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-			if handler, ok := handlers[Method(method).Code()]; ok {
+type NewClusterOption func(c *Cluster)
+
+func WithInvokeHandlers(invokeHandlers InvokeHandlers) NewClusterOption {
+	return func(c *Cluster) {
+		c.onInvoke = func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
 				result, err := handler(args)
 				if err != nil {
 					return err
@@ -252,36 +213,60 @@ func NewCluster(handlers Handlers) *Cluster {
 				return nil
 			}
 			return fmt.Errorf("testutil: method '%s' not implemented", method)
-		},
+		}
 	}
-
 }
 
-type ClientConn struct {
-	OnInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
-	OnNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	OnAddress   func() string
-}
-
-func (c *ClientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-	if c.OnInvoke == nil {
-		return fmt.Errorf("OnInvoke not implemented (method: %s, request: %v, response: %v)", method, args, reply)
+func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) NewClusterOption {
+	return func(c *Cluster) {
+		c.onNewStream = func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			if handler, ok := newStreamHandlers[Method(method).Code()]; ok {
+				return handler(desc)
+			}
+			return nil, fmt.Errorf("testutil: method '%s' not implemented", method)
+		}
 	}
-	return c.OnInvoke(ctx, method, args, reply, opts...)
 }
 
-func (c *ClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	if c.OnNewStream == nil {
-		return nil, fmt.Errorf("OnInvoke not implemented (method: %s, desc: %v)", method, desc)
+func WithClose(onClose func() error) NewClusterOption {
+	return func(c *Cluster) {
+		c.onClose = onClose
 	}
-	return c.OnNewStream(ctx, desc, method, opts...)
 }
 
-func (c *ClientConn) Address() string {
-	if c.OnAddress == nil {
+func NewCluster(opts ...NewClusterOption) *Cluster {
+	c := &Cluster{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+type clientConn struct {
+	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
+	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	onAddress   func() string
+}
+
+func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	if c.onInvoke == nil {
+		return fmt.Errorf("onInvoke not implemented (method: %s, request: %v, response: %v)", method, args, reply)
+	}
+	return c.onInvoke(ctx, method, args, reply, opts...)
+}
+
+func (c *clientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	if c.onNewStream == nil {
+		return nil, fmt.Errorf("onNewStream not implemented (method: %s, desc: %v)", method, desc)
+	}
+	return c.onNewStream(ctx, desc, method, opts...)
+}
+
+func (c *clientConn) Address() string {
+	if c.onAddress == nil {
 		return ""
 	}
-	return c.OnAddress()
+	return c.onAddress()
 }
 
 type ClientStream struct {

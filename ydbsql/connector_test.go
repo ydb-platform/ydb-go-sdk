@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 	"net"
 	"testing"
 	"time"
@@ -139,32 +140,21 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 			c := Connector(
 				WithClient(
 					table.NewClient(
-						&testutil.Cluster{
-							OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-								return &testutil.ClientConn{
-									OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-										switch testutil.Method(method).Code() {
-										case testutil.TableCreateSession:
-										case testutil.TableExecuteDataQuery:
-											r := testutil.TableExecuteDataQueryRequest{args}
-											if len(test.queryCachePolicyOption) > 0 {
-												keepInCache, ok := r.KeepInCache()
-												require.True(t, ok)
-												require.True(t, keepInCache)
-											} else {
-												keepInCache, ok := r.KeepInCache()
-												require.True(t, ok)
-												require.False(t, keepInCache)
-											}
-											return nil
-										default:
-											t.Fatalf("Unexpected method %s", method)
-										}
-										return nil
+						testutil.NewCluster(
+							testutil.WithInvokeHandlers(
+								testutil.InvokeHandlers{
+									testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+										return &Ydb_Table.CreateSessionResult{}, nil
 									},
-								}, nil
-							},
-						},
+									testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+										r := request.(*Ydb_Table.ExecuteDataQueryRequest)
+										keepInCache := r.QueryCachePolicy.KeepInCache
+										require.Equal(t, len(test.queryCachePolicyOption) > 0, keepInCache)
+										return &Ydb_Table.ExecuteQueryResult{}, nil
+									},
+								},
+							),
+						),
 					),
 				),
 				WithDefaultExecDataQueryOption(table.WithQueryCachePolicy(test.queryCachePolicyOption...)),

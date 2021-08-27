@@ -28,11 +28,15 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewCluster(testutil.Handlers{
-			testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
-				return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
-			},
-		}),
+		Cluster: testutil.NewCluster(
+			testutil.WithInvokeHandlers(
+				testutil.InvokeHandlers{
+					testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
+						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
+					},
+				},
+			),
+		),
 	}
 	s, err := b.CreateSession(ctx)
 	if err != nil {
@@ -78,13 +82,17 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewCluster(testutil.Handlers{
-			testutil.TableDescribeTable: func(request interface{}) (proto.Message, error) {
-				r := &Ydb_Table.DescribeTableResult{}
-				proto.Merge(r, result)
-				return r, e
-			},
-		}),
+		Cluster: testutil.NewCluster(
+			testutil.WithInvokeHandlers(
+				testutil.InvokeHandlers{
+					testutil.TableDescribeTable: func(request interface{}) (proto.Message, error) {
+						r := &Ydb_Table.DescribeTableResult{}
+						proto.Merge(r, result)
+						return r, e
+					},
+				},
+			),
+		),
 	}
 	s, err := b.CreateSession(ctx)
 	if err != nil {
@@ -302,22 +310,26 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := Client{
-							cluster: testutil.NewCluster(testutil.Handlers{
-								testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
-									return &Ydb_Table.ExecuteQueryResult{
-										TxMeta: &Ydb_Table.TransactionMeta{
-											Id: "",
+							cluster: testutil.NewCluster(
+								testutil.WithInvokeHandlers(
+									testutil.InvokeHandlers{
+										testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.ExecuteQueryResult{
+												TxMeta: &Ydb_Table.TransactionMeta{
+													Id: "",
+												},
+											}, nil
 										},
-									}, nil
-								},
-								testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
-									return &Ydb_Table.BeginTransactionResult{
-										TxMeta: &Ydb_Table.TransactionMeta{
-											Id: "",
+										testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.BeginTransactionResult{
+												TxMeta: &Ydb_Table.TransactionMeta{
+													Id: "",
+												},
+											}, nil
 										},
-									}, nil
-								},
-							}),
+									},
+								),
+							),
 						}
 						ctx, cancel := context.WithTimeout(
 							context.Background(),
@@ -369,15 +381,19 @@ func TestClientCache(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			client := &Client{
-				cluster: testutil.NewCluster(testutil.Handlers{
-					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-						return &Ydb_Table.CreateSessionResult{}, nil
-					},
-					testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
-						prepareRequestsCount++
-						return &Ydb_Table.PrepareQueryResult{}, nil
-					},
-				}),
+				cluster: testutil.NewCluster(
+					testutil.WithInvokeHandlers(
+						testutil.InvokeHandlers{
+							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.CreateSessionResult{}, nil
+							},
+							testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+								prepareRequestsCount++
+								return &Ydb_Table.PrepareQueryResult{}, nil
+							},
+						},
+					),
+				),
 			}
 			s, err := client.CreateSession(ctx)
 			require.NoError(t, err)

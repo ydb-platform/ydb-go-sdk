@@ -4,10 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
-	"io"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -120,15 +116,7 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 
 func TestRetryerBadSession(t *testing.T) {
 	client := &Client{
-		cluster: &testutil.Cluster{
-			OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-				return &testutil.ClientConn{
-					OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-						return nil
-					},
-				}, nil
-			},
-		},
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	r := Retryer{
 		MaxRetries: 3,
@@ -168,15 +156,7 @@ func TestRetryerBadSession(t *testing.T) {
 
 func TestRetryerBadSessionReuse(t *testing.T) {
 	client := &Client{
-		cluster: &testutil.Cluster{
-			OnGet: func(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
-				return &testutil.ClientConn{
-					OnInvoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-						return nil
-					},
-				}, nil
-			},
-		},
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	var (
 		sessions = make([]*Session, 10)
@@ -262,222 +242,5 @@ func TestRetryerImmediateReturn(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
-	}
-}
-
-func TestContextCancelOverRetry(t *testing.T) {
-	tolerance := 10 * time.Millisecond
-	timeouts := []time.Duration{
-		time.Nanosecond,
-		time.Microsecond,
-		time.Millisecond,
-		10 * time.Millisecond,
-		20 * time.Millisecond,
-		30 * time.Millisecond,
-		40 * time.Millisecond,
-		50 * time.Millisecond,
-		60 * time.Millisecond,
-		70 * time.Millisecond,
-		80 * time.Millisecond,
-		90 * time.Millisecond,
-		100 * time.Millisecond,
-		150 * time.Millisecond,
-		200 * time.Millisecond,
-		300 * time.Millisecond,
-		400 * time.Millisecond,
-		500 * time.Millisecond,
-		600 * time.Millisecond,
-		700 * time.Millisecond,
-		800 * time.Millisecond,
-		900 * time.Millisecond,
-		time.Second,
-		time.Minute,
-	}
-	sleeps := []time.Duration{
-		time.Nanosecond,
-		time.Microsecond,
-		time.Millisecond,
-		10 * time.Millisecond,
-		20 * time.Millisecond,
-		30 * time.Millisecond,
-		40 * time.Millisecond,
-		50 * time.Millisecond,
-		60 * time.Millisecond,
-		70 * time.Millisecond,
-		80 * time.Millisecond,
-		90 * time.Millisecond,
-		100 * time.Millisecond,
-		150 * time.Millisecond,
-		200 * time.Millisecond,
-		300 * time.Millisecond,
-		400 * time.Millisecond,
-		500 * time.Millisecond,
-		600 * time.Millisecond,
-		700 * time.Millisecond,
-		800 * time.Millisecond,
-		900 * time.Millisecond,
-		time.Second,
-		time.Minute,
-	}
-	errs := []error{
-		io.EOF,
-		context.DeadlineExceeded,
-		fmt.Errorf("test error"),
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnknownCode,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorCanceled,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnknown,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorInvalidArgument,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorDeadlineExceeded,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorNotFound,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorAlreadyExists,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorPermissionDenied,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorResourceExhausted,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorFailedPrecondition,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorAborted,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorOutOfRange,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnimplemented,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorInternal,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnavailable,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorDataLoss,
-		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnauthenticated,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusUnknownStatus,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusBadRequest,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusUnauthorized,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusInternalError,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusAborted,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusUnavailable,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusOverloaded,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusSchemeError,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusGenericError,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusTimeout,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusBadSession,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusPreconditionFailed,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusAlreadyExists,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusNotFound,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusSessionExpired,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusCancelled,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusUndetermined,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusUnsupported,
-		},
-		&ydb.OpError{
-			Reason: ydb.StatusSessionBusy,
-		},
-	}
-	cluster := testutil.NewCluster(testutil.Handlers{
-		testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-			return &Ydb_Table.CreateSessionResult{}, nil
-		},
-	})
-	r := Retryer{
-		MaxRetries:   1e6,
-		RetryChecker: ydb.DefaultRetryChecker,
-		SessionProvider: &SessionPool{
-			Builder: NewClient(cluster),
-		},
-	}
-	for i := range timeouts {
-		for j := range sleeps {
-			for k := range errs {
-				timeout := timeouts[i]
-				sleep := sleeps[j]
-				err := errs[k]
-				t.Run(fmt.Sprintf("timeout %v, sleep %v, err: %v", timeout, sleep, err), func(t *testing.T) {
-					start := time.Now()
-					ctx, cancel := context.WithTimeout(context.Background(), timeout)
-					defer cancel()
-					e := r.Do(
-						WithRetryTrace(
-							ctx,
-							RetryTrace{
-								OnLoop: func(info RetryLoopStartInfo) func(RetryLoopDoneInfo) {
-									return func(info RetryLoopDoneInfo) {
-										if info.Latency-timeout > tolerance {
-											t.Errorf("unexpected latency: %v (attempts %d, err: %v)", info.Latency, info.Attempts, err)
-										}
-									}
-								},
-							},
-						),
-						OperationFunc(func(ctx context.Context, _ *Session) error {
-							time.Sleep(sleep)
-							return err
-						}),
-					)
-					latency := time.Since(start)
-					if latency > tolerance {
-						t.Errorf("unexpected latency: %v (err: %v)", latency, e)
-					}
-				})
-			}
-		}
 	}
 }

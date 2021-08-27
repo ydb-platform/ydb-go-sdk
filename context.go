@@ -18,6 +18,8 @@ type (
 	ctxOpCancelAfterKey struct{}
 	ctxOpModeKey        struct{}
 
+	ctxClientConnApplierKey struct{}
+
 	// Deprecated: no need to append endpoint info
 	ctxEndpointInfoKey struct{}
 
@@ -141,6 +143,30 @@ func WithOperationMode(ctx context.Context, m OperationMode) context.Context {
 func ContextOperationMode(ctx context.Context) (m OperationMode, ok bool) {
 	m, ok = ctx.Value(ctxOpModeKey{}).(OperationMode)
 	return
+}
+
+type ClientConnApplier func(c ClientConnInterface)
+
+// WithClientConnApplier returns a copy of parent context with client conn applier function
+func WithClientConnApplier(ctx context.Context, apply ClientConnApplier) context.Context {
+	if exist := clientConnApplier(ctx); exist != nil {
+		return context.WithValue(
+			ctx,
+			ctxClientConnApplierKey{},
+			ClientConnApplier(func(conn ClientConnInterface) {
+				exist(conn)
+				apply(conn)
+			}),
+		)
+	}
+	return context.WithValue(ctx, ctxClientConnApplierKey{}, apply)
+}
+
+func clientConnApplier(ctx context.Context) ClientConnApplier {
+	if v := ctx.Value(ctxClientConnApplierKey{}); v != nil {
+		return v.(ClientConnApplier)
+	}
+	return nil
 }
 
 type OperationMode uint

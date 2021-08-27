@@ -51,14 +51,19 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
 	)
-	conn, err := c.cluster.Get(ctx)
-	if err != nil {
-		return nil, err
-	}
 	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
-	response, err = Ydb_Table_V1.NewTableServiceClient(conn).CreateSession(ctx, &Ydb_Table.CreateSessionRequest{})
+	var conn ydb.ClientConnInterface
+	response, err = Ydb_Table_V1.NewTableServiceClient(c.cluster).CreateSession(
+		ydb.WithClientConnApplier(
+			ctx,
+			func(c ydb.ClientConnInterface) {
+				conn = c
+			},
+		),
+		&Ydb_Table.CreateSessionRequest{},
+	)
 	if err != nil {
 		return nil, err
 	}

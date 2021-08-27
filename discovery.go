@@ -21,11 +21,11 @@ type discoveryClient struct {
 	ssl              bool
 }
 
-func discover(ctx context.Context, discoveryService Ydb_Discovery_V1.DiscoveryServiceClient, database string, ssl bool) ([]Endpoint, error) {
+func (d *discoveryClient) Discover(ctx context.Context) ([]Endpoint, error) {
 	request := Ydb_Discovery.ListEndpointsRequest{
-		Database: database,
+		Database: d.database,
 	}
-	response, err := discoveryService.ListEndpoints(ctx, &request)
+	response, err := d.discoveryService.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func discover(ctx context.Context, discoveryService Ydb_Discovery_V1.DiscoverySe
 	}
 	endpoints := make([]Endpoint, 0, len(listEndpointsResult.Endpoints))
 	for _, e := range listEndpointsResult.Endpoints {
-		if e.Ssl == ssl {
+		if e.Ssl == d.ssl {
 			endpoints = append(endpoints, Endpoint{
 				Addr:  e.Address,
 				Port:  int(e.Port),
@@ -45,8 +45,4 @@ func discover(ctx context.Context, discoveryService Ydb_Discovery_V1.DiscoverySe
 		}
 	}
 	return endpoints, nil
-}
-
-func (d *discoveryClient) Discover(ctx context.Context) ([]Endpoint, error) {
-	return discover(ctx, d.discoveryService, d.database, d.ssl)
 }

@@ -1,7 +1,6 @@
 package ydb
 
 import (
-	"context"
 	"google.golang.org/grpc"
 )
 
@@ -18,9 +17,6 @@ type Cluster interface {
 	// Lazy getting grpc-connection must use for embedded client-side balancing
 	// Cluster may be put into code-generated client constructor as is.
 	grpc.ClientConnInterface
-
-	// Get returns raw-connection to fixed endpoint
-	Get(ctx context.Context) (conn ClientConnInterface, err error)
 
 	// Close clears resources and close all connections to YDB
 	Close() error
