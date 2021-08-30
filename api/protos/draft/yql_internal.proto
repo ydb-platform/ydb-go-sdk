@@ -47,6 +47,7 @@ message GetTaskResult {
     string user_id = 13;
     YandexQuery.QueryContent.QueryType query_type = 14;
     string scope = 15;
+    YandexQuery.ExecuteMode execute_mode = 16;
 }
 
 message GetTaskResponse {

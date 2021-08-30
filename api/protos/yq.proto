@@ -142,6 +142,8 @@ message BriefQuery {
     QueryContent.QueryType type = 1;
     string name = 2 [(Ydb.length).le = 1024];
     QueryMeta meta = 3;
+    Acl.Visibility visibility = 4;
+    bool automatic = 5;
 }
 
 message QueryPlan {
