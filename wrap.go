@@ -7,6 +7,10 @@ import (
 
 type Operation = internal.Operation
 
+func WrapWithResponse(method string, req proto.Message, resp Response) Operation {
+	return internal.WrapWithResponse(method, req, resp)
+}
+
 func Wrap(method string, req, res proto.Message) Operation {
 	return internal.Wrap(method, req, res)
 }
