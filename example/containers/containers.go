@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
 	"bytes"
 	"context"
@@ -52,6 +53,126 @@ var query = template.Must(template.New("fill database").Parse(`
 type Command struct {
 }
 
+type exampleStruct struct {
+}
+
+func (*exampleStruct) UnmarshalYDB(res ydb.RawScanner) error {
+	res.NextItem()
+	log.Printf("T: %s", res.Type())
+	for i, n := 0, res.StructIn(); i < n; i++ {
+		name := res.StructField(i)
+		val := res.Int32()
+		log.Printf("(struct): %s: %d", name, val)
+	}
+	res.StructOut()
+	return nil
+}
+
+type exampleList struct {
+}
+
+func (*exampleList) UnmarshalYDB(res ydb.RawScanner) error {
+	res.NextItem()
+	log.Printf("T: %s", res.Type())
+	for i, n := 0, res.ListIn(); i < n; i++ {
+		res.ListItem(i)
+		log.Printf("(list) %q: %s", res.Path(), res.String())
+	}
+	res.ListOut()
+	return nil
+}
+
+type exampleTuple struct {
+}
+
+func (*exampleTuple) UnmarshalYDB(res ydb.RawScanner) error {
+	res.NextItem()
+	log.Printf("T: %s", res.Type())
+	for i, n := 0, res.TupleIn(); i < n; i++ {
+		res.TupleItem(i)
+		switch i {
+		case 0:
+			log.Printf("(tuple) %q: %d", res.Path(), res.Int32())
+		case 1:
+			log.Printf("(tuple) %q: %s", res.Path(), res.String())
+		case 2:
+			n := res.ListIn()
+			for j := 0; j < n; j++ {
+				res.ListItem(j)
+				log.Printf("(tuple) %q: %d", res.Path(), res.Int32())
+			}
+			res.ListOut()
+		}
+	}
+	res.TupleOut()
+	return nil
+}
+
+type exampleDict struct {
+}
+
+func (*exampleDict) UnmarshalYDB(res ydb.RawScanner) error {
+	res.NextItem()
+	log.Printf("T: %s", res.Type())
+	for i, n := 0, res.DictIn(); i < n; i++ {
+		res.DictKey(i)
+		key := res.String()
+
+		res.DictPayload(i)
+		val := res.Int32()
+
+		log.Printf("(dict) %q: %s: %d", res.Path(), key, val)
+	}
+	res.DictOut()
+	return nil
+}
+
+type variantStruct struct {
+}
+
+func (*variantStruct) UnmarshalYDB(res ydb.RawScanner) error {
+	res.NextItem()
+	log.Printf("T: %s", res.Type())
+	name, index := res.Variant()
+	var x interface{}
+	switch name {
+	case "foo":
+		x = res.Uint32()
+	case "bar":
+		x = res.UTF8()
+	case "baz":
+		x = res.Int64()
+	}
+	log.Printf(
+		"(struct variant): %s %s %q %d = %v",
+		res.Path(), res.Type(), name, index, x,
+	)
+	return nil
+}
+
+type variantTuple struct {
+}
+
+func (*variantTuple) UnmarshalYDB(res ydb.RawScanner) error {
+	res.NextItem()
+	log.Printf("T: %s", res.Type())
+	name, index := res.Variant()
+	var x interface{}
+	switch index {
+	case 0:
+		x = res.Uint32()
+	case 1:
+		x = res.UTF8()
+	case 2:
+		x = res.Int64()
+	}
+	log.Printf(
+		"(tuple variant): %s %s %q %d = %v",
+		res.Path(), res.Type(), name, index, x,
+	)
+	return nil
+}
+
 func (cmd *Command) ExportFlags(context.Context, *flag.FlagSet) {}
 
 func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
@@ -91,88 +212,27 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	parsers := [...]func(){
 		func() {
-			for i, n := 0, res.ListIn(); i < n; i++ {
-				res.ListItem(i)
-				log.Printf("(list) %q: %s", res.Path(), res.String())
-			}
-			res.ListOut()
+			_ = res.ScanRaw(&exampleList{})
 		},
 		func() {
-			for i, n := 0, res.TupleIn(); i < n; i++ {
-				res.TupleItem(i)
-				switch i {
-				case 0:
-					log.Printf("(tuple) %q: %d", res.Path(), res.Int32())
-				case 1:
-					log.Printf("(tuple) %q: %s", res.Path(), res.String())
-				case 2:
-					n := res.ListIn()
-					for j := 0; j < n; j++ {
-						res.ListItem(j)
-						log.Printf("(tuple) %q: %d", res.Path(), res.Int32())
-					}
-					res.ListOut()
-				}
-			}
-			res.TupleOut()
+			_ = res.ScanRaw(&exampleTuple{})
 		},
 		func() {
-			for i, n := 0, res.DictIn(); i < n; i++ {
-				res.DictKey(i)
-				key := res.String()
-
-				res.DictPayload(i)
-				val := res.Int32()
-
-				log.Printf("(dict) %q: %s: %d", res.Path(), key, val)
-			}
-			res.DictOut()
+			_ = res.ScanRaw(&exampleDict{})
 		},
 		func() {
-			for i, n := 0, res.StructIn(); i < n; i++ {
-				name := res.StructField(i)
-				val := res.Int32()
-				log.Printf("(struct) %q: %s: %d", res.Path(), name, val)
-			}
-			res.StructOut()
+			_ = res.ScanRaw(&exampleStruct{})
 		},
 		func() {
-			name, index := res.Variant()
-			var x interface{}
-			switch name {
-			case "foo":
-				x = res.Uint32()
-			case "bar":
-				x = res.UTF8()
-			case "baz":
-				x = res.Int64()
-			}
-			log.Printf(
-				"(struct variant): %s %s %q %d = %v",
-				res.Path(), res.Type(), name, index, x,
-			)
+			_ = res.ScanRaw(&variantStruct{})
 		},
 		func() {
-			name, index := res.Variant()
-			var x interface{}
-			switch index {
-			case 0:
-				x = res.Uint32()
-			case 1:
-				x = res.UTF8()
-			case 2:
-				x = res.Int64()
-			}
-			log.Printf(
-				"(tuple variant): %s %s %q %d = %v",
-				res.Path(), res.Type(), name, index, x,
-			)
+			_ = res.ScanRaw(&variantTuple{})
 		},
 	}
+
 	for set := 0; res.NextSet(); set++ {
 		res.NextRow()
-		res.NextItem()
-		log.Printf("T: %s", res.Type())
 		parsers[set]()
 	}
 	if err := res.Err(); err != nil {

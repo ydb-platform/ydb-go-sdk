@@ -3,6 +3,7 @@ package ydb
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
@@ -116,6 +117,171 @@ func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
 	internal.WriteTypeStringTo(buf, t)
 }
 
-type YdbScanner interface {
-	Scan(src interface{}) error
+// CustomScanner scanning non-primitive yql types
+type CustomScanner interface {
+	UnmarshalYDB(res RawScanner) error
+}
+
+// RawScanner scanning non-primitive yql types
+type RawScanner interface {
+	HasItems() bool
+	HasNextItem() bool
+
+	// NextItem selects next item to parse in the current row.
+	// It returns false if there are no more items in the row.
+	//
+	// Note that NextItem() differs from NextRow() and NextSet() – if it return
+	// false it fails the Result such that no further operations may be processed.
+	// That is, res.Err() becomes non-nil.
+	NextItem() (ok bool)
+
+	// SeekItem finds the column with given name in the result set and selects
+	// appropriate item to parse in the current row.
+	SeekItem(name string) bool
+	Path() string
+	WritePathTo(w io.Writer) (n int64, err error)
+	Type() Type
+	Bool() (v bool)
+	Int8() (v int8)
+	Uint8() (v uint8)
+	Int16() (v int16)
+	Uint16() (v uint16)
+	Int32() (v int32)
+	Uint32() (v uint32)
+	Int64() (v int64)
+	Uint64() (v uint64)
+	Float() (v float32)
+	Double() (v float64)
+	Date() (v uint32)
+	Datetime() (v uint32)
+	Timestamp() (v uint64)
+	Interval() (v int64)
+	TzDate() (v string)
+	TzDatetime() (v string)
+	TzTimestamp() (v string)
+	String() (v []byte)
+	UTF8() (v string)
+	YSON() (v string)
+	JSON() (v string)
+	UUID() (v [16]byte)
+	JSONDocument() (v string)
+	DyNumber() (v string)
+	OBool() (v bool)
+	OInt8() (v int8)
+	OUint8() (v uint8)
+	OInt16() (v int16)
+	OUint16() (v uint16)
+	OInt32() (v int32)
+	OUint32() (v uint32)
+	OInt64() (v int64)
+	OUint64() (v uint64)
+	OFloat() (v float32)
+	ODouble() (v float64)
+	ODate() (v uint32)
+	ODatetime() (v uint32)
+	OTimestamp() (v uint64)
+	OInterval() (v int64)
+	OTzDate() (v string)
+	OTzDatetime() (v string)
+	OTzTimestamp() (v string)
+	OString() (v []byte)
+	OUTF8() (v string)
+	OYSON() (v string)
+	OJSON() (v string)
+	OUUID() (v [16]byte)
+	OJSONDocument() (v string)
+	ODyNumber() (v string)
+
+	// Any returns any pritmitive value.
+	// Currently it may return one of this types:
+	//
+	//   bool
+	//   int8
+	//   uint8
+	//   int16
+	//   uint16
+	//   int32
+	//   uint32
+	//   int64
+	//   uint64
+	//   float32
+	//   float64
+	//   []byte
+	//   string
+	//   [16]byte
+	//
+	Any() interface{}
+	Value() Value
+
+	// ListIn interprets current item under scan as a ydb's list.
+	// It returns the size of the nested items.
+	// If current item under scan is not a list type, it returns -1.
+	ListIn() (size int)
+
+	// ListItem selects current item i-th element as an item to scan.
+	// ListIn() must be called before.
+	ListItem(i int)
+
+	// ListOut leaves list entered before by ListIn() call.
+	ListOut()
+
+	// TupleIn interprets current item under scan as a ydb's tuple.
+	// It returns the size of the nested items.
+	TupleIn() (size int)
+
+	// TupleItem selects current item i-th element as an item to scan.
+	// Note that TupleIn() must be called before.
+	// It panics if it is out of bounds.
+	TupleItem(i int)
+
+	// TupleOut leaves tuple entered before by TupleIn() call.
+	TupleOut()
+
+	// StructIn interprets current item under scan as a ydb's struct.
+	// It returns the size of the nested items – the struct fields values.
+	// If there is no current item under scan it returns -1.
+	StructIn() (size int)
+
+	// StructField selects current item i-th field value as an item to scan.
+	// Note that StructIn() must be called before.
+	// It panics if i is out of bounds.
+	StructField(i int) (name string)
+
+	// StructOut leaves struct entered before by StructIn() call.
+	StructOut()
+
+	// DictIn interprets current item under scan as a ydb's dict.
+	// It returns the size of the nested items pairs.
+	// If there is no current item under scan it returns -1.
+	DictIn() (size int)
+
+	// DictKey selects current item i-th pair key as an item to scan.
+	// Note that DictIn() must be called before.
+	// It panics if i is out of bounds.
+	DictKey(i int)
+
+	// DictPayload selects current item i-th pair value as an item to scan.
+	// Note that DictIn() must be called before.
+	// It panics if i is out of bounds.
+	DictPayload(i int)
+
+	// DictOut leaves dict entered before by DictIn() call.
+	DictOut()
+
+	// Variant unwraps current item under scan interpreting it as Variant<T> type.
+	// It returns non-empty name of a field that is filled for struct-based
+	// variant.
+	// It always returns an index of filled field of a T.
+	Variant() (name string, index uint32)
+
+	// Decimal returns decimal value represented by big-endian 128 bit signed integer.
+	Decimal(t Type) (v [16]byte)
+	ODecimal(t Type) (v [16]byte)
+
+	// UnwrapDecimal returns decimal value represented by big-endian 128 bit signed
+	// integer and its type information.
+	UnwrapDecimal() (v [16]byte, precision, scale uint32)
+
+	// Unwrap unwraps current item under scan interpreting it as Optional<T> type.
+	Unwrap()
 }

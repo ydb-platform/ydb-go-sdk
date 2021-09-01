@@ -3,6 +3,9 @@ package result
 import (
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
+	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -15,6 +18,47 @@ type column struct {
 	testDefault bool
 	nilValue    bool
 	byteTest    bool
+}
+
+type intIncScanner int64
+
+func (s *intIncScanner) Scan(src interface{}) error {
+	v, ok := src.(int64)
+	if !ok {
+		return fmt.Errorf("wrong type")
+	}
+	*s = intIncScanner(v + 10)
+	return nil
+}
+
+type dateScanner time.Time
+
+func (s *dateScanner) Scan(src interface{}) error {
+	v, ok := src.(time.Time)
+	if !ok {
+		return fmt.Errorf("wrong type")
+	}
+	*s = dateScanner(v)
+	return nil
+}
+
+type nullStringScanner struct {
+	value string
+	isNil bool
+}
+
+func (s *nullStringScanner) Scan(src interface{}) error {
+	if src == nil {
+		s.isNil = true
+		return nil
+	}
+	v, ok := src.(string)
+	if !ok {
+		return fmt.Errorf("wrong type")
+	}
+	s.value = v
+	s.isNil = false
+	return nil
 }
 
 var scannerData = []struct {
@@ -117,7 +161,7 @@ var scannerData = []struct {
 			name:   "string",
 			typeID: Ydb.Type_STRING,
 		}},
-		values: []interface{}{new([]byte), new(string), new(string)},
+		values: []interface{}{new(string), new(string), new(string)},
 	},
 	{
 		name:  "Scan float32, int64, uint64 and skip other columns",
@@ -441,4 +485,65 @@ var scannerData = []struct {
 		}},
 		values: []interface{}{new([8]byte)},
 	},
+}
+
+func PrepareScannerPerformanceTest(count int) *Scanner {
+	res := Scanner{
+		set: &Ydb.ResultSet{
+			Columns:   nil,
+			Rows:      nil,
+			Truncated: false,
+		},
+		row: nil,
+		stack: scanStack{
+			v: [8]item{},
+			p: 0,
+		},
+		nextRow:        0,
+		nextItem:       0,
+		setColumnIndex: nil,
+		columnIndexes:  nil,
+		err:            nil,
+	}
+	res.set.Columns = []*Ydb.Column{{
+		Name: "series_id",
+		Type: &Ydb.Type{
+			Type: &Ydb.Type_TypeId{
+				TypeId: Ydb.Type_UINT64,
+			},
+		},
+	}, {
+		Name: "title",
+		Type: &Ydb.Type{
+			Type: &Ydb.Type_TypeId{
+				TypeId: Ydb.Type_UTF8,
+			},
+		},
+	}, {
+		Name: "release_date",
+		Type: &Ydb.Type{
+			Type: &Ydb.Type_TypeId{
+				TypeId: Ydb.Type_DATETIME,
+			},
+		},
+	}}
+	res.set.Rows = []*Ydb.Value{}
+	for i := 0; i < count; i++ {
+		res.set.Rows = append(res.set.Rows, &Ydb.Value{
+			Items: []*Ydb.Value{{
+				Value: &Ydb.Value_Uint64Value{
+					Uint64Value: uint64(i),
+				},
+			}, {
+				Value: &Ydb.Value_TextValue{
+					TextValue: strconv.Itoa(i) + "a",
+				},
+			}, {
+				Value: &Ydb.Value_Uint32Value{
+					Uint32Value: internal.MarshalDatetime(time.Now()) + uint32(i),
+				},
+			}},
+		})
+	}
+	return &res
 }
