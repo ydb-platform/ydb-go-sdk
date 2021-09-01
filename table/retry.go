@@ -112,6 +112,43 @@ func Retry(ctx context.Context, s SessionProvider, op Operation) error {
 }
 
 // Do calls op.Do until it return nil or not retriable error.
+func (r Retryer) sessionGet(ctx context.Context) (_ *Session, err error) {
+	result := make(chan struct {
+		s *Session
+		e error
+	})
+	go func() {
+		defer close(result)
+		s, e := r.SessionProvider.Get(ctx)
+		result <- struct {
+			s *Session
+			e error
+		}{s: s, e: e}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-result:
+		return result.s, result.e
+	}
+}
+
+// Do calls op.Do until it return nil or not retriable error.
+func (r Retryer) opDo(ctx context.Context, op Operation, s *Session) error {
+	err := make(chan error)
+	go func() {
+		defer close(err)
+		err <- op.Do(ctx, s)
+	}()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case e := <-err:
+		return e
+	}
+}
+
+// Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 	retryTraceLoopDone := retryTraceOnLoop(ctx, r.Trace, ctx)
 	var (
@@ -127,41 +164,46 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 		}
 	}()
 	for i = 0; i <= r.MaxRetries; i++ {
-		if s == nil {
-			var e error
-			s, e = r.SessionProvider.Get(ctx)
-			if e != nil {
-				if err == nil {
-					// It is initial attempt to get a Session.
-					// Otherwise s could be nil only when status bad session
-					// received – that is, we must return bad session error to
-					// make it possible to lay on for the client.
-					err = e
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if s == nil {
+				var e error
+				s, e = r.sessionGet(ctx)
+				if e != nil {
+					if err == nil {
+						// It is initial attempt to get a Session.
+						// Otherwise s could be nil only when status bad session
+						// received – that is, we must return bad session error to
+						// make it possible to lay on for the client.
+						err = e
+					}
+					return
 				}
-				return
 			}
-		}
-		if err = op.Do(ctx, s); err == nil {
-			return nil
-		}
-		m = r.RetryChecker.Check(err)
-		switch {
-		case m.MustDeleteSession():
-			defer s.Close(ydb.ContextWithoutDeadline(ctx))
-			s = nil
+			if err = r.opDo(ctx, op, s); err == nil {
+				return nil
+			}
+			m = r.RetryChecker.Check(err)
+			switch {
+			case m.MustDeleteSession():
+				defer s.Close(ydb.ContextWithoutDeadline(ctx))
+				s = nil
 
-		case m.MustCheckSession():
-			_ = r.SessionProvider.PutBusy(ctx, s)
-			s = nil
-		}
-		if !m.Retriable() {
-			return err
-		}
-		if m.MustBackoff() {
-			if e := ydb.WaitBackoff(ctx, r.Backoff, i); e != nil {
-				// Return original error to make it possible to lay on for the
-				// client.
+			case m.MustCheckSession():
+				_ = r.SessionProvider.PutBusy(ctx, s)
+				s = nil
+			}
+			if !m.Retriable() {
 				return err
+			}
+			if m.MustBackoff() {
+				if e := ydb.WaitBackoff(ctx, r.Backoff, i); e != nil {
+					// Return original error to make it possible to lay on for the
+					// client.
+					return err
+				}
 			}
 		}
 	}
