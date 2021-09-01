@@ -55,7 +55,6 @@ func UUIDValue(v [16]byte) Value                { return internal.UUIDValue(v) }
 func JSONDocumentValue(v string) Value          { return internal.JSONDocumentValue(v) }
 func JSONDocumentValueFromBytes(v []byte) Value { return internal.JSONDocumentValue(string(v)) }
 func DyNumberValue(v string) Value              { return internal.DyNumberValue(v) }
-func DyNumberValueFromBytes(v []byte) Value     { return internal.DyNumberValue(string(v)) }
 
 func VoidValue() Value            { return internal.VoidValue }
 func NullValue(t Type) Value      { return internal.NullValue(t) }

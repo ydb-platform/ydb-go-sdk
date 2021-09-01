@@ -3,7 +3,6 @@ package ydb
 import (
 	"context"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 )
 
 func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
@@ -24,30 +23,6 @@ func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method st
 	return c.raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 }
 
-func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
-	// Remember raw context to pass it for the tracing functions.
-	rawCtx := ctx
-
-	// Get credentials (token actually) for the request.
-	var md metadata.MD
-	md, err = d.meta.md(ctx)
-	if err != nil {
-		return
-	}
-	if len(md) > 0 {
-		ctx = metadata.NewOutgoingContext(ctx, md)
-	}
-
-	driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
-	c, err = d.cluster.Get(ctx)
-	driverTraceGetConnDone(rawCtx, c.Address(), err)
-
-	if err == nil {
-		if apply := clientConnApplier(rawCtx); apply != nil {
-			apply(c)
-		}
-		c.d = d
-	}
-
-	return
+func (d *driver) Close() error {
+	return d.cluster.Close()
 }

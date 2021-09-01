@@ -1,77 +1,11 @@
 package result
 
 import (
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
 	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
-	"strconv"
 	"testing"
 	"time"
 )
-
-func prepareTest(count int) *Scanner {
-	res := Scanner{
-		set: &Ydb.ResultSet{
-			Columns:   nil,
-			Rows:      nil,
-			Truncated: false,
-		},
-		row: nil,
-		stack: scanStack{
-			v: [8]item{},
-			p: 0,
-		},
-		nextRow:        0,
-		nextItem:       0,
-		setColumnIndex: nil,
-		columnIndexes:  nil,
-		err:            nil,
-	}
-	res.set.Columns = []*Ydb.Column{{
-		Name: "series_id",
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_UINT64,
-			},
-		},
-	}, {
-		Name: "title",
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_UTF8,
-			},
-		},
-	}, {
-		Name: "release_date",
-		Type: &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_DATETIME,
-			},
-		},
-	}}
-	n := count
-	if n == 0 {
-		n = testSize
-	}
-	res.set.Rows = []*Ydb.Value{}
-	for i := 0; i < n; i++ {
-		res.set.Rows = append(res.set.Rows, &Ydb.Value{
-			Items: []*Ydb.Value{{
-				Value: &Ydb.Value_Uint64Value{
-					Uint64Value: uint64(i),
-				},
-			}, {
-				Value: &Ydb.Value_TextValue{
-					TextValue: strconv.Itoa(i) + "a",
-				},
-			}, {
-				Value: &Ydb.Value_Uint32Value{
-					Uint32Value: internal.MarshalDatetime(time.Now()) + uint32(i),
-				},
-			}},
-		})
-	}
-	return &res
-}
 
 type series struct {
 	id    uint64
@@ -81,12 +15,21 @@ type series struct {
 
 var (
 	testSize = 10000
-	ar       []series
 )
+
+func (s *series) UnmarshalYDB(res ydb.RawScanner) error {
+	res.SeekItem("series_id")
+	s.id = res.OUint64()
+	res.SeekItem("title")
+	s.title = res.OUTF8()
+	res.SeekItem("release_date")
+	s.date = internal.UnmarshalDatetime(res.ODatetime())
+	return nil
+}
 
 func BenchmarkTestScanWithColumns(b *testing.B) {
 	b.ReportAllocs()
-	res := prepareTest(b.N)
+	res := PrepareScannerPerformanceTest(b.N)
 	row := series{}
 	res.setColumnIndexes([]string{"series_id", "title", "release_date"})
 	b.ResetTimer()
@@ -99,7 +42,7 @@ func BenchmarkTestScanWithColumns(b *testing.B) {
 
 func BenchmarkTestScan(b *testing.B) {
 	b.ReportAllocs()
-	res := prepareTest(b.N)
+	res := PrepareScannerPerformanceTest(b.N)
 	row := series{}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -111,7 +54,7 @@ func BenchmarkTestScan(b *testing.B) {
 
 func BenchmarkTestDeprecatedNext(b *testing.B) {
 	b.ReportAllocs()
-	res := prepareTest(b.N)
+	res := PrepareScannerPerformanceTest(b.N)
 	row := series{}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -128,7 +71,7 @@ func BenchmarkTestDeprecatedNext(b *testing.B) {
 
 func BenchmarkTestDeprecatedSeek(b *testing.B) {
 	b.ReportAllocs()
-	res := prepareTest(b.N)
+	res := PrepareScannerPerformanceTest(b.N)
 	row := series{}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -139,6 +82,18 @@ func BenchmarkTestDeprecatedSeek(b *testing.B) {
 			row.title = res.OUTF8()
 			res.SeekItem("release_date")
 			row.date = internal.UnmarshalDatetime(res.ODatetime())
+		}
+	}
+}
+
+func BenchmarkTestScanRow(b *testing.B) {
+	b.ReportAllocs()
+	res := PrepareScannerPerformanceTest(b.N)
+	row := series{}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if res.NextRow() {
+			res.ScanRaw(&row)
 		}
 	}
 }

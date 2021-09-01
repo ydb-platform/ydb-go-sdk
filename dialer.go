@@ -89,6 +89,7 @@ type dialer struct {
 }
 
 func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
+	endpoint := d.endpointByAddr(addr)
 	cluster := cluster{
 		dial:  d.dialHostPort,
 		trace: d.config.Trace,
@@ -118,19 +119,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 			_ = cluster.Close()
 		}
 	}()
-
-	curr := []Endpoint{
-		d.endpointByAddr(addr),
-	}
-
-	cluster.Insert(ctx, curr[0])
-
-	// Ensure that endpoint is online.
-	_, err = cluster.Get(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+	cluster.Insert(ctx, endpoint)
 	driver := &driver{
 		cluster:              &cluster,
 		meta:                 d.meta,
@@ -140,15 +129,34 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 		operationTimeout:     d.config.OperationTimeout,
 		operationCancelAfter: d.config.OperationCancelAfter,
 	}
-	discoveryClient := &discoveryClient{
-		discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(driver),
-		database:         d.config.Database,
-		ssl:              d.useTLS(),
+	// Ensure that endpoint is online.
+	_, err = driver.getConn(ctx)
+	if err != nil {
+		return nil, err
 	}
 	if d.config.DiscoveryInterval > 0 {
-		wg := newWG()
-		wg.Add(1)
+		discoveryClient := &discoveryClient{
+			discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(driver),
+			database:         d.config.Database,
+			ssl:              d.useTLS(),
+		}
 
+		curr, err := discoveryClient.Discover(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// Endpoints must be sorted to merge
+		sortEndpoints(curr)
+		wg := newWG()
+		wg.Add(len(curr))
+		for _, e := range curr {
+			go cluster.Insert(ctx, e, wg)
+		}
+		if d.config.FastDial {
+			wg.WaitFirst()
+		} else {
+			wg.Wait()
+		}
 		cluster.explorer = NewRepeater(
 			d.config.DiscoveryInterval,
 			func(ctx context.Context) {
@@ -194,11 +202,6 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 				curr = next
 			},
 		)
-		if d.config.FastDial {
-			wg.WaitFirst()
-		} else {
-			wg.Wait()
-		}
 	}
 	return driver, nil
 }

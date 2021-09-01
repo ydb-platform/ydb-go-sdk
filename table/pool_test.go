@@ -1327,6 +1327,72 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	}
 }
 
+// create session
+// close pool
+// PutBusy session in the pool
+// session must be closed and error is returned
+func TestPutBusyAfterClosePool(t *testing.T) {
+	p := &SessionPool{
+		Trace: SessionPoolTrace{},
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 1,
+			Handler: methodHandlers{
+				testutil.TableDeleteSession: okHandler,
+			},
+		},
+		SizeLimit:              1,
+		IdleThreshold:          -1,
+		IdleKeepAliveThreshold: -1,
+	}
+	s := mustCreateSession(t, p)
+	closed := make(chan bool)
+	s.OnClose(func() {
+		close(closed)
+	})
+	_ = p.Close(context.Background())
+	err := p.PutBusy(context.Background(), s)
+	if err != ErrSessionPoolClosed {
+		t.Fatalf("unexpected error: %v; want %v", err, ErrSessionPoolClosed)
+	}
+	<-closed
+}
+
+// create first session
+// PutBusy first session in the pool
+// BusyCheckInterval is very long
+// create second session
+// PutBusy second session, busyCheck channel is overflow
+// second session must be closed
+func TestOverflowBusyCheck(t *testing.T) {
+	p := &SessionPool{
+		Trace: SessionPoolTrace{},
+		Builder: &StubBuilder{
+			T:     t,
+			Limit: 2,
+			Handler: methodHandlers{
+				testutil.TableDeleteSession: okHandler,
+			},
+		},
+		SizeLimit:              1,
+		IdleThreshold:          -1,
+		IdleKeepAliveThreshold: -1,
+		BusyCheckInterval:      time.Hour,
+	}
+	defer func() {
+		_ = p.Close(context.Background())
+	}()
+	s1 := mustCreateSession(t, p)
+	mustPutBusySession(t, p, s1)
+	s2 := mustCreateSession(t, p)
+	closed := make(chan bool)
+	s2.OnClose(func() {
+		close(closed)
+	})
+	mustPutBusySession(t, p, s2)
+	<-closed
+}
+
 func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 	select {
 	case act := <-ch:

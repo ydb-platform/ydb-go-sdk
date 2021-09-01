@@ -2,57 +2,17 @@ package result
 
 import (
 	"encoding/binary"
-	"fmt"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 )
-
-type intIncScanner int64
-
-func (s *intIncScanner) Scan(src interface{}) error {
-	v, ok := src.(int64)
-	if !ok {
-		return fmt.Errorf("wrong type")
-	}
-	*s = intIncScanner(v + 10)
-	return nil
-}
-
-type dateScanner time.Time
-
-func (s *dateScanner) Scan(src interface{}) error {
-	v, ok := src.(uint32)
-	if !ok {
-		return fmt.Errorf("wrong type")
-	}
-	*s = dateScanner(internal.UnmarshalDate(v))
-	return nil
-}
-
-type nullStringScanner struct {
-	value string
-	isNil bool
-}
-
-func (s *nullStringScanner) Scan(src interface{}) error {
-	if src == nil {
-		s.isNil = true
-		return nil
-	}
-	v, ok := src.([]byte)
-	if !ok {
-		return fmt.Errorf("wrong type")
-	}
-	s.value = string(v)
-	s.isNil = false
-	return nil
-}
 
 func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 	rv := rand.Int63()
@@ -500,12 +460,11 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 				TextValue: v,
 			},
 		}
-		src := []byte(v)
 		if c.optional && !c.testDefault {
-			vp := &src
+			vp := &v
 			return ydbval, &vp
 		}
-		return ydbval, &src
+		return ydbval, &v
 	default:
 		panic("ydb: unexpected type")
 	}
