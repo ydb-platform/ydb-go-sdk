@@ -197,7 +197,8 @@ message ListQueriesRequest {
         QueryContent.QueryType query_type = 1;
         repeated QueryMeta.ComputeStatus status = 2 [(Ydb.size).le = 20];
         repeated ExecuteMode mode = 3 [(Ydb.size).le = 20];
-        string name = 4 [(Ydb.length).le = 1024];
+        string name = 4 [(Ydb.length).le = 1024]; // queries whose name contains the filter.name substring
+        bool created_by_me = 5;
     }
     Filter filter = 4;
 }
@@ -296,6 +297,7 @@ message ListJobsRequest {
 
     message Filter {
         string query_id = 1 [(Ydb.length).le = 1024];
+        bool created_by_me = 2;
     }
     Filter filter = 4;
 }
@@ -414,6 +416,12 @@ message ListConnectionsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     string page_token = 2 [(Ydb.length).le = 1024];
     int32 limit = 3 [(Ydb.value) = "[1; 100]"];
+
+    message Filter {
+        string name = 1 [(Ydb.length).le = 1024]; // connections whose name contains the filter.name substring
+        bool created_by_me = 2;
+    }
+    Filter filter = 4;
 }
 
 message ListConnectionsResponse {
@@ -569,7 +577,9 @@ message ListBindingsRequest {
     int32 limit = 3 [(Ydb.value) = "[1; 100]"];
 
     message Filter {
-        string connection_id = 2 [(Ydb.length).le = 1024];
+        string connection_id = 1 [(Ydb.length).le = 1024];
+        string name = 2 [(Ydb.length).le = 1024]; // bindings whose name contains the filter.name substring
+        bool created_by_me = 3;
     }
     Filter filter = 4;
 }
