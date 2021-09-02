@@ -332,6 +332,10 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				Builder: &StubBuilder{
 					T:     t,
 					Limit: 1,
+					Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						}})),
 				},
 			}
 			defer func() {
