@@ -231,7 +231,7 @@ func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
 	driverTraceGetConnDone(rawCtx, c.Address(), err)
 
 	if err == nil {
-		if apply := clientConnApplier(rawCtx); apply != nil {
+		if apply, ok := ContextClientConnApplier(rawCtx); ok {
 			apply(c)
 		}
 		c.d = d

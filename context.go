@@ -149,7 +149,7 @@ type ClientConnApplier func(c ClientConnInterface)
 
 // WithClientConnApplier returns a copy of parent context with client conn applier function
 func WithClientConnApplier(ctx context.Context, apply ClientConnApplier) context.Context {
-	if exist := clientConnApplier(ctx); exist != nil {
+	if exist, ok := ContextClientConnApplier(ctx); ok {
 		return context.WithValue(
 			ctx,
 			ctxClientConnApplierKey{},
@@ -162,11 +162,10 @@ func WithClientConnApplier(ctx context.Context, apply ClientConnApplier) context
 	return context.WithValue(ctx, ctxClientConnApplierKey{}, apply)
 }
 
-func clientConnApplier(ctx context.Context) ClientConnApplier {
-	if v := ctx.Value(ctxClientConnApplierKey{}); v != nil {
-		return v.(ClientConnApplier)
-	}
-	return nil
+// ContextClientConnApplier returns the ClientConnApplier within given context.
+func ContextClientConnApplier(ctx context.Context) (v ClientConnApplier, ok bool) {
+	v, ok = ctx.Value(ctxClientConnApplierKey{}).(ClientConnApplier)
+	return
 }
 
 type OperationMode uint

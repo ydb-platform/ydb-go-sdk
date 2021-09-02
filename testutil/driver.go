@@ -160,6 +160,13 @@ func (c *Cluster) Invoke(ctx context.Context, method string, args interface{}, r
 	if c.onInvoke == nil {
 		return fmt.Errorf("Cluster.onInvoke() not implemented")
 	}
+	if apply, ok := ydb.ContextClientConnApplier(ctx); ok {
+		cc, err := c.Get(ctx)
+		if err != nil {
+			return err
+		}
+		apply(cc)
+	}
 	return c.onInvoke(ctx, method, args, reply, opts...)
 }
 
