@@ -64,7 +64,13 @@ message Entry {
     string owner = 2;
     Type type = 5;
     repeated Permissions effective_permissions = 6; 
-    repeated Permissions permissions = 7; 
+    repeated Permissions permissions = 7;
+
+    // Size of entry in bytes. Currently filled for:
+    // - TABLE;
+    // - DATABASE.
+    // Empty (zero) in other cases.
+    uint64 size_bytes = 8;
 }
 
 message ListDirectoryResult {
