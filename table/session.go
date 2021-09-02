@@ -159,9 +159,13 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 	if s.tableService == nil {
 		panic("nil table service")
 	}
-	_, err = s.tableService.KeepAlive(ctx, &Ydb_Table.KeepAliveRequest{
+	resp, err := s.tableService.KeepAlive(ctx, &Ydb_Table.KeepAliveRequest{
 		SessionId: s.ID,
 	})
+	if err != nil {
+		return
+	}
+	err = proto.Unmarshal(resp.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return
 	}

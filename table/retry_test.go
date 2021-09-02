@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"math/rand"
 	"sync/atomic"
@@ -158,7 +160,10 @@ func TestRetryerBadSession(t *testing.T) {
 
 func TestRetryerBadSessionReuse(t *testing.T) {
 	client := &Client{
-		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.CreateSessionResult{}, nil
+			}})),
 	}
 	var (
 		sessions = make([]*Session, 10)
@@ -381,11 +386,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		},
 	}
 	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				return nil
-			},
-		},
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	r := Retryer{
 		MaxRetries:   1e6,
