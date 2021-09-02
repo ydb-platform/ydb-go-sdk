@@ -1,3 +1,6 @@
+## 2.5.1
+* Fix lock on write to chan in case when context is done
+
 ## 2.5.0
 * Added ScanRow for scan results as struct, list, tuple, map
 * Created RowScanner interface in order to generate method With

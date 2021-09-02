@@ -113,10 +113,13 @@ func Retry(ctx context.Context, s SessionProvider, op Operation) error {
 
 // Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) sessionGet(ctx context.Context) (_ *Session, err error) {
+	if err = ctx.Err(); err != nil {
+		return nil, err // simple call saves a goroutine
+	}
 	result := make(chan struct {
 		s *Session
 		e error
-	})
+	}, 1)
 	go func() {
 		defer close(result)
 		s, e := r.SessionProvider.Get(ctx)
@@ -128,23 +131,26 @@ func (r Retryer) sessionGet(ctx context.Context) (_ *Session, err error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case result := <-result:
-		return result.s, result.e
+	case r := <-result:
+		return r.s, r.e
 	}
 }
 
 // Do calls op.Do until it return nil or not retriable error.
-func (r Retryer) opDo(ctx context.Context, op Operation, s *Session) error {
-	err := make(chan error)
+func (r Retryer) opDo(ctx context.Context, op Operation, s *Session) (err error) {
+	if err = ctx.Err(); err != nil {
+		return err // simple call saves a goroutine
+	}
+	errs := make(chan error, 1)
 	go func() {
-		defer close(err)
-		err <- op.Do(ctx, s)
+		defer close(errs)
+		errs <- op.Do(ctx, s)
 	}()
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case e := <-err:
-		return e
+	case err = <-errs:
+		return err
 	}
 }
 
