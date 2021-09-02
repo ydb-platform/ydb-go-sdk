@@ -912,8 +912,8 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 		IdleThreshold:     -1,
 		BusyCheckInterval: -1,
 		Builder: &StubBuilder{
-			T:       t,
-			Limit:   1,
+			T:     t,
+			Limit: 1,
 			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
@@ -1030,6 +1030,9 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 			Cluster: testutil.NewCluster(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 							done := make(chan struct{})
 							keepalive <- done
@@ -1092,6 +1095,10 @@ func TestSessionPoolDoublePut(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
+			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				}})),
 		},
 	}
 
@@ -1139,6 +1146,9 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 			Cluster: testutil.NewCluster(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 							keepalive <- request
 							return nil, <-keepaliveResult
@@ -1209,12 +1219,15 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 			Cluster: testutil.NewCluster(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 							keepAliveCnt++
 							if keepAliveCnt%3 == 0 {
 								allKeepAlive <- keepAliveCnt
 							}
-							return nil, nil
+							return &Ydb_Table.KeepAliveResult{}, nil
 						},
 						testutil.TableDeleteSession: okHandler,
 					},
@@ -1270,6 +1283,9 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 			Cluster: testutil.NewCluster(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 							return nil, &ydb.OpError{
 								Reason: ydb.StatusBadSession,
@@ -1310,6 +1326,9 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 			Cluster: testutil.NewCluster(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 							if retry {
 								retry = false
@@ -1366,6 +1385,10 @@ func TestPutBusyAfterClosePool(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
+			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				}})),
 		},
 		SizeLimit:              1,
 		IdleThreshold:          -1,
@@ -1396,6 +1419,10 @@ func TestOverflowBusyCheck(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
+			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				}})),
 		},
 		SizeLimit:              1,
 		IdleThreshold:          -1,
