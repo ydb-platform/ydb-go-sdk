@@ -409,6 +409,10 @@ func TestSessionPoolClose(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 3,
+			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				}})),
 		},
 	}
 	defer func() {
@@ -477,6 +481,10 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				Builder: &StubBuilder{
 					T:     t,
 					Limit: 2,
+					Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						}})),
 				},
 			}
 			defer func() {
@@ -618,6 +626,10 @@ func TestSessionPoolPutInFull(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
+			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				}})),
 		},
 	}
 
@@ -656,6 +668,10 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				Builder: &StubBuilder{
 					T:     t,
 					Limit: 1,
+					Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						}})),
 				},
 			}
 			defer func() {
@@ -752,6 +768,9 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 			Cluster: testutil.NewCluster(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 							keepalive <- struct{}{}
 							// Here we are emulating blocked connection initialization.
