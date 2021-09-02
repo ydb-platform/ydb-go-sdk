@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"errors"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
@@ -33,6 +34,9 @@ func TestSessionKeepAlive(t *testing.T) {
 				testutil.InvokeHandlers{
 					testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
 						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
+					},
+					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						return &Ydb_Table.CreateSessionResult{}, nil
 					},
 				},
 			),
@@ -85,6 +89,9 @@ func TestSessionDescribeTable(t *testing.T) {
 		Cluster: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
+					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						return &Ydb_Table.CreateSessionResult{}, nil
+					},
 					testutil.TableDescribeTable: func(request interface{}) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)
@@ -217,7 +224,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExecuteDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c: c,
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, _, err := s.Execute(ctx, TxControl(), "", NewQueryParameters())
 				require.NoError(t, err)
@@ -227,7 +235,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExplainDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c: c,
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.Explain(ctx, "")
 				require.NoError(t, err)
@@ -237,7 +246,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TablePrepareDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c: c,
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.Prepare(ctx, "")
 				require.NoError(t, err)
@@ -254,7 +264,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableDeleteSession,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c: c,
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				require.NoError(t, s.Close(ctx))
 			},
@@ -264,6 +275,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
 					c: c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.BeginTransaction(ctx, TxSettings())
 				require.NoError(t, err)
@@ -275,6 +287,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				tx := &Transaction{
 					s: &Session{
 						c: c,
+						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
 				}
 				_, err := tx.CommitTx(ctx)
@@ -287,6 +300,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				tx := &Transaction{
 					s: &Session{
 						c: c,
+						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
 				}
 				err := tx.Rollback(ctx)
@@ -297,7 +311,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableKeepAlive,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c: c,
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.KeepAlive(ctx)
 				require.NoError(t, err)
@@ -326,6 +341,27 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 													Id: "",
 												},
 											}, nil
+										},
+										testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.ExecuteQueryResult{}, nil
+										},
+										testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.PrepareQueryResult{}, nil
+										},
+										testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.CreateSessionResult{}, nil
+										},
+										testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.DeleteSessionResponse{}, nil
+										},
+										testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.CommitTransactionResponse{}, nil
+										},
+										testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.RollbackTransactionResponse{}, nil
+										},
+										testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.KeepAliveResult{}, nil
 										},
 									},
 								),
