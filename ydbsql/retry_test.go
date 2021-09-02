@@ -114,22 +114,29 @@ func (b *ClusterBuilder) Build() ydb.Cluster {
 				testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 					r := request.(*Ydb_Table.PrepareDataQueryRequest)
 					sid := r.SessionId
-
 					b.log("[%q] prepare data query", sid)
+					mu.RLock()
+					s := sessions[sid]
+					mu.RUnlock()
 
-					return &Ydb_Table.PrepareQueryResult{}, nil
+					s.Lock()
+					s.busy = true
+					s.Unlock()
+					if b.Error != nil {
+						err = b.Error(nil, testutil.TablePrepareDataQuery)
+					}
+					return &Ydb_Table.PrepareQueryResult{}, err
 				},
 				testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
 					r := request.(*Ydb_Table.ExecuteDataQueryRequest)
 					sid := r.SessionId
 					tid := r.TxControl.TxSelector.(*Ydb_Table.TransactionControl_TxId).TxId
 					b.log("[%q][%q] execute data query", sid, tid)
-
 					return &Ydb_Table.ExecuteQueryResult{
 						TxMeta: &Ydb_Table.TransactionMeta{
 							Id: tid,
 						},
-					}, nil
+					}, err
 				},
 			},
 		),
@@ -140,11 +147,8 @@ func TestTxDoerStmt(t *testing.T) {
 	var count int
 	b := ClusterBuilder{
 		Error: func(_ context.Context, method testutil.MethodCode) (err error) {
-			if method != testutil.TablePrepareDataQuery {
-				return nil
-			}
 			defer func() { count++ }()
-			if count == 1 {
+			if count > 0 && count < 3 {
 				err = &ydb.TransportError{
 					Reason: ydb.TransportErrorDeadlineExceeded,
 				}
@@ -155,12 +159,12 @@ func TestTxDoerStmt(t *testing.T) {
 	}
 	cluster := b.Build()
 
-	busyChecking := make(chan struct{})
+	busyChecking := make(chan bool)
 	db := sql.OpenDB(Connector(
 		WithSessionPoolIdleThreshold(time.Hour),
 		WithSessionPoolTrace(table.SessionPoolTrace{
 			OnBusyCheck: func(info table.SessionPoolBusyCheckStartInfo) func(table.SessionPoolBusyCheckDoneInfo) {
-				busyChecking <- struct{}{}
+				busyChecking <- true
 				t.Logf("busy checking session %q", info.Session.ID)
 				return nil
 			},
@@ -178,19 +182,8 @@ func TestTxDoerStmt(t *testing.T) {
 	defer cancel()
 
 	stmt, err := db.PrepareContext(ctx, "QUERY")
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	// Block previously created session to force one more session to be created
-	// and one more prepared statement be done.
-	c, err := db.Conn(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		_ = c.Close()
-	}()
+	_, err = db.PrepareContext(ctx, "QUERY")
 
 	// Try to prepare statement on second session, which must fail due to our
 	// stub logic above.
@@ -209,7 +202,7 @@ func TestTxDoerStmt(t *testing.T) {
 		t.Fatalf("no busy checking after %s", timeout)
 	}
 
-	// Try to repeate the same thing – we should not receive any error here –
+	// Try to repeat the same thing – we should not receive any error here –
 	// previous session must be marked busy and not used for some time.
 	err = DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 		_, err := tx.Stmt(stmt).Exec()
