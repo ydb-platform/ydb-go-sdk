@@ -116,22 +116,32 @@ func (r Retryer) sessionGet(ctx context.Context) (_ *Session, err error) {
 	if err = ctx.Err(); err != nil {
 		return nil, err // simple call saves a goroutine
 	}
-	result := make(chan struct {
+	type result struct {
 		s *Session
 		e error
-	}, 1)
+	}
+	res := make(chan result)
 	go func() {
-		defer close(result)
+		defer close(res)
 		s, e := r.SessionProvider.Get(ctx)
-		result <- struct {
-			s *Session
-			e error
-		}{s: s, e: e}
+		if s == nil && e == nil {
+			panic("only one of pair <session, error> must be not nil")
+		}
+		select {
+		case res <- result{s: s, e: e}:
+		default:
+			if s != nil {
+				_ = r.SessionProvider.Put(ctx, s)
+			}
+		}
 	}()
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case r := <-result:
+	case r, ok := <-res:
+		if !ok {
+			return nil, context.DeadlineExceeded
+		}
 		return r.s, r.e
 	}
 }

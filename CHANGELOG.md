@@ -1,3 +1,6 @@
+## 2.5.3
+* Fix put session into pool
+
 ## 2.5.2
 * Fix panic on operate with result scanner
 

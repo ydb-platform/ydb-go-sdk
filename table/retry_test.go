@@ -68,10 +68,10 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 	for testErr, session := range map[error]*Session{
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorResourceExhausted,
-		}: nil,
+		}: new(Session),
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorAborted,
-		}: nil,
+		}: new(Session),
 		&ydb.OpError{
 			Reason: ydb.StatusUnavailable,
 		}: new(Session),
@@ -88,14 +88,17 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 			Reason: ydb.StatusAborted,
 		}): new(Session),
 	} {
-		t.Run("", func(t *testing.T) {
+		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
 			var count int
 			r := Retryer{
 				MaxRetries:   3,
 				RetryChecker: ydb.DefaultRetryChecker,
 				SessionProvider: SessionProviderFunc{
 					OnGet: func(ctx context.Context) (s *Session, err error) {
-						return session, nil
+						if session != nil {
+							return session, nil
+						}
+						return nil, testErr
 					},
 				},
 			}
