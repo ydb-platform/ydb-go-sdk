@@ -1,6 +1,11 @@
-## 3.0.0
-* Replaced internal api codegen package to external ydb-go-genproto
-* Replaced old proto and grpc libraries to
+## 2.5.3
+* Fix put session into pool
+
+## 2.5.2
+* Fix panic on operate with result scanner
+
+## 2.5.1
+* Fix lock on write to chan in case when context is done
 
 ## 2.5.0
 * Added ScanRow for scan results as struct, list, tuple, map

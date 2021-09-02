@@ -59,7 +59,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			}
 
 			cancel()
-			if err := <-result; err != testErr {
+			if err := <-result; !errors.Is(err, testErr) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
@@ -70,10 +70,10 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 	for testErr, session := range map[error]*Session{
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorResourceExhausted,
-		}: nil,
+		}: new(Session),
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorAborted,
-		}: nil,
+		}: new(Session),
 		&ydb.OpError{
 			Reason: ydb.StatusUnavailable,
 		}: new(Session),
@@ -90,14 +90,17 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 			Reason: ydb.StatusAborted,
 		}): new(Session),
 	} {
-		t.Run("", func(t *testing.T) {
+		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
 			var count int
 			r := Retryer{
 				MaxRetries:   3,
 				RetryChecker: ydb.DefaultRetryChecker,
 				SessionProvider: SessionProviderFunc{
 					OnGet: func(ctx context.Context) (s *Session, err error) {
-						return session, nil
+						if session != nil {
+							return session, nil
+						}
+						return nil, testErr
 					},
 				},
 			}
@@ -111,7 +114,7 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 			if act, exp := count, r.MaxRetries+1; act != exp {
 				t.Errorf("unexpected operation calls: %v; want %v", act, exp)
 			}
-			if err != testErr {
+			if !errors.Is(err, testErr) {
 				t.Fatalf("unexpected error: %v; want: %v", err, testErr)
 			}
 		})
@@ -245,13 +248,15 @@ func TestRetryerImmediateReturn(t *testing.T) {
 					return testErr
 				}),
 			)
-			if err != testErr {
+			if !errors.Is(err, testErr) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
 }
 
+// We are testing all suspentions of custom operation func against to all context
+// timeouts - all sub-tests must have latency less than timeouts (+tolerance)
 func TestRetryContextDeadline(t *testing.T) {
 	tolerance := 10 * time.Millisecond
 	timeouts := []time.Duration{
