@@ -872,7 +872,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 							created++
-							return nil, nil
+							return &Ydb_Table.CreateSessionResult{}, nil
 						},
 						testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
 							deleted++
@@ -914,7 +914,10 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 		Builder: &StubBuilder{
 			T:       t,
 			Limit:   1,
-			Cluster: testutil.NewCluster(),
+			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				}})),
 		},
 	}
 
@@ -953,9 +956,12 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 					testutil.InvokeHandlers{
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 							atomic.AddUint32(&keepAliveCount, 1)
-							return nil, nil
+							return &Ydb_Table.KeepAliveResult{}, nil
 						},
 						testutil.TableDeleteSession: okHandler,
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
 					},
 				),
 			),
