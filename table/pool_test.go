@@ -1337,9 +1337,6 @@ func TestPutBusyAfterClosePool(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Handler: methodHandlers{
-				testutil.TableDeleteSession: okHandler,
-			},
 		},
 		SizeLimit:              1,
 		IdleThreshold:          -1,
@@ -1370,9 +1367,6 @@ func TestOverflowBusyCheck(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Handler: methodHandlers{
-				testutil.TableDeleteSession: okHandler,
-			},
 		},
 		SizeLimit:              1,
 		IdleThreshold:          -1,
@@ -1468,7 +1462,7 @@ func newSession(cluster ydb.Cluster, id string) *Session {
 type StubBuilder struct {
 	OnCreateSession func(ctx context.Context) (*Session, error)
 
-	Cluster ydb.Cluster
+	Cluster *testutil.Cluster
 	Limit   int
 	T       *testing.T
 
