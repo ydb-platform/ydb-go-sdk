@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/grpc"
 	"io"
 	"log"
@@ -137,7 +138,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txExp != nil {
 				sExp = table.TxSettings(test.txExp)
 			}
-			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmp.AllowUnexported(table.TransactionSettings{})) {
+			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmpopts.IgnoreUnexported(table.TransactionSettings{})) {
 				t.Fatalf("unexpected tx settings: %+v; want %+v", sAct, sExp)
 			}
 
@@ -148,7 +149,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txcExp != nil {
 				cExp = table.TxControl(test.txcExp...)
 			}
-			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmp.AllowUnexported(table.TransactionSettings{})) {
+			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmpopts.IgnoreUnexported(table.TransactionSettings{})) {
 				t.Fatalf("unexpected settings: %+v; want %+v", cAct, cExp)
 			}
 		})
@@ -214,6 +215,12 @@ func TestQuery(t *testing.T) {
 								return &testutil.ClientStream{
 									OnRecvMsg: func(m interface{}) error {
 										return io.EOF
+									},
+									OnSendMsg: func(m interface{}) error {
+										return nil
+									},
+									OnCloseSend: func() error {
+										return nil
 									},
 								}, nil
 							},
