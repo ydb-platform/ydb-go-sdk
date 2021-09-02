@@ -2,6 +2,10 @@
 * Replaced internal api codegen package to external ydb-go-genproto
 * Replaced old proto and grpc libraries to
 
+## 2.5.0
+* Added ScanRow for scan results as struct, list, tuple, map
+* Created RowScanner interface in order to generate method With
+
 ## 2.4.1
 * Fixed deadlock in the session pool
 
