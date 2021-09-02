@@ -91,17 +91,19 @@ func (s *Scanner) seekItemByID(id int) {
 }
 
 func (s *Scanner) setColumnIndexes(columns []string) {
+	if columns == nil {
+		s.columnIndexes = nil
+		return
+	}
 	s.indexSetColumns()
-	if columns != nil {
-		s.columnIndexes = make([]int, 0, len(columns))
-		for _, col := range columns {
-			colIndex, ok := s.setColumnIndex[col]
-			if !ok {
-				s.noColumnError(col)
-				return
-			}
-			s.columnIndexes = append(s.columnIndexes, colIndex)
+	s.columnIndexes = make([]int, 0, len(columns))
+	for _, col := range columns {
+		colIndex, ok := s.setColumnIndex[col]
+		if !ok {
+			s.noColumnError(col)
+			return
 		}
+		s.columnIndexes = append(s.columnIndexes, colIndex)
 	}
 }
 
@@ -265,6 +267,10 @@ func (s *Scanner) value() ydb.Value {
 
 // s.set must be initialized.
 func (s *Scanner) indexSetColumns() {
+	if s.set == nil {
+		s.setColumnIndex = nil
+		return
+	}
 	s.setColumnIndex = make(map[string]int, len(s.set.Columns))
 	for i, m := range s.set.Columns {
 		s.setColumnIndex[m.Name] = i

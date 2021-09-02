@@ -1,3 +1,6 @@
+## 2.5.2
+* Fix panic on operate with result scanner
+
 ## 2.5.1
 * Fix lock on write to chan in case when context is done
 
