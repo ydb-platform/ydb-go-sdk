@@ -13,7 +13,8 @@
 - [ ] Remove or hide (do private) deprecated API for new `scanner`.
 - [ ] Hide (do private) entity `table.Client` or `table.SessionPool` because it most difficultly for SDK users
 - [ ] Extract auth package to neighbour project(-s) for isolation ydb-go-sdk from unnecessary dependencies
-- [ ] Extract coordination package to neighbour project as plugin over ydb-go-sdk
-- [ ] Extract ratelimiter package to neighbour project as plugin over ydb-go-sdk
+- [x] Extract coordination package to neighbour project as plugin over ydb-go-sdk
+- [x] Extract ratelimiter package to neighbour project as plugin over ydb-go-sdk
 - [ ] Extract experimental package to neighbour project as plugin over ydb-go-sdk
 - [ ] Refactoring Trace API: exclude duplicates of data from closure Trace functions
+- [x] Move traceutil from internal to root
