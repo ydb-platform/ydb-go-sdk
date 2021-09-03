@@ -1,3 +1,6 @@
+## 2.5.4
+* Remove ready queue in session pool
+
 ## 2.5.3
 * Fix put session into pool
 
