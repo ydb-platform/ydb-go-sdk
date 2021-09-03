@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	ydb "github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
@@ -121,11 +123,7 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 
 func TestRetryerBadSession(t *testing.T) {
 	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				return nil
-			},
-		},
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	r := Retryer{
 		MaxRetries: 3,
@@ -165,11 +163,10 @@ func TestRetryerBadSession(t *testing.T) {
 
 func TestRetryerBadSessionReuse(t *testing.T) {
 	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				return nil
-			},
-		},
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.CreateSessionResult{}, nil
+			}})),
 	}
 	var (
 		sessions = make([]*Session, 10)
@@ -394,11 +391,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		},
 	}
 	client := &Client{
-		Driver: &testutil.Driver{
-			OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-				return nil
-			},
-		},
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	r := Retryer{
 		MaxRetries:   1e6,

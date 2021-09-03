@@ -1,10 +1,6 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/example/internal/cli"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"bytes"
 	"context"
 	"flag"
@@ -13,6 +9,11 @@ import (
 	"path"
 	"text/template"
 	"time"
+
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/connect"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/example/internal/cli"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 type templateConfig struct {
@@ -84,6 +85,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		params.ConnectParams,
 		connect.WithSessionPoolIdleThreshold(time.Second*5),
 		connect.WithSessionPoolKeepAliveMinSize(-1),
+		connect.WithDiscoveryInterval(5*time.Second),
 	)
 	if err != nil {
 		return fmt.Errorf("connect error: %w", err)

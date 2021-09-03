@@ -1,10 +1,10 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/auth"
 	"context"
 	"crypto/tls"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/auth"
 )
 
 // New connects to database and return database connection
@@ -14,7 +14,7 @@ func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *C
 		scheme: newSchemeWrapper(ctx),
 	}
 	for _, opt := range opts {
-		err := opt(c)
+		err = opt(c)
 		if err != nil {
 			return nil, err
 		}
@@ -40,7 +40,7 @@ func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *C
 	if err != nil {
 		return nil, err
 	}
-	c.table.client.Driver = c.driver
-	c.scheme.client.Driver = c.driver
+	c.table.set(c.driver)
+	c.scheme.set(c.driver)
 	return c, nil
 }

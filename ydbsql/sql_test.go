@@ -4,20 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/grpc"
 	"io"
 	"log"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/traceutil"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/traceutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
 )
 
 // Interface checks.
@@ -135,7 +138,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txExp != nil {
 				sExp = table.TxSettings(test.txExp)
 			}
-			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmp.AllowUnexported(table.TransactionSettings{})) {
+			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmpopts.IgnoreUnexported(table.TransactionSettings{})) {
 				t.Fatalf("unexpected tx settings: %+v; want %+v", sAct, sExp)
 			}
 
@@ -146,7 +149,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txcExp != nil {
 				cExp = table.TxControl(test.txcExp...)
 			}
-			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmp.AllowUnexported(table.TransactionSettings{})) {
+			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmpopts.IgnoreUnexported(table.TransactionSettings{})) {
 				t.Fatalf("unexpected settings: %+v; want %+v", cAct, cExp)
 			}
 		})
@@ -186,32 +189,46 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 
 func TestQuery(t *testing.T) {
 	c := Connector(
-		WithClient(&table.Client{
-			Driver: &testutil.Driver{
-				OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-					switch m {
-					case testutil.TableCreateSession:
-					case testutil.TableExecuteDataQuery:
-						r := testutil.TableExecuteDataQueryResult{R: res}
-						r.SetTransactionID("")
-					case testutil.TablePrepareDataQuery:
-					default:
-						t.Fatalf("Unexpected method %d", m)
-					}
-					return nil
-				},
-				OnStreamRead: func(ctx context.Context, m testutil.MethodCode, req, res interface{}, process func(error)) error {
-					switch m {
-					case testutil.TableCreateSession:
-					case testutil.TableStreamExecuteScanQuery:
-						process(io.EOF)
-					default:
-						t.Fatalf("Unexpected method %d", m)
-					}
-					return nil
-				},
-			},
-		}),
+		WithClient(
+			table.NewClient(
+				testutil.NewCluster(
+					testutil.WithInvokeHandlers(
+						testutil.InvokeHandlers{
+							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.CreateSessionResult{}, nil
+							},
+							testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.ExecuteQueryResult{
+									TxMeta: &Ydb_Table.TransactionMeta{
+										Id: "",
+									},
+								}, nil
+							},
+							testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.PrepareQueryResult{}, nil
+							},
+						},
+					),
+					testutil.WithNewStreamHandlers(
+						testutil.NewStreamHandlers{
+							testutil.TableStreamExecuteScanQuery: func(desc *grpc.StreamDesc) (grpc.ClientStream, error) {
+								return &testutil.ClientStream{
+									OnRecvMsg: func(m interface{}) error {
+										return io.EOF
+									},
+									OnSendMsg: func(m interface{}) error {
+										return nil
+									},
+									OnCloseSend: func() error {
+										return nil
+									},
+								}, nil
+							},
+						},
+					),
+				),
+			),
+		),
 		WithDefaultExecDataQueryOption(),
 	)
 

@@ -4,13 +4,13 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 )
 
 var (
@@ -96,14 +96,6 @@ type SessionPool struct {
 	// If BusyCheckInterval is equal to zero, then the
 	// DefaultSessionPoolBusyCheckInterval value is used.
 	BusyCheckInterval time.Duration
-
-	// Deprecated: unnecessary parameter
-	// it will be removed at next major release
-	// KeepAliveBatchSize is a maximum number sessions taken from the pool to
-	// prepare KeepAlive() call on them in background.
-	// If KeepAliveBatchSize is less than or equal to zero, then there is no
-	// batch limit.
-	KeepAliveBatchSize int
 
 	// KeepAliveTimeout limits maximum time spent on KeepAlive request
 	// If KeepAliveTimeout is less than or equal to zero then the
@@ -213,13 +205,31 @@ func isCreateSessionErrorRetriable(err error) bool {
 }
 
 // p.mu must NOT be held.
-func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrace) (*Session, error) {
+func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrace) (session *Session, err error) {
 	// pre-check the pool size
 	p.mu.Lock()
 	enoughSpace := p.createInProgress+len(p.index) < p.limit
 	if enoughSpace {
 		p.createInProgress++
+		defer func() {
+			p.mu.Lock()
+			p.createInProgress--
+			if session == nil && err == nil {
+				panic("ydb: abnormal result of pool.createSession()")
+			}
+			if session != nil {
+				fmt.Println("defer: store session to index: before: ", len(p.index))
+				p.index[session] = sessionInfo{}
+				fmt.Println("defer: store session to index: after: ", len(p.index))
+			}
+			if err != nil {
+				fmt.Println("defer err:", err)
+			}
+			fmt.Println("defer:", p.createInProgress, len(p.index), p.limit, enoughSpace)
+			p.mu.Unlock()
+		}()
 	}
+	fmt.Println("createSession: ", p.createInProgress, len(p.index), p.limit, enoughSpace)
 	p.mu.Unlock()
 	trace.onCheckEnoughSpace(enoughSpace)
 
@@ -253,9 +263,6 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 		}
 
 		if r.err != nil {
-			p.mu.Lock()
-			p.createInProgress--
-			p.mu.Unlock()
 			resCh <- r
 			return
 		}
@@ -267,19 +274,15 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 				return
 			}
 
+			fmt.Println("createSession -> session.onClose() : delete session from index: before: ", len(p.index))
 			delete(p.index, r.s)
+			fmt.Println("createSession -> session.onClose() : delete session from index: after: ", len(p.index))
 			p.notify(nil)
 
 			if info.idle != nil {
 				panic("ydb: table: session closed while still in idle pool")
 			}
 		})
-
-		// Slot for session already reserved early
-		p.mu.Lock()
-		p.index[r.s] = sessionInfo{}
-		p.createInProgress--
-		p.mu.Unlock()
 
 		resCh <- r
 	}()
@@ -289,9 +292,6 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 	select {
 	case r := <-resCh:
 		trace.onReadResult(r)
-		if r.s == nil && r.err == nil {
-			panic("ydb: abnormal result of pool.createSession()")
-		}
 		return r.s, r.err
 	case <-ctx.Done():
 		trace.onContextDone()
@@ -464,7 +464,9 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	if p.busyCheck == nil {
 		panicLocked(&p.mu, "ydb: table: PutBusy() session into the pool without busy checker")
 	}
+	fmt.Println("PutBusy delete session from index: before: ", len(p.index))
 	delete(p.index, s)
+	fmt.Println("PutBusy delete session from index: after: ", len(p.index))
 	p.notify(nil)
 	p.mu.Unlock()
 	select {
@@ -683,6 +685,9 @@ func (p *SessionPool) busyChecker() {
 				case s, ok := <-p.busyCheck:
 					if !ok {
 						return
+					}
+					if s == nil {
+						panic("nil session")
 					}
 					if closeAll || !p.reuse(ctx, s) {
 						p.closeSession(ctx, s)

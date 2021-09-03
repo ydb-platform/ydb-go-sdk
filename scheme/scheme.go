@@ -2,10 +2,11 @@ package scheme
 
 import (
 	"context"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Scheme_V1"
+	"google.golang.org/protobuf/proto"
 
-	ydb "github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Scheme"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
 )
 
 type EntryType uint
@@ -61,56 +62,67 @@ type Directory struct {
 }
 
 type Client struct {
-	Driver ydb.Driver
+	schemeService Ydb_Scheme_V1.SchemeServiceClient
+}
+
+func NewClient(cluster ydb.Cluster) *Client {
+	return &Client{
+		schemeService: Ydb_Scheme_V1.NewSchemeServiceClient(cluster),
+	}
 }
 
 func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
-	req := Ydb_Scheme.MakeDirectoryRequest{
+	_, err = c.schemeService.MakeDirectory(ctx, &Ydb_Scheme.MakeDirectoryRequest{
 		Path: path,
-	}
-	_, err = c.Driver.Call(ctx, internal.Wrap("/Ydb.Scheme.V1.SchemeService/MakeDirectory", &req, nil))
-	return
+	})
+	return err
 }
 
 func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
-	req := Ydb_Scheme.RemoveDirectoryRequest{
+	_, err = c.schemeService.RemoveDirectory(ctx, &Ydb_Scheme.RemoveDirectoryRequest{
 		Path: path,
-	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(
-		"/Ydb.Scheme.V1.SchemeService/RemoveDirectory", &req, nil,
-	))
-	return
+	})
+	return err
 }
 
 func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, err error) {
-	var res Ydb_Scheme.ListDirectoryResult
-	req := Ydb_Scheme.ListDirectoryRequest{
+	var (
+		response *Ydb_Scheme.ListDirectoryResponse
+		result   Ydb_Scheme.ListDirectoryResult
+	)
+	response, err = c.schemeService.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
-	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(
-		"/Ydb.Scheme.V1.SchemeService/ListDirectory", &req, &res,
-	))
+	})
 	if err != nil {
 		return d, err
 	}
-	d.Entry.from(res.Self)
-	d.Children = make([]Entry, len(res.Children))
-	putEntry(d.Children, res.Children)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	if err != nil {
+		return d, err
+	}
+	d.Entry.from(result.Self)
+	d.Children = make([]Entry, len(result.Children))
+	putEntry(d.Children, result.Children)
 	return d, nil
 }
 
 func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err error) {
-	var res Ydb_Scheme.DescribePathResult
-	req := Ydb_Scheme.DescribePathRequest{
+	var (
+		response *Ydb_Scheme.DescribePathResponse
+		result   Ydb_Scheme.DescribePathResult
+	)
+	response, err = c.schemeService.DescribePath(ctx, &Ydb_Scheme.DescribePathRequest{
 		Path: path,
+	})
+	if err != nil {
+		return e, err
 	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(
-		"/Ydb.Scheme.V1.SchemeService/DescribePath", &req, &res,
-	))
-	if err == nil {
-		e.from(res.Self)
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	if err != nil {
+		return e, err
 	}
-	return e, err
+	e.from(result.Self)
+	return e, nil
 }
 
 func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...PermissionsOption) (err error) {
@@ -118,15 +130,12 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...Per
 	for _, opt := range opts {
 		opt(&desc)
 	}
-	req := Ydb_Scheme.ModifyPermissionsRequest{
+	_, err = c.schemeService.ModifyPermissions(ctx, &Ydb_Scheme.ModifyPermissionsRequest{
 		Path:             path,
 		Actions:          desc.actions,
 		ClearPermissions: desc.clear,
-	}
-	_, err = c.Driver.Call(ctx, internal.Wrap(
-		"/Ydb.Scheme.V1.SchemeService/ModifyPermissions", &req, nil,
-	))
-	return
+	})
+	return err
 }
 
 func (e *Entry) from(y *Ydb_Scheme.Entry) {

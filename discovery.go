@@ -2,12 +2,10 @@ package ydb
 
 import (
 	"context"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Discovery_V1"
+	"google.golang.org/protobuf/proto"
 
-	"google.golang.org/grpc/metadata"
-
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Discovery"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Discovery"
 )
 
 type Endpoint struct {
@@ -18,42 +16,33 @@ type Endpoint struct {
 }
 
 type discoveryClient struct {
-	conn *conn
-	meta *meta
+	discoveryService Ydb_Discovery_V1.DiscoveryServiceClient
+	database         string
+	ssl              bool
 }
 
-func (d *discoveryClient) Discover(ctx context.Context, database string, ssl bool) ([]Endpoint, error) {
-	var (
-		resp Ydb_Operations.GetOperationResponse
-		res  Ydb_Discovery.ListEndpointsResult
-	)
-	req := Ydb_Discovery.ListEndpointsRequest{
-		Database: database,
+func (d *discoveryClient) Discover(ctx context.Context) ([]Endpoint, error) {
+	request := Ydb_Discovery.ListEndpointsRequest{
+		Database: d.database,
 	}
-	// Get credentials (token actually) for the request.
-	md, err := d.meta.md(ctx)
+	response, err := d.discoveryService.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, err
 	}
-	if len(md) > 0 {
-		ctx = metadata.NewOutgoingContext(ctx, md)
-	}
-	err = invoke(
-		ctx, d.conn.conn, internal.WrapOpResponse(&resp),
-		"/Ydb.Discovery.V1.DiscoveryService/ListEndpoints", &req, &res,
-	)
+	listEndpointsResult := Ydb_Discovery.ListEndpointsResult{}
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &listEndpointsResult)
 	if err != nil {
 		return nil, err
 	}
-	es := make([]Endpoint, 0, len(res.Endpoints))
-	for _, e := range res.Endpoints {
-		if e.Ssl == ssl {
-			es = append(es, Endpoint{
+	endpoints := make([]Endpoint, 0, len(listEndpointsResult.Endpoints))
+	for _, e := range listEndpointsResult.Endpoints {
+		if e.Ssl == d.ssl {
+			endpoints = append(endpoints, Endpoint{
 				Addr:  e.Address,
 				Port:  int(e.Port),
-				Local: e.Location == res.SelfLocation,
+				Local: e.Location == listEndpointsResult.SelfLocation,
 			})
 		}
 	}
-	return es, nil
+	return endpoints, nil
 }

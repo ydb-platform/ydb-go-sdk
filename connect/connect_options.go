@@ -1,11 +1,12 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/auth/iam"
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/auth/iam"
 )
 
 type ConnectOption func(client *Connection) error
@@ -72,9 +73,12 @@ func WithDriverConfig(config *ydb.DriverConfig) ConnectOption {
 	}
 }
 
-func withDriver(driver ydb.Driver) ConnectOption {
+func WithDiscoveryInterval(discoveryInterval time.Duration) ConnectOption {
 	return func(c *Connection) error {
-		c.table.client.Driver = driver
+		if c.driverConfig == nil {
+			c.driverConfig = &ydb.DriverConfig{}
+		}
+		c.driverConfig.DiscoveryInterval = discoveryInterval
 		return nil
 	}
 }
@@ -103,13 +107,6 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) ConnectOption {
 func WithSessionPoolBusyCheckInterval(busyCheckInterval time.Duration) ConnectOption {
 	return func(c *Connection) error {
 		c.table.sessionPool.BusyCheckInterval = busyCheckInterval
-		return nil
-	}
-}
-
-func WithSessionPoolKeepAliveBatchSize(keepAliveBatchSize int) ConnectOption {
-	return func(c *Connection) error {
-		c.table.sessionPool.KeepAliveBatchSize = keepAliveBatchSize
 		return nil
 	}
 }

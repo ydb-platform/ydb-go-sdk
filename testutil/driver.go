@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"reflect"
 	"strings"
-
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -18,6 +21,12 @@ type MethodCode uint
 
 func (m MethodCode) String() string {
 	return codeToString[m]
+}
+
+type Method string
+
+func (m Method) Code() MethodCode {
+	return grpcMethodToCode[m]
 }
 
 const (
@@ -42,7 +51,7 @@ const (
 	TableStreamExecuteScanQuery
 )
 
-var grpcMethodToCode = map[string]MethodCode{
+var grpcMethodToCode = map[Method]MethodCode{
 	"/Ydb.Table.V1.TableService/CreateSession":          TableCreateSession,
 	"/Ydb.Table.V1.TableService/DeleteSession":          TableDeleteSession,
 	"/Ydb.Table.V1.TableService/KeepAlive":              TableKeepAlive,
@@ -141,73 +150,182 @@ func getField(name string, src, dst interface{}) bool {
 	return fn(reflect.ValueOf(src).Elem(), strings.Split(name, ".")...)
 }
 
-type TableCreateSessionResult struct {
-	R interface{}
+type Cluster struct {
+	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
+	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	onClose     func() error
 }
 
-func (t TableCreateSessionResult) SetSessionID(id string) {
-	setField("SessionId", t.R, id)
-}
-
-type TableKeepAliveResult struct {
-	R interface{}
-}
-
-func (t TableKeepAliveResult) SetSessionStatus(ready bool) {
-	var status Ydb_Table.KeepAliveResult_SessionStatus
-	if ready {
-		status = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY
-	} else {
-		status = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY
+func (c *Cluster) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	if c.onInvoke == nil {
+		return fmt.Errorf("Cluster.onInvoke() not implemented")
 	}
-	setField("SessionStatus", t.R, status)
+	if apply, ok := ydb.ContextClientConnApplier(ctx); ok {
+		cc, err := c.Get(ctx)
+		if err != nil {
+			return err
+		}
+		apply(cc)
+	}
+	return c.onInvoke(ctx, method, args, reply, opts...)
 }
 
-type TableBeginTransactionResult struct {
-	R interface{}
+func (c *Cluster) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	if c.onNewStream == nil {
+		return nil, fmt.Errorf("Cluster.onNewStream() not implemented")
+	}
+	return c.onNewStream(ctx, desc, method, opts...)
 }
 
-func (t TableBeginTransactionResult) SetTransactionID(id string) {
-	setField("TxMeta", t.R, &Ydb_Table.TransactionMeta{
-		Id: id,
-	})
+func (c *Cluster) Get(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+	return &clientConn{
+		onInvoke:    c.onInvoke,
+		onNewStream: c.onNewStream,
+	}, nil
 }
 
-type TableExecuteDataQueryResult struct {
-	R interface{}
+func (c *Cluster) Close() error {
+	if c.onClose == nil {
+		return fmt.Errorf("Cluster.Close() not implemented")
+	}
+	return c.onClose()
 }
 
-func (t TableExecuteDataQueryResult) SetTransactionID(id string) {
-	setField("TxMeta", t.R, &Ydb_Table.TransactionMeta{
-		Id: id,
-	})
+type (
+	InvokeHandlers    map[MethodCode]func(request interface{}) (result proto.Message, err error)
+	NewStreamHandlers map[MethodCode]func(desc *grpc.StreamDesc) (grpc.ClientStream, error)
+)
+
+type NewClusterOption func(c *Cluster)
+
+func WithInvokeHandlers(invokeHandlers InvokeHandlers) NewClusterOption {
+	return func(c *Cluster) {
+		c.onInvoke = func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
+				result, err := handler(args)
+				if err != nil {
+					return err
+				}
+				anyResult, err := anypb.New(result)
+				if err != nil {
+					return err
+				}
+				setField(
+					"Operation",
+					reply,
+					&Ydb_Operations.Operation{
+						Result: anyResult,
+					},
+				)
+				return nil
+			}
+			return fmt.Errorf("testutil: method '%s' not implemented", method)
+		}
+	}
 }
 
-type TableExecuteDataQueryRequest struct {
-	R interface{}
+func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) NewClusterOption {
+	return func(c *Cluster) {
+		c.onNewStream = func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			if handler, ok := newStreamHandlers[Method(method).Code()]; ok {
+				return handler(desc)
+			}
+			return nil, fmt.Errorf("testutil: method '%s' not implemented", method)
+		}
+	}
 }
 
-func (t TableExecuteDataQueryRequest) SessionID() (id string) {
-	getField("SessionId", t.R, &id)
-	return
+func WithClose(onClose func() error) NewClusterOption {
+	return func(c *Cluster) {
+		c.onClose = onClose
+	}
 }
 
-func (t TableExecuteDataQueryRequest) TransactionID() (id string, ok bool) {
-	ok = getField("TxControl.TxSelector.TxId", t.R, &id)
-	return
+func NewCluster(opts ...NewClusterOption) *Cluster {
+	c := &Cluster{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
-func (t TableExecuteDataQueryRequest) KeepInCache() (keepInCache bool, ok bool) {
-	ok = getField("QueryCachePolicy.KeepInCache", t.R, &keepInCache)
-	return
+type clientConn struct {
+	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
+	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	onAddress   func() string
 }
 
-type TablePrepareDataQueryResult struct {
-	R interface{}
+func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	if c.onInvoke == nil {
+		return fmt.Errorf("onInvoke not implemented (method: %s, request: %v, response: %v)", method, args, reply)
+	}
+	return c.onInvoke(ctx, method, args, reply, opts...)
 }
 
-func (t TablePrepareDataQueryResult) SetQueryID(id string) {
-	setField("QueryId", t.R, id)
+func (c *clientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	if c.onNewStream == nil {
+		return nil, fmt.Errorf("onNewStream not implemented (method: %s, desc: %v)", method, desc)
+	}
+	return c.onNewStream(ctx, desc, method, opts...)
+}
+
+func (c *clientConn) Address() string {
+	if c.onAddress == nil {
+		return ""
+	}
+	return c.onAddress()
+}
+
+type ClientStream struct {
+	OnHeader    func() (metadata.MD, error)
+	OnTrailer   func() metadata.MD
+	OnCloseSend func() error
+	OnContext   func() context.Context
+	OnSendMsg   func(m interface{}) error
+	OnRecvMsg   func(m interface{}) error
+}
+
+func (s *ClientStream) Header() (metadata.MD, error) {
+	if s.OnHeader == nil {
+		return nil, ErrNotImplemented
+	}
+	return s.OnHeader()
+}
+
+func (s *ClientStream) Trailer() metadata.MD {
+	if s.OnTrailer == nil {
+		return nil
+	}
+	return s.OnTrailer()
+}
+
+func (s *ClientStream) CloseSend() error {
+	if s.OnCloseSend == nil {
+		return ErrNotImplemented
+	}
+	return s.OnCloseSend()
+}
+
+func (s *ClientStream) Context() context.Context {
+	if s.OnContext == nil {
+		return nil
+	}
+	return s.OnContext()
+}
+
+func (s *ClientStream) SendMsg(m interface{}) error {
+	if s.OnSendMsg == nil {
+		return ErrNotImplemented
+	}
+	return s.OnSendMsg(m)
+
+}
+
+func (s *ClientStream) RecvMsg(m interface{}) error {
+	if s.OnRecvMsg == nil {
+		return ErrNotImplemented
+	}
+	return s.OnRecvMsg(m)
 }
 
 type Driver struct {
@@ -221,7 +339,7 @@ func (d *Driver) Call(ctx context.Context, op ydb.Operation) (ydb.CallInfo, erro
 		return nil, ErrNotImplemented
 	}
 	method, req, res, _ := internal.Unwrap(op)
-	code := grpcMethodToCode[method]
+	code := grpcMethodToCode[Method(method)]
 
 	// NOTE: req and res may be converted to testutil inner structs, which are
 	// mirrors of grpc api envelopes.
@@ -233,7 +351,7 @@ func (d *Driver) StreamRead(ctx context.Context, op ydb.StreamOperation) (ydb.Ca
 		return nil, ErrNotImplemented
 	}
 	method, req, res, processor := internal.UnwrapStreamOperation(op)
-	code := grpcMethodToCode[method]
+	code := grpcMethodToCode[Method(method)]
 
 	return nil, d.OnStreamRead(ctx, code, req, res, processor)
 }

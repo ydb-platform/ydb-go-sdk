@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 	"hash/fnv"
 	"net/http"
 	"os"
@@ -15,7 +15,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/connect"
 )
 
 const (

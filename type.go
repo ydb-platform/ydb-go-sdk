@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
 )
 
 // Type describes YDB data type.

@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Discovery_V1"
 	"net"
 	"strconv"
 	"sync"
@@ -19,13 +20,6 @@ var (
 	MinKeepaliveInterval     = 1 * time.Minute
 	DefaultGRPCMsgSize       = 64 * 1024 * 1024 // 64MB
 )
-
-func Dial(ctx context.Context, addr string, c *DriverConfig) (Driver, error) {
-	d := Dialer{
-		DriverConfig: c,
-	}
-	return d.Dial(ctx, addr)
-}
 
 // Dialer contains options of dialing and initialization of particular ydb
 // driver.
@@ -54,7 +48,7 @@ type Dialer struct {
 }
 
 // Dial dials given addr and initializes driver instance on success.
-func (d *Dialer) Dial(ctx context.Context, addr string) (_ Driver, err error) {
+func (d *Dialer) Dial(ctx context.Context, addr string) (_ *driver, err error) {
 	config := d.DriverConfig.withDefaults()
 	grpcKeepalive := d.Keepalive
 	if grpcKeepalive == 0 {
@@ -94,19 +88,19 @@ type dialer struct {
 	meta      *meta
 }
 
-func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
+func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
+	endpoint := d.endpointByAddr(addr)
 	cluster := cluster{
 		dial:  d.dialHostPort,
 		trace: d.config.Trace,
-	}
-	defer func() {
-		if err != nil {
-			_ = cluster.Close()
-		}
-	}()
-	if d.config.DiscoveryInterval > 0 {
-		if d.config.PreferLocalEndpoints {
-			cluster.balancer = newMultiBalancer(
+		balancer: func() balancer {
+			if d.config.DiscoveryInterval == 0 {
+				return new(singleConnBalancer)
+			}
+			if !d.config.PreferLocalEndpoints {
+				return d.newBalancer()
+			}
+			return newMultiBalancer(
 				withBalancer(
 					d.newBalancer(), func(_ *conn, info connInfo) bool {
 						return info.local
@@ -118,12 +112,36 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 					},
 				),
 			)
-		} else {
-			cluster.balancer = d.newBalancer()
+		}(),
+	}
+	defer func() {
+		if err != nil {
+			_ = cluster.Close()
+		}
+	}()
+	cluster.Insert(ctx, endpoint)
+	driver := &driver{
+		cluster:              &cluster,
+		meta:                 d.meta,
+		trace:                d.config.Trace,
+		requestTimeout:       d.config.RequestTimeout,
+		streamTimeout:        d.config.StreamTimeout,
+		operationTimeout:     d.config.OperationTimeout,
+		operationCancelAfter: d.config.OperationCancelAfter,
+	}
+	// Ensure that endpoint is online.
+	_, err = driver.getConn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if d.config.DiscoveryInterval > 0 {
+		discoveryClient := &discoveryClient{
+			discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(driver),
+			database:         d.config.Database,
+			ssl:              d.useTLS(),
 		}
 
-		var curr []Endpoint
-		curr, err = d.discover(ctx, addr)
+		curr, err := discoveryClient.Discover(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -139,9 +157,10 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		} else {
 			wg.Wait()
 		}
-		cluster.explorer = NewRepeater(d.config.DiscoveryInterval, 0,
+		cluster.explorer = NewRepeater(
+			d.config.DiscoveryInterval,
 			func(ctx context.Context) {
-				next, err := d.discover(ctx, addr)
+				next, err := discoveryClient.Discover(ctx)
 				if err != nil {
 					return
 				}
@@ -181,35 +200,10 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 				wg.Add(actual - max) // adjust
 				wg.Wait()
 				curr = next
-			})
-	} else {
-		var (
-			e   Endpoint
-			err error
+			},
 		)
-		e.Addr, e.Port, err = d.splitHostPort(addr)
-		if err != nil {
-			return nil, err
-		}
-
-		cluster.balancer = new(singleConnBalancer)
-		cluster.Insert(ctx, e)
-
-		// Ensure that endpoint is online.
-		_, err = cluster.Get(ctx)
-		if err != nil {
-			return nil, err
-		}
 	}
-	return &driver{
-		cluster:              &cluster,
-		meta:                 d.meta,
-		trace:                d.config.Trace,
-		requestTimeout:       d.config.RequestTimeout,
-		streamTimeout:        d.config.StreamTimeout,
-		operationTimeout:     d.config.OperationTimeout,
-		operationCancelAfter: d.config.OperationCancelAfter,
-	}, nil
+	return driver, nil
 }
 
 func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn, error) {
@@ -242,34 +236,6 @@ func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
 		return nil, err
 	}
 	return d.dialHostPort(ctx, host, port)
-}
-
-func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoint, err error) {
-	driverTraceDiscoveryDone := driverTraceOnDiscovery(ctx, d.config.Trace, ctx)
-	defer func() {
-		driverTraceDiscoveryDone(ctx, endpoints, err)
-	}()
-
-	var conn *conn
-	conn, err = d.dialAddr(ctx, addr)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = conn.conn.Close()
-	}()
-
-	subctx := ctx
-	if d.timeout > 0 {
-		var cancel context.CancelFunc
-		subctx, cancel = context.WithTimeout(ctx, d.timeout)
-		defer cancel()
-	}
-
-	return (&discoveryClient{
-		conn: conn,
-		meta: d.meta,
-	}).Discover(subctx, d.config.Database, d.useTLS())
 }
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
@@ -312,6 +278,23 @@ func (d *dialer) splitHostPort(addr string) (host string, port int, err error) {
 		return
 	}
 	port, err = strconv.Atoi(prt)
+	return
+}
+
+func (d *dialer) mustSplitHostPort(addr string) (host string, port int) {
+	host, prt, err := net.SplitHostPort(addr)
+	if err != nil {
+		panic(err)
+	}
+	port, err = strconv.Atoi(prt)
+	if err != nil {
+		panic(err)
+	}
+	return host, port
+}
+
+func (d *dialer) endpointByAddr(addr string) (e Endpoint) {
+	e.Addr, e.Port = d.mustSplitHostPort(addr)
 	return
 }
 

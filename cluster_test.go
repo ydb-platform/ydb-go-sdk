@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil/timetest"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil/timetest"
 )
 
 func TestClusterFastRedial(t *testing.T) {
@@ -32,7 +32,7 @@ func TestClusterFastRedial(t *testing.T) {
 			cc, err := ln.Dial(ctx)
 			return &conn{
 				addr: connAddr{s, p},
-				conn: cc,
+				raw:  cc,
 			}, err
 		},
 		balancer: balancer,
@@ -45,7 +45,7 @@ func TestClusterFastRedial(t *testing.T) {
 				con, err := c.Get(context.Background())
 				// enforce close bad connects to track them
 				if err == nil && con != nil && con.addr.addr == "bad" {
-					_ = con.conn.Close()
+					_ = con.raw.Close()
 				}
 			}
 			close(done)
@@ -89,7 +89,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			cc, err := ln.Dial(ctx)
 			return &conn{
 				addr: connAddr{s, p},
-				conn: cc,
+				raw:  cc,
 			}, err
 		},
 		balancer: balancer,
@@ -102,7 +102,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			con, err := c.Get(sub)
 			// enforce close bad connects to track them
 			if err == nil && con != nil && con.addr.addr == "bad" {
-				_ = con.conn.Close()
+				_ = con.raw.Close()
 			}
 		}
 	}
@@ -202,7 +202,7 @@ func TestClusterRemoveTracking(t *testing.T) {
 			cc, err := ln.Dial(ctx)
 			return &conn{
 				addr: connAddr{s, p},
-				conn: cc,
+				raw:  cc,
 			}, err
 		},
 		balancer: balancer,
@@ -330,7 +330,12 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 			ch <- len(q)
 		},
 	}
-	defer c.Close()
+	defer func() {
+		err := c.Close()
+		if err != nil {
+			t.Errorf("close failed: %v", err)
+		}
+	}()
 
 	t.Run("test actual block of tracker", func(t *testing.T) {
 		endpoint := Endpoint{Addr: "foo"}
@@ -391,7 +396,7 @@ func TestClusterAwait(t *testing.T) {
 				return nil, err
 			}
 			return &conn{
-				conn: cc,
+				raw: cc,
 			}, nil
 		},
 		balancer: stubBalancer{

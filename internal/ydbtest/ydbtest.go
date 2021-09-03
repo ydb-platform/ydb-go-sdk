@@ -13,14 +13,14 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Discovery"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Discovery"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
 )
 
 type Handler func(ctx context.Context, req RequestParser) (res interface{}, err error)
@@ -46,7 +46,7 @@ func operationResponse(r proto.Message, id string, status Ydb.StatusIds_StatusCo
 			Id:     id,
 			Ready:  true,
 			Status: status,
-			Result: &any.Any{
+			Result: &anypb.Any{
 				Value: res,
 			},
 		},

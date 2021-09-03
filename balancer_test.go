@@ -104,6 +104,6 @@ func TestMultiBalancer(t *testing.T) {
 		}
 	}
 	if c := m.Next(); c != nil {
-		t.Fatalf("Next() returned unexpected non-nil connection")
+		t.Fatalf("Next() returned unexpected non-nil conn")
 	}
 }

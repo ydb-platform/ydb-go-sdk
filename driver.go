@@ -5,10 +5,10 @@ import (
 	"path"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -22,10 +22,6 @@ type driver struct {
 	streamTimeout        time.Duration
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
-}
-
-func (d *driver) Close() error {
-	return d.cluster.Close()
 }
 
 func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err error) {
@@ -72,7 +68,7 @@ func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err err
 		conn: conn,
 	}
 
-	if conn.conn == nil {
+	if conn.raw == nil {
 		return info, ErrNilConnection
 	}
 
@@ -90,7 +86,7 @@ func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err err
 	conn.runtime.operationStart(start)
 	driverTraceOperationDone := driverTraceOnOperation(ctx, d.trace, ctx, conn.addr.String(), Method(method), params)
 
-	err = invoke(ctx, conn.conn, resp, method, req, res)
+	err = invoke(ctx, conn.raw, resp, method, req, res)
 
 	conn.runtime.operationDone(
 		start, timeutil.Now(),
@@ -166,7 +162,7 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallI
 		}
 	}()
 
-	s, err := grpc.NewClientStream(ctx, &desc, conn.conn, method,
+	s, err := grpc.NewClientStream(ctx, &desc, conn.raw, method,
 		grpc.MaxCallRecvMsgSize(50*1024*1024), // 50MB
 	)
 	if err != nil {
@@ -214,4 +210,32 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallI
 	}()
 
 	return info, nil
+}
+
+func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
+	// Remember raw context to pass it for the tracing functions.
+	rawCtx := ctx
+
+	// Get credentials (token actually) for the request.
+	var md metadata.MD
+	md, err = d.meta.md(ctx)
+	if err != nil {
+		return
+	}
+	if len(md) > 0 {
+		ctx = metadata.NewOutgoingContext(ctx, md)
+	}
+
+	driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
+	c, err = d.cluster.Get(ctx)
+	driverTraceGetConnDone(rawCtx, c.Address(), err)
+
+	if err == nil {
+		if apply, ok := ContextClientConnApplier(rawCtx); ok {
+			apply(c)
+		}
+		c.d = d
+	}
+
+	return
 }

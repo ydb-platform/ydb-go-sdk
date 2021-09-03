@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/traceutil"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/ydbtest"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/traceutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/ydbtest"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 func TestClusterTracking(t *testing.T) {
@@ -86,9 +86,7 @@ func TestClusterTracking(t *testing.T) {
 	// trying to connect to them (and is not able until we put ticket into the
 	// dialTicket channel).
 
-	tc := table.Client{
-		Driver: d,
-	}
+	tc := table.NewClient(d)
 	mustCreateSession := func() {
 		sub, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()

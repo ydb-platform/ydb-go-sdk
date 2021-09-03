@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil/timetest"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil/timetest"
 )
 
 func TestRepeater(t *testing.T) {
@@ -25,7 +25,7 @@ func TestRepeater(t *testing.T) {
 	defer cleanup()
 
 	exec := make(chan struct{}, 1)
-	r := NewRepeater(42*time.Second, 0,
+	r := NewRepeater(42*time.Second,
 		func(_ context.Context) {
 			exec <- struct{}{}
 		})
@@ -53,7 +53,7 @@ func TestRepeaterCancelation(t *testing.T) {
 	})
 	defer cleanup()
 
-	r := NewRepeater(42*time.Second, 0,
+	r := NewRepeater(42*time.Second,
 		func(ctx context.Context) {
 			enter <- struct{}{}
 			<-ctx.Done()

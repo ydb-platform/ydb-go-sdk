@@ -5,8 +5,8 @@ package tests
 import (
 	"strconv"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 var (
@@ -89,4 +89,3 @@ func (t *Times) StructType() ydb.Type {
 	}
 	return t0
 }
-

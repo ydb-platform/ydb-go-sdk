@@ -1,22 +1,22 @@
 package table
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal/cache/lru"
 	"context"
 	"errors"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Scheme"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Table"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
 )
 
 func TestSessionKeepAlive(t *testing.T) {
@@ -29,14 +29,18 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Handler: methodHandlers{
-			testutil.TableKeepAlive: func(req, res interface{}) error {
-				r, _ := res.(*Ydb_Table.KeepAliveResult)
-				r.SessionStatus = status
-
-				return e
-			},
-		},
+		Cluster: testutil.NewCluster(
+			testutil.WithInvokeHandlers(
+				testutil.InvokeHandlers{
+					testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
+						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
+					},
+					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						return &Ydb_Table.CreateSessionResult{}, nil
+					},
+				},
+			),
+		),
 	}
 	s, err := b.CreateSession(ctx)
 	if err != nil {
@@ -82,14 +86,20 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Handler: methodHandlers{
-			testutil.TableDescribeTable: func(req, res interface{}) error {
-				r, _ := res.(*Ydb_Table.DescribeTableResult)
-				r.Reset()
-				proto.Merge(r, result)
-				return e
-			},
-		},
+		Cluster: testutil.NewCluster(
+			testutil.WithInvokeHandlers(
+				testutil.InvokeHandlers{
+					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						return &Ydb_Table.CreateSessionResult{}, nil
+					},
+					testutil.TableDescribeTable: func(request interface{}) (proto.Message, error) {
+						r := &Ydb_Table.DescribeTableResult{}
+						proto.Merge(r, result)
+						return r, e
+					},
+				},
+			),
+		),
 	}
 	s, err := b.CreateSession(ctx)
 	if err != nil {
@@ -214,8 +224,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExecuteDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, _, err := s.Execute(ctx, TxControl(), "", NewQueryParameters())
 				require.NoError(t, err)
@@ -225,8 +235,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExplainDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.Explain(ctx, "")
 				require.NoError(t, err)
@@ -236,8 +246,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TablePrepareDataQuery,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.Prepare(ctx, "")
 				require.NoError(t, err)
@@ -254,8 +264,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableDeleteSession,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				require.NoError(t, s.Close(ctx))
 			},
@@ -264,8 +274,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableBeginTransaction,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c: c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.BeginTransaction(ctx, TxSettings())
 				require.NoError(t, err)
@@ -276,8 +286,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				tx := &Transaction{
 					s: &Session{
-						c:      c,
-						qcache: lru.New(0),
+						c: c,
+						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
 				}
 				_, err := tx.CommitTx(ctx)
@@ -289,8 +299,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				tx := &Transaction{
 					s: &Session{
-						c:      c,
-						qcache: lru.New(0),
+						c: c,
+						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
 				}
 				err := tx.Rollback(ctx)
@@ -301,8 +311,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableKeepAlive,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c:      c,
-					qcache: lru.New(0),
+					c:            c,
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.KeepAlive(ctx)
 				require.NoError(t, err)
@@ -315,23 +325,47 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := Client{
-							Driver: &testutil.Driver{
-								OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-									require.Equal(t, test.method, m)
-									mode, ok := ydb.ContextOperationMode(ctx)
-									require.True(t, ok)
-									require.Equal(t, srcDst.dstMode, mode)
-									switch m {
-									case testutil.TableExecuteDataQuery:
-										r := testutil.TableExecuteDataQueryResult{R: res}
-										r.SetTransactionID("")
-									case testutil.TableBeginTransaction:
-										r := testutil.TableBeginTransactionResult{R: res}
-										r.SetTransactionID("")
-									}
-									return nil
-								},
-							},
+							cluster: testutil.NewCluster(
+								testutil.WithInvokeHandlers(
+									testutil.InvokeHandlers{
+										testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.ExecuteQueryResult{
+												TxMeta: &Ydb_Table.TransactionMeta{
+													Id: "",
+												},
+											}, nil
+										},
+										testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.BeginTransactionResult{
+												TxMeta: &Ydb_Table.TransactionMeta{
+													Id: "",
+												},
+											}, nil
+										},
+										testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.ExecuteQueryResult{}, nil
+										},
+										testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.PrepareQueryResult{}, nil
+										},
+										testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.CreateSessionResult{}, nil
+										},
+										testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.DeleteSessionResponse{}, nil
+										},
+										testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.CommitTransactionResponse{}, nil
+										},
+										testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.RollbackTransactionResponse{}, nil
+										},
+										testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+											return &Ydb_Table.KeepAliveResult{}, nil
+										},
+									},
+								),
+							),
 						}
 						ctx, cancel := context.WithTimeout(
 							context.Background(),
@@ -360,19 +394,19 @@ func TestClientCache(t *testing.T) {
 		prepareRequestsCount int
 	}{
 		{
-			name:                 "fixed query cache size, one request proxed to server",
+			name:                 "fixed query cache size, one request must be proxed to server",
 			cacheSize:            10,
 			prepareCount:         10,
 			prepareRequestsCount: 1,
 		},
 		{
-			name:                 "default query cache size, one request proxed to server",
+			name:                 "default query cache size, one request must be proxed to server",
 			cacheSize:            0,
 			prepareCount:         10,
 			prepareRequestsCount: 1,
 		},
 		{
-			name:                 "disabled query cache, all requests proxed to server",
+			name:                 "disabled query cache, all requests must be proxed to server",
 			cacheSize:            -1,
 			prepareCount:         10,
 			prepareRequestsCount: 10,
@@ -383,20 +417,19 @@ func TestClientCache(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 			client := &Client{
-				Driver: &testutil.Driver{
-					OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface{}) error {
-						switch m {
-						case testutil.TableCreateSession:
-						case testutil.TablePrepareDataQuery:
-							prepareRequestsCount++
-						default:
-							t.Fatalf("Unexpected method %d", m)
-
-						}
-						return nil
-					},
-				},
-				MaxQueryCacheSize: test.cacheSize,
+				cluster: testutil.NewCluster(
+					testutil.WithInvokeHandlers(
+						testutil.InvokeHandlers{
+							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.CreateSessionResult{}, nil
+							},
+							testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+								prepareRequestsCount++
+								return &Ydb_Table.PrepareQueryResult{}, nil
+							},
+						},
+					),
+				),
 			}
 			s, err := client.CreateSession(ctx)
 			require.NoError(t, err)

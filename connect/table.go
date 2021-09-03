@@ -1,8 +1,9 @@
 package connect
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"context"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 type tableWrapper struct {
@@ -12,17 +13,17 @@ type tableWrapper struct {
 }
 
 func newTableWrapper(ctx context.Context) *tableWrapper {
-	tableClient := &table.Client{
-		Trace: table.ContextClientTrace(ctx),
-	}
 	return &tableWrapper{
-		ctx:    ctx,
-		client: tableClient,
+		ctx: ctx,
 		sessionPool: &table.SessionPool{
-			Builder: tableClient,
-			Trace:   table.ContextSessionPoolTrace(ctx),
+			Trace: table.ContextSessionPoolTrace(ctx),
 		},
 	}
+}
+
+func (t *tableWrapper) set(cluster ydb.Cluster) {
+	t.client = table.NewClient(cluster, table.WithClientTraceOption(table.ContextClientTrace(t.ctx)))
+	t.sessionPool.Builder = t.client
 }
 
 func (t *tableWrapper) CreateSession(ctx context.Context) (*table.Session, error) {

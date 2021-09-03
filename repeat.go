@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 )
 
 // repeater contains logic of repeating some task.
@@ -13,10 +13,6 @@ type repeater struct {
 	// Interval contains an interval between task execution.
 	// Interval must be greater than zero; if not, Repeater will panic.
 	interval time.Duration
-
-	// Timeout for an operation passed as a context instance.
-	// If 0 passed - no timeout is set
-	timeout time.Duration
 
 	// Task is a function that must be executed periodically.
 	task func(context.Context)
@@ -31,14 +27,13 @@ type repeater struct {
 }
 
 // NewRepeater creates and begins to execute task periodically.
-func NewRepeater(interval, timeout time.Duration, task func(ctx context.Context)) *repeater {
+func NewRepeater(interval time.Duration, task func(ctx context.Context)) *repeater {
 	if interval <= 0 {
 		return nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	r := &repeater{
 		interval: interval,
-		timeout:  timeout,
 		task:     task,
 		timer:    timeutil.NewTimer(interval),
 		stopOnce: sync.Once{},
@@ -71,6 +66,7 @@ func (r *repeater) Force() {
 func (r *repeater) worker() {
 	defer close(r.done)
 	for {
+		r.task(r.ctx)
 		select {
 		case <-r.stop:
 			return
@@ -82,12 +78,5 @@ func (r *repeater) worker() {
 			}
 		}
 		r.timer.Reset(r.interval)
-		ctx := r.ctx
-		if t := r.timeout; t > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, t)
-			defer cancel()
-		}
-		r.task(ctx)
 	}
 }

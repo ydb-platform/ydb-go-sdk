@@ -1,17 +1,19 @@
 package ydbsql
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2/testutil"
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 )
 
 func TestConnectorDialOnPing(t *testing.T) {
@@ -27,6 +29,9 @@ func TestConnectorDialOnPing(t *testing.T) {
 			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
 				dial <- struct{}{}
 				return client, nil
+			},
+			DriverConfig: &ydb.DriverConfig{
+				Credentials: ydb.NewAnonymousCredentials("test"),
 			},
 		}),
 	)
@@ -71,7 +76,9 @@ func TestConnectorRedialOnError(t *testing.T) {
 					return nil, errors.New("any error")
 				}
 			},
-			DriverConfig: &ydb.DriverConfig{},
+			DriverConfig: &ydb.DriverConfig{
+				Credentials: ydb.NewAnonymousCredentials("test"),
+			},
 		}),
 		WithDefaultTxControl(table.TxControl(
 			table.BeginTx(
@@ -96,49 +103,30 @@ func TestConnectorRedialOnError(t *testing.T) {
 func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 	for _, test := range [...]struct {
 		name                   string
-		cacheSize              int
 		prepareCount           int
 		prepareRequestsCount   int
 		queryCachePolicyOption []table.QueryCachePolicyOption
 	}{
 		{
-			name:                   "fixed query cache size, with server cache, one request proxed to server",
-			cacheSize:              10,
+			name:                   "with server cache, one request proxed to server",
 			prepareCount:           10,
 			prepareRequestsCount:   1,
 			queryCachePolicyOption: []table.QueryCachePolicyOption{table.WithQueryCachePolicyKeepInCache()},
 		},
 		{
-			name:                   "default query cache size, with server cache, one request proxed to server",
-			cacheSize:              0,
-			prepareCount:           10,
-			prepareRequestsCount:   1,
-			queryCachePolicyOption: []table.QueryCachePolicyOption{table.WithQueryCachePolicyKeepInCache()},
-		},
-		{
-			name:                   "disabled query cache, with server cache, all requests proxed to server",
-			cacheSize:              -1,
+			name:                   "with server cache, all requests proxed to server",
 			prepareCount:           10,
 			prepareRequestsCount:   10,
 			queryCachePolicyOption: []table.QueryCachePolicyOption{table.WithQueryCachePolicyKeepInCache()},
 		},
 		{
-			name:                   "fixed query cache size, no server cache, one request proxed to server",
-			cacheSize:              10,
+			name:                   "no server cache, one request proxed to server",
 			prepareCount:           10,
 			prepareRequestsCount:   1,
 			queryCachePolicyOption: []table.QueryCachePolicyOption{},
 		},
 		{
-			name:                   "default query cache size, no server cache, one request proxed to server",
-			cacheSize:              0,
-			prepareCount:           10,
-			prepareRequestsCount:   1,
-			queryCachePolicyOption: []table.QueryCachePolicyOption{},
-		},
-		{
-			name:                   "disabled query cache, no server cache, all requests proxed to server",
-			cacheSize:              -1,
+			name:                   "no server cache, all requests proxed to server",
 			prepareCount:           10,
 			prepareRequestsCount:   10,
 			queryCachePolicyOption: []table.QueryCachePolicyOption{},
@@ -150,36 +138,25 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 			defer server.Close()
 
 			c := Connector(
-				WithClient(&table.Client{
-					Driver: &testutil.Driver{
-						OnCall: func(ctx context.Context, m testutil.MethodCode, req, res interface {
-						}) error {
-							switch m {
-							case testutil.TableCreateSession:
-							case testutil.TableExecuteDataQuery:
-								r := testutil.TableExecuteDataQueryRequest{req}
-								if len(test.queryCachePolicyOption) > 0 {
-									keepInCache, ok := r.KeepInCache()
-									require.True(t, ok)
-									require.True(t, keepInCache)
-								} else {
-									keepInCache, ok := r.KeepInCache()
-									require.True(t, ok)
-									require.False(t, keepInCache)
-								}
-								{
-									r := testutil.TableExecuteDataQueryResult{res}
-									r.SetTransactionID("")
-								}
-								return nil
-							default:
-								t.Fatalf("Unexpected method %d", m)
-							}
-							return nil
-						},
-					},
-					MaxQueryCacheSize: test.cacheSize,
-				}),
+				WithClient(
+					table.NewClient(
+						testutil.NewCluster(
+							testutil.WithInvokeHandlers(
+								testutil.InvokeHandlers{
+									testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+										return &Ydb_Table.CreateSessionResult{}, nil
+									},
+									testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+										r := request.(*Ydb_Table.ExecuteDataQueryRequest)
+										keepInCache := r.QueryCachePolicy.KeepInCache
+										require.Equal(t, len(test.queryCachePolicyOption) > 0, keepInCache)
+										return &Ydb_Table.ExecuteQueryResult{}, nil
+									},
+								},
+							),
+						),
+					),
+				),
 				WithDefaultExecDataQueryOption(table.WithQueryCachePolicy(test.queryCachePolicyOption...)),
 			)
 			db := sql.OpenDB(c)

@@ -2,10 +2,11 @@ package coordination
 
 import (
 	"context"
-
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Coordination"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/scheme"
+	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Coordination_V1"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Coordination"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/scheme"
+	"google.golang.org/protobuf/proto"
 )
 
 type ConsistencyMode uint
@@ -60,11 +61,17 @@ type Config struct {
 }
 
 type Client struct {
-	Driver ydb.Driver
+	coordinationService Ydb_Coordination_V1.CoordinationServiceClient
+}
+
+func NewClient(cluster ydb.Cluster) *Client {
+	return &Client{
+		coordinationService: Ydb_Coordination_V1.NewCoordinationServiceClient(cluster),
+	}
 }
 
 func (c *Client) CreateNode(ctx context.Context, path string, config Config) (err error) {
-	req := Ydb_Coordination.CreateNodeRequest{
+	_, err = c.coordinationService.CreateNode(ctx, &Ydb_Coordination.CreateNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
 			Path:                     config.Path,
@@ -74,15 +81,12 @@ func (c *Client) CreateNode(ctx context.Context, path string, config Config) (er
 			AttachConsistencyMode:    config.AttachConsistencyMode.to(),
 			RateLimiterCountersMode:  config.RateLimiterCountersMode.to(),
 		},
-	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.Coordination.V1.CoordinationService/CreateNode", &req, nil,
-	))
+	})
 	return
 }
 
 func (c *Client) AlterNode(ctx context.Context, path string, config Config) (err error) {
-	req := Ydb_Coordination.AlterNodeRequest{
+	_, err = c.coordinationService.AlterNode(ctx, &Ydb_Coordination.AlterNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
 			Path:                     config.Path,
@@ -92,42 +96,40 @@ func (c *Client) AlterNode(ctx context.Context, path string, config Config) (err
 			AttachConsistencyMode:    config.AttachConsistencyMode.to(),
 			RateLimiterCountersMode:  config.RateLimiterCountersMode.to(),
 		},
-	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.Coordination.V1.CoordinationService/AlterNode", &req, nil,
-	))
+	})
 	return
 }
 
 func (c *Client) DropNode(ctx context.Context, path string) (err error) {
-	req := Ydb_Coordination.DropNodeRequest{
+	_, err = c.coordinationService.DropNode(ctx, &Ydb_Coordination.DropNodeRequest{
 		Path: path,
-	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.Coordination.V1.CoordinationService/DropNode", &req, nil,
-	))
+	})
 	return
 }
 
 // Describes a coordination node
-func (c *Client) DescribeNode(ctx context.Context, path string) (*scheme.Entry, *Config, error) {
-	var res Ydb_Coordination.DescribeNodeResult
-	req := Ydb_Coordination.DescribeNodeRequest{
+func (c *Client) DescribeNode(ctx context.Context, path string) (_ *scheme.Entry, _ *Config, err error) {
+	var (
+		response *Ydb_Coordination.DescribeNodeResponse
+		result   Ydb_Coordination.DescribeNodeResult
+	)
+	response, err = c.coordinationService.DescribeNode(ctx, &Ydb_Coordination.DescribeNodeRequest{
 		Path: path,
-	}
-	_, err := c.Driver.Call(ctx, ydb.Wrap(
-		"/Ydb.Coordination.V1.CoordinationService/DescribeNode", &req, &res,
-	))
+	})
 	if err != nil {
 		return nil, nil, err
 	}
-	return scheme.InnerConvertEntry(res.Self), &Config{
-		Path:                     res.Config.Path,
-		SelfCheckPeriodMillis:    res.Config.SelfCheckPeriodMillis,
-		SessionGracePeriodMillis: res.Config.SessionGracePeriodMillis,
-		ReadConsistencyMode:      consistencyMode(res.Config.ReadConsistencyMode),
-		AttachConsistencyMode:    consistencyMode(res.Config.AttachConsistencyMode),
-		RateLimiterCountersMode:  rateLimiterCountersMode(res.Config.RateLimiterCountersMode),
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	if err != nil {
+		return nil, nil, err
+	}
+	return scheme.InnerConvertEntry(result.GetSelf()), &Config{
+		Path:                     result.GetConfig().GetPath(),
+		SelfCheckPeriodMillis:    result.GetConfig().GetSelfCheckPeriodMillis(),
+		SessionGracePeriodMillis: result.GetConfig().GetSessionGracePeriodMillis(),
+		ReadConsistencyMode:      consistencyMode(result.GetConfig().GetReadConsistencyMode()),
+		AttachConsistencyMode:    consistencyMode(result.GetConfig().GetAttachConsistencyMode()),
+		RateLimiterCountersMode:  rateLimiterCountersMode(result.GetConfig().GetRateLimiterCountersMode()),
 	}, nil
 
 }

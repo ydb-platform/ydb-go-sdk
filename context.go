@@ -7,19 +7,23 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/duration"
+	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Operations"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
 )
 
 type (
 	ctxOpTimeoutKey     struct{}
 	ctxOpCancelAfterKey struct{}
 	ctxOpModeKey        struct{}
-	ctxEndpointInfoKey  struct{}
 
+	ctxClientConnApplierKey struct{}
+
+	// Deprecated: no need to append endpoint info
+	ctxEndpointInfoKey struct{}
+
+	// Deprecated: no need to append endpoint info
 	ctxEndpointInfo struct {
 		conn   *conn
 		policy ConnUsePolicy
@@ -57,6 +61,7 @@ func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
 }
 
 // WithEndpointInfo returns a copy of parent context with endopint info and custom connection use policy
+// Deprecated: no need to append endpoint info
 func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, policy ConnUsePolicy) context.Context {
 	if endpointInfo != nil {
 		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
@@ -68,6 +73,7 @@ func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, p
 }
 
 // WithEndpointInfo returns a copy of parent context with endpoint info and default connection use policy
+// Deprecated: no need to append endpoint info
 func WithEndpointInfo(ctx context.Context, endpointInfo EndpointInfo) context.Context {
 	if endpointInfo != nil {
 		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
@@ -89,6 +95,7 @@ func WithUserAgent(ctx context.Context, userAgent string) context.Context {
 }
 
 // ContextConn returns the connection and connection use policy
+// Deprecated: no need to use endpoint info from context
 func ContextConn(ctx context.Context) (conn *conn, backoffUseBalancer bool) {
 	connInfo, ok := ctx.Value(ctxEndpointInfoKey{}).(ctxEndpointInfo)
 	if !ok {
@@ -135,6 +142,29 @@ func WithOperationMode(ctx context.Context, m OperationMode) context.Context {
 // ContextOperationMode returns the mode of YDB operation within given context.
 func ContextOperationMode(ctx context.Context) (m OperationMode, ok bool) {
 	m, ok = ctx.Value(ctxOpModeKey{}).(OperationMode)
+	return
+}
+
+type ClientConnApplier func(c ClientConnInterface)
+
+// WithClientConnApplier returns a copy of parent context with client conn applier function
+func WithClientConnApplier(ctx context.Context, apply ClientConnApplier) context.Context {
+	if exist, ok := ContextClientConnApplier(ctx); ok {
+		return context.WithValue(
+			ctx,
+			ctxClientConnApplierKey{},
+			ClientConnApplier(func(conn ClientConnInterface) {
+				exist(conn)
+				apply(conn)
+			}),
+		)
+	}
+	return context.WithValue(ctx, ctxClientConnApplierKey{}, apply)
+}
+
+// ContextClientConnApplier returns the ClientConnApplier within given context.
+func ContextClientConnApplier(ctx context.Context) (v ClientConnApplier, ok bool) {
+	v, ok = ctx.Value(ctxClientConnApplierKey{}).(ClientConnApplier)
 	return
 }
 
@@ -223,9 +253,9 @@ func setOperationParams(req interface{}, params OperationParams) {
 	x.SetOperationParams(params.toYDB())
 }
 
-func timeoutParam(d time.Duration) *duration.Duration {
+func timeoutParam(d time.Duration) *durationpb.Duration {
 	if d > 0 {
-		return ptypes.DurationProto(d)
+		return durationpb.New(d)
 	}
 	return nil
 }

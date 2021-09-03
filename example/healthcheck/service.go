@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/connect"
-	"github.com/yandex-cloud/ydb-go-sdk/v2/table"
 	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/connect"
+	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
 	"net/http"
 	"net/url"
 	"os"
