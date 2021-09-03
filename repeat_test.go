@@ -24,7 +24,7 @@ func TestRepeater(t *testing.T) {
 	})
 	defer cleanup()
 
-	exec := make(chan struct{}, 1)
+	exec := make(chan struct{})
 	r := NewRepeater(42*time.Second,
 		func(_ context.Context) {
 			exec <- struct{}{}
@@ -32,7 +32,7 @@ func TestRepeater(t *testing.T) {
 
 	timerC <- time.Now()
 	assertRecv(t, 500*time.Millisecond, exec)
-	assertNoRecv(t, 50*time.Millisecond, exec)
+	assertRecv(t, 50*time.Millisecond, exec)
 
 	r.Stop()
 	timerC <- time.Now()

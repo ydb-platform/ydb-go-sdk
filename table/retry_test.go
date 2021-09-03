@@ -123,7 +123,10 @@ func TestRetryerImmediateiRetry(t *testing.T) {
 
 func TestRetryerBadSession(t *testing.T) {
 	client := &Client{
-		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.CreateSessionResult{}, nil
+			}})),
 	}
 	r := Retryer{
 		MaxRetries: 3,

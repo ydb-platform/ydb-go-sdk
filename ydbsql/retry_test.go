@@ -195,7 +195,7 @@ func TestTxDoerStmt(t *testing.T) {
 		t.Fatalf("not busy error: %v", err)
 	}
 
-	const timeout = time.Second
+	const timeout = 2 * time.Second
 	select {
 	case <-busyChecking:
 	case <-time.After(timeout):
