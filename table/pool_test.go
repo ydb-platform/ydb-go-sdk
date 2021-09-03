@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"path"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1115,8 +1116,8 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 }
 
 func TestSessionPoolKeepAliveMinSize(t *testing.T) {
-	keepAliveCnt := 0
-	allKeepAlive := make(chan int)
+	keepAliveCounter := make(map[string]int)
+
 	p := &SessionPool{
 		Trace: SessionPoolTrace{},
 		Builder: &StubBuilder{
@@ -1125,10 +1126,8 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 			Handler: methodHandlers{
 				testutil.TableDeleteSession: okHandler,
 				testutil.TableKeepAlive: func(req, res interface{}) error {
-					keepAliveCnt++
-					if keepAliveCnt%3 == 0 {
-						allKeepAlive <- keepAliveCnt
-					}
+					r := req.(*Ydb_Table.KeepAliveRequest)
+					keepAliveCounter[r.SessionId]++
 					return nil
 				},
 			},
@@ -1143,18 +1142,18 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	}()
 	sessionBuilder := func(t *testing.T, poll *SessionPool) (*Session, chan bool) {
 		s := mustCreateSession(t, poll)
-		mustPutSession(t, p, s)
 		closed := make(chan bool)
 		s.OnClose(func() {
 			close(closed)
 		})
 		return s, closed
 	}
-	_, c1 := sessionBuilder(t, p)
-	_, c2 := sessionBuilder(t, p)
+	s1, c1 := sessionBuilder(t, p)
+	s2, c2 := sessionBuilder(t, p)
 	s3, c3 := sessionBuilder(t, p)
-	<-allKeepAlive
-	<-allKeepAlive
+	mustPutSession(t, p, s1)
+	mustPutSession(t, p, s2)
+	mustPutSession(t, p, s3)
 	<-c1
 	<-c2
 
@@ -1162,7 +1161,10 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 		t.Fatalf("lower bound for sessions in the pool is not equal KeepAliveMinSize")
 	}
 
+	mustTakeSession(t, p, s3)
 	s4, c4 := sessionBuilder(t, p)
+	mustPutSession(t, p, s3)
+	mustPutSession(t, p, s4)
 	<-c3
 
 	s := mustGetSession(t, p)
@@ -1171,6 +1173,13 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	}
 	_ = s.Close(context.Background())
 	<-c4
+
+	if keepAliveCounter[s1.ID] != 2 || keepAliveCounter[s2.ID] != 2 {
+		t.Fatalf("incorrect keepAlive attempts: excpected: 2 found: %d %d", keepAliveCounter[s1.ID], keepAliveCounter[s2.ID])
+	}
+	if keepAliveCounter[s3.ID] != 5 {
+		t.Fatalf("incorrect keepAlive attempts for reused session: excpected: 5 found: %d", keepAliveCounter[s3.ID])
+	}
 }
 
 func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
@@ -1234,9 +1243,9 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 		_ = p.Close(context.Background())
 	}()
 	s := mustCreateSession(t, p)
-	mustPutSession(t, p, s)
 	<-timer.Created
 	s2 := mustCreateSession(t, p)
+	mustPutSession(t, p, s)
 	mustPutSession(t, p, s2)
 	//retry
 	shiftTime(p.IdleThreshold)
@@ -1390,10 +1399,10 @@ var okHandler = func(req, res interface{}) error {
 }
 
 func simpleSession() *Session {
-	return newSession(nil, nil)
+	return newSession(nil, 0, nil)
 }
 
-func newSession(t *testing.T, h methodHandlers) *Session {
+func newSession(t *testing.T, id int, h methodHandlers) *Session {
 	return &Session{
 		c: Client{
 			Driver: &testutil.Driver{
@@ -1409,6 +1418,7 @@ func newSession(t *testing.T, h methodHandlers) *Session {
 				},
 			},
 		},
+		ID: strconv.Itoa(id),
 	}
 }
 
@@ -1439,7 +1449,7 @@ func (s *StubBuilder) CreateSession(ctx context.Context) (*Session, error) {
 	}
 
 	if s.Handler == nil || s.Handler[testutil.TableCreateSession] == nil {
-		return newSession(s.T, s.Handler), nil
+		return newSession(s.T, s.actual, s.Handler), nil
 	}
 	var (
 		req Ydb_Table.CreateSessionRequest
@@ -1450,7 +1460,7 @@ func (s *StubBuilder) CreateSession(ctx context.Context) (*Session, error) {
 		return nil, err
 	}
 
-	r := newSession(s.T, s.Handler)
+	r := newSession(s.T, s.actual, s.Handler)
 	r.ID = res.SessionId
 
 	return r, nil

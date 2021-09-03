@@ -1,4 +1,5 @@
 # Breaking changes for the next major release
+- [ ] Delete deprecated ready statistics from session pool
 - [ ] Delete deprecated api package
 - [ ] Delete deprecated internalapi package
 - [ ] Delete deprecated parameter KeepAliveBatchSize from session pool

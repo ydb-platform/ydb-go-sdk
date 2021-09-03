@@ -126,7 +126,6 @@ type SessionPool struct {
 	createInProgress int        // KIKIMR-9163: in-create-process counter
 	limit            int        // Upper bound for pool size.
 	idle             *list.List // list<*Session>
-	ready            *list.List // list<*Session>
 	waitq            *list.List // list<*chan *Session>
 
 	keeperWake chan struct{} // Set by keeper.
@@ -152,7 +151,6 @@ func (p *SessionPool) init() {
 		p.index = make(map[*Session]sessionInfo)
 
 		p.idle = list.New()
-		p.ready = list.New()
 		p.waitq = list.New()
 		p.limit = p.SizeLimit
 		if p.limit <= 0 {
@@ -274,10 +272,6 @@ func (p *SessionPool) createSession(ctx context.Context, trace createSessionTrac
 
 			if info.idle != nil {
 				panic("ydb: table: session closed while still in idle pool")
-			}
-			if info.ready != nil {
-				p.ready.Remove(info.ready)
-				info.ready = nil
 			}
 		})
 
@@ -550,7 +544,7 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 		// We are not dealing with this because even if session is not deleted
 		// by keeper() it could be staled on the server and the same user
 		// experience will appear.
-		s = p.getReady()
+		s, _ = p.peekFirstIdle()
 		p.mu.Unlock()
 
 		if s == nil {
@@ -565,11 +559,6 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 			continue
 		}
 		if err != nil {
-			if atomic.LoadUint32(&p.closed) == 0 {
-				p.mu.Lock()
-				p.pushReady(s)
-				p.mu.Unlock()
-			}
 			return nil, err
 		}
 
@@ -618,7 +607,6 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	waitq := p.waitq
 	p.limit = 0
 	p.idle = list.New()
-	p.ready = list.New()
 	p.waitq = list.New()
 	p.index = make(map[*Session]sessionInfo)
 	p.mu.Unlock()
@@ -641,9 +629,6 @@ func (p *SessionPool) Stats() SessionPoolStats {
 	idleCount, readyCount, waitQCount, indexCount := 0, 0, 0, 0
 	if p.idle != nil {
 		idleCount = p.idle.Len()
-	}
-	if p.ready != nil {
-		readyCount = p.ready.Len()
 	}
 	if p.waitq != nil {
 		waitQCount = p.waitq.Len()
@@ -681,7 +666,6 @@ func (p *SessionPool) reuse(ctx context.Context, s *Session) (reused bool) {
 			p.index[s] = sessionInfo{}
 			if !p.notify(s) {
 				p.pushIdle(s, timeutil.Now())
-				p.pushReady(s)
 			}
 			return true
 		}
@@ -1085,37 +1069,6 @@ func (p *SessionPool) wakeUpKeeper() {
 	}
 }
 
-// p.mu must be held.
-func (p *SessionPool) getReady() *Session {
-	if p.ready.Len() == 0 {
-		return nil
-	}
-
-	s := p.ready.Remove(p.ready.Front()).(*Session)
-	info, has := p.index[s]
-	if !has {
-		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
-	}
-	if info.ready == nil {
-		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
-	}
-	info.ready = nil
-	return s
-}
-
-// p.mu must be held.
-func (p *SessionPool) pushReady(s *Session) {
-	info, has := p.index[s]
-	if !has {
-		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
-	}
-	if info.ready != nil {
-		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
-	}
-	info.ready = p.ready.PushBack(s)
-	p.index[s] = info
-}
-
 type sessionInfo struct {
 	idle           *list.Element
 	ready          *list.Element
@@ -1129,7 +1082,8 @@ func panicLocked(mu sync.Locker, message string) {
 }
 
 type SessionPoolStats struct {
-	Idle             int
+	Idle int
+	// Deprecated: always zero
 	Ready            int
 	Index            int
 	WaitQ            int
