@@ -1,4 +1,4 @@
-module github.com/YandexDatabase/ydb-go-sdk/v2
+module github.com/YandexDatabase/ydb-go-sdk/v3
 
 go 1.13
 

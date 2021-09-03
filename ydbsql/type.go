@@ -3,10 +3,10 @@ package ydbsql
 import (
 	"database/sql"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
 )
 
 type valuer interface {

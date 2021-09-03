@@ -3,8 +3,8 @@ package connect
 import (
 	"context"
 	"crypto/tls"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/auth"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/auth"
 )
 
 // New connects to database and return database connection

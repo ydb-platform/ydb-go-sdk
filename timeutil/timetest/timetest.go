@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
 )
 
 type SingleTimerStub struct {

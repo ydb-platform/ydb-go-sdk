@@ -9,11 +9,11 @@ import (
 	"path"
 	"text/template"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/connect"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/decimal"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/example/internal/cli"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/connect"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/decimal"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/example/internal/cli"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 )
 
 type templateConfig struct {

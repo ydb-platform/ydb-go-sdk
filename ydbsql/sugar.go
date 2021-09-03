@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
 )
 
 type Declaration struct {

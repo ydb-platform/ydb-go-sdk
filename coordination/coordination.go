@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Coordination"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/scheme"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/scheme"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -5,15 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 )
 
 func TestConnectorDialOnPing(t *testing.T) {

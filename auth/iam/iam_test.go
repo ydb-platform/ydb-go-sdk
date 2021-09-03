@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
 )
 
 type TransportFunc func(context.Context, string) (string, time.Time, error)

@@ -3,7 +3,7 @@ package ydb
 import (
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
 )
 
 // Deprecated: Use standard time.Time instead

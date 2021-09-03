@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
 	"net/url"
 )
 

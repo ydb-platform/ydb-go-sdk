@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
 	"os"
 	"strconv"
 	"text/tabwriter"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 )
 
 func doList(

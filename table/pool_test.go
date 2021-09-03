@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Table_V1"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
 	"google.golang.org/protobuf/proto"
 	"math/rand"
 	"path"
@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil/timetest"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil/timetest"
 )
 
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
