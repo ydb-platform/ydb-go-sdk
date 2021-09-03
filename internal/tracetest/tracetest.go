@@ -2,9 +2,10 @@ package tracetest
 
 import (
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/traceutil"
 	"reflect"
 	"testing"
+
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/traceutil"
 )
 
 // TestCompose is a generic function for testing trace composing.

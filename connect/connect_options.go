@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/auth/iam"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/auth/iam"
 )
 
 type ConnectOption func(client *Connection) error

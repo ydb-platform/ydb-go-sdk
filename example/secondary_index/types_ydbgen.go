@@ -5,8 +5,8 @@ package main
 import (
 	"strconv"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 )
 
 var (
@@ -224,4 +224,3 @@ func (ss SeriesList) ListValue() ydb.Value {
 	}
 	return list0
 }
-

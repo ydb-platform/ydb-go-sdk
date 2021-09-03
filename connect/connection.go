@@ -6,8 +6,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/scheme"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/scheme"
 )
 
 type Connection struct {

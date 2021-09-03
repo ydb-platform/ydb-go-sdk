@@ -11,13 +11,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
 )
 
 const GeneratedFileSuffix = "_ydbgen"
 
 var (
-	sdkImportPath = "github.com/YandexDatabase/ydb-go-sdk/v2"
+	sdkImportPath = "github.com/YandexDatabase/ydb-go-sdk/v3"
 
 	deps = []dep{
 		{

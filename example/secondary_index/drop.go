@@ -4,7 +4,7 @@ import (
 	"context"
 	"path"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 )
 
 func doDrop(

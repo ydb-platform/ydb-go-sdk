@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/YandexDatabase/ydb-go-sdk/v2/example/internal/cli"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/example/internal/cli"
 )
 
 func main() {
