@@ -17,10 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal/traceutil"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/traceutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
 )
 
 // Interface checks.

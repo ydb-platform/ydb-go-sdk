@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
 	"google.golang.org/protobuf/proto"
 	"sync"
 	"sync/atomic"
@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
 )
 
 type ClusterBuilder struct {

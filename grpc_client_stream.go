@@ -4,11 +4,11 @@ import (
 	"context"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Issue"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
 )
 
 type grpcClientStream struct {

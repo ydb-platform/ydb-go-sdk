@@ -6,7 +6,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
-	ydb "github.com/YandexDatabase/ydb-go-sdk/v2"
+	ydb "github.com/YandexDatabase/ydb-go-sdk/v3"
 )
 
 type EntryType uint

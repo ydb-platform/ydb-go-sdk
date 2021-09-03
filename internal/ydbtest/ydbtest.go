@@ -20,7 +20,7 @@ import (
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Discovery"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
 )
 
 type Handler func(ctx context.Context, req RequestParser) (res interface{}, err error)

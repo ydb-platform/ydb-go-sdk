@@ -17,8 +17,8 @@ import (
 
 	"github.com/golang-jwt/jwt"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/timeutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
 )
 
 // Default client parameters.

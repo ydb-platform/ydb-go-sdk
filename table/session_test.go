@@ -14,9 +14,9 @@ import (
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/testutil"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
 )
 
 func TestSessionKeepAlive(t *testing.T) {
@@ -274,7 +274,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableBeginTransaction,
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				s := &Session{
-					c: c,
+					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.BeginTransaction(ctx, TxSettings())
@@ -286,7 +286,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				tx := &Transaction{
 					s: &Session{
-						c: c,
+						c:            c,
 						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
 				}
@@ -299,7 +299,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c Client) {
 				tx := &Transaction{
 					s: &Session{
-						c: c,
+						c:            c,
 						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
 				}

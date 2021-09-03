@@ -20,8 +20,8 @@ func TestGenerator_importDeps(t *testing.T) {
 		`import (
 	"strconv"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 )
 
 var (

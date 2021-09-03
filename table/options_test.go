@@ -8,8 +8,8 @@ import (
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/YandexDatabase/ydb-go-sdk/v2"
-	"github.com/YandexDatabase/ydb-go-sdk/v2/internal"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
 )
 
 func TestSessionOptionsProfile(t *testing.T) {

@@ -2,7 +2,7 @@
 
 > YDB API client written in Go.
 
-[godoc](https://godoc.org/github.com/YandexDatabase/ydb-go-sdk/v2/)
+[godoc](https://godoc.org/github.com/YandexDatabase/ydb-go-sdk/v3/)
 
 ## Overview
 
@@ -15,7 +15,7 @@ Requires Go 1.13 or later.
 ## Install
 
 ```
-go get -u github.com/YandexDatabase/ydb-go-sdk/v2
+go get -u github.com/YandexDatabase/ydb-go-sdk/v3
 ```
 
 ## Usage
@@ -150,7 +150,7 @@ passing values to prepare query. There is an **experimental** tool named
 #### Install ydbgen
 
 ```
-go get -u github.com/YandexDatabase/ydb-go-sdk/v2/cmd/ydbgen
+go get -u github.com/YandexDatabase/ydb-go-sdk/v3/cmd/ydbgen
 ```
 
 
@@ -274,7 +274,7 @@ There is special package called `ydb/opt` for this purposes:
 ```go
 package main
 
-import "github.com/YandexDatabase/ydb-go-sdk/v2/opt"
+import "github.com/YandexDatabase/ydb-go-sdk/v3/opt"
 
 //go:generate ydbgen
 
