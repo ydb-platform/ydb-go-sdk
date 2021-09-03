@@ -3,6 +3,7 @@ package ydbtest_test
 import (
 	"context"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/traceutil"
 	"log"
 	"net"
 	"testing"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/traceutil"
 	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/ydbtest"
 	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 )

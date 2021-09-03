@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/traceutil"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/grpc"
 	"io"
@@ -18,7 +19,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/traceutil"
 	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
 )

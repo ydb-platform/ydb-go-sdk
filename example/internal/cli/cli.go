@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/traceutil"
 	"log"
 	"os"
 	"os/signal"
@@ -12,9 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
 	"github.com/YandexDatabase/ydb-go-sdk/v3/connect"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/traceutil"
 	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
 )
 
