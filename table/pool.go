@@ -628,7 +628,7 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 func (p *SessionPool) Stats() SessionPoolStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	idleCount, readyCount, waitQCount, indexCount := 0, 0, 0, 0
+	idleCount, waitQCount, indexCount := 0, 0, 0
 	if p.idle != nil {
 		idleCount = p.idle.Len()
 	}
@@ -640,7 +640,6 @@ func (p *SessionPool) Stats() SessionPoolStats {
 	}
 	return SessionPoolStats{
 		Idle:             idleCount,
-		Ready:            readyCount,
 		Index:            indexCount,
 		WaitQ:            waitQCount,
 		CreateInProgress: p.createInProgress,
@@ -1087,9 +1086,7 @@ func panicLocked(mu sync.Locker, message string) {
 }
 
 type SessionPoolStats struct {
-	Idle int
-	// Deprecated: always zero
-	Ready            int
+	Idle             int
 	Index            int
 	WaitQ            int
 	MinSize          int
