@@ -18,6 +18,9 @@ type Cluster interface {
 	// Cluster may be put into code-generated client constructor as is.
 	grpc.ClientConnInterface
 
+	// Stats provide getting connections stats
+	Stats(it func(Endpoint, ConnStats))
+
 	// Close clears resources and close all connections to YDB
 	Close() error
 }

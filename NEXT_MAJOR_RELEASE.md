@@ -19,3 +19,4 @@
 - [ ] Extract experimental package to neighbour project as plugin over ydb-go-sdk
 - [ ] Refactoring Trace API: exclude duplicates of data from closure Trace functions
 - [x] Move traceutil from internal to root
+- [X] Drop ReadConnStats() public method. Use Cluster.Stats() instead

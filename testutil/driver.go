@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
@@ -326,41 +325,6 @@ func (s *ClientStream) RecvMsg(m interface{}) error {
 		return ErrNotImplemented
 	}
 	return s.OnRecvMsg(m)
-}
-
-type Driver struct {
-	OnCall       func(ctx context.Context, code MethodCode, req, res interface{}) error
-	OnStreamRead func(ctx context.Context, code MethodCode, req, res interface{}, process func(error)) error
-	OnClose      func() error
-}
-
-func (d *Driver) Call(ctx context.Context, op ydb.Operation) (ydb.CallInfo, error) {
-	if d.OnCall == nil {
-		return nil, ErrNotImplemented
-	}
-	method, req, res, _ := internal.Unwrap(op)
-	code := grpcMethodToCode[Method(method)]
-
-	// NOTE: req and res may be converted to testutil inner structs, which are
-	// mirrors of grpc api envelopes.
-	return nil, d.OnCall(ctx, code, req, res)
-}
-
-func (d *Driver) StreamRead(ctx context.Context, op ydb.StreamOperation) (ydb.CallInfo, error) {
-	if d.OnStreamRead == nil {
-		return nil, ErrNotImplemented
-	}
-	method, req, res, processor := internal.UnwrapStreamOperation(op)
-	code := grpcMethodToCode[Method(method)]
-
-	return nil, d.OnStreamRead(ctx, code, req, res, processor)
-}
-
-func (d *Driver) Close() error {
-	if d.OnClose == nil {
-		return ErrNotImplemented
-	}
-	return d.OnClose()
 }
 
 func lastSegment(m string) string {
