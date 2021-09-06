@@ -1,3 +1,6 @@
+## 2.5.6
+* Supported nil and time conventions for scanner
+
 ## 2.5.5
 * Reverted adds async sessionGet and opDo into table.Retry.
 * Added sessionClose() func into SessionProvider interface.

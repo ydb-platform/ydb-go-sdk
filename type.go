@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 )
@@ -152,65 +153,20 @@ type RawScanner interface {
 	Uint64() (v uint64)
 	Float() (v float32)
 	Double() (v float64)
-	Date() (v uint32)
-	Datetime() (v uint32)
-	Timestamp() (v uint64)
-	Interval() (v int64)
-	TzDate() (v string)
-	TzDatetime() (v string)
-	TzTimestamp() (v string)
-	String() (v []byte)
+	Date() (v time.Time)
+	Datetime() (v time.Time)
+	Timestamp() (v time.Time)
+	Interval() (v time.Duration)
+	TzDate() (v time.Time)
+	TzDatetime() (v time.Time)
+	TzTimestamp() (v time.Time)
+	String() (v string)
 	UTF8() (v string)
-	YSON() (v string)
-	JSON() (v string)
+	YSON() (v []byte)
+	JSON() (v []byte)
 	UUID() (v [16]byte)
-	JSONDocument() (v string)
+	JSONDocument() (v []byte)
 	DyNumber() (v string)
-	OBool() (v bool)
-	OInt8() (v int8)
-	OUint8() (v uint8)
-	OInt16() (v int16)
-	OUint16() (v uint16)
-	OInt32() (v int32)
-	OUint32() (v uint32)
-	OInt64() (v int64)
-	OUint64() (v uint64)
-	OFloat() (v float32)
-	ODouble() (v float64)
-	ODate() (v uint32)
-	ODatetime() (v uint32)
-	OTimestamp() (v uint64)
-	OInterval() (v int64)
-	OTzDate() (v string)
-	OTzDatetime() (v string)
-	OTzTimestamp() (v string)
-	OString() (v []byte)
-	OUTF8() (v string)
-	OYSON() (v string)
-	OJSON() (v string)
-	OUUID() (v [16]byte)
-	OJSONDocument() (v string)
-	ODyNumber() (v string)
-
-	// Any returns any pritmitive value.
-	// Currently it may return one of this types:
-	//
-	//   bool
-	//   int8
-	//   uint8
-	//   int16
-	//   uint16
-	//   int32
-	//   uint32
-	//   int64
-	//   uint64
-	//   float32
-	//   float64
-	//   []byte
-	//   string
-	//   [16]byte
-	//
-	Any() interface{}
 	Value() Value
 
 	// ListIn interprets current item under scan as a ydb's list.
@@ -284,4 +240,8 @@ type RawScanner interface {
 
 	// Unwrap unwraps current item under scan interpreting it as Optional<T> type.
 	Unwrap()
+	IsNull() bool
+	IsOptional() bool
+	IsDecimal() bool
+	Err() error
 }
