@@ -7,7 +7,7 @@ import (
 )
 
 // New connects to database and return database connection
-func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *Connection, err error) {
+func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connection, err error) {
 	c = &Connection{
 		table:  newTableWrapper(ctx),
 		scheme: newSchemeWrapper(ctx),

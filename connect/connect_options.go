@@ -6,21 +6,21 @@ import (
 	"github.com/YandexDatabase/ydb-go-sdk/v3"
 )
 
-type ConnectOption func(client *Connection) error
+type Option func(client *Connection) error
 
-func WithAccessTokenCredentials(accessToken string) ConnectOption {
+func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
 		ydb.NewAuthTokenCredentials(accessToken, "connect.WithAccessTokenCredentials(accessToken)"), // hide access token for logs
 	)
 }
 
-func WithAnonymousCredentials() ConnectOption {
+func WithAnonymousCredentials() Option {
 	return WithCredentials(
 		ydb.NewAnonymousCredentials("connect.WithAnonymousCredentials()"),
 	)
 }
 
-func WithCreateCredentialsFunc(createCredentials func() (ydb.Credentials, error)) ConnectOption {
+func WithCreateCredentialsFunc(createCredentials func() (ydb.Credentials, error)) Option {
 	return func(c *Connection) error {
 		if c.driverConfig == nil {
 			c.driverConfig = &ydb.DriverConfig{}
@@ -34,20 +34,20 @@ func WithCreateCredentialsFunc(createCredentials func() (ydb.Credentials, error)
 	}
 }
 
-func WithCredentials(credentials ydb.Credentials) ConnectOption {
+func WithCredentials(credentials ydb.Credentials) Option {
 	return WithCreateCredentialsFunc(func() (ydb.Credentials, error) {
 		return credentials, nil
 	})
 }
 
-func WithDriverConfig(config *ydb.DriverConfig) ConnectOption {
+func WithDriverConfig(config *ydb.DriverConfig) Option {
 	return func(c *Connection) error {
 		c.driverConfig = config
 		return nil
 	}
 }
 
-func WithDiscoveryInterval(discoveryInterval time.Duration) ConnectOption {
+func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(c *Connection) error {
 		if c.driverConfig == nil {
 			c.driverConfig = &ydb.DriverConfig{}
@@ -57,49 +57,49 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) ConnectOption {
 	}
 }
 
-func WithSessionPoolSizeLimit(sizeLimit int) ConnectOption {
+func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(c *Connection) error {
 		c.table.sessionPool.SizeLimit = sizeLimit
 		return nil
 	}
 }
 
-func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) ConnectOption {
+func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(c *Connection) error {
 		c.table.sessionPool.KeepAliveMinSize = keepAliveMinSize
 		return nil
 	}
 }
 
-func WithSessionPoolIdleThreshold(idleThreshold time.Duration) ConnectOption {
+func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(c *Connection) error {
 		c.table.sessionPool.IdleThreshold = idleThreshold
 		return nil
 	}
 }
 
-func WithSessionPoolBusyCheckInterval(busyCheckInterval time.Duration) ConnectOption {
+func WithSessionPoolBusyCheckInterval(busyCheckInterval time.Duration) Option {
 	return func(c *Connection) error {
 		c.table.sessionPool.BusyCheckInterval = busyCheckInterval
 		return nil
 	}
 }
 
-func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) ConnectOption {
+func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(c *Connection) error {
 		c.table.sessionPool.KeepAliveTimeout = keepAliveTimeout
 		return nil
 	}
 }
 
-func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) ConnectOption {
+func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(c *Connection) error {
 		c.table.sessionPool.CreateSessionTimeout = createSessionTimeout
 		return nil
 	}
 }
 
-func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) ConnectOption {
+func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(c *Connection) error {
 		c.table.sessionPool.DeleteTimeout = deleteTimeout
 		return nil
