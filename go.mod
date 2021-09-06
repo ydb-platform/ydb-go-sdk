@@ -3,7 +3,7 @@ module github.com/YandexDatabase/ydb-go-sdk/v3
 go 1.13
 
 require (
-	github.com/YandexDatabase/ydb-go-genproto v0.0.0-20210819161110-9d8e262e3f07
+	github.com/YandexDatabase/ydb-go-genproto v0.0.0-20210906061342-0c70eaeb512c
 	github.com/golang-jwt/jwt v3.2.1+incompatible
 	github.com/google/go-cmp v0.5.6
 	github.com/stretchr/testify v1.7.0
