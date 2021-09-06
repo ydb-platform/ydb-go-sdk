@@ -11,6 +11,7 @@
       which will be use driver as `grpc.ClientConnInterface`  provider.
 - [ ] Delete deprecated Driver interface
 - [ ] Remove or hide (do private) deprecated API for new `scanner`.
+- [ ] Delete deprecated ready statistics from session pool
 - [ ] Hide (do private) entity `table.Client` or `table.SessionPool` because it most difficultly for SDK users
 - [ ] Extract auth package to neighbour project(-s) for isolation ydb-go-sdk from unnecessary dependencies
 - [x] Extract coordination package to neighbour project as plugin over ydb-go-sdk
