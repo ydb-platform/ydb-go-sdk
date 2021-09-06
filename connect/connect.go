@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/auth"
 )
 
 // New connects to database and return database connection
@@ -24,10 +23,7 @@ func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *C
 	}
 	c.driverConfig.Database = params.Database()
 	if c.driverConfig.Credentials == nil {
-		c.driverConfig.Credentials, err = auth.FromEnviron(ctx)
-		if err != nil {
-			return nil, err
-		}
+		return nil, ydb.ErrCredentialsNoCredentials
 	}
 	var tlsConfig *tls.Config
 	if params.UseTLS() {

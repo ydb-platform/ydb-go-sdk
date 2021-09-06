@@ -1,12 +1,9 @@
 package connect
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/auth/iam"
 )
 
 type ConnectOption func(client *Connection) error
@@ -23,30 +20,7 @@ func WithAnonymousCredentials() ConnectOption {
 	)
 }
 
-func WithMetadataCredentials(ctx context.Context) ConnectOption {
-	return WithCredentials(
-		iam.InstanceServiceAccount(
-			ydb.WithCredentialsSourceInfo(ctx, "connect.WithMetadataCredentials(ctx)"),
-		),
-	)
-}
-
-func WithServiceAccountKeyFileCredentials(serviceAccountKeyFile string) ConnectOption {
-	return withCredentials(func() (ydb.Credentials, error) {
-		credentials, err := iam.NewClient(
-			iam.WithServiceFile(serviceAccountKeyFile),
-			iam.WithDefaultEndpoint(),
-			iam.WithSystemCertPool(),
-			iam.WithSourceInfo("connect.WithServiceAccountKeyFileCredentials(\""+serviceAccountKeyFile+"\")"),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("configure credentials error: %w", err)
-		}
-		return credentials, nil
-	})
-}
-
-func withCredentials(createCredentials func() (ydb.Credentials, error)) ConnectOption {
+func WithCreateCredentialsFunc(createCredentials func() (ydb.Credentials, error)) ConnectOption {
 	return func(c *Connection) error {
 		if c.driverConfig == nil {
 			c.driverConfig = &ydb.DriverConfig{}
@@ -61,7 +35,7 @@ func withCredentials(createCredentials func() (ydb.Credentials, error)) ConnectO
 }
 
 func WithCredentials(credentials ydb.Credentials) ConnectOption {
-	return withCredentials(func() (ydb.Credentials, error) {
+	return WithCreateCredentialsFunc(func() (ydb.Credentials, error) {
 		return credentials, nil
 	})
 }
