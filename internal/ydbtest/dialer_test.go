@@ -3,7 +3,6 @@ package ydbtest_test
 import (
 	"context"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/traceutil"
 	"log"
 	"net"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/YandexDatabase/ydb-go-sdk/v3"
 	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/ydbtest"
 	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
+	"github.com/YandexDatabase/ydb-go-sdk/v3/traceutil"
 )
 
 func TestClusterTracking(t *testing.T) {
@@ -29,7 +29,9 @@ func TestClusterTracking(t *testing.T) {
 		T: t,
 	}
 	balancer := db.StartBalancer()
-	defer balancer.Close()
+	defer func() {
+		_ = balancer.Close()
+	}()
 
 	endpoint := db.StartEndpoint()
 	defer endpoint.Close()
@@ -80,7 +82,9 @@ func TestClusterTracking(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
+	defer func() {
+		_ = d.Close()
+	}()
 
 	// At this point dialer reached balancer, received endpoints list and is
 	// trying to connect to them (and is not able until we put ticket into the

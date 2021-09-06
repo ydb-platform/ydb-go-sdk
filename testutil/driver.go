@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"reflect"
+	"strings"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"reflect"
-	"strings"
+
+	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/YandexDatabase/ydb-go-sdk/v3"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -152,6 +154,7 @@ func getField(name string, src, dst interface{}) bool {
 type Cluster struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	onStats     func()
 	onClose     func() error
 }
 
@@ -176,11 +179,14 @@ func (c *Cluster) NewStream(ctx context.Context, desc *grpc.StreamDesc, method s
 	return c.onNewStream(ctx, desc, method, opts...)
 }
 
-func (c *Cluster) Get(ctx context.Context) (conn ydb.ClientConnInterface, err error) {
+func (c *Cluster) Get(context.Context) (conn ydb.ClientConnInterface, err error) {
 	return &clientConn{
 		onInvoke:    c.onInvoke,
 		onNewStream: c.onNewStream,
 	}, nil
+}
+
+func (c *Cluster) Stats(func(ydb.Endpoint, ydb.ConnStats)) {
 }
 
 func (c *Cluster) Close() error {
