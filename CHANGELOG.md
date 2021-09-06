@@ -1,5 +1,10 @@
+## 2.5.5
+* Reverted adds async sessionGet and opDo into table.Retry.
+* Added sessionClose() func into SessionProvider interface.
+* Implemented async session closing
+
 ## 2.5.4
-* Remove ready queue in session pool
+* Remove ready queue from session pool
 
 ## 2.5.3
 * Fix put session into pool

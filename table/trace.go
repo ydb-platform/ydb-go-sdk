@@ -260,7 +260,21 @@ type (
 		OnContextDone                 func()
 		OnPutSession                  func(session *Session, err error)
 	}
+
+	createSessionTraceContextKey struct{}
 )
+
+func withCreateSessionTrace(ctx context.Context, trace createSessionTrace) context.Context {
+	return context.WithValue(ctx,
+		createSessionTraceContextKey{},
+		contextCreateSessionTrace(ctx).Compose(trace),
+	)
+}
+
+func contextCreateSessionTrace(ctx context.Context) createSessionTrace {
+	t, _ := ctx.Value(createSessionTraceContextKey{}).(createSessionTrace)
+	return t
+}
 
 type createSessionResult struct {
 	s   *Session

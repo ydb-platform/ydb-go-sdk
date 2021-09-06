@@ -157,9 +157,11 @@ func TestRetryerBadSession(t *testing.T) {
 		} else {
 			seen[s] = true
 		}
+		s.closeMux.Lock()
 		if !s.closed {
 			t.Errorf("bad session was not closed")
 		}
+		s.closeMux.Unlock()
 	}
 }
 
@@ -429,8 +431,12 @@ func TestRetryContextDeadline(t *testing.T) {
 						},
 					),
 					OperationFunc(func(ctx context.Context, _ *Session) error {
-						time.Sleep(sleep)
-						return errs[random.Intn(len(errs))]
+						select {
+						case <-ctx.Done():
+							return ctx.Err()
+						case <-time.After(sleep):
+							return errs[random.Intn(len(errs))]
+						}
 					}),
 				)
 			})

@@ -41,19 +41,24 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 				time.Duration(rand.Float32()+float32(time.Second)),
 			)
 			defer cancel()
-			s, err := p.createSession(ctx, createSessionTrace{
-				OnStartSelect: func() {
-					runtime.Gosched() // for force run create session goroutine
-				},
-				OnReadResult: func(r createSessionResult) {
-					if r.s == nil && r.err == nil {
-						t.Fatalf("unexpected result: <%v, %vz>", r.s, r.err)
-					}
-				},
-				OnPutSession: func(s *Session, err error) {
-					fmt.Println("put session", s, err)
-				},
-			})
+			s, err := p.createSession(
+				withCreateSessionTrace(
+					ctx,
+					createSessionTrace{
+						OnStartSelect: func() {
+							runtime.Gosched() // for force run create session goroutine
+						},
+						OnReadResult: func(r createSessionResult) {
+							if r.s == nil && r.err == nil {
+								t.Fatalf("unexpected result: <%v, %vz>", r.s, r.err)
+							}
+						},
+						OnPutSession: func(s *Session, err error) {
+							fmt.Println("put session", s, err)
+						},
+					},
+				),
+			)
 			if s == nil && err == nil {
 				t.Fatalf("unexpected result: <%v, %vz>", s, err)
 			}
@@ -1088,9 +1093,9 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	assertFilled := func(want bool) {
 		const timeout = time.Millisecond
 		select {
-		case <-cond:
+		case e := <-cond:
 			if !want {
-				t.Fatalf("unexpected cond event")
+				t.Fatalf("unexpected cond event: %v", e)
 			}
 		case <-time.After(timeout):
 			if want {
