@@ -48,6 +48,7 @@ message GetTaskResult {
     YandexQuery.QueryContent.QueryType query_type = 14;
     string scope = 15;
     YandexQuery.ExecuteMode execute_mode = 16;
+    YandexQuery.StateLoadMode state_load_mode = 17;
 }
 
 message GetTaskResponse {
