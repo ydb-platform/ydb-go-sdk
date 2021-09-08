@@ -1,6 +1,3 @@
-## 2.7.0
-* Delete NextStreamSet and HasNextSet
-
 ## 2.6.0
 * Exported `SessionProvider.CloseSession` func
 * Implements by default async closing session and putting busy

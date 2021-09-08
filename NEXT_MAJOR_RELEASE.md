@@ -20,3 +20,4 @@
 - [ ] Refactoring Trace API: exclude duplicates of data from closure Trace functions
 - [x] Move traceutil from internal to root
 - [X] Drop ReadConnStats() public method. Use Cluster.Stats() instead
+- [x] Drop deprecated NextStreamSet (merged logic into NextSet)
