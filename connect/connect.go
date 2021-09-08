@@ -13,7 +13,7 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connecti
 		scheme: newSchemeWrapper(ctx),
 	}
 	for _, opt := range opts {
-		err = opt(c)
+		err = opt(ctx, c)
 		if err != nil {
 			return nil, err
 		}
