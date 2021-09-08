@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -225,18 +224,11 @@ func (p *SessionPool) createSession(ctx context.Context) (session *Session, err 
 				panic("ydb: abnormal result of pool.createSession()")
 			}
 			if session != nil {
-				fmt.Println("defer: store session to index: before: ", len(p.index))
 				p.index[session] = sessionInfo{}
-				fmt.Println("defer: store session to index: after: ", len(p.index))
 			}
-			if err != nil {
-				fmt.Println("defer err:", err)
-			}
-			fmt.Println("defer:", p.createInProgress, len(p.index), p.limit, enoughSpace)
 			p.mu.Unlock()
 		}()
 	}
-	fmt.Println("createSession: ", p.createInProgress, len(p.index), p.limit, enoughSpace)
 	p.mu.Unlock()
 	trace.onCheckEnoughSpace(enoughSpace)
 
@@ -279,9 +271,7 @@ func (p *SessionPool) createSession(ctx context.Context) (session *Session, err 
 				return
 			}
 
-			fmt.Println("createSession -> session.onClose() : delete session from index: before: ", len(p.index))
 			delete(p.index, r.s)
-			fmt.Println("createSession -> session.onClose() : delete session from index: after: ", len(p.index))
 			p.notify(nil)
 
 			if info.idle != nil {
@@ -496,9 +486,7 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	if p.busyCheck == nil {
 		panicLocked(&p.mu, "ydb: table: PutBusy() session into the pool without busy checker")
 	}
-	fmt.Println("PutBusy delete session from index: before: ", len(p.index))
 	delete(p.index, s)
-	fmt.Println("PutBusy delete session from index: after: ", len(p.index))
 	p.notify(nil)
 
 	putBusyDone := sessionPoolTraceOnPutBusy(ctx, p.Trace, ctx, s)

@@ -16,7 +16,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil/timetest"
@@ -32,6 +32,9 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 			Cluster: testutil.NewCluster(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
 						testutil.TableDeleteSession: okHandler,
 					},
 				),
@@ -1687,30 +1690,13 @@ type StubBuilder struct {
 func (s *StubBuilder) CreateSession(ctx context.Context) (session *Session, err error) {
 	defer func() {
 		s.mu.Lock()
-		if s.T != nil {
-			s.T.Log("defer:", session != nil, err)
-		}
-		if session == nil {
-			if s.T != nil {
-				s.T.Log("defer: append session to actual discarded")
-			}
-		}
 		if session != nil {
 			s.actual++
-			if s.T != nil {
-				s.T.Log("defer: append session to actual")
-			}
 		}
 		s.mu.Unlock()
 	}()
 	s.mu.Lock()
-	if s.T != nil {
-		s.T.Log(s.actual, s.Limit)
-	}
 	if s.Limit > 0 && s.actual == s.Limit {
-		if s.T != nil {
-			s.T.Errorf("create session limit overflow")
-		}
 		s.mu.Unlock()
 		return nil, fmt.Errorf("stub builder: limit overflow")
 	}
@@ -1720,12 +1706,7 @@ func (s *StubBuilder) CreateSession(ctx context.Context) (session *Session, err 
 		return f(ctx)
 	}
 
-	conn, err := s.Cluster.Get(ctx)
-	if err != nil {
-		return
-	}
-
-	response, err := Ydb_Table_V1.NewTableServiceClient(conn).CreateSession(ctx, &Ydb_Table.CreateSessionRequest{})
+	response, err := Ydb_Table_V1.NewTableServiceClient(s.Cluster).CreateSession(ctx, &Ydb_Table.CreateSessionRequest{})
 	if err != nil {
 		return
 	}
