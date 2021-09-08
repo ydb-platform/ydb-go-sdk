@@ -663,7 +663,7 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc TableOptionsDe
 //
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamReadTable() call; that is, the time until returned result is closed
-// via Close() call or fully drained by sequential NextStreamSet() calls.
+// via Close() call or fully drained by sequential NextSet() calls.
 func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...ReadTableOption) (_ *Result, err error) {
 	var (
 		request = Ydb_Table.ReadTableRequest{
@@ -725,7 +725,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 //
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamExecuteScanQuery() call; that is, the time until returned result is closed
-// via Close() call or fully drained by sequential NextStreamSet() calls.
+// via Close() call or fully drained by sequential NextSet() calls.
 func (s *Session) StreamExecuteScanQuery(
 	ctx context.Context,
 	query string,

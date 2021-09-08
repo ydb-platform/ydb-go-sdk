@@ -1,6 +1,7 @@
 package table
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -39,7 +40,7 @@ func TestResultAny(t *testing.T) {
 				),
 			)
 			var i int
-			for res.NextSet() {
+			for res.NextSet(context.Background()) {
 				for res.NextRow() {
 					res.NextItem()
 					if res.IsOptional() {
@@ -92,7 +93,7 @@ func TestResultOUint32(t *testing.T) {
 				),
 			)
 			var i int
-			for res.NextSet() {
+			for res.NextSet(context.Background()) {
 				for res.NextRow() {
 					res.NextItem()
 					act := res.OUint32()
