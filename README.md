@@ -78,7 +78,7 @@ var (
     id    int32
     myStr *string //optional value
 )
-for res.NextSet("id", "mystr") {
+for res.NextSet(ctx, "id", "mystr") {
     for res.NextRow() {
         // Suppose our "users" table has two rows: id and age.
         // Thus, current row will contain two appropriate items with

@@ -220,7 +220,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	if err != nil {
 		return nil, err
 	}
-	res.NextSet()
+	res.NextSet(ctx)
 	return &rows{res: res}, nil
 }
 
@@ -229,7 +229,7 @@ func (c *conn) scanQueryContext(ctx context.Context, query string, args []driver
 	if err != nil {
 		return nil, err
 	}
-	res.NextStreamSet(ctx)
+	res.NextSet(ctx)
 	return &stream{ctx: ctx, res: res}, res.Err()
 }
 
@@ -525,7 +525,7 @@ func (s *stmt) queryContext(ctx context.Context, args []driver.NamedValue) (driv
 	if err != nil {
 		return nil, err
 	}
-	res.NextSet()
+	res.NextSet(ctx)
 	return &rows{res: res}, nil
 }
 
@@ -534,7 +534,7 @@ func (s *stmt) scanQueryContext(ctx context.Context, args []driver.NamedValue) (
 	if err != nil {
 		return nil, err
 	}
-	res.NextStreamSet(ctx)
+	res.NextSet(ctx)
 	return &stream{ctx: ctx, res: res}, res.Err()
 }
 
@@ -626,14 +626,14 @@ func (r *rows) Columns() []string {
 }
 
 func (r *rows) NextResultSet() error {
-	if !r.res.NextSet() {
+	if !r.res.NextSet(context.Background()) {
 		return io.EOF
 	}
 	return nil
 }
 
 func (r *rows) HasNextResultSet() bool {
-	return r.res.HasNextSet()
+	return r.res.NextSet(context.Background())
 }
 
 func (r *rows) Next(dst []driver.Value) error {
@@ -688,7 +688,7 @@ func (r *stream) Columns() []string {
 
 func (r *stream) Next(dst []driver.Value) error {
 	if !r.res.HasNextRow() {
-		if !r.res.NextStreamSet(r.ctx) {
+		if !r.res.NextSet(r.ctx) {
 			err := r.res.Err()
 			if err != nil {
 				return err

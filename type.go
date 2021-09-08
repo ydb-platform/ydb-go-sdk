@@ -131,7 +131,7 @@ type RawScanner interface {
 	// NextItem selects next item to parse in the current row.
 	// It returns false if there are no more items in the row.
 	//
-	// Note that NextItem() differs from NextRow() and NextSet() – if it return
+	// Note that NextItem() differs from NextRow and NextSet – if it return
 	// false it fails the Result such that no further operations may be processed.
 	// That is, res.Err() becomes non-nil.
 	NextItem() (ok bool)
