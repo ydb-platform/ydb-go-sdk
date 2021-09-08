@@ -233,25 +233,15 @@ func TestSessionPoolBusyChecker(t *testing.T) {
 	<-timer.Created
 	mustPutSession(t, p, s2)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
 	{
-		act, err := p.Get(ctx)
-		if err != nil {
-			t.Fatalf("unexpected Get() error: %v", err)
-		}
+		act := mustGetSession(t, p)
 		if act != s2 {
 			t.Fatalf("unexpected session")
 		}
 	}
 	{
 		<-keepalive
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		act, err := p.Get(ctx)
-		if err != nil {
-			t.Fatalf("unexpected Get() error: %v", err)
-		}
+		act := mustGetSession(t, p)
 		if act != s1 {
 			t.Fatalf("unexpected session")
 		}
