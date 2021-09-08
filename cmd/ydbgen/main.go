@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/ydbtypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ydbtypes"
 )
 
 func generate(pairs []pair, cfg cfg) error {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"math/rand"
@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	ydb "github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
@@ -158,9 +158,11 @@ func TestRetryerBadSession(t *testing.T) {
 		} else {
 			seen[s] = true
 		}
+		s.closeMux.Lock()
 		if !s.closed {
 			t.Errorf("bad session was not closed")
 		}
+		s.closeMux.Unlock()
 	}
 }
 
@@ -425,8 +427,12 @@ func TestRetryContextDeadline(t *testing.T) {
 						},
 					),
 					OperationFunc(func(ctx context.Context, _ *Session) error {
-						time.Sleep(sleep)
-						return errs[random.Intn(len(errs))]
+						select {
+						case <-ctx.Done():
+							return ctx.Err()
+						case <-time.After(sleep):
+							return errs[random.Intn(len(errs))]
+						}
 					}),
 				)
 			})

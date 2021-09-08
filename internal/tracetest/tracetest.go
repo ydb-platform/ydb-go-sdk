@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3/traceutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/traceutil"
 )
 
 func TestSingleTrace(t *testing.T, x interface{}, traceName string) {

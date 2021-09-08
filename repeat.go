@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
 )
 
 // repeater contains logic of repeating some task.

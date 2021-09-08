@@ -3,8 +3,8 @@ package internal
 import (
 	"google.golang.org/protobuf/proto"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Issue"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
 
 type Operation struct {

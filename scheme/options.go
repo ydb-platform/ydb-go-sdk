@@ -1,6 +1,6 @@
 package scheme
 
-import "github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
+import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 
 type permissionsDesc struct {
 	clear   bool

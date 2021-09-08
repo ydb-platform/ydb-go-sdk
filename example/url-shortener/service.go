@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"hash/fnv"
 	"net/http"
 	"os"
@@ -15,7 +15,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3/connect"
+	"github.com/ydb-platform/ydb-go-sdk/v3/connect"
 )
 
 const (

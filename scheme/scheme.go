@@ -2,11 +2,11 @@ package scheme
 
 import (
 	"context"
-	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Scheme_V1"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
-	ydb "github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 type EntryType uint

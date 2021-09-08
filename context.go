@@ -9,8 +9,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
 )
 
 type (

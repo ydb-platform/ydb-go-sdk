@@ -3,7 +3,7 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
-	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Discovery_V1"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"net"
 	"strconv"
 	"sync"

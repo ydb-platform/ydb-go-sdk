@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 // SessionProvider is the interface that holds session lifecycle logic.
@@ -13,13 +13,20 @@ type SessionProvider interface {
 	// Get returns alive idle session or creates new one.
 	Get(context.Context) (*Session, error)
 
-	// Put takes no longer needed session for reuse or deletion depending on
-	// implementation.
+	// Put takes no longer needed session for reuse or deletion depending
+	// on implementation.
+	// Put must be fast, if necessary must be async
 	Put(context.Context, *Session) (err error)
 
 	// PutBusy takes session with not yet completed operation inside.
 	// It gives full ownership of s to session provider.
+	// PutBusy must be fast, if necessary must be async
 	PutBusy(context.Context, *Session) (err error)
+
+	// CloseSession provides the most effective way of session closing
+	// instead of plain session.Close.
+	// CloseSession must be fast. If necessary, can be async.
+	CloseSession(ctx context.Context, s *Session) error
 }
 
 type SessionProviderFunc struct {
@@ -47,6 +54,10 @@ func (f SessionProviderFunc) PutBusy(ctx context.Context, s *Session) error {
 		return s.Close(ctx)
 	}
 	return f.OnPutBusy(ctx, s)
+}
+
+func (f SessionProviderFunc) CloseSession(ctx context.Context, s *Session) error {
+	return s.Close(ctx)
 }
 
 // SingleSession returns SessionProvider that uses only given session durting
@@ -112,59 +123,6 @@ func Retry(ctx context.Context, s SessionProvider, op Operation) error {
 }
 
 // Do calls op.Do until it return nil or not retriable error.
-func (r Retryer) sessionGet(ctx context.Context) (_ *Session, err error) {
-	if err = ctx.Err(); err != nil {
-		return nil, err // simple call saves a goroutine
-	}
-	type result struct {
-		s *Session
-		e error
-	}
-	res := make(chan result)
-	go func() {
-		defer close(res)
-		s, e := r.SessionProvider.Get(ctx)
-		if s == nil && e == nil {
-			panic("only one of pair <session, error> must be not nil")
-		}
-		select {
-		case res <- result{s: s, e: e}:
-		default:
-			if s != nil {
-				_ = r.SessionProvider.Put(ctx, s)
-			}
-		}
-	}()
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case r, ok := <-res:
-		if !ok {
-			return nil, context.DeadlineExceeded
-		}
-		return r.s, r.e
-	}
-}
-
-// Do calls op.Do until it return nil or not retriable error.
-func (r Retryer) opDo(ctx context.Context, op Operation, s *Session) (err error) {
-	if err = ctx.Err(); err != nil {
-		return err // simple call saves a goroutine
-	}
-	errs := make(chan error, 1)
-	go func() {
-		defer close(errs)
-		errs <- op.Do(ctx, s)
-	}()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err = <-errs:
-		return err
-	}
-}
-
-// Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 	retryTraceLoopDone := retryTraceOnLoop(ctx, r.Trace, ctx)
 	var (
@@ -183,10 +141,14 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+
 		default:
 			if s == nil {
 				var e error
-				s, e = r.sessionGet(ctx)
+				s, e = r.SessionProvider.Get(ctx)
+				if s == nil && e == nil {
+					panic("only one of pair <session, error> must be not nil")
+				}
 				if e != nil {
 					if err == nil {
 						// It is initial attempt to get a Session.
@@ -198,13 +160,15 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 					return
 				}
 			}
-			if err = r.opDo(ctx, op, s); err == nil {
+
+			if err = op.Do(ctx, s); err == nil {
 				return nil
 			}
+
 			m = r.RetryChecker.Check(err)
 			switch {
 			case m.MustDeleteSession():
-				defer s.Close(ydb.ContextWithoutDeadline(ctx))
+				_ = r.SessionProvider.CloseSession(ctx, s)
 				s = nil
 
 			case m.MustCheckSession():
@@ -263,5 +227,17 @@ func (s *singleSession) PutBusy(ctx context.Context, x *Session) error {
 	if !s.empty {
 		return errSessionOverflow
 	}
+	s.empty = true
+	return x.Close(ctx)
+}
+
+func (s *singleSession) CloseSession(ctx context.Context, x *Session) error {
+	if x != s.s {
+		return errUnexpectedSession
+	}
+	if !s.empty {
+		return errSessionOverflow
+	}
+	s.empty = true
 	return x.Close(ctx)
 }

@@ -1,8 +1,8 @@
 package result
 
 import (
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"testing"
 	"time"
 )
@@ -19,11 +19,11 @@ var (
 
 func (s *series) UnmarshalYDB(res ydb.RawScanner) error {
 	res.SeekItem("series_id")
-	s.id = res.OUint64()
+	s.id = res.Uint64()
 	res.SeekItem("title")
-	s.title = res.OUTF8()
+	s.title = res.UTF8()
 	res.SeekItem("release_date")
-	s.date = internal.UnmarshalDatetime(res.ODatetime())
+	s.date = res.Datetime()
 	return nil
 }
 

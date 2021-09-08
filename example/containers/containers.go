@@ -5,13 +5,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"log"
 	"text/template"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3/connect"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/example/internal/cli"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/connect"
+	"github.com/ydb-platform/ydb-go-sdk/v3/example/internal/cli"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 var query = template.Must(template.New("fill database").Parse(`
@@ -61,6 +61,9 @@ func (*exampleStruct) UnmarshalYDB(res ydb.RawScanner) error {
 	log.Printf("T: %s", res.Type())
 	for i, n := 0, res.StructIn(); i < n; i++ {
 		name := res.StructField(i)
+		if res.IsNull() {
+			continue
+		}
 		val := res.Int32()
 		log.Printf("(struct): %s: %d", name, val)
 	}

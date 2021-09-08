@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 func Reset(s *Scanner, set *Ydb.ResultSet, columnNames ...string) {
@@ -24,12 +24,12 @@ func Columns(s *Scanner, it func(name string, typ internal.T)) {
 }
 
 type Scanner struct {
-	set *Ydb.ResultSet
-	row *Ydb.Value
-
-	stack    scanStack
-	nextRow  int
-	nextItem int
+	set       *Ydb.ResultSet
+	row       *Ydb.Value
+	converter *rawConverter
+	stack     scanStack
+	nextRow   int
+	nextItem  int
 
 	setColumnIndex map[string]int
 
@@ -48,6 +48,9 @@ func (s *Scanner) reset(set *Ydb.ResultSet) {
 	s.columnIndexes = nil
 	s.defaultValueForOptional = true
 	s.stack.reset()
+	s.converter = &rawConverter{
+		Scanner: s,
+	}
 }
 
 func (s *Scanner) path() string {
@@ -174,6 +177,24 @@ func (s *Scanner) Err() error {
 	return s.err
 }
 
+// Any returns any primitive value.
+// Currently it may return one of this types:
+//
+//   bool
+//   int8
+//   uint8
+//   int16
+//   uint16
+//   int32
+//   uint32
+//   int64
+//   uint64
+//   float32
+//   float64
+//   []byte
+//   string
+//   [16]byte
+//
 func (s *Scanner) any() interface{} {
 	x := s.stack.current()
 	if s.err != nil || x.isEmpty() {
@@ -364,7 +385,7 @@ func (s *Scanner) unwrap() {
 		return
 	}
 
-	t := s.assertTypeOptional(s.stack.current().t)
+	t, _ := s.stack.currentType().(*Ydb.Type_OptionalType)
 	if t == nil {
 		return
 	}
@@ -886,7 +907,7 @@ func (s *Scanner) setDefaultValue(dst interface{}) {
 // use ydbgen to generate method UnmarshalYDB
 // see example containers
 func (s *Scanner) ScanRaw(row ydb.CustomScanner) error {
-	return row.UnmarshalYDB(s)
+	return row.UnmarshalYDB(s.converter)
 }
 
 // ScanWithDefaults scan with default type values.
@@ -937,9 +958,12 @@ func (s *Scanner) scan(values []interface{}) error {
 			return s.err
 		}
 	}
+	if s.nextItem != 0 {
+		panic("scan row failed: double scan per row")
+	}
 	for i, value := range values {
 		if s.columnIndexes == nil {
-			s.seekItemByID(s.nextItem + i)
+			s.seekItemByID(i)
 		} else {
 			s.seekItemByID(s.columnIndexes[i])
 		}

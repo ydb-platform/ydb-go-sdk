@@ -2,10 +2,10 @@ package ydb
 
 import (
 	"context"
-	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Discovery_V1"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Discovery"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 )
 
 type Endpoint struct {

@@ -11,7 +11,7 @@ import (
 
 	"google.golang.org/grpc/connectivity"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
 )
 
 const (

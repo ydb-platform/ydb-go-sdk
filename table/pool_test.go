@@ -3,21 +3,23 @@ package table
 import (
 	"context"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Table_V1"
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"google.golang.org/protobuf/proto"
 	"math/rand"
 	"path"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/timeutil/timetest"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil/timetest"
 )
 
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
@@ -46,19 +48,24 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 				time.Duration(rand.Float32()+float32(time.Second)),
 			)
 			defer cancel()
-			s, err := p.createSession(ctx, createSessionTrace{
-				OnStartSelect: func() {
-					runtime.Gosched() // for force run create session goroutine
-				},
-				OnReadResult: func(r createSessionResult) {
-					if r.s == nil && r.err == nil {
-						t.Fatalf("unexpected result: <%v, %vz>", r.s, r.err)
-					}
-				},
-				OnPutSession: func(s *Session, err error) {
-					fmt.Println("put session", s, err)
-				},
-			})
+			s, err := p.createSession(
+				withCreateSessionTrace(
+					ctx,
+					createSessionTrace{
+						OnStartSelect: func() {
+							runtime.Gosched() // for force run create session goroutine
+						},
+						OnReadResult: func(r createSessionResult) {
+							if r.s == nil && r.err == nil {
+								t.Fatalf("unexpected result: <%v, %vz>", r.s, r.err)
+							}
+						},
+						OnPutSession: func(s *Session, err error) {
+							fmt.Println("put session", s, err)
+						},
+					},
+				),
+			)
 			if s == nil && err == nil {
 				t.Fatalf("unexpected result: <%v, %v>", s, err)
 			}
@@ -433,11 +440,10 @@ func TestSessionPoolClose(t *testing.T) {
 	s3.OnClose(func() { closed3 = true })
 
 	mustPutSession(t, p, s1)
-	if err := p.PutBusy(context.Background(), s2); err != nil {
-		t.Fatal(err)
-	}
 
-	_ = p.Close(context.Background())
+	mustPutBusySession(t, p, s2)
+
+	mustClose(t, p)
 
 	if !closed1 {
 		t.Fatalf("session was not closed")
@@ -449,13 +455,34 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatalf("unexpected session close")
 	}
 
-	err := p.Put(context.Background(), s3)
-	if err != ErrSessionPoolClosed {
+	wg := sync.WaitGroup{}
+	if err := p.Put(
+		WithSessionPoolTrace(
+			context.Background(),
+			SessionPoolTrace{
+				OnPut: func(info SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolPutDoneInfo) {
+						wg.Done()
+					}
+				},
+				OnCloseSession: func(info SessionPoolCloseSessionStartInfo) func(doneInfo SessionPoolCloseSessionDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolCloseSessionDoneInfo) {
+						wg.Done()
+					}
+				},
+			},
+		),
+		s3,
+	); err != ErrSessionPoolClosed {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
 			err, ErrSessionPoolClosed,
 		)
 	}
+	wg.Wait()
+
 	if !closed3 {
 		t.Fatalf("session was not closed")
 	}
@@ -1212,7 +1239,6 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	keepAliveCnt := 0
 	allKeepAlive := make(chan int)
 	p := &SessionPool{
-		Trace: SessionPoolTrace{},
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 4,
@@ -1276,7 +1302,6 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 
 func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 	p := &SessionPool{
-		Trace: SessionPoolTrace{},
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 4,
@@ -1319,7 +1344,6 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 
 	retry := true
 	p := &SessionPool{
-		Trace: SessionPoolTrace{},
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
@@ -1380,31 +1404,55 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 // PutBusy session in the pool
 // session must be closed and error is returned
 func TestPutBusyAfterClosePool(t *testing.T) {
+	limit := 100000
 	p := &SessionPool{
-		Trace: SessionPoolTrace{},
 		Builder: &StubBuilder{
 			T:     t,
-			Limit: 1,
-			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.CreateSessionResult{}, nil
-				}})),
+			Limit: limit,
+			Cluster: testutil.NewCluster(
+				testutil.WithInvokeHandlers(
+					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
+						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+							r := &Ydb_Table.KeepAliveResult{
+								SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
+							}
+							return r, nil
+						},
+						testutil.TableDeleteSession: okHandler,
+					},
+				),
+			),
 		},
-		SizeLimit:              1,
+		SizeLimit:              limit,
 		IdleThreshold:          -1,
 		IdleKeepAliveThreshold: -1,
 	}
-	s := mustCreateSession(t, p)
-	closed := make(chan bool)
-	s.OnClose(func() {
-		close(closed)
-	})
-	_ = p.Close(context.Background())
-	err := p.PutBusy(context.Background(), s)
-	if err != ErrSessionPoolClosed {
-		t.Fatalf("unexpected error: %v; want %v", err, ErrSessionPoolClosed)
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < limit; i++ {
+		wg.Add(2)
+		s := mustCreateSession(t, p)
+		s.ID = strconv.Itoa(i)
+		s.OnClose(func() {
+			wg.Done()
+		})
+		t.Run(s.ID, func(t *testing.T) {
+			defer wg.Done()
+			err := p.PutBusy(context.Background(), s)
+			if err != nil && err != ErrSessionPoolClosed {
+				t.Fatalf("unexpected error: %v; want %v", err, ErrSessionPoolClosed)
+			}
+		})
 	}
-	<-closed
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = p.Close(context.Background())
+	}()
+	wg.Wait()
 }
 
 // create first session
@@ -1419,10 +1467,15 @@ func TestOverflowBusyCheck(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.CreateSessionResult{}, nil
-				}})),
+			Cluster: testutil.NewCluster(
+				testutil.WithInvokeHandlers(
+					testutil.InvokeHandlers{
+						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							return &Ydb_Table.CreateSessionResult{}, nil
+						},
+					},
+				),
+			),
 		},
 		SizeLimit:              1,
 		IdleThreshold:          -1,
@@ -1458,7 +1511,21 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 }
 
 func mustCreateSession(t *testing.T, p *SessionPool) *Session {
-	s, err := p.Create(context.Background())
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	s, err := p.Create(
+		WithSessionPoolTrace(
+			context.Background(),
+			SessionPoolTrace{
+				OnCreate: func(info SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolCreateDoneInfo) {
+						wg.Done()
+					}
+				},
+			},
+		),
+	)
 	if err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
@@ -1466,7 +1533,21 @@ func mustCreateSession(t *testing.T, p *SessionPool) *Session {
 }
 
 func mustGetSession(t *testing.T, p *SessionPool) *Session {
-	s, err := p.Get(context.Background())
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	s, err := p.Get(
+		WithSessionPoolTrace(
+			context.Background(),
+			SessionPoolTrace{
+				OnGet: func(info SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolGetDoneInfo) {
+						wg.Done()
+					}
+				},
+			},
+		),
+	)
 	if err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
@@ -1474,21 +1555,98 @@ func mustGetSession(t *testing.T, p *SessionPool) *Session {
 }
 
 func mustPutSession(t *testing.T, p *SessionPool, s *Session) {
-	if err := p.Put(context.Background(), s); err != nil {
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	if err := p.Put(
+		WithSessionPoolTrace(
+			context.Background(),
+			SessionPoolTrace{
+				OnPut: func(info SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolPutDoneInfo) {
+						wg.Done()
+					}
+				},
+				OnCloseSession: func(info SessionPoolCloseSessionStartInfo) func(doneInfo SessionPoolCloseSessionDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolCloseSessionDoneInfo) {
+						wg.Done()
+					}
+				},
+			},
+		),
+		s,
+	); err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
 }
 
 func mustPutBusySession(t *testing.T, p *SessionPool, s *Session) {
-	if err := p.PutBusy(context.Background(), s); err != nil {
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	if err := p.PutBusy(
+		WithSessionPoolTrace(
+			context.Background(),
+			SessionPoolTrace{
+				OnPutBusy: func(info SessionPoolPutBusyStartInfo) func(doneInfo SessionPoolPutBusyDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolPutBusyDoneInfo) {
+						wg.Done()
+					}
+				},
+				OnCloseSession: func(info SessionPoolCloseSessionStartInfo) func(doneInfo SessionPoolCloseSessionDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolCloseSessionDoneInfo) {
+						wg.Done()
+					}
+				},
+			},
+		),
+		s,
+	); err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
 }
 
 func mustTakeSession(t *testing.T, p *SessionPool, s *Session) {
-	took, err := p.Take(context.Background(), s)
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	took, err := p.Take(
+		WithSessionPoolTrace(
+			context.Background(),
+			SessionPoolTrace{
+				OnTake: func(info SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolTakeDoneInfo) {
+						wg.Done()
+					}
+				},
+			},
+		),
+		s,
+	)
 	if !took {
 		t.Fatalf("%s: can not take session (%v)", caller(), err)
+	}
+}
+
+func mustClose(t *testing.T, p *SessionPool) {
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+	if err := p.Close(
+		WithSessionPoolTrace(
+			context.Background(),
+			SessionPoolTrace{
+				OnCloseSession: func(info SessionPoolCloseSessionStartInfo) func(doneInfo SessionPoolCloseSessionDoneInfo) {
+					wg.Add(1)
+					return func(info SessionPoolCloseSessionDoneInfo) {
+						wg.Done()
+					}
+				},
+			},
+		),
+	); err != nil {
+		t.Fatalf("%s: %v", caller(), err)
 	}
 }
 

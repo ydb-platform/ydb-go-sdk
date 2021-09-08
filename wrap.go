@@ -1,7 +1,7 @@
 package ydb
 
 import (
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"google.golang.org/protobuf/proto"
 )
 

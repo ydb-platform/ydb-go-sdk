@@ -4,11 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/connect"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/connect"
 
-	"github.com/YandexDatabase/ydb-go-sdk/v3/example/internal/cli"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/example/internal/cli"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type Command struct {

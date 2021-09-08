@@ -2,10 +2,10 @@ package table
 
 import (
 	"context"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_TableStats"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal/result"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/result"
 )
 
 // Result is a result of a query.
@@ -87,6 +87,9 @@ func (r *Result) Close() error {
 	return nil
 }
 
+// Err return scanner error
+// To handle errors, do not need to check after scanning each row
+// It is enough to check after reading all ResultSet
 func (r *Result) Err() error {
 	if r.err != nil {
 		return r.err

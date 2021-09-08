@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
 // Compare compares its operands.

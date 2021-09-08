@@ -3,7 +3,7 @@ package table
 import (
 	"context"
 	"errors"
-	"github.com/YandexDatabase/ydb-go-genproto/Ydb_Table_V1"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
@@ -11,12 +11,12 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Scheme"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/YandexDatabase/ydb-go-sdk/v3"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/internal"
-	"github.com/YandexDatabase/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestSessionKeepAlive(t *testing.T) {

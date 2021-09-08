@@ -4,9 +4,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Issue"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Operations"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 )
 
 type Response interface {

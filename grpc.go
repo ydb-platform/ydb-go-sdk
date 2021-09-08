@@ -8,8 +8,8 @@ import (
 
 	grpccodes "google.golang.org/grpc/codes"
 
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb"
-	"github.com/YandexDatabase/ydb-go-genproto/protos/Ydb_Issue"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
 
 type Issue struct {
