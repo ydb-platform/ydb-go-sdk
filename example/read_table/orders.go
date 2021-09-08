@@ -84,6 +84,13 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 	return nil
 }
 
+type row struct {
+	id          uint64
+	orderID     uint64
+	date        time.Time
+	description string
+}
+
 func readTable(ctx context.Context, sp *table.SessionPool, path string, opts ...table.ReadTableOption) (err error) {
 	var res *table.Result
 
@@ -96,30 +103,28 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string, opts ...
 	if err != nil {
 		return err
 	}
-
+	r := row{}
 	for res.NextStreamSet(ctx) {
 		for res.NextRow() {
-
-			res.SeekItem("customer_id")
-			id := res.OUint64()
-
-			res.SeekItem("order_id")
-			orderID := res.OUint64()
-
-			res.SeekItem("order_date")
-			date := res.ODate()
-
 			if res.ColumnCount() == 4 {
-				res.SeekItem("description")
-				description := res.OUTF8()
-				log.Printf("#  Order, CustomerId: %d, OrderId: %d, Description: %s, Order date: %s", id, orderID, description, time.Unix(int64(date)*24*60*60, 0).Format("2006-01-02"))
+				description := ""
+				err = res.ScanWithDefaults(&r.id, &r.orderID, &description, &r.date)
+				if err != nil {
+					return err
+				}
+				log.Printf("#  Order, CustomerId: %d, OrderId: %d, Description: %s, Order date: %s", r.id, r.orderID, description, r.date.Format("2006-01-02"))
 			} else {
-				log.Printf("#  Order, CustomerId: %d, OrderId: %d, Order date: %s", id, orderID, time.Unix(int64(date)*24*60*60, 0).Format("2006-01-02"))
+				err = res.ScanWithDefaults(&r.id, &r.orderID, &r.date)
+				if err != nil {
+					return err
+				}
+				log.Printf("#  Order, CustomerId: %d, OrderId: %d, Order date: %s", r.id, r.orderID, r.date.Format("2006-01-02"))
 			}
 		}
 	}
-	if err := res.Err(); err != nil {
-		return err
+	// check that no errors occur during the scan
+	if res.Err() != nil {
+		return res.Err()
 	}
 	return nil
 }

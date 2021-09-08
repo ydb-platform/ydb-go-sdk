@@ -9,7 +9,78 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
+
+type rawConverter struct {
+	*Scanner
+}
+
+func (s *rawConverter) Date() (v time.Time) {
+	s.unwrap()
+	return internal.UnmarshalDate(s.uint32())
+}
+func (s *rawConverter) Datetime() (v time.Time) {
+	s.unwrap()
+	return internal.UnmarshalDatetime(s.uint32())
+}
+func (s *rawConverter) Timestamp() (v time.Time) {
+	s.unwrap()
+	return internal.UnmarshalTimestamp(s.uint64())
+}
+func (s *rawConverter) Interval() (v time.Duration) {
+	s.unwrap()
+	return internal.UnmarshalInterval(s.int64())
+}
+func (s *rawConverter) TzDate() (v time.Time) {
+	s.unwrap()
+	if s.isNull() {
+		return
+	}
+	src, err := internal.UnmarshalTzDate(s.text())
+	if err != nil {
+		s.errorf("scan raw failed: %w", err)
+	}
+	return src
+}
+func (s *rawConverter) TzDatetime() (v time.Time) {
+	s.unwrap()
+	if s.isNull() {
+		return
+	}
+	src, err := internal.UnmarshalTzDatetime(s.text())
+	if err != nil {
+		s.errorf("scan raw failed: %w", err)
+	}
+	return src
+}
+func (s *rawConverter) TzTimestamp() (v time.Time) {
+	s.unwrap()
+	if s.isNull() {
+		return
+	}
+	src, err := internal.UnmarshalTzTimestamp(s.text())
+	if err != nil {
+		s.errorf("scan raw failed: %w", err)
+	}
+	return src
+}
+func (s *rawConverter) String() (v string) {
+	s.unwrap()
+	return string(s.bytes())
+}
+func (s *rawConverter) YSON() (v []byte) {
+	s.unwrap()
+	return []byte(s.text())
+}
+func (s *rawConverter) JSON() (v []byte) {
+	s.unwrap()
+	return []byte(s.text())
+}
+func (s *rawConverter) JSONDocument() (v []byte) {
+	s.unwrap()
+	return []byte(s.text())
+}
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
@@ -118,99 +189,110 @@ func (s *Scanner) Type() ydb.Type {
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Bool() (v bool) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_BOOL) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.bool()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Int8() (v int8) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INT8) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.int8()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Uint8() (v uint8) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UINT8) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.uint8()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Int16() (v int16) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INT16) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.int16()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Uint16() (v uint16) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UINT16) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.uint16()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Int32() (v int32) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INT32) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.int32()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Uint32() (v uint32) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UINT32) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.uint32()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Int64() (v int64) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INT64) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.int64()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Uint64() (v uint64) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UINT64) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.uint64()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Float() (v float32) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_FLOAT) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.float()
 }
 
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) Double() (v float64) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DOUBLE) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.double()
 }
 
@@ -289,9 +371,10 @@ func (s *Scanner) String() (v []byte) {
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) UTF8() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UTF8) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.text()
 }
 
@@ -316,9 +399,10 @@ func (s *Scanner) JSON() (v string) {
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) UUID() (v [16]byte) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_UUID) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.uint128()
 }
 
@@ -334,9 +418,10 @@ func (s *Scanner) JSONDocument() (v string) {
 // Deprecated: Use Scan instead
 // Method will be available only for RawScanner in the next major release
 func (s *Scanner) DyNumber() (v string) {
-	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DYNUMBER) {
+	if s.err != nil {
 		return
 	}
+	s.unwrap()
 	return s.text()
 }
 
@@ -647,6 +732,7 @@ func (s *Scanner) Value() ydb.Value {
 	if s.err != nil {
 		return nil
 	}
+	s.unwrap()
 	x := s.stack.current()
 	return internal.ValueFromYDB(x.t, x.v)
 }

@@ -87,6 +87,9 @@ func (r *Result) Close() error {
 	return nil
 }
 
+// Err return scanner error
+// To handle errors, do not need to check after scanning each row
+// It is enough to check after reading all ResultSet
 func (r *Result) Err() error {
 	if r.err != nil {
 		return r.err

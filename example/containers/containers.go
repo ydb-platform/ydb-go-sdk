@@ -61,6 +61,9 @@ func (*exampleStruct) UnmarshalYDB(res ydb.RawScanner) error {
 	log.Printf("T: %s", res.Type())
 	for i, n := 0, res.StructIn(); i < n; i++ {
 		name := res.StructField(i)
+		if res.IsNull() {
+			continue
+		}
 		val := res.Int32()
 		log.Printf("(struct): %s: %d", name, val)
 	}

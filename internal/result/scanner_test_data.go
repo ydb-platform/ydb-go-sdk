@@ -545,5 +545,6 @@ func PrepareScannerPerformanceTest(count int) *Scanner {
 			}},
 		})
 	}
+	res.converter = &rawConverter{&res}
 	return &res
 }

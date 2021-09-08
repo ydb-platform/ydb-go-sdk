@@ -178,17 +178,28 @@ type (
 	//gtrace:set shortcut
 	//gtrace:set context
 	SessionPoolTrace struct {
-		OnGet       func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo)
-		OnWait      func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo)
-		OnBusyCheck func(SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo)
-		OnTake      func(SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo)
-		OnTakeWait  func(SessionPoolTakeWaitInfo)
-		OnPut       func(SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo)
-		OnClose     func(SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo)
+		OnCreate       func(SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo)
+		OnGet          func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo)
+		OnWait         func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo)
+		OnBusyCheck    func(SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo)
+		OnTake         func(SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo)
+		OnTakeWait     func(SessionPoolTakeWaitInfo)
+		OnPut          func(SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo)
+		OnPutBusy      func(SessionPoolPutBusyStartInfo) func(SessionPoolPutBusyDoneInfo)
+		OnCloseSession func(SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo)
+		OnClose        func(SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo)
 	}
 )
 
 type (
+	SessionPoolCreateStartInfo struct {
+		Context context.Context
+	}
+	SessionPoolCreateDoneInfo struct {
+		Context context.Context
+		Session *Session
+		Error   error
+	}
 	SessionPoolGetStartInfo struct {
 		Context context.Context
 	}
@@ -240,6 +251,24 @@ type (
 		Session *Session
 		Error   error
 	}
+	SessionPoolPutBusyStartInfo struct {
+		Context context.Context
+		Session *Session
+	}
+	SessionPoolPutBusyDoneInfo struct {
+		Context context.Context
+		Session *Session
+		Error   error
+	}
+	SessionPoolCloseSessionStartInfo struct {
+		Context context.Context
+		Session *Session
+	}
+	SessionPoolCloseSessionDoneInfo struct {
+		Context context.Context
+		Session *Session
+		Error   error
+	}
 	SessionPoolCloseStartInfo struct {
 		Context context.Context
 	}
@@ -260,7 +289,21 @@ type (
 		OnContextDone                 func()
 		OnPutSession                  func(session *Session, err error)
 	}
+
+	createSessionTraceContextKey struct{}
 )
+
+func withCreateSessionTrace(ctx context.Context, trace createSessionTrace) context.Context {
+	return context.WithValue(ctx,
+		createSessionTraceContextKey{},
+		contextCreateSessionTrace(ctx).Compose(trace),
+	)
+}
+
+func contextCreateSessionTrace(ctx context.Context) createSessionTrace {
+	t, _ := ctx.Value(createSessionTraceContextKey{}).(createSessionTrace)
+	return t
+}
 
 type createSessionResult struct {
 	s   *Session
