@@ -1,3 +1,6 @@
+## 2.5.7
+* Added panic on double scan per row
+
 ## 2.5.6
 * Supported nil and time conventions for scanner
 

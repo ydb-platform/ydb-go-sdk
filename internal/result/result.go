@@ -958,9 +958,12 @@ func (s *Scanner) scan(values []interface{}) error {
 			return s.err
 		}
 	}
+	if s.nextItem != 0 {
+		panic("scan row failed: double scan per row")
+	}
 	for i, value := range values {
 		if s.columnIndexes == nil {
-			s.seekItemByID(s.nextItem + i)
+			s.seekItemByID(i)
 		} else {
 			s.seekItemByID(s.columnIndexes[i])
 		}
