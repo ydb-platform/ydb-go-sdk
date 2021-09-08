@@ -3,16 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"log"
-	"os"
 	"path"
 	"text/template"
-	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/connect"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type templateConfig struct {
@@ -70,84 +65,6 @@ SELECT
 	CAST(air_date AS Uint64) AS air_date
 FROM AS_TABLE($episodesData);
 `))
-
-func FromEnviron(_ context.Context) (ydb.Credentials, error) {
-	if accessToken, ok := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); ok {
-		return ydb.NewAuthTokenCredentials(accessToken, "auth.FromEnviron(Env['YDB_ACCESS_TOKEN_CREDENTIALS'])"), nil
-	}
-	panic("YDB_ACCESS_TOKEN_CREDENTIALS not found ")
-}
-
-func Run(ctx context.Context, params connect.ConnectParams) error {
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
-	defer cancel()
-
-	db, err := connect.New(
-		connectCtx,
-		params,
-		connect.WithCreateCredentialsFunc(FromEnviron),
-		connect.WithSessionPoolIdleThreshold(time.Second*5),
-		connect.WithSessionPoolKeepAliveMinSize(-1),
-		connect.WithDiscoveryInterval(5*time.Second),
-	)
-	if err != nil {
-		return fmt.Errorf("connect error: %w", err)
-	}
-	defer db.Close()
-
-	err = db.CleanupDatabase(ctx, params.Database(), "series", "episodes", "seasons")
-	if err != nil {
-		return err
-	}
-
-	err = db.EnsurePathExists(ctx, params.Database())
-	if err != nil {
-		return err
-	}
-
-	err = describeTableOptions(ctx, db.Table().Pool())
-	if err != nil {
-		return fmt.Errorf("describe table options error: %w", err)
-	}
-
-	err = createTables(ctx, db.Table().Pool(), params.Database())
-	if err != nil {
-		return fmt.Errorf("create tables error: %w", err)
-	}
-
-	err = describeTable(ctx, db.Table().Pool(), path.Join(
-		params.Database(), "series",
-	))
-	if err != nil {
-		return fmt.Errorf("describe table error: %w", err)
-	}
-
-	err = fillTablesWithData(ctx, db.Table().Pool(), params.Database())
-	if err != nil {
-		return fmt.Errorf("fill tables with data error: %w", err)
-	}
-
-	err = selectSimple(ctx, db.Table().Pool(), params.Database())
-	if err != nil {
-		return fmt.Errorf("select simple error: %w", err)
-	}
-
-	err = scanQuerySelect(ctx, db.Table().Pool(), params.Database())
-	if err != nil {
-		if !ydb.IsTransportError(err, ydb.TransportErrorUnimplemented) {
-			return fmt.Errorf("scan query select error: %w", err)
-		}
-	}
-
-	err = readTable(ctx, db.Table().Pool(), path.Join(
-		params.Database(), "series",
-	))
-	if err != nil {
-		return fmt.Errorf("read table error: %w", err)
-	}
-
-	return nil
-}
 
 func readTable(ctx context.Context, sp *table.SessionPool, path string) (err error) {
 	var res *table.Result
