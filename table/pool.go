@@ -140,10 +140,16 @@ type SessionPool struct {
 	busyCheckerDone  chan struct{}
 	busyCheckCounter int32
 
-	closed uint32
+	closed bool
 
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
+}
+
+func (p *SessionPool) isClosed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.closed
 }
 
 func (p *SessionPool) init() {
@@ -315,9 +321,9 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		i     = 0
 		start = time.Now()
 	)
-	sessionPoolTraceGetDone := sessionPoolTraceOnGet(ctx, p.Trace, ctx)
+	getDone := sessionPoolTraceOnGet(ctx, p.Trace, ctx)
 	defer func() {
-		sessionPoolTraceGetDone(ctx, s, time.Since(start), i, err)
+		getDone(ctx, s, time.Since(start), i, err)
 	}()
 
 	const maxAttempts = 100
@@ -327,7 +333,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			el *list.Element // Element in the wait queue.
 		)
 
-		if atomic.LoadUint32(&p.closed) == 1 {
+		if p.isClosed() {
 			return nil, ErrSessionPoolClosed
 		}
 		p.mu.Lock()
@@ -366,7 +372,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		if ch == nil {
 			continue
 		}
-		sessionPoolTraceWaitDone := sessionPoolTraceOnWait(ctx, p.Trace, ctx)
+		waitDone := sessionPoolTraceOnWait(ctx, p.Trace, ctx)
 		var ok bool
 		select {
 		case s, ok = <-*ch:
@@ -382,7 +388,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 				// for the next waiter – session could be lost for a long time.
 				p.putWaitCh(ch)
 			}
-			sessionPoolTraceWaitDone(ctx, s, err)
+			waitDone(ctx, s, err)
 
 		case <-ctx.Done():
 			p.mu.Lock()
@@ -392,7 +398,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			p.waitq.Remove(el)
 			p.mu.Unlock()
 			err = ctx.Err()
-			sessionPoolTraceWaitDone(ctx, s, err)
+			waitDone(ctx, s, err)
 			return nil, err
 		}
 	}
@@ -412,14 +418,15 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 // panic.
 func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 	p.init()
-	sessionPoolTracePutDone := sessionPoolTraceOnPut(ctx, p.Trace, ctx, s)
+
+	putDone := sessionPoolTraceOnPut(ctx, p.Trace, ctx, s)
 	defer func() {
-		sessionPoolTracePutDone(ctx, s, err)
+		putDone(ctx, s, err)
 	}()
 
 	p.mu.Lock()
 	switch {
-	case atomic.LoadUint32(&p.closed) == 1:
+	case p.closed:
 		err = ErrSessionPoolClosed
 
 	case p.idle.Len() >= p.limit:
@@ -433,10 +440,32 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 	p.mu.Unlock()
 
 	if err != nil {
-		_ = p.closeSession(ctx, s)
+		_ = p.CloseSession(ctx, s)
 	}
 
 	return
+}
+
+// p.mu must NOT be held.
+func (p *SessionPool) putBusy(ctx context.Context, s *Session) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		_ = p.CloseSession(ctx, s)
+		return ErrSessionPoolClosed
+	}
+	select {
+	case <-p.busyCheckerStop:
+		return p.CloseSession(ctx, s)
+
+	case p.busyCheck <- s:
+		atomic.AddInt32(&p.busyCheckCounter, 1)
+		return nil
+
+	default:
+		// if cannot push session into busyCheck (channel is full) - close session
+		return p.CloseSession(ctx, s)
+	}
 }
 
 // PutBusy returns given session s into the pool after some operation on s was
@@ -449,11 +478,14 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	p.init()
 
-	if atomic.LoadUint32(&p.closed) == 1 {
-		_ = p.closeSession(ctx, s)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.closed {
+		_ = p.CloseSession(ctx, s)
 		return ErrSessionPoolClosed
 	}
-	p.mu.Lock()
+
 	info, has := p.index[s]
 	if !has {
 		panicLocked(&p.mu, "ydb: table: PutBusy() unknown session")
@@ -466,20 +498,12 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 	}
 	delete(p.index, s)
 	p.notify(nil)
-	p.mu.Unlock()
 
-	select {
-	case <-p.busyCheckerStop:
-		close(p.busyCheck)
-		_ = p.closeSession(ctx, s)
+	putBusyDone := sessionPoolTraceOnPutBusy(ctx, p.Trace, ctx, s)
+	go func() {
+		putBusyDone(ctx, s, p.putBusy(ctx, s))
+	}()
 
-	case p.busyCheck <- s:
-		atomic.AddInt32(&p.busyCheckCounter, 1)
-
-	default:
-		// if cannot push session into busyCheck (channel is full) - close session
-		_ = p.closeSession(ctx, s)
-	}
 	return
 }
 
@@ -498,12 +522,13 @@ func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
 // It is assumed that Take() callers never call Get() method.
 func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err error) {
 	p.init()
-	sessionPoolTraceTakeDone := sessionPoolTraceOnTake(ctx, p.Trace, ctx, s)
+
+	takeDone := sessionPoolTraceOnTake(ctx, p.Trace, ctx, s)
 	defer func() {
-		sessionPoolTraceTakeDone(ctx, s, took, err)
+		takeDone(ctx, s, took, err)
 	}()
 
-	if atomic.LoadUint32(&p.closed) == 1 {
+	if p.isClosed() {
 		return false, ErrSessionPoolClosed
 	}
 	var has bool
@@ -537,6 +562,11 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 // The intended way of Create() usage relates to Take() method.
 func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 	p.init()
+
+	createDone := sessionPoolTraceOnCreate(ctx, p.Trace, ctx)
+	defer func() {
+		createDone(ctx, s, err)
+	}()
 
 	const maxAttempts = 10
 	for i := 0; i < maxAttempts; i++ {
@@ -576,17 +606,19 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 // Note that even on error it calls Close() on each session.
 func (p *SessionPool) Close(ctx context.Context) (err error) {
 	p.init()
-	sessionPoolTraceCloseDone := sessionPoolTraceOnClose(ctx, p.Trace, ctx)
 
+	closeDone := sessionPoolTraceOnClose(ctx, p.Trace, ctx)
 	defer func() {
-		sessionPoolTraceCloseDone(ctx, err)
+		closeDone(ctx, err)
 	}()
 
-	if atomic.LoadUint32(&p.closed) == 1 {
+	if p.isClosed() {
 		return
 	}
-	atomic.SwapUint32(&p.closed, 1)
+
 	p.mu.Lock()
+
+	p.closed = true
 
 	keeperDone := p.keeperDone
 	if ch := p.keeperStop; ch != nil {
@@ -604,6 +636,7 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	}
 	if busyCheckerDone != nil {
 		<-busyCheckerDone
+		close(p.busyCheck)
 	}
 
 	p.mu.Lock()
@@ -621,7 +654,7 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	}
 	for e := idle.Front(); e != nil; e = e.Next() {
 		s := e.Value.(*Session)
-		_ = p.closeSession(ctx, s)
+		_ = p.CloseSession(ctx, s)
 	}
 
 	return nil
@@ -658,14 +691,14 @@ func (p *SessionPool) reuse(ctx context.Context, s *Session) (reused bool) {
 		err         error
 		enoughSpace bool
 	)
-	sessionPoolTraceBusyCheckDone := sessionPoolTraceOnBusyCheck(ctx, p.Trace, ctx, s)
+	busyCheckDone := sessionPoolTraceOnBusyCheck(ctx, p.Trace, ctx, s)
 	defer func() {
-		sessionPoolTraceBusyCheckDone(ctx, s, enoughSpace, err)
+		busyCheckDone(ctx, s, enoughSpace, err)
 	}()
 	if info, err = p.keepAliveSession(ctx, s); err == nil && info.Status == SessionReady {
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		enoughSpace = atomic.LoadUint32(&p.closed) == 0 && p.createInProgress+len(p.index) < p.limit
+		enoughSpace = !p.closed && p.createInProgress+len(p.index) < p.limit
 		if enoughSpace {
 			p.index[s] = sessionInfo{}
 			if !p.notify(s) {
@@ -689,7 +722,7 @@ func (p *SessionPool) busyChecker() {
 						return
 					}
 					if closeAll || !p.reuse(ctx, s) {
-						_ = p.closeSession(ctx, s)
+						_ = p.CloseSession(ctx, s)
 					}
 					atomic.AddInt32(&p.busyCheckCounter, -1)
 				default:
@@ -842,7 +875,12 @@ func (p *SessionPool) keeper() {
 			}
 			for i, s := range toDelete {
 				toDelete[i] = nil
-				_ = p.closeSession(context.Background(), s)
+				ctx, cancel := context.WithTimeout(
+					context.Background(),
+					p.DeleteTimeout,
+				)
+				_ = s.Close(ctx)
+				cancel()
 			}
 			if touchingDone != nil {
 				close(touchingDone)
@@ -958,14 +996,19 @@ func (p *SessionPool) notify(s *Session) (notified bool) {
 	return false
 }
 
-// p.mu must NOT be held.
-func (p *SessionPool) closeSession(ctx context.Context, s *Session) error {
+// CloseSession provides the most effective way of session closing
+// instead of plain session.Close.
+// CloseSession must be fast. If necessary, can be async.
+func (p *SessionPool) CloseSession(ctx context.Context, s *Session) error {
 	ctx, cancel := context.WithTimeout(
 		ydb.ContextWithoutDeadline(ctx),
 		p.DeleteTimeout,
 	)
-	_ = s.Close(ctx)
-	cancel()
+	closeSessionDone := sessionPoolTraceOnCloseSession(ctx, p.Trace, ctx, s)
+	go func() {
+		defer cancel()
+		closeSessionDone(ctx, s, s.Close(ctx))
+	}()
 	return nil
 }
 

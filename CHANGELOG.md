@@ -1,3 +1,12 @@
+## 2.6.0
+* Exported `SessionProvider.CloseSession` func
+* Implements by default async closing session and putting busy
+  session into pool
+* Added some session pool trace funcs for execution control of
+  goroutines in tests
+* Switched internal session pool boolean field closed from atomic
+  usage to mutex-locked usage
+
 ## 2.5.7
 * Added panic on double scan per row
 
@@ -5,9 +14,8 @@
 * Supported nil and time conventions for scanner
 
 ## 2.5.5
-* Reverted adds async sessionGet and opDo into table.Retry.
-* Added sessionClose() func into SessionProvider interface.
-* Implemented async session closing
+* Reverted adds async sessionGet and opDo into `table.Retry`.
+* Added `sessionClose()` func into `SessionProvider` interface.
 
 ## 2.5.4
 * Remove ready queue from session pool
@@ -22,8 +30,8 @@
 * Fix lock on write to chan in case when context is done
 
 ## 2.5.0
-* Added ScanRow for scan results as struct, list, tuple, map
-* Created RowScanner interface in order to generate method With
+* Added `ScanRaw` for scan results as struct, list, tuple, map
+* Created `RawScanner` interface in order to generate method With
 
 ## 2.4.1
 * Fixed deadlock in the session pool
@@ -33,15 +41,15 @@
 * Fixed dualism of interpret data (default values were deprecated for optional values)
 
 ## 2.3.3
-* Fixed internal/stats/series.go (index out of range)
-* Optimized rotate buckets in the Series
+* Fixed `internal/stats/series.go` (index out of range)
+* Optimized rotate buckets in the `Series`
 
 ## 2.3.2
-* Moved api/wrap.go to root for next replacement api package to external genproto
+* Moved `api/wrap.go` to root for next replacement api package to external genproto
 
 ## 2.3.1
 * Correct session pool tests
-* Fixed conditions with KeepAliveMinSize and IdleKeepAliveThreshold
+* Fixed conditions with KeepAliveMinSize and `IdleKeepAliveThreshold`
 
 ## 2.3.0
 * Added credentials connect options:
@@ -57,47 +65,47 @@
   - `example/auth/service_account_credentials`
 
 ## 2.2.1
-* Fixed returning error from table.StreamExecuteScanQuery
+* Fixed returning error from `table.StreamExecuteScanQuery`
 
 ## 2.2.0
 * Supported loading certs from file using `YDB_SSL_ROOT_CERTIFICATES_FILE` environment variable
 
 ## 2.1.0
-* Fixed erasing session from pool if session keep-alive count great then IdleKeepAliveThreshold
-* Add major session pool config params as connect.WithSessionPool*() options
+* Fixed erasing session from pool if session keep-alive count great then `IdleKeepAliveThreshold`
+* Add major session pool config params as `connect.WithSessionPool*()` options
 
 ## 2.0.3
-* Added panic for wrong NextSet/NextStreamSet call
+* Added panic for wrong `NextSet`/`NextStreamSet` call
 
 ## 2.0.2
-* Fixed infinite keep alive session on transport errors Cancelled and DeadlineExceeded
+* Fixed infinite keep alive session on transport errors `Cancelled` and `DeadlineExceeded`
 
 ## 2.0.1
 * Fixed parser of connection string
-* Fixed EnsurePathExists and CleanupDatabase methods
-* Fixed basic_example_v1
+* Fixed `EnsurePathExists` and `CleanupDatabase` methods
+* Fixed `basic_example_v1`
 * Renamed example cli flag `-link=connectionString` to `-ydb=connectionString` for connection string to YDB
 * Added `-connect-timeout` flag to example cli
 * Fixed some linter issues
 
 ## 2.0.0
-* Renamed package ydbx to connect. New usage semantic: connect.New() instead ydbx.Connect()
-* Added healthcheck example
+* Renamed package ydbx to connect. New usage semantic: `connect.New()` instead `ydbx.Connect()`
+* Added `healthcheck` example
 * Fixed all examples with usage connect package
-* Dropped example/internal/ydbutil package
-* Simplified API of Traces, world trend.
+* Dropped `example/internal/ydbutil` package
+* Simplified API of Traces - replace all pairs start/done to single handler with closure.
 
 ## 1.5.2
-* Fixed WithYdbCA at nil certPool case
+* Fixed `WithYdbCA` at nil certPool case
 
 ## 1.5.1
-* Fixed package name of ydbx
+* Fixed package name of `ydbx`
 
 ## 1.5.0
-* Added ydbx package
+* Added `ydbx` package
 
 ## 1.4.1
-* Fixed fmt.Errorf error wrapping and some linter issues
+* Fixed `fmt.Errorf` error wrapping and some linter issues
 
 ## 1.4.0
 * Added helper for create credentials from environ
@@ -106,16 +114,16 @@
   dedicated YDB and not need to dial with IAM. YDB CA automatically added to all grpc calling
 
 ## 1.3.0
-* Added Compose method to traces
+* Added `Compose` method to traces
 
 ## 1.2.0
 * Load YDB certificates by default with TLS connection
 
 ## 1.1.0
-* Support scan-query method in ydbsql (database.sql api)
+* Support scan-query method in `ydbsql` (database/sql API)
 
 ## 1.0.7
-* Use github.com/golang-jwt/jwt instead of github.com/dgrijalva/jwt-go
+* Use `github.com/golang-jwt/jwt` instead of `github.com/dgrijalva/jwt-go`
 
 ## 1.0.6
 * Append (if not exits) SYNC Operation mode on table calls: *Session, *DataQuery, *Transaction, KeepAlive

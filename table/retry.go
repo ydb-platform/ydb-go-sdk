@@ -23,9 +23,10 @@ type SessionProvider interface {
 	// PutBusy must be fast, if necessary must be async
 	PutBusy(context.Context, *Session) (err error)
 
-	// closeSession provide closing session from SessionCloser
-	// closeSession must be fast, if necessary must be async
-	closeSession(ctx context.Context, s *Session) error
+	// CloseSession provides the most effective way of session closing
+	// instead of plain session.Close.
+	// CloseSession must be fast. If necessary, can be async.
+	CloseSession(ctx context.Context, s *Session) error
 }
 
 type SessionProviderFunc struct {
@@ -55,7 +56,7 @@ func (f SessionProviderFunc) PutBusy(ctx context.Context, s *Session) error {
 	return f.OnPutBusy(ctx, s)
 }
 
-func (f SessionProviderFunc) closeSession(ctx context.Context, s *Session) error {
+func (f SessionProviderFunc) CloseSession(ctx context.Context, s *Session) error {
 	return s.Close(ctx)
 }
 
@@ -167,7 +168,7 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 			m = r.RetryChecker.Check(err)
 			switch {
 			case m.MustDeleteSession():
-				_ = r.SessionProvider.closeSession(ctx, s)
+				_ = r.SessionProvider.CloseSession(ctx, s)
 				s = nil
 
 			case m.MustCheckSession():
@@ -230,7 +231,7 @@ func (s *singleSession) PutBusy(ctx context.Context, x *Session) error {
 	return x.Close(ctx)
 }
 
-func (s *singleSession) closeSession(ctx context.Context, x *Session) error {
+func (s *singleSession) CloseSession(ctx context.Context, x *Session) error {
 	if x != s.s {
 		return errUnexpectedSession
 	}
