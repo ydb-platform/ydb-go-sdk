@@ -96,6 +96,14 @@ type SessionPool struct {
 	// DefaultSessionPoolBusyCheckInterval value is used.
 	BusyCheckInterval time.Duration
 
+	// Deprecated: unnecessary parameter
+	// it will be removed at next major release
+	// KeepAliveBatchSize is a maximum number sessions taken from the pool to
+	// prepare KeepAlive() call on them in background.
+	// If KeepAliveBatchSize is less than or equal to zero, then there is no
+	// batch limit.
+	KeepAliveBatchSize int
+
 	// KeepAliveTimeout limits maximum time spent on KeepAlive request
 	// If KeepAliveTimeout is less than or equal to zero then the
 	// DefaultSessionPoolKeepAliveTimeout is used.
@@ -210,24 +218,13 @@ func isCreateSessionErrorRetriable(err error) bool {
 }
 
 // p.mu must NOT be held.
-func (p *SessionPool) createSession(ctx context.Context) (session *Session, err error) {
+func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 	trace := contextCreateSessionTrace(ctx)
 	// pre-check the pool size
 	p.mu.Lock()
 	enoughSpace := p.createInProgress+len(p.index) < p.limit
 	if enoughSpace {
 		p.createInProgress++
-		defer func() {
-			p.mu.Lock()
-			p.createInProgress--
-			if session == nil && err == nil {
-				panic("ydb: abnormal result of pool.createSession()")
-			}
-			if session != nil {
-				p.index[session] = sessionInfo{}
-			}
-			p.mu.Unlock()
-		}()
 	}
 	p.mu.Unlock()
 	trace.onCheckEnoughSpace(enoughSpace)
@@ -260,6 +257,9 @@ func (p *SessionPool) createSession(ctx context.Context) (session *Session, err 
 		}
 
 		if r.err != nil {
+			p.mu.Lock()
+			p.createInProgress--
+			p.mu.Unlock()
 			resCh <- r
 			return
 		}
@@ -293,6 +293,9 @@ func (p *SessionPool) createSession(ctx context.Context) (session *Session, err 
 	select {
 	case r := <-resCh:
 		trace.onReadResult(r)
+		if r.s == nil && r.err == nil {
+			panic("ydb: abnormal result of pool.createSession()")
+		}
 		return r.s, r.err
 	case <-ctx.Done():
 		trace.onContextDone()
@@ -300,7 +303,7 @@ func (p *SessionPool) createSession(ctx context.Context) (session *Session, err 
 		go func() {
 			if r, ok := <-resCh; ok && r.s != nil {
 				// if cannot put session into result channel - put session into pool for reuse
-				trace.onPutSession(r.s, p.Put(ctx, r.s))
+				trace.onPutSession(r.s, p.PutBusy(ctx, r.s))
 			}
 		}()
 		return nil, ctx.Err()
@@ -659,7 +662,7 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 func (p *SessionPool) Stats() SessionPoolStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	idleCount, waitQCount, indexCount := 0, 0, 0
+	idleCount, readyCount, waitQCount, indexCount := 0, 0, 0, 0
 	if p.idle != nil {
 		idleCount = p.idle.Len()
 	}
@@ -671,6 +674,7 @@ func (p *SessionPool) Stats() SessionPoolStats {
 	}
 	return SessionPoolStats{
 		Idle:             idleCount,
+		Ready:            readyCount,
 		Index:            indexCount,
 		WaitQ:            waitQCount,
 		CreateInProgress: p.createInProgress,
@@ -715,9 +719,6 @@ func (p *SessionPool) busyChecker() {
 				case s, ok := <-p.busyCheck:
 					if !ok {
 						return
-					}
-					if s == nil {
-						panic("nil session")
 					}
 					if closeAll || !p.reuse(ctx, s) {
 						_ = p.CloseSession(ctx, s)
@@ -1128,7 +1129,9 @@ func panicLocked(mu sync.Locker, message string) {
 }
 
 type SessionPoolStats struct {
-	Idle             int
+	Idle int
+	// Deprecated: always zero
+	Ready            int
 	Index            int
 	WaitQ            int
 	MinSize          int
