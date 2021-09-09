@@ -356,13 +356,6 @@ func (s *Scanner) overflowError(i, n interface{}) {
 	s.errorf("overflow error: %d overflows capacity of %t", i, n)
 }
 
-func (s *Scanner) primitiveTypeError(act, exp Ydb.Type_PrimitiveTypeId) {
-	s.errorf(
-		"unexpected type id at %q %s: %s; want %s",
-		s.path(), s.getType(), act, exp,
-	)
-}
-
 func (s *Scanner) isNull() bool {
 	_, yes := s.stack.currentValue().(*Ydb.Value_NullFlagValue)
 	return yes
