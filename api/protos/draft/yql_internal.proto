@@ -62,6 +62,7 @@ message PingTaskRequest {
     SignedIdentity result_id = 4;
     YandexQuery.QueryMeta.ComputeStatus status = 5;
     repeated Ydb.Issue.IssueMessage issues = 6;
+    repeated Ydb.Issue.IssueMessage transient_issues = 16;
     uint32 result_set_count = 7;
     string statistics = 8;
     repeated YandexQuery.ResultSetMeta result_set_meta = 9;

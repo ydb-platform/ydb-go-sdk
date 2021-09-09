@@ -45,7 +45,7 @@ message ChildShard {
 // Represents details of consumer
 message Consumer {
     string consumer_arn = 1;
-    uint64 consumer_creation_timestamp = 2;
+    int64 consumer_creation_timestamp = 2;
     string consumer_name = 3;
     ConsumerDescription.ConsumerStatus consumer_status = 4;
 }
@@ -58,7 +58,7 @@ message HashKeyRange {
 
 message Record {
     // Timestamp that the record was inserted into the stream
-    int32 timestamp = 1;
+    int64 timestamp = 1;
     // Data blob
     bytes data = 2;
     // Encryption type used on record
@@ -484,7 +484,7 @@ message PutRecordsResultEntry {
 message GetRecordsRequest {
     Ydb.Operations.OperationParams operation_params = 1;
     // Max number of records to return
-    int32 limit = 2;
+    uint32 limit = 2;
     // Iterator to shard
     string shard_iterator = 3;
 }
