@@ -2,9 +2,11 @@ package ydb
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	"google.golang.org/grpc/metadata"
 	"testing"
+
+	"google.golang.org/grpc/metadata"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 func TestMetaRequiredHeaders(t *testing.T) {

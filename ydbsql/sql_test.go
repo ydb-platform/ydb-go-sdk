@@ -4,18 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	"google.golang.org/grpc"
 	"io"
 	"log"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/traceutil"
@@ -482,20 +482,20 @@ func getSeriesData() ydb.Value {
 	)
 }
 
-func seriesData(id uint64, released uint32, title, info string) ydb.Value {
+func seriesData(id uint64, released time.Time, title, info string) ydb.Value {
 	return ydb.StructValue(
 		ydb.StructFieldValue("series_id", ydb.Uint64Value(id)),
-		ydb.StructFieldValue("release_date", ydb.DateValue(released)),
+		ydb.StructFieldValue("release_date", ydb.DateValueFromTime(released)),
 		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
 		ydb.StructFieldValue("series_info", ydb.UTF8Value(info)),
 	)
 }
 
-func days(date string) uint32 {
+func days(date string) time.Time {
 	const ISO8601 = "2006-01-02"
 	t, err := time.Parse(ISO8601, date)
 	if err != nil {
 		panic(err)
 	}
-	return ydb.Time(t).Date()
+	return t
 }

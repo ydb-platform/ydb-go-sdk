@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 func TestGenerator_importDeps(t *testing.T) {
@@ -33,5 +34,5 @@ var (
 )
 
 `
-	internal.Equal(t,expected, buf.String())
+	internal.Equal(t, expected, buf.String())
 }

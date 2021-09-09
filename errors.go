@@ -3,8 +3,9 @@ package ydb
 import (
 	"context"
 	"errors"
-	"google.golang.org/grpc/status"
 	"io"
+
+	"google.golang.org/grpc/status"
 )
 
 func isTimeoutError(err error) bool {

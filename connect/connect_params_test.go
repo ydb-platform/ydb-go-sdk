@@ -3,8 +3,9 @@ package connect
 import (
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 func TestParseConnectionString(t *testing.T) {
