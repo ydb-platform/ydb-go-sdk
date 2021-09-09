@@ -3,9 +3,6 @@ package table
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -70,8 +67,11 @@ func TestSessionOptionsProfile(t *testing.T) {
 		opt((*createTableDesc)(&req))
 		p := req.Profile.PartitioningPolicy
 
-		if pp, ok := p.Partitions.(*Ydb_Table.PartitioningPolicy_ExplicitPartitions); !ok || !cmp.Equal(pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{internal.ValueToYDB(ydb.Int64Value(1))}, cmp.Comparer(proto.Equal)) {
+		pp, ok := p.Partitions.(*Ydb_Table.PartitioningPolicy_ExplicitPartitions)
+		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
+		} else {
+			internal.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{internal.ValueToYDB(ydb.Int64Value(1))})
 		}
 	}
 	{

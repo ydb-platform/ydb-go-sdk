@@ -2,7 +2,7 @@ package ydb
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"google.golang.org/grpc/metadata"
 	"testing"
 )
@@ -29,11 +29,11 @@ func TestMetaRequiredHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, []string{"database"}, md.Get(metaDatabase))
-	require.Equal(t, []string{"requestType"}, md.Get(metaRequestType))
-	require.Equal(t, []string{"token"}, md.Get(metaTicket))
-	require.Equal(t, []string{"userAgent"}, md.Get(metaUserAgent))
-	require.Equal(t, []string{"traceID"}, md.Get(metaTraceID))
-	require.Equal(t, []string{Version}, md.Get(metaVersion))
-	require.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
+	internal.Equal(t, []string{"database"}, md.Get(metaDatabase))
+	internal.Equal(t, []string{"requestType"}, md.Get(metaRequestType))
+	internal.Equal(t, []string{"token"}, md.Get(metaTicket))
+	internal.Equal(t, []string{"userAgent"}, md.Get(metaUserAgent))
+	internal.Equal(t, []string{"traceID"}, md.Get(metaTraceID))
+	internal.Equal(t, []string{Version}, md.Get(metaVersion))
+	internal.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
 }

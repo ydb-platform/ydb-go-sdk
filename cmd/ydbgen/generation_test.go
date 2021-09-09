@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"io"
 	"strings"
 	"testing"
@@ -38,7 +38,7 @@ func TestGenerator(t *testing.T) {
 				t.Log(err)
 			}
 			if err == nil {
-				assert.Equal(t, out.String(), test.out)
+				internal.Equal(t,test.out,out.String())
 			}
 		})
 	}

@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestGenerator_importDeps(t *testing.T) {
@@ -14,10 +14,12 @@ func TestGenerator_importDeps(t *testing.T) {
 
 	bw := bufio.NewWriter(&buf)
 	g.importDeps(bw)
-	require.NoError(t, bw.Flush())
-	require.Equal(
-		t,
-		`import (
+	err := bw.Flush()
+	if err != nil {
+		t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
+	}
+
+	expected := `import (
 	"strconv"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -30,7 +32,6 @@ var (
 	_ = table.NewQueryParameters
 )
 
-`,
-		buf.String(),
-	)
+`
+	internal.Equal(t,expected, buf.String())
 }

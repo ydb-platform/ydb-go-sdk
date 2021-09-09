@@ -2,7 +2,8 @@ package connect
 
 import (
 	"errors"
-	"github.com/stretchr/testify/require"
+	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"testing"
 )
 
@@ -11,7 +12,7 @@ func TestParseConnectionString(t *testing.T) {
 		connectionString string
 		schema           string
 		endpoint         string
-		databse          string
+		database         string
 		error            error
 	}{
 		{
@@ -46,32 +47,35 @@ func TestParseConnectionString(t *testing.T) {
 		t.Run(test.connectionString, func(t *testing.T) {
 			schema, endpoint, database, err := parseConnectionString(test.connectionString)
 			if !errors.Is(err, test.error) {
-				require.Fail(t, "")
+				t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
 			}
-			require.Equal(t, test.schema, schema)
-			require.Equal(t, test.endpoint, endpoint)
-			require.Equal(t, test.databse, database)
+			internal.Equal(t, test.schema, schema)
+			internal.Equal(t, test.endpoint, endpoint)
+			internal.Equal(t, test.database, database)
 		})
+	}
+}
+
+func assertConnectParams(t *testing.T, params ConnectParams) {
+	internal.NotNil(t, params)
+	internal.Equal(t, "endpoint", params.Endpoint())
+	internal.Equal(t, "database", params.Database())
+	if !params.UseTLS() {
+		t.Fatal("UseTLS is not true")
 	}
 }
 
 func TestEndpointDatabase(t *testing.T) {
 	params := EndpointDatabase("endpoint", "database", true)
-	require.NotNil(t, params)
-	require.Equal(t, "endpoint", params.Endpoint())
-	require.Equal(t, "database", params.Database())
-	require.True(t, true, params.UseTLS())
+	assertConnectParams(t, params)
 }
 
 func TestMustConnectionString(t *testing.T) {
 	defer func() {
 		if e := recover(); e != nil {
-			require.Fail(t, "panic on MustConnectionString", e)
+			t.Fatal("panic on MustConnectionString", e)
 		}
 	}()
 	params := MustConnectionString("grpcs://endpoint/?database=database")
-	require.NotNil(t, params)
-	require.Equal(t, "endpoint", params.Endpoint())
-	require.Equal(t, "database", params.Database())
-	require.True(t, true, params.UseTLS())
+	assertConnectParams(t, params)
 }

@@ -4,16 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestConnectorDialOnPing(t *testing.T) {
@@ -149,7 +149,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 									testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
 										r := request.(*Ydb_Table.ExecuteDataQueryRequest)
 										keepInCache := r.QueryCachePolicy.KeepInCache
-										require.Equal(t, len(test.queryCachePolicyOption) > 0, keepInCache)
+										internal.Equal(t, len(test.queryCachePolicyOption) > 0, keepInCache)
 										return &Ydb_Table.ExecuteQueryResult{}, nil
 									},
 								},
@@ -163,8 +163,8 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			rows, err := db.QueryContext(ctx, "SELECT 1")
-			require.NoError(t, err)
-			require.NotNil(t, rows)
+			internal.NoError(t, err)
+			internal.NotNil(t, rows)
 		})
 	}
 }
