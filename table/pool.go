@@ -279,6 +279,12 @@ func (p *SessionPool) createSession(ctx context.Context) (session *Session, err 
 			}
 		})
 
+		// Slot for session already reserved early
+		p.mu.Lock()
+		p.index[r.s] = sessionInfo{}
+		p.createInProgress--
+		p.mu.Unlock()
+
 		resCh <- r
 	}()
 
