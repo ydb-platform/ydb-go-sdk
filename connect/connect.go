@@ -29,14 +29,14 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connecti
 	if params.UseTLS() {
 		tlsConfig = new(tls.Config)
 	}
-	c.driver, err = (&ydb.Dialer{
+	c.cluster, err = (&ydb.Dialer{
 		DriverConfig: c.driverConfig,
 		TLSConfig:    tlsConfig,
 	}).Dial(ctx, params.Endpoint())
 	if err != nil {
 		return nil, err
 	}
-	c.table.set(c.driver)
-	c.scheme.set(c.driver)
+	c.table.set(c.cluster)
+	c.scheme.set(c.cluster)
 	return c, nil
 }
