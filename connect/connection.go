@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc"
 	"path"
 	"strings"
 
@@ -12,15 +13,27 @@ import (
 
 type Connection struct {
 	driverConfig *ydb.DriverConfig
-	driver       ydb.Cluster
+	cluster      ydb.Cluster
 	credentials  ydb.Credentials
 	table        *tableWrapper
 	scheme       *schemeWrapper
 }
 
-func (c *Connection) Close() {
+func (c *Connection) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	return c.cluster.Invoke(ctx, method, args, reply, opts...)
+}
+
+func (c *Connection) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return c.cluster.NewStream(ctx, desc, method, opts...)
+}
+
+func (c *Connection) Stats(it func(ydb.Endpoint, ydb.ConnStats)) {
+	c.cluster.Stats(it)
+}
+
+func (c *Connection) Close() error {
 	_ = c.table.Pool().Close(context.Background())
-	_ = c.driver.Close()
+	return c.cluster.Close()
 }
 
 func (c *Connection) Table() *tableWrapper {
