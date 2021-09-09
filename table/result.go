@@ -104,7 +104,13 @@ func (r *Result) inactive() bool {
 	return r.closed || r.err != nil || r.Scanner.Err() != nil
 }
 
-func (r *Result) hasNextSet() bool {
+// HasNextSet reports whether result set may be advanced.
+//
+// It may be useful to call HasNextSet() instead of NextSet to look ahead
+// without advancing the result set.
+//
+// Note that it does not work with sets from stream.
+func (r *Result) HasNextSet() bool {
 	if r.inactive() || r.nextSet == len(r.sets) {
 		return false
 	}
@@ -116,7 +122,7 @@ func (r *Result) hasNextSet() bool {
 // It returns false if there are no more result sets.
 // Work with sets from stream.
 func (r *Result) NextSet(ctx context.Context, columns ...string) bool {
-	if !r.hasNextSet() {
+	if !r.HasNextSet() {
 		return r.nextStreamSet(ctx, columns...)
 	}
 	result.Reset(&r.Scanner, r.sets[r.nextSet], columns...)

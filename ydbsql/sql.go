@@ -633,7 +633,7 @@ func (r *rows) NextResultSet() error {
 }
 
 func (r *rows) HasNextResultSet() bool {
-	return r.res.NextSet(context.Background())
+	return r.res.HasNextSet()
 }
 
 func (r *rows) Next(dst []driver.Value) error {
