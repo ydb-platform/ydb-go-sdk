@@ -244,6 +244,7 @@ type RawScanner interface {
 	IsOptional() bool
 	IsDecimal() bool
 	Err() error
+	Any() interface{}
 }
 
 // Scanner scanning non-primitive yql types

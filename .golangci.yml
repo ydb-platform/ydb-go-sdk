@@ -57,6 +57,7 @@ linters-settings:
   govet:
     # report about shadowed variables
     check-shadowing: true
+    fieldalignment: true
   golint:
     # minimal confidence for issues, default is 0.8
     min-confidence: 0.8
@@ -106,12 +107,11 @@ linters:
     - goconst
     - gofmt # On why gofmt when goimports is enabled - https://github.com/golang/go/issues/21476
     - goimports
-    - golint
     - gosimple
     - govet
     - ineffassign
-    - maligned
     - misspell
+    - revive
     - staticcheck
     - structcheck
     - typecheck

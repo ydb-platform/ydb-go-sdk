@@ -44,7 +44,7 @@ func main() {
 		connect.WithDiscoveryInterval(5*time.Second),
 	)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "connect error: %w\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)
 		os.Exit(1)
 	}
 	defer db.Close()
@@ -105,7 +105,7 @@ func main() {
 		connectParams.Database(), "series",
 	))
 	if err != nil {
-		fmt.Printf("read table error: %w\n", err)
+		fmt.Printf("read table error: %v\n", err)
 		os.Exit(1)
 	}
 }

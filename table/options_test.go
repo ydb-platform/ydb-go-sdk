@@ -10,38 +10,42 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
+var (
+	abc = "abc"
+)
+
 func TestSessionOptionsProfile(t *testing.T) {
 	{
 		opt := WithProfile(
-			WithProfilePreset("abc"),
+			WithProfilePreset(abc),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*createTableDesc)(&req))
-		if req.Profile.PresetName != "abc" {
+		if req.Profile.PresetName != abc {
 			t.Errorf("Preset is not as expected")
 		}
 	}
 	{
 		opt := WithProfile(
-			WithCompactionPolicy(WithCompactionPolicyPreset("abc")),
+			WithCompactionPolicy(WithCompactionPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*createTableDesc)(&req))
-		if req.Profile.CompactionPolicy.PresetName != "abc" {
+		if req.Profile.CompactionPolicy.PresetName != abc {
 			t.Errorf("Compaction policy is not as expected")
 		}
 	}
 	{
 		opt := WithProfile(
 			WithPartitioningPolicy(
-				WithPartitioningPolicyPreset("abc"),
+				WithPartitioningPolicyPreset(abc),
 				WithPartitioningPolicyMode(PartitioningAutoSplit),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*createTableDesc)(&req))
 		p := req.Profile.PartitioningPolicy
-		if p.PresetName != "abc" || p.AutoPartitioning != Ydb_Table.PartitioningPolicy_AUTO_SPLIT {
+		if p.PresetName != abc || p.AutoPartitioning != Ydb_Table.PartitioningPolicy_AUTO_SPLIT {
 			t.Errorf("Partitioning policy is not as expected")
 		}
 	}
@@ -77,18 +81,18 @@ func TestSessionOptionsProfile(t *testing.T) {
 	}
 	{
 		opt := WithProfile(
-			WithExecutionPolicy(WithExecutionPolicyPreset("abc")),
+			WithExecutionPolicy(WithExecutionPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*createTableDesc)(&req))
-		if req.Profile.ExecutionPolicy.PresetName != "abc" {
+		if req.Profile.ExecutionPolicy.PresetName != abc {
 			t.Errorf("Execution policy is not as expected")
 		}
 	}
 	{
 		opt := WithProfile(
 			WithReplicationPolicy(
-				WithReplicationPolicyPreset("abc"),
+				WithReplicationPolicyPreset(abc),
 				WithReplicationPolicyReplicasCount(3),
 				WithReplicationPolicyCreatePerAZ(ydb.FeatureEnabled),
 				WithReplicationPolicyAllowPromotion(ydb.FeatureDisabled),
@@ -97,7 +101,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*createTableDesc)(&req))
 		p := req.Profile.ReplicationPolicy
-		if p.PresetName != "abc" ||
+		if p.PresetName != abc ||
 			p.ReplicasCount != 3 ||
 			p.CreatePerAvailabilityZone != Ydb.FeatureFlag_ENABLED ||
 			p.AllowPromotion != Ydb.FeatureFlag_DISABLED {
@@ -106,11 +110,11 @@ func TestSessionOptionsProfile(t *testing.T) {
 	}
 	{
 		opt := WithProfile(
-			WithCachingPolicy(WithCachingPolicyPreset("abc")),
+			WithCachingPolicy(WithCachingPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*createTableDesc)(&req))
-		if req.Profile.CachingPolicy.PresetName != "abc" {
+		if req.Profile.CachingPolicy.PresetName != abc {
 			t.Errorf("Caching policy is not as expected")
 		}
 	}
@@ -120,7 +124,7 @@ func TestStoragePolicyOptions(t *testing.T) {
 	{
 		opt := WithProfile(
 			WithStoragePolicy(
-				WithStoragePolicyPreset("abc"),
+				WithStoragePolicyPreset(abc),
 				WithStoragePolicySyslog("any1"),
 				WithStoragePolicyLog("any2"),
 				WithStoragePolicyData("any3"),
@@ -131,7 +135,7 @@ func TestStoragePolicyOptions(t *testing.T) {
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*createTableDesc)(&req))
 		p := req.Profile.StoragePolicy
-		if p.PresetName != "abc" ||
+		if p.PresetName != abc ||
 			p.Syslog.Media != "any1" ||
 			p.Log.Media != "any2" ||
 			p.Data.Media != "any3" ||

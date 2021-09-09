@@ -118,7 +118,7 @@ type Backoff interface {
 	Wait(n int) <-chan time.Time
 }
 
-// BackoffFunc is an adatper to allow the use of ordinary functions as Backoff.
+// BackoffFunc is an adapter to allow the use of ordinary functions as Backoff.
 type BackoffFunc func(n int) <-chan time.Time
 
 // Wait implements Backoff interface.

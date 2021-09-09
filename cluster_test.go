@@ -356,7 +356,7 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 		c.Remove(ctx, endpoint)
 
 		// Now insert back the same endpoint with alive connection (and let dialer
-		// to dial successfuly).
+		// to dial successfully).
 		dialTicket <- 100
 		c.Insert(ctx, endpoint)
 

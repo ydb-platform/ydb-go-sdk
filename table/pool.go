@@ -509,7 +509,7 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 
 // Close deletes all stored sessions inside SessionPool.
 // It also stops all underlying timers and goroutines.
-// It returns first error occured during stale sessions deletion.
+// It returns first error occurred during stale sessions' deletion.
 // Note that even on error it calls Close() on each session.
 func (p *SessionPool) Close(ctx context.Context) (err error) {
 	p.init()

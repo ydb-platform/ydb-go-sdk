@@ -312,37 +312,6 @@ func (s *Scanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
 	return
 }
 
-func (s *Scanner) assertCurrentTypePrimitive(id Ydb.Type_PrimitiveTypeId) bool {
-	p := s.assertTypePrimitive(s.stack.current().t)
-	if p == nil {
-		return false
-	}
-	if p.TypeId != id {
-		s.primitiveTypeError(p.TypeId, id)
-		return false
-	}
-	return true
-}
-
-func (s *Scanner) assertCurrentTypeOptionalPrimitive(id Ydb.Type_PrimitiveTypeId) bool {
-	typ := s.stack.current().t
-	if t, _ := typ.Type.(*Ydb.Type_OptionalType); t != nil {
-		typ = t.OptionalType.Item
-	}
-	if typ == nil {
-		return false
-	}
-	p := s.assertTypePrimitive(typ)
-	if p == nil {
-		return false
-	}
-	if p.TypeId != id {
-		s.primitiveTypeError(p.TypeId, id)
-		return false
-	}
-	return true
-}
-
 func (s *Scanner) isCurrentTypeOptional() bool {
 	c := s.stack.current()
 	return isOptional(c.t)
@@ -934,11 +903,6 @@ func (s *Scanner) setDefaultValue(dst interface{}) {
 			s.errorf("scan row failed: type %T is unknown", v)
 		}
 	}
-}
-
-// Deprecated: Use Scan and implement ydb.Scanner
-func (s *Scanner) ScanRaw(row ydb.CustomScanner) error {
-	return row.UnmarshalYDB(s.converter)
 }
 
 // ScanWithDefaults scan with default type values.

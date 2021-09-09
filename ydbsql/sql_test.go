@@ -192,7 +192,7 @@ func TestQuery(t *testing.T) {
 							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.CreateSessionResult{}, nil
 							},
-							testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+							testutil.TableExecuteDataQuery: func(_ interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.ExecuteQueryResult{
 									TxMeta: &Ydb_Table.TransactionMeta{
 										Id: "",
@@ -206,7 +206,7 @@ func TestQuery(t *testing.T) {
 					),
 					testutil.WithNewStreamHandlers(
 						testutil.NewStreamHandlers{
-							testutil.TableStreamExecuteScanQuery: func(desc *grpc.StreamDesc) (grpc.ClientStream, error) {
+							testutil.TableStreamExecuteScanQuery: func(_ *grpc.StreamDesc) (grpc.ClientStream, error) {
 								return &testutil.ClientStream{
 									OnRecvMsg: func(m interface{}) error {
 										return io.EOF
@@ -257,7 +257,7 @@ func TestQuery(t *testing.T) {
 			defer cancel()
 			stmt, err := db.PrepareContext(ctx, "SELECT 1")
 			internal.NoError(t, err)
-			defer stmt.Close()
+			defer func() { _ = stmt.Close() }()
 			if test.scanQueryMode {
 				ctx = WithScanQuery(ctx)
 			}
@@ -282,7 +282,7 @@ func TestQuery(t *testing.T) {
 			defer cancel()
 			stmt, err := db.PrepareContext(ctx, "SELECT 1")
 			internal.NoError(t, err)
-			defer stmt.Close()
+			defer func() { _ = stmt.Close() }()
 			if test.scanQueryMode {
 				ctx = WithScanQuery(ctx)
 			}
@@ -315,7 +315,7 @@ func TestDatabaseSelect(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			res, err := db.ExecContext(ctx, test.query, test.params...)
 			if err != nil {
 				t.Fatal(err)
@@ -327,7 +327,7 @@ func TestDatabaseSelect(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			rows, err := db.QueryContext(ctx, test.query, test.params...)
 			if err != nil {
 				t.Fatal(err)
@@ -347,7 +347,7 @@ func TestStatement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	conn, err := db.Conn(ctx)
 	if err != nil {
@@ -357,7 +357,7 @@ func TestStatement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	_, _ = stmt.Exec()
 	_, _ = stmt.Exec()
@@ -375,7 +375,7 @@ func TestTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -385,7 +385,7 @@ func TestTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	_, _ = stmt.Exec()
 	_ = tx.Commit()
@@ -414,7 +414,7 @@ func TestDriver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	rows, err := db.QueryContext(ctx, `
 		DECLARE $seriesData AS "List<Struct<

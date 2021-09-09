@@ -67,7 +67,7 @@ is just a shortcut) for this purpose:
 		// Explicit retries for transactions.
 		err = ydbsql.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			// Execute statements here.
-			// Note that Commit()/Rollback() are not neccessary here.
+			// Note that Commit()/Rollback() are not necessary here.
 		})
 		if err != nil {
 			// handle error
