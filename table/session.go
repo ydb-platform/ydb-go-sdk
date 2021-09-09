@@ -298,6 +298,15 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		attrs[k] = v
 	}
 
+	indexes := make([]IndexDescription, len(res.Indexes))
+	for i, idx := range res.Indexes {
+		indexes[i] = IndexDescription{
+			Name:         idx.Name,
+			IndexColumns: idx.IndexColumns,
+			Status:       idx.Status,
+		}
+	}
+
 	return Description{
 		Name:                 res.Self.Name,
 		PrimaryKey:           res.PrimaryKey,
@@ -310,6 +319,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		StorageSettings:      storageSettings(res.GetStorageSettings()),
 		KeyBloomFilter:       internal.FeatureFlagFromYDB(res.GetKeyBloomFilter()),
 		PartitioningSettings: partitioningSettings(res.GetPartitioningSettings()),
+		Indexes:              indexes,
 		TTLSettings:          ttlSettings(res.GetTtlSettings()),
 		TimeToLiveSettings:   timeToLiveSettings(res.GetTtlSettings()),
 	}, nil

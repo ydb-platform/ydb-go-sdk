@@ -45,6 +45,20 @@ func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 	}
 }
 
+type IndexDescription struct {
+	Name         string
+	IndexColumns []string
+	Status       Ydb_Table.TableIndexDescription_Status
+}
+
+func (i IndexDescription) toYDB() *Ydb_Table.TableIndexDescription {
+	return &Ydb_Table.TableIndexDescription{
+		Name:         i.Name,
+		IndexColumns: i.IndexColumns,
+		Status:       i.Status,
+	}
+}
+
 type Description struct {
 	Name                 string
 	Columns              []Column
@@ -57,6 +71,7 @@ type Description struct {
 	StorageSettings      StorageSettings
 	KeyBloomFilter       ydb.FeatureFlag
 	PartitioningSettings PartitioningSettings
+	Indexes              []IndexDescription
 
 	// Deprecated: use TimeToLiveSettings instead.
 	// Will be removed after Jan 2022.

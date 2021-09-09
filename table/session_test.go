@@ -144,6 +144,7 @@ func TestSessionDescribeTable(t *testing.T) {
 				External:           StoragePool{Media: "m3"},
 				StoreExternalBlobs: ydb.FeatureEnabled,
 			},
+			Indexes: []IndexDescription{},
 		}
 		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{
