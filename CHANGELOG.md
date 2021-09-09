@@ -1,3 +1,6 @@
+## 2.6.1
+* fix panic on lazy put to full pool
+
 ## 2.6.0
 * Exported `SessionProvider.CloseSession` func
 * Implements by default async closing session and putting busy

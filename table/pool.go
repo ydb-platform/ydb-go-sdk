@@ -430,7 +430,7 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 		err = ErrSessionPoolClosed
 
 	case p.idle.Len() >= p.limit:
-		panicLocked(&p.mu, "ydb: table: Put() on full session pool")
+		err = ErrSessionPoolOverflow
 
 	default:
 		if !p.notify(s) {
