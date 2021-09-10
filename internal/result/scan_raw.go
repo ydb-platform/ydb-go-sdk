@@ -10,7 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
@@ -98,11 +98,11 @@ func (s *rawConverter) HasNextItem() bool {
 
 func (s *rawConverter) Path() string {
 	var buf bytes.Buffer
-	_, _ = s.WritePathTo(&buf)
+	_, _ = s.writePathTo(&buf)
 	return buf.String()
 }
 
-func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
+func (s *rawConverter) writePathTo(w io.Writer) (n int64, err error) {
 	for sp := 0; sp < s.stack.size(); sp++ {
 		if sp > 0 {
 			m, err := io.WriteString(w, ".")
@@ -569,7 +569,7 @@ func (s *rawConverter) boundsError(n, i int) {
 func (s *Scanner) decimalTypeError(t ydb.Type) {
 	s.errorf(
 		"unexpected decimal type at %q %s: want %s",
-		s.Path(), s.Type(), t,
+		s.path(), s.Type(), t,
 	)
 }
 
@@ -599,7 +599,7 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 	if isOptional(p.t) {
 		return true
 	}
-	s.errorf("not nullable type at %q: %s (%d %s %s)", s.Path(), s.Type(), s.stack.size(), c.t, p.t)
+	s.errorf("not nullable type at %q: %s (%d %s %s)", s.path(), s.Type(), s.stack.size(), c.t, p.t)
 	return false
 }
 func (s *rawConverter) assertCurrentTypeIs(t ydb.Type) bool {
@@ -608,7 +608,7 @@ func (s *rawConverter) assertCurrentTypeIs(t ydb.Type) bool {
 	if !internal.TypesEqual(act, t) {
 		s.errorf(
 			"unexpected type at %q %s: %s; want %s",
-			s.Path(), s.Type(), act, t,
+			s.path(), s.Type(), act, t,
 		)
 		return false
 	}

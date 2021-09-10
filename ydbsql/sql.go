@@ -23,14 +23,7 @@ type ydbWrapper struct {
 	dst *driver.Value
 }
 
-func (d *ydbWrapper) UnmarshalYDB(res ydb.RawScanner) error {
-	if !res.NextItem() {
-		err := res.Err()
-		if err == nil {
-			err = io.ErrUnexpectedEOF
-		}
-		return err
-	}
+func (d *ydbWrapper) UnmarshalYDB(res ydb.RawValue) error {
 	if res.IsOptional() {
 		res.Unwrap()
 	}

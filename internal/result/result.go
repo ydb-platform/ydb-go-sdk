@@ -813,12 +813,10 @@ func (s *Scanner) scanOptional(value interface{}) {
 		if s.isNull() {
 			*v = nil
 		} else {
-			s.unwrap()
 			src := s.any()
 			*v = &src
 		}
 	case sql.Scanner:
-		s.unwrap()
 		err := v.Scan(s.any())
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
