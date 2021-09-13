@@ -159,16 +159,8 @@ func TestTxDoerStmt(t *testing.T) {
 	}
 	cluster := b.Build()
 
-	busyChecking := make(chan bool)
 	db := sql.OpenDB(Connector(
 		WithSessionPoolIdleThreshold(time.Hour),
-		WithSessionPoolTrace(table.SessionPoolTrace{
-			OnBusyCheck: func(info table.SessionPoolBusyCheckStartInfo) func(table.SessionPoolBusyCheckDoneInfo) {
-				busyChecking <- true
-				t.Logf("busy checking session %q", info.Session.ID)
-				return nil
-			},
-		}),
 		WithClient(table.NewClient(cluster)),
 	))
 	if err := db.Ping(); err != nil {
@@ -191,16 +183,6 @@ func TestTxDoerStmt(t *testing.T) {
 		_, err := tx.Stmt(stmt).Exec()
 		return err
 	})
-	if !isBusy(err) {
-		t.Fatalf("not busy error: %v", err)
-	}
-
-	const timeout = 2 * time.Second
-	select {
-	case <-busyChecking:
-	case <-time.After(timeout):
-		t.Fatalf("no busy checking after %s", timeout)
-	}
 
 	// Try to repeat the same thing – we should not receive any error here –
 	// previous session must be marked busy and not used for some time.

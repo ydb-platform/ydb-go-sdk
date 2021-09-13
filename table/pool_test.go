@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"path"
 	"runtime"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -73,54 +72,6 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 				t.Fatalf("unexpected result: <%v, %v>", s, err)
 			}
 		})
-	}
-}
-
-func TestSessionPoolTakeBusy(t *testing.T) {
-	timer := &time.Timer{}
-	keepalive := make(chan struct{}, 1)
-	p := &SessionPool{
-		SizeLimit:         1,
-		BusyCheckInterval: 1 * time.Second,
-		IdleThreshold:     -1,
-		Builder: &StubBuilder{
-			T:     t,
-			Limit: 1,
-			Cluster: testutil.NewCluster(
-				testutil.WithInvokeHandlers(
-					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-							return &Ydb_Table.CreateSessionResult{}, nil
-						},
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
-							r := &Ydb_Table.KeepAliveResult{
-								SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
-							}
-							timer = time.NewTimer(time.Second)
-							keepalive <- struct{}{}
-							return r, nil
-						},
-						testutil.TableDeleteSession: okHandler,
-					},
-				),
-			),
-		},
-	}
-	defer func() {
-		_ = p.Close(context.Background())
-	}()
-
-	s1 := mustCreateSession(t, p)
-
-	mustPutSession(t, p, s1)
-	mustTakeSession(t, p, s1)
-	mustPutBusySession(t, p, s1)
-
-	<-keepalive
-	<-timer.C
-	s2 := mustCreateSession(t, p)
-	if s2 != s1 {
-		t.Fatalf("ready session is not reused")
 	}
 }
 
@@ -259,9 +210,8 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 		keepalive = make(chan struct{})
 	)
 	p := &SessionPool{
-		SizeLimit:         1,
-		IdleThreshold:     time.Hour,
-		BusyCheckInterval: -1,
+		SizeLimit:     1,
+		IdleThreshold: time.Hour,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
@@ -403,9 +353,8 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 
 func TestSessionPoolClose(t *testing.T) {
 	p := &SessionPool{
-		SizeLimit:         3,
-		IdleThreshold:     time.Hour,
-		BusyCheckInterval: time.Hour,
+		SizeLimit:     3,
+		IdleThreshold: time.Hour,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 3,
@@ -434,7 +383,7 @@ func TestSessionPoolClose(t *testing.T) {
 
 	mustPutSession(t, p, s1)
 
-	mustPutBusySession(t, p, s2)
+	mustPutSession(t, p, s2)
 
 	mustClose(t, p)
 
@@ -570,9 +519,8 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	}
 	create := make(chan createReq)
 	p := &SessionPool{
-		SizeLimit:         1,
-		IdleThreshold:     -1,
-		BusyCheckInterval: -1,
+		SizeLimit:     1,
+		IdleThreshold: -1,
 		Builder: &StubBuilder{
 			Limit: 1,
 			OnCreateSession: func(ctx context.Context) (*Session, error) {
@@ -640,9 +588,8 @@ func TestSessionPoolRacyGet(t *testing.T) {
 
 func TestSessionPoolPutInFull(t *testing.T) {
 	p := &SessionPool{
-		SizeLimit:         1,
-		IdleThreshold:     -1,
-		BusyCheckInterval: -1,
+		SizeLimit:     1,
+		IdleThreshold: -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
@@ -654,14 +601,13 @@ func TestSessionPoolPutInFull(t *testing.T) {
 	}
 
 	s := mustGetSession(t, p)
-	_ = p.Put(context.Background(), s)
+	if err := p.Put(context.Background(), s); err != nil {
+		t.Fatalf("unexpected error on put session into non-full pool: %v, wand: %v", err, nil)
+	}
 
-	defer func() {
-		if thePanic := recover(); thePanic == nil {
-			t.Fatalf("no panic")
-		}
-	}()
-	_ = p.Put(context.Background(), simpleSession())
+	if err := p.Put(context.Background(), simpleSession()); err != ErrSessionPoolOverflow {
+		t.Fatalf("unexpected error on put session into full pool: %v, wand: %v", err, ErrSessionPoolOverflow)
+	}
 }
 
 func TestSessionPoolSizeLimitOverflow(t *testing.T) {
@@ -779,9 +725,8 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 		keepalive = make(chan struct{})
 	)
 	p := &SessionPool{
-		SizeLimit:         1,
-		IdleThreshold:     time.Hour,
-		BusyCheckInterval: -1,
+		SizeLimit:     1,
+		IdleThreshold: time.Hour,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
@@ -928,9 +873,8 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 	defer timer.Cleanup()
 
 	p := &SessionPool{
-		SizeLimit:         1,
-		IdleThreshold:     -1,
-		BusyCheckInterval: -1,
+		SizeLimit:     1,
+		IdleThreshold: -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
@@ -965,9 +909,8 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 		keepAliveCount uint32
 	)
 	p := &SessionPool{
-		SizeLimit:         2,
-		IdleThreshold:     idleThreshold,
-		BusyCheckInterval: -1,
+		SizeLimit:     2,
+		IdleThreshold: idleThreshold,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
@@ -1041,9 +984,8 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 		keepalive     = make(chan chan<- struct{})
 	)
 	p := &SessionPool{
-		SizeLimit:         2,
-		IdleThreshold:     idleThreshold,
-		BusyCheckInterval: -1,
+		SizeLimit:     2,
+		IdleThreshold: idleThreshold,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
@@ -1109,9 +1051,8 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 
 func TestSessionPoolDoublePut(t *testing.T) {
 	p := &SessionPool{
-		SizeLimit:         2, // Skip a panic on full pool.
-		IdleThreshold:     -1,
-		BusyCheckInterval: -1,
+		SizeLimit:     2,
+		IdleThreshold: -1,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
@@ -1157,9 +1098,8 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 		deleteSessionResult = make(chan error)
 	)
 	p := &SessionPool{
-		SizeLimit:         1,
-		IdleThreshold:     time.Second,
-		BusyCheckInterval: -1,
+		SizeLimit:     1,
+		IdleThreshold: time.Second,
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
@@ -1392,103 +1332,6 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	}
 }
 
-// create session
-// close pool
-// PutBusy session in the pool
-// session must be closed and error is returned
-func TestPutBusyAfterClosePool(t *testing.T) {
-	limit := 100000
-	p := &SessionPool{
-		Builder: &StubBuilder{
-			T:     t,
-			Limit: limit,
-			Cluster: testutil.NewCluster(
-				testutil.WithInvokeHandlers(
-					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-							return &Ydb_Table.CreateSessionResult{}, nil
-						},
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
-							r := &Ydb_Table.KeepAliveResult{
-								SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
-							}
-							return r, nil
-						},
-						testutil.TableDeleteSession: okHandler,
-					},
-				),
-			),
-		},
-		SizeLimit:              limit,
-		IdleThreshold:          -1,
-		IdleKeepAliveThreshold: -1,
-	}
-
-	wg := sync.WaitGroup{}
-	for i := 0; i < limit; i++ {
-		wg.Add(2)
-		s := mustCreateSession(t, p)
-		s.ID = strconv.Itoa(i)
-		s.OnClose(func() {
-			wg.Done()
-		})
-		t.Run(s.ID, func(t *testing.T) {
-			defer wg.Done()
-			err := p.PutBusy(context.Background(), s)
-			if err != nil && err != ErrSessionPoolClosed {
-				t.Fatalf("unexpected error: %v; want %v", err, ErrSessionPoolClosed)
-			}
-		})
-	}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_ = p.Close(context.Background())
-	}()
-	wg.Wait()
-}
-
-// create first session
-// PutBusy first session in the pool
-// BusyCheckInterval is very long
-// create second session
-// PutBusy second session, busyCheck channel is overflow
-// second session must be closed
-func TestOverflowBusyCheck(t *testing.T) {
-	p := &SessionPool{
-		Trace: SessionPoolTrace{},
-		Builder: &StubBuilder{
-			T:     t,
-			Limit: 2,
-			Cluster: testutil.NewCluster(
-				testutil.WithInvokeHandlers(
-					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-							return &Ydb_Table.CreateSessionResult{}, nil
-						},
-					},
-				),
-			),
-		},
-		SizeLimit:              1,
-		IdleThreshold:          -1,
-		IdleKeepAliveThreshold: -1,
-		BusyCheckInterval:      time.Hour,
-	}
-	defer func() {
-		_ = p.Close(context.Background())
-	}()
-	s1 := mustCreateSession(t, p)
-	mustPutBusySession(t, p, s1)
-	s2 := mustCreateSession(t, p)
-	closed := make(chan bool)
-	s2.OnClose(func() {
-		close(closed)
-	})
-	mustPutBusySession(t, p, s2)
-	<-closed
-}
-
 func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 	select {
 	case act := <-ch:
@@ -1557,33 +1400,6 @@ func mustPutSession(t *testing.T, p *SessionPool, s *Session) {
 				OnPut: func(info SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
 					wg.Add(1)
 					return func(info SessionPoolPutDoneInfo) {
-						wg.Done()
-					}
-				},
-				OnCloseSession: func(info SessionPoolCloseSessionStartInfo) func(doneInfo SessionPoolCloseSessionDoneInfo) {
-					wg.Add(1)
-					return func(info SessionPoolCloseSessionDoneInfo) {
-						wg.Done()
-					}
-				},
-			},
-		),
-		s,
-	); err != nil {
-		t.Fatalf("%s: %v", caller(), err)
-	}
-}
-
-func mustPutBusySession(t *testing.T, p *SessionPool, s *Session) {
-	wg := sync.WaitGroup{}
-	defer wg.Wait()
-	if err := p.PutBusy(
-		WithSessionPoolTrace(
-			context.Background(),
-			SessionPoolTrace{
-				OnPutBusy: func(info SessionPoolPutBusyStartInfo) func(doneInfo SessionPoolPutBusyDoneInfo) {
-					wg.Add(1)
-					return func(info SessionPoolPutBusyDoneInfo) {
 						wg.Done()
 					}
 				},

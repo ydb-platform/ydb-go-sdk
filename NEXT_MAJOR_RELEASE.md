@@ -13,6 +13,14 @@
 - [ ] Remove or hide (do private) deprecated API for new `scanner`.
 - [x] Delete deprecated ready statistics from session pool
 - [ ] Hide (do private) entity `table.Client` or `table.SessionPool` because it most difficultly for SDK users
+- [ ] Drop `table.SessionProvider.PutBusy()` interface func
+- [ ] Drop `Retry.MustCheckSession()` func
+- [ ] Drop `RetryCheckSession` constant
+- [ ] Drop `table.SessionPoolStats.BusyCheck` counter
+- [ ] Drop `ydbsql.WithSessionPoolBusyCheckInterval()`
+- [ ] Drop `connect.WithSessionPoolBusyCheckInterval()`
+- [ ] Drop marked as deprecated some retry constants
+- [ ] Change `Backoff` interface
 - [x] Extract auth package to neighbour project(-s) for isolation ydb-go-sdk from unnecessary dependencies
 - [x] Extract coordination package to neighbour project as plugin over ydb-go-sdk
 - [x] Extract ratelimiter package to neighbour project as plugin over ydb-go-sdk

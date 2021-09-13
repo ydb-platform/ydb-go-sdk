@@ -254,7 +254,7 @@ func WithDriverTrace(ctx context.Context, t DriverTrace) context.Context {
 }
 
 // ContextDriverTrace returns DriverTrace associated with ctx.
-// If there is no DriverTrace associated with ctx then zero value 
+// If there is no DriverTrace associated with ctx then zero value
 // of DriverTrace is returned.
 func ContextDriverTrace(ctx context.Context) DriverTrace {
 	t, _ := ctx.Value(driverTraceContextKey{}).(DriverTrace)
@@ -263,7 +263,7 @@ func ContextDriverTrace(ctx context.Context) DriverTrace {
 
 func (t DriverTrace) onDial(ctx context.Context, d DialStartInfo) func(DialDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(DialStartInfo) func(DialDoneInfo) 
+	var fn func(DialStartInfo) func(DialDoneInfo)
 	switch {
 	case t.OnDial == nil:
 		fn = c.OnDial
@@ -303,7 +303,7 @@ func (t DriverTrace) onDial(ctx context.Context, d DialStartInfo) func(DialDoneI
 }
 func (t DriverTrace) onGetConn(ctx context.Context, g GetConnStartInfo) func(GetConnDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(GetConnStartInfo) func(GetConnDoneInfo) 
+	var fn func(GetConnStartInfo) func(GetConnDoneInfo)
 	switch {
 	case t.OnGetConn == nil:
 		fn = c.OnGetConn
@@ -343,7 +343,7 @@ func (t DriverTrace) onGetConn(ctx context.Context, g GetConnStartInfo) func(Get
 }
 func (t DriverTrace) onPessimization(ctx context.Context, p PessimizationStartInfo) func(PessimizationDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(PessimizationStartInfo) func(PessimizationDoneInfo) 
+	var fn func(PessimizationStartInfo) func(PessimizationDoneInfo)
 	switch {
 	case t.OnPessimization == nil:
 		fn = c.OnPessimization
@@ -383,7 +383,7 @@ func (t DriverTrace) onPessimization(ctx context.Context, p PessimizationStartIn
 }
 func (t DriverTrace) trackConnStart(ctx context.Context, t1 TrackConnStartInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(TrackConnStartInfo) 
+	var fn func(TrackConnStartInfo)
 	switch {
 	case t.TrackConnStart == nil:
 		fn = c.TrackConnStart
@@ -404,7 +404,7 @@ func (t DriverTrace) trackConnStart(ctx context.Context, t1 TrackConnStartInfo) 
 }
 func (t DriverTrace) trackConnDone(ctx context.Context, t1 TrackConnDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(TrackConnDoneInfo) 
+	var fn func(TrackConnDoneInfo)
 	switch {
 	case t.TrackConnDone == nil:
 		fn = c.TrackConnDone
@@ -425,7 +425,7 @@ func (t DriverTrace) trackConnDone(ctx context.Context, t1 TrackConnDoneInfo) {
 }
 func (t DriverTrace) onGetCredentials(ctx context.Context, g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo) 
+	var fn func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
 	switch {
 	case t.OnGetCredentials == nil:
 		fn = c.OnGetCredentials
@@ -465,7 +465,7 @@ func (t DriverTrace) onGetCredentials(ctx context.Context, g GetCredentialsStart
 }
 func (t DriverTrace) onDiscovery(ctx context.Context, d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(DiscoveryStartInfo) func(DiscoveryDoneInfo) 
+	var fn func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
 	switch {
 	case t.OnDiscovery == nil:
 		fn = c.OnDiscovery
@@ -505,7 +505,7 @@ func (t DriverTrace) onDiscovery(ctx context.Context, d DiscoveryStartInfo) func
 }
 func (t DriverTrace) onOperation(ctx context.Context, o OperationStartInfo) func(OperationDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(OperationStartInfo) func(OperationDoneInfo) 
+	var fn func(OperationStartInfo) func(OperationDoneInfo)
 	switch {
 	case t.OnOperation == nil:
 		fn = c.OnOperation
@@ -545,7 +545,7 @@ func (t DriverTrace) onOperation(ctx context.Context, o OperationStartInfo) func
 }
 func (t DriverTrace) onOperationWait(ctx context.Context, o OperationWaitInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(OperationWaitInfo) 
+	var fn func(OperationWaitInfo)
 	switch {
 	case t.OnOperationWait == nil:
 		fn = c.OnOperationWait
@@ -566,7 +566,7 @@ func (t DriverTrace) onOperationWait(ctx context.Context, o OperationWaitInfo) {
 }
 func (t DriverTrace) onStream(ctx context.Context, s StreamStartInfo) func(StreamDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(StreamStartInfo) func(StreamDoneInfo) 
+	var fn func(StreamStartInfo) func(StreamDoneInfo)
 	switch {
 	case t.OnStream == nil:
 		fn = c.OnStream
@@ -606,7 +606,7 @@ func (t DriverTrace) onStream(ctx context.Context, s StreamStartInfo) func(Strea
 }
 func (t DriverTrace) onStreamRecv(ctx context.Context, s StreamRecvStartInfo) func(StreamRecvDoneInfo) {
 	c := ContextDriverTrace(ctx)
-	var fn func(StreamRecvStartInfo) func(StreamRecvDoneInfo) 
+	var fn func(StreamRecvStartInfo) func(StreamRecvDoneInfo)
 	switch {
 	case t.OnStreamRecv == nil:
 		fn = c.OnStreamRecv

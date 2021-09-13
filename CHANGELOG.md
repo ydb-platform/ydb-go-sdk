@@ -1,3 +1,13 @@
+## 2.7.0
+* Dropped busy checker logic
+* Refactoring of `RetryMode`, `RetryChecker` and `Retryer`
+* Added fast/slow retry logic
+* Supported context param for retry operation with no idempotent errors
+* Added secondary indexes info to table describing method
+
+## 2.6.1
+* fix panic on lazy put to full pool
+
 ## 2.6.0
 * Exported `SessionProvider.CloseSession` func
 * Implements by default async closing session and putting busy

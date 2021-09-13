@@ -21,6 +21,8 @@ type SessionProvider interface {
 	// PutBusy takes session with not yet completed operation inside.
 	// It gives full ownership of s to session provider.
 	// PutBusy must be fast, if necessary must be async
+	// Deprecated: use conditionally Put() or CloseSession() for uncertain
+	// sessions instead
 	PutBusy(context.Context, *Session) (err error)
 
 	// CloseSession provides the most effective way of session closing
@@ -30,8 +32,9 @@ type SessionProvider interface {
 }
 
 type SessionProviderFunc struct {
-	OnGet     func(context.Context) (*Session, error)
-	OnPut     func(context.Context, *Session) error
+	OnGet func(context.Context) (*Session, error)
+	OnPut func(context.Context, *Session) error
+	// Deprecated: has no effect now
 	OnPutBusy func(context.Context, *Session) error
 }
 
@@ -49,11 +52,9 @@ func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
 	return f.OnPut(ctx, s)
 }
 
+// Deprecated: wull be dropped at next major release
 func (f SessionProviderFunc) PutBusy(ctx context.Context, s *Session) error {
-	if f.OnPutBusy == nil {
-		return s.Close(ctx)
-	}
-	return f.OnPutBusy(ctx, s)
+	return s.Close(ctx)
 }
 
 func (f SessionProviderFunc) CloseSession(ctx context.Context, s *Session) error {
@@ -105,8 +106,16 @@ type Retryer struct {
 	RetryChecker ydb.RetryChecker
 
 	// Backoff is a selected backoff policy.
-	// If backoff is nil, then the DefaultBackoff is used.
+	// Deprecated: use FastBackoff and SlowBackoff instead, has no effect now
 	Backoff ydb.Backoff
+
+	// FastBackoff is a selected backoff policy.
+	// If backoff is nil, then the ydb.DefaultFastBackoff is used.
+	FastBackoff ydb.Backoff
+
+	// SlowBackoff is a selected backoff policy.
+	// If backoff is nil, then the ydb.DefaultSlowBackoff is used.
+	SlowBackoff ydb.Backoff
 
 	// Trace provide tracing of retry logic
 	Trace RetryTrace
@@ -118,18 +127,41 @@ func Retry(ctx context.Context, s SessionProvider, op Operation) error {
 		SessionProvider: s,
 		MaxRetries:      ydb.DefaultMaxRetries,
 		RetryChecker:    ydb.DefaultRetryChecker,
-		Backoff:         ydb.DefaultBackoff,
+		FastBackoff:     ydb.DefaultFastBackoff,
+		SlowBackoff:     ydb.DefaultSlowBackoff,
 	}).Do(ctx, op)
+}
+
+func (r Retryer) backoff(ctx context.Context, m ydb.RetryMode, i int) error {
+	var b ydb.Backoff
+	switch m.BackoffType() {
+	case ydb.BackoffTypeNoBackoff:
+		return nil
+	case ydb.BackoffTypeFastBackoff:
+		if r.FastBackoff != nil {
+			b = r.FastBackoff
+		} else {
+			b = r.Backoff
+		}
+	case ydb.BackoffTypeSlowBackoff:
+		if r.SlowBackoff != nil {
+			b = r.SlowBackoff
+		} else {
+			b = r.Backoff
+		}
+	}
+	return ydb.WaitBackoff(ctx, b, i)
 }
 
 // Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
-	retryTraceLoopDone := retryTraceOnLoop(ctx, r.Trace, ctx)
 	var (
-		s     *Session
-		m     ydb.RetryMode
-		i     int
-		start = time.Now()
+		s                  *Session
+		m                  ydb.RetryMode
+		i                  int
+		start              = time.Now()
+		retryNoIdempotent  = ydb.ContextRetryNoIdempotent(ctx)
+		retryTraceLoopDone = retryTraceOnLoop(ctx, r.Trace, ctx)
 	)
 	defer func() {
 		retryTraceLoopDone(ctx, time.Since(start), i)
@@ -166,24 +198,15 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 			}
 
 			m = r.RetryChecker.Check(err)
-			switch {
-			case m.MustDeleteSession():
+			if m.MustDeleteSession() {
 				_ = r.SessionProvider.CloseSession(ctx, s)
 				s = nil
-
-			case m.MustCheckSession():
-				_ = r.SessionProvider.PutBusy(ctx, s)
-				s = nil
 			}
-			if !m.Retriable() {
+			if !m.MustRetry(retryNoIdempotent) {
 				return err
 			}
-			if m.MustBackoff() {
-				if e := ydb.WaitBackoff(ctx, r.Backoff, i); e != nil {
-					// Return original error to make it possible to lay on for the
-					// client.
-					return err
-				}
+			if e := r.backoff(ctx, m, i); e != nil {
+				return err
 			}
 		}
 	}

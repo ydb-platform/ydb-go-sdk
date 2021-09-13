@@ -17,17 +17,9 @@ type (
 	ctxOpTimeoutKey     struct{}
 	ctxOpCancelAfterKey struct{}
 	ctxOpModeKey        struct{}
+	ctxRetryNoIdempotentKey struct {}
 
 	ctxClientConnApplierKey struct{}
-
-	// Deprecated: no need to append endpoint info
-	ctxEndpointInfoKey struct{}
-
-	// Deprecated: no need to append endpoint info
-	ctxEndpointInfo struct {
-		conn   *conn
-		policy ConnUsePolicy
-	}
 )
 
 type valueOnlyContext struct{ context.Context }
@@ -60,30 +52,6 @@ func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
 	return
 }
 
-// WithEndpointInfo returns a copy of parent context with endopint info and custom connection use policy
-// Deprecated: no need to append endpoint info
-func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, policy ConnUsePolicy) context.Context {
-	if endpointInfo != nil {
-		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
-			conn:   endpointInfo.Conn(),
-			policy: policy,
-		})
-	}
-	return ctx
-}
-
-// WithEndpointInfo returns a copy of parent context with endpoint info and default connection use policy
-// Deprecated: no need to append endpoint info
-func WithEndpointInfo(ctx context.Context, endpointInfo EndpointInfo) context.Context {
-	if endpointInfo != nil {
-		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
-			conn:   endpointInfo.Conn(),
-			policy: ConnUseSmart,
-		})
-	}
-	return ctx
-}
-
 // WithTraceID returns a copy of parent context with traceID
 func WithTraceID(ctx context.Context, traceID string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, metaTraceID, traceID)
@@ -92,16 +60,6 @@ func WithTraceID(ctx context.Context, traceID string) context.Context {
 // WithUserAgent returns a copy of parent context with custom user-agent info
 func WithUserAgent(ctx context.Context, userAgent string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, metaUserAgent, userAgent)
-}
-
-// ContextConn returns the connection and connection use policy
-// Deprecated: no need to use endpoint info from context
-func ContextConn(ctx context.Context) (conn *conn, backoffUseBalancer bool) {
-	connInfo, ok := ctx.Value(ctxEndpointInfoKey{}).(ctxEndpointInfo)
-	if !ok {
-		return nil, true
-	}
-	return connInfo.conn, connInfo.policy != ConnUseEndpoint
 }
 
 // WithOperationCancelAfter returns a copy of parent context in which YDB operation
@@ -115,7 +73,7 @@ func WithOperationCancelAfter(ctx context.Context, d time.Duration) context.Cont
 	return context.WithValue(ctx, ctxOpCancelAfterKey{}, d)
 }
 
-// ContextOperationTimeout returns the timeout within given context after which
+// ContextOperationCancelAfter returns the timeout within given context after which
 // YDB should try to cancel operation and return result regardless of the
 // cancelation.
 func ContextOperationCancelAfter(ctx context.Context) (d time.Duration, ok bool) {
@@ -166,6 +124,18 @@ func WithClientConnApplier(ctx context.Context, apply ClientConnApplier) context
 func ContextClientConnApplier(ctx context.Context) (v ClientConnApplier, ok bool) {
 	v, ok = ctx.Value(ctxClientConnApplierKey{}).(ClientConnApplier)
 	return
+}
+
+// WithRetryNoIdempotent returns a copy of parent context with allow retry
+// operations with no idempotent errors
+func WithRetryNoIdempotent(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxRetryNoIdempotentKey{}, true)
+}
+
+// ContextRetryNoIdempotent returns the flag for retry with no idempotent errors
+func ContextRetryNoIdempotent(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxRetryNoIdempotentKey{}).(bool)
+	return ok && v
 }
 
 type OperationMode uint

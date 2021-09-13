@@ -17,8 +17,10 @@ var (
 	ErrUnsupported         = errors.New("ydbsql: not supported")
 	ErrActiveTransaction   = errors.New("ydbsql: can not begin tx within active tx")
 	ErrNoActiveTransaction = errors.New("ydbsql: no active tx to work with")
-	ErrSessionBusy         = errors.New("ydbsql: session is busy")
 	ErrResultTruncated     = errors.New("ydbsql: result set has been truncated")
+
+	// Deprecated: not used
+	ErrSessionBusy = errors.New("ydbsql: session is busy")
 )
 
 // conn is a connection to the ydb.
@@ -27,7 +29,6 @@ type conn struct {
 	session   *table.Session // Immutable and r/o usage.
 
 	idle bool
-	busy bool
 
 	tx  *table.Transaction
 	txc *table.TransactionControl
@@ -44,23 +45,15 @@ func (c *conn) takeSession(ctx context.Context) bool {
 	return true
 }
 
-func (c *conn) putSession(ctx context.Context) {
+func (c *conn) ResetSession(ctx context.Context) error {
 	if c.idle {
-		return
+		return nil
 	}
 	err := c.pool().Put(ctx, c.session)
 	if err != nil {
-		panic(fmt.Sprintf("ydbsql: put session error: %v", err))
+		return mapBadSessionError(err)
 	}
 	c.idle = true
-}
-
-func (c *conn) ResetSession(ctx context.Context) error {
-	if c.busy {
-		_ = c.pool().PutBusy(ctx, c.session)
-		return driver.ErrBadConn
-	}
-	c.putSession(ctx)
 	return nil
 }
 
@@ -70,7 +63,6 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	}
 	s, err := c.session.Prepare(ctx, query)
 	if err != nil {
-		c.busy = isBusy(err)
 		return nil, mapBadSessionError(err)
 	}
 	return &stmt{
@@ -137,7 +129,6 @@ func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx
 	if isolation != nil {
 		c.tx, err = c.session.BeginTransaction(ctx, table.TxSettings(isolation))
 		if err != nil {
-			c.busy = isBusy(err)
 			return nil, mapBadSessionError(err)
 		}
 		c.txc = table.TxControl(table.WithTx(c.tx))
@@ -158,16 +149,6 @@ func (c *conn) Rollback() error {
 	c.tx = nil
 	c.txc = nil
 
-	if c.busy {
-		// We don't try to rollback tx here after previous operation was not
-		// completed – session is probably still in busy state.
-		//
-		// Do not return driver.ErrBadConn here – we want this conn's session
-		// to be reused after c.ResetSession() call. Bad conn error will force
-		// database/sql to close this session without calling ResetSession().
-		return ErrSessionBusy
-	}
-
 	if tx != nil {
 		return tx.Rollback(context.Background())
 	}
@@ -182,16 +163,6 @@ func (c *conn) Commit() error {
 	tx := c.tx
 	c.tx = nil
 	c.txc = nil
-
-	if c.busy {
-		// We don't try to rollback tx here after previous operation was not
-		// completed – session is probably still in busy state.
-		//
-		// Do not return driver.ErrBadConn here – we want this conn's session
-		// to be reused after c.ResetSession() call. Bad conn error will force
-		// database/sql to close this session without calling ResetSession().
-		return ErrSessionBusy
-	}
 
 	if tx != nil {
 		return tx.Commit(context.Background())
@@ -246,11 +217,6 @@ func (c *conn) Ping(ctx context.Context) error {
 }
 
 func (c *conn) Close() error {
-	if c.busy {
-		// NOTE: do not close the session – it is already returned to the pool
-		// by PutBusy() call.
-		return nil
-	}
 	ctx := context.Background()
 	if !c.takeSession(ctx) {
 		return driver.ErrBadConn
@@ -272,6 +238,7 @@ func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParam
 		return nil, driver.ErrBadConn
 	}
 	rc := c.retryConfig()
+	retryNoIdempotent := ydb.ContextRetryNoIdempotent(ctx)
 	maxRetries := rc.MaxRetries
 	if c.tx != nil {
 		// NOTE: when under transaction, no retries must be done.
@@ -279,13 +246,8 @@ func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParam
 	}
 	var m ydb.RetryMode
 	for i := 0; i <= maxRetries; i++ {
-		if m.MustBackoff() {
-			e := ydb.WaitBackoff(ctx, rc.Backoff, i-1)
-			if e != nil {
-				// Use original error to make it possible to lay on for the
-				// client.
-				break
-			}
+		if e := backoff(ctx, m, rc, i-1); e != nil {
+			break
 		}
 		res, err = req.process(ctx, c, params)
 		if err == nil {
@@ -294,32 +256,10 @@ func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParam
 
 		m = rc.RetryChecker.Check(err)
 
-		if c.busy = m.MustCheckSession(); c.busy {
-			if m.Retriable() {
-				return nil, driver.ErrBadConn
-			}
-			// Can not use this conn anymore – operation started and may still
-			// be not finished.
-			//
-			// NOTE: we can not return ErrBadConn right here because in that
-			// case database/sql will retry given query. Instead, since we have
-			// marked this sql.Conn busy above, it will be closed after
-			// ResetSession() call by database/sql.
-			return nil, err
-		}
-		if m.MustDropCache() {
-			// NOTE: if prepared statement is not found, the easy solution is just
-			// to drop the sql.Conn (which mapping of table.Session) with all its
-			// cached queries.
-			//
-			// That is, it could be pretty messy to deal with database/sql prepare
-			// logic which happens for all sql.Conn instances implicitly.
-			return nil, driver.ErrBadConn
-		}
 		if m.MustDeleteSession() {
 			return nil, driver.ErrBadConn
 		}
-		if !m.Retriable() {
+		if !m.MustRetry(retryNoIdempotent) {
 			break
 		}
 	}
@@ -414,6 +354,7 @@ type TxDoer struct {
 //   }))
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 	rc := d.RetryConfig
+	retryNoIdempotent := ydb.ContextRetryNoIdempotent(ctx)
 	if rc == nil {
 		rc = &d.DB.Driver().(*Driver).c.retryConfig
 	}
@@ -426,18 +367,12 @@ func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 			// session must be closed. Thus we could retry whole transaction.
 			continue
 		}
-		// NOTE: not checking isBusy() here because it is checked
-		// inside conn.exec() method.
 		m := rc.RetryChecker.Check(err)
-		if !m.Retriable() {
+		if !m.MustRetry(retryNoIdempotent) {
 			return err
 		}
-		if m.MustBackoff() {
-			if e := ydb.WaitBackoff(ctx, rc.Backoff, i); e != nil {
-				// Return original error to make it possible to lay on for the
-				// client.
-				return err
-			}
+		if e := backoff(ctx, m, rc, i); e != nil {
+			break
 		}
 	}
 	return

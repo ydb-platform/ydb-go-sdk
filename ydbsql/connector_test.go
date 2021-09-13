@@ -20,7 +20,9 @@ func TestConnectorDialOnPing(t *testing.T) {
 	const timeout = time.Second
 
 	client, server := net.Pipe()
-	defer server.Close()
+	defer func() {
+		_ = server.Close()
+	}()
 
 	dial := make(chan struct{})
 	c := Connector(
@@ -34,6 +36,7 @@ func TestConnectorDialOnPing(t *testing.T) {
 				Credentials: ydb.NewAnonymousCredentials("test"),
 			},
 		}),
+		WithCredentials(ydb.NewAnonymousCredentials("TestConnectorDialOnPing")),
 	)
 
 	db := sql.OpenDB(c)
@@ -45,7 +48,9 @@ func TestConnectorDialOnPing(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go db.PingContext(ctx)
+	go func() {
+		_ = db.PingContext(ctx)
+	}()
 
 	select {
 	case <-dial:
@@ -59,7 +64,9 @@ func TestConnectorRedialOnError(t *testing.T) {
 	const timeout = 100 * time.Millisecond
 
 	client, server := net.Pipe()
-	defer server.Close()
+	defer func() {
+		_ = server.Close()
+	}()
 	success := make(chan bool, 1)
 
 	dial := false
@@ -80,6 +87,7 @@ func TestConnectorRedialOnError(t *testing.T) {
 				Credentials: ydb.NewAnonymousCredentials("test"),
 			},
 		}),
+		WithCredentials(ydb.NewAnonymousCredentials("TestConnectorRedialOnError")),
 		WithDefaultTxControl(table.TxControl(
 			table.BeginTx(
 				table.WithStaleReadOnly(),
@@ -134,8 +142,12 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			client, server := net.Pipe()
-			defer client.Close()
-			defer server.Close()
+			defer func() {
+				_ = client.Close()
+			}()
+			defer func() {
+				_ = server.Close()
+			}()
 
 			c := Connector(
 				WithClient(
