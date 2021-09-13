@@ -166,11 +166,13 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 		title *string
 		date  *uint64
 	)
-	// TODO(kamardin): truncated flag.
-	for res.NextStreamSet(ctx, "series_id", "title", "release_date") {
-		for res.NextRow() {
-			_ = res.Scan(&id, &title, &date)
 
+	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
+		for res.NextRow() {
+			err = res.Scan(&id, &title, &date)
+			if err != nil {
+				return err
+			}
 			log.Printf("#  %d %s %d", *id, *title, *date)
 		}
 	}
@@ -288,12 +290,13 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		title *string
 		date  *[]byte
 	)
-	// TODO(kamardin): truncated flag.
-	for res.NextSet("series_id", "title", "release_date") {
+
+	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 		for res.NextRow() {
-
-			_ = res.Scan(&id, &title, &date)
-
+			err = res.Scan(&id, &title, &date)
+			if err != nil {
+				return err
+			}
 			log.Printf(
 				"\n> select_simple_transaction: %d %s %s",
 				*id, *title, *date,
@@ -341,27 +344,20 @@ func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) 
 	if err != nil {
 		return err
 	}
-
+	var (
+		seriesID uint64
+		seasonID uint64
+		title    string
+		date     string // due to cast in select query
+	)
 	log.Print("\n> scan_query_select:")
-	for res.NextStreamSet(ctx) {
-		if err = res.Err(); err != nil {
-			return err
-		}
-
+	for res.NextResultSet(ctx) {
 		for res.NextRow() {
-			res.SeekItem("series_id")
-			id := res.OUint64()
-
-			res.SeekItem("season_id")
-			season := res.OUint64()
-
-			res.SeekItem("title")
-			title := res.OUTF8()
-
-			res.SeekItem("first_aired")
-			date := res.OString()
-
-			log.Printf("#  Season, SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", id, season, title, date)
+			err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
+			if err != nil {
+				return err
+			}
+			log.Printf("#  Season, SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
 		}
 	}
 	if err = res.Err(); err != nil {

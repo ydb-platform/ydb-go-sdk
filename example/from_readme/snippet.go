@@ -72,7 +72,7 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 		id    int32
 		myStr *string //optional value
 	)
-	for res.NextSet("id", "mystr") {
+	for res.NextResultSet(ctx, "id", "mystr") {
 		for res.NextRow() {
 			// Suppose our "users" table has two rows: id and age.
 			// Thus, current row will contain two appropriate items with
