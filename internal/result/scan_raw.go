@@ -98,7 +98,7 @@ func (s *rawConverter) HasNextItem() bool {
 
 func (s *rawConverter) Path() string {
 	var buf bytes.Buffer
-	_, _ = s.writePathTo(&buf)
+	_, _ = s.WritePathTo(&buf)
 	return buf.String()
 }
 
