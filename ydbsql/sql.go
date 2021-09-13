@@ -17,10 +17,6 @@ var (
 	ErrUnsupported         = errors.New("ydbsql: not supported")
 	ErrActiveTransaction   = errors.New("ydbsql: can not begin tx within active tx")
 	ErrNoActiveTransaction = errors.New("ydbsql: no active tx to work with")
-	ErrResultTruncated     = errors.New("ydbsql: result set has been truncated")
-
-	// Deprecated: not used
-	ErrSessionBusy = errors.New("ydbsql: session is busy")
 )
 
 // conn is a connection to the ydb.
@@ -155,7 +151,7 @@ func (c *conn) Rollback() error {
 	return nil
 }
 
-func (c *conn) Commit() error {
+func (c *conn) Commit() (err error) {
 	if c.tx == nil && c.txc == nil {
 		return ErrNoActiveTransaction
 	}
@@ -165,9 +161,9 @@ func (c *conn) Commit() error {
 	c.txc = nil
 
 	if tx != nil {
-		return tx.Commit(context.Background())
+		_, err = tx.CommitTx(context.Background())
 	}
-	return nil
+	return
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
@@ -191,7 +187,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	if err != nil {
 		return nil, err
 	}
-	res.NextSet(ctx)
+	res.NextResultSet(ctx)
 	return &rows{res: res}, nil
 }
 
@@ -200,7 +196,7 @@ func (c *conn) scanQueryContext(ctx context.Context, query string, args []driver
 	if err != nil {
 		return nil, err
 	}
-	res.NextSet(ctx)
+	res.NextResultSet(ctx)
 	return &stream{ctx: ctx, res: res}, res.Err()
 }
 
@@ -383,7 +379,9 @@ func (d TxDoer) do(ctx context.Context, f TxOperationFunc) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 	if err := f(ctx, tx); err != nil {
 		return err
 	}
@@ -427,11 +425,11 @@ func (s *stmt) Close() error {
 	return nil
 }
 
-func (s stmt) Exec(args []driver.Value) (driver.Result, error) {
+func (s stmt) Exec([]driver.Value) (driver.Result, error) {
 	return nil, ErrDeprecated
 }
 
-func (s stmt) Query(args []driver.Value) (driver.Rows, error) {
+func (s stmt) Query([]driver.Value) (driver.Rows, error) {
 	return nil, ErrDeprecated
 }
 
@@ -460,7 +458,7 @@ func (s *stmt) queryContext(ctx context.Context, args []driver.NamedValue) (driv
 	if err != nil {
 		return nil, err
 	}
-	res.NextSet(ctx)
+	res.NextResultSet(ctx)
 	return &rows{res: res}, nil
 }
 
@@ -469,7 +467,7 @@ func (s *stmt) scanQueryContext(ctx context.Context, args []driver.NamedValue) (
 	if err != nil {
 		return nil, err
 	}
-	res.NextSet(ctx)
+	res.NextResultSet(ctx)
 	return &stream{ctx: ctx, res: res}, res.Err()
 }
 
@@ -561,14 +559,14 @@ func (r *rows) Columns() []string {
 }
 
 func (r *rows) NextResultSet() error {
-	if !r.res.NextSet(context.Background()) {
+	if !r.res.NextResultSet(context.Background()) {
 		return io.EOF
 	}
 	return nil
 }
 
 func (r *rows) HasNextResultSet() bool {
-	return r.res.HasNextSet()
+	return r.res.HasNextResultSet()
 }
 
 func (r *rows) Next(dst []driver.Value) error {
@@ -623,7 +621,7 @@ func (r *stream) Columns() []string {
 
 func (r *stream) Next(dst []driver.Value) error {
 	if !r.res.HasNextRow() {
-		if !r.res.NextSet(r.ctx) {
+		if !r.res.NextResultSet(r.ctx) {
 			err := r.res.Err()
 			if err != nil {
 				return err

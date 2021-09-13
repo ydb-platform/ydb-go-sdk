@@ -66,22 +66,6 @@ func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
 	}
 }
 
-// Deprecated: use WithTimeToLiveSettings instead.
-// Will be removed after Jan 2022.
-func WithTTL(settings TTLSettings) CreateTableOption {
-	return func(d *createTableDesc) {
-		d.TtlSettings = &Ydb_Table.TtlSettings{
-			Mode: &Ydb_Table.TtlSettings_DateTypeColumn{
-				DateTypeColumn: &Ydb_Table.DateTypeColumnModeSettings{
-					ColumnName:         settings.DateTimeColumn,
-					ExpireAfterSeconds: settings.TTLSeconds,
-				},
-			},
-		}
-
-	}
-}
-
 func WithTimeToLiveSettings(settings TimeToLiveSettings) CreateTableOption {
 	return func(d *createTableDesc) {
 		d.TtlSettings = settings.ToYDB()
@@ -355,18 +339,6 @@ type (
 	PartitioningSettingsOption func(settings *ydbPartitioningSettings)
 )
 
-// Deprecated: use WithPartitioningSettingsObject instead. Will be removed after Jan 2021.
-func WithPartitioningSettings(opts ...PartitioningSettingsOption) CreateTableOption {
-	return func(d *createTableDesc) {
-		if d.PartitioningSettings == nil {
-			d.PartitioningSettings = new(Ydb_Table.PartitioningSettings)
-		}
-		for _, opt := range opts {
-			opt((*ydbPartitioningSettings)(d.PartitioningSettings))
-		}
-	}
-}
-
 func WithPartitioningBySize(flag ydb.FeatureFlag) PartitioningSettingsOption {
 	return func(settings *ydbPartitioningSettings) {
 		settings.PartitioningBySize = flag.ToYDB()
@@ -475,49 +447,11 @@ func WithAlterPartitionSettingsObject(ps PartitioningSettings) AlterTableOption 
 	}
 }
 
-// Deprecated: use WithAlterPartitionSettingsObject instead.
-// Will be removed after Jan 2021.
-func WithAlterPartitioningSettings(opts ...PartitioningSettingsOption) AlterTableOption {
-	return func(d *alterTableDesc) {
-		if d.AlterPartitioningSettings == nil {
-			d.AlterPartitioningSettings = new(Ydb_Table.PartitioningSettings)
-		}
-		for _, opt := range opts {
-			opt((*ydbPartitioningSettings)(d.AlterPartitioningSettings))
-		}
-	}
-}
-
-// Deprecated: use WithSetTimeToLiveSettings instead.
-// Will be removed after Jan 2022.
-func WithSetTTL(settings TTLSettings) AlterTableOption {
-	return func(d *alterTableDesc) {
-		d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
-			SetTtlSettings: &Ydb_Table.TtlSettings{
-				Mode: &Ydb_Table.TtlSettings_DateTypeColumn{
-					DateTypeColumn: &Ydb_Table.DateTypeColumnModeSettings{
-						ColumnName:         settings.DateTimeColumn,
-						ExpireAfterSeconds: settings.TTLSeconds,
-					},
-				},
-			},
-		}
-	}
-}
-
 func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
 	return func(d *alterTableDesc) {
 		d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
 			SetTtlSettings: settings.ToYDB(),
 		}
-	}
-}
-
-// Deprecated: use WithDropTimeToLive instead.
-// Will be removed after Jan 2022.
-func WithDropTTL() AlterTableOption {
-	return func(d *alterTableDesc) {
-		d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
 	}
 }
 

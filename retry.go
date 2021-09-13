@@ -10,23 +10,15 @@ import (
 
 // Default parameters used by Retry() functions within different sub packages.
 const (
-	DefaultFastSlot = 5 * time.Millisecond
-	DefaultSlowSlot = 1 * time.Second
+	DefaultMaxRetries = 10
+	DefaultFastSlot   = 5 * time.Millisecond
+	DefaultSlowSlot   = 1 * time.Second
 )
 
 // Default parameters used by Retry() functions within different sub packages.
 var (
-	// Deprecated: will be redeclared as constant at next major release,
-	// use as constant instead and configure max retries as parameter of Retryer
-	DefaultMaxRetries   = 10
 	DefaultRetryChecker = RetryChecker{}
-	// DefaultBackoff is a logarithmic backoff retry strategy.
-	// Deprecated: use DefaultFastBackoff or DefaultSlowBackoff instead
-	DefaultBackoff = LogBackoff{
-		SlotDuration: time.Second,
-		Ceiling:      6,
-	}
-	DefaultFastBackoff = LogBackoff{
+	DefaultFastBackoff  = LogBackoff{
 		SlotDuration: DefaultFastSlot,
 		Ceiling:      6,
 	}
@@ -38,11 +30,7 @@ var (
 
 // RetryChecker contains options of checking errors returned by YDB for ability
 // to retry provoked operation.
-type RetryChecker struct {
-	// RetryNotFound reports whether Repeater must retry ErrNotFound errors.
-	// Deprecated: has no effect now
-	RetryNotFound bool
-}
+type RetryChecker struct{}
 
 // RetryMode reports whether operation is able to be retried and with which
 // properties.
@@ -51,16 +39,6 @@ type RetryMode struct {
 	backoff       BackoffType
 	deleteSession bool
 }
-
-// Deprecated: has no effect now
-const (
-	RetryUnavailable = 1 << iota >> 1
-	RetryAvailable
-	RetryBackoff
-	RetryDeleteSession
-	RetryCheckSession
-	RetryDropCache
-)
 
 // BackoffType reports how to backoff operation
 type BackoffType uint8
@@ -86,15 +64,6 @@ const (
 
 	RetryTypeAny = RetryTypeNoIdempotent | RetryTypeIdempotent
 )
-
-// Deprecated: will be dropped at next major release
-func (m RetryMode) Retriable() bool { return m.retry&RetryTypeAny != 0 }
-
-// Deprecated: will be dropped at next major release
-func (m RetryMode) MustCheckSession() bool { return m.deleteSession }
-
-// Deprecated: will be dropped at next major release
-func (m RetryMode) MustDropCache() bool { return m.deleteSession }
 
 func (m RetryMode) MustRetry(retryNoIdempotent bool) bool {
 	switch m.retry {

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 type series struct {
@@ -53,40 +52,6 @@ func BenchmarkTestScan(b *testing.B) {
 	}
 }
 
-func BenchmarkTestDeprecatedNext(b *testing.B) {
-	b.ReportAllocs()
-	res := PrepareScannerPerformanceTest(b.N)
-	row := series{}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if res.NextRow() {
-			res.NextItem()
-			row.id = res.OUint64()
-			res.NextItem()
-			row.title = res.OUTF8()
-			res.NextItem()
-			row.date = internal.UnmarshalDatetime(res.ODatetime())
-		}
-	}
-}
-
-func BenchmarkTestDeprecatedSeek(b *testing.B) {
-	b.ReportAllocs()
-	res := PrepareScannerPerformanceTest(b.N)
-	row := series{}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if res.NextRow() {
-			res.SeekItem("series_id")
-			row.id = res.OUint64()
-			res.SeekItem("title")
-			row.title = res.OUTF8()
-			res.SeekItem("release_date")
-			row.date = internal.UnmarshalDatetime(res.ODatetime())
-		}
-	}
-}
-
 func BenchmarkTestScanRow(b *testing.B) {
 	b.ReportAllocs()
 	res := PrepareScannerPerformanceTest(b.N)
@@ -100,7 +65,7 @@ func BenchmarkTestScanRow(b *testing.B) {
 }
 
 func TestOverallApproaches(t *testing.T) {
-	for k, f := range map[string]func(b *testing.B){"BenchmarkTestScanWithColumns": BenchmarkTestScanWithColumns, "BenchmarkTestScan": BenchmarkTestScan, "BenchmarkTestDeprecatedSeek": BenchmarkTestDeprecatedSeek, "BenchmarkTestDeprecatedNext": BenchmarkTestDeprecatedNext} {
+	for k, f := range map[string]func(b *testing.B){"BenchmarkTestScanWithColumns": BenchmarkTestScanWithColumns, "BenchmarkTestScan": BenchmarkTestScan} {
 		r := testing.Benchmark(f)
 		t.Log(k, r.String(), r.MemString())
 	}

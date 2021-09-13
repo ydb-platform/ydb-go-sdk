@@ -298,7 +298,6 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 		KeyBloomFilter:       internal.FeatureFlagFromYDB(result.GetKeyBloomFilter()),
 		PartitioningSettings: partitioningSettings(result.GetPartitioningSettings()),
 		Indexes:              indexes,
-		TTLSettings:          ttlSettings(result.GetTtlSettings()),
 		TimeToLiveSettings:   timeToLiveSettings(result.GetTtlSettings()),
 	}, nil
 }
@@ -874,20 +873,6 @@ func (tx *Transaction) ExecuteStatement(
 ) (r *Result, err error) {
 	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
 	return
-}
-
-// Deprecated: Use CommitTx instead
-// Commit commits specified active transaction.
-func (tx *Transaction) Commit(ctx context.Context) (err error) {
-	clientTraceCommitTransactionDone := clientTraceOnCommitTransaction(ctx, tx.s.c.trace, ctx, tx.s, tx.id)
-	defer func() {
-		clientTraceCommitTransactionDone(ctx, tx.s, tx.id, err)
-	}()
-	_, err = tx.s.tableService.CommitTransaction(ctx, &Ydb_Table.CommitTransactionRequest{
-		SessionId: tx.s.ID,
-		TxId:      tx.id,
-	})
-	return err
 }
 
 // CommitTx commits specified active transaction.

@@ -79,13 +79,6 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
-func WithSessionPoolBusyCheckInterval(busyCheckInterval time.Duration) Option {
-	return func(ctx context.Context, c *Connection) error {
-		c.table.sessionPool.BusyCheckInterval = busyCheckInterval
-		return nil
-	}
-}
-
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Connection) error {
 		c.table.sessionPool.KeepAliveTimeout = keepAliveTimeout

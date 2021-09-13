@@ -18,13 +18,6 @@ type SessionProvider interface {
 	// Put must be fast, if necessary must be async
 	Put(context.Context, *Session) (err error)
 
-	// PutBusy takes session with not yet completed operation inside.
-	// It gives full ownership of s to session provider.
-	// PutBusy must be fast, if necessary must be async
-	// Deprecated: use conditionally Put() or CloseSession() for uncertain
-	// sessions instead
-	PutBusy(context.Context, *Session) (err error)
-
 	// CloseSession provides the most effective way of session closing
 	// instead of plain session.Close.
 	// CloseSession must be fast. If necessary, can be async.
@@ -34,8 +27,6 @@ type SessionProvider interface {
 type SessionProviderFunc struct {
 	OnGet func(context.Context) (*Session, error)
 	OnPut func(context.Context, *Session) error
-	// Deprecated: has no effect now
-	OnPutBusy func(context.Context, *Session) error
 }
 
 func (f SessionProviderFunc) Get(ctx context.Context) (*Session, error) {
@@ -50,11 +41,6 @@ func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
 		return errSessionOverflow
 	}
 	return f.OnPut(ctx, s)
-}
-
-// Deprecated: wull be dropped at next major release
-func (f SessionProviderFunc) PutBusy(ctx context.Context, s *Session) error {
-	return s.Close(ctx)
 }
 
 func (f SessionProviderFunc) CloseSession(ctx context.Context, s *Session) error {
@@ -105,10 +91,6 @@ type Retryer struct {
 	// not found error.
 	RetryChecker ydb.RetryChecker
 
-	// Backoff is a selected backoff policy.
-	// Deprecated: use FastBackoff and SlowBackoff instead, has no effect now
-	Backoff ydb.Backoff
-
 	// FastBackoff is a selected backoff policy.
 	// If backoff is nil, then the ydb.DefaultFastBackoff is used.
 	FastBackoff ydb.Backoff
@@ -141,13 +123,13 @@ func (r Retryer) backoff(ctx context.Context, m ydb.RetryMode, i int) error {
 		if r.FastBackoff != nil {
 			b = r.FastBackoff
 		} else {
-			b = r.Backoff
+			b = ydb.DefaultFastBackoff
 		}
 	case ydb.BackoffTypeSlowBackoff:
 		if r.SlowBackoff != nil {
 			b = r.SlowBackoff
 		} else {
-			b = r.Backoff
+			b = ydb.DefaultSlowBackoff
 		}
 	}
 	return ydb.WaitBackoff(ctx, b, i)

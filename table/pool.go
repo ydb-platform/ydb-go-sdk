@@ -19,9 +19,6 @@ var (
 	DefaultSessionPoolSizeLimit            = 50
 	DefaultKeepAliveMinSize                = 10
 	DefaultIdleKeepAliveThreshold          = 2
-
-	// Deprecated: has no effect now
-	DefaultSessionPoolBusyCheckInterval = 1 * time.Second
 )
 
 var (
@@ -89,22 +86,6 @@ type SessionPool struct {
 	// If IdleThreshold is zero, then the DefaultSessionPoolIdleThreshold value
 	// is used.
 	IdleThreshold time.Duration
-
-	// BusyCheckInterval is an interval between busy sessions status checks.
-	// If BusyCheckInterval is less than zero then there busy checking is
-	// disabled.
-	// If BusyCheckInterval is equal to zero, then the
-	// DefaultSessionPoolBusyCheckInterval value is used.
-	// Deprecated: has no effect now
-	BusyCheckInterval time.Duration
-
-	// Deprecated: unnecessary parameter
-	// it will be removed at next major release
-	// KeepAliveBatchSize is a maximum number sessions taken from the pool to
-	// prepare KeepAlive() call on them in background.
-	// If KeepAliveBatchSize is less than or equal to zero, then there is no
-	// batch limit.
-	KeepAliveBatchSize int
 
 	// KeepAliveTimeout limits maximum time spent on KeepAlive request
 	// If KeepAliveTimeout is less than or equal to zero then the
@@ -289,8 +270,7 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 		// read result from resCh for prevention of forgetting session
 		go func() {
 			if r, ok := <-resCh; ok && r.s != nil {
-				// if cannot put session into result channel - put session into pool for reuse
-				trace.onPutSession(r.s, p.PutBusy(ctx, r.s))
+				trace.onPutSession(r.s, r.s.Close(ydb.ContextWithoutDeadline(ctx)))
 			}
 		}()
 		return nil, ctx.Err()
@@ -432,12 +412,6 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 	}
 
 	return
-}
-
-// PutBusy used for putting session into busy checker
-// Deprecated: use Put() instead
-func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
-	return p.CloseSession(ctx, s)
 }
 
 // Take removes session s from the pool and ensures that s will not be returned
@@ -585,7 +559,7 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 func (p *SessionPool) Stats() SessionPoolStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	idleCount, readyCount, waitQCount, indexCount := 0, 0, 0, 0
+	idleCount, waitQCount, indexCount := 0, 0, 0
 	if p.idle != nil {
 		idleCount = p.idle.Len()
 	}
@@ -597,7 +571,6 @@ func (p *SessionPool) Stats() SessionPoolStats {
 	}
 	return SessionPoolStats{
 		Idle:             idleCount,
-		Ready:            readyCount,
 		Index:            indexCount,
 		WaitQ:            waitQCount,
 		CreateInProgress: p.createInProgress,

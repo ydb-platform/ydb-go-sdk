@@ -15,10 +15,6 @@ type RetryConfig struct {
 	// RetryChecker contains options of mapping errors to retry mode.
 	RetryChecker ydb.RetryChecker
 
-	// Backoff is a selected backoff policy.
-	// Deprecated: use pair FastBackoff / SlowBackoff instead
-	Backoff ydb.Backoff
-
 	// FastBackoff is a selected backoff policy.
 	// If backoff is nil, then the ydb.DefaultFastBackoff is used.
 	FastBackoff ydb.Backoff
@@ -44,13 +40,13 @@ func backoff(ctx context.Context, m ydb.RetryMode, rc *RetryConfig, i int) error
 		if rc.FastBackoff != nil {
 			b = rc.FastBackoff
 		} else {
-			b = rc.Backoff
+			b = ydb.DefaultFastBackoff
 		}
 	case ydb.BackoffTypeSlowBackoff:
 		if rc.SlowBackoff != nil {
 			b = rc.SlowBackoff
 		} else {
-			b = rc.Backoff
+			b = ydb.DefaultSlowBackoff
 		}
 	}
 	return ydb.WaitBackoff(ctx, b, i)

@@ -87,17 +87,6 @@ func WithSessionPoolIdleThreshold(d time.Duration) ConnectorOption {
 	}
 }
 
-// Deprecated: has no effect now
-func WithSessionPoolBusyCheckInterval(time.Duration) ConnectorOption {
-	return func(c *connector) {}
-}
-
-func WithSessionPoolKeepAliveBatchSize(n int) ConnectorOption {
-	return func(c *connector) {
-		c.pool.KeepAliveBatchSize = n
-	}
-}
-
 func WithSessionPoolKeepAliveTimeout(d time.Duration) ConnectorOption {
 	return func(c *connector) {
 		c.pool.KeepAliveTimeout = d
@@ -121,12 +110,6 @@ func WithMaxRetries(n int) ConnectorOption {
 		if n >= 0 {
 			c.retryConfig.MaxRetries = n
 		}
-	}
-}
-
-func WithRetryBackoff(b ydb.Backoff) ConnectorOption {
-	return func(c *connector) {
-		c.retryConfig.Backoff = b
 	}
 }
 
@@ -160,15 +143,7 @@ func WithDefaultExecScanQueryOption(opts ...table.ExecuteScanQueryOption) Connec
 	}
 }
 
-var retryChecker = ydb.RetryChecker{
-	// NOTE: we do not want to retry not found prepared statement
-	// errors.
-	//
-	// In other case we would just burn the CPU looping up to max
-	// retry attempts times – we are not making any Prepare() calls
-	// in the retry callbacks.
-	RetryNotFound: false,
-}
+var retryChecker = ydb.RetryChecker{}
 
 func Connector(opts ...ConnectorOption) driver.Connector {
 	c := &connector{

@@ -104,11 +104,6 @@ func (r *Result) inactive() bool {
 	return r.closed || r.err != nil || r.Scanner.Err() != nil
 }
 
-// Deprecated: Use HasNextResultSet
-func (r *Result) HasNextSet() bool {
-	return r.HasNextResultSet()
-}
-
 // HasNextResultSet reports whether result set may be advanced.
 //
 // It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
@@ -119,16 +114,6 @@ func (r *Result) HasNextResultSet() bool {
 	if r.inactive() || r.nextSet == len(r.sets) {
 		return false
 	}
-	return true
-}
-
-// Deprecated: Use only NextResultSet with context
-func (r *Result) NextSet(columns ...string) bool {
-	if !r.HasNextResultSet() {
-		return false
-	}
-	result.Reset(&r.Scanner, r.sets[r.nextSet], columns...)
-	r.nextSet++
 	return true
 }
 
@@ -148,11 +133,6 @@ func (r *Result) NextResultSet(ctx context.Context, columns ...string) bool {
 // Truncated returns true if current result set has been truncated by server.
 func (r *Result) Truncated() bool {
 	return r.Scanner.ResultSetTruncated()
-}
-
-// Deprecated: Use only NextResultSet with context
-func (r *Result) NextStreamSet(ctx context.Context, columns ...string) bool {
-	return r.nextStreamSet(ctx, columns...)
 }
 
 // NextStreamSet selects next result set from the result of streaming operation.

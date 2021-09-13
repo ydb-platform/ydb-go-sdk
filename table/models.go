@@ -73,11 +73,7 @@ type Description struct {
 	KeyBloomFilter       ydb.FeatureFlag
 	PartitioningSettings PartitioningSettings
 	Indexes              []IndexDescription
-
-	// Deprecated: use TimeToLiveSettings instead.
-	// Will be removed after Jan 2022.
-	TTLSettings        *TTLSettings
-	TimeToLiveSettings *TimeToLiveSettings
+	TimeToLiveSettings   *TimeToLiveSettings
 }
 
 type TableStats struct {
@@ -279,23 +275,6 @@ func partitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSettin
 		PartitioningByLoad: internal.FeatureFlagFromYDB(ps.GetPartitioningByLoad()),
 		MinPartitionsCount: ps.GetMinPartitionsCount(),
 		MaxPartitionsCount: ps.GetMaxPartitionsCount(),
-	}
-}
-
-func ttlSettings(s *Ydb_Table.TtlSettings) *TTLSettings {
-	if s == nil {
-		return nil
-	}
-	switch mode := s.Mode.(type) {
-	// for the time being the only implementation of Mode
-	case *Ydb_Table.TtlSettings_DateTypeColumn:
-		c := mode.DateTypeColumn
-		return &TTLSettings{
-			DateTimeColumn: c.ColumnName,
-			TTLSeconds:     c.ExpireAfterSeconds,
-		}
-	default:
-		return nil
 	}
 }
 
