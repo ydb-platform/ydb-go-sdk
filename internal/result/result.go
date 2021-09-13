@@ -61,7 +61,7 @@ func (s *Scanner) path() string {
 }
 
 func (s *Scanner) writePathTo(w io.Writer) (n int64, err error) {
-	x := s.stack.primitiveItem
+	x := s.stack.current()
 	st := x.name
 	m, err := io.WriteString(w, st)
 	if err != nil {
@@ -89,9 +89,9 @@ func (s *Scanner) seekItemByID(id int) {
 		return
 	}
 	col := s.set.Columns[id]
-	s.stack.primitiveItem.name = col.Name
-	s.stack.primitiveItem.t = col.Type
-	s.stack.primitiveItem.v = s.row.Items[id]
+	s.stack.scanItem.name = col.Name
+	s.stack.scanItem.t = col.Type
+	s.stack.scanItem.v = s.row.Items[id]
 }
 
 func (s *Scanner) setColumnIndexes(columns []string) {
@@ -178,8 +178,8 @@ func (s *Scanner) Err() error {
 	return s.err
 }
 
-// Any returns any primitive value.
-// Currently it may return one of this types:
+// Any returns any primitive or optional value.
+// Currently, it may return one of these types:
 //
 //   bool
 //   int8
@@ -204,6 +204,11 @@ func (s *Scanner) any() interface{} {
 
 	if s.isNull() {
 		return nil
+	}
+
+	if s.isCurrentTypeOptional() {
+		s.unwrap()
+		x = s.stack.current()
 	}
 
 	t := internal.TypeFromYDB(x.t)
@@ -350,6 +355,20 @@ func (s *Scanner) errorf(f string, args ...interface{}) {
 	s.err = fmt.Errorf(f, args...)
 }
 
+func (s *Scanner) typeError(act, exp interface{}) {
+	s.errorf(
+		"unexpected type during scan at %q %s: %s; want %s",
+		s.Path(), s.Type(), nameIface(act), nameIface(exp),
+	)
+}
+
+func (s *Scanner) valueTypeError(act, exp interface{}) {
+	s.errorf(
+		"unexpected value during scan at %q %s: %s; want %s",
+		s.Path(), s.Type(), nameIface(act), nameIface(exp),
+	)
+}
+
 func (s *Scanner) noValueError() {
 	s.errorf(
 		"no value at %q",
@@ -392,9 +411,9 @@ func (s *Scanner) unwrap() {
 	}
 
 	if isOptional(t.OptionalType.Item) {
-		s.stack.primitiveItem.v = s.unwrapValue()
+		s.stack.scanItem.v = s.unwrapValue()
 	}
-	s.stack.primitiveItem.t = t.OptionalType.Item
+	s.stack.scanItem.t = t.OptionalType.Item
 }
 
 func (s *Scanner) unwrapValue() (v *Ydb.Value) {
@@ -625,7 +644,7 @@ func (s *Scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
 	return true
 }
 
-func (s *Scanner) scanPrimitive(value interface{}) {
+func (s *Scanner) scanRequired(value interface{}) {
 	switch v := value.(type) {
 	case *bool:
 		*v = s.bool()
@@ -670,6 +689,11 @@ func (s *Scanner) scanPrimitive(value interface{}) {
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
 		}
+	case ydb.Scanner:
+		err := v.UnmarshalYDB(s.converter)
+		if err != nil {
+			s.errorf("ydb.Scanner error: %w", err)
+		}
 	case *ydb.Value:
 		*v = s.value()
 	default:
@@ -680,13 +704,13 @@ func (s *Scanner) scanPrimitive(value interface{}) {
 	}
 }
 
-func (s *Scanner) scanOptionalPrimitive(value interface{}) {
+func (s *Scanner) scanOptional(value interface{}) {
 	if s.defaultValueForOptional {
 		if s.isNull() {
 			s.setDefaultValue(value)
 		} else {
 			s.unwrap()
-			s.scanPrimitive(value)
+			s.scanRequired(value)
 		}
 		return
 	}
@@ -837,6 +861,11 @@ func (s *Scanner) scanOptionalPrimitive(value interface{}) {
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
 		}
+	case ydb.Scanner:
+		err := v.UnmarshalYDB(s.converter)
+		if err != nil {
+			s.errorf("ydb.Scanner error: %w", err)
+		}
 	default:
 		s.unwrap()
 		ok := s.trySetByteArray(v, true, false)
@@ -892,6 +921,11 @@ func (s *Scanner) setDefaultValue(dst interface{}) {
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
 		}
+	case ydb.Scanner:
+		err := v.UnmarshalYDB(s.converter)
+		if err != nil {
+			s.errorf("ydb.Scanner error: %w", err)
+		}
 	case *ydb.Value:
 		*v = s.value()
 	default:
@@ -902,11 +936,7 @@ func (s *Scanner) setDefaultValue(dst interface{}) {
 	}
 }
 
-// ScanRaw scan one row as struct
-// Input parameter - ydb.CustomScanner interface
-// To implement the interface:
-// use ydbgen to generate method UnmarshalYDB
-// see example containers
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) ScanRaw(row ydb.CustomScanner) error {
 	return row.UnmarshalYDB(s.converter)
 }
@@ -942,6 +972,7 @@ func (s *Scanner) ScanWithDefaults(values ...interface{}) error {
 // For optional type use double pointer construction.
 // For unknown types use interface type.
 // Supported scanning byte arrays of various length.
+// For complex yql types: Dict, List, Tuple and own specific scanning logic implement ydb.Scanner with UnmarshalYDB method
 // See examples for more detailed information.
 // Output param - Scanner error
 func (s *Scanner) Scan(values ...interface{}) error {
@@ -972,9 +1003,9 @@ func (s *Scanner) scan(values []interface{}) error {
 			return s.err
 		}
 		if s.isCurrentTypeOptional() {
-			s.scanOptionalPrimitive(value)
+			s.scanOptional(value)
 		} else {
-			s.scanPrimitive(value)
+			s.scanRequired(value)
 		}
 	}
 	s.nextItem += len(values)
@@ -983,7 +1014,6 @@ func (s *Scanner) scan(values []interface{}) error {
 
 const tinyStack = 8
 
-var emptyStack [tinyStack]item
 var emptyItem item
 
 type item struct {
@@ -998,12 +1028,15 @@ func (x item) isEmpty() bool {
 }
 
 type scanStack struct {
-	v             [tinyStack]item
-	p             int8
-	primitiveItem item
+	v        []item
+	p        int8
+	scanItem item
 }
 
 func (s *scanStack) size() int {
+	if !s.scanItem.isEmpty() {
+		s.set(s.scanItem)
+	}
 	return int(s.p) + 1
 }
 
@@ -1012,12 +1045,16 @@ func (s *scanStack) get(i int) item {
 }
 
 func (s *scanStack) reset() {
-	s.v = emptyStack
-	s.primitiveItem = emptyItem
+	s.scanItem = emptyItem
 	s.p = 0
 }
 
 func (s *scanStack) enter() {
+	// support compatibility
+	if !s.scanItem.isEmpty() {
+		s.set(s.scanItem)
+	}
+	s.scanItem = emptyItem
 	s.p++
 }
 
@@ -1029,7 +1066,11 @@ func (s *scanStack) leave() {
 }
 
 func (s *scanStack) set(v item) {
-	s.v[s.p] = v
+	if int(s.p) == len(s.v) {
+		s.v = append(s.v, v)
+	} else {
+		s.v[s.p] = v
+	}
 }
 
 func (s *scanStack) parent() item {
@@ -1040,8 +1081,8 @@ func (s *scanStack) parent() item {
 }
 
 func (s *scanStack) current() item {
-	if s.primitiveItem.v != nil {
-		return s.primitiveItem
+	if !s.scanItem.isEmpty() {
+		return s.scanItem
 	}
 	return s.v[s.p]
 }

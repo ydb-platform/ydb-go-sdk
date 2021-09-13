@@ -509,25 +509,10 @@ func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]in
 }
 
 func TestScanSqlTypes(t *testing.T) {
-	s := Scanner{
-		set: &Ydb.ResultSet{
-			Columns:   nil,
-			Rows:      nil,
-			Truncated: false,
-		},
-		row: nil,
-		stack: scanStack{
-			v: [8]item{},
-			p: 0,
-		},
-		nextRow:        0,
-		nextItem:       0,
-		setColumnIndex: nil,
-		columnIndexes:  nil,
-	}
+	s := initScanner()
 	for _, test := range scannerData {
 		set, expected := getResultSet(test.count, test.columns)
-		Reset(&s, set, test.setColumns...)
+		Reset(s, set, test.setColumns...)
 		var err error
 		for s.NextRow() {
 			if test.columns[0].testDefault {

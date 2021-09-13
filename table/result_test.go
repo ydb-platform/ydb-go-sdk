@@ -41,13 +41,13 @@ func TestResultAny(t *testing.T) {
 				),
 			)
 			var i int
-			for res.NextSet(context.Background()) {
+			var act interface{}
+			for res.NextResultSet(context.Background()) {
 				for res.NextRow() {
-					res.NextItem()
-					if res.IsOptional() {
-						res.Unwrap()
+					err := res.ScanWithDefaults(&act)
+					if err != nil {
+						t.Fatal(err)
 					}
-					act := res.Any()
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
 						t.Errorf(
 							"unexpected Any() result: %[1]v (%[1]T); want %[2]v (%[2]T)",
@@ -94,7 +94,7 @@ func TestResultOUint32(t *testing.T) {
 				),
 			)
 			var i int
-			for res.NextSet(context.Background()) {
+			for res.NextResultSet(context.Background()) {
 				for res.NextRow() {
 					res.NextItem()
 					act := res.OUint32()

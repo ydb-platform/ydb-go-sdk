@@ -2,30 +2,11 @@ package result
 
 import (
 	"testing"
-	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
-
-type series struct {
-	id    uint64
-	title string
-	date  time.Time
-}
 
 var (
 	testSize = 10000
 )
-
-func (s *series) UnmarshalYDB(res ydb.RawScanner) error {
-	res.SeekItem("series_id")
-	s.id = res.Uint64()
-	res.SeekItem("title")
-	s.title = res.UTF8()
-	res.SeekItem("release_date")
-	s.date = res.Datetime()
-	return nil
-}
 
 func BenchmarkTestScanWithColumns(b *testing.B) {
 	b.ReportAllocs()
@@ -48,18 +29,6 @@ func BenchmarkTestScan(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		if res.NextRow() {
 			res.Scan(&row.id, &row.title, &row.date)
-		}
-	}
-}
-
-func BenchmarkTestScanRow(b *testing.B) {
-	b.ReportAllocs()
-	res := PrepareScannerPerformanceTest(b.N)
-	row := series{}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if res.NextRow() {
-			res.ScanRaw(&row)
 		}
 	}
 }
