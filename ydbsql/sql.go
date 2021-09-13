@@ -6,9 +6,9 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"io"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -568,7 +568,7 @@ func (r *rows) NextResultSet() error {
 }
 
 func (r *rows) HasNextResultSet() bool {
-	return r.res.NextSet(context.Background())
+	return r.res.HasNextSet()
 }
 
 func (r *rows) Next(dst []driver.Value) error {

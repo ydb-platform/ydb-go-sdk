@@ -1,8 +1,9 @@
 package ydb
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 type Operation = internal.Operation

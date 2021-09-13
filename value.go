@@ -1,8 +1,9 @@
 package ydb
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 type Value interface {

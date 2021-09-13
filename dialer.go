@@ -3,12 +3,12 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"net"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"

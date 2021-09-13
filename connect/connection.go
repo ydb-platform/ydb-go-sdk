@@ -3,12 +3,13 @@ package connect
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc"
 	"path"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+
+	"google.golang.org/grpc"
 )
 
 type Connection struct {

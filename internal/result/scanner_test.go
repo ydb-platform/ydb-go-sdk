@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
@@ -539,16 +538,12 @@ func TestScanSqlTypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("test: %s; error: %s", test.name, err)
 			}
-			ok := true
 			if test.setColumnIndexes != nil {
 				for i, v := range test.setColumnIndexes {
-					ok = assert.Equal(t, expected[0][v], test.values[i])
+					internal.Equal(t, expected[0][v], test.values[i])
 				}
 			} else {
-				ok = assert.Equal(t, expected[0], test.values)
-			}
-			if ok == false {
-				t.Fatalf("test: %s; error: not equal", test.name)
+				internal.Equal(t, expected[0], test.values)
 			}
 			expected = expected[1:]
 		}

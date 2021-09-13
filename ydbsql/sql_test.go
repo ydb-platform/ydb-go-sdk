@@ -4,20 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"google.golang.org/grpc"
 	"io"
 	"log"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/traceutil"
@@ -138,9 +136,8 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txExp != nil {
 				sExp = table.TxSettings(test.txExp)
 			}
-			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmpopts.IgnoreUnexported(table.TransactionSettings{})) {
-				t.Fatalf("unexpected tx settings: %+v; want %+v", sAct, sExp)
-			}
+
+			internal.Equal(t, sAct, sExp)
 
 			var cAct, cExp *table.TransactionControl
 			if txcAct != nil {
@@ -149,9 +146,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txcExp != nil {
 				cExp = table.TxControl(test.txcExp...)
 			}
-			if !cmp.Equal(sAct, sExp, cmp.Comparer(proto.Equal), cmpopts.IgnoreUnexported(table.TransactionSettings{})) {
-				t.Fatalf("unexpected settings: %+v; want %+v", cAct, cExp)
-			}
+			internal.Equal(t, cAct, cExp)
 		})
 	}
 }
@@ -253,22 +248,22 @@ func TestQuery(t *testing.T) {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := db.QueryContext(ctx, "SELECT 1")
-			require.NoError(t, err)
-			require.NotNil(t, rows)
+			internal.NoError(t, err)
+			internal.NotNil(t, rows)
 		})
 		t.Run("QueryContext/STMT/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			stmt, err := db.PrepareContext(ctx, "SELECT 1")
-			require.NoError(t, err)
+			internal.NoError(t, err)
 			defer stmt.Close()
 			if test.scanQueryMode {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := stmt.QueryContext(ctx)
-			require.NoError(t, err)
-			require.NotNil(t, rows)
+			internal.NoError(t, err)
+			internal.NotNil(t, rows)
 		})
 		t.Run("ExecContext/Conn/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
@@ -278,22 +273,22 @@ func TestQuery(t *testing.T) {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := db.ExecContext(ctx, "SELECT 1")
-			require.NoError(t, err)
-			require.NotNil(t, rows)
+			internal.NoError(t, err)
+			internal.NotNil(t, rows)
 		})
 		t.Run("ExecContext/STMT/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			stmt, err := db.PrepareContext(ctx, "SELECT 1")
-			require.NoError(t, err)
+			internal.NoError(t, err)
 			defer stmt.Close()
 			if test.scanQueryMode {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := stmt.ExecContext(ctx)
-			require.NoError(t, err)
-			require.NotNil(t, rows)
+			internal.NoError(t, err)
+			internal.NotNil(t, rows)
 		})
 	}
 }
@@ -487,20 +482,20 @@ func getSeriesData() ydb.Value {
 	)
 }
 
-func seriesData(id uint64, released uint32, title, info string) ydb.Value {
+func seriesData(id uint64, released time.Time, title, info string) ydb.Value {
 	return ydb.StructValue(
 		ydb.StructFieldValue("series_id", ydb.Uint64Value(id)),
-		ydb.StructFieldValue("release_date", ydb.DateValue(released)),
+		ydb.StructFieldValue("release_date", ydb.DateValueFromTime(released)),
 		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
 		ydb.StructFieldValue("series_info", ydb.UTF8Value(info)),
 	)
 }
 
-func days(date string) uint32 {
+func days(date string) time.Time {
 	const ISO8601 = "2006-01-02"
 	t, err := time.Parse(ISO8601, date)
 	if err != nil {
 		panic(err)
 	}
-	return ydb.Time(t).Date()
+	return t
 }

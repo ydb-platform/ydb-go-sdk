@@ -1,10 +1,11 @@
 package ydb
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
 	"sync"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
 )
 
 type connRuntime struct {

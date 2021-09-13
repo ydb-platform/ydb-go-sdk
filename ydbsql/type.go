@@ -3,9 +3,9 @@ package ydbsql
 import (
 	"database/sql"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
