@@ -11,7 +11,6 @@ import (
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	ClientTrace struct {
 		OnCreateSession func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
 
@@ -39,7 +38,6 @@ type (
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	RetryTrace struct {
 		OnLoop func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
 	}
@@ -176,7 +174,6 @@ type (
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	SessionPoolTrace struct {
 		OnCreate       func(SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo)
 		OnGet          func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo)

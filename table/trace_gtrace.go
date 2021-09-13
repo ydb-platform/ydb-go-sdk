@@ -252,52 +252,8 @@ func (t ClientTrace) Compose(x ClientTrace) (ret ClientTrace) {
 	}
 	return ret
 }
-
-type clientTraceContextKey struct{}
-
-// WithClientTrace returns context which has associated ClientTrace with it.
-func WithClientTrace(ctx context.Context, t ClientTrace) context.Context {
-	return context.WithValue(ctx,
-		clientTraceContextKey{},
-		ContextClientTrace(ctx).Compose(t),
-	)
-}
-
-// ContextClientTrace returns ClientTrace associated with ctx.
-// If there is no ClientTrace associated with ctx then zero value 
-// of ClientTrace is returned.
-func ContextClientTrace(ctx context.Context) ClientTrace {
-	t, _ := ctx.Value(clientTraceContextKey{}).(ClientTrace)
-	return t
-}
-
-func (t ClientTrace) onCreateSession(ctx context.Context, c1 CreateSessionStartInfo) func(CreateSessionDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(CreateSessionStartInfo) func(CreateSessionDoneInfo) 
-	switch {
-	case t.OnCreateSession == nil:
-		fn = c.OnCreateSession
-	case c.OnCreateSession == nil:
-		fn = t.OnCreateSession
-	default:
-		h1 := t.OnCreateSession
-		h2 := c.OnCreateSession
-		fn = func(c CreateSessionStartInfo) func(CreateSessionDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(c CreateSessionDoneInfo) {
-					r1(c)
-					r2(c)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onCreateSession(c1 CreateSessionStartInfo) func(CreateSessionDoneInfo) {
+	fn := t.OnCreateSession
 	if fn == nil {
 		return func(CreateSessionDoneInfo) {
 			return
@@ -311,33 +267,8 @@ func (t ClientTrace) onCreateSession(ctx context.Context, c1 CreateSessionStartI
 	}
 	return res
 }
-func (t ClientTrace) onKeepAlive(ctx context.Context, k KeepAliveStartInfo) func(KeepAliveDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(KeepAliveStartInfo) func(KeepAliveDoneInfo) 
-	switch {
-	case t.OnKeepAlive == nil:
-		fn = c.OnKeepAlive
-	case c.OnKeepAlive == nil:
-		fn = t.OnKeepAlive
-	default:
-		h1 := t.OnKeepAlive
-		h2 := c.OnKeepAlive
-		fn = func(k KeepAliveStartInfo) func(KeepAliveDoneInfo) {
-			r1 := h1(k)
-			r2 := h2(k)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(k KeepAliveDoneInfo) {
-					r1(k)
-					r2(k)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onKeepAlive(k KeepAliveStartInfo) func(KeepAliveDoneInfo) {
+	fn := t.OnKeepAlive
 	if fn == nil {
 		return func(KeepAliveDoneInfo) {
 			return
@@ -351,33 +282,8 @@ func (t ClientTrace) onKeepAlive(ctx context.Context, k KeepAliveStartInfo) func
 	}
 	return res
 }
-func (t ClientTrace) onDeleteSession(ctx context.Context, d DeleteSessionStartInfo) func(DeleteSessionDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(DeleteSessionStartInfo) func(DeleteSessionDoneInfo) 
-	switch {
-	case t.OnDeleteSession == nil:
-		fn = c.OnDeleteSession
-	case c.OnDeleteSession == nil:
-		fn = t.OnDeleteSession
-	default:
-		h1 := t.OnDeleteSession
-		h2 := c.OnDeleteSession
-		fn = func(d DeleteSessionStartInfo) func(DeleteSessionDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DeleteSessionDoneInfo) {
-					r1(d)
-					r2(d)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onDeleteSession(d DeleteSessionStartInfo) func(DeleteSessionDoneInfo) {
+	fn := t.OnDeleteSession
 	if fn == nil {
 		return func(DeleteSessionDoneInfo) {
 			return
@@ -391,33 +297,8 @@ func (t ClientTrace) onDeleteSession(ctx context.Context, d DeleteSessionStartIn
 	}
 	return res
 }
-func (t ClientTrace) onPrepareDataQuery(ctx context.Context, p PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo) 
-	switch {
-	case t.OnPrepareDataQuery == nil:
-		fn = c.OnPrepareDataQuery
-	case c.OnPrepareDataQuery == nil:
-		fn = t.OnPrepareDataQuery
-	default:
-		h1 := t.OnPrepareDataQuery
-		h2 := c.OnPrepareDataQuery
-		fn = func(p PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo) {
-			r1 := h1(p)
-			r2 := h2(p)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(p PrepareDataQueryDoneInfo) {
-					r1(p)
-					r2(p)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onPrepareDataQuery(p PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo) {
+	fn := t.OnPrepareDataQuery
 	if fn == nil {
 		return func(PrepareDataQueryDoneInfo) {
 			return
@@ -431,33 +312,8 @@ func (t ClientTrace) onPrepareDataQuery(ctx context.Context, p PrepareDataQueryS
 	}
 	return res
 }
-func (t ClientTrace) onExecuteDataQuery(ctx context.Context, e ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo) 
-	switch {
-	case t.OnExecuteDataQuery == nil:
-		fn = c.OnExecuteDataQuery
-	case c.OnExecuteDataQuery == nil:
-		fn = t.OnExecuteDataQuery
-	default:
-		h1 := t.OnExecuteDataQuery
-		h2 := c.OnExecuteDataQuery
-		fn = func(e ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo) {
-			r1 := h1(e)
-			r2 := h2(e)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(e ExecuteDataQueryDoneInfo) {
-					r1(e)
-					r2(e)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onExecuteDataQuery(e ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo) {
+	fn := t.OnExecuteDataQuery
 	if fn == nil {
 		return func(ExecuteDataQueryDoneInfo) {
 			return
@@ -471,33 +327,8 @@ func (t ClientTrace) onExecuteDataQuery(ctx context.Context, e ExecuteDataQueryS
 	}
 	return res
 }
-func (t ClientTrace) onStreamReadTable(ctx context.Context, s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(StreamReadTableStartInfo) func(StreamReadTableDoneInfo) 
-	switch {
-	case t.OnStreamReadTable == nil:
-		fn = c.OnStreamReadTable
-	case c.OnStreamReadTable == nil:
-		fn = t.OnStreamReadTable
-	default:
-		h1 := t.OnStreamReadTable
-		h2 := c.OnStreamReadTable
-		fn = func(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s StreamReadTableDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onStreamReadTable(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
+	fn := t.OnStreamReadTable
 	if fn == nil {
 		return func(StreamReadTableDoneInfo) {
 			return
@@ -511,33 +342,8 @@ func (t ClientTrace) onStreamReadTable(ctx context.Context, s StreamReadTableSta
 	}
 	return res
 }
-func (t ClientTrace) onStreamExecuteScanQuery(ctx context.Context, s StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) 
-	switch {
-	case t.OnStreamExecuteScanQuery == nil:
-		fn = c.OnStreamExecuteScanQuery
-	case c.OnStreamExecuteScanQuery == nil:
-		fn = t.OnStreamExecuteScanQuery
-	default:
-		h1 := t.OnStreamExecuteScanQuery
-		h2 := c.OnStreamExecuteScanQuery
-		fn = func(s StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s StreamExecuteScanQueryDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onStreamExecuteScanQuery(s StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) {
+	fn := t.OnStreamExecuteScanQuery
 	if fn == nil {
 		return func(StreamExecuteScanQueryDoneInfo) {
 			return
@@ -551,33 +357,8 @@ func (t ClientTrace) onStreamExecuteScanQuery(ctx context.Context, s StreamExecu
 	}
 	return res
 }
-func (t ClientTrace) onBeginTransaction(ctx context.Context, b BeginTransactionStartInfo) func(BeginTransactionDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(BeginTransactionStartInfo) func(BeginTransactionDoneInfo) 
-	switch {
-	case t.OnBeginTransaction == nil:
-		fn = c.OnBeginTransaction
-	case c.OnBeginTransaction == nil:
-		fn = t.OnBeginTransaction
-	default:
-		h1 := t.OnBeginTransaction
-		h2 := c.OnBeginTransaction
-		fn = func(b BeginTransactionStartInfo) func(BeginTransactionDoneInfo) {
-			r1 := h1(b)
-			r2 := h2(b)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(b BeginTransactionDoneInfo) {
-					r1(b)
-					r2(b)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onBeginTransaction(b BeginTransactionStartInfo) func(BeginTransactionDoneInfo) {
+	fn := t.OnBeginTransaction
 	if fn == nil {
 		return func(BeginTransactionDoneInfo) {
 			return
@@ -591,33 +372,8 @@ func (t ClientTrace) onBeginTransaction(ctx context.Context, b BeginTransactionS
 	}
 	return res
 }
-func (t ClientTrace) onCommitTransaction(ctx context.Context, c1 CommitTransactionStartInfo) func(CommitTransactionDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(CommitTransactionStartInfo) func(CommitTransactionDoneInfo) 
-	switch {
-	case t.OnCommitTransaction == nil:
-		fn = c.OnCommitTransaction
-	case c.OnCommitTransaction == nil:
-		fn = t.OnCommitTransaction
-	default:
-		h1 := t.OnCommitTransaction
-		h2 := c.OnCommitTransaction
-		fn = func(c CommitTransactionStartInfo) func(CommitTransactionDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(c CommitTransactionDoneInfo) {
-					r1(c)
-					r2(c)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onCommitTransaction(c1 CommitTransactionStartInfo) func(CommitTransactionDoneInfo) {
+	fn := t.OnCommitTransaction
 	if fn == nil {
 		return func(CommitTransactionDoneInfo) {
 			return
@@ -631,33 +387,8 @@ func (t ClientTrace) onCommitTransaction(ctx context.Context, c1 CommitTransacti
 	}
 	return res
 }
-func (t ClientTrace) onRollbackTransaction(ctx context.Context, r RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo) {
-	c := ContextClientTrace(ctx)
-	var fn func(RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo) 
-	switch {
-	case t.OnRollbackTransaction == nil:
-		fn = c.OnRollbackTransaction
-	case c.OnRollbackTransaction == nil:
-		fn = t.OnRollbackTransaction
-	default:
-		h1 := t.OnRollbackTransaction
-		h2 := c.OnRollbackTransaction
-		fn = func(r RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo) {
-			r1 := h1(r)
-			r2 := h2(r)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(r RollbackTransactionDoneInfo) {
-					r1(r)
-					r2(r)
-				}
-			}
-		}
-	}
+func (t ClientTrace) onRollbackTransaction(r RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo) {
+	fn := t.OnRollbackTransaction
 	if fn == nil {
 		return func(RollbackTransactionDoneInfo) {
 			return
@@ -671,6 +402,7 @@ func (t ClientTrace) onRollbackTransaction(ctx context.Context, r RollbackTransa
 	}
 	return res
 }
+
 // Compose returns a new RetryTrace which has functional fields composed
 // both from t and x.
 func (t RetryTrace) Compose(x RetryTrace) (ret RetryTrace) {
@@ -700,52 +432,8 @@ func (t RetryTrace) Compose(x RetryTrace) (ret RetryTrace) {
 	}
 	return ret
 }
-
-type retryTraceContextKey struct{}
-
-// WithRetryTrace returns context which has associated RetryTrace with it.
-func WithRetryTrace(ctx context.Context, t RetryTrace) context.Context {
-	return context.WithValue(ctx,
-		retryTraceContextKey{},
-		ContextRetryTrace(ctx).Compose(t),
-	)
-}
-
-// ContextRetryTrace returns RetryTrace associated with ctx.
-// If there is no RetryTrace associated with ctx then zero value 
-// of RetryTrace is returned.
-func ContextRetryTrace(ctx context.Context) RetryTrace {
-	t, _ := ctx.Value(retryTraceContextKey{}).(RetryTrace)
-	return t
-}
-
-func (t RetryTrace) onLoop(ctx context.Context, r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
-	c := ContextRetryTrace(ctx)
-	var fn func(RetryLoopStartInfo) func(RetryLoopDoneInfo) 
-	switch {
-	case t.OnLoop == nil:
-		fn = c.OnLoop
-	case c.OnLoop == nil:
-		fn = t.OnLoop
-	default:
-		h1 := t.OnLoop
-		h2 := c.OnLoop
-		fn = func(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
-			r1 := h1(r)
-			r2 := h2(r)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(r RetryLoopDoneInfo) {
-					r1(r)
-					r2(r)
-				}
-			}
-		}
-	}
+func (t RetryTrace) onLoop(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
+	fn := t.OnLoop
 	if fn == nil {
 		return func(RetryLoopDoneInfo) {
 			return
@@ -759,6 +447,7 @@ func (t RetryTrace) onLoop(ctx context.Context, r RetryLoopStartInfo) func(Retry
 	}
 	return res
 }
+
 // Compose returns a new SessionPoolTrace which has functional fields composed
 // both from t and x.
 func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
@@ -993,52 +682,8 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	}
 	return ret
 }
-
-type sessionPoolTraceContextKey struct{}
-
-// WithSessionPoolTrace returns context which has associated SessionPoolTrace with it.
-func WithSessionPoolTrace(ctx context.Context, t SessionPoolTrace) context.Context {
-	return context.WithValue(ctx,
-		sessionPoolTraceContextKey{},
-		ContextSessionPoolTrace(ctx).Compose(t),
-	)
-}
-
-// ContextSessionPoolTrace returns SessionPoolTrace associated with ctx.
-// If there is no SessionPoolTrace associated with ctx then zero value 
-// of SessionPoolTrace is returned.
-func ContextSessionPoolTrace(ctx context.Context) SessionPoolTrace {
-	t, _ := ctx.Value(sessionPoolTraceContextKey{}).(SessionPoolTrace)
-	return t
-}
-
-func (t SessionPoolTrace) onCreate(ctx context.Context, s SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) 
-	switch {
-	case t.OnCreate == nil:
-		fn = c.OnCreate
-	case c.OnCreate == nil:
-		fn = t.OnCreate
-	default:
-		h1 := t.OnCreate
-		h2 := c.OnCreate
-		fn = func(s SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolCreateDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onCreate(s SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
+	fn := t.OnCreate
 	if fn == nil {
 		return func(SessionPoolCreateDoneInfo) {
 			return
@@ -1052,33 +697,8 @@ func (t SessionPoolTrace) onCreate(ctx context.Context, s SessionPoolCreateStart
 	}
 	return res
 }
-func (t SessionPoolTrace) onGet(ctx context.Context, s SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) 
-	switch {
-	case t.OnGet == nil:
-		fn = c.OnGet
-	case c.OnGet == nil:
-		fn = t.OnGet
-	default:
-		h1 := t.OnGet
-		h2 := c.OnGet
-		fn = func(s SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolGetDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onGet(s SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
+	fn := t.OnGet
 	if fn == nil {
 		return func(SessionPoolGetDoneInfo) {
 			return
@@ -1092,33 +712,8 @@ func (t SessionPoolTrace) onGet(ctx context.Context, s SessionPoolGetStartInfo) 
 	}
 	return res
 }
-func (t SessionPoolTrace) onWait(ctx context.Context, s SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) 
-	switch {
-	case t.OnWait == nil:
-		fn = c.OnWait
-	case c.OnWait == nil:
-		fn = t.OnWait
-	default:
-		h1 := t.OnWait
-		h2 := c.OnWait
-		fn = func(s SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolWaitDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onWait(s SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
+	fn := t.OnWait
 	if fn == nil {
 		return func(SessionPoolWaitDoneInfo) {
 			return
@@ -1132,33 +727,8 @@ func (t SessionPoolTrace) onWait(ctx context.Context, s SessionPoolWaitStartInfo
 	}
 	return res
 }
-func (t SessionPoolTrace) onBusyCheck(ctx context.Context, s SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo) 
-	switch {
-	case t.OnBusyCheck == nil:
-		fn = c.OnBusyCheck
-	case c.OnBusyCheck == nil:
-		fn = t.OnBusyCheck
-	default:
-		h1 := t.OnBusyCheck
-		h2 := c.OnBusyCheck
-		fn = func(s SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolBusyCheckDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onBusyCheck(s SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo) {
+	fn := t.OnBusyCheck
 	if fn == nil {
 		return func(SessionPoolBusyCheckDoneInfo) {
 			return
@@ -1172,33 +742,8 @@ func (t SessionPoolTrace) onBusyCheck(ctx context.Context, s SessionPoolBusyChec
 	}
 	return res
 }
-func (t SessionPoolTrace) onTake(ctx context.Context, s SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo) 
-	switch {
-	case t.OnTake == nil:
-		fn = c.OnTake
-	case c.OnTake == nil:
-		fn = t.OnTake
-	default:
-		h1 := t.OnTake
-		h2 := c.OnTake
-		fn = func(s SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolTakeDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onTake(s SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo) {
+	fn := t.OnTake
 	if fn == nil {
 		return func(SessionPoolTakeDoneInfo) {
 			return
@@ -1212,54 +757,15 @@ func (t SessionPoolTrace) onTake(ctx context.Context, s SessionPoolTakeStartInfo
 	}
 	return res
 }
-func (t SessionPoolTrace) onTakeWait(ctx context.Context, s SessionPoolTakeWaitInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolTakeWaitInfo) 
-	switch {
-	case t.OnTakeWait == nil:
-		fn = c.OnTakeWait
-	case c.OnTakeWait == nil:
-		fn = t.OnTakeWait
-	default:
-		h1 := t.OnTakeWait
-		h2 := c.OnTakeWait
-		fn = func(s SessionPoolTakeWaitInfo) {
-			h1(s)
-			h2(s)
-		}
-	}
+func (t SessionPoolTrace) onTakeWait(s SessionPoolTakeWaitInfo) {
+	fn := t.OnTakeWait
 	if fn == nil {
 		return
 	}
 	fn(s)
 }
-func (t SessionPoolTrace) onPut(ctx context.Context, s SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) 
-	switch {
-	case t.OnPut == nil:
-		fn = c.OnPut
-	case c.OnPut == nil:
-		fn = t.OnPut
-	default:
-		h1 := t.OnPut
-		h2 := c.OnPut
-		fn = func(s SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolPutDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onPut(s SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
+	fn := t.OnPut
 	if fn == nil {
 		return func(SessionPoolPutDoneInfo) {
 			return
@@ -1273,33 +779,8 @@ func (t SessionPoolTrace) onPut(ctx context.Context, s SessionPoolPutStartInfo) 
 	}
 	return res
 }
-func (t SessionPoolTrace) onPutBusy(ctx context.Context, s SessionPoolPutBusyStartInfo) func(SessionPoolPutBusyDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolPutBusyStartInfo) func(SessionPoolPutBusyDoneInfo) 
-	switch {
-	case t.OnPutBusy == nil:
-		fn = c.OnPutBusy
-	case c.OnPutBusy == nil:
-		fn = t.OnPutBusy
-	default:
-		h1 := t.OnPutBusy
-		h2 := c.OnPutBusy
-		fn = func(s SessionPoolPutBusyStartInfo) func(SessionPoolPutBusyDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolPutBusyDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onPutBusy(s SessionPoolPutBusyStartInfo) func(SessionPoolPutBusyDoneInfo) {
+	fn := t.OnPutBusy
 	if fn == nil {
 		return func(SessionPoolPutBusyDoneInfo) {
 			return
@@ -1313,33 +794,8 @@ func (t SessionPoolTrace) onPutBusy(ctx context.Context, s SessionPoolPutBusySta
 	}
 	return res
 }
-func (t SessionPoolTrace) onCloseSession(ctx context.Context, s SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo) 
-	switch {
-	case t.OnCloseSession == nil:
-		fn = c.OnCloseSession
-	case c.OnCloseSession == nil:
-		fn = t.OnCloseSession
-	default:
-		h1 := t.OnCloseSession
-		h2 := c.OnCloseSession
-		fn = func(s SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolCloseSessionDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onCloseSession(s SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo) {
+	fn := t.OnCloseSession
 	if fn == nil {
 		return func(SessionPoolCloseSessionDoneInfo) {
 			return
@@ -1353,33 +809,8 @@ func (t SessionPoolTrace) onCloseSession(ctx context.Context, s SessionPoolClose
 	}
 	return res
 }
-func (t SessionPoolTrace) onClose(ctx context.Context, s SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo) {
-	c := ContextSessionPoolTrace(ctx)
-	var fn func(SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo) 
-	switch {
-	case t.OnClose == nil:
-		fn = c.OnClose
-	case c.OnClose == nil:
-		fn = t.OnClose
-	default:
-		h1 := t.OnClose
-		h2 := c.OnClose
-		fn = func(s SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolCloseDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
+func (t SessionPoolTrace) onClose(s SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo) {
+	fn := t.OnClose
 	if fn == nil {
 		return func(SessionPoolCloseDoneInfo) {
 			return
@@ -1393,6 +824,7 @@ func (t SessionPoolTrace) onClose(ctx context.Context, s SessionPoolCloseStartIn
 	}
 	return res
 }
+
 // Compose returns a new createSessionTrace which has functional fields composed
 // both from t and x.
 func (t createSessionTrace) Compose(x createSessionTrace) (ret createSessionTrace) {
@@ -1537,10 +969,10 @@ func (t createSessionTrace) onPutSession(session *Session, err error) {
 	}
 	fn(session, err)
 }
-func clientTraceOnCreateSession(ctx context.Context, t ClientTrace, c context.Context) func(_ context.Context, _ *Session, endpoint string, latency time.Duration, _ error) {
+func clientTraceOnCreateSession(t ClientTrace, c context.Context) func(_ context.Context, _ *Session, endpoint string, latency time.Duration, _ error) {
 	var p CreateSessionStartInfo
 	p.Context = c
-	res := t.onCreateSession(ctx, p)
+	res := t.onCreateSession(p)
 	return func(c context.Context, s *Session, endpoint string, latency time.Duration, e error) {
 		var p CreateSessionDoneInfo
 		p.Context = c
@@ -1551,11 +983,11 @@ func clientTraceOnCreateSession(ctx context.Context, t ClientTrace, c context.Co
 		res(p)
 	}
 }
-func clientTraceOnKeepAlive(ctx context.Context, t ClientTrace, c context.Context, s *Session) func(context.Context, *Session, SessionInfo, error) {
+func clientTraceOnKeepAlive(t ClientTrace, c context.Context, s *Session) func(context.Context, *Session, SessionInfo, error) {
 	var p KeepAliveStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onKeepAlive(ctx, p)
+	res := t.onKeepAlive(p)
 	return func(c context.Context, s *Session, s1 SessionInfo, e error) {
 		var p KeepAliveDoneInfo
 		p.Context = c
@@ -1565,11 +997,11 @@ func clientTraceOnKeepAlive(ctx context.Context, t ClientTrace, c context.Contex
 		res(p)
 	}
 }
-func clientTraceOnDeleteSession(ctx context.Context, t ClientTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, latency time.Duration, _ error) {
+func clientTraceOnDeleteSession(t ClientTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, latency time.Duration, _ error) {
 	var p DeleteSessionStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onDeleteSession(ctx, p)
+	res := t.onDeleteSession(p)
 	return func(c context.Context, s *Session, latency time.Duration, e error) {
 		var p DeleteSessionDoneInfo
 		p.Context = c
@@ -1579,12 +1011,12 @@ func clientTraceOnDeleteSession(ctx context.Context, t ClientTrace, c context.Co
 		res(p)
 	}
 }
-func clientTraceOnPrepareDataQuery(ctx context.Context, t ClientTrace, c context.Context, s *Session, query string) func(_ context.Context, _ *Session, query string, result *DataQuery, cached bool, _ error) {
+func clientTraceOnPrepareDataQuery(t ClientTrace, c context.Context, s *Session, query string) func(_ context.Context, _ *Session, query string, result *DataQuery, cached bool, _ error) {
 	var p PrepareDataQueryStartInfo
 	p.Context = c
 	p.Session = s
 	p.Query = query
-	res := t.onPrepareDataQuery(ctx, p)
+	res := t.onPrepareDataQuery(p)
 	return func(c context.Context, s *Session, query string, result *DataQuery, cached bool, e error) {
 		var p PrepareDataQueryDoneInfo
 		p.Context = c
@@ -1596,14 +1028,14 @@ func clientTraceOnPrepareDataQuery(ctx context.Context, t ClientTrace, c context
 		res(p)
 	}
 }
-func clientTraceOnExecuteDataQuery(ctx context.Context, t ClientTrace, c context.Context, s *Session, txID string, query *DataQuery, parameters *QueryParameters) func(_ context.Context, _ *Session, txID string, query *DataQuery, parameters *QueryParameters, prepared bool, _ *Result, _ error) {
+func clientTraceOnExecuteDataQuery(t ClientTrace, c context.Context, s *Session, txID string, query *DataQuery, parameters *QueryParameters) func(_ context.Context, _ *Session, txID string, query *DataQuery, parameters *QueryParameters, prepared bool, _ *Result, _ error) {
 	var p ExecuteDataQueryStartInfo
 	p.Context = c
 	p.Session = s
 	p.TxID = txID
 	p.Query = query
 	p.Parameters = parameters
-	res := t.onExecuteDataQuery(ctx, p)
+	res := t.onExecuteDataQuery(p)
 	return func(c context.Context, s *Session, txID string, query *DataQuery, parameters *QueryParameters, prepared bool, r *Result, e error) {
 		var p ExecuteDataQueryDoneInfo
 		p.Context = c
@@ -1617,11 +1049,11 @@ func clientTraceOnExecuteDataQuery(ctx context.Context, t ClientTrace, c context
 		res(p)
 	}
 }
-func clientTraceOnStreamReadTable(ctx context.Context, t ClientTrace, c context.Context, s *Session) func(context.Context, *Session, *Result, error) {
+func clientTraceOnStreamReadTable(t ClientTrace, c context.Context, s *Session) func(context.Context, *Session, *Result, error) {
 	var p StreamReadTableStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onStreamReadTable(ctx, p)
+	res := t.onStreamReadTable(p)
 	return func(c context.Context, s *Session, r *Result, e error) {
 		var p StreamReadTableDoneInfo
 		p.Context = c
@@ -1631,13 +1063,13 @@ func clientTraceOnStreamReadTable(ctx context.Context, t ClientTrace, c context.
 		res(p)
 	}
 }
-func clientTraceOnStreamExecuteScanQuery(ctx context.Context, t ClientTrace, c context.Context, s *Session, query *DataQuery, parameters *QueryParameters) func(_ context.Context, _ *Session, query *DataQuery, parameters *QueryParameters, _ *Result, _ error) {
+func clientTraceOnStreamExecuteScanQuery(t ClientTrace, c context.Context, s *Session, query *DataQuery, parameters *QueryParameters) func(_ context.Context, _ *Session, query *DataQuery, parameters *QueryParameters, _ *Result, _ error) {
 	var p StreamExecuteScanQueryStartInfo
 	p.Context = c
 	p.Session = s
 	p.Query = query
 	p.Parameters = parameters
-	res := t.onStreamExecuteScanQuery(ctx, p)
+	res := t.onStreamExecuteScanQuery(p)
 	return func(c context.Context, s *Session, query *DataQuery, parameters *QueryParameters, r *Result, e error) {
 		var p StreamExecuteScanQueryDoneInfo
 		p.Context = c
@@ -1649,11 +1081,11 @@ func clientTraceOnStreamExecuteScanQuery(ctx context.Context, t ClientTrace, c c
 		res(p)
 	}
 }
-func clientTraceOnBeginTransaction(ctx context.Context, t ClientTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, txID string, _ error) {
+func clientTraceOnBeginTransaction(t ClientTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, txID string, _ error) {
 	var p BeginTransactionStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onBeginTransaction(ctx, p)
+	res := t.onBeginTransaction(p)
 	return func(c context.Context, s *Session, txID string, e error) {
 		var p BeginTransactionDoneInfo
 		p.Context = c
@@ -1663,12 +1095,12 @@ func clientTraceOnBeginTransaction(ctx context.Context, t ClientTrace, c context
 		res(p)
 	}
 }
-func clientTraceOnCommitTransaction(ctx context.Context, t ClientTrace, c context.Context, s *Session, txID string) func(_ context.Context, _ *Session, txID string, _ error) {
+func clientTraceOnCommitTransaction(t ClientTrace, c context.Context, s *Session, txID string) func(_ context.Context, _ *Session, txID string, _ error) {
 	var p CommitTransactionStartInfo
 	p.Context = c
 	p.Session = s
 	p.TxID = txID
-	res := t.onCommitTransaction(ctx, p)
+	res := t.onCommitTransaction(p)
 	return func(c context.Context, s *Session, txID string, e error) {
 		var p CommitTransactionDoneInfo
 		p.Context = c
@@ -1678,12 +1110,12 @@ func clientTraceOnCommitTransaction(ctx context.Context, t ClientTrace, c contex
 		res(p)
 	}
 }
-func clientTraceOnRollbackTransaction(ctx context.Context, t ClientTrace, c context.Context, s *Session, txID string) func(_ context.Context, _ *Session, txID string, _ error) {
+func clientTraceOnRollbackTransaction(t ClientTrace, c context.Context, s *Session, txID string) func(_ context.Context, _ *Session, txID string, _ error) {
 	var p RollbackTransactionStartInfo
 	p.Context = c
 	p.Session = s
 	p.TxID = txID
-	res := t.onRollbackTransaction(ctx, p)
+	res := t.onRollbackTransaction(p)
 	return func(c context.Context, s *Session, txID string, e error) {
 		var p RollbackTransactionDoneInfo
 		p.Context = c
@@ -1693,10 +1125,10 @@ func clientTraceOnRollbackTransaction(ctx context.Context, t ClientTrace, c cont
 		res(p)
 	}
 }
-func retryTraceOnLoop(ctx context.Context, t RetryTrace, c context.Context) func(_ context.Context, latency time.Duration, attempts int) {
+func retryTraceOnLoop(t RetryTrace, c context.Context) func(_ context.Context, latency time.Duration, attempts int) {
 	var p RetryLoopStartInfo
 	p.Context = c
-	res := t.onLoop(ctx, p)
+	res := t.onLoop(p)
 	return func(c context.Context, latency time.Duration, attempts int) {
 		var p RetryLoopDoneInfo
 		p.Context = c
@@ -1705,10 +1137,10 @@ func retryTraceOnLoop(ctx context.Context, t RetryTrace, c context.Context) func
 		res(p)
 	}
 }
-func sessionPoolTraceOnCreate(ctx context.Context, t SessionPoolTrace, c context.Context) func(context.Context, *Session, error) {
+func sessionPoolTraceOnCreate(t SessionPoolTrace, c context.Context) func(context.Context, *Session, error) {
 	var p SessionPoolCreateStartInfo
 	p.Context = c
-	res := t.onCreate(ctx, p)
+	res := t.onCreate(p)
 	return func(c context.Context, s *Session, e error) {
 		var p SessionPoolCreateDoneInfo
 		p.Context = c
@@ -1717,10 +1149,10 @@ func sessionPoolTraceOnCreate(ctx context.Context, t SessionPoolTrace, c context
 		res(p)
 	}
 }
-func sessionPoolTraceOnGet(ctx context.Context, t SessionPoolTrace, c context.Context) func(_ context.Context, _ *Session, latency time.Duration, retryAttempts int, _ error) {
+func sessionPoolTraceOnGet(t SessionPoolTrace, c context.Context) func(_ context.Context, _ *Session, latency time.Duration, retryAttempts int, _ error) {
 	var p SessionPoolGetStartInfo
 	p.Context = c
-	res := t.onGet(ctx, p)
+	res := t.onGet(p)
 	return func(c context.Context, s *Session, latency time.Duration, retryAttempts int, e error) {
 		var p SessionPoolGetDoneInfo
 		p.Context = c
@@ -1731,10 +1163,10 @@ func sessionPoolTraceOnGet(ctx context.Context, t SessionPoolTrace, c context.Co
 		res(p)
 	}
 }
-func sessionPoolTraceOnWait(ctx context.Context, t SessionPoolTrace, c context.Context) func(context.Context, *Session, error) {
+func sessionPoolTraceOnWait(t SessionPoolTrace, c context.Context) func(context.Context, *Session, error) {
 	var p SessionPoolWaitStartInfo
 	p.Context = c
-	res := t.onWait(ctx, p)
+	res := t.onWait(p)
 	return func(c context.Context, s *Session, e error) {
 		var p SessionPoolWaitDoneInfo
 		p.Context = c
@@ -1743,11 +1175,11 @@ func sessionPoolTraceOnWait(ctx context.Context, t SessionPoolTrace, c context.C
 		res(p)
 	}
 }
-func sessionPoolTraceOnBusyCheck(ctx context.Context, t SessionPoolTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, reused bool, _ error) {
+func sessionPoolTraceOnBusyCheck(t SessionPoolTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, reused bool, _ error) {
 	var p SessionPoolBusyCheckStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onBusyCheck(ctx, p)
+	res := t.onBusyCheck(p)
 	return func(c context.Context, s *Session, reused bool, e error) {
 		var p SessionPoolBusyCheckDoneInfo
 		p.Context = c
@@ -1757,11 +1189,11 @@ func sessionPoolTraceOnBusyCheck(ctx context.Context, t SessionPoolTrace, c cont
 		res(p)
 	}
 }
-func sessionPoolTraceOnTake(ctx context.Context, t SessionPoolTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, took bool, _ error) {
+func sessionPoolTraceOnTake(t SessionPoolTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, took bool, _ error) {
 	var p SessionPoolTakeStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onTake(ctx, p)
+	res := t.onTake(p)
 	return func(c context.Context, s *Session, took bool, e error) {
 		var p SessionPoolTakeDoneInfo
 		p.Context = c
@@ -1771,17 +1203,17 @@ func sessionPoolTraceOnTake(ctx context.Context, t SessionPoolTrace, c context.C
 		res(p)
 	}
 }
-func sessionPoolTraceOnTakeWait(ctx context.Context, t SessionPoolTrace, c context.Context, s *Session) {
+func sessionPoolTraceOnTakeWait(t SessionPoolTrace, c context.Context, s *Session) {
 	var p SessionPoolTakeWaitInfo
 	p.Context = c
 	p.Session = s
-	t.onTakeWait(ctx, p)
+	t.onTakeWait(p)
 }
-func sessionPoolTraceOnPut(ctx context.Context, t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session, error) {
+func sessionPoolTraceOnPut(t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session, error) {
 	var p SessionPoolPutStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onPut(ctx, p)
+	res := t.onPut(p)
 	return func(c context.Context, s *Session, e error) {
 		var p SessionPoolPutDoneInfo
 		p.Context = c
@@ -1790,11 +1222,11 @@ func sessionPoolTraceOnPut(ctx context.Context, t SessionPoolTrace, c context.Co
 		res(p)
 	}
 }
-func sessionPoolTraceOnPutBusy(ctx context.Context, t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session, error) {
+func sessionPoolTraceOnPutBusy(t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session, error) {
 	var p SessionPoolPutBusyStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onPutBusy(ctx, p)
+	res := t.onPutBusy(p)
 	return func(c context.Context, s *Session, e error) {
 		var p SessionPoolPutBusyDoneInfo
 		p.Context = c
@@ -1803,11 +1235,11 @@ func sessionPoolTraceOnPutBusy(ctx context.Context, t SessionPoolTrace, c contex
 		res(p)
 	}
 }
-func sessionPoolTraceOnCloseSession(ctx context.Context, t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session, error) {
+func sessionPoolTraceOnCloseSession(t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session, error) {
 	var p SessionPoolCloseSessionStartInfo
 	p.Context = c
 	p.Session = s
-	res := t.onCloseSession(ctx, p)
+	res := t.onCloseSession(p)
 	return func(c context.Context, s *Session, e error) {
 		var p SessionPoolCloseSessionDoneInfo
 		p.Context = c
@@ -1816,10 +1248,10 @@ func sessionPoolTraceOnCloseSession(ctx context.Context, t SessionPoolTrace, c c
 		res(p)
 	}
 }
-func sessionPoolTraceOnClose(ctx context.Context, t SessionPoolTrace, c context.Context) func(context.Context, error) {
+func sessionPoolTraceOnClose(t SessionPoolTrace, c context.Context) func(context.Context, error) {
 	var p SessionPoolCloseStartInfo
 	p.Context = c
-	res := t.onClose(ctx, p)
+	res := t.onClose(p)
 	return func(c context.Context, e error) {
 		var p SessionPoolCloseDoneInfo
 		p.Context = c
