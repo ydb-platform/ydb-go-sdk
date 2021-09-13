@@ -334,7 +334,7 @@ func (s *Scanner) typeError(act, exp interface{}) {
 func (s *Scanner) valueTypeError(act, exp interface{}) {
 	s.errorf(
 		"unexpected value during scan at %q %s: %s; want %s",
-		s.Path(), s.Type(), nameIface(act), nameIface(exp),
+		s.path(), s.getType(), nameIface(act), nameIface(exp),
 	)
 }
 

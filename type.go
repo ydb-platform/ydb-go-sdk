@@ -3,6 +3,7 @@ package ydb
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
@@ -119,6 +120,8 @@ func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
 
 // RawValue scanning non-primitive yql types or for own implementation scanner native API
 type RawValue interface {
+	Path() string
+	WritePathTo(w io.Writer) (n int64, err error)
 	Type() Type
 	Bool() (v bool)
 	Int8() (v int8)
@@ -166,6 +169,12 @@ type RawValue interface {
 	//   [16]byte
 	//
 	Any() interface{}
+
+	// Unwrap unwraps current item under scan interpreting it as Optional<T> type.
+	Unwrap()
+	AssertType(t Type) bool
+	IsNull() bool
+	IsOptional() bool
 
 	// ListIn interprets current item under scan as a ydb's list.
 	// It returns the size of the nested items.
@@ -235,12 +244,6 @@ type RawValue interface {
 	// UnwrapDecimal returns decimal value represented by big-endian 128 bit signed
 	// integer and its type information.
 	UnwrapDecimal() (v [16]byte, precision, scale uint32)
-
-	// Unwrap unwraps current item under scan interpreting it as Optional<T> type.
-	Unwrap()
-	AssertType(t Type) bool
-	IsNull() bool
-	IsOptional() bool
 	IsDecimal() bool
 	Err() error
 }

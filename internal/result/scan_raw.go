@@ -102,7 +102,7 @@ func (s *rawConverter) Path() string {
 	return buf.String()
 }
 
-func (s *rawConverter) writePathTo(w io.Writer) (n int64, err error) {
+func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
 	for sp := 0; sp < s.stack.size(); sp++ {
 		if sp > 0 {
 			m, err := io.WriteString(w, ".")
@@ -126,11 +126,7 @@ func (s *rawConverter) writePathTo(w io.Writer) (n int64, err error) {
 }
 
 func (s *rawConverter) Type() ydb.Type {
-	x := s.stack.current()
-	if x.isEmpty() {
-		return nil
-	}
-	return internal.TypeFromYDB(x.t)
+	return s.getType()
 }
 
 func (s *rawConverter) Bool() (v bool) {
@@ -566,10 +562,10 @@ func (s *rawConverter) boundsError(n, i int) {
 	)
 }
 
-func (s *Scanner) decimalTypeError(t ydb.Type) {
+func (s *rawConverter) decimalTypeError(t ydb.Type) {
 	s.errorf(
 		"unexpected decimal type at %q %s: want %s",
-		s.path(), s.getType(), t,
+		s.Path(), s.getType(), t,
 	)
 }
 
@@ -599,7 +595,7 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 	if isOptional(p.t) {
 		return true
 	}
-	s.errorf("not nullable type at %q: %s (%d %s %s)", s.path(), s.Type(), s.stack.size(), c.t, p.t)
+	s.errorf("not nullable type at %q: %s (%d %s %s)", s.Path(), s.Type(), s.stack.size(), c.t, p.t)
 	return false
 }
 func (s *rawConverter) assertCurrentTypeIs(t ydb.Type) bool {
@@ -608,7 +604,7 @@ func (s *rawConverter) assertCurrentTypeIs(t ydb.Type) bool {
 	if !internal.TypesEqual(act, t) {
 		s.errorf(
 			"unexpected type at %q %s: %s; want %s",
-			s.path(), s.Type(), act, t,
+			s.Path(), s.Type(), act, t,
 		)
 		return false
 	}

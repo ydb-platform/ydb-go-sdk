@@ -2,20 +2,12 @@ package result
 
 import (
 	"testing"
-<<<<<<< HEAD
-=======
-	"time"
->>>>>>> add rawValue
 )
 
 var (
 	testSize = 10000
 )
 
-<<<<<<< HEAD
-=======
-
->>>>>>> add rawValue
 func BenchmarkTestScanWithColumns(b *testing.B) {
 	b.ReportAllocs()
 	res := PrepareScannerPerformanceTest(b.N)
