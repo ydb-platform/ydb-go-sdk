@@ -152,8 +152,6 @@ func (b *DriverBuilder) Build() ydb.Driver {
 				err = b.Error(ctx, method)
 			}
 
-			s.busy = isBusy(err)
-
 			return
 		},
 	}
@@ -178,16 +176,8 @@ func TestTxDoerStmt(t *testing.T) {
 	}
 	driver := b.Build()
 
-	busyChecking := make(chan struct{})
 	db := sql.OpenDB(Connector(
 		WithSessionPoolIdleThreshold(time.Hour),
-		WithSessionPoolTrace(table.SessionPoolTrace{
-			OnBusyCheck: func(info table.SessionPoolBusyCheckStartInfo) func(table.SessionPoolBusyCheckDoneInfo){
-				busyChecking <- struct{}{}
-				t.Logf("busy checking session %q", info.Session.ID)
-				return nil
-			},
-		}),
 		WithClient(&table.Client{
 			Driver: driver,
 		}),
@@ -223,16 +213,6 @@ func TestTxDoerStmt(t *testing.T) {
 		_, err := tx.Stmt(stmt).Exec()
 		return err
 	})
-	if !isBusy(err) {
-		t.Fatalf("not busy error: %v", err)
-	}
-
-	const timeout = time.Second
-	select {
-	case <-busyChecking:
-	case <-time.After(timeout):
-		t.Fatalf("no busy checking after %s", timeout)
-	}
 
 	// Try to repeate the same thing – we should not receive any error here –
 	// previous session must be marked busy and not used for some time.

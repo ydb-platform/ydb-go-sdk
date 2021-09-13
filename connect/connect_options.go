@@ -100,16 +100,16 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) ConnectOption {
 	}
 }
 
+// Deprecated: has no effect now
 func WithSessionPoolBusyCheckInterval(busyCheckInterval time.Duration) ConnectOption {
 	return func(c *Connection) error {
-		c.table.sessionPool.BusyCheckInterval = busyCheckInterval
 		return nil
 	}
 }
 
+// Deprecated: has no effect now
 func WithSessionPoolKeepAliveBatchSize(keepAliveBatchSize int) ConnectOption {
 	return func(c *Connection) error {
-		c.table.sessionPool.KeepAliveBatchSize = keepAliveBatchSize
 		return nil
 	}
 }

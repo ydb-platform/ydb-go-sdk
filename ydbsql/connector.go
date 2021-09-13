@@ -21,6 +21,9 @@ type ConnectorOption func(*connector)
 func WithDialer(d ydb.Dialer) ConnectorOption {
 	return func(c *connector) {
 		c.dialer = d
+		if c.dialer.DriverConfig == nil {
+			c.dialer.DriverConfig = new(ydb.DriverConfig)
+		}
 	}
 }
 
@@ -84,16 +87,14 @@ func WithSessionPoolIdleThreshold(d time.Duration) ConnectorOption {
 	}
 }
 
-func WithSessionPoolBusyCheckInterval(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.BusyCheckInterval = d
-	}
+// Deprecated: has no effect now
+func WithSessionPoolBusyCheckInterval(time.Duration) ConnectorOption {
+	return func(c *connector) {}
 }
 
-func WithSessionPoolKeepAliveBatchSize(n int) ConnectorOption {
-	return func(c *connector) {
-		c.pool.KeepAliveBatchSize = n
-	}
+// Deprecated: has no effect now
+func WithSessionPoolKeepAliveBatchSize(int) ConnectorOption {
+	return func(c *connector) {}
 }
 
 func WithSessionPoolKeepAliveTimeout(d time.Duration) ConnectorOption {
@@ -125,6 +126,18 @@ func WithMaxRetries(n int) ConnectorOption {
 func WithRetryBackoff(b ydb.Backoff) ConnectorOption {
 	return func(c *connector) {
 		c.retryConfig.Backoff = b
+	}
+}
+
+func WithRetryFastSlot(fastSlot time.Duration) ConnectorOption {
+	return func(c *connector) {
+		c.retryConfig.FastSlot = fastSlot
+	}
+}
+
+func WithRetrySlowSlot(slowSlot time.Duration) ConnectorOption {
+	return func(c *connector) {
+		c.retryConfig.SlowSlot = slowSlot
 	}
 }
 
@@ -163,8 +176,9 @@ func Connector(opts ...ConnectorOption) driver.Connector {
 		},
 		retryConfig: RetryConfig{
 			MaxRetries:   ydb.DefaultMaxRetries,
-			Backoff:      ydb.DefaultBackoff,
 			RetryChecker: retryChecker,
+			SlowSlot:     ydb.DefaultSlowSlot,
+			FastSlot:     ydb.DefaultFastSlot,
 		},
 		defaultTxControl: table.TxControl(
 			table.BeginTx(
@@ -278,11 +292,11 @@ func (d *Driver) Close() error {
 }
 
 // Open returns a new connection to the ydb.
-func (d *Driver) Open(name string) (driver.Conn, error) {
+func (d *Driver) Open(string) (driver.Conn, error) {
 	return nil, ErrDeprecated
 }
 
-func (d *Driver) OpenConnector(name string) (driver.Connector, error) {
+func (d *Driver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
 }
 

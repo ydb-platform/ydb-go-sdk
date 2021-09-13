@@ -5,11 +5,9 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2"
-
 	"github.com/yandex-cloud/ydb-go-sdk/v2/timeutil"
 )
 
@@ -18,10 +16,12 @@ var (
 	DefaultSessionPoolDeleteTimeout        = 500 * time.Millisecond
 	DefaultSessionPoolCreateSessionTimeout = 5 * time.Second
 	DefaultSessionPoolIdleThreshold        = 5 * time.Minute
-	DefaultSessionPoolBusyCheckInterval    = 1 * time.Second
 	DefaultSessionPoolSizeLimit            = 50
 	DefaultKeepAliveMinSize                = 10
 	DefaultIdleKeepAliveThreshold          = 2
+
+	// Deprecated: has no effect now
+	DefaultSessionPoolBusyCheckInterval = 1 * time.Second
 )
 
 var (
@@ -95,6 +95,7 @@ type SessionPool struct {
 	// disabled.
 	// If BusyCheckInterval is equal to zero, then the
 	// DefaultSessionPoolBusyCheckInterval value is used.
+	// Deprecated: has no effect now
 	BusyCheckInterval time.Duration
 
 	// Deprecated: unnecessary parameter
@@ -134,11 +135,6 @@ type SessionPool struct {
 
 	touching     bool
 	touchingDone chan struct{}
-
-	busyCheck        chan *Session
-	busyCheckerStop  chan struct{}
-	busyCheckerDone  chan struct{}
-	busyCheckCounter int32
 
 	closed bool
 
@@ -180,16 +176,6 @@ func (p *SessionPool) init() {
 
 		if p.IdleKeepAliveThreshold == 0 {
 			p.IdleKeepAliveThreshold = DefaultIdleKeepAliveThreshold
-		}
-
-		if p.BusyCheckInterval == 0 {
-			p.BusyCheckInterval = DefaultSessionPoolBusyCheckInterval
-		}
-		if p.BusyCheckInterval > 0 {
-			p.busyCheckerStop = make(chan struct{})
-			p.busyCheckerDone = make(chan struct{})
-			p.busyCheck = make(chan *Session, p.limit)
-			go p.busyChecker()
 		}
 
 		if p.CreateSessionTimeout <= 0 {
@@ -412,6 +398,8 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 // Put returns session to the SessionPool for further reuse.
 // If pool is already closed Put() calls s.Close(ctx) and returns
 // ErrSessionPoolClosed.
+// If pool is overflow calls s.Close(ctx) and returns
+// ErrSessionPoolOverflow.
 //
 // Note that Put() must be called only once after being created or received by
 // Get() or Take() calls. In other way it will produce unexpected behavior or
@@ -446,65 +434,10 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 	return
 }
 
-// p.mu must NOT be held.
-func (p *SessionPool) putBusy(ctx context.Context, s *Session) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.closed {
-		_ = p.CloseSession(ctx, s)
-		return ErrSessionPoolClosed
-	}
-	select {
-	case <-p.busyCheckerStop:
-		return p.CloseSession(ctx, s)
-
-	case p.busyCheck <- s:
-		atomic.AddInt32(&p.busyCheckCounter, 1)
-		return nil
-
-	default:
-		// if cannot push session into busyCheck (channel is full) - close session
-		return p.CloseSession(ctx, s)
-	}
-}
-
-// PutBusy returns given session s into the pool after some operation on s was
-// canceled by the client (probably due the timeout) or after some transport
-// error received. That is, session may be still in request processing state
-// and is not able to process further requests.
-//
-// Given session may be reused or may be closed in the future. That is, calling
-// PutBusy() gives complete ownership of s to the pool.
+// PutBusy used for putting session into busy checker
+// Deprecated: use Put() instead
 func (p *SessionPool) PutBusy(ctx context.Context, s *Session) (err error) {
-	p.init()
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.closed {
-		_ = p.CloseSession(ctx, s)
-		return ErrSessionPoolClosed
-	}
-
-	info, has := p.index[s]
-	if !has {
-		panicLocked(&p.mu, "ydb: table: PutBusy() unknown session")
-	}
-	if info.idle != nil {
-		panicLocked(&p.mu, "ydb: table: PutBusy() idle session")
-	}
-	if p.busyCheck == nil {
-		panicLocked(&p.mu, "ydb: table: PutBusy() session into the pool without busy checker")
-	}
-	delete(p.index, s)
-	p.notify(nil)
-
-	putBusyDone := sessionPoolTraceOnPutBusy(ctx, p.Trace, ctx, s)
-	go func() {
-		putBusyDone(ctx, s, p.putBusy(ctx, s))
-	}()
-
-	return
+	return p.CloseSession(ctx, s)
 }
 
 // Take removes session s from the pool and ensures that s will not be returned
@@ -617,26 +550,15 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	}
 
 	p.mu.Lock()
-
 	p.closed = true
-
 	keeperDone := p.keeperDone
 	if ch := p.keeperStop; ch != nil {
-		close(ch)
-	}
-
-	busyCheckerDone := p.busyCheckerDone
-	if ch := p.busyCheckerStop; ch != nil {
 		close(ch)
 	}
 	p.mu.Unlock()
 
 	if keeperDone != nil {
 		<-keeperDone
-	}
-	if busyCheckerDone != nil {
-		<-busyCheckerDone
-		close(p.busyCheck)
 	}
 
 	p.mu.Lock()
@@ -679,7 +601,6 @@ func (p *SessionPool) Stats() SessionPoolStats {
 		Index:            indexCount,
 		WaitQ:            waitQCount,
 		CreateInProgress: p.createInProgress,
-		BusyCheck:        int(p.busyCheckCounter),
 		MinSize:          p.KeepAliveMinSize,
 		MaxSize:          p.limit,
 	}
@@ -708,39 +629,6 @@ func (p *SessionPool) reuse(ctx context.Context, s *Session) (reused bool) {
 		}
 	}
 	return false
-}
-
-func (p *SessionPool) busyChecker() {
-	defer close(p.busyCheckerDone)
-	var (
-		ctx     = context.Background()
-		readAll = func(closeAll bool) {
-			for {
-				select {
-				case s, ok := <-p.busyCheck:
-					if !ok {
-						return
-					}
-					if closeAll || !p.reuse(ctx, s) {
-						_ = p.CloseSession(ctx, s)
-					}
-					atomic.AddInt32(&p.busyCheckCounter, -1)
-				default:
-					return
-				}
-			}
-		}
-	)
-	for {
-		select {
-		case <-p.busyCheckerStop:
-			readAll(true)
-			return
-
-		case <-time.After(p.BusyCheckInterval):
-			readAll(false)
-		}
-	}
 }
 
 func (p *SessionPool) keeper() {
@@ -1130,13 +1018,14 @@ func panicLocked(mu sync.Locker, message string) {
 }
 
 type SessionPoolStats struct {
-	Idle int
-	// Deprecated: always zero
-	Ready            int
+	Idle             int
 	Index            int
 	WaitQ            int
 	MinSize          int
 	MaxSize          int
 	CreateInProgress int
-	BusyCheck        int
+	// Deprecated: always zero
+	Ready int
+	// Deprecated: always zero
+	BusyCheck int
 }

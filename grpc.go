@@ -119,6 +119,55 @@ func (e StatusCode) String() string {
 	return Ydb.StatusIds_StatusCode_name[int32(e)]
 }
 
+func (e StatusCode) retryType() RetryType {
+	switch e {
+	case
+		StatusAborted,
+		StatusUnavailable,
+		StatusOverloaded,
+		StatusBadSession,
+		StatusSessionBusy,
+		StatusNotFound:
+		return RetryTypeAny
+	case
+		StatusCancelled,
+		StatusUndetermined:
+		return RetryTypeIdempotent
+	default:
+		return RetryTypeNoRetry
+	}
+}
+
+func (e StatusCode) backoffType() BackoffType {
+	switch e {
+	case
+		StatusOverloaded:
+		return BackoffTypeSlowBackoff
+	case
+		StatusAborted,
+		StatusUnavailable,
+		StatusBadSession,
+		StatusCancelled,
+		StatusSessionBusy,
+		StatusUndetermined:
+		return BackoffTypeFastBackoff
+	default:
+		return BackoffTypeNoBackoff
+	}
+}
+
+func (e StatusCode) mustDeleteSession() bool {
+	switch e {
+	case
+		StatusBadSession,
+		StatusSessionExpired,
+		StatusSessionBusy:
+		return true
+	default:
+		return false
+	}
+}
+
 // Errors describing unsusccessful operation status.
 const (
 	StatusUnknownStatus      = StatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED)
@@ -189,6 +238,47 @@ type TransportErrorCode int32
 
 func (t TransportErrorCode) String() string {
 	return transportErrorString(t)
+}
+
+func (t TransportErrorCode) retryType() RetryType {
+	switch t {
+	case
+		TransportErrorResourceExhausted,
+		TransportErrorAborted:
+		return RetryTypeAny
+	case
+		TransportErrorInternal,
+		TransportErrorUnavailable:
+		return RetryTypeIdempotent
+	default:
+		return RetryTypeNoRetry
+	}
+}
+
+func (t TransportErrorCode) backoffType() BackoffType {
+	switch t {
+	case
+		TransportErrorInternal,
+		TransportErrorUnavailable:
+		return BackoffTypeFastBackoff
+	case
+		TransportErrorResourceExhausted:
+		return BackoffTypeSlowBackoff
+	default:
+		return BackoffTypeNoBackoff
+	}
+}
+
+func (t TransportErrorCode) mustDeleteSession() bool {
+	switch t {
+	case
+		TransportErrorCanceled,
+		TransportErrorResourceExhausted,
+		TransportErrorOutOfRange:
+		return false
+	default:
+		return true
+	}
 }
 
 const (

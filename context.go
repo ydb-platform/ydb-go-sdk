@@ -15,10 +15,11 @@ import (
 )
 
 type (
-	ctxOpTimeoutKey     struct{}
-	ctxOpCancelAfterKey struct{}
-	ctxOpModeKey        struct{}
-	ctxEndpointInfoKey  struct{}
+	ctxOpTimeoutKey         struct{}
+	ctxOpCancelAfterKey     struct{}
+	ctxOpModeKey            struct{}
+	ctxRetryNoIdempotentKey struct{}
+	ctxEndpointInfoKey      struct{}
 
 	ctxEndpointInfo struct {
 		conn   *conn
@@ -136,6 +137,18 @@ func WithOperationMode(ctx context.Context, m OperationMode) context.Context {
 func ContextOperationMode(ctx context.Context) (m OperationMode, ok bool) {
 	m, ok = ctx.Value(ctxOpModeKey{}).(OperationMode)
 	return
+}
+
+// WithRetryNoIdempotent returns a copy of parent context with allow retry
+// operations with no idempotent errors
+func WithRetryNoIdempotent(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxRetryNoIdempotentKey{}, true)
+}
+
+// ContextRetryNoIdempotent returns the flag for retry with no idempotent errors
+func ContextRetryNoIdempotent(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxRetryNoIdempotentKey{}).(bool)
+	return ok && v
 }
 
 type OperationMode uint

@@ -32,13 +32,15 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
+			bacoffFunc := ydb.BackoffFunc(func(n int) <-chan time.Time {
+				ch := make(chan time.Time)
+				backoff <- ch
+				return ch
+			})
 			r := Retryer{
-				MaxRetries: 1,
-				Backoff: ydb.BackoffFunc(func(n int) <-chan time.Time {
-					ch := make(chan time.Time)
-					backoff <- ch
-					return ch
-				}),
+				MaxRetries:      1,
+				FastBackoff:     bacoffFunc,
+				SlowBackoff:     bacoffFunc,
 				SessionProvider: SingleSession(simpleSession()),
 			}
 
@@ -64,29 +66,29 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	}
 }
 
-func TestRetryerImmediateiRetry(t *testing.T) {
+func TestRetryerImmediateRetry(t *testing.T) {
 	for testErr, session := range map[error]*Session{
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorResourceExhausted,
-		}: new(Session),
+		}: newSession(t, 1, nil),
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorAborted,
-		}: new(Session),
+		}: newSession(t, 2, nil),
 		&ydb.OpError{
 			Reason: ydb.StatusUnavailable,
-		}: new(Session),
+		}: newSession(t, 3, nil),
 		&ydb.OpError{
 			Reason: ydb.StatusOverloaded,
-		}: new(Session),
+		}: newSession(t, 4, nil),
 		&ydb.OpError{
 			Reason: ydb.StatusAborted,
-		}: new(Session),
+		}: newSession(t, 5, nil),
 		&ydb.OpError{
 			Reason: ydb.StatusNotFound,
-		}: new(Session),
+		}: newSession(t, 6, nil),
 		fmt.Errorf("wrap op error: %w", &ydb.OpError{
 			Reason: ydb.StatusAborted,
-		}): new(Session),
+		}): newSession(t, 7, nil),
 	} {
 		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
 			var count int

@@ -9,14 +9,29 @@ import (
 )
 
 // Default parameters used by Retry() functions within different sub packages.
+const (
+	DefaultFastSlot = 5 * time.Millisecond
+	DefaultSlowSlot = 1 * time.Second
+)
+
+// Default parameters used by Retry() functions within different sub packages.
 var (
+	// Deprecated: will be redeclared as constant at next major release,
+	// use as constant instead and configure max retries as parameter of Retryer
 	DefaultMaxRetries   = 10
-	DefaultRetryChecker = RetryChecker{
-		RetryNotFound: true,
-	}
+	DefaultRetryChecker = RetryChecker{}
 	// DefaultBackoff is a logarithmic backoff retry strategy.
+	// Deprecated: use DefaultFastBackoff or DefaultSlowBackoff instead
 	DefaultBackoff = LogBackoff{
 		SlotDuration: time.Second,
+		Ceiling:      6,
+	}
+	DefaultFastBackoff = LogBackoff{
+		SlotDuration: DefaultFastSlot,
+		Ceiling:      6,
+	}
+	DefaultSlowBackoff = LogBackoff{
+		SlotDuration: DefaultSlowSlot,
 		Ceiling:      6,
 	}
 )
@@ -25,14 +40,19 @@ var (
 // to retry provoked operation.
 type RetryChecker struct {
 	// RetryNotFound reports whether Repeater must retry ErrNotFound errors.
+	// Deprecated: has no effect now
 	RetryNotFound bool
 }
 
 // RetryMode reports whether operation is able to be retried and with which
 // properties.
-type RetryMode uint32
+type RetryMode struct {
+	retry         RetryType
+	backoff       BackoffType
+	deleteSession bool
+}
 
-// Binary flags that used as RetryMode.
+// Deprecated: has no effect now
 const (
 	RetryUnavailable = 1 << iota >> 1
 	RetryAvailable
@@ -42,11 +62,55 @@ const (
 	RetryDropCache
 )
 
-func (m RetryMode) Retriable() bool         { return m&RetryAvailable != 0 }
-func (m RetryMode) MustDeleteSession() bool { return m&RetryDeleteSession != 0 }
-func (m RetryMode) MustCheckSession() bool  { return m&RetryCheckSession != 0 }
-func (m RetryMode) MustBackoff() bool       { return m&RetryBackoff != 0 }
-func (m RetryMode) MustDropCache() bool     { return m&RetryDropCache != 0 }
+// BackoffType reports how to backoff operation
+type BackoffType uint8
+
+// Binary flags that used as BackoffType
+const (
+	BackoffTypeNoBackoff BackoffType = 1 << iota >> 1
+
+	BackoffTypeFastBackoff
+	BackoffTypeSlowBackoff
+
+	backoffTypeBackoffAny = BackoffTypeFastBackoff | BackoffTypeSlowBackoff
+)
+
+// RetryType reports which operations need to retry
+type RetryType uint8
+
+// Binary flags that used as RetryType
+const (
+	RetryTypeNoRetry RetryType = 1 << iota >> 1
+	RetryTypeIdempotent
+	RetryTypeNoIdempotent
+
+	RetryTypeAny = RetryTypeNoIdempotent | RetryTypeIdempotent
+)
+
+// Deprecated: will be dropped at next major release
+func (m RetryMode) Retriable() bool { return m.retry&RetryTypeAny != 0 }
+
+// Deprecated: will be dropped at next major release
+func (m RetryMode) MustCheckSession() bool { return m.deleteSession }
+
+// Deprecated: will be dropped at next major release
+func (m RetryMode) MustDropCache() bool { return m.deleteSession }
+
+func (m RetryMode) MustRetry(retryNoIdempotent bool) bool {
+	switch m.retry {
+	case RetryTypeNoRetry:
+		return false
+	case RetryTypeNoIdempotent:
+		return retryNoIdempotent
+	default:
+		return true
+	}
+}
+
+func (m RetryMode) MustBackoff() bool        { return m.backoff&backoffTypeBackoffAny != 0 }
+func (m RetryMode) BackoffType() BackoffType { return m.backoff }
+
+func (m RetryMode) MustDeleteSession() bool { return m.deleteSession }
 
 // Check returns retry mode for err.
 func (r *RetryChecker) Check(err error) (m RetryMode) {
@@ -54,47 +118,25 @@ func (r *RetryChecker) Check(err error) (m RetryMode) {
 	var oe *OpError
 
 	switch {
-	case
-		errors.Is(err, context.Canceled),
-		errors.Is(err, context.DeadlineExceeded):
-		return RetryCheckSession
 	case errors.As(err, &te):
-		switch te.Reason {
-		case
-			TransportErrorResourceExhausted,
-			TransportErrorAborted:
-			m |= RetryBackoff
-		default:
-			return RetryCheckSession
+		return RetryMode{
+			retry:         te.Reason.retryType(),
+			backoff:       te.Reason.backoffType(),
+			deleteSession: te.Reason.mustDeleteSession(),
 		}
 	case errors.As(err, &oe):
-		switch oe.Reason {
-		case
-			StatusUnavailable,
-			StatusAborted:
-			// Repeat immediately.
-
-		case StatusSessionBusy:
-			m |= RetryCheckSession
-
-		case StatusOverloaded:
-			m |= RetryBackoff
-
-		case StatusBadSession:
-			m |= RetryDeleteSession
-
-		case StatusNotFound:
-			m |= RetryDropCache
-			if !r.RetryNotFound {
-				return
-			}
-		default:
-			return
+		return RetryMode{
+			retry:         oe.Reason.retryType(),
+			backoff:       oe.Reason.backoffType(),
+			deleteSession: oe.Reason.mustDeleteSession(),
 		}
 	default:
-		return
+		return RetryMode{
+			retry:         RetryTypeNoRetry,
+			backoff:       BackoffTypeNoBackoff,
+			deleteSession: false,
+		}
 	}
-	return RetryAvailable | m
 }
 
 // Backoff is the interface that contains logic of delaying operation retry.
@@ -120,7 +162,7 @@ func (f BackoffFunc) Wait(n int) <-chan time.Time {
 // It returns non-nil error if and only if context expiration branch wins.
 func WaitBackoff(ctx context.Context, b Backoff, i int) error {
 	if b == nil {
-		b = DefaultBackoff
+		return ctx.Err()
 	}
 	select {
 	case <-b.Wait(i):
