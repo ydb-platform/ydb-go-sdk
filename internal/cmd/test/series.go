@@ -90,10 +90,12 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 		date  *uint64
 	)
 
-	for res.NextSet(ctx, "series_id", "title", "release_date") {
+	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 		for res.NextRow() {
-			_ = res.Scan(&id, &title, &date)
-
+			err = res.Scan(&id, &title, &date)
+			if err != nil {
+				return err
+			}
 			log.Printf("#  %d %s %d", *id, *title, *date)
 		}
 	}
@@ -212,11 +214,12 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		date  *[]byte
 	)
 
-	for res.NextSet(ctx, "series_id", "title", "release_date") {
+	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 		for res.NextRow() {
-
-			_ = res.Scan(&id, &title, &date)
-
+			err = res.Scan(&id, &title, &date)
+			if err != nil {
+				return err
+			}
 			log.Printf(
 				"\n> select_simple_transaction: %d %s %s",
 				*id, *title, *date,
@@ -264,20 +267,14 @@ func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) 
 	if err != nil {
 		return err
 	}
-
-	log.Print("\n> scan_query_select:")
 	var (
 		seriesID uint64
 		seasonID uint64
 		title    string
 		date     string // due to cast in select query
 	)
-
-	for res.NextSet(ctx) {
-		if err = res.Err(); err != nil {
-			return err
-		}
-
+	log.Print("\n> scan_query_select:")
+	for res.NextResultSet(ctx) {
 		for res.NextRow() {
 			err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
 			if err != nil {

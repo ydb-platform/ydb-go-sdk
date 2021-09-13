@@ -1,3 +1,6 @@
+## 2.8.0
+* Added NextResultSet for both streaming and non-streaming operations
+
 ## 2.7.0
 * Dropped busy checker logic
 * Refactoring of `RetryMode`, `RetryChecker` and `Retryer`
