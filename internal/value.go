@@ -150,7 +150,7 @@ func valueToString(buf *bytes.Buffer, t T, v *Ydb.Value) {
 		case TupleType:
 			copy(types, x.Elems)
 		default:
-			panic("ydb: unkown iterable type")
+			panic("ydb: unknown iterable type")
 		}
 		for i, item := range v.Items {
 			valueToString(buf, types[i], item)

@@ -94,10 +94,10 @@ func TestResultOUint32(t *testing.T) {
 				),
 			)
 			var i int
+			var act uint32
 			for res.NextResultSet(context.Background()) {
 				for res.NextRow() {
-					res.NextItem()
-					act := res.OUint32()
+					_ = res.ScanWithDefaults(&act)
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
 						t.Errorf(
 							"unexpected OUint32() result: %[1]v (%[1]T); want %[2]v (%[2]T)",

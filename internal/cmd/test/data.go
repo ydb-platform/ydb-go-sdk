@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
-func seriesData(id uint64, released uint32, title, info, comment string) ydb.Value {
+func seriesData(id uint64, released time.Time, title, info, comment string) ydb.Value {
 	var commentv ydb.Value
 	if comment == "" {
 		commentv = ydb.NullValue(ydb.TypeUTF8)
@@ -15,30 +15,30 @@ func seriesData(id uint64, released uint32, title, info, comment string) ydb.Val
 	}
 	return ydb.StructValue(
 		ydb.StructFieldValue("series_id", ydb.Uint64Value(id)),
-		ydb.StructFieldValue("release_date", ydb.DateValue(released)),
+		ydb.StructFieldValue("release_date", ydb.DateValueFromTime(released)),
 		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
 		ydb.StructFieldValue("series_info", ydb.UTF8Value(info)),
 		ydb.StructFieldValue("comment", commentv),
 	)
 }
 
-func seasonData(seriesID, seasonID uint64, title string, first, last uint32) ydb.Value {
+func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) ydb.Value {
 	return ydb.StructValue(
 		ydb.StructFieldValue("series_id", ydb.Uint64Value(seriesID)),
 		ydb.StructFieldValue("season_id", ydb.Uint64Value(seasonID)),
 		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
-		ydb.StructFieldValue("first_aired", ydb.DateValue(first)),
-		ydb.StructFieldValue("last_aired", ydb.DateValue(last)),
+		ydb.StructFieldValue("first_aired", ydb.DateValueFromTime(first)),
+		ydb.StructFieldValue("last_aired", ydb.DateValueFromTime(last)),
 	)
 }
 
-func episodeData(seriesID, seasonID, episodeID uint64, title string, date uint32) ydb.Value {
+func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.Time) ydb.Value {
 	return ydb.StructValue(
 		ydb.StructFieldValue("series_id", ydb.Uint64Value(seriesID)),
 		ydb.StructFieldValue("season_id", ydb.Uint64Value(seasonID)),
 		ydb.StructFieldValue("episode_id", ydb.Uint64Value(episodeID)),
 		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
-		ydb.StructFieldValue("air_date", ydb.DateValue(date)),
+		ydb.StructFieldValue("air_date", ydb.DateValueFromTime(date)),
 	)
 }
 
@@ -150,10 +150,10 @@ func getEpisodesData() ydb.Value {
 
 const DateISO8601 = "2006-01-02"
 
-func days(date string) uint32 {
+func days(date string) time.Time {
 	t, err := time.Parse(DateISO8601, date)
 	if err != nil {
 		panic(err)
 	}
-	return ydb.Time(t).Date()
+	return t
 }

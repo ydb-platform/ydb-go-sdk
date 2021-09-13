@@ -681,7 +681,7 @@ func (g *GenItem) ParseComment(text string) (err error) {
 	case "set":
 		return g.parseGenMode(text)
 	default:
-		return fmt.Errorf("unkown prefix: %q", prefix)
+		return fmt.Errorf("unknown prefix: %q", prefix)
 	}
 }
 

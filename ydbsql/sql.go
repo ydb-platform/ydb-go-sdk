@@ -19,6 +19,27 @@ var (
 	ErrNoActiveTransaction = errors.New("ydbsql: no active tx to work with")
 )
 
+type ydbWrapper struct {
+	dst *driver.Value
+}
+
+func (d *ydbWrapper) UnmarshalYDB(res ydb.RawValue) error {
+	if res.IsOptional() {
+		res.Unwrap()
+	}
+	if res.IsDecimal() {
+		b, p, s := res.UnwrapDecimal()
+		*d.dst = Decimal{
+			Bytes:     b,
+			Precision: p,
+			Scale:     s,
+		}
+	} else {
+		*d.dst = res.Any()
+	}
+	return res.Err()
+}
+
 // conn is a connection to the ydb.
 type conn struct {
 	connector *connector     // Immutable and r/o usage.
@@ -336,7 +357,7 @@ type TxDoer struct {
 //
 //   var results []int
 //   ydbsql.DoTx(ctx, db, TxOperationFunc(func(ctx context.Context, tx *sql.Tx) error {
-//       // Reset resulting slice to prevent duplicates when retry occured.
+//       // Reset resulting slice to prevent duplicates when retry occurred.
 //       results = results[:0]
 //
 //       rows, err := tx.QueryContext(...)
@@ -576,26 +597,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	for i := range dst {
 		// NOTE: for queries like "SELECT * FROM xxx" order of columns is
 		// undefined.
-		if !r.res.NextItem() {
-			err := r.res.Err()
-			if err == nil {
-				err = io.ErrUnexpectedEOF
-			}
-			return err
-		}
-		if r.res.IsOptional() {
-			r.res.Unwrap()
-		}
-		if r.res.IsDecimal() {
-			b, p, s := r.res.UnwrapDecimal()
-			dst[i] = Decimal{
-				Bytes:     b,
-				Precision: p,
-				Scale:     s,
-			}
-		} else {
-			dst[i] = r.res.Any()
-		}
+		_ = r.res.Scan(&ydbWrapper{&dst[i]})
 	}
 	return r.res.Err()
 }
@@ -635,26 +637,7 @@ func (r *stream) Next(dst []driver.Value) error {
 	for i := range dst {
 		// NOTE: for queries like "SELECT * FROM xxx" order of columns is
 		// undefined.
-		if !r.res.NextItem() {
-			err := r.res.Err()
-			if err == nil {
-				err = io.ErrUnexpectedEOF
-			}
-			return err
-		}
-		if r.res.IsOptional() {
-			r.res.Unwrap()
-		}
-		if r.res.IsDecimal() {
-			b, p, s := r.res.UnwrapDecimal()
-			dst[i] = Decimal{
-				Bytes:     b,
-				Precision: p,
-				Scale:     s,
-			}
-		} else {
-			dst[i] = r.res.Any()
-		}
+		_ = r.res.Scan(&ydbWrapper{&dst[i]})
 	}
 	return r.res.Err()
 }
