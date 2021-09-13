@@ -85,6 +85,8 @@ message TableIndexDescription {
     Status status = 4;
     // list of columns content to be copied in to index table
     repeated string data_columns = 6;
+    // Size of index data in bytes
+    uint64 size_bytes = 7;
 }
 
 // State of index building operation
