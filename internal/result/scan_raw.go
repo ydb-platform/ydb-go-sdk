@@ -569,7 +569,7 @@ func (s *rawConverter) boundsError(n, i int) {
 func (s *Scanner) decimalTypeError(t ydb.Type) {
 	s.errorf(
 		"unexpected decimal type at %q %s: want %s",
-		s.path(), s.Type(), t,
+		s.path(), s.getType(), t,
 	)
 }
 
