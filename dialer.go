@@ -218,7 +218,7 @@ func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn
 		port: port,
 	}
 	s := addr.String()
-	driverTraceDialDone := driverTraceOnDial(ctx, d.config.Trace, ctx, s)
+	driverTraceDialDone := driverTraceOnDial(d.config.Trace, ctx, s)
 
 	cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
 

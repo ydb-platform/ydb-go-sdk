@@ -7,7 +7,6 @@ import "context"
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	Trace struct {
 		OnDial func(DialStartInfo) func(DialDoneInfo)
 	}

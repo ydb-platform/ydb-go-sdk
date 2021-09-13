@@ -62,7 +62,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	s.c.runtime.streamRecv(timeutil.Now())
 
-	driverTraceStreamRecvDone := driverTraceOnStreamRecv(s.ctx, s.d.trace, s.Context(), s.c.Address(), s.method)
+	driverTraceStreamRecvDone := driverTraceOnStreamRecv(s.d.trace, s.Context(), s.c.Address(), s.method)
 	defer func() {
 		driverTraceStreamRecvDone(s.ctx, s.c.addr.String(), s.method, issues, hideEOF(err))
 	}()
@@ -73,7 +73,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		err = mapGRPCError(err)
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			driverTracePessimizationDone := driverTraceOnPessimization(s.ctx, s.d.trace, s.ctx, s.c.Address(), err)
+			driverTracePessimizationDone := driverTraceOnPessimization(s.d.trace, s.ctx, s.c.Address(), err)
 			driverTracePessimizationDone(s.ctx, s.c.Address(), s.d.cluster.Pessimize(s.c.addr))
 		}
 		return

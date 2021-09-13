@@ -35,7 +35,7 @@ func (m *meta) md(ctx context.Context) (md metadata.MD, err error) {
 	}
 	if m.credentials != nil {
 		var token string
-		driverTraceGetCredentialsDone := driverTraceOnGetCredentials(ctx, m.trace, ctx)
+		driverTraceGetCredentialsDone := driverTraceOnGetCredentials(m.trace, ctx)
 		defer func() {
 			driverTraceGetCredentialsDone(ctx, token != "", err)
 		}()

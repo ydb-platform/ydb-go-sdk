@@ -10,7 +10,6 @@ import (
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	DriverTrace struct {
 		OnDial func(DialStartInfo) func(DialDoneInfo)
 

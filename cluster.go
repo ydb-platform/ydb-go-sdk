@@ -426,7 +426,7 @@ func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
 
 // c.mu must be held.
 func (c *cluster) track(conn *conn) (el *list.Element) {
-	driverTraceTrackConnStart(context.Background(), c.trace, conn.addr.String())
+	driverTraceTrackConnStart(c.trace, conn.addr.String())
 	el = c.trackerQueue.PushBack(conn)
 	select {
 	case c.trackerWake <- struct{}{}:
@@ -512,7 +512,7 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 						conn.runtime.setState(ConnOnline)
 					}
 
-					driverTraceTrackConnDone(context.Background(), c.trace, conn.addr.String())
+					driverTraceTrackConnDone(c.trace, conn.addr.String())
 					entry.conn = conn
 					entry.insertInto(c.balancer)
 					c.index[addr] = entry

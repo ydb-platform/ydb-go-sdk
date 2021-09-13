@@ -35,52 +35,8 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	}
 	return ret
 }
-
-type traceContextKey struct{}
-
-// WithTrace returns context which has associated Trace with it.
-func WithTrace(ctx context.Context, t Trace) context.Context {
-	return context.WithValue(ctx,
-		traceContextKey{},
-		ContextTrace(ctx).Compose(t),
-	)
-}
-
-// ContextTrace returns Trace associated with ctx.
-// If there is no Trace associated with ctx then zero value
-// of Trace is returned.
-func ContextTrace(ctx context.Context) Trace {
-	t, _ := ctx.Value(traceContextKey{}).(Trace)
-	return t
-}
-
-func (t Trace) onDial(ctx context.Context, d DialStartInfo) func(DialDoneInfo) {
-	c := ContextTrace(ctx)
-	var fn func(DialStartInfo) func(DialDoneInfo)
-	switch {
-	case t.OnDial == nil:
-		fn = c.OnDial
-	case c.OnDial == nil:
-		fn = t.OnDial
-	default:
-		h1 := t.OnDial
-		h2 := c.OnDial
-		fn = func(d DialStartInfo) func(DialDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DialDoneInfo) {
-					r1(d)
-					r2(d)
-				}
-			}
-		}
-	}
+func (t Trace) onDial(d DialStartInfo) func(DialDoneInfo) {
+	fn := t.OnDial
 	if fn == nil {
 		return func(DialDoneInfo) {
 			return
@@ -94,10 +50,10 @@ func (t Trace) onDial(ctx context.Context, d DialStartInfo) func(DialDoneInfo) {
 	}
 	return res
 }
-func traceOnDial(ctx context.Context, t Trace, c context.Context) func(context.Context, error) {
+func traceOnDial(t Trace, c context.Context) func(context.Context, error) {
 	var p DialStartInfo
 	p.Context = c
-	res := t.onDial(ctx, p)
+	res := t.onDial(p)
 	return func(c context.Context, e error) {
 		var p DialDoneInfo
 		p.Context = c
