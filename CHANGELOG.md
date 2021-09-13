@@ -1,3 +1,6 @@
+## 2.9.0
+* Added RawValue and supported ydb.Scanner in Scan
+
 ## 2.8.0
 * Added NextResultSet for both streaming and non-streaming operations
 

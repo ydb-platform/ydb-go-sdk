@@ -16,6 +16,15 @@ import (
 
 var query = template.Must(template.New("fill database").Parse(`
 	DECLARE $var AS Variant<Utf8,Uint64,Uint32>;
+
+	$struct = AsStruct(
+		Uint32("0") as foo,
+		UTF8("x") as bar,
+		Int64("0") as baz,
+	);
+	$variantStructType = VariantType(TypeOf($struct));
+	SELECT Variant(42, "baz", $variantStructType);
+
 	SELECT
 		AsList("foo", "bar", "baz");
 	SELECT
@@ -33,14 +42,6 @@ var query = template.Must(template.New("fill database").Parse(`
 			43 AS baz,
 		);
 
-	$struct = AsStruct(
-		Uint32("0") as foo,
-		UTF8("x") as bar,
-		Int64("0") as baz,
-	);
-	$variantStructType = VariantType(TypeOf($struct));
-	SELECT Variant(42, "baz", $variantStructType);
-
 	$tuple = AsTuple(
 		Uint32("0"),
 		UTF8("x"),
@@ -56,8 +57,7 @@ type Command struct {
 type exampleStruct struct {
 }
 
-func (*exampleStruct) UnmarshalYDB(res ydb.RawScanner) error {
-	res.NextItem()
+func (*exampleStruct) UnmarshalYDB(res ydb.RawValue) error {
 	log.Printf("T: %s", res.Type())
 	for i, n := 0, res.StructIn(); i < n; i++ {
 		name := res.StructField(i)
@@ -74,8 +74,7 @@ func (*exampleStruct) UnmarshalYDB(res ydb.RawScanner) error {
 type exampleList struct {
 }
 
-func (*exampleList) UnmarshalYDB(res ydb.RawScanner) error {
-	res.NextItem()
+func (*exampleList) UnmarshalYDB(res ydb.RawValue) error {
 	log.Printf("T: %s", res.Type())
 	for i, n := 0, res.ListIn(); i < n; i++ {
 		res.ListItem(i)
@@ -88,8 +87,7 @@ func (*exampleList) UnmarshalYDB(res ydb.RawScanner) error {
 type exampleTuple struct {
 }
 
-func (*exampleTuple) UnmarshalYDB(res ydb.RawScanner) error {
-	res.NextItem()
+func (*exampleTuple) UnmarshalYDB(res ydb.RawValue) error {
 	log.Printf("T: %s", res.Type())
 	for i, n := 0, res.TupleIn(); i < n; i++ {
 		res.TupleItem(i)
@@ -114,8 +112,7 @@ func (*exampleTuple) UnmarshalYDB(res ydb.RawScanner) error {
 type exampleDict struct {
 }
 
-func (*exampleDict) UnmarshalYDB(res ydb.RawScanner) error {
-	res.NextItem()
+func (*exampleDict) UnmarshalYDB(res ydb.RawValue) error {
 	log.Printf("T: %s", res.Type())
 	for i, n := 0, res.DictIn(); i < n; i++ {
 		res.DictKey(i)
@@ -133,8 +130,7 @@ func (*exampleDict) UnmarshalYDB(res ydb.RawScanner) error {
 type variantStruct struct {
 }
 
-func (*variantStruct) UnmarshalYDB(res ydb.RawScanner) error {
-	res.NextItem()
+func (*variantStruct) UnmarshalYDB(res ydb.RawValue) error {
 	log.Printf("T: %s", res.Type())
 	name, index := res.Variant()
 	var x interface{}
@@ -156,8 +152,7 @@ func (*variantStruct) UnmarshalYDB(res ydb.RawScanner) error {
 type variantTuple struct {
 }
 
-func (*variantTuple) UnmarshalYDB(res ydb.RawScanner) error {
-	res.NextItem()
+func (*variantTuple) UnmarshalYDB(res ydb.RawValue) error {
 	log.Printf("T: %s", res.Type())
 	name, index := res.Variant()
 	var x interface{}
@@ -215,30 +210,32 @@ func (cmd *Command) Run(ctx context.Context, params cli.Parameters) error {
 
 	parsers := [...]func(){
 		func() {
-			_ = res.ScanRaw(&exampleList{})
+			_ = res.Scan(&variantStruct{})
 		},
 		func() {
-			_ = res.ScanRaw(&exampleTuple{})
+			_ = res.Scan(&exampleList{})
 		},
 		func() {
-			_ = res.ScanRaw(&exampleDict{})
+			_ = res.Scan(&exampleTuple{})
 		},
 		func() {
-			_ = res.ScanRaw(&exampleStruct{})
+			_ = res.Scan(&exampleDict{})
 		},
 		func() {
-			_ = res.ScanRaw(&variantStruct{})
+			_ = res.Scan(&exampleStruct{})
 		},
 		func() {
-			_ = res.ScanRaw(&variantTuple{})
+			_ = res.Scan(&variantTuple{})
 		},
 	}
-
 	for set := 0; res.NextSet(); set++ {
 		res.NextRow()
 		parsers[set]()
+		if err = res.Err(); err != nil {
+			return err
+		}
 	}
-	if err := res.Err(); err != nil {
+	if err = res.Err(); err != nil {
 		return err
 	}
 

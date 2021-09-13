@@ -487,7 +487,7 @@ var scannerData = []struct {
 	},
 }
 
-func PrepareScannerPerformanceTest(count int) *Scanner {
+func initScanner() *Scanner {
 	res := Scanner{
 		set: &Ydb.ResultSet{
 			Columns:   nil,
@@ -496,7 +496,7 @@ func PrepareScannerPerformanceTest(count int) *Scanner {
 		},
 		row: nil,
 		stack: scanStack{
-			v: [8]item{},
+			v: nil,
 			p: 0,
 		},
 		nextRow:        0,
@@ -505,6 +505,11 @@ func PrepareScannerPerformanceTest(count int) *Scanner {
 		columnIndexes:  nil,
 		err:            nil,
 	}
+	return &res
+}
+
+func PrepareScannerPerformanceTest(count int) *Scanner {
+	res := initScanner()
 	res.set.Columns = []*Ydb.Column{{
 		Name: "series_id",
 		Type: &Ydb.Type{
@@ -545,6 +550,14 @@ func PrepareScannerPerformanceTest(count int) *Scanner {
 			}},
 		})
 	}
-	res.converter = &rawConverter{&res}
-	return &res
+	res.converter = &rawConverter{res}
+	return res
+}
+
+type series struct {
+	id    uint64
+	title string
+	date  time.Time
+	ID    uint64
+	Title string
 }

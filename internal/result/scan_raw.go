@@ -82,20 +82,30 @@ func (s *rawConverter) JSONDocument() (v []byte) {
 	return []byte(s.text())
 }
 
+func (s *rawConverter) Any() interface{} {
+	return s.any()
+}
+
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) HasItems() bool {
 	return s.err == nil && s.set != nil && s.row != nil
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) HasNextItem() bool {
 	return s.HasItems() && s.nextItem < len(s.row.Items)
 }
 
+// NextItem selects next item to parse in the current row.
+// It returns false if there are no more items in the row.
+//
+// Note that NextItem() differs from NextRow() and NextSet() – if it return
+// false it fails the Result such that no further operations may be processed.
+// That is, res.Err() becomes non-nil.
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) NextItem() (ok bool) {
 	if !s.HasNextItem() {
 		s.noValueError()
@@ -117,8 +127,10 @@ func (s *Scanner) NextItem() (ok bool) {
 	return true
 }
 
+// SeekItem finds the column with given name in the result set and selects
+// appropriate item to parse in the current row.
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) SeekItem(name string) bool {
 	if !s.HasItems() {
 		s.noValueError()
@@ -187,7 +199,7 @@ func (s *Scanner) Type() ydb.Type {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Bool() (v bool) {
 	if s.err != nil {
 		return
@@ -197,7 +209,7 @@ func (s *Scanner) Bool() (v bool) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Int8() (v int8) {
 	if s.err != nil {
 		return
@@ -207,7 +219,7 @@ func (s *Scanner) Int8() (v int8) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Uint8() (v uint8) {
 	if s.err != nil {
 		return
@@ -217,7 +229,7 @@ func (s *Scanner) Uint8() (v uint8) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Int16() (v int16) {
 	if s.err != nil {
 		return
@@ -227,7 +239,7 @@ func (s *Scanner) Int16() (v int16) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Uint16() (v uint16) {
 	if s.err != nil {
 		return
@@ -237,7 +249,7 @@ func (s *Scanner) Uint16() (v uint16) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Int32() (v int32) {
 	if s.err != nil {
 		return
@@ -247,7 +259,7 @@ func (s *Scanner) Int32() (v int32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Uint32() (v uint32) {
 	if s.err != nil {
 		return
@@ -257,7 +269,7 @@ func (s *Scanner) Uint32() (v uint32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Int64() (v int64) {
 	if s.err != nil {
 		return
@@ -267,7 +279,7 @@ func (s *Scanner) Int64() (v int64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Uint64() (v uint64) {
 	if s.err != nil {
 		return
@@ -277,7 +289,7 @@ func (s *Scanner) Uint64() (v uint64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Float() (v float32) {
 	if s.err != nil {
 		return
@@ -287,7 +299,7 @@ func (s *Scanner) Float() (v float32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Double() (v float64) {
 	if s.err != nil {
 		return
@@ -297,7 +309,7 @@ func (s *Scanner) Double() (v float64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Date() (v uint32) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DATE) {
 		return
@@ -306,7 +318,7 @@ func (s *Scanner) Date() (v uint32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Datetime() (v uint32) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_DATETIME) {
 		return
@@ -315,7 +327,7 @@ func (s *Scanner) Datetime() (v uint32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Timestamp() (v uint64) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_TIMESTAMP) {
 		return
@@ -324,7 +336,7 @@ func (s *Scanner) Timestamp() (v uint64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Interval() (v int64) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_INTERVAL) {
 		return
@@ -333,7 +345,7 @@ func (s *Scanner) Interval() (v int64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) TzDate() (v string) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_TZ_DATE) {
 		return
@@ -342,7 +354,7 @@ func (s *Scanner) TzDate() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) TzDatetime() (v string) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_TZ_DATETIME) {
 		return
@@ -351,7 +363,7 @@ func (s *Scanner) TzDatetime() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) TzTimestamp() (v string) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_TZ_TIMESTAMP) {
 		return
@@ -360,7 +372,7 @@ func (s *Scanner) TzTimestamp() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) String() (v []byte) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_STRING) {
 		return
@@ -369,7 +381,7 @@ func (s *Scanner) String() (v []byte) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) UTF8() (v string) {
 	if s.err != nil {
 		return
@@ -379,7 +391,7 @@ func (s *Scanner) UTF8() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) YSON() (v string) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_YSON) {
 		return
@@ -388,7 +400,7 @@ func (s *Scanner) YSON() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) JSON() (v string) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_JSON) {
 		return
@@ -397,7 +409,7 @@ func (s *Scanner) JSON() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) UUID() (v [16]byte) {
 	if s.err != nil {
 		return
@@ -407,7 +419,7 @@ func (s *Scanner) UUID() (v [16]byte) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) JSONDocument() (v string) {
 	if s.err != nil || !s.assertCurrentTypePrimitive(Ydb.Type_JSON_DOCUMENT) {
 		return
@@ -416,7 +428,7 @@ func (s *Scanner) JSONDocument() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) DyNumber() (v string) {
 	if s.err != nil {
 		return
@@ -426,7 +438,7 @@ func (s *Scanner) DyNumber() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OBool() (v bool) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_BOOL) {
 		return
@@ -438,7 +450,7 @@ func (s *Scanner) OBool() (v bool) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OInt8() (v int8) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INT8) {
 		return
@@ -450,7 +462,7 @@ func (s *Scanner) OInt8() (v int8) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OUint8() (v uint8) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UINT8) {
 		return
@@ -462,7 +474,7 @@ func (s *Scanner) OUint8() (v uint8) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OInt16() (v int16) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INT16) {
 		return
@@ -474,7 +486,7 @@ func (s *Scanner) OInt16() (v int16) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OUint16() (v uint16) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UINT16) {
 		return
@@ -486,7 +498,7 @@ func (s *Scanner) OUint16() (v uint16) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OInt32() (v int32) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INT32) {
 		return
@@ -498,7 +510,7 @@ func (s *Scanner) OInt32() (v int32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OUint32() (v uint32) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UINT32) {
 		return
@@ -510,7 +522,7 @@ func (s *Scanner) OUint32() (v uint32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OInt64() (v int64) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INT64) {
 		return
@@ -522,7 +534,7 @@ func (s *Scanner) OInt64() (v int64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OUint64() (v uint64) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UINT64) {
 		return
@@ -534,7 +546,7 @@ func (s *Scanner) OUint64() (v uint64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OFloat() (v float32) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_FLOAT) {
 		return
@@ -546,7 +558,7 @@ func (s *Scanner) OFloat() (v float32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) ODouble() (v float64) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DOUBLE) {
 		return
@@ -558,7 +570,7 @@ func (s *Scanner) ODouble() (v float64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) ODate() (v uint32) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DATE) {
 		return
@@ -570,7 +582,7 @@ func (s *Scanner) ODate() (v uint32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) ODatetime() (v uint32) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DATETIME) {
 		return
@@ -582,7 +594,7 @@ func (s *Scanner) ODatetime() (v uint32) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OTimestamp() (v uint64) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_TIMESTAMP) {
 		return
@@ -594,7 +606,7 @@ func (s *Scanner) OTimestamp() (v uint64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OInterval() (v int64) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_INTERVAL) {
 		return
@@ -606,7 +618,7 @@ func (s *Scanner) OInterval() (v int64) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OTzDate() (v string) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_TZ_DATE) {
 		return
@@ -618,7 +630,7 @@ func (s *Scanner) OTzDate() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OTzDatetime() (v string) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_TZ_DATETIME) {
 		return
@@ -630,7 +642,7 @@ func (s *Scanner) OTzDatetime() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OTzTimestamp() (v string) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_TZ_TIMESTAMP) {
 		return
@@ -642,7 +654,7 @@ func (s *Scanner) OTzTimestamp() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OString() (v []byte) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_STRING) {
 		return
@@ -654,7 +666,7 @@ func (s *Scanner) OString() (v []byte) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OUTF8() (v string) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UTF8) {
 		return
@@ -666,7 +678,7 @@ func (s *Scanner) OUTF8() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OYSON() (v string) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_YSON) {
 		return
@@ -678,7 +690,7 @@ func (s *Scanner) OYSON() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OJSON() (v string) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_JSON) {
 		return
@@ -690,7 +702,7 @@ func (s *Scanner) OJSON() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OUUID() (v [16]byte) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_UUID) {
 		return
@@ -702,7 +714,7 @@ func (s *Scanner) OUUID() (v [16]byte) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) OJSONDocument() (v string) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_JSON_DOCUMENT) {
 		return
@@ -714,7 +726,7 @@ func (s *Scanner) OJSONDocument() (v string) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) ODyNumber() (v string) {
 	if s.err != nil || !s.assertCurrentTypeOptionalPrimitive(Ydb.Type_DYNUMBER) {
 		return
@@ -727,7 +739,7 @@ func (s *Scanner) ODyNumber() (v string) {
 
 // Value returns current item under scan as ydb.Value type.
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Value() ydb.Value {
 	if s.err != nil {
 		return nil
@@ -737,8 +749,7 @@ func (s *Scanner) Value() ydb.Value {
 	return internal.ValueFromYDB(x.t, x.v)
 }
 
-// Deprecated: Use this method only for own driver database/sql implementation
-// in other case use method scan
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) Any() interface{} {
 	x := s.stack.current()
 	if s.err != nil || x.isEmpty() {
@@ -804,7 +815,7 @@ func (s *Scanner) Any() interface{} {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) ListIn() (size int) {
 	if s.err != nil {
 		return 0
@@ -816,7 +827,7 @@ func (s *Scanner) ListIn() (size int) {
 	return 0
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) ListItem(i int) {
 	if s.err != nil {
 		return
@@ -834,7 +845,7 @@ func (s *Scanner) ListItem(i int) {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) ListOut() {
 	if s.err != nil {
 		return
@@ -845,7 +856,7 @@ func (s *Scanner) ListOut() {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) TupleIn() (size int) {
 	if s.err != nil {
 		return 0
@@ -857,7 +868,7 @@ func (s *Scanner) TupleIn() (size int) {
 	return 0
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) TupleItem(i int) {
 	if s.err != nil {
 		return
@@ -875,7 +886,7 @@ func (s *Scanner) TupleItem(i int) {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) TupleOut() {
 	if s.err != nil {
 		return
@@ -886,7 +897,7 @@ func (s *Scanner) TupleOut() {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) StructIn() (size int) {
 	if s.err != nil {
 		return 0
@@ -898,7 +909,7 @@ func (s *Scanner) StructIn() (size int) {
 	return 0
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) StructField(i int) (name string) {
 	if s.err != nil {
 		return
@@ -920,7 +931,7 @@ func (s *Scanner) StructField(i int) (name string) {
 	return
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) StructOut() {
 	if s.err != nil {
 		return
@@ -931,7 +942,7 @@ func (s *Scanner) StructOut() {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) DictIn() (size int) {
 	if s.err != nil {
 		return 0
@@ -943,7 +954,7 @@ func (s *Scanner) DictIn() (size int) {
 	return 0
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) DictKey(i int) {
 	if s.err != nil {
 		return
@@ -961,7 +972,7 @@ func (s *Scanner) DictKey(i int) {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) DictPayload(i int) {
 	if s.err != nil {
 		return
@@ -979,7 +990,7 @@ func (s *Scanner) DictPayload(i int) {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) DictOut() {
 	if s.err != nil {
 		return
@@ -990,7 +1001,7 @@ func (s *Scanner) DictOut() {
 	}
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) Variant() (name string, index uint32) {
 	if s.err != nil {
 		return
@@ -1005,6 +1016,7 @@ func (s *Scanner) Variant() (name string, index uint32) {
 		return
 	}
 	name, typ := s.unwrapVariantType(t, index)
+	s.stack.scanItem.v = nil
 	s.stack.set(item{
 		name: name,
 		i:    int(index),
@@ -1014,7 +1026,7 @@ func (s *Scanner) Variant() (name string, index uint32) {
 	return name, index
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) Unwrap() {
 	if s.err != nil {
 		return
@@ -1036,7 +1048,7 @@ func (s *Scanner) Unwrap() {
 	})
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) Decimal(t ydb.Type) (v [16]byte) {
 	if s.err != nil || !s.assertCurrentTypeDecimal(t) {
 		return
@@ -1044,7 +1056,7 @@ func (s *Scanner) Decimal(t ydb.Type) (v [16]byte) {
 	return s.uint128()
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) UnwrapDecimal() (v [16]byte, precision, scale uint32) {
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
@@ -1053,7 +1065,7 @@ func (s *Scanner) UnwrapDecimal() (v [16]byte, precision, scale uint32) {
 	return s.uint128(), d.DecimalType.Precision, d.DecimalType.Scale
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) ODecimal(t ydb.Type) (v [16]byte) {
 	if s.err != nil || !s.assertCurrentTypeOptionalDecimal(t) {
 		return
@@ -1065,13 +1077,13 @@ func (s *Scanner) ODecimal(t ydb.Type) (v [16]byte) {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) AssertType(t ydb.Type) bool {
 	return s.assertCurrentTypeIs(t)
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) Null() {
 	if s.err != nil || !s.assertCurrentTypeNullable() {
 		return
@@ -1080,7 +1092,7 @@ func (s *Scanner) Null() {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) IsNull() bool {
 	if s.err != nil {
 		return false
@@ -1089,7 +1101,7 @@ func (s *Scanner) IsNull() bool {
 }
 
 // Deprecated: Use Scan instead
-// Method will be available only for RawScanner in the next major release
+// Method will be available only for RawValue in the next major release
 func (s *Scanner) IsOptional() bool {
 	if s.err != nil {
 		return false
@@ -1097,7 +1109,7 @@ func (s *Scanner) IsOptional() bool {
 	return s.isCurrentTypeOptional()
 }
 
-// Deprecated: Use ScanRaw instead
+// Deprecated: Use Scan and implement ydb.Scanner
 func (s *Scanner) IsDecimal() bool {
 	if s.err != nil {
 		return false
@@ -1138,20 +1150,6 @@ func (s *Scanner) boundsError(n, i int) {
 	s.errorf(
 		"index out of range: %d; have %d",
 		i, n,
-	)
-}
-
-func (s *Scanner) typeError(act, exp interface{}) {
-	s.errorf(
-		"unexpected type during scan at %q %s: %s; want %s",
-		s.Path(), s.Type(), nameIface(act), nameIface(exp),
-	)
-}
-
-func (s *Scanner) valueTypeError(act, exp interface{}) {
-	s.errorf(
-		"unexpected value during scan at %q %s: %s; want %s",
-		s.Path(), s.Type(), nameIface(act), nameIface(exp),
 	)
 }
 

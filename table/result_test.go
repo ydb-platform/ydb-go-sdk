@@ -39,13 +39,13 @@ func TestResultAny(t *testing.T) {
 				),
 			)
 			var i int
+			var act interface{}
 			for res.NextSet() {
 				for res.NextRow() {
-					res.NextItem()
-					if res.IsOptional() {
-						res.Unwrap()
+					err := res.ScanWithDefaults(&act)
+					if err != nil {
+						t.Fatal(err)
 					}
-					act := res.Any()
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
 						t.Errorf(
 							"unexpected Any() result: %[1]v (%[1]T); want %[2]v (%[2]T)",

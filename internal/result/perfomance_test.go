@@ -1,31 +1,13 @@
 package result
 
 import (
-	"github.com/yandex-cloud/ydb-go-sdk/v2"
 	"github.com/yandex-cloud/ydb-go-sdk/v2/internal"
 	"testing"
-	"time"
 )
-
-type series struct {
-	id    uint64
-	title string
-	date  time.Time
-}
 
 var (
 	testSize = 10000
 )
-
-func (s *series) UnmarshalYDB(res ydb.RawScanner) error {
-	res.SeekItem("series_id")
-	s.id = res.Uint64()
-	res.SeekItem("title")
-	s.title = res.UTF8()
-	res.SeekItem("release_date")
-	s.date = res.Datetime()
-	return nil
-}
 
 func BenchmarkTestScanWithColumns(b *testing.B) {
 	b.ReportAllocs()
@@ -82,18 +64,6 @@ func BenchmarkTestDeprecatedSeek(b *testing.B) {
 			row.title = res.OUTF8()
 			res.SeekItem("release_date")
 			row.date = internal.UnmarshalDatetime(res.ODatetime())
-		}
-	}
-}
-
-func BenchmarkTestScanRow(b *testing.B) {
-	b.ReportAllocs()
-	res := PrepareScannerPerformanceTest(b.N)
-	row := series{}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if res.NextRow() {
-			res.ScanRaw(&row)
 		}
 	}
 }
