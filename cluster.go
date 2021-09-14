@@ -88,7 +88,7 @@ type cluster struct {
 	closed bool
 
 	testHookTrackerQueue func([]*list.Element)
-	// tracer function. Set after driverTraceTrackConnStart call.
+	// tracer function. Set after the call driverTraceTrackConnStart .
 	trackDone func(address string)
 }
 

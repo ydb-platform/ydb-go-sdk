@@ -128,7 +128,11 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 
 	c.runtime.streamStart(timeutil.Now())
 	streamRecv := driverTraceOnStream(c.d.trace, ctx, c.Address(), Method(method))
-
+	defer func() {
+		if err != nil {
+			c.runtime.streamDone(timeutil.Now(), err)
+		}
+	}()
 	s, err := c.raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 	if err != nil {
 		return nil, mapGRPCError(err)
