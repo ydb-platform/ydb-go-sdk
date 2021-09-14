@@ -65,9 +65,9 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 
 	start := timeutil.Now()
 	c.runtime.operationStart(start)
-	driverTraceOperationDone := driverTraceOnOperation(ctx, c.d.trace, ctx, c.Address(), Method(method), params)
+	operationDone := driverTraceOnOperation(c.d.trace, ctx, c.Address(), Method(method), params)
 	defer func() {
-		driverTraceOperationDone(rawCtx, c.Address(), Method(method), params, opId, issues, err)
+		operationDone(rawCtx, c.Address(), Method(method), params, opId, issues, err)
 		c.runtime.operationDone(
 			start, timeutil.Now(),
 			errIf(isTimeoutError(err), err),
@@ -80,8 +80,8 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		err = mapGRPCError(err)
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			driverTracePessimizationDone := driverTraceOnPessimization(ctx, c.d.trace, ctx, c.Address(), err)
-			driverTracePessimizationDone(ctx, c.Address(), c.d.cluster.Pessimize(c.addr))
+			pessimizationDone := driverTraceOnPessimization(c.d.trace, ctx, c.Address(), err)
+			pessimizationDone(ctx, c.Address(), c.d.cluster.Pessimize(c.addr))
 		}
 		return
 	}
@@ -127,14 +127,12 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	c.runtime.streamStart(timeutil.Now())
-	driverTraceStreamDone := driverTraceOnStream(ctx, c.d.trace, ctx, c.Address(), Method(method))
+	streamRecv := driverTraceOnStream(c.d.trace, ctx, c.Address(), Method(method))
 	defer func() {
 		if err != nil {
 			c.runtime.streamDone(timeutil.Now(), err)
-			driverTraceStreamDone(rawCtx, c.Address(), Method(method), err)
 		}
 	}()
-
 	s, err := c.raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 	if err != nil {
 		return nil, mapGRPCError(err)
@@ -146,7 +144,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		d:      c.d,
 		s:      s,
 		cancel: cancel,
-		done:   driverTraceStreamDone,
+		recv:   streamRecv,
 	}, nil
 }
 

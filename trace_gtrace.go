@@ -89,22 +89,20 @@ func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
 	default:
 		h1 := t.TrackConnStart
 		h2 := x.TrackConnStart
-		ret.TrackConnStart = func(t TrackConnStartInfo) {
-			h1(t)
-			h2(t)
-		}
-	}
-	switch {
-	case t.TrackConnDone == nil:
-		ret.TrackConnDone = x.TrackConnDone
-	case x.TrackConnDone == nil:
-		ret.TrackConnDone = t.TrackConnDone
-	default:
-		h1 := t.TrackConnDone
-		h2 := x.TrackConnDone
-		ret.TrackConnDone = func(t TrackConnDoneInfo) {
-			h1(t)
-			h2(t)
+		ret.TrackConnStart = func(t TrackConnStartInfo) func(TrackConnDoneInfo) {
+			r1 := h1(t)
+			r2 := h2(t)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(t TrackConnDoneInfo) {
+					r1(t)
+					r2(t)
+				}
+			}
 		}
 	}
 	switch {
@@ -180,19 +178,6 @@ func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
 		}
 	}
 	switch {
-	case t.OnOperationWait == nil:
-		ret.OnOperationWait = x.OnOperationWait
-	case x.OnOperationWait == nil:
-		ret.OnOperationWait = t.OnOperationWait
-	default:
-		h1 := t.OnOperationWait
-		h2 := x.OnOperationWait
-		ret.OnOperationWait = func(o OperationWaitInfo) {
-			h1(o)
-			h2(o)
-		}
-	}
-	switch {
 	case t.OnStream == nil:
 		ret.OnStream = x.OnStream
 	case x.OnStream == nil:
@@ -200,7 +185,7 @@ func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
 	default:
 		h1 := t.OnStream
 		h2 := x.OnStream
-		ret.OnStream = func(s StreamStartInfo) func(StreamDoneInfo) {
+		ret.OnStream = func(s StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -209,85 +194,28 @@ func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s StreamDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnStreamRecv == nil:
-		ret.OnStreamRecv = x.OnStreamRecv
-	case x.OnStreamRecv == nil:
-		ret.OnStreamRecv = t.OnStreamRecv
-	default:
-		h1 := t.OnStreamRecv
-		h2 := x.OnStreamRecv
-		ret.OnStreamRecv = func(s StreamRecvStartInfo) func(StreamRecvDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s StreamRecvDoneInfo) {
-					r1(s)
-					r2(s)
+				return func(s StreamRecvDoneInfo) func(StreamDoneInfo) {
+					r11 := r1(s)
+					r21 := r2(s)
+					switch {
+					case r11 == nil:
+						return r21
+					case r21 == nil:
+						return r11
+					default:
+						return func(s StreamDoneInfo) {
+							r11(s)
+							r21(s)
+						}
+					}
 				}
 			}
 		}
 	}
 	return ret
 }
-
-type driverTraceContextKey struct{}
-
-// WithDriverTrace returns context which has associated DriverTrace with it.
-func WithDriverTrace(ctx context.Context, t DriverTrace) context.Context {
-	return context.WithValue(ctx,
-		driverTraceContextKey{},
-		ContextDriverTrace(ctx).Compose(t),
-	)
-}
-
-// ContextDriverTrace returns DriverTrace associated with ctx.
-// If there is no DriverTrace associated with ctx then zero value
-// of DriverTrace is returned.
-func ContextDriverTrace(ctx context.Context) DriverTrace {
-	t, _ := ctx.Value(driverTraceContextKey{}).(DriverTrace)
-	return t
-}
-
-func (t DriverTrace) onDial(ctx context.Context, d DialStartInfo) func(DialDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(DialStartInfo) func(DialDoneInfo)
-	switch {
-	case t.OnDial == nil:
-		fn = c.OnDial
-	case c.OnDial == nil:
-		fn = t.OnDial
-	default:
-		h1 := t.OnDial
-		h2 := c.OnDial
-		fn = func(d DialStartInfo) func(DialDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DialDoneInfo) {
-					r1(d)
-					r2(d)
-				}
-			}
-		}
-	}
+func (t DriverTrace) onDial(d DialStartInfo) func(DialDoneInfo) {
+	fn := t.OnDial
 	if fn == nil {
 		return func(DialDoneInfo) {
 			return
@@ -301,33 +229,8 @@ func (t DriverTrace) onDial(ctx context.Context, d DialStartInfo) func(DialDoneI
 	}
 	return res
 }
-func (t DriverTrace) onGetConn(ctx context.Context, g GetConnStartInfo) func(GetConnDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(GetConnStartInfo) func(GetConnDoneInfo)
-	switch {
-	case t.OnGetConn == nil:
-		fn = c.OnGetConn
-	case c.OnGetConn == nil:
-		fn = t.OnGetConn
-	default:
-		h1 := t.OnGetConn
-		h2 := c.OnGetConn
-		fn = func(g GetConnStartInfo) func(GetConnDoneInfo) {
-			r1 := h1(g)
-			r2 := h2(g)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(g GetConnDoneInfo) {
-					r1(g)
-					r2(g)
-				}
-			}
-		}
-	}
+func (t DriverTrace) onGetConn(g GetConnStartInfo) func(GetConnDoneInfo) {
+	fn := t.OnGetConn
 	if fn == nil {
 		return func(GetConnDoneInfo) {
 			return
@@ -341,33 +244,8 @@ func (t DriverTrace) onGetConn(ctx context.Context, g GetConnStartInfo) func(Get
 	}
 	return res
 }
-func (t DriverTrace) onPessimization(ctx context.Context, p PessimizationStartInfo) func(PessimizationDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(PessimizationStartInfo) func(PessimizationDoneInfo)
-	switch {
-	case t.OnPessimization == nil:
-		fn = c.OnPessimization
-	case c.OnPessimization == nil:
-		fn = t.OnPessimization
-	default:
-		h1 := t.OnPessimization
-		h2 := c.OnPessimization
-		fn = func(p PessimizationStartInfo) func(PessimizationDoneInfo) {
-			r1 := h1(p)
-			r2 := h2(p)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(p PessimizationDoneInfo) {
-					r1(p)
-					r2(p)
-				}
-			}
-		}
-	}
+func (t DriverTrace) onPessimization(p PessimizationStartInfo) func(PessimizationDoneInfo) {
+	fn := t.OnPessimization
 	if fn == nil {
 		return func(PessimizationDoneInfo) {
 			return
@@ -381,75 +259,23 @@ func (t DriverTrace) onPessimization(ctx context.Context, p PessimizationStartIn
 	}
 	return res
 }
-func (t DriverTrace) trackConnStart(ctx context.Context, t1 TrackConnStartInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(TrackConnStartInfo)
-	switch {
-	case t.TrackConnStart == nil:
-		fn = c.TrackConnStart
-	case c.TrackConnStart == nil:
-		fn = t.TrackConnStart
-	default:
-		h1 := t.TrackConnStart
-		h2 := c.TrackConnStart
-		fn = func(t TrackConnStartInfo) {
-			h1(t)
-			h2(t)
-		}
-	}
+func (t DriverTrace) trackConnStart(t1 TrackConnStartInfo) func(TrackConnDoneInfo) {
+	fn := t.TrackConnStart
 	if fn == nil {
-		return
-	}
-	fn(t1)
-}
-func (t DriverTrace) trackConnDone(ctx context.Context, t1 TrackConnDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(TrackConnDoneInfo)
-	switch {
-	case t.TrackConnDone == nil:
-		fn = c.TrackConnDone
-	case c.TrackConnDone == nil:
-		fn = t.TrackConnDone
-	default:
-		h1 := t.TrackConnDone
-		h2 := c.TrackConnDone
-		fn = func(t TrackConnDoneInfo) {
-			h1(t)
-			h2(t)
+		return func(TrackConnDoneInfo) {
+			return
 		}
 	}
-	if fn == nil {
-		return
-	}
-	fn(t1)
-}
-func (t DriverTrace) onGetCredentials(ctx context.Context, g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
-	switch {
-	case t.OnGetCredentials == nil:
-		fn = c.OnGetCredentials
-	case c.OnGetCredentials == nil:
-		fn = t.OnGetCredentials
-	default:
-		h1 := t.OnGetCredentials
-		h2 := c.OnGetCredentials
-		fn = func(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
-			r1 := h1(g)
-			r2 := h2(g)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(g GetCredentialsDoneInfo) {
-					r1(g)
-					r2(g)
-				}
-			}
+	res := fn(t1)
+	if res == nil {
+		return func(TrackConnDoneInfo) {
+			return
 		}
 	}
+	return res
+}
+func (t DriverTrace) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
+	fn := t.OnGetCredentials
 	if fn == nil {
 		return func(GetCredentialsDoneInfo) {
 			return
@@ -463,33 +289,8 @@ func (t DriverTrace) onGetCredentials(ctx context.Context, g GetCredentialsStart
 	}
 	return res
 }
-func (t DriverTrace) onDiscovery(ctx context.Context, d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
-	switch {
-	case t.OnDiscovery == nil:
-		fn = c.OnDiscovery
-	case c.OnDiscovery == nil:
-		fn = t.OnDiscovery
-	default:
-		h1 := t.OnDiscovery
-		h2 := c.OnDiscovery
-		fn = func(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DiscoveryDoneInfo) {
-					r1(d)
-					r2(d)
-				}
-			}
-		}
-	}
+func (t DriverTrace) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
+	fn := t.OnDiscovery
 	if fn == nil {
 		return func(DiscoveryDoneInfo) {
 			return
@@ -503,33 +304,8 @@ func (t DriverTrace) onDiscovery(ctx context.Context, d DiscoveryStartInfo) func
 	}
 	return res
 }
-func (t DriverTrace) onOperation(ctx context.Context, o OperationStartInfo) func(OperationDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(OperationStartInfo) func(OperationDoneInfo)
-	switch {
-	case t.OnOperation == nil:
-		fn = c.OnOperation
-	case c.OnOperation == nil:
-		fn = t.OnOperation
-	default:
-		h1 := t.OnOperation
-		h2 := c.OnOperation
-		fn = func(o OperationStartInfo) func(OperationDoneInfo) {
-			r1 := h1(o)
-			r2 := h2(o)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(o OperationDoneInfo) {
-					r1(o)
-					r2(o)
-				}
-			}
-		}
-	}
+func (t DriverTrace) onOperation(o OperationStartInfo) func(OperationDoneInfo) {
+	fn := t.OnOperation
 	if fn == nil {
 		return func(OperationDoneInfo) {
 			return
@@ -543,112 +319,38 @@ func (t DriverTrace) onOperation(ctx context.Context, o OperationStartInfo) func
 	}
 	return res
 }
-func (t DriverTrace) onOperationWait(ctx context.Context, o OperationWaitInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(OperationWaitInfo)
-	switch {
-	case t.OnOperationWait == nil:
-		fn = c.OnOperationWait
-	case c.OnOperationWait == nil:
-		fn = t.OnOperationWait
-	default:
-		h1 := t.OnOperationWait
-		h2 := c.OnOperationWait
-		fn = func(o OperationWaitInfo) {
-			h1(o)
-			h2(o)
-		}
-	}
+func (t DriverTrace) onStream(s StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo) {
+	fn := t.OnStream
 	if fn == nil {
-		return
-	}
-	fn(o)
-}
-func (t DriverTrace) onStream(ctx context.Context, s StreamStartInfo) func(StreamDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(StreamStartInfo) func(StreamDoneInfo)
-	switch {
-	case t.OnStream == nil:
-		fn = c.OnStream
-	case c.OnStream == nil:
-		fn = t.OnStream
-	default:
-		h1 := t.OnStream
-		h2 := c.OnStream
-		fn = func(s StreamStartInfo) func(StreamDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s StreamDoneInfo) {
-					r1(s)
-					r2(s)
-				}
+		return func(StreamRecvDoneInfo) func(StreamDoneInfo) {
+			return func(StreamDoneInfo) {
+				return
 			}
-		}
-	}
-	if fn == nil {
-		return func(StreamDoneInfo) {
-			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(StreamDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t DriverTrace) onStreamRecv(ctx context.Context, s StreamRecvStartInfo) func(StreamRecvDoneInfo) {
-	c := ContextDriverTrace(ctx)
-	var fn func(StreamRecvStartInfo) func(StreamRecvDoneInfo)
-	switch {
-	case t.OnStreamRecv == nil:
-		fn = c.OnStreamRecv
-	case c.OnStreamRecv == nil:
-		fn = t.OnStreamRecv
-	default:
-		h1 := t.OnStreamRecv
-		h2 := c.OnStreamRecv
-		fn = func(s StreamRecvStartInfo) func(StreamRecvDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s StreamRecvDoneInfo) {
-					r1(s)
-					r2(s)
-				}
+		return func(StreamRecvDoneInfo) func(StreamDoneInfo) {
+			return func(StreamDoneInfo) {
+				return
 			}
 		}
 	}
-	if fn == nil {
-		return func(StreamRecvDoneInfo) {
-			return
+	return func(s StreamRecvDoneInfo) func(StreamDoneInfo) {
+		res := res(s)
+		if res == nil {
+			return func(StreamDoneInfo) {
+				return
+			}
 		}
+		return res
 	}
-	res := fn(s)
-	if res == nil {
-		return func(StreamRecvDoneInfo) {
-			return
-		}
-	}
-	return res
 }
-func driverTraceOnDial(ctx context.Context, t DriverTrace, c context.Context, address string) func(_ context.Context, address string, _ error) {
+func driverTraceOnDial(t DriverTrace, c context.Context, address string) func(_ context.Context, address string, _ error) {
 	var p DialStartInfo
 	p.Context = c
 	p.Address = address
-	res := t.onDial(ctx, p)
+	res := t.onDial(p)
 	return func(c context.Context, address string, e error) {
 		var p DialDoneInfo
 		p.Context = c
@@ -657,10 +359,10 @@ func driverTraceOnDial(ctx context.Context, t DriverTrace, c context.Context, ad
 		res(p)
 	}
 }
-func driverTraceOnGetConn(ctx context.Context, t DriverTrace, c context.Context) func(_ context.Context, address string, _ error) {
+func driverTraceOnGetConn(t DriverTrace, c context.Context) func(_ context.Context, address string, _ error) {
 	var p GetConnStartInfo
 	p.Context = c
-	res := t.onGetConn(ctx, p)
+	res := t.onGetConn(p)
 	return func(c context.Context, address string, e error) {
 		var p GetConnDoneInfo
 		p.Context = c
@@ -669,12 +371,12 @@ func driverTraceOnGetConn(ctx context.Context, t DriverTrace, c context.Context)
 		res(p)
 	}
 }
-func driverTraceOnPessimization(ctx context.Context, t DriverTrace, c context.Context, address string, cause error) func(_ context.Context, address string, _ error) {
+func driverTraceOnPessimization(t DriverTrace, c context.Context, address string, cause error) func(_ context.Context, address string, _ error) {
 	var p PessimizationStartInfo
 	p.Context = c
 	p.Address = address
 	p.Cause = cause
-	res := t.onPessimization(ctx, p)
+	res := t.onPessimization(p)
 	return func(c context.Context, address string, e error) {
 		var p PessimizationDoneInfo
 		p.Context = c
@@ -683,20 +385,20 @@ func driverTraceOnPessimization(ctx context.Context, t DriverTrace, c context.Co
 		res(p)
 	}
 }
-func driverTraceTrackConnStart(ctx context.Context, t DriverTrace, address string) {
+func driverTraceTrackConnStart(t DriverTrace, address string) func(address string) {
 	var p TrackConnStartInfo
 	p.Address = address
-	t.trackConnStart(ctx, p)
+	res := t.trackConnStart(p)
+	return func(address string) {
+		var p TrackConnDoneInfo
+		p.Address = address
+		res(p)
+	}
 }
-func driverTraceTrackConnDone(ctx context.Context, t DriverTrace, address string) {
-	var p TrackConnDoneInfo
-	p.Address = address
-	t.trackConnDone(ctx, p)
-}
-func driverTraceOnGetCredentials(ctx context.Context, t DriverTrace, c context.Context) func(_ context.Context, token bool, _ error) {
+func driverTraceOnGetCredentials(t DriverTrace, c context.Context) func(_ context.Context, token bool, _ error) {
 	var p GetCredentialsStartInfo
 	p.Context = c
-	res := t.onGetCredentials(ctx, p)
+	res := t.onGetCredentials(p)
 	return func(c context.Context, token bool, e error) {
 		var p GetCredentialsDoneInfo
 		p.Context = c
@@ -705,10 +407,10 @@ func driverTraceOnGetCredentials(ctx context.Context, t DriverTrace, c context.C
 		res(p)
 	}
 }
-func driverTraceOnDiscovery(ctx context.Context, t DriverTrace, c context.Context) func(_ context.Context, endpoints []Endpoint, _ error) {
+func driverTraceOnDiscovery(t DriverTrace, c context.Context) func(_ context.Context, endpoints []Endpoint, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
-	res := t.onDiscovery(ctx, p)
+	res := t.onDiscovery(p)
 	return func(c context.Context, endpoints []Endpoint, e error) {
 		var p DiscoveryDoneInfo
 		p.Context = c
@@ -717,13 +419,13 @@ func driverTraceOnDiscovery(ctx context.Context, t DriverTrace, c context.Contex
 		res(p)
 	}
 }
-func driverTraceOnOperation(ctx context.Context, t DriverTrace, c context.Context, address string, m Method, params OperationParams) func(_ context.Context, address string, _ Method, params OperationParams, opID string, issues IssueIterator, _ error) {
+func driverTraceOnOperation(t DriverTrace, c context.Context, address string, m Method, params OperationParams) func(_ context.Context, address string, _ Method, params OperationParams, opID string, issues IssueIterator, _ error) {
 	var p OperationStartInfo
 	p.Context = c
 	p.Address = address
 	p.Method = m
 	p.Params = params
-	res := t.onOperation(ctx, p)
+	res := t.onOperation(p)
 	return func(c context.Context, address string, m Method, params OperationParams, opID string, issues IssueIterator, e error) {
 		var p OperationDoneInfo
 		p.Context = c
@@ -736,43 +438,26 @@ func driverTraceOnOperation(ctx context.Context, t DriverTrace, c context.Contex
 		res(p)
 	}
 }
-func driverTraceOnOperationWait(ctx context.Context, t DriverTrace, c context.Context, address string, m Method, params OperationParams, opID string) {
-	var p OperationWaitInfo
-	p.Context = c
-	p.Address = address
-	p.Method = m
-	p.Params = params
-	p.OpID = opID
-	t.onOperationWait(ctx, p)
-}
-func driverTraceOnStream(ctx context.Context, t DriverTrace, c context.Context, address string, m Method) func(_ context.Context, address string, _ Method, _ error) {
+func driverTraceOnStream(t DriverTrace, c context.Context, address string, m Method) func(_ context.Context, address string, _ Method, _ error) func(_ context.Context, address string, _ Method, _ error) {
 	var p StreamStartInfo
 	p.Context = c
 	p.Address = address
 	p.Method = m
-	res := t.onStream(ctx, p)
-	return func(c context.Context, address string, m Method, e error) {
-		var p StreamDoneInfo
-		p.Context = c
-		p.Address = address
-		p.Method = m
-		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnStreamRecv(ctx context.Context, t DriverTrace, c context.Context, address string, m Method) func(_ context.Context, address string, _ Method, issues IssueIterator, _ error) {
-	var p StreamRecvStartInfo
-	p.Context = c
-	p.Address = address
-	p.Method = m
-	res := t.onStreamRecv(ctx, p)
-	return func(c context.Context, address string, m Method, issues IssueIterator, e error) {
+	res := t.onStream(p)
+	return func(c context.Context, address string, m Method, e error) func(context.Context, string, Method, error) {
 		var p StreamRecvDoneInfo
 		p.Context = c
 		p.Address = address
 		p.Method = m
-		p.Issues = issues
 		p.Error = e
-		res(p)
+		res := res(p)
+		return func(c context.Context, address string, m Method, e error) {
+			var p StreamDoneInfo
+			p.Context = c
+			p.Address = address
+			p.Method = m
+			p.Error = e
+			res(p)
+		}
 	}
 }

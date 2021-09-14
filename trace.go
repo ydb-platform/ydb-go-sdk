@@ -10,7 +10,6 @@ import (
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	DriverTrace struct {
 		OnDial func(DialStartInfo) func(DialDoneInfo)
 
@@ -19,19 +18,15 @@ type (
 		OnPessimization func(PessimizationStartInfo) func(PessimizationDoneInfo)
 
 		// Only for background.
-		TrackConnStart func(TrackConnStartInfo)
-		TrackConnDone  func(TrackConnDoneInfo)
+		TrackConnStart func(TrackConnStartInfo) func(TrackConnDoneInfo)
 
 		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
 
 		OnDiscovery func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
 
-		OnOperation     func(OperationStartInfo) func(OperationDoneInfo)
-		OnOperationWait func(OperationWaitInfo)
+		OnOperation func(OperationStartInfo) func(OperationDoneInfo)
 
-		OnStream func(StreamStartInfo) func(StreamDoneInfo)
-
-		OnStreamRecv func(StreamRecvStartInfo) func(StreamRecvDoneInfo)
+		OnStream func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
 	}
 )
 
@@ -115,13 +110,6 @@ type (
 		Method  Method
 		Params  OperationParams
 	}
-	OperationWaitInfo struct {
-		Context context.Context
-		Address string
-		Method  Method
-		Params  OperationParams
-		OpID    string
-	}
 	OperationDoneInfo struct {
 		Context context.Context
 		Address string
@@ -136,16 +124,10 @@ type (
 		Address string
 		Method  Method
 	}
-	StreamRecvStartInfo struct {
-		Context context.Context
-		Address string
-		Method  Method
-	}
 	StreamRecvDoneInfo struct {
 		Context context.Context
 		Address string
 		Method  Method
-		Issues  IssueIterator
 		Error   error
 	}
 	StreamDoneInfo struct {

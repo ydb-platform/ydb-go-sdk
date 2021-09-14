@@ -287,7 +287,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		i     = 0
 		start = time.Now()
 	)
-	getDone := sessionPoolTraceOnGet(ctx, p.Trace, ctx)
+	getDone := sessionPoolTraceOnGet(p.Trace, ctx)
 	defer func() {
 		getDone(ctx, s, time.Since(start), i, err)
 	}()
@@ -338,7 +338,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		if ch == nil {
 			continue
 		}
-		waitDone := sessionPoolTraceOnWait(ctx, p.Trace, ctx)
+		waitDone := sessionPoolTraceOnWait(p.Trace, ctx)
 		var ok bool
 		select {
 		case s, ok = <-*ch:
@@ -387,7 +387,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 	p.init()
 
-	putDone := sessionPoolTraceOnPut(ctx, p.Trace, ctx, s)
+	putDone := sessionPoolTraceOnPut(p.Trace, ctx, s)
 	defer func() {
 		putDone(ctx, s, err)
 	}()
@@ -430,10 +430,8 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err error) {
 	p.init()
 
-	takeDone := sessionPoolTraceOnTake(ctx, p.Trace, ctx, s)
-	defer func() {
-		takeDone(ctx, s, took, err)
-	}()
+	takeWait := sessionPoolTraceOnTake(p.Trace, ctx, s)
+	var takeDone func(_ context.Context, _ *Session, took bool, _ error)
 
 	if p.isClosed() {
 		return false, ErrSessionPoolClosed
@@ -443,7 +441,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
-		sessionPoolTraceOnTakeWait(ctx, p.Trace, ctx, s)
+		takeDone = takeWait(ctx, s)
 
 		// Keepalive processing takes place right now.
 		// Try to await touched session before creation of new one.
@@ -456,6 +454,9 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 
 		p.mu.Lock()
 	}
+	defer func() {
+		takeDone(ctx, s, took, err)
+	}()
 	p.mu.Unlock()
 
 	if !has {
@@ -470,7 +471,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 	p.init()
 
-	createDone := sessionPoolTraceOnCreate(ctx, p.Trace, ctx)
+	createDone := sessionPoolTraceOnCreate(p.Trace, ctx)
 	defer func() {
 		createDone(ctx, s, err)
 	}()
@@ -514,7 +515,7 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 func (p *SessionPool) Close(ctx context.Context) (err error) {
 	p.init()
 
-	closeDone := sessionPoolTraceOnClose(ctx, p.Trace, ctx)
+	closeDone := sessionPoolTraceOnClose(p.Trace, ctx)
 	defer func() {
 		closeDone(ctx, err)
 	}()
@@ -577,31 +578,6 @@ func (p *SessionPool) Stats() SessionPoolStats {
 		MinSize:          p.KeepAliveMinSize,
 		MaxSize:          p.limit,
 	}
-}
-
-func (p *SessionPool) reuse(ctx context.Context, s *Session) (reused bool) {
-	var (
-		info        SessionInfo
-		err         error
-		enoughSpace bool
-	)
-	busyCheckDone := sessionPoolTraceOnBusyCheck(ctx, p.Trace, ctx, s)
-	defer func() {
-		busyCheckDone(ctx, s, enoughSpace, err)
-	}()
-	if info, err = p.keepAliveSession(ctx, s); err == nil && info.Status == SessionReady {
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		enoughSpace = !p.closed && p.createInProgress+len(p.index) < p.limit
-		if enoughSpace {
-			p.index[s] = sessionInfo{}
-			if !p.notify(s) {
-				p.pushIdle(s, timeutil.Now())
-			}
-			return true
-		}
-	}
-	return false
 }
 
 func (p *SessionPool) keeper() {
@@ -865,7 +841,7 @@ func (p *SessionPool) CloseSession(ctx context.Context, s *Session) error {
 		ydb.ContextWithoutDeadline(ctx),
 		p.DeleteTimeout,
 	)
-	closeSessionDone := sessionPoolTraceOnCloseSession(ctx, p.Trace, ctx, s)
+	closeSessionDone := sessionPoolTraceOnCloseSession(p.Trace, ctx, s)
 	go func() {
 		defer cancel()
 		closeSessionDone(ctx, s, s.Close(ctx))
