@@ -31,7 +31,6 @@ type (
 	}
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	RetryTrace struct {
 		OnRetry func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
 	}
