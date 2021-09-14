@@ -533,20 +533,20 @@ func DictValue(n int, it func(int) V) Value {
 
 // It panics if vs is empty or contains not equal types.
 func ListValue(n int, it func(int) V) Value {
-	T := it(0).(Value).t
+	t := it(0).(Value).t
 	var items = make([]*Ydb.Value, n)
 	for i := 0; i < n; i++ {
 		v := it(i).(Value)
-		if !TypesEqual(v.t, T) {
+		if !TypesEqual(v.t, t) {
 			panic(fmt.Sprintf(
 				"unexpected item type: %s; want %s",
-				v.t, T,
+				v.t, t,
 			))
 		}
 		items[i] = v.v
 	}
 	return Value{
-		t: ListType{T},
+		t: ListType{t},
 		v: &Ydb.Value{
 			Items: items,
 		},

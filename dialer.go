@@ -90,7 +90,7 @@ type dialer struct {
 
 func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 	endpoint := d.endpointByAddr(addr)
-	cluster := cluster{
+	c := cluster{
 		dial:  d.dialHostPort,
 		trace: d.config.Trace,
 		balancer: func() balancer {
@@ -116,12 +116,12 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 	}
 	defer func() {
 		if err != nil {
-			_ = cluster.Close()
+			_ = c.Close()
 		}
 	}()
-	cluster.Insert(ctx, endpoint)
+	c.Insert(ctx, endpoint)
 	driver := &driver{
-		cluster:              &cluster,
+		cluster:              &c,
 		meta:                 d.meta,
 		trace:                d.config.Trace,
 		requestTimeout:       d.config.RequestTimeout,
@@ -150,14 +150,14 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 		wg := newWG()
 		wg.Add(len(curr))
 		for _, e := range curr {
-			go cluster.Insert(ctx, e, wg)
+			go c.Insert(ctx, e, wg)
 		}
 		if d.config.FastDial {
 			wg.WaitFirst()
 		} else {
 			wg.Wait()
 		}
-		cluster.explorer = NewRepeater(
+		c.explorer = NewRepeater(
 			d.config.DiscoveryInterval,
 			func(ctx context.Context) {
 				next, err := discoveryClient.Discover(ctx)
@@ -169,7 +169,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 				if len(next) == 0 {
 					go func() {
 						time.Sleep(time.Second)
-						cluster.explorer.Force()
+						c.explorer.Force()
 
 					}()
 					return
@@ -186,15 +186,15 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 						actual++
 						// Endpoints are equal, but we still need to update meta
 						// data such that load factor and others.
-						go cluster.Update(ctx, next[j], wg)
+						go c.Update(ctx, next[j], wg)
 					},
 					func(i, j int) {
 						actual++
-						go cluster.Insert(ctx, next[j], wg)
+						go c.Insert(ctx, next[j], wg)
 					},
 					func(i, j int) {
 						actual++
-						go cluster.Remove(ctx, curr[i], wg)
+						go c.Remove(ctx, curr[i], wg)
 					},
 				)
 				wg.Add(actual - max) // adjust

@@ -190,14 +190,14 @@ func TestQuery(t *testing.T) {
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
 							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-								return &Ydb_Table.CreateSessionResult{}, nil
+								return &Ydb_Table.CreateSessionResult{}, err
 							},
 							testutil.TableExecuteDataQuery: func(_ interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.ExecuteQueryResult{
 									TxMeta: &Ydb_Table.TransactionMeta{
 										Id: "",
 									},
-								}, nil
+								}, err
 							},
 							testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.PrepareQueryResult{}, nil
@@ -206,7 +206,7 @@ func TestQuery(t *testing.T) {
 					),
 					testutil.WithNewStreamHandlers(
 						testutil.NewStreamHandlers{
-							testutil.TableStreamExecuteScanQuery: func(_ *grpc.StreamDesc) (grpc.ClientStream, error) {
+							testutil.TableStreamExecuteScanQuery: func(_ *grpc.StreamDesc) (c grpc.ClientStream, err error) {
 								return &testutil.ClientStream{
 									OnRecvMsg: func(m interface{}) error {
 										return io.EOF
@@ -217,7 +217,7 @@ func TestQuery(t *testing.T) {
 									OnCloseSend: func() error {
 										return nil
 									},
-								}, nil
+								}, err
 							},
 						},
 					),

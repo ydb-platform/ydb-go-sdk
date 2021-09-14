@@ -15,31 +15,6 @@ var (
 	_ = table.NewQueryParameters
 )
 
-func (c *ConvAssert) Scan(res *table.Result) (err error) {
-	res.SeekItem("int8_int16")
-	c.Int8Int16 = int16(res.Int8())
-
-	res.SeekItem("int32_int64")
-	c.Int32Int64 = int64(res.Int32())
-
-	res.SeekItem("int16_int8")
-	c.Int16Int8 = ydbConvI16ToI8(res.Int16())
-
-	res.SeekItem("uint64_int8")
-	c.Uint64Int8 = ydbConvU64ToI8(res.Uint64())
-
-	res.SeekItem("uint32_uint")
-	c.Uint32Uint = uint(res.Uint32())
-
-	res.SeekItem("int32_int")
-	c.Int32Int = int(res.Int32())
-
-	res.SeekItem("int32_to_byte")
-	c.Int32ToByte = ydbConvI32ToB(res.Int32())
-
-	return res.Err()
-}
-
 func ydbConvI16ToI8(x int16) int8 {
 	const (
 		bits = 8

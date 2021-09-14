@@ -13,10 +13,10 @@ import (
 )
 
 type (
-	ctxOpTimeoutKey     struct{}
-	ctxOpCancelAfterKey struct{}
-	ctxOpModeKey        struct{}
-	ctxRetryNoIdempotentKey struct {}
+	ctxOpTimeoutKey         struct{}
+	ctxOpCancelAfterKey     struct{}
+	ctxOpModeKey            struct{}
+	ctxRetryNoIdempotentKey struct{}
 
 	ctxClientConnApplierKey struct{}
 )

@@ -15,86 +15,6 @@ var (
 	_ = table.NewQueryParameters
 )
 
-func (c *Container) Scan(res *table.Result) (err error) {
-	res.SeekItem("struct")
-	for i0, n0 := 0, res.StructIn(); i0 < n0; i0++ {
-		switch res.StructField(i0) {
-		case "id":
-			c.Struct.ID = res.OUTF8()
-		case "ints":
-			n1 := res.ListIn()
-			xs0 := make([]int32, n1)
-			for i1 := 0; i1 < n1; i1++ {
-				res.ListItem(i1)
-				var x0 int32
-				x0 = res.OInt32()
-				xs0[i1] = x0
-			}
-			c.Struct.Ints = xs0
-			res.ListOut()
-		}
-	}
-	res.StructOut()
-
-	res.SeekItem("structs")
-	n0 := res.ListIn()
-	xs0 := make([]Foo, n0)
-	for i0 := 0; i0 < n0; i0++ {
-		res.ListItem(i0)
-		var x0 Foo
-		for i1, n1 := 0, res.StructIn(); i1 < n1; i1++ {
-			switch res.StructField(i1) {
-			case "id":
-				x0.ID = res.OUTF8()
-			case "ints":
-				n2 := res.ListIn()
-				xs1 := make([]int32, n2)
-				for i2 := 0; i2 < n2; i2++ {
-					res.ListItem(i2)
-					var x1 int32
-					x1 = res.OInt32()
-					xs1[i2] = x1
-				}
-				x0.Ints = xs1
-				res.ListOut()
-			}
-		}
-		res.StructOut()
-		xs0[i0] = x0
-	}
-	c.Structs = xs0
-	res.ListOut()
-
-	res.SeekItem("bytes")
-	n1 := res.ListIn()
-	xs1 := make([]byte, n1)
-	for i0 := 0; i0 < n1; i0++ {
-		res.ListItem(i0)
-		var x0 byte
-		x0 = ydbConvU32ToB(res.Uint32())
-		xs1[i0] = x0
-	}
-	c.Bytes = xs1
-	res.ListOut()
-
-	res.SeekItem("strings")
-	n2 := res.ListIn()
-	xs2 := make([]string, n2)
-	for i0 := 0; i0 < n2; i0++ {
-		res.ListItem(i0)
-		var x0 string
-		x0 = string(res.String())
-		xs2[i0] = x0
-	}
-	c.Strings = xs2
-	res.ListOut()
-
-	res.SeekItem("string")
-	c.String = res.OString()
-
-	return res.Err()
-}
-
 func (c *Container) QueryParameters() *table.QueryParameters {
 	var v0 ydb.Value
 	{
@@ -571,23 +491,25 @@ func (c *Container) StructType() ydb.Type {
 	return t0
 }
 
-func (f *Foo) Scan(res *table.Result) (err error) {
-	res.SeekItem("id")
-	f.ID = res.OUTF8()
+type structfield3 []int32
 
-	res.SeekItem("ints")
+func (s *structfield3) UnmarshalYDB(res ydb.RawValue) error {
 	n0 := res.ListIn()
 	xs0 := make([]int32, n0)
 	for i0 := 0; i0 < n0; i0++ {
 		res.ListItem(i0)
 		var x0 int32
-		x0 = res.OInt32()
+		x0 = res.Int32()
 		xs0[i0] = x0
 	}
-	f.Ints = xs0
+	*s = xs0
 	res.ListOut()
-
 	return res.Err()
+}
+
+func (f *Foo) Scan(res *table.Result) (err error) {
+	err = res.Scan(&f.ID, &f.Ints)
+	return
 }
 
 func (f *Foo) QueryParameters() *table.QueryParameters {
@@ -692,31 +614,6 @@ func (f *Foo) StructType() ydb.Type {
 		t0 = ydb.Struct(fs0...)
 	}
 	return t0
-}
-
-func (fs *Foos) Scan(res *table.Result) (err error) {
-	for res.NextRow() {
-		var x0 Foo
-		res.SeekItem("id")
-		x0.ID = res.OUTF8()
-
-		res.SeekItem("ints")
-		n0 := res.ListIn()
-		xs0 := make([]int32, n0)
-		for i0 := 0; i0 < n0; i0++ {
-			res.ListItem(i0)
-			var x1 int32
-			x1 = res.OInt32()
-			xs0[i0] = x1
-		}
-		x0.Ints = xs0
-		res.ListOut()
-
-		if res.Err() == nil {
-			*fs = append(*fs, x0)
-		}
-	}
-	return res.Err()
 }
 
 func (bs *Bar) Scan(res *table.Result) (err error) {

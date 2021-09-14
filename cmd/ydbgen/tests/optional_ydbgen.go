@@ -15,26 +15,6 @@ var (
 	_ = table.NewQueryParameters
 )
 
-func (o *Optional) Scan(res *table.Result) (err error) {
-	res.SeekItem("int64")
-	res.Unwrap()
-	if !res.IsNull() {
-		x0 := int64(res.Int16())
-		o.Int64.Set(x0)
-	}
-
-	res.SeekItem("str")
-	{
-		x0 := string(res.String())
-		o.Str.Set(x0)
-	}
-
-	res.SeekItem("int32")
-	o.Int32 = res.OInt32()
-
-	return res.Err()
-}
-
 func (o *Optional) QueryParameters() *table.QueryParameters {
 	var v0 ydb.Value
 	{

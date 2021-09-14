@@ -100,7 +100,12 @@ func TestConnectorRedialOnError(t *testing.T) {
 	db := sql.OpenDB(c)
 	for i := 0; i < 3; i++ {
 		success <- i%2 == 0
-		ctx, _ := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer func() {
+			if cancel != nil {
+				cancel()
+			}
+		}()
 		_ = db.PingContext(ctx)
 		if !dial {
 			t.Fatalf("no dial on re-ping at %v iteration", i)

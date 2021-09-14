@@ -4,6 +4,7 @@ package tests
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -15,31 +16,17 @@ var (
 	_ = table.NewQueryParameters
 )
 
-func (t *Times) Scan(res *table.Result) (err error) {
-	res.SeekItem("date")
-	res.Unwrap()
-	if !res.IsNull() {
-		x0 := res.Date()
-		err := (*ydb.Time)(&t.Date).FromDate(x0)
-		if err != nil {
-			panic("ydbgen: date type conversion failed: " + err.Error())
-		}
-	}
-
-	return res.Err()
-}
-
 func (t *Times) QueryParameters() *table.QueryParameters {
 	var v0 ydb.Value
 	{
 		var v1 ydb.Value
-		var x0 uint32
+		var x0 time.Time
 		ok0 := !t.Date.IsZero()
 		if ok0 {
-			x0 = ydb.Time(t.Date).Date()
+			x0 = t.Date
 		}
 		if ok0 {
-			v1 = ydb.OptionalValue(ydb.DateValue(x0))
+			v1 = ydb.OptionalValue(ydb.DateValueFromTime(x0))
 		} else {
 			v1 = ydb.NullValue(ydb.TypeDate)
 		}
@@ -56,13 +43,13 @@ func (t *Times) StructValue() ydb.Value {
 		var v1 ydb.Value
 		{
 			var v2 ydb.Value
-			var x0 uint32
+			var x0 time.Time
 			ok0 := !t.Date.IsZero()
 			if ok0 {
-				x0 = ydb.Time(t.Date).Date()
+				x0 = t.Date
 			}
 			if ok0 {
-				v2 = ydb.OptionalValue(ydb.DateValue(x0))
+				v2 = ydb.OptionalValue(ydb.DateValueFromTime(x0))
 			} else {
 				v2 = ydb.NullValue(ydb.TypeDate)
 			}

@@ -967,8 +967,6 @@ func (s *Scanner) scan(values []interface{}) error {
 	return s.err
 }
 
-const tinyStack = 8
-
 var emptyItem item
 
 type item struct {

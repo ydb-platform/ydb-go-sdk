@@ -154,7 +154,6 @@ func getField(name string, src, dst interface{}) bool {
 type Cluster struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onStats     func()
 	onClose     func() error
 }
 

@@ -110,7 +110,7 @@ func (b *ClusterBuilder) Build() ydb.Cluster {
 
 					b.log("[%q][%q] rollback transaction", sid, tid)
 
-					return nil, nil
+					return result, err
 				},
 				testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 					r := request.(*Ydb_Table.PrepareDataQueryRequest)
@@ -180,16 +180,16 @@ func TestTxDoerStmt(t *testing.T) {
 
 	// Try to prepare statement on second session, which must fail due to our
 	// stub logic above.
-	err = DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
-		_, err := tx.Stmt(stmt).Exec()
-		return err
+	err = DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
+		_, err = tx.Stmt(stmt).Exec()
+		return
 	})
 
 	// Try to repeat the same thing – we should not receive any error here –
 	// previous session must be marked busy and not used for some time.
-	err = DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
-		_, err := tx.Stmt(stmt).Exec()
-		return err
+	err = DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
+		_, err = tx.Stmt(stmt).Exec()
+		return
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
