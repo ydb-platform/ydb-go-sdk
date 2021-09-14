@@ -180,19 +180,6 @@ func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
 		}
 	}
 	switch {
-	case t.OnOperationWait == nil:
-		ret.OnOperationWait = x.OnOperationWait
-	case x.OnOperationWait == nil:
-		ret.OnOperationWait = t.OnOperationWait
-	default:
-		h1 := t.OnOperationWait
-		h2 := x.OnOperationWait
-		ret.OnOperationWait = func(o OperationWaitInfo) {
-			h1(o)
-			h2(o)
-		}
-	}
-	switch {
 	case t.OnStream == nil:
 		ret.OnStream = x.OnStream
 	case x.OnStream == nil:
@@ -210,30 +197,6 @@ func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
 				return r1
 			default:
 				return func(s StreamDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnStreamRecv == nil:
-		ret.OnStreamRecv = x.OnStreamRecv
-	case x.OnStreamRecv == nil:
-		ret.OnStreamRecv = t.OnStreamRecv
-	default:
-		h1 := t.OnStreamRecv
-		h2 := x.OnStreamRecv
-		ret.OnStreamRecv = func(s StreamRecvStartInfo) func(StreamRecvDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s StreamRecvDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -346,13 +309,6 @@ func (t DriverTrace) onOperation(o OperationStartInfo) func(OperationDoneInfo) {
 	}
 	return res
 }
-func (t DriverTrace) onOperationWait(o OperationWaitInfo) {
-	fn := t.OnOperationWait
-	if fn == nil {
-		return
-	}
-	fn(o)
-}
 func (t DriverTrace) onStream(s StreamStartInfo) func(StreamDoneInfo) {
 	fn := t.OnStream
 	if fn == nil {
@@ -363,21 +319,6 @@ func (t DriverTrace) onStream(s StreamStartInfo) func(StreamDoneInfo) {
 	res := fn(s)
 	if res == nil {
 		return func(StreamDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t DriverTrace) onStreamRecv(s StreamRecvStartInfo) func(StreamRecvDoneInfo) {
-	fn := t.OnStreamRecv
-	if fn == nil {
-		return func(StreamRecvDoneInfo) {
-			return
-		}
-	}
-	res := fn(s)
-	if res == nil {
-		return func(StreamRecvDoneInfo) {
 			return
 		}
 	}
@@ -475,15 +416,6 @@ func driverTraceOnOperation(t DriverTrace, c context.Context, address string, m 
 		res(p)
 	}
 }
-func driverTraceOnOperationWait(t DriverTrace, c context.Context, address string, m Method, params OperationParams, opID string) {
-	var p OperationWaitInfo
-	p.Context = c
-	p.Address = address
-	p.Method = m
-	p.Params = params
-	p.OpID = opID
-	t.onOperationWait(p)
-}
 func driverTraceOnStream(t DriverTrace, c context.Context, address string, m Method) func(_ context.Context, address string, _ Method, _ error) {
 	var p StreamStartInfo
 	p.Context = c
@@ -495,22 +427,6 @@ func driverTraceOnStream(t DriverTrace, c context.Context, address string, m Met
 		p.Context = c
 		p.Address = address
 		p.Method = m
-		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnStreamRecv(t DriverTrace, c context.Context, address string, m Method) func(_ context.Context, address string, _ Method, issues IssueIterator, _ error) {
-	var p StreamRecvStartInfo
-	p.Context = c
-	p.Address = address
-	p.Method = m
-	res := t.onStreamRecv(p)
-	return func(c context.Context, address string, m Method, issues IssueIterator, e error) {
-		var p StreamRecvDoneInfo
-		p.Context = c
-		p.Address = address
-		p.Method = m
-		p.Issues = issues
 		p.Error = e
 		res(p)
 	}

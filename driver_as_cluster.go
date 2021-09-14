@@ -47,9 +47,9 @@ func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	driverTraceGetConnDone := driverTraceOnGetConn(d.trace, ctx)
+	getConnDone := driverTraceOnGetConn(d.trace, ctx)
 	c, err = d.cluster.Get(ctx)
-	driverTraceGetConnDone(rawCtx, c.Address(), err)
+	getConnDone(rawCtx, c.Address(), err)
 
 	if err == nil {
 		if apply, ok := ContextClientConnApplier(rawCtx); ok {

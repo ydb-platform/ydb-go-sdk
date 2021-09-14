@@ -25,12 +25,9 @@ type (
 
 		OnDiscovery func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
 
-		OnOperation     func(OperationStartInfo) func(OperationDoneInfo)
-		OnOperationWait func(OperationWaitInfo)
+		OnOperation func(OperationStartInfo) func(OperationDoneInfo)
 
 		OnStream func(StreamStartInfo) func(StreamDoneInfo)
-
-		OnStreamRecv func(StreamRecvStartInfo) func(StreamRecvDoneInfo)
 	}
 )
 
@@ -114,13 +111,6 @@ type (
 		Method  Method
 		Params  OperationParams
 	}
-	OperationWaitInfo struct {
-		Context context.Context
-		Address string
-		Method  Method
-		Params  OperationParams
-		OpID    string
-	}
 	OperationDoneInfo struct {
 		Context context.Context
 		Address string
@@ -134,18 +124,6 @@ type (
 		Context context.Context
 		Address string
 		Method  Method
-	}
-	StreamRecvStartInfo struct {
-		Context context.Context
-		Address string
-		Method  Method
-	}
-	StreamRecvDoneInfo struct {
-		Context context.Context
-		Address string
-		Method  Method
-		Issues  IssueIterator
-		Error   error
 	}
 	StreamDoneInfo struct {
 		Context context.Context

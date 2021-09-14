@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -56,15 +55,11 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
-	var (
-		issues []*Ydb_Issue.IssueMessage
-	)
-
 	s.c.runtime.streamRecv(timeutil.Now())
 
-	driverTraceStreamRecvDone := driverTraceOnStreamRecv(s.d.trace, s.Context(), s.c.Address(), s.method)
+	streamDone := driverTraceOnStream(s.d.trace, s.Context(), s.c.Address(), s.method)
 	defer func() {
-		driverTraceStreamRecvDone(s.ctx, s.c.addr.String(), s.method, issues, hideEOF(err))
+		streamDone(s.ctx, s.c.addr.String(), s.method, hideEOF(err))
 	}()
 
 	err = s.s.RecvMsg(m)
@@ -73,8 +68,8 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		err = mapGRPCError(err)
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			driverTracePessimizationDone := driverTraceOnPessimization(s.d.trace, s.ctx, s.c.Address(), err)
-			driverTracePessimizationDone(s.ctx, s.c.Address(), s.d.cluster.Pessimize(s.c.addr))
+			pessimizationDone := driverTraceOnPessimization(s.d.trace, s.ctx, s.c.Address(), err)
+			pessimizationDone(s.ctx, s.c.Address(), s.d.cluster.Pessimize(s.c.addr))
 		}
 		return
 	}

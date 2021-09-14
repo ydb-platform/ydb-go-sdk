@@ -524,30 +524,6 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 		}
 	}
 	switch {
-	case t.OnBusyCheck == nil:
-		ret.OnBusyCheck = x.OnBusyCheck
-	case x.OnBusyCheck == nil:
-		ret.OnBusyCheck = t.OnBusyCheck
-	default:
-		h1 := t.OnBusyCheck
-		h2 := x.OnBusyCheck
-		ret.OnBusyCheck = func(s SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolBusyCheckDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
 	case t.OnTake == nil:
 		ret.OnTake = x.OnTake
 	case x.OnTake == nil:
@@ -555,7 +531,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	default:
 		h1 := t.OnTake
 		h2 := x.OnTake
-		ret.OnTake = func(s SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo) {
+		ret.OnTake = func(s SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -564,24 +540,22 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s SessionPoolTakeDoneInfo) {
-					r1(s)
-					r2(s)
+				return func(s SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+					r11 := r1(s)
+					r21 := r2(s)
+					switch {
+					case r11 == nil:
+						return r21
+					case r21 == nil:
+						return r11
+					default:
+						return func(s SessionPoolTakeDoneInfo) {
+							r11(s)
+							r21(s)
+						}
+					}
 				}
 			}
-		}
-	}
-	switch {
-	case t.OnTakeWait == nil:
-		ret.OnTakeWait = x.OnTakeWait
-	case x.OnTakeWait == nil:
-		ret.OnTakeWait = t.OnTakeWait
-	default:
-		h1 := t.OnTakeWait
-		h2 := x.OnTakeWait
-		ret.OnTakeWait = func(s SessionPoolTakeWaitInfo) {
-			h1(s)
-			h2(s)
 		}
 	}
 	switch {
@@ -602,30 +576,6 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 				return r1
 			default:
 				return func(s SessionPoolPutDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnPutBusy == nil:
-		ret.OnPutBusy = x.OnPutBusy
-	case x.OnPutBusy == nil:
-		ret.OnPutBusy = t.OnPutBusy
-	default:
-		h1 := t.OnPutBusy
-		h2 := x.OnPutBusy
-		ret.OnPutBusy = func(s SessionPoolPutBusyStartInfo) func(SessionPoolPutBusyDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolPutBusyDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -727,42 +677,32 @@ func (t SessionPoolTrace) onWait(s SessionPoolWaitStartInfo) func(SessionPoolWai
 	}
 	return res
 }
-func (t SessionPoolTrace) onBusyCheck(s SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo) {
-	fn := t.OnBusyCheck
-	if fn == nil {
-		return func(SessionPoolBusyCheckDoneInfo) {
-			return
-		}
-	}
-	res := fn(s)
-	if res == nil {
-		return func(SessionPoolBusyCheckDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t SessionPoolTrace) onTake(s SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo) {
+func (t SessionPoolTrace) onTake(s SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
 	fn := t.OnTake
 	if fn == nil {
-		return func(SessionPoolTakeDoneInfo) {
-			return
+		return func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+			return func(SessionPoolTakeDoneInfo) {
+				return
+			}
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(SessionPoolTakeDoneInfo) {
-			return
+		return func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+			return func(SessionPoolTakeDoneInfo) {
+				return
+			}
 		}
 	}
-	return res
-}
-func (t SessionPoolTrace) onTakeWait(s SessionPoolTakeWaitInfo) {
-	fn := t.OnTakeWait
-	if fn == nil {
-		return
+	return func(s SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+		res := res(s)
+		if res == nil {
+			return func(SessionPoolTakeDoneInfo) {
+				return
+			}
+		}
+		return res
 	}
-	fn(s)
 }
 func (t SessionPoolTrace) onPut(s SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
 	fn := t.OnPut
@@ -774,21 +714,6 @@ func (t SessionPoolTrace) onPut(s SessionPoolPutStartInfo) func(SessionPoolPutDo
 	res := fn(s)
 	if res == nil {
 		return func(SessionPoolPutDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t SessionPoolTrace) onPutBusy(s SessionPoolPutBusyStartInfo) func(SessionPoolPutBusyDoneInfo) {
-	fn := t.OnPutBusy
-	if fn == nil {
-		return func(SessionPoolPutBusyDoneInfo) {
-			return
-		}
-	}
-	res := fn(s)
-	if res == nil {
-		return func(SessionPoolPutBusyDoneInfo) {
 			return
 		}
 	}
@@ -1175,39 +1100,25 @@ func sessionPoolTraceOnWait(t SessionPoolTrace, c context.Context) func(context.
 		res(p)
 	}
 }
-func sessionPoolTraceOnBusyCheck(t SessionPoolTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, reused bool, _ error) {
-	var p SessionPoolBusyCheckStartInfo
-	p.Context = c
-	p.Session = s
-	res := t.onBusyCheck(p)
-	return func(c context.Context, s *Session, reused bool, e error) {
-		var p SessionPoolBusyCheckDoneInfo
-		p.Context = c
-		p.Session = s
-		p.Reused = reused
-		p.Error = e
-		res(p)
-	}
-}
-func sessionPoolTraceOnTake(t SessionPoolTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, took bool, _ error) {
+func sessionPoolTraceOnTake(t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session) func(_ context.Context, _ *Session, took bool, _ error) {
 	var p SessionPoolTakeStartInfo
 	p.Context = c
 	p.Session = s
 	res := t.onTake(p)
-	return func(c context.Context, s *Session, took bool, e error) {
-		var p SessionPoolTakeDoneInfo
+	return func(c context.Context, s *Session) func(context.Context, *Session, bool, error) {
+		var p SessionPoolTakeWaitInfo
 		p.Context = c
 		p.Session = s
-		p.Took = took
-		p.Error = e
-		res(p)
+		res := res(p)
+		return func(c context.Context, s *Session, took bool, e error) {
+			var p SessionPoolTakeDoneInfo
+			p.Context = c
+			p.Session = s
+			p.Took = took
+			p.Error = e
+			res(p)
+		}
 	}
-}
-func sessionPoolTraceOnTakeWait(t SessionPoolTrace, c context.Context, s *Session) {
-	var p SessionPoolTakeWaitInfo
-	p.Context = c
-	p.Session = s
-	t.onTakeWait(p)
 }
 func sessionPoolTraceOnPut(t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session, error) {
 	var p SessionPoolPutStartInfo
@@ -1216,19 +1127,6 @@ func sessionPoolTraceOnPut(t SessionPoolTrace, c context.Context, s *Session) fu
 	res := t.onPut(p)
 	return func(c context.Context, s *Session, e error) {
 		var p SessionPoolPutDoneInfo
-		p.Context = c
-		p.Session = s
-		p.Error = e
-		res(p)
-	}
-}
-func sessionPoolTraceOnPutBusy(t SessionPoolTrace, c context.Context, s *Session) func(context.Context, *Session, error) {
-	var p SessionPoolPutBusyStartInfo
-	p.Context = c
-	p.Session = s
-	res := t.onPutBusy(p)
-	return func(c context.Context, s *Session, e error) {
-		var p SessionPoolPutBusyDoneInfo
 		p.Context = c
 		p.Session = s
 		p.Error = e
