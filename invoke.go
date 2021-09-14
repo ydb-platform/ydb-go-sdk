@@ -35,12 +35,5 @@ func invoke(
 	if err != nil {
 		return err
 	}
-	if res == nil {
-		// NOTE: YDB API at this moment supports extension of its protocol by
-		// adding Result structures. That is, one may think that no result is
-		// provided by some call, but some day it may change and client
-		// implementation will lag some time – no strict behavior is possible.
-		return nil
-	}
 	return proto.Unmarshal(resp.GetResult().Value, res)
 }

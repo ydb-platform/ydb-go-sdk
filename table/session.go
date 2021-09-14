@@ -764,6 +764,7 @@ func (s *Session) StreamExecuteScanQuery(
 	client, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
 
 	clientTraceStreamExecuteScanQueryDone := clientTraceOnStreamExecuteScanQuery(ctx, s.c.trace, ctx, s, q, params)
+
 	if err != nil {
 		cancel()
 		clientTraceStreamExecuteScanQueryDone(ctx, s, q, params, nil, err)

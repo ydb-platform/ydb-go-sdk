@@ -556,6 +556,18 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	return nil
 }
 
+// RetryOperation is the interface that holds an operation for retry.
+type RetryOperation func(context.Context, *Session) (err error)
+
+// Retry provide the best effort fo retrying operation
+// Retry implements internal busy loop until one of the following conditions is met:
+// - context was cancelled or deadlined
+// - retry operation returned nil as error
+// Warning: if context without deadline or cancellation func Retry will be worked infinite
+func (p *SessionPool) Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error) {
+	return retry(ctx, p, ydb.FastBackoff, ydb.SlowBackoff, retryNoIdempotent, op)
+}
+
 func (p *SessionPool) Stats() SessionPoolStats {
 	p.mu.Lock()
 	defer p.mu.Unlock()

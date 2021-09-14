@@ -18,8 +18,6 @@ type conn struct {
 	raw  *grpc.ClientConn
 	addr connAddr
 
-	d *driver
-
 	runtime connRuntime
 }
 
@@ -32,8 +30,10 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		cancel context.CancelFunc
 		opId   string
 		issues []*Ydb_Issue.IssueMessage
+
+		d = contextDriver(ctx)
 	)
-	if t := c.d.requestTimeout; t > 0 {
+	if t := d.requestTimeout; t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
 	}
 	defer func() {
@@ -41,16 +41,16 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 			cancel()
 		}
 	}()
-	if t := c.d.operationTimeout; t > 0 {
+	if t := d.operationTimeout; t > 0 {
 		ctx = WithOperationTimeout(ctx, t)
 	}
-	if t := c.d.operationCancelAfter; t > 0 {
+	if t := d.operationCancelAfter; t > 0 {
 		ctx = WithOperationCancelAfter(ctx, t)
 	}
 
 	// Get credentials (token actually) for the request.
 	var md metadata.MD
-	md, err = c.d.meta.md(ctx)
+	md, err = d.meta.md(ctx)
 	if err != nil {
 		return
 	}
@@ -65,7 +65,7 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 
 	start := timeutil.Now()
 	c.runtime.operationStart(start)
-	driverTraceOperationDone := driverTraceOnOperation(ctx, c.d.trace, ctx, c.Address(), Method(method), params)
+	driverTraceOperationDone := driverTraceOnOperation(ctx, d.trace, ctx, c.Address(), Method(method), params)
 	defer func() {
 		driverTraceOperationDone(rawCtx, c.Address(), Method(method), params, opId, issues, err)
 		c.runtime.operationDone(
@@ -80,8 +80,8 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		err = mapGRPCError(err)
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			driverTracePessimizationDone := driverTraceOnPessimization(ctx, c.d.trace, ctx, c.Address(), err)
-			driverTracePessimizationDone(ctx, c.Address(), c.d.cluster.Pessimize(c.addr))
+			driverTracePessimizationDone := driverTraceOnPessimization(ctx, d.trace, ctx, c.Address(), err)
+			driverTracePessimizationDone(ctx, c.Address(), d.cluster.Pessimize(c.addr))
 		}
 		return
 	}
@@ -107,8 +107,12 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 
-	var cancel context.CancelFunc
-	if t := c.d.streamTimeout; t > 0 {
+	var (
+		cancel context.CancelFunc
+
+		d = contextDriver(ctx)
+	)
+	if t := d.streamTimeout; t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer func() {
 			if err != nil {
@@ -118,7 +122,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	// Get credentials (token actually) for the request.
-	md, err := c.d.meta.md(ctx)
+	md, err := d.meta.md(ctx)
 	if err != nil {
 		return
 	}
@@ -127,7 +131,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	c.runtime.streamStart(timeutil.Now())
-	driverTraceStreamDone := driverTraceOnStream(ctx, c.d.trace, ctx, c.Address(), Method(method))
+	driverTraceStreamDone := driverTraceOnStream(ctx, d.trace, ctx, c.Address(), Method(method))
 	defer func() {
 		if err != nil {
 			c.runtime.streamDone(timeutil.Now(), err)
@@ -143,7 +147,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	return &grpcClientStream{
 		ctx:    rawCtx,
 		c:      c,
-		d:      c.d,
+		d:      d,
 		s:      s,
 		cancel: cancel,
 		done:   driverTraceStreamDone,

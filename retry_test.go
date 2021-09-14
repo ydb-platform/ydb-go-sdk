@@ -1,9 +1,8 @@
-package internal
+package ydb
 
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"math/rand"
 	"testing"
 	"time"
@@ -17,12 +16,12 @@ func TestLogBackoff(t *testing.T) {
 	}
 	for _, test := range []struct {
 		name    string
-		backoff ydb.LogBackoff
+		backoff logBackoff
 		exp     []exp
 		seeds   int64
 	}{
 		{
-			backoff: ydb.LogBackoff{
+			backoff: logBackoff{
 				SlotDuration: time.Second,
 				Ceiling:      3,
 				JitterLimit:  0,
@@ -39,7 +38,7 @@ func TestLogBackoff(t *testing.T) {
 			seeds: 1000,
 		},
 		{
-			backoff: ydb.LogBackoff{
+			backoff: logBackoff{
 				SlotDuration: time.Second,
 				Ceiling:      3,
 				JitterLimit:  0.5,
@@ -56,7 +55,7 @@ func TestLogBackoff(t *testing.T) {
 			seeds: 1000,
 		},
 		{
-			backoff: ydb.LogBackoff{
+			backoff: logBackoff{
 				SlotDuration: time.Second,
 				Ceiling:      3,
 				JitterLimit:  1,
@@ -81,7 +80,7 @@ func TestLogBackoff(t *testing.T) {
 				rand.Seed(seed)
 
 				for n, exp := range test.exp {
-					act := test.backoff.Delay(n)
+					act := test.backoff.delay(n)
 					if exp := exp.eq; exp != 0 {
 						if exp != act {
 							t.Fatalf(
@@ -111,322 +110,322 @@ func TestLogBackoff(t *testing.T) {
 
 func TestRetryModes(t *testing.T) {
 	type Case struct {
-		err           error                // given error
-		retryType     RetryType   // type of retry: no retry, retry always idempotent, retry conditionally with user allow retry for unidempotent operations
-		backoff       BackoffType // type of Backoff: no Backoff (=== no retry), fast Backoff, slow Backoff
-		deleteSession bool                 // close session and delete from pool
+		err           error       // given error
+		retryType     retryType   // type of retry: no retry, retry always idempotent, retry conditionally with user allow retry for unidempotent operations
+		backoff       backoffType // type of Backoff: no Backoff (=== no retry), fast Backoff, slow Backoff
+		deleteSession bool        // close session and delete from pool
 	}
 	errs := []Case{
 		{
 			err:           fmt.Errorf("unknown error"), // retryer given unknown error - we will not retry and will close session
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
 			err:           context.DeadlineExceeded, // golang context deadline exceeded
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
 			err:           context.Canceled, // golang context cancelled
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorUnknownCode,
+			err: &TransportError{
+				Reason: TransportErrorUnknownCode,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorCanceled,
+			err: &TransportError{
+				Reason: TransportErrorCanceled,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorUnknown,
+			err: &TransportError{
+				Reason: TransportErrorUnknown,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorInvalidArgument,
+			err: &TransportError{
+				Reason: TransportErrorInvalidArgument,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorDeadlineExceeded,
+			err: &TransportError{
+				Reason: TransportErrorDeadlineExceeded,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorNotFound,
+			err: &TransportError{
+				Reason: TransportErrorNotFound,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorAlreadyExists,
+			err: &TransportError{
+				Reason: TransportErrorAlreadyExists,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorPermissionDenied,
+			err: &TransportError{
+				Reason: TransportErrorPermissionDenied,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorResourceExhausted,
+			err: &TransportError{
+				Reason: TransportErrorResourceExhausted,
 			},
-			retryType:     RetryTypeAny,
-			backoff:       BackoffTypeSlowBackoff,
+			retryType:     retryTypeAny,
+			backoff:       backoffTypeSlowBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorFailedPrecondition,
+			err: &TransportError{
+				Reason: TransportErrorFailedPrecondition,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorAborted,
+			err: &TransportError{
+				Reason: TransportErrorAborted,
 			},
-			retryType:     RetryTypeAny,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeAny,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorOutOfRange,
+			err: &TransportError{
+				Reason: TransportErrorOutOfRange,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorUnimplemented,
+			err: &TransportError{
+				Reason: TransportErrorUnimplemented,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorInternal,
+			err: &TransportError{
+				Reason: TransportErrorInternal,
 			},
-			retryType:     RetryTypeIdempotent,
-			backoff:       BackoffTypeFastBackoff,
+			retryType:     retryTypeIdempotent,
+			backoff:       backoffTypeFastBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorUnavailable,
+			err: &TransportError{
+				Reason: TransportErrorUnavailable,
 			},
-			retryType:     RetryTypeIdempotent,
-			backoff:       BackoffTypeFastBackoff,
+			retryType:     retryTypeIdempotent,
+			backoff:       backoffTypeFastBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorDataLoss,
+			err: &TransportError{
+				Reason: TransportErrorDataLoss,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.TransportError{
-				Reason: ydb.TransportErrorUnauthenticated,
+			err: &TransportError{
+				Reason: TransportErrorUnauthenticated,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusUnknownStatus,
+			err: &OpError{
+				Reason: StatusUnknownStatus,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusBadRequest,
+			err: &OpError{
+				Reason: StatusBadRequest,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusUnauthorized,
+			err: &OpError{
+				Reason: StatusUnauthorized,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusInternalError,
+			err: &OpError{
+				Reason: StatusInternalError,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusAborted,
+			err: &OpError{
+				Reason: StatusAborted,
 			},
-			retryType:     RetryTypeAny,
-			backoff:       BackoffTypeFastBackoff,
+			retryType:     retryTypeAny,
+			backoff:       backoffTypeFastBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusUnavailable,
+			err: &OpError{
+				Reason: StatusUnavailable,
 			},
-			retryType:     RetryTypeAny,
-			backoff:       BackoffTypeFastBackoff,
+			retryType:     retryTypeAny,
+			backoff:       backoffTypeFastBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusOverloaded,
+			err: &OpError{
+				Reason: StatusOverloaded,
 			},
-			retryType:     RetryTypeAny,
-			backoff:       BackoffTypeSlowBackoff,
+			retryType:     retryTypeAny,
+			backoff:       backoffTypeSlowBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusSchemeError,
+			err: &OpError{
+				Reason: StatusSchemeError,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusGenericError,
+			err: &OpError{
+				Reason: StatusGenericError,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusTimeout,
+			err: &OpError{
+				Reason: StatusTimeout,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusBadSession,
+			err: &OpError{
+				Reason: StatusBadSession,
 			},
-			retryType:     RetryTypeAny,
-			backoff:       BackoffTypeFastBackoff,
+			retryType:     retryTypeAny,
+			backoff:       backoffTypeFastBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusPreconditionFailed,
+			err: &OpError{
+				Reason: StatusPreconditionFailed,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusAlreadyExists,
+			err: &OpError{
+				Reason: StatusAlreadyExists,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusNotFound,
+			err: &OpError{
+				Reason: StatusNotFound,
 			},
-			retryType:     RetryTypeAny,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeAny,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusSessionExpired,
+			err: &OpError{
+				Reason: StatusSessionExpired,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusCancelled,
+			err: &OpError{
+				Reason: StatusCancelled,
 			},
-			retryType:     RetryTypeIdempotent,
-			backoff:       BackoffTypeFastBackoff,
+			retryType:     retryTypeIdempotent,
+			backoff:       backoffTypeFastBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusUndetermined,
+			err: &OpError{
+				Reason: StatusUndetermined,
 			},
-			retryType:     RetryTypeIdempotent,
-			backoff:       BackoffTypeFastBackoff,
+			retryType:     retryTypeIdempotent,
+			backoff:       backoffTypeFastBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusUnsupported,
+			err: &OpError{
+				Reason: StatusUnsupported,
 			},
-			retryType:     RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
+			retryType:     retryTypeNoRetry,
+			backoff:       backoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &ydb.OpError{
-				Reason: ydb.StatusSessionBusy,
+			err: &OpError{
+				Reason: StatusSessionBusy,
 			},
-			retryType:     RetryTypeAny,
-			backoff:       BackoffTypeFastBackoff,
+			retryType:     retryTypeAny,
+			backoff:       backoffTypeFastBackoff,
 			deleteSession: true,
 		},
 	}
 	for _, test := range errs {
 		t.Run(test.err.Error(), func(t *testing.T) {
-			m := ydb.Check(test.err)
+			m := Check(test.err)
 			if m.retry != test.retryType {
 				t.Errorf("unexpected retryType status: %v, want: %v", m.retry, test.retryType)
 			}

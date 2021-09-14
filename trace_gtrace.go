@@ -4,6 +4,7 @@ package ydb
 
 import (
 	"context"
+	"time"
 )
 
 // Compose returns a new DriverTrace which has functional fields composed
@@ -644,6 +645,95 @@ func (t DriverTrace) onStreamRecv(ctx context.Context, s StreamRecvStartInfo) fu
 	}
 	return res
 }
+
+// Compose returns a new RetryTrace which has functional fields composed
+// both from t and x.
+func (t RetryTrace) Compose(x RetryTrace) (ret RetryTrace) {
+	switch {
+	case t.OnRetry == nil:
+		ret.OnRetry = x.OnRetry
+	case x.OnRetry == nil:
+		ret.OnRetry = t.OnRetry
+	default:
+		h1 := t.OnRetry
+		h2 := x.OnRetry
+		ret.OnRetry = func(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
+			r1 := h1(r)
+			r2 := h2(r)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(r RetryLoopDoneInfo) {
+					r1(r)
+					r2(r)
+				}
+			}
+		}
+	}
+	return ret
+}
+
+type retryTraceContextKey struct{}
+
+// WithRetryTrace returns context which has associated RetryTrace with it.
+func WithRetryTrace(ctx context.Context, t RetryTrace) context.Context {
+	return context.WithValue(ctx,
+		retryTraceContextKey{},
+		ContextRetryTrace(ctx).Compose(t),
+	)
+}
+
+// ContextRetryTrace returns RetryTrace associated with ctx.
+// If there is no RetryTrace associated with ctx then zero value
+// of RetryTrace is returned.
+func ContextRetryTrace(ctx context.Context) RetryTrace {
+	t, _ := ctx.Value(retryTraceContextKey{}).(RetryTrace)
+	return t
+}
+
+func (t RetryTrace) onRetry(ctx context.Context, r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
+	c := ContextRetryTrace(ctx)
+	var fn func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
+	switch {
+	case t.OnRetry == nil:
+		fn = c.OnRetry
+	case c.OnRetry == nil:
+		fn = t.OnRetry
+	default:
+		h1 := t.OnRetry
+		h2 := c.OnRetry
+		fn = func(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
+			r1 := h1(r)
+			r2 := h2(r)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(r RetryLoopDoneInfo) {
+					r1(r)
+					r2(r)
+				}
+			}
+		}
+	}
+	if fn == nil {
+		return func(RetryLoopDoneInfo) {
+			return
+		}
+	}
+	res := fn(r)
+	if res == nil {
+		return func(RetryLoopDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func driverTraceOnDial(ctx context.Context, t DriverTrace, c context.Context, address string) func(_ context.Context, address string, _ error) {
 	var p DialStartInfo
 	p.Context = c
@@ -773,6 +863,18 @@ func driverTraceOnStreamRecv(ctx context.Context, t DriverTrace, c context.Conte
 		p.Method = m
 		p.Issues = issues
 		p.Error = e
+		res(p)
+	}
+}
+func retryTraceOnRetry(ctx context.Context, t RetryTrace, c context.Context) func(_ context.Context, latency time.Duration, attempts int) {
+	var p RetryLoopStartInfo
+	p.Context = c
+	res := t.onRetry(ctx, p)
+	return func(c context.Context, latency time.Duration, attempts int) {
+		var p RetryLoopDoneInfo
+		p.Context = c
+		p.Latency = latency
+		p.Attempts = attempts
 		res(p)
 	}
 }

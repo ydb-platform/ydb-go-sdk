@@ -3,9 +3,9 @@ package table
 import (
 	"context"
 	"errors"
-	"time"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"time"
 )
 
 // SessionProvider is the interface that holds session lifecycle logic.
@@ -22,11 +22,19 @@ type SessionProvider interface {
 	// instead of plain session.Close.
 	// CloseSession must be fast. If necessary, can be async.
 	CloseSession(ctx context.Context, s *Session) error
+
+	// Retry provide the best effort fo retrying operation
+	// Retry implements internal busy loop until one of the following conditions is met:
+	// - context was cancelled or deadlined
+	// - retry operation returned nil as error
+	// If context without deadline used session pool RetryTimeout
+	Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error)
 }
 
 type SessionProviderFunc struct {
-	OnGet func(context.Context) (*Session, error)
-	OnPut func(context.Context, *Session) error
+	OnGet   func(context.Context) (*Session, error)
+	OnPut   func(context.Context, *Session) error
+	OnRetry func(context.Context, RetryOperation) error
 }
 
 func (f SessionProviderFunc) Get(ctx context.Context) (*Session, error) {
@@ -38,161 +46,26 @@ func (f SessionProviderFunc) Get(ctx context.Context) (*Session, error) {
 
 func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
 	if f.OnPut == nil {
-		return errSessionOverflow
+		return testutil.ErrNotImplemented
 	}
 	return f.OnPut(ctx, s)
+}
+
+func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op RetryOperation) error {
+	if f.OnRetry == nil {
+		return retry(ctx, f, nil, nil, false, op)
+	}
+	return f.OnRetry(ctx, op)
 }
 
 func (f SessionProviderFunc) CloseSession(ctx context.Context, s *Session) error {
 	return s.Close(ctx)
 }
 
-// SingleSession returns SessionProvider that uses only given session durting
+// SingleSession returns SessionProvider that uses only given session during
 // retries.
-func SingleSession(s *Session) SessionProvider {
-	return &singleSession{s: s}
-}
-
-// Operation is the interface that holds an operation for retry.
-type Operation interface {
-	// Do prepares actions need to be done for this operation.
-	//
-	// Implementations MUST NOT wrap ydb/table errors in order to leave the
-	// ability to distinguish error type and make a decision about the next
-	// retry attempt.
-	Do(context.Context, *Session) error
-}
-
-// OperationFunc is an adapter to allow the use of ordinary functions as
-// Operation.
-type OperationFunc func(context.Context, *Session) error
-
-// Do implements Operation interface.
-func (f OperationFunc) Do(ctx context.Context, s *Session) error {
-	return f(ctx, s)
-}
-
-// Retryer contains logic of retrying operations failed with retriable errors.
-type Retryer struct {
-	// SessionProvider is an interface capable for management of ydb sessions.
-	// SessionProvider must not be nil.
-	SessionProvider SessionProvider
-
-	// MaxRetries is a number of maximum attempts to retry a failed operation.
-	// If MaxRetries is zero then no attempts will be made.
-	MaxRetries int
-
-	// RetryChecker contains options of mapping errors to retry mode.
-	//
-	// Note that if RetryChecker's RetryNotFound field is set to true, creation
-	// of prepared statements must always be included in the Operation logic.
-	// Otherwise when prepared statement become removed by any reason from the
-	// server, Retryer will just repeat MaxRetries times reception of statement
-	// not found error.
-	RetryChecker ydb.RetryChecker
-
-	// FastBackoff is a selected backoff policy.
-	// If backoff is nil, then the ydb.DefaultFastBackoff is used.
-	FastBackoff ydb.Backoff
-
-	// SlowBackoff is a selected backoff policy.
-	// If backoff is nil, then the ydb.DefaultSlowBackoff is used.
-	SlowBackoff ydb.Backoff
-
-	// Trace provide tracing of retry logic
-	Trace RetryTrace
-}
-
-// Retry calls Retryer.Do() configured with default values.
-func Retry(ctx context.Context, s SessionProvider, op Operation) error {
-	return (Retryer{
-		SessionProvider: s,
-		MaxRetries:      ydb.DefaultMaxRetries,
-		RetryChecker:    ydb.DefaultRetryChecker,
-		FastBackoff:     ydb.DefaultFastBackoff,
-		SlowBackoff:     ydb.DefaultSlowBackoff,
-	}).Do(ctx, op)
-}
-
-func (r Retryer) backoff(ctx context.Context, m ydb.RetryMode, i int) error {
-	var b ydb.Backoff
-	switch m.BackoffType() {
-	case ydb.BackoffTypeNoBackoff:
-		return nil
-	case ydb.BackoffTypeFastBackoff:
-		if r.FastBackoff != nil {
-			b = r.FastBackoff
-		} else {
-			b = ydb.DefaultFastBackoff
-		}
-	case ydb.BackoffTypeSlowBackoff:
-		if r.SlowBackoff != nil {
-			b = r.SlowBackoff
-		} else {
-			b = ydb.DefaultSlowBackoff
-		}
-	}
-	return ydb.WaitBackoff(ctx, b, i)
-}
-
-// Do calls op.Do until it return nil or not retriable error.
-func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
-	var (
-		s                  *Session
-		m                  ydb.RetryMode
-		i                  int
-		start              = time.Now()
-		retryNoIdempotent  = ydb.ContextRetryNoIdempotent(ctx)
-		retryTraceLoopDone = retryTraceOnLoop(ctx, r.Trace, ctx)
-	)
-	defer func() {
-		retryTraceLoopDone(ctx, time.Since(start), i)
-		if s != nil {
-			_ = r.SessionProvider.Put(ctx, s)
-		}
-	}()
-	for i = 0; i <= r.MaxRetries; i++ {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-
-		default:
-			if s == nil {
-				var e error
-				s, e = r.SessionProvider.Get(ctx)
-				if s == nil && e == nil {
-					panic("only one of pair <session, error> must be not nil")
-				}
-				if e != nil {
-					if err == nil {
-						// It is initial attempt to get a Session.
-						// Otherwise s could be nil only when status bad session
-						// received – that is, we must return bad session error to
-						// make it possible to lay on for the client.
-						err = e
-					}
-					return
-				}
-			}
-
-			if err = op.Do(ctx, s); err == nil {
-				return nil
-			}
-
-			m = r.RetryChecker.Check(err)
-			if m.MustDeleteSession() {
-				_ = r.SessionProvider.CloseSession(ctx, s)
-				s = nil
-			}
-			if !m.MustRetry(retryNoIdempotent) {
-				return err
-			}
-			if e := r.backoff(ctx, m, i); e != nil {
-				return err
-			}
-		}
-	}
-	return err
+func SingleSession(s *Session, b ydb.Backoff) SessionProvider {
+	return &singleSession{s: s, b: b}
 }
 
 var (
@@ -203,7 +76,12 @@ var (
 
 type singleSession struct {
 	s     *Session
+	b     ydb.Backoff
 	empty bool
+}
+
+func (s *singleSession) Retry(ctx context.Context, _ bool, op RetryOperation) (err error) {
+	return retry(ctx, s, s.b, s.b, false, op)
 }
 
 func (s *singleSession) Get(context.Context) (*Session, error) {
@@ -245,4 +123,76 @@ func (s *singleSession) CloseSession(ctx context.Context, x *Session) error {
 	}
 	s.empty = true
 	return x.Close(ctx)
+}
+
+func retry(
+	ctx context.Context,
+	p SessionProvider,
+	fastBackoff ydb.Backoff,
+	slowBackoff ydb.Backoff,
+	retryNoIdempotent bool,
+	op RetryOperation,
+) (err error) {
+	var (
+		s        *Session
+		i        int
+		attempts int
+
+		code   = int32(0)
+		start  = time.Now()
+		onDone = ydb.OnRetry(ctx)
+	)
+	defer func() {
+		onDone(ctx, time.Since(start), attempts)
+		if s != nil {
+			_ = p.Put(ctx, s)
+		}
+	}()
+	for {
+		i++
+		attempts++
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		default:
+			if s == nil {
+				var e error
+				s, e = p.Get(ctx)
+				if s == nil && e == nil {
+					panic("only one of pair <session, error> must be not nil")
+				}
+				if e != nil {
+					if err == nil {
+						// It is initial attempt to get a Session.
+						// Otherwise s could be nil only when status bad session
+						// received – that is, we must return bad session error to
+						// make it possible to lay on for the client.
+						err = e
+					}
+					return
+				}
+			}
+
+			if err = op(ctx, s); err == nil {
+				return
+			}
+			m := ydb.Check(err)
+			if m.StatusCode() != code {
+				i = 0
+			}
+			if m.MustDeleteSession() {
+				_ = p.CloseSession(ctx, s)
+				s = nil
+			}
+			if !m.MustRetry(retryNoIdempotent) {
+				return err
+			}
+			if e := ydb.Wait(ctx, fastBackoff, slowBackoff, m, i); e != nil {
+				return err
+			}
+			code = m.StatusCode()
+		}
+	}
+	return err
 }

@@ -442,7 +442,7 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 	if !timer.Stop() {
 		panic("ydb: can't stop timer")
 	}
-	backoff := LogBackoff{
+	backoff := logBackoff{
 		SlotDuration: 5 * time.Millisecond,
 		Ceiling:      10, // ~1s (2^10ms)
 		JitterLimit:  1,  // Without randomization.
@@ -464,7 +464,7 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 				<-timer.C()
 			}
 			i = 0
-			timer.Reset(backoff.Delay(i))
+			timer.Reset(backoff.delay(i))
 
 		case <-timer.C():
 			queue = fetchQueue(queue[:0])
@@ -531,7 +531,7 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 			}
 			cancel()
 			if active {
-				timer.Reset(backoff.Delay(i))
+				timer.Reset(backoff.delay(i))
 			}
 
 		case <-c.trackerCtx.Done():
