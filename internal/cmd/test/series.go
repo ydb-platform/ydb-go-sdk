@@ -69,8 +69,10 @@ FROM AS_TABLE($episodesData);
 
 func readTable(ctx context.Context, sp *table.SessionPool, path string) (err error) {
 	var res *table.Result
-	err = table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
+	err = sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			res, err = s.StreamReadTable(ctx, path,
 				table.ReadOrdered(),
 				table.ReadColumn("series_id"),
@@ -78,7 +80,7 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 				table.ReadColumn("release_date"),
 			)
 			return
-		}),
+		},
 	)
 	if err != nil {
 		return err
@@ -128,11 +130,13 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 
 func describeTableOptions(ctx context.Context, sp *table.SessionPool) (err error) {
 	var desc table.TableOptionsDescription
-	err = table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
+	err = sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
 			return
-		}),
+		},
 	)
 	if err != nil {
 		return err
@@ -190,8 +194,10 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		table.CommitTx(),
 	)
 	var res *table.Result
-	err = table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
+	err = sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$seriesID", ydb.Uint64Value(1)),
@@ -202,7 +208,7 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 				table.WithCollectStatsModeBasic(),
 			)
 			return
-		}),
+		},
 	)
 	if err != nil {
 		return err
@@ -249,8 +255,10 @@ func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) 
 	)
 
 	var res *table.Result
-	err = table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
+	err = sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			res, err = s.StreamExecuteScanQuery(ctx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$series",
@@ -262,7 +270,7 @@ func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) 
 				),
 			)
 			return
-		}),
+		},
 	)
 	if err != nil {
 		return err
@@ -297,27 +305,31 @@ func fillTablesWithData(ctx context.Context, sp *table.SessionPool, prefix strin
 		),
 		table.CommitTx(),
 	)
-	return table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) (err error) {
+	return sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			stmt, err := s.Prepare(ctx, render(fill, templateConfig{
 				TablePathPrefix: prefix,
 			}))
 			if err != nil {
-				return err
+				return
 			}
 			_, _, err = stmt.Execute(ctx, writeTx, table.NewQueryParameters(
 				table.ValueParam("$seriesData", getSeriesData()),
 				table.ValueParam("$seasonsData", getSeasonsData()),
 				table.ValueParam("$episodesData", getEpisodesData()),
 			))
-			return err
-		}),
+			return
+		},
 	)
 }
 
 func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (err error) {
-	err = table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
+	err = sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
 				table.WithColumn("series_id", ydb.Optional(ydb.TypeUint64)),
 				table.WithColumn("title", ydb.Optional(ydb.TypeUTF8)),
@@ -326,14 +338,16 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 				table.WithColumn("comment", ydb.Optional(ydb.TypeUTF8)),
 				table.WithPrimaryKeyColumn("series_id"),
 			)
-		}),
+		},
 	)
 	if err != nil {
 		return err
 	}
 
-	err = table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
+	err = sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "seasons"),
 				table.WithColumn("series_id", ydb.Optional(ydb.TypeUint64)),
 				table.WithColumn("season_id", ydb.Optional(ydb.TypeUint64)),
@@ -342,14 +356,16 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 				table.WithColumn("last_aired", ydb.Optional(ydb.TypeUint64)),
 				table.WithPrimaryKeyColumn("series_id", "season_id"),
 			)
-		}),
+		},
 	)
 	if err != nil {
 		return err
 	}
 
-	err = table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
+	return sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "episodes"),
 				table.WithColumn("series_id", ydb.Optional(ydb.TypeUint64)),
 				table.WithColumn("season_id", ydb.Optional(ydb.TypeUint64)),
@@ -358,30 +374,26 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 				table.WithColumn("air_date", ydb.Optional(ydb.TypeUint64)),
 				table.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			)
-		}),
+		},
 	)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func describeTable(ctx context.Context, sp *table.SessionPool, path string) (err error) {
-	err = table.Retry(ctx, sp,
-		table.OperationFunc(func(ctx context.Context, s *table.Session) error {
+	return sp.Retry(
+		ctx,
+		false,
+		func(ctx context.Context, s *table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
 			if err != nil {
-				return err
+				return
 			}
 			log.Printf("\n> describe table: %s", path)
 			for _, c := range desc.Columns {
 				log.Printf("column, name: %s, %s", c.Type, c.Name)
 			}
-			return nil
-		}),
+			return
+		},
 	)
-	return
 }
 
 func render(t *template.Template, data interface{}) string {

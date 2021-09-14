@@ -5,6 +5,7 @@ package ydb
 import (
 	"context"
 	"strings"
+	"time"
 )
 
 type (
@@ -27,6 +28,20 @@ type (
 		OnOperation func(OperationStartInfo) func(OperationDoneInfo)
 
 		OnStream func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
+	}
+	//gtrace:gen
+	//gtrace:set shortcut
+	//gtrace:set context
+	RetryTrace struct {
+		OnRetry func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
+	}
+	RetryLoopStartInfo struct {
+		Context context.Context
+	}
+	RetryLoopDoneInfo struct {
+		Context  context.Context
+		Latency  time.Duration
+		Attempts int
 	}
 )
 
@@ -137,3 +152,21 @@ type (
 		Error   error
 	}
 )
+
+func OnRetry(ctx context.Context) func(ctx context.Context, latency time.Duration, attempts int) {
+	onStart := ContextRetryTrace(ctx).OnRetry
+	var onDone func(RetryLoopDoneInfo)
+	if onStart != nil {
+		onDone = onStart(RetryLoopStartInfo{Context: ctx})
+	}
+	if onDone == nil {
+		onDone = func(info RetryLoopDoneInfo) {}
+	}
+	return func(ctx context.Context, latency time.Duration, attempts int) {
+		onDone(RetryLoopDoneInfo{
+			Context:  ctx,
+			Latency:  latency,
+			Attempts: attempts,
+		})
+	}
+}
