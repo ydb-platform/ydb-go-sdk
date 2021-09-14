@@ -14,7 +14,7 @@ func (d *driver) Invoke(ctx context.Context, method string, request interface{},
 	}
 
 	return c.Invoke(
-		withDriver(ctx, d),
+		ctx,
 		method,
 		request,
 		response,
@@ -28,8 +28,8 @@ func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method st
 		return
 	}
 
-	return c.raw.NewStream(
-		withDriver(ctx, d),
+	return c.NewStream(
+		ctx,
 		desc,
 		method,
 		append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...,
@@ -67,27 +67,18 @@ func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
 	}
 
 	c = &conn{
-		raw:     c.raw,
-		addr:    c.addr,
-		driver:  d,
-		runtime: c.runtime,
+		mtx:      c.mtx,
+		grpcConn: c.grpcConn,
+		dial:     c.dial,
+		addr:     c.addr,
+		driver:   d,
+		runtime:  c.runtime,
+		lifetime: c.lifetime,
+		timer:    c.timer,
+		done:     c.done,
 	}
 	if apply, ok := ContextClientConnApplier(rawCtx); ok {
 		apply(c)
 	}
 	return c, err
-}
-
-type driverContextKey struct{}
-
-func withDriver(ctx context.Context, d *driver) context.Context {
-	return context.WithValue(ctx,
-		driverContextKey{},
-		d,
-	)
-}
-
-func contextDriver(ctx context.Context) *driver {
-	t, _ := ctx.Value(driverContextKey{}).(*driver)
-	return t
 }

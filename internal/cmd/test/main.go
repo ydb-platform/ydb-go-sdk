@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"math/rand"
 	"os"
 	"path"
 	"sync"
@@ -33,7 +34,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	connectCtx, cancel := context.WithTimeout(ctx, time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	db, err := connect.New(
@@ -93,6 +94,9 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
+			time.Sleep(time.Duration(rand.Float64() * 5 * float64(time.Minute)))
+
 			err = selectSimple(ctx, db.Table().Pool(), connectParams.Database())
 			if err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)

@@ -206,36 +206,24 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 	return driver, nil
 }
 
-func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn, error) {
-	rawctx := ctx
+func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*grpc.ClientConn, error) {
+	rawСtx := ctx
 	if d.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, d.timeout)
 		defer cancel()
 	}
-	addr := connAddr{
-		addr: host,
-		port: port,
-	}
-	s := addr.String()
+	s := connAddr{addr: host, port: port}.String()
 	dialDone := driverTraceOnDial(d.config.Trace, ctx, s)
 
 	cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
 
-	dialDone(rawctx, s, err)
+	dialDone(rawСtx, s, err)
 	if err != nil {
 		return nil, err
 	}
 
-	return newConn(cc, addr), nil
-}
-
-func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
-	host, port, err := d.splitHostPort(addr)
-	if err != nil {
-		return nil, err
-	}
-	return d.dialHostPort(ctx, host, port)
+	return cc, nil
 }
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
