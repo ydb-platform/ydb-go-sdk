@@ -1,9 +1,10 @@
-package ydb
+package internal
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"testing"
 )
 
@@ -15,7 +16,7 @@ func TestIsTransportError(t *testing.T) {
 		fmt.Errorf("wrapped: %w", &TransportError{Reason: code}),
 	} {
 		t.Run("", func(t *testing.T) {
-			if !IsTransportError(err, code) {
+			if !ydb.IsTransportError(err, code) {
 				t.Errorf("expected %v to be TransportError with code=%v", err, code)
 			}
 		})
@@ -31,7 +32,7 @@ func TestIsNotTransportError(t *testing.T) {
 		&OpError{Reason: StatusBadRequest},
 	} {
 		t.Run("", func(t *testing.T) {
-			if IsTransportError(err, code) {
+			if ydb.IsTransportError(err, code) {
 				t.Errorf("expected %v not to be TransportError with code=%v", err, code)
 			}
 		})
@@ -55,7 +56,7 @@ func TestIsOpError(t *testing.T) {
 		fmt.Errorf("wrapped: %w", &OpError{Reason: code}),
 	} {
 		t.Run("", func(t *testing.T) {
-			if !IsOpError(err, code) {
+			if !ydb.IsOpError(err, code) {
 				t.Errorf("expected %v to be OpError with code=%v", err, code)
 			}
 		})
@@ -70,7 +71,7 @@ func TestIsNotOpError(t *testing.T) {
 		&TransportError{Reason: TransportErrorAborted},
 	} {
 		t.Run("", func(t *testing.T) {
-			if IsOpError(err, code) {
+			if ydb.IsOpError(err, code) {
 				t.Errorf("expected %v not to be OpError with code=%v", err, code)
 			}
 		})

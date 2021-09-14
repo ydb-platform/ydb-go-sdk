@@ -1,4 +1,4 @@
-package ydb
+package internal
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	grpccodes "google.golang.org/grpc/codes"
+	grpc "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
@@ -45,6 +45,14 @@ type TransportError struct {
 	err     error
 }
 
+func NewTransportError(reason grpc.Code, message string, err error) *TransportError {
+	return &TransportError{
+		Reason:  TransportErrorCode(reason),
+		message: message,
+		err:     err,
+	}
+}
+
 func (t *TransportError) Error() string {
 	s := "ydb: transport error: " + t.Reason.String()
 	if t.message != "" {
@@ -62,6 +70,13 @@ type OpError struct {
 	Reason StatusCode
 
 	issues []*Ydb_Issue.IssueMessage
+}
+
+func NewOpError(reason Ydb.StatusIds_StatusCode, issues []*Ydb_Issue.IssueMessage) *OpError {
+	return &OpError{
+		Reason: StatusCode(reason),
+		issues: issues,
+	}
 }
 
 func (e *OpError) Issues() IssueIterator {
@@ -119,7 +134,7 @@ func (e StatusCode) String() string {
 	return Ydb.StatusIds_StatusCode_name[int32(e)]
 }
 
-func (e StatusCode) retryType() RetryType {
+func (e StatusCode) RetryType() RetryType {
 	switch e {
 	case
 		StatusAborted,
@@ -138,7 +153,7 @@ func (e StatusCode) retryType() RetryType {
 	}
 }
 
-func (e StatusCode) backoffType() BackoffType {
+func (e StatusCode) BackoffType() BackoffType {
 	switch e {
 	case
 		StatusOverloaded:
@@ -156,7 +171,7 @@ func (e StatusCode) backoffType() BackoffType {
 	}
 }
 
-func (e StatusCode) mustDeleteSession() bool {
+func (e StatusCode) MustDeleteSession() bool {
 	switch e {
 	case
 		StatusBadSession,
@@ -191,56 +206,13 @@ const (
 	StatusSessionBusy        = StatusCode(Ydb.StatusIds_SESSION_BUSY)
 )
 
-func statusCode(s Ydb.StatusIds_StatusCode) StatusCode {
-	switch s {
-	case Ydb.StatusIds_BAD_REQUEST:
-		return StatusBadRequest
-	case Ydb.StatusIds_UNAUTHORIZED:
-		return StatusUnauthorized
-	case Ydb.StatusIds_INTERNAL_ERROR:
-		return StatusInternalError
-	case Ydb.StatusIds_ABORTED:
-		return StatusAborted
-	case Ydb.StatusIds_UNAVAILABLE:
-		return StatusUnavailable
-	case Ydb.StatusIds_OVERLOADED:
-		return StatusOverloaded
-	case Ydb.StatusIds_SCHEME_ERROR:
-		return StatusSchemeError
-	case Ydb.StatusIds_GENERIC_ERROR:
-		return StatusGenericError
-	case Ydb.StatusIds_TIMEOUT:
-		return StatusTimeout
-	case Ydb.StatusIds_BAD_SESSION:
-		return StatusBadSession
-	case Ydb.StatusIds_PRECONDITION_FAILED:
-		return StatusPreconditionFailed
-	case Ydb.StatusIds_ALREADY_EXISTS:
-		return StatusAlreadyExists
-	case Ydb.StatusIds_NOT_FOUND:
-		return StatusNotFound
-	case Ydb.StatusIds_SESSION_EXPIRED:
-		return StatusSessionExpired
-	case Ydb.StatusIds_CANCELLED:
-		return StatusCancelled
-	case Ydb.StatusIds_UNDETERMINED:
-		return StatusUndetermined
-	case Ydb.StatusIds_UNSUPPORTED:
-		return StatusUnsupported
-	case Ydb.StatusIds_SESSION_BUSY:
-		return StatusSessionBusy
-	default:
-		return StatusUnknownStatus
-	}
-}
-
 type TransportErrorCode int32
 
 func (t TransportErrorCode) String() string {
 	return transportErrorString(t)
 }
 
-func (t TransportErrorCode) retryType() RetryType {
+func (t TransportErrorCode) RetryType() RetryType {
 	switch t {
 	case
 		TransportErrorResourceExhausted,
@@ -255,7 +227,7 @@ func (t TransportErrorCode) retryType() RetryType {
 	}
 }
 
-func (t TransportErrorCode) backoffType() BackoffType {
+func (t TransportErrorCode) BackoffType() BackoffType {
 	switch t {
 	case
 		TransportErrorInternal,
@@ -269,7 +241,7 @@ func (t TransportErrorCode) backoffType() BackoffType {
 	}
 }
 
-func (t TransportErrorCode) mustDeleteSession() bool {
+func (t TransportErrorCode) MustDeleteSession() bool {
 	switch t {
 	case
 		TransportErrorCanceled,
@@ -302,25 +274,25 @@ const (
 )
 
 var grpcCodesToTransportError = [...]TransportErrorCode{
-	grpccodes.Canceled:           TransportErrorCanceled,
-	grpccodes.Unknown:            TransportErrorUnknown,
-	grpccodes.InvalidArgument:    TransportErrorInvalidArgument,
-	grpccodes.DeadlineExceeded:   TransportErrorDeadlineExceeded,
-	grpccodes.NotFound:           TransportErrorNotFound,
-	grpccodes.AlreadyExists:      TransportErrorAlreadyExists,
-	grpccodes.PermissionDenied:   TransportErrorPermissionDenied,
-	grpccodes.ResourceExhausted:  TransportErrorResourceExhausted,
-	grpccodes.FailedPrecondition: TransportErrorFailedPrecondition,
-	grpccodes.Aborted:            TransportErrorAborted,
-	grpccodes.OutOfRange:         TransportErrorOutOfRange,
-	grpccodes.Unimplemented:      TransportErrorUnimplemented,
-	grpccodes.Internal:           TransportErrorInternal,
-	grpccodes.Unavailable:        TransportErrorUnavailable,
-	grpccodes.DataLoss:           TransportErrorDataLoss,
-	grpccodes.Unauthenticated:    TransportErrorUnauthenticated,
+	grpc.Canceled:           TransportErrorCanceled,
+	grpc.Unknown:            TransportErrorUnknown,
+	grpc.InvalidArgument:    TransportErrorInvalidArgument,
+	grpc.DeadlineExceeded:   TransportErrorDeadlineExceeded,
+	grpc.NotFound:           TransportErrorNotFound,
+	grpc.AlreadyExists:      TransportErrorAlreadyExists,
+	grpc.PermissionDenied:   TransportErrorPermissionDenied,
+	grpc.ResourceExhausted:  TransportErrorResourceExhausted,
+	grpc.FailedPrecondition: TransportErrorFailedPrecondition,
+	grpc.Aborted:            TransportErrorAborted,
+	grpc.OutOfRange:         TransportErrorOutOfRange,
+	grpc.Unimplemented:      TransportErrorUnimplemented,
+	grpc.Internal:           TransportErrorInternal,
+	grpc.Unavailable:        TransportErrorUnavailable,
+	grpc.DataLoss:           TransportErrorDataLoss,
+	grpc.Unauthenticated:    TransportErrorUnauthenticated,
 }
 
-func transportErrorCode(c grpccodes.Code) TransportErrorCode {
+func transportErrorCode(c grpc.Code) TransportErrorCode {
 	if int(c) < len(grpcCodesToTransportError) {
 		return grpcCodesToTransportError[c]
 	}

@@ -23,11 +23,11 @@ type grpcClientStream struct {
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
-	return s.Header()
+	return s.s.Header()
 }
 
 func (s *grpcClientStream) Trailer() metadata.MD {
-	return s.Trailer()
+	return s.s.Trailer()
 }
 
 func (s *grpcClientStream) CloseSend() (err error) {
