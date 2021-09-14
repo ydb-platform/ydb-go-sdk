@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"os"
 	"path"
+	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/connect"
 )
 
@@ -87,25 +88,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = selectSimple(ctx, db.Table().Pool(), connectParams.Database())
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
-		os.Exit(1)
-	}
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10000; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err = selectSimple(ctx, db.Table().Pool(), connectParams.Database())
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
+			}
 
-	err = scanQuerySelect(ctx, db.Table().Pool(), connectParams.Database())
-	if err != nil {
-		if !ydb.IsTransportError(err, ydb.TransportErrorUnimplemented) {
-			_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
-			os.Exit(1)
-		}
-	}
+			err = scanQuerySelect(ctx, db.Table().Pool(), connectParams.Database())
+			if err != nil {
+				if !ydb.IsTransportError(err, ydb.TransportErrorUnimplemented) {
+					_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
+				}
+			}
 
-	err = readTable(ctx, db.Table().Pool(), path.Join(
-		connectParams.Database(), "series",
-	))
-	if err != nil {
-		fmt.Printf("read table error: %v\n", err)
-		os.Exit(1)
+			err = readTable(ctx, db.Table().Pool(), path.Join(
+				connectParams.Database(), "series",
+			))
+			if err != nil {
+				fmt.Printf("read table error: %v\n", err)
+			}
+		}()
 	}
+	wg.Wait()
 }

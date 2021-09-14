@@ -15,9 +15,9 @@ import (
 )
 
 type conn struct {
-	raw  *grpc.ClientConn
-	addr connAddr
-
+	raw     *grpc.ClientConn
+	addr    connAddr
+	driver  *driver
 	runtime connRuntime
 }
 
@@ -31,8 +31,11 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		opId   string
 		issues []*Ydb_Issue.IssueMessage
 
-		d = contextDriver(ctx)
+		d = c.driver
 	)
+	if d == nil {
+		d = contextDriver(ctx)
+	}
 	if t := d.requestTimeout; t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
 	}
@@ -110,8 +113,11 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	var (
 		cancel context.CancelFunc
 
-		d = contextDriver(ctx)
+		d = c.driver
 	)
+	if d == nil {
+		d = contextDriver(ctx)
+	}
 	if t := d.streamTimeout; t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer func() {

@@ -62,13 +62,20 @@ func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
 	c, err = d.cluster.Get(ctx)
 	getConnDone(rawCtx, c.Address(), err)
 
-	if err == nil {
-		if apply, ok := ContextClientConnApplier(rawCtx); ok {
-			apply(c)
-		}
+	if err != nil {
+		return nil, err
 	}
 
-	return
+	c = &conn{
+		raw:     c.raw,
+		addr:    c.addr,
+		driver:  d,
+		runtime: c.runtime,
+	}
+	if apply, ok := ContextClientConnApplier(rawCtx); ok {
+		apply(c)
+	}
+	return c, err
 }
 
 type driverContextKey struct{}
