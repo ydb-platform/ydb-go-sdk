@@ -10,7 +10,7 @@
 - [x] Replace all internal usages of `driver.Call()` and `driver.StreamRead()` to code-generated grpc-clients,
       which will be use driver as `grpc.ClientConnInterface`  provider.
 - [x] Delete deprecated Driver interface
-- [ ] Remove or hide (do private) deprecated API for new `scanner`.
+- [x] Remove or hide (do private) deprecated API for new `scanner`.
 - [x] Delete deprecated ready statistics from session pool
 - [ ] Hide (do private) entity `table.Client` or `table.SessionPool` because it most difficultly for SDK users
 - [ ] Drop `table.SessionProvider.PutBusy()` interface func
@@ -25,7 +25,7 @@
 - [x] Extract coordination package to neighbour project as plugin over ydb-go-sdk
 - [x] Extract ratelimiter package to neighbour project as plugin over ydb-go-sdk
 - [x] Extract experimental package to neighbour project as plugin over ydb-go-sdk
-- [ ] Refactoring Trace API: exclude duplicates of data from closure Trace functions
+- [x] Refactoring Trace API: exclude duplicates of data from closure Trace functions
 - [x] Move traceutil from internal to root
 - [X] Drop ReadConnStats() public method. Use Cluster.Stats() instead
 - [x] Drop deprecated NextStreamSet (merged logic into NextSet)

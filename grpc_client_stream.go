@@ -18,6 +18,7 @@ type grpcClientStream struct {
 	method Method
 	s      grpc.ClientStream
 	cancel context.CancelFunc
+	recv   func(_ context.Context, address string, _ Method, _ error) func(_ context.Context, address string, _ Method, _ error)
 	done   func(_ context.Context, address string, _ Method, _ error)
 }
 
@@ -35,7 +36,9 @@ func (s *grpcClientStream) CloseSend() (err error) {
 		err = mapGRPCError(err)
 	}
 	s.c.runtime.streamDone(timeutil.Now(), hideEOF(err))
-	s.done(s.ctx, s.c.addr.String(), s.method, hideEOF(err))
+	if s.done != nil {
+		s.done(s.ctx, s.c.addr.String(), s.method, hideEOF(err))
+	}
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -57,11 +60,6 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	s.c.runtime.streamRecv(timeutil.Now())
 
-	streamDone := driverTraceOnStream(s.d.trace, s.Context(), s.c.Address(), s.method)
-	defer func() {
-		streamDone(s.ctx, s.c.addr.String(), s.method, hideEOF(err))
-	}()
-
 	err = s.s.RecvMsg(m)
 
 	if err != nil {
@@ -82,6 +80,8 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 			}
 		}
 	}
+
+	s.done = s.recv(s.Context(), s.c.Address(), s.method, hideEOF(err))
 
 	return err
 }

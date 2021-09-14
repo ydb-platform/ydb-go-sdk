@@ -18,8 +18,7 @@ type (
 		OnPessimization func(PessimizationStartInfo) func(PessimizationDoneInfo)
 
 		// Only for background.
-		TrackConnStart func(TrackConnStartInfo)
-		TrackConnDone  func(TrackConnDoneInfo)
+		TrackConnStart func(TrackConnStartInfo) func(TrackConnDoneInfo)
 
 		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
 
@@ -27,7 +26,7 @@ type (
 
 		OnOperation func(OperationStartInfo) func(OperationDoneInfo)
 
-		OnStream func(StreamStartInfo) func(StreamDoneInfo)
+		OnStream func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
 	}
 )
 
@@ -124,6 +123,12 @@ type (
 		Context context.Context
 		Address string
 		Method  Method
+	}
+	StreamRecvDoneInfo struct {
+		Context context.Context
+		Address string
+		Method  Method
+		Error   error
 	}
 	StreamDoneInfo struct {
 		Context context.Context
