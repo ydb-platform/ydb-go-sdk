@@ -254,32 +254,14 @@ func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParam
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
-	rc := c.retryConfig()
-	retryNoIdempotent := ydb.ContextRetryNoIdempotent(ctx)
-	maxRetries := rc.MaxRetries
-	if c.tx != nil {
-		// NOTE: when under transaction, no retries must be done.
-		maxRetries = 0
-	}
-	var m ydb.RetryMode
-	for i := 0; i <= maxRetries; i++ {
-		if e := backoff(ctx, m, rc, i-1); e != nil {
-			break
-		}
-		res, err = req.process(ctx, c, params)
-		if err == nil {
-			return res, nil
-		}
-
-		m = rc.RetryChecker.Check(err)
-
-		if m.MustDeleteSession() {
-			return nil, driver.ErrBadConn
-		}
-		if !m.MustRetry(retryNoIdempotent) {
-			break
-		}
-	}
+	c.pool().Retry(
+		ctx,
+		ydb.ContextRetryNoIdempotent(ctx),
+		func(ctx context.Context, session *table.Session) (err error) {
+			res, err = req.process(ctx, c, params)
+			return err
+		},
+	)
 	return nil, err
 }
 
@@ -300,10 +282,6 @@ func (c *conn) scanOpts() []table.ExecuteScanQueryOption {
 
 func (c *conn) pool() *table.SessionPool {
 	return &c.connector.pool
-}
-
-func (c *conn) retryConfig() *RetryConfig {
-	return &c.connector.retryConfig
 }
 
 type processor interface {
@@ -342,9 +320,6 @@ type TxOperationFunc func(context.Context, *sql.Tx) error
 type TxDoer struct {
 	DB      *sql.DB
 	Options *sql.TxOptions
-
-	// RetryConfig allows to override retry parameters from DB.
-	RetryConfig *RetryConfig
 }
 
 // Do starts a transaction and calls f with it. If f() call returns a retryable
@@ -370,29 +345,13 @@ type TxDoer struct {
 //       return rows.Err()
 //   }))
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
-	rc := d.RetryConfig
-	retryNoIdempotent := ydb.ContextRetryNoIdempotent(ctx)
-	if rc == nil {
-		rc = &d.DB.Driver().(*Driver).c.retryConfig
-	}
-	for i := 0; i <= rc.MaxRetries; i++ {
-		if err = d.do(ctx, f); err == nil {
-			return
-		}
-		if err == driver.ErrBadConn {
-			// ErrBadConn returned by us to indicate that conn's underlying
-			// session must be closed. Thus we could retry whole transaction.
-			continue
-		}
-		m := rc.RetryChecker.Check(err)
-		if !m.MustRetry(retryNoIdempotent) {
-			return err
-		}
-		if e := backoff(ctx, m, rc, i); e != nil {
-			break
-		}
-	}
-	return
+	return ydb.Retry(
+		ctx,
+		ydb.ContextRetryNoIdempotent(ctx),
+		func(ctx context.Context) (err error) {
+			return d.do(ctx, f)
+		},
+	)
 }
 
 func (d TxDoer) do(ctx context.Context, f TxOperationFunc) error {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,7 +18,7 @@ import (
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
-		// Errors leading to backoff repeat.
+		// Errors leading to Wait repeat.
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorResourceExhausted,
 		},
@@ -35,24 +34,22 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
-			bacoffFunc := ydb.BackoffFunc(func(n int) <-chan time.Time {
-				ch := make(chan time.Time)
-				backoff <- ch
-				return ch
-			})
-			r := Retryer{
-				MaxRetries:      1,
-				FastBackoff:     bacoffFunc,
-				SlowBackoff:     bacoffFunc,
-				SessionProvider: SingleSession(simpleSession()),
-			}
+			pool := SingleSession(
+				simpleSession(),
+				testutil.BackoffFunc(func(n int) <-chan time.Time {
+					ch := make(chan time.Time)
+					backoff <- ch
+					return ch
+				},
+				),
+			)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			result := make(chan error)
 			go func() {
-				result <- r.Do(ctx, OperationFunc(func(ctx context.Context, _ *Session) error {
+				result <- pool.Retry(ctx, false, func(ctx context.Context, _ *Session) error {
 					return testErr
-				}))
+				})
 			}()
 
 			select {
@@ -73,50 +70,41 @@ func TestRetryerImmediateRetry(t *testing.T) {
 	for testErr, session := range map[error]*Session{
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorResourceExhausted,
-		}: newSession(t, 1, nil),
+		}: newSession(nil, "1"),
 		&ydb.TransportError{
 			Reason: ydb.TransportErrorAborted,
-		}: newSession(t, 2, nil),
+		}: newSession(nil, "2"),
 		&ydb.OpError{
 			Reason: ydb.StatusUnavailable,
-		}: newSession(t, 3, nil),
+		}: newSession(nil, "3"),
 		&ydb.OpError{
 			Reason: ydb.StatusOverloaded,
-		}: newSession(t, 4, nil),
+		}: newSession(nil, "4"),
 		&ydb.OpError{
 			Reason: ydb.StatusAborted,
-		}: newSession(t, 5, nil),
+		}: newSession(nil, "5"),
 		&ydb.OpError{
 			Reason: ydb.StatusNotFound,
-		}: newSession(t, 6, nil),
+		}: newSession(nil, "6"),
 		fmt.Errorf("wrap op error: %w", &ydb.OpError{
 			Reason: ydb.StatusAborted,
-		}): newSession(t, 7, nil),
+		}): newSession(nil, "7"),
 	} {
 		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
-			var count int
-			r := Retryer{
-				MaxRetries:   3,
-				RetryChecker: ydb.DefaultRetryChecker,
-				SessionProvider: SessionProviderFunc{
-					OnGet: func(ctx context.Context) (s *Session, err error) {
-						if session != nil {
-							return session, nil
-						}
-						return nil, testErr
-					},
-				},
-			}
-			err := r.Do(
-				context.Background(),
-				OperationFunc(func(ctx context.Context, _ *Session) error {
-					count++
-					return testErr
+			pool := SingleSession(
+				simpleSession(),
+				testutil.BackoffFunc(func(n int) <-chan time.Time {
+					t.Fatalf("this code will not be called")
+					return nil
 				}),
 			)
-			if act, exp := count, r.MaxRetries+1; act != exp {
-				t.Errorf("unexpected operation calls: %v; want %v", act, exp)
-			}
+			err := pool.Retry(
+				context.Background(),
+				false,
+				func(ctx context.Context, _ *Session) error {
+					return testErr
+				},
+			)
 			if !errors.Is(err, testErr) {
 				t.Fatalf("unexpected error: %v; want: %v", err, testErr)
 			}
@@ -125,34 +113,27 @@ func TestRetryerImmediateRetry(t *testing.T) {
 }
 
 func TestRetryerBadSession(t *testing.T) {
-	client := &Client{
-		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-				return &Ydb_Table.CreateSessionResult{}, nil
-			}})),
-	}
-	r := Retryer{
-		MaxRetries: 3,
-		SessionProvider: SessionProviderFunc{
-			OnGet: client.CreateSession,
+	pool := SessionProviderFunc{
+		OnGet: func(ctx context.Context) (*Session, error) {
+			return simpleSession(), nil
 		},
+		OnPut:   nil,
+		OnRetry: nil,
 	}
 
 	var sessions []*Session
-	err := r.Do(
+	err := pool.Retry(
 		context.Background(),
-		OperationFunc(func(ctx context.Context, s *Session) error {
+		false,
+		func(ctx context.Context, s *Session) error {
 			sessions = append(sessions, s)
 			return &ydb.OpError{
 				Reason: ydb.StatusBadSession,
 			}
-		}),
+		},
 	)
 	if !ydb.IsOpError(err, ydb.StatusBadSession) {
 		t.Errorf("unexpected error: %v", err)
-	}
-	if act, exp := len(sessions), r.MaxRetries+1; act != exp {
-		t.Errorf("unexpected operation calls: %v; want %v", act, exp)
 	}
 	seen := make(map[*Session]bool, len(sessions))
 	for _, s := range sessions {
@@ -189,30 +170,38 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 		sessions[i] = s
 		bad[s] = i < len(sessions)-1 // All bad but last.
 	}
-	var i int
-	r := Retryer{
-		MaxRetries: len(sessions),
-		SessionProvider: SessionProviderFunc{
-			OnGet: func(_ context.Context) (*Session, error) {
-				defer func() { i++ }()
-				return sessions[i], nil
-			},
-			OnPut: func(_ context.Context, s *Session) error {
-				reused[s] = true
-				return nil
-			},
+	var (
+		i    int
+		pool SessionProvider
+	)
+	backoff := testutil.BackoffFunc(func(n int) <-chan time.Time {
+		t.Fatalf("this code will not be called")
+		return nil
+	})
+	pool = SessionProviderFunc{
+		OnGet: func(_ context.Context) (*Session, error) {
+			defer func() { i++ }()
+			return sessions[i], nil
+		},
+		OnPut: func(_ context.Context, s *Session) error {
+			reused[s] = true
+			return nil
+		},
+		OnRetry: func(ctx context.Context, operation RetryOperation) error {
+			return retry(ctx, pool, backoff, backoff, false, operation)
 		},
 	}
-	_ = r.Do(
+	_ = pool.Retry(
 		context.Background(),
-		OperationFunc(func(ctx context.Context, s *Session) error {
+		false,
+		func(ctx context.Context, s *Session) error {
 			if bad[s] {
 				return &ydb.OpError{
 					Reason: ydb.StatusBadSession,
 				}
 			}
 			return nil
-		}),
+		},
 	)
 	for _, s := range sessions {
 		if bad[s] && reused[s] {
@@ -241,20 +230,23 @@ func TestRetryerImmediateReturn(t *testing.T) {
 		errors.New("whoa"),
 	} {
 		t.Run("", func(t *testing.T) {
-			var count int32
-			r := Retryer{
-				MaxRetries:      1e6,
-				RetryChecker:    ydb.DefaultRetryChecker,
-				SessionProvider: SingleSession(simpleSession()),
-			}
-			err := r.Do(
-				context.Background(),
-				OperationFunc(func(ctx context.Context, _ *Session) error {
-					if !atomic.CompareAndSwapInt32(&count, 0, 1) {
-						t.Fatalf("unexpected repeat")
-					}
-					return testErr
+			defer func() {
+				if e := recover(); e != nil {
+					t.Fatalf("unexpected panic: %v", e)
+				}
+			}()
+			pool := SingleSession(
+				simpleSession(),
+				testutil.BackoffFunc(func(n int) <-chan time.Time {
+					panic("this code will not be called")
 				}),
+			)
+			err := pool.Retry(
+				context.Background(),
+				false,
+				func(ctx context.Context, _ *Session) error {
+					return testErr
+				},
 			)
 			if !errors.Is(err, testErr) {
 				t.Fatalf("unexpected error: %v", err)
@@ -401,12 +393,8 @@ func TestRetryContextDeadline(t *testing.T) {
 	client := &Client{
 		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
-	r := Retryer{
-		MaxRetries:   1e6,
-		RetryChecker: ydb.DefaultRetryChecker,
-		SessionProvider: SessionProviderFunc{
-			OnGet: client.CreateSession,
-		},
+	pool := SessionProviderFunc{
+		OnGet: client.CreateSession,
 	}
 	for i := range timeouts {
 		for j := range sleeps {
@@ -416,12 +404,12 @@ func TestRetryContextDeadline(t *testing.T) {
 				random := rand.New(rand.NewSource(time.Now().Unix()))
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
-				_ = r.Do(
-					WithRetryTrace(
+				_ = pool.Retry(
+					ydb.WithRetryTrace(
 						ctx,
-						RetryTrace{
-							OnLoop: func(info RetryLoopStartInfo) func(RetryLoopDoneInfo) {
-								return func(info RetryLoopDoneInfo) {
+						ydb.RetryTrace{
+							OnRetry: func(info ydb.RetryLoopStartInfo) func(ydb.RetryLoopDoneInfo) {
+								return func(info ydb.RetryLoopDoneInfo) {
 									if info.Latency-timeouts[i] > tolerance {
 										t.Errorf("unexpected latency: %v (attempts %d)", info.Latency, info.Attempts)
 									}
@@ -429,14 +417,15 @@ func TestRetryContextDeadline(t *testing.T) {
 							},
 						},
 					),
-					OperationFunc(func(ctx context.Context, _ *Session) error {
+					false,
+					func(ctx context.Context, _ *Session) error {
 						select {
 						case <-ctx.Done():
 							return ctx.Err()
 						case <-time.After(sleep):
 							return errs[random.Intn(len(errs))]
 						}
-					}),
+					},
 				)
 			})
 		}

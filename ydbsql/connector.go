@@ -105,26 +105,6 @@ func WithSessionPoolDeleteTimeout(d time.Duration) ConnectorOption {
 	}
 }
 
-func WithMaxRetries(n int) ConnectorOption {
-	return func(c *connector) {
-		if n >= 0 {
-			c.retryConfig.MaxRetries = n
-		}
-	}
-}
-
-func WithRetryFastSlot(fastSlot time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.retryConfig.FastSlot = fastSlot
-	}
-}
-
-func WithRetrySlowSlot(slowSlot time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.retryConfig.SlowSlot = slowSlot
-	}
-}
-
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
 	return func(c *connector) {
 		c.defaultTxControl = txControl
@@ -143,18 +123,10 @@ func WithDefaultExecScanQueryOption(opts ...table.ExecuteScanQueryOption) Connec
 	}
 }
 
-var retryChecker = ydb.RetryChecker{}
-
 func Connector(opts ...ConnectorOption) driver.Connector {
 	c := &connector{
 		dialer: ydb.Dialer{
 			DriverConfig: new(ydb.DriverConfig),
-		},
-		retryConfig: RetryConfig{
-			MaxRetries:   ydb.DefaultMaxRetries,
-			RetryChecker: retryChecker,
-			SlowSlot:     ydb.DefaultSlowSlot,
-			FastSlot:     ydb.DefaultFastSlot,
 		},
 		defaultTxControl: table.TxControl(
 			table.BeginTx(
@@ -181,7 +153,6 @@ type connector struct {
 	client *table.Client
 	pool   table.SessionPool // Used as a template for created connections.
 
-	retryConfig      RetryConfig
 	defaultTxControl *table.TransactionControl
 
 	dataOpts []table.ExecuteDataQueryOption

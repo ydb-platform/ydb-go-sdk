@@ -1,4 +1,4 @@
-package internal
+package ydb
 
 import (
 	"bytes"
@@ -45,14 +45,6 @@ type TransportError struct {
 	err     error
 }
 
-func NewTransportError(reason grpc.Code, message string, err error) *TransportError {
-	return &TransportError{
-		Reason:  TransportErrorCode(reason),
-		message: message,
-		err:     err,
-	}
-}
-
 func (t *TransportError) Error() string {
 	s := "ydb: transport error: " + t.Reason.String()
 	if t.message != "" {
@@ -70,13 +62,6 @@ type OpError struct {
 	Reason StatusCode
 
 	issues []*Ydb_Issue.IssueMessage
-}
-
-func NewOpError(reason Ydb.StatusIds_StatusCode, issues []*Ydb_Issue.IssueMessage) *OpError {
-	return &OpError{
-		Reason: StatusCode(reason),
-		issues: issues,
-	}
 }
 
 func (e *OpError) Issues() IssueIterator {
@@ -134,55 +119,6 @@ func (e StatusCode) String() string {
 	return Ydb.StatusIds_StatusCode_name[int32(e)]
 }
 
-func (e StatusCode) RetryType() RetryType {
-	switch e {
-	case
-		StatusAborted,
-		StatusUnavailable,
-		StatusOverloaded,
-		StatusBadSession,
-		StatusSessionBusy,
-		StatusNotFound:
-		return RetryTypeAny
-	case
-		StatusCancelled,
-		StatusUndetermined:
-		return RetryTypeIdempotent
-	default:
-		return RetryTypeNoRetry
-	}
-}
-
-func (e StatusCode) BackoffType() BackoffType {
-	switch e {
-	case
-		StatusOverloaded:
-		return BackoffTypeSlowBackoff
-	case
-		StatusAborted,
-		StatusUnavailable,
-		StatusBadSession,
-		StatusCancelled,
-		StatusSessionBusy,
-		StatusUndetermined:
-		return BackoffTypeFastBackoff
-	default:
-		return BackoffTypeNoBackoff
-	}
-}
-
-func (e StatusCode) MustDeleteSession() bool {
-	switch e {
-	case
-		StatusBadSession,
-		StatusSessionExpired,
-		StatusSessionBusy:
-		return true
-	default:
-		return false
-	}
-}
-
 // Errors describing unsusccessful operation status.
 const (
 	StatusUnknownStatus      = StatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED)
@@ -206,51 +142,53 @@ const (
 	StatusSessionBusy        = StatusCode(Ydb.StatusIds_SESSION_BUSY)
 )
 
+func statusCode(s Ydb.StatusIds_StatusCode) StatusCode {
+	switch s {
+	case Ydb.StatusIds_BAD_REQUEST:
+		return StatusBadRequest
+	case Ydb.StatusIds_UNAUTHORIZED:
+		return StatusUnauthorized
+	case Ydb.StatusIds_INTERNAL_ERROR:
+		return StatusInternalError
+	case Ydb.StatusIds_ABORTED:
+		return StatusAborted
+	case Ydb.StatusIds_UNAVAILABLE:
+		return StatusUnavailable
+	case Ydb.StatusIds_OVERLOADED:
+		return StatusOverloaded
+	case Ydb.StatusIds_SCHEME_ERROR:
+		return StatusSchemeError
+	case Ydb.StatusIds_GENERIC_ERROR:
+		return StatusGenericError
+	case Ydb.StatusIds_TIMEOUT:
+		return StatusTimeout
+	case Ydb.StatusIds_BAD_SESSION:
+		return StatusBadSession
+	case Ydb.StatusIds_PRECONDITION_FAILED:
+		return StatusPreconditionFailed
+	case Ydb.StatusIds_ALREADY_EXISTS:
+		return StatusAlreadyExists
+	case Ydb.StatusIds_NOT_FOUND:
+		return StatusNotFound
+	case Ydb.StatusIds_SESSION_EXPIRED:
+		return StatusSessionExpired
+	case Ydb.StatusIds_CANCELLED:
+		return StatusCancelled
+	case Ydb.StatusIds_UNDETERMINED:
+		return StatusUndetermined
+	case Ydb.StatusIds_UNSUPPORTED:
+		return StatusUnsupported
+	case Ydb.StatusIds_SESSION_BUSY:
+		return StatusSessionBusy
+	default:
+		return StatusUnknownStatus
+	}
+}
+
 type TransportErrorCode int32
 
 func (t TransportErrorCode) String() string {
 	return transportErrorString(t)
-}
-
-func (t TransportErrorCode) RetryType() RetryType {
-	switch t {
-	case
-		TransportErrorResourceExhausted,
-		TransportErrorAborted:
-		return RetryTypeAny
-	case
-		TransportErrorInternal,
-		TransportErrorUnavailable:
-		return RetryTypeIdempotent
-	default:
-		return RetryTypeNoRetry
-	}
-}
-
-func (t TransportErrorCode) BackoffType() BackoffType {
-	switch t {
-	case
-		TransportErrorInternal,
-		TransportErrorUnavailable:
-		return BackoffTypeFastBackoff
-	case
-		TransportErrorResourceExhausted:
-		return BackoffTypeSlowBackoff
-	default:
-		return BackoffTypeNoBackoff
-	}
-}
-
-func (t TransportErrorCode) MustDeleteSession() bool {
-	switch t {
-	case
-		TransportErrorCanceled,
-		TransportErrorResourceExhausted,
-		TransportErrorOutOfRange:
-		return false
-	default:
-		return true
-	}
 }
 
 const (
