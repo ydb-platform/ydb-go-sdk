@@ -44,6 +44,9 @@ type DriverConfig struct {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval time.Duration
 
+	// TODO: add description
+	ConnectionTTL time.Duration
+
 	// BalancingMethod is an algorithm used by the driver for endpoint
 	// selection.
 	// If BalancingMethod is zero then the DefaultBalancingMethod is used.

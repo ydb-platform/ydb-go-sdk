@@ -48,6 +48,13 @@ func WithDriverConfig(config *ydb.DriverConfig) Option {
 	}
 }
 
+func WithConnectionTTL(connectionTTL time.Duration) Option {
+	return func(ctx context.Context, c *Connection) error {
+		c.driverConfig.ConnectionTTL = connectionTTL
+		return nil
+	}
+}
+
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, c *Connection) error {
 		if c.driverConfig == nil {

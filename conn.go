@@ -25,7 +25,7 @@ type conn struct {
 
 	mtx      *sync.Mutex
 	timer    timeutil.Timer
-	lifetime time.Duration
+	ttl      time.Duration
 	grpcConn *grpc.ClientConn
 }
 
@@ -39,7 +39,7 @@ func (c *conn) conn(ctx context.Context) (*grpc.ClientConn, error) {
 		}
 		c.grpcConn = raw
 	}
-	c.timer.Reset(c.lifetime)
+	c.timer.Reset(c.ttl)
 	return c.grpcConn, nil
 }
 
@@ -240,21 +240,21 @@ func (c *conn) Address() string {
 	return ""
 }
 
-func newConn(addr connAddr, dial func(context.Context, string, int) (*grpc.ClientConn, error), lifetime time.Duration) *conn {
+func newConn(addr connAddr, dial func(context.Context, string, int) (*grpc.ClientConn, error), ttl time.Duration) *conn {
 	const (
 		statsDuration = time.Minute
 		statsBuckets  = 12
 	)
-	if lifetime <= 0 {
-		lifetime = time.Minute
+	if ttl <= 0 {
+		ttl = time.Minute
 	}
 	c := &conn{
-		mtx:      &sync.Mutex{},
-		addr:     addr,
-		dial:     dial,
-		lifetime: lifetime,
-		timer:    timeutil.NewTimer(lifetime),
-		done:     make(chan struct{}),
+		mtx:   &sync.Mutex{},
+		addr:  addr,
+		dial:  dial,
+		ttl:   ttl,
+		timer: timeutil.NewTimer(ttl),
+		done:  make(chan struct{}),
 		runtime: &connRuntime{
 			opTime:  stats.NewSeries(statsDuration, statsBuckets),
 			opRate:  stats.NewSeries(statsDuration, statsBuckets),

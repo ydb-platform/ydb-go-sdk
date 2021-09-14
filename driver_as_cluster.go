@@ -73,7 +73,7 @@ func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
 		addr:     c.addr,
 		driver:   d,
 		runtime:  c.runtime,
-		lifetime: c.lifetime,
+		ttl:      c.ttl,
 		timer:    c.timer,
 		done:     c.done,
 	}

@@ -92,6 +92,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 	endpoint := d.endpointByAddr(addr)
 	c := cluster{
 		dial:  d.dialHostPort,
+		ttl:   d.config.ConnectionTTL,
 		trace: d.config.Trace,
 		balancer: func() balancer {
 			if d.config.DiscoveryInterval == 0 {

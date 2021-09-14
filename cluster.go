@@ -66,6 +66,7 @@ func (c *connEntry) removeFrom(b balancer) {
 
 type cluster struct {
 	dial     func(context.Context, string, int) (*grpc.ClientConn, error)
+	ttl      time.Duration
 	balancer balancer
 	explorer *repeater
 	trace    DriverTrace
@@ -243,7 +244,7 @@ func (c *cluster) Insert(ctx context.Context, e Endpoint, wg ...WG) {
 		loadFactor: e.LoadFactor,
 		local:      e.Local,
 	}
-	conn := newConn(addr, c.dial, 0)
+	conn := newConn(addr, c.dial, c.ttl)
 	var wait chan struct{}
 	defer func() {
 		if wait != nil {
