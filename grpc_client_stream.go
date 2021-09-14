@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -19,6 +18,7 @@ type grpcClientStream struct {
 	method Method
 	s      grpc.ClientStream
 	cancel context.CancelFunc
+	recv   func(_ context.Context, address string, _ Method, _ error) func(_ context.Context, address string, _ Method, _ error)
 	done   func(_ context.Context, address string, _ Method, _ error)
 }
 
@@ -36,7 +36,9 @@ func (s *grpcClientStream) CloseSend() (err error) {
 		err = mapGRPCError(err)
 	}
 	s.c.runtime.streamDone(timeutil.Now(), hideEOF(err))
-	s.done(s.ctx, s.c.addr.String(), s.method, hideEOF(err))
+	if s.done != nil {
+		s.done(s.ctx, s.c.addr.String(), s.method, hideEOF(err))
+	}
 	if s.cancel != nil {
 		s.cancel()
 	}
@@ -56,16 +58,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
-	var (
-		issues []*Ydb_Issue.IssueMessage
-	)
-
 	s.c.runtime.streamRecv(timeutil.Now())
-
-	driverTraceStreamRecvDone := driverTraceOnStreamRecv(s.ctx, s.d.trace, s.Context(), s.c.Address(), s.method)
-	defer func() {
-		driverTraceStreamRecvDone(s.ctx, s.c.addr.String(), s.method, issues, hideEOF(err))
-	}()
 
 	err = s.s.RecvMsg(m)
 
@@ -73,8 +66,8 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		err = mapGRPCError(err)
 		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
 			// remove node from discovery cache on any transport error
-			driverTracePessimizationDone := driverTraceOnPessimization(s.ctx, s.d.trace, s.ctx, s.c.Address(), err)
-			driverTracePessimizationDone(s.ctx, s.c.Address(), s.d.cluster.Pessimize(s.c.addr))
+			pessimizationDone := driverTraceOnPessimization(s.d.trace, s.ctx, s.c.Address(), err)
+			pessimizationDone(s.ctx, s.c.Address(), s.d.cluster.Pessimize(s.c.addr))
 		}
 		return
 	}
@@ -87,6 +80,8 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 			}
 		}
 	}
+
+	s.done = s.recv(s.Context(), s.c.Address(), s.method, hideEOF(err))
 
 	return err
 }

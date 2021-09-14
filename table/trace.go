@@ -11,7 +11,6 @@ import (
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	ClientTrace struct {
 		OnCreateSession func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
 
@@ -35,11 +34,28 @@ type (
 	}
 )
 
+type clientTraceContextKey struct{}
+
+// WithClientTrace returns context which has associated ClientTrace with it.
+func WithClientTrace(ctx context.Context, t ClientTrace) context.Context {
+	return context.WithValue(ctx,
+		clientTraceContextKey{},
+		ContextClientTrace(ctx).Compose(t),
+	)
+}
+
+// ContextClientTrace returns ClientTrace associated with ctx.
+// If there is no ClientTrace associated with ctx then zero value
+// of ClientTrace is returned.
+func ContextClientTrace(ctx context.Context) ClientTrace {
+	t, _ := ctx.Value(clientTraceContextKey{}).(ClientTrace)
+	return t
+}
+
 // RetryTrace contains options for tracing retry client activity.
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	RetryTrace struct {
 		OnLoop func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
 	}
@@ -176,16 +192,12 @@ type (
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	//gtrace:set context
 	SessionPoolTrace struct {
 		OnCreate       func(SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo)
 		OnGet          func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo)
 		OnWait         func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo)
-		OnBusyCheck    func(SessionPoolBusyCheckStartInfo) func(SessionPoolBusyCheckDoneInfo)
-		OnTake         func(SessionPoolTakeStartInfo) func(SessionPoolTakeDoneInfo)
-		OnTakeWait     func(SessionPoolTakeWaitInfo)
+		OnTake         func(SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo)
 		OnPut          func(SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo)
-		OnPutBusy      func(SessionPoolPutBusyStartInfo) func(SessionPoolPutBusyDoneInfo)
 		OnCloseSession func(SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo)
 		OnClose        func(SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo)
 	}
@@ -218,16 +230,6 @@ type (
 		Session *Session
 		Error   error
 	}
-	SessionPoolBusyCheckStartInfo struct {
-		Context context.Context
-		Session *Session
-	}
-	SessionPoolBusyCheckDoneInfo struct {
-		Context context.Context
-		Session *Session
-		Reused  bool
-		Error   error
-	}
 	SessionPoolTakeStartInfo struct {
 		Context context.Context
 		Session *Session
@@ -251,15 +253,6 @@ type (
 		Session *Session
 		Error   error
 	}
-	SessionPoolPutBusyStartInfo struct {
-		Context context.Context
-		Session *Session
-	}
-	SessionPoolPutBusyDoneInfo struct {
-		Context context.Context
-		Session *Session
-		Error   error
-	}
 	SessionPoolCloseSessionStartInfo struct {
 		Context context.Context
 		Session *Session
@@ -277,6 +270,24 @@ type (
 		Error   error
 	}
 )
+
+type sessionPoolTraceContextKey struct{}
+
+// WithSessionPoolTrace returns context which has associated SessionPoolTrace with it.
+func WithSessionPoolTrace(ctx context.Context, t SessionPoolTrace) context.Context {
+	return context.WithValue(ctx,
+		sessionPoolTraceContextKey{},
+		ContextSessionPoolTrace(ctx).Compose(t),
+	)
+}
+
+// ContextSessionPoolTrace returns SessionPoolTrace associated with ctx.
+// If there is no SessionPoolTrace associated with ctx then zero value
+// of SessionPoolTrace is returned.
+func ContextSessionPoolTrace(ctx context.Context) SessionPoolTrace {
+	t, _ := ctx.Value(sessionPoolTraceContextKey{}).(SessionPoolTrace)
+	return t
+}
 
 type (
 	//gtrace:gen

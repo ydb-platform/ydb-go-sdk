@@ -88,6 +88,8 @@ type cluster struct {
 	closed bool
 
 	testHookTrackerQueue func([]*list.Element)
+	// tracer function. Set after the call driverTraceTrackConnStart .
+	trackDone func(address string)
 }
 
 func (c *cluster) init() {
@@ -426,7 +428,7 @@ func (c *cluster) Stats(it func(Endpoint, ConnStats)) {
 
 // c.mu must be held.
 func (c *cluster) track(conn *conn) (el *list.Element) {
-	driverTraceTrackConnStart(context.Background(), c.trace, conn.addr.String())
+	c.trackDone = driverTraceTrackConnStart(c.trace, conn.addr.String())
 	el = c.trackerQueue.PushBack(conn)
 	select {
 	case c.trackerWake <- struct{}{}:
@@ -512,7 +514,7 @@ func (c *cluster) tracker(timer timeutil.Timer) {
 						conn.runtime.setState(ConnOnline)
 					}
 
-					driverTraceTrackConnDone(context.Background(), c.trace, conn.addr.String())
+					c.trackDone(conn.addr.String())
 					entry.conn = conn
 					entry.insertInto(c.balancer)
 					c.index[addr] = entry
