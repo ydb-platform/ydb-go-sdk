@@ -24,7 +24,6 @@ type conn struct {
 func (c *conn) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
-	c.raw.Target()
 
 	var (
 		cancel context.CancelFunc
