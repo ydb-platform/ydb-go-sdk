@@ -403,51 +403,6 @@ func (t ClientTrace) onRollbackTransaction(r RollbackTransactionStartInfo) func(
 	return res
 }
 
-// Compose returns a new RetryTrace which has functional fields composed
-// both from t and x.
-func (t RetryTrace) Compose(x RetryTrace) (ret RetryTrace) {
-	switch {
-	case t.OnLoop == nil:
-		ret.OnLoop = x.OnLoop
-	case x.OnLoop == nil:
-		ret.OnLoop = t.OnLoop
-	default:
-		h1 := t.OnLoop
-		h2 := x.OnLoop
-		ret.OnLoop = func(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
-			r1 := h1(r)
-			r2 := h2(r)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(r RetryLoopDoneInfo) {
-					r1(r)
-					r2(r)
-				}
-			}
-		}
-	}
-	return ret
-}
-func (t RetryTrace) onLoop(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
-	fn := t.OnLoop
-	if fn == nil {
-		return func(RetryLoopDoneInfo) {
-			return
-		}
-	}
-	res := fn(r)
-	if res == nil {
-		return func(RetryLoopDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-
 // Compose returns a new SessionPoolTrace which has functional fields composed
 // both from t and x.
 func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
@@ -1047,18 +1002,6 @@ func clientTraceOnRollbackTransaction(t ClientTrace, c context.Context, s *Sessi
 		p.Session = s
 		p.TxID = txID
 		p.Error = e
-		res(p)
-	}
-}
-func retryTraceOnLoop(t RetryTrace, c context.Context) func(_ context.Context, latency time.Duration, attempts int) {
-	var p RetryLoopStartInfo
-	p.Context = c
-	res := t.onLoop(p)
-	return func(c context.Context, latency time.Duration, attempts int) {
-		var p RetryLoopDoneInfo
-		p.Context = c
-		p.Latency = latency
-		p.Attempts = attempts
 		res(p)
 	}
 }
