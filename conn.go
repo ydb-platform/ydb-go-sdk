@@ -17,21 +17,22 @@ import (
 )
 
 type conn struct {
+	sync.Mutex
+
 	dial    func(context.Context, string, int) (*grpc.ClientConn, error)
 	addr    connAddr
 	driver  *driver
 	runtime *connRuntime
 	done    chan struct{}
 
-	mtx      *sync.Mutex
 	timer    timeutil.Timer
 	ttl      time.Duration
 	grpcConn *grpc.ClientConn
 }
 
 func (c *conn) conn(ctx context.Context) (*grpc.ClientConn, error) {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
+	c.Lock()
+	defer c.Unlock()
 	if c.grpcConn == nil || isBroken(c.grpcConn) {
 		raw, err := c.dial(ctx, c.addr.addr, c.addr.port)
 		if err != nil {
@@ -52,8 +53,8 @@ func isBroken(raw *grpc.ClientConn) bool {
 }
 
 func (c *conn) isReady() bool {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
+	c.Lock()
+	defer c.Unlock()
 	return c != nil && c.grpcConn != nil && c.grpcConn.GetState() == connectivity.Ready
 }
 
@@ -63,12 +64,12 @@ func (c *conn) waitClose() {
 		case <-c.done:
 			return
 		case <-c.timer.C():
-			c.mtx.Lock()
+			c.Lock()
 			if c.grpcConn != nil {
 				_ = c.grpcConn.Close()
 				c.grpcConn = nil
 			}
-			c.mtx.Unlock()
+			c.Unlock()
 		}
 	}
 }
@@ -78,8 +79,8 @@ func (c *conn) close() error {
 	if !c.timer.Stop() {
 		panic("cant stop timer")
 	}
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
+	c.Lock()
+	defer c.Unlock()
 	if c.grpcConn != nil {
 		return c.grpcConn.Close()
 	}
@@ -249,7 +250,6 @@ func newConn(addr connAddr, dial func(context.Context, string, int) (*grpc.Clien
 		ttl = time.Minute
 	}
 	c := &conn{
-		mtx:   &sync.Mutex{},
 		addr:  addr,
 		dial:  dial,
 		ttl:   ttl,

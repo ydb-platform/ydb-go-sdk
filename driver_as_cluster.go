@@ -66,19 +66,11 @@ func (d *driver) getConn(ctx context.Context) (c *conn, err error) {
 		return nil, err
 	}
 
-	c = &conn{
-		mtx:      c.mtx,
-		grpcConn: c.grpcConn,
-		dial:     c.dial,
-		addr:     c.addr,
-		driver:   d,
-		runtime:  c.runtime,
-		ttl:      c.ttl,
-		timer:    c.timer,
-		done:     c.done,
-	}
+	c.Lock()
 	if apply, ok := ContextClientConnApplier(rawCtx); ok {
 		apply(c)
 	}
+	c.driver = d
+	c.Unlock()
 	return c, err
 }

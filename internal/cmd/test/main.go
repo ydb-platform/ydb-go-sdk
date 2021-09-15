@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"math/rand"
 	"os"
 	"path"
 	"sync"
@@ -49,7 +48,7 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)
 		os.Exit(1)
 	}
-	defer func() { _ = db.Close() }()
+	//defer func() { _ = db.Close() }()
 
 	err = db.CleanupDatabase(ctx, connectParams.Database(), "series", "episodes", "seasons")
 	if err != nil {
@@ -90,12 +89,10 @@ func main() {
 	}
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-
-			time.Sleep(time.Duration(rand.Float64() * 5 * float64(time.Minute)))
 
 			err = selectSimple(ctx, db.Table().Pool(), connectParams.Database())
 			if err != nil {
