@@ -347,8 +347,7 @@ func (s *Scanner) noValueError() {
 
 func (s *Scanner) noColumnError(name string) {
 	s.errorf(
-		"no column %q at %q",
-		name, s.path(),
+		"no column %q", name,
 	)
 }
 
