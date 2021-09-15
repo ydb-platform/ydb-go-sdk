@@ -2,6 +2,7 @@ package connect
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -103,6 +104,30 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Connection) error {
 		c.table.sessionPool.DeleteTimeout = deleteTimeout
+		return nil
+	}
+}
+
+// WithDriverTrace returns context which has associated DriverTrace with it.
+func WithDriverTrace(trace ydb.DriverTrace) Option {
+	return func(ctx context.Context, c *Connection) error {
+		c.driverConfig.Trace = trace
+		return nil
+	}
+}
+
+// WithTableClientTrace returns context which has associated DriverTrace with it.
+func WithTableClientTrace(trace table.ClientTrace) Option {
+	return func(ctx context.Context, c *Connection) error {
+		c.table.client.Trace = trace
+		return nil
+	}
+}
+
+// WithTableSessionPoolTrace returns context which has associated DriverTrace with it.
+func WithTableSessionPoolTrace(trace table.SessionPoolTrace) Option {
+	return func(ctx context.Context, c *Connection) error {
+		c.table.sessionPool.Trace = trace
 		return nil
 	}
 }
