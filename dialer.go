@@ -120,7 +120,6 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 			_ = c.Close()
 		}
 	}()
-	c.Insert(ctx, endpoint)
 	driver := &driver{
 		cluster:              &c,
 		meta:                 d.meta,
@@ -131,13 +130,20 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ *driver, err error) {
 		operationCancelAfter: d.config.OperationCancelAfter,
 	}
 	// Ensure that endpoint is online.
-	_, err = driver.getConn(ctx)
+	var conn *grpc.ClientConn
+	conn, err = d.dialHostPort(ctx, endpoint.Addr, endpoint.Port)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
 	if err != nil {
 		return nil, err
 	}
 	if d.config.DiscoveryInterval > 0 {
 		discoveryClient := &discoveryClient{
-			discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(driver),
+			discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(conn),
 			database:         d.config.Database,
 			ssl:              d.useTLS(),
 		}
