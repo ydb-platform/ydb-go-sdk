@@ -13,11 +13,11 @@ import (
 )
 
 type Connection struct {
-	driverConfig *ydb.DriverConfig
-	cluster      ydb.Cluster
-	credentials  ydb.Credentials
-	table        *tableWrapper
-	scheme       *schemeWrapper
+	database string
+	options  options
+	cluster  ydb.Cluster
+	table    *tableWrapper
+	scheme   *schemeWrapper
 }
 
 func (c *Connection) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -46,7 +46,7 @@ func (c *Connection) Scheme() *scheme.Client {
 }
 
 func (c *Connection) EnsurePathExists(ctx context.Context, path string) error {
-	for i := len(c.driverConfig.Database); i < len(path); i++ {
+	for i := len(c.database); i < len(path); i++ {
 		x := strings.IndexByte(path[i:], '/')
 		if x == -1 {
 			x = len(path[i:]) - 1

@@ -10,8 +10,9 @@ import (
 // New connects to database and return database connection
 func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connection, err error) {
 	c = &Connection{
-		table:  newTableWrapper(ctx),
-		scheme: newSchemeWrapper(ctx),
+		database: params.Database(),
+		table:    &tableWrapper{},
+		scheme:   &schemeWrapper{},
 	}
 	for _, opt := range opts {
 		err = opt(ctx, c)
@@ -19,25 +20,26 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connecti
 			return nil, err
 		}
 	}
-	if c.driverConfig == nil {
-		c.driverConfig = &ydb.DriverConfig{}
-	}
-	c.driverConfig.Database = params.Database()
-	if c.driverConfig.Credentials == nil {
-		return nil, ydb.ErrCredentialsNoCredentials
-	}
 	var tlsConfig *tls.Config
 	if params.UseTLS() {
 		tlsConfig = new(tls.Config)
 	}
+	if c.options.connectTimeout != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *c.options.connectTimeout)
+		defer cancel()
+	}
 	c.cluster, err = (&ydb.Dialer{
-		DriverConfig: c.driverConfig,
-		TLSConfig:    tlsConfig,
+		DriverConfig: &ydb.DriverConfig{
+			Database:    params.Database(),
+			Credentials: c.options.credentials,
+		},
+		TLSConfig: tlsConfig,
 	}).Dial(ctx, params.Endpoint())
 	if err != nil {
 		return nil, err
 	}
-	c.table.set(c.cluster)
-	c.scheme.set(c.cluster)
+	c.table.set(c.cluster, c.options)
+	c.scheme.set(c.cluster, c.options)
 	return c, nil
 }

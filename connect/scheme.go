@@ -1,23 +1,14 @@
 package connect
 
 import (
-	"context"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type schemeWrapper struct {
-	ctx    context.Context
 	client *scheme.Client
 }
 
-func newSchemeWrapper(ctx context.Context) *schemeWrapper {
-	return &schemeWrapper{
-		ctx: ctx,
-	}
-}
-
-func (s *schemeWrapper) set(cluster ydb.Cluster) {
+func (s *schemeWrapper) set(cluster ydb.Cluster, o options) {
 	s.client = scheme.NewClient(cluster)
 }

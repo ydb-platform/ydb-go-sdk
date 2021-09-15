@@ -45,7 +45,7 @@ type DriverConfig struct {
 	DiscoveryInterval time.Duration
 
 	// TODO: add description
-	ConnectionTTL time.Duration
+	GrpcConnTTL time.Duration
 
 	// BalancingMethod is an algorithm used by the driver for endpoint
 	// selection.
