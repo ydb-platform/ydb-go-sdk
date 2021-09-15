@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"crypto/tls"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
@@ -29,10 +30,16 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connecti
 		ctx, cancel = context.WithTimeout(ctx, *c.options.connectTimeout)
 		defer cancel()
 	}
+	var grpcConnTTL time.Duration
+	if c.options.grpcConnTTL != nil {
+		grpcConnTTL = *c.options.grpcConnTTL
+	}
+
 	c.cluster, err = (&ydb.Dialer{
 		DriverConfig: &ydb.DriverConfig{
 			Database:    params.Database(),
 			Credentials: c.options.credentials,
+			GrpcConnTTL: grpcConnTTL,
 		},
 		TLSConfig: tlsConfig,
 	}).Dial(ctx, params.Endpoint())
