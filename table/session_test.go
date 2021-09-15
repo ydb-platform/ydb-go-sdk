@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"reflect"
 	"testing"
 	"time"
@@ -120,17 +121,17 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []Column{
 				{
 					Name:   "testColumn",
-					Type:   ydb.Void(),
+					Type:   types.Void(),
 					Family: "testFamily",
 				},
 			},
 			KeyRanges: []KeyRange{
 				{
 					From: nil,
-					To:   ydb.Int64Value(100500),
+					To:   types.Int64Value(100500),
 				},
 				{
-					From: ydb.Int64Value(100500),
+					From: types.Int64Value(100500),
 					To:   nil,
 				},
 			},

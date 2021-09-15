@@ -2,6 +2,7 @@ package result
 
 import (
 	"encoding/binary"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
@@ -130,7 +130,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			},
 		}
 		if c.ydbvalue {
-			vp := ydb.Int64Value(v)
+			vp := types.Int64Value(v)
 			return ydbval, &vp
 		}
 		if c.scanner {
@@ -162,7 +162,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			},
 		}
 		if c.ydbvalue {
-			vp := ydb.FloatValue(v)
+			vp := types.FloatValue(v)
 			return ydbval, &vp
 		}
 		if c.optional && !c.testDefault {
@@ -404,7 +404,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			},
 		}
 		if c.ydbvalue {
-			vp := ydb.JSONValue(v)
+			vp := types.JSONValue(v)
 			return ydbval, &vp
 		}
 		src := []byte(v)
@@ -465,7 +465,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 		}
 		return ydbval, &v
 	default:
-		panic("ydb: unexpected type")
+		panic("ydb: unexpected types")
 	}
 }
 

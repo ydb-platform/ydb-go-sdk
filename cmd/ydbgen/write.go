@@ -441,7 +441,7 @@ func (TimeFieldFace) Set(bw *bufio.Writer, c Context) {
 	code(bw, tab(c.Depth), `err := `)
 	line(bw, `(*ydb.Time)(&`, c.Rcvr, `).From`, y, `(`, c.In, `)`)
 	line(bw, tab(c.Depth), `if err != nil {`)
-	line(bw, tab(c.Depth+1), `panic("ydbgen: date type conversion failed: " + err.Error())`)
+	line(bw, tab(c.Depth+1), `panic("ydbgen: date types conversion failed: " + err.Error())`)
 	line(bw, tab(c.Depth), `}`)
 }
 
@@ -504,7 +504,7 @@ func (g *Generator) assignBasicFaceValue(bw *bufio.Writer, depth int, rcvr strin
 		code(bw, tab(depth+1), val, ` = `)
 		line(bw, `ydb.NullValue(ydb.Type`, ydbTypeName(t.Basic.Primitive), `)`)
 	} else {
-		line(bw, tab(depth+1), `panic("ydbgen: no value for non-optional type")`)
+		line(bw, tab(depth+1), `panic("ydbgen: no value for non-optional types")`)
 	}
 	line(bw, tab(depth), `}`)
 	return val
@@ -855,7 +855,7 @@ func (t ConversionTemplate) Write(bw *bufio.Writer) {
 	}()
 	b0, b1, ok := basic(t.Type[0], t.Type[1])
 	if !ok {
-		panic("ydbgen: internal: not a basic type for conversion")
+		panic("ydbgen: internal: not a basic types for conversion")
 	}
 	var (
 		i0 = b0.Info()
@@ -864,7 +864,7 @@ func (t ConversionTemplate) Write(bw *bufio.Writer) {
 		s1 = sizeof(b1)
 	)
 	if i0&types.IsInteger == 0 || i1&types.IsInteger == 0 {
-		panic("ydbgen: internal: not an integer type for conversion")
+		panic("ydbgen: internal: not an integer types for conversion")
 	}
 	signconv := [2]bool{
 		i0&types.IsUnsigned != 0,
@@ -907,7 +907,7 @@ func (t ConversionTemplate) Write(bw *bufio.Writer) {
 	code(bw, tab(3), `"ydbgen: convassert: " + `)
 	format(bw, i0, 2, "x")
 	line(bw, ` +`)
-	code(bw, tab(4), `" (type `, b0.String(), `)`)
+	code(bw, tab(4), `" (types `, b0.String(), `)`)
 	line(bw, ` overflows `, b1.String(), `",`)
 	line(bw, tab(2), `)`)
 	line(bw, tab(1), `}`)
@@ -985,7 +985,7 @@ func ydbTypeName(t internal.PrimitiveType) string {
 		return "DyNumber"
 
 	default:
-		panic("ydbgen: unexpected primitive type")
+		panic("ydbgen: unexpected primitive types")
 	}
 	return t.String()
 }

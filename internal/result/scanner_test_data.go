@@ -2,12 +2,12 @@ package result
 
 import (
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
@@ -27,7 +27,7 @@ type intIncScanner int64
 func (s *intIncScanner) Scan(src interface{}) error {
 	v, ok := src.(int64)
 	if !ok {
-		return fmt.Errorf("wrong type")
+		return fmt.Errorf("wrong types")
 	}
 	*s = intIncScanner(v + 10)
 	return nil
@@ -38,7 +38,7 @@ type dateScanner time.Time
 func (s *dateScanner) Scan(src interface{}) error {
 	v, ok := src.(time.Time)
 	if !ok {
-		return fmt.Errorf("wrong type")
+		return fmt.Errorf("wrong types")
 	}
 	*s = dateScanner(v)
 	return nil
@@ -56,7 +56,7 @@ func (s *nullStringScanner) Scan(src interface{}) error {
 	}
 	v, ok := src.(string)
 	if !ok {
-		return fmt.Errorf("wrong type")
+		return fmt.Errorf("wrong types")
 	}
 	s.value = v
 	s.isNil = false
@@ -241,7 +241,7 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_JSON,
 			ydbvalue: true,
 		}},
-		values: []interface{}{new(ydb.Value), new(ydb.Value), new(ydb.Value)},
+		values: []interface{}{new(types.Value), new(types.Value), new(types.Value)},
 	},
 	{
 		name:  "Scan table with single column",
@@ -371,7 +371,7 @@ var scannerData = []struct {
 		values: []interface{}{new(int32), new(time.Duration), new(string)},
 	},
 	{
-		name:  "ScanWithDefaults optional int32, timeinterval, string, nil values applied as default value type",
+		name:  "ScanWithDefaults optional int32, timeinterval, string, nil values applied as default value types",
 		count: 14,
 		columns: []*column{{
 			name:        "oint32",

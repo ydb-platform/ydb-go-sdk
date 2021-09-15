@@ -67,14 +67,14 @@ func TypeFromYDB(x *Ydb.Type) T {
 				S: StructType{StructFields(x.StructItems.Members)},
 			}
 		default:
-			panic("ydb: unknown variant type")
+			panic("ydb: unknown variant types")
 		}
 
 	case *Ydb.Type_VoidType:
 		return VoidType{}
 
 	default:
-		panic("ydb: unknown type")
+		panic("ydb: unknown types")
 	}
 }
 
@@ -150,7 +150,7 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) T {
 	case Ydb.Type_DYNUMBER:
 		return TypeDyNumber
 	default:
-		panic("ydb: unexpected type")
+		panic("ydb: unexpected types")
 	}
 }
 
@@ -562,7 +562,7 @@ func (t PrimitiveType) toYDB() *Ydb.Type {
 	if 0 < i && i < len(primitive) {
 		return primitive[i]
 	}
-	panic("ydb: unexpected primitive type")
+	panic("ydb: unexpected primitive types")
 }
 
 func (t PrimitiveType) toString(buf *bytes.Buffer) {

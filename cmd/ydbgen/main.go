@@ -43,7 +43,7 @@ func generate(pairs []pair, cfg cfg) error {
 	for _, t := range strings.Split(cfg.gentype, ",") {
 		wantType[t] = true
 	}
-	// A Config controls various options of the type checker.
+	// A Config controls various options of the types checker.
 	// The defaults work fine except for one setting:
 	// we must specify how to deal with imports.
 	conf := types.Config{
@@ -65,7 +65,7 @@ func generate(pairs []pair, cfg cfg) error {
 	}
 	p, err := conf.Check(".", fset, astFiles, &info)
 	if err != nil && !cfg.force {
-		return fmt.Errorf("type error: %w", err)
+		return fmt.Errorf("types error: %w", err)
 	}
 	if p == nil {
 		return fmt.Errorf("nil package")
@@ -152,12 +152,12 @@ func generate(pairs []pair, cfg cfg) error {
 					}
 				}
 				if item == nil {
-					astLog("skipping type spec %q", v.Name)
+					astLog("skipping types spec %q", v.Name)
 					return false
 				}
 				item.TypeSpec = v
 				reset = depth
-				astLog("processing type spec %q", v.Name)
+				astLog("processing types spec %q", v.Name)
 
 			case *ast.StructType:
 				astLog("struct %+v", v)
@@ -170,7 +170,7 @@ func generate(pairs []pair, cfg cfg) error {
 			case *ast.ArrayType:
 				if v.Len != nil {
 					// Type is not a slice.
-					astLog("skipping array type")
+					astLog("skipping array types")
 					return false
 				}
 				item.ArrayType = v
@@ -207,13 +207,13 @@ func generate(pairs []pair, cfg cfg) error {
 			case *ast.ArrayType:
 				typ = info.TypeOf(expr)
 			default:
-				return fmt.Errorf("unexpected field ast type: %T", expr)
+				return fmt.Errorf("unexpected field ast types: %T", expr)
 			}
 
 			switch x := typ.(type) {
 			case *types.Slice:
 				if !t.Container && isByteSlice(x) {
-					// Special case for ydb string type.
+					// Special case for ydb string types.
 					t.GetBasic()
 					t.Basic.Type = x
 					return inferBasicType(t.Basic)
@@ -235,7 +235,7 @@ func generate(pairs []pair, cfg cfg) error {
 				case name == "time.Time":
 					if t.Basic == nil || t.Basic.BaseType == nil {
 						return fmt.Errorf(
-							"field type tag required for %s conversion",
+							"field types tag required for %s conversion",
 							name,
 						)
 					}
@@ -258,7 +258,7 @@ func generate(pairs []pair, cfg cfg) error {
 				}
 
 			default:
-				return fmt.Errorf("unexpected field object type: %T", x)
+				return fmt.Errorf("unexpected field object types: %T", x)
 			}
 
 			return nil
@@ -378,20 +378,20 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("ydbgen: ")
 	var (
-		wrapMode = flag.String("wrap", "optional", "default type wrapping mode")
+		wrapMode = flag.String("wrap", "optional", "default types wrapping mode")
 		convMode = flag.String("conv", "safe", "default conv mode")
 		seekMode = flag.String("seek", "column", "default seek mode")
 
 		dir     = flag.String("dir", "", "directory to generate code for")
 		out     = flag.String("out", "", "directory to put results to")
 		exclude = flag.String("exclude", "", "regular expression to exclude files from build")
-		gentype = flag.String("type", "", "comma-separated list of types to generate code for")
+		gentype = flag.String("types", "", "comma-separated list of types to generate code for")
 		all     = flag.Bool("all", false, "generate code for all found types")
 
 		goroot       = flag.String("goroot", "", "replace go/build GOROOT path")
 		sourceLookup = flag.String("lookup", "", "mapping of base import path to directory in form of import:dir")
 
-		force   = flag.Bool("force", false, "ignore type errors")
+		force   = flag.Bool("force", false, "ignore types errors")
 		verbose = flag.Bool("verbose", false, "print debug info")
 	)
 	flag.Parse()
@@ -414,7 +414,7 @@ func main() {
 	}
 
 	if *sourceLookup != "" {
-		// We are given some base import path to be searchable by type checker.
+		// We are given some base import path to be searchable by types checker.
 		// That is, we expand default GOPATH variable with temporary directory
 		// with GOPATH friendly layout which src directory contains only base
 		// import path node which is a symbolic link to the given source base
@@ -601,7 +601,7 @@ func (p *Package) Register(id string, x interface{}) {
 func (p *Package) Finalize() error {
 	for id, l := range p.Container {
 		return fmt.Errorf(
-			"type dependency not met: %d container type(s) want type %s to be generated",
+			"types dependency not met: %d container types(s) want types %s to be generated",
 			l.Len(), id,
 		)
 	}
@@ -652,7 +652,7 @@ func ParseWrapMode(s string) (WrapMode, error) {
 	case "none":
 		return WrapNothing, nil
 	default:
-		return 0, fmt.Errorf("unknown type mode: %q", s)
+		return 0, fmt.Errorf("unknown types mode: %q", s)
 	}
 }
 
@@ -696,7 +696,7 @@ func (g *GenItem) parseGenFlags(text string) error {
 			g.Flags |= GenQueryParams
 		case "value":
 			g.Flags |= GenValue
-		case "type":
+		case "types":
 			g.Flags |= GenType
 		default:
 			return fmt.Errorf("unknown generation flag: %q", param)
@@ -762,8 +762,8 @@ type Slice struct {
 type Basic struct {
 	Conv      ConvMode
 	Face      FieldFace
-	Type      types.Type // Actual go type.
-	BaseType  types.Type // Column's go type.
+	Type      types.Type // Actual go types.
+	BaseType  types.Type // Column's go types.
 	Primitive internal.PrimitiveType
 }
 
@@ -898,7 +898,7 @@ func dig(t *T, it func(*T)) error {
 		t.Struct != nil,
 		t.Slice != nil,
 	) {
-		return fmt.Errorf("ambiguous type inference/suggestion")
+		return fmt.Errorf("ambiguous types inference/suggestion")
 	}
 
 	it(t)
@@ -926,7 +926,7 @@ func digBasic(t *T) (*T, error) {
 		t.Struct != nil,
 		t.Slice != nil,
 	) {
-		return nil, fmt.Errorf("ambiguous type inference/suggestion")
+		return nil, fmt.Errorf("ambiguous types inference/suggestion")
 	}
 	if t.Basic != nil {
 		return t, nil
@@ -947,14 +947,14 @@ func (f *Field) Validate() error {
 	}
 	t := tb.Basic
 	if t.Type == nil {
-		return fmt.Errorf("insufficient type info: Type unknown")
+		return fmt.Errorf("insufficient types info: Type unknown")
 	}
 	if t.BaseType == nil {
-		return fmt.Errorf("insufficient type info: BaseType unknown")
+		return fmt.Errorf("insufficient types info: BaseType unknown")
 	}
 	if !types.ConvertibleTo(t.Type, t.BaseType) {
 		return fmt.Errorf(
-			"impossible type conversion from %s to %s (ydb primitive type %s)",
+			"impossible types conversion from %s to %s (ydb primitive types %s)",
 			t.Type, t.BaseType, t.Primitive,
 		)
 	}
@@ -965,7 +965,7 @@ func (f *Field) Validate() error {
 		} {
 			if !isSafeConversion(conv[0], conv[1]) {
 				return fmt.Errorf(
-					"unsafe type conversion: from %s to %s",
+					"unsafe types conversion: from %s to %s",
 					conv[0], conv[1],
 				)
 			}
@@ -984,7 +984,7 @@ func (f *Field) Validate() error {
 		}
 		if safe {
 			return fmt.Errorf(
-				"already safe type conversion: %s <-> %s",
+				"already safe types conversion: %s <-> %s",
 				t.Type, t.BaseType,
 			)
 		}
@@ -1027,7 +1027,7 @@ func (f *Field) ParseTags(tags string) (err error) {
 			if err != nil {
 				return
 			}
-		case "type":
+		case "types":
 			typs = value
 		case "conv":
 			conv, err = ParseConvMode(value)
@@ -1075,13 +1075,13 @@ func basic(t1, t2 types.Type) (b1, b2 *types.Basic, ok bool) {
 func isSafeConversion(t1, t2 types.Type) bool {
 	b1, b2, ok := basic(t1, t2)
 	if !ok {
-		// Let the go compiler to prepare type checking.
+		// Let the go compiler to prepare types checking.
 		return true
 	}
 	i1 := b1.Info()
 	i2 := b2.Info()
 	if i1&types.IsNumeric != i2&types.IsNumeric {
-		// Let the go compiler to prepare type checking.
+		// Let the go compiler to prepare types checking.
 		return true
 	}
 	if i1&types.IsUnsigned != i2&types.IsUnsigned {
@@ -1187,7 +1187,7 @@ func singleParam(f *types.Func) (*types.Basic, error) {
 		return b, nil
 	}
 	return nil, fmt.Errorf(
-		"unexpected parameter %q of method %q type: "+
+		"unexpected parameter %q of method %q types: "+
 			"%s; only basic types are supported",
 		f.Name(), arg.Name(), arg.Type(),
 	)
@@ -1209,7 +1209,7 @@ func singleResult(f *types.Func) (*types.Basic, error) {
 		return b, nil
 	}
 	return nil, fmt.Errorf(
-		"unexpected type of method %q result: "+
+		"unexpected types of method %q result: "+
 			"%s; only basic types are supported",
 		f.Name(), res.Type(),
 	)
@@ -1231,7 +1231,7 @@ func resultWithFlag(f *types.Func) (*types.Basic, error) {
 	rb, ok := res.Type().(*types.Basic)
 	if !ok {
 		return nil, fmt.Errorf(
-			"unexpected type of method %q result value: "+
+			"unexpected types of method %q result value: "+
 				"%s; only basic types are supported",
 			f.Name(), res.Type(),
 		)
@@ -1241,14 +1241,14 @@ func resultWithFlag(f *types.Func) (*types.Basic, error) {
 	fb, ok := v.Type().(*types.Basic)
 	if !ok {
 		return nil, fmt.Errorf(
-			"unexpected type of method %q result value: "+
+			"unexpected types of method %q result value: "+
 				"%s; only basic types are supported",
 			f.Name(), v.Type(),
 		)
 	}
 	if fb.Kind() != types.Bool {
 		return nil, fmt.Errorf(
-			"unexpected type of method %q result flag: "+
+			"unexpected types of method %q result flag: "+
 				"have %s; want bool",
 			f.Name(), fb.Name(),
 		)
@@ -1316,7 +1316,7 @@ func suggestType(t *T, s string, conv ConvMode) error {
 			slice := t.GetSlice()
 			return suggestType(&slice.T, s[i+1:n-1], conv)
 		default:
-			return fmt.Errorf("unsupported container type: %q", s[:i])
+			return fmt.Errorf("unsupported container types: %q", s[:i])
 		}
 	}
 

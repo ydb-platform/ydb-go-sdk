@@ -3,12 +3,12 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"reflect"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
@@ -16,16 +16,16 @@ func TestResultAny(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		columns []Column
-		values  []ydb.Value
+		values  []types.Value
 		exp     []interface{}
 	}{
 		{
 			columns: []Column{
-				{"column0", ydb.Optional(ydb.TypeUint32), "family0"},
+				{"column0", types.Optional(types.TypeUint32), "family0"},
 			},
-			values: []ydb.Value{
-				ydb.OptionalValue(ydb.Uint32Value(43)),
-				ydb.NullValue(ydb.TypeUint32),
+			values: []types.Value{
+				types.OptionalValue(types.Uint32Value(43)),
+				types.NullValue(types.TypeUint32),
 			},
 			exp: []interface{}{
 				uint32(43),
@@ -68,17 +68,17 @@ func TestResultOUint32(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		columns []Column
-		values  []ydb.Value
+		values  []types.Value
 		exp     []uint32
 	}{
 		{
 			columns: []Column{
-				{"column0", ydb.Optional(ydb.TypeUint32), "family0"},
-				{"column1", ydb.TypeUint32, "family0"},
+				{"column0", types.Optional(types.TypeUint32), "family0"},
+				{"column1", types.TypeUint32, "family0"},
 			},
-			values: []ydb.Value{
-				ydb.OptionalValue(ydb.Uint32Value(43)),
-				ydb.Uint32Value(43),
+			values: []types.Value{
+				types.OptionalValue(types.Uint32Value(43)),
+				types.Uint32Value(43),
 			},
 			exp: []uint32{
 				43,
@@ -129,7 +129,7 @@ func WithColumns(cs ...Column) ResultSetOption {
 	}
 }
 
-func WithValues(vs ...ydb.Value) ResultSetOption {
+func WithValues(vs ...types.Value) ResultSetOption {
 	return func(r *resultSetDesc) {
 		n := len(r.Columns)
 		if n == 0 {
@@ -154,7 +154,7 @@ func WithValues(vs ...ydb.Value) ResultSetOption {
 			exp := internal.TypeFromYDB(r.Columns[j].Type)
 			if !internal.TypesEqual(act, exp) {
 				panic(fmt.Sprintf(
-					"unexpected type for #%d column: %s; want %s",
+					"unexpected types for #%d column: %s; want %s",
 					j, act, exp,
 				))
 			}

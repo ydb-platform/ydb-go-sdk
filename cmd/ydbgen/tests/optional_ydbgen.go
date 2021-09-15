@@ -3,44 +3,44 @@
 package tests
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = ydb.StringValue
+	_ = types.StringValue
 	_ = table.NewQueryParameters
 )
 
 func (o *Optional) QueryParameters() *table.QueryParameters {
-	var v0 ydb.Value
+	var v0 types.Value
 	{
-		var v1 ydb.Value
+		var v1 types.Value
 		x0, ok0 := o.Int64.Get()
 		if ok0 {
-			v1 = ydb.OptionalValue(ydb.Int16Value(ydbConvI64ToI16(x0)))
+			v1 = types.OptionalValue(types.Int16Value(ydbConvI64ToI16(x0)))
 		} else {
-			v1 = ydb.NullValue(ydb.TypeInt16)
+			v1 = types.NullValue(types.TypeInt16)
 		}
 		v0 = v1
 	}
-	var v1 ydb.Value
+	var v1 types.Value
 	{
-		var v2 ydb.Value
+		var v2 types.Value
 		x0, ok0 := o.Str.Get()
 		if ok0 {
-			v2 = ydb.StringValue([]uint8(x0))
+			v2 = types.StringValue([]uint8(x0))
 		} else {
-			panic("ydbgen: no value for non-optional type")
+			panic("ydbgen: no value for non-optional types")
 		}
 		v1 = v2
 	}
-	var v2 ydb.Value
+	var v2 types.Value
 	{
-		vp0 := ydb.OptionalValue(ydb.Int32Value(o.Int32))
+		vp0 := types.OptionalValue(types.Int32Value(o.Int32))
 		v2 = vp0
 	}
 	return table.NewQueryParameters(
@@ -50,68 +50,68 @@ func (o *Optional) QueryParameters() *table.QueryParameters {
 	)
 }
 
-func (o *Optional) StructValue() ydb.Value {
-	var v0 ydb.Value
+func (o *Optional) StructValue() types.Value {
+	var v0 types.Value
 	{
-		var v1 ydb.Value
+		var v1 types.Value
 		{
-			var v2 ydb.Value
+			var v2 types.Value
 			x0, ok0 := o.Int64.Get()
 			if ok0 {
-				v2 = ydb.OptionalValue(ydb.Int16Value(ydbConvI64ToI16(x0)))
+				v2 = types.OptionalValue(types.Int16Value(ydbConvI64ToI16(x0)))
 			} else {
-				v2 = ydb.NullValue(ydb.TypeInt16)
+				v2 = types.NullValue(types.TypeInt16)
 			}
 			v1 = v2
 		}
-		var v2 ydb.Value
+		var v2 types.Value
 		{
-			var v3 ydb.Value
+			var v3 types.Value
 			x0, ok0 := o.Str.Get()
 			if ok0 {
-				v3 = ydb.StringValue([]uint8(x0))
+				v3 = types.StringValue([]uint8(x0))
 			} else {
-				panic("ydbgen: no value for non-optional type")
+				panic("ydbgen: no value for non-optional types")
 			}
 			v2 = v3
 		}
-		var v3 ydb.Value
+		var v3 types.Value
 		{
-			vp0 := ydb.OptionalValue(ydb.Int32Value(o.Int32))
+			vp0 := types.OptionalValue(types.Int32Value(o.Int32))
 			v3 = vp0
 		}
-		v0 = ydb.StructValue(
-			ydb.StructFieldValue("int64", v1),
-			ydb.StructFieldValue("str", v2),
-			ydb.StructFieldValue("int32", v3),
+		v0 = types.StructValue(
+			types.StructFieldValue("int64", v1),
+			types.StructFieldValue("str", v2),
+			types.StructFieldValue("int32", v3),
 		)
 	}
 	return v0
 }
 
-func (o *Optional) StructType() ydb.Type {
-	var t0 ydb.Type
+func (o *Optional) StructType() types.Type {
+	var t0 types.Type
 	{
-		fs0 := make([]ydb.StructOption, 3)
-		var t1 ydb.Type
+		fs0 := make([]types.StructOption, 3)
+		var t1 types.Type
 		{
-			tp0 := ydb.TypeInt16
-			t1 = ydb.Optional(tp0)
+			tp0 := types.TypeInt16
+			t1 = types.Optional(tp0)
 		}
-		fs0[0] = ydb.StructField("int64", t1)
-		var t2 ydb.Type
+		fs0[0] = types.StructField("int64", t1)
+		var t2 types.Type
 		{
-			tp0 := ydb.TypeString
+			tp0 := types.TypeString
 			t2 = tp0
 		}
-		fs0[1] = ydb.StructField("str", t2)
-		var t3 ydb.Type
+		fs0[1] = types.StructField("str", t2)
+		var t3 types.Type
 		{
-			tp0 := ydb.TypeInt32
-			t3 = ydb.Optional(tp0)
+			tp0 := types.TypeInt32
+			t3 = types.Optional(tp0)
 		}
-		fs0[2] = ydb.StructField("int32", t3)
-		t0 = ydb.Struct(fs0...)
+		fs0[2] = types.StructField("int32", t3)
+		t0 = types.Struct(fs0...)
 	}
 	return t0
 }
@@ -130,7 +130,7 @@ func ydbConvI64ToI16(x int64) int16 {
 	if abs&mask != abs {
 		panic(
 			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) +
-				" (type int64) overflows int16",
+				" (types int64) overflows int16",
 		)
 	}
 	return int16(x)

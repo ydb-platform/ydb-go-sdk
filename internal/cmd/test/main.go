@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/errors"
 	"os"
 	"path"
 	"sync"
@@ -101,7 +101,7 @@ func main() {
 
 			err = scanQuerySelect(ctx, db.Table().Pool(), connectParams.Database())
 			if err != nil {
-				if !ydb.IsTransportError(err, ydb.TransportErrorUnimplemented) {
+				if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
 					_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
 				}
 			}

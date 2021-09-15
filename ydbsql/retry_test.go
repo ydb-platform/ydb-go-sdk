@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	conn2 "github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,7 +14,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
@@ -29,7 +30,7 @@ func (b *ClusterBuilder) log(msg string, args ...interface{}) {
 	b.Logf(fmt.Sprint("db stub: ", fmt.Sprintf(msg, args...)))
 }
 
-func (b *ClusterBuilder) Build() ydb.Cluster {
+func (b *ClusterBuilder) Build() conn2.Cluster {
 	type session struct {
 		sync.Mutex
 		busy bool
@@ -150,8 +151,8 @@ func TestTxDoerStmt(t *testing.T) {
 		Error: func(_ context.Context, method testutil.MethodCode) (err error) {
 			defer func() { count++ }()
 			if count > 0 && count < 3 {
-				err = &ydb.TransportError{
-					Reason: ydb.TransportErrorDeadlineExceeded,
+				err = &errors.TransportError{
+					Reason: errors.TransportErrorDeadlineExceeded,
 				}
 			}
 			return

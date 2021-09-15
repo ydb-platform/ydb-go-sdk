@@ -2,9 +2,9 @@ package ydbsql
 
 import (
 	"bytes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
@@ -20,7 +20,7 @@ func (d *Declaration) String() string {
 	return d.buf.String()
 }
 
-func (d *Declaration) Declare(name string, t ydb.Type) {
+func (d *Declaration) Declare(name string, t types.Type) {
 	d.buf.WriteString("DECLARE $")
 	d.buf.WriteString(name)
 	d.buf.WriteString(" AS \"")

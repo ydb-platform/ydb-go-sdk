@@ -6,6 +6,8 @@ package ydbtest
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"net"
 	"strconv"
 	"sync"
@@ -19,13 +21,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 type Handler func(ctx context.Context, req RequestParser) (res interface{}, err error)
 
-type Handlers map[ydb.Method]Handler
+type Handlers map[trace.Method]Handler
 
 type RequestParser func(interface{})
 type ResponseMapper func(RequestParser) proto.Message
@@ -74,7 +74,7 @@ type YDB struct {
 	descs []grpc.ServiceDesc
 
 	mu        sync.Mutex
-	endpoints map[ydb.Endpoint]*Endpoint
+	endpoints map[endpoint.Endpoint]*Endpoint
 }
 
 func (s *YDB) init() {
@@ -104,14 +104,14 @@ func (s *YDB) init() {
 			})
 		}
 
-		s.endpoints = make(map[ydb.Endpoint]*Endpoint)
+		s.endpoints = make(map[endpoint.Endpoint]*Endpoint)
 	})
 }
 
 type Endpoint struct {
 	db     *YDB
 	ln     *Listener
-	id     ydb.Endpoint
+	id     endpoint.Endpoint
 	server *grpc.Server
 }
 
@@ -127,7 +127,7 @@ func (s *YDB) StartEndpoint() *Endpoint {
 	if err != nil {
 		s.T.Fatal(err)
 	}
-	e := ydb.Endpoint{
+	e := endpoint.Endpoint{
 		Addr: host,
 		Port: port,
 	}
@@ -197,7 +197,7 @@ func (s *YDB) StartBalancer() *Balancer {
 
 	ln := NewListener()
 	srv := grpc.NewServer()
-	m := ydb.Method("/Ydb.Discovery.V1.DiscoveryService/ListEndpoints")
+	m := trace.Method("/Ydb.Discovery.V1.DiscoveryService/ListEndpoints")
 
 	service, method := m.Split()
 	srv.RegisterService(&grpc.ServiceDesc{
@@ -238,7 +238,7 @@ func (s *YDB) StartBalancer() *Balancer {
 }
 
 func (s *YDB) DialContext(ctx context.Context, addr string) (_ net.Conn, err error) {
-	var e ydb.Endpoint
+	var e endpoint.Endpoint
 	e.Addr, e.Port, err = SplitHostPort(addr)
 	if err != nil {
 		return

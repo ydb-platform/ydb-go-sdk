@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
 	"math"
 	"reflect"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
@@ -71,7 +71,7 @@ func (s *Scanner) writePathTo(w io.Writer) (n int64, err error) {
 	return n, nil
 }
 
-func (s *Scanner) getType() ydb.Type {
+func (s *Scanner) getType() types.Type {
 	x := s.stack.current()
 	if x.isEmpty() {
 		return nil
@@ -278,13 +278,13 @@ func (s *Scanner) any() interface{} {
 		internal.TypeJSONDocument:
 		return []byte(s.text())
 	default:
-		s.errorf("ydb/table: unknown primitive type")
+		s.errorf("ydb/table: unknown primitive types")
 		return nil
 	}
 }
 
-// Value returns current item under scan as ydb.Value type.
-func (s *Scanner) value() ydb.Value {
+// Value returns current item under scan as ydb.Value types.
+func (s *Scanner) value() types.Value {
 	if s.err != nil {
 		return nil
 	}
@@ -326,7 +326,7 @@ func (s *Scanner) errorf(f string, args ...interface{}) {
 
 func (s *Scanner) typeError(act, exp interface{}) {
 	s.errorf(
-		"unexpected type during scan at %q %s: %s; want %s",
+		"unexpected types during scan at %q %s: %s; want %s",
 		s.path(), s.getType(), nameIface(act), nameIface(exp),
 	)
 }
@@ -361,7 +361,7 @@ func (s *Scanner) isNull() bool {
 	return yes
 }
 
-// unwrap unwraps current item under scan interpreting it as Optional<T> type.
+// unwrap unwraps current item under scan interpreting it as Optional<T> types.
 func (s *Scanner) unwrap() {
 	if s.err != nil {
 		return
@@ -537,7 +537,7 @@ func (s *Scanner) setTime(dst *time.Time) {
 		}
 		*dst = src
 	default:
-		s.errorf("scan row failed: incorrect source type %s", t)
+		s.errorf("scan row failed: incorrect source types %s", t)
 	}
 }
 
@@ -550,7 +550,7 @@ func (s *Scanner) setString(dst *string) {
 	case Ydb.Type_DYNUMBER:
 		*dst = s.text()
 	default:
-		s.errorf("scan row failed: incorrect source type %s", t)
+		s.errorf("scan row failed: incorrect source types %s", t)
 	}
 }
 
@@ -564,7 +564,7 @@ func (s *Scanner) setByte(dst *[]byte) {
 	case Ydb.Type_STRING:
 		*dst = s.bytes()
 	default:
-		s.errorf("scan row failed: incorrect source type %s", t)
+		s.errorf("scan row failed: incorrect source types %s", t)
 	}
 }
 
@@ -651,17 +651,17 @@ func (s *Scanner) scanRequired(value interface{}) {
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
 		}
-	case ydb.Scanner:
+	case types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			s.errorf("ydb.Scanner error: %w", err)
 		}
-	case *ydb.Value:
+	case *types.Value:
 		*v = s.value()
 	default:
 		ok := s.trySetByteArray(v, false, false)
 		if !ok {
-			s.errorf("scan row failed: type %T is unknown", v)
+			s.errorf("scan row failed: types %T is unknown", v)
 		}
 	}
 }
@@ -821,7 +821,7 @@ func (s *Scanner) scanOptional(value interface{}) {
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
 		}
-	case ydb.Scanner:
+	case types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			s.errorf("ydb.Scanner error: %w", err)
@@ -832,9 +832,9 @@ func (s *Scanner) scanOptional(value interface{}) {
 		if !ok {
 			rv := reflect.TypeOf(v)
 			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Ptr {
-				s.errorf("scan row failed: type %T is unknown", v)
+				s.errorf("scan row failed: types %T is unknown", v)
 			} else {
-				s.errorf("scan row failed: type %T is not optional! use double pointer or sql.Scanner.", v)
+				s.errorf("scan row failed: types %T is not optional! use double pointer or sql.Scanner.", v)
 			}
 		}
 	}
@@ -881,23 +881,23 @@ func (s *Scanner) setDefaultValue(dst interface{}) {
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
 		}
-	case ydb.Scanner:
+	case types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			s.errorf("ydb.Scanner error: %w", err)
 		}
-	case *ydb.Value:
+	case *types.Value:
 		*v = s.value()
 	default:
 		ok := s.trySetByteArray(v, false, true)
 		if !ok {
-			s.errorf("scan row failed: type %T is unknown", v)
+			s.errorf("scan row failed: types %T is unknown", v)
 		}
 	}
 }
 
-// ScanWithDefaults scan with default type values.
-// Nil values applied as default value type
+// ScanWithDefaults scan with default types values.
+// Nil values applied as default value types
 // Input params - pointers to types.
 func (s *Scanner) ScanWithDefaults(values ...interface{}) error {
 	s.defaultValueForOptional = true
@@ -924,8 +924,8 @@ func (s *Scanner) ScanWithDefaults(values ...interface{}) error {
 //   time.Duration
 //   ydb.Value
 // For custom types implement sql.Scanner interface.
-// For optional type use double pointer construction.
-// For unknown types use interface type.
+// For optional types use double pointer construction.
+// For unknown types use interface types.
 // Supported scanning byte arrays of various length.
 // For complex yql types: Dict, List, Tuple and own specific scanning logic implement ydb.Scanner with UnmarshalYDB method
 // See examples for more detailed information.

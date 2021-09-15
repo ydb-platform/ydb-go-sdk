@@ -1,10 +1,9 @@
 package ydbsql
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strings"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 func TestDeclaration(t *testing.T) {
@@ -14,13 +13,13 @@ func TestDeclaration(t *testing.T) {
 	}{
 		{
 			decl: func(d *Declaration) {
-				d.Declare("foo", ydb.TypeString)
-				d.Declare("bar", ydb.TypeInt64)
-				d.Declare("baz", ydb.Struct(
-					ydb.StructField("foo", ydb.TypeString),
-					ydb.StructField("bar", ydb.TypeInt64),
-					ydb.StructField("baz", ydb.Tuple(
-						ydb.TypeString, ydb.TypeInt64,
+				d.Declare("foo", types.TypeString)
+				d.Declare("bar", types.TypeInt64)
+				d.Declare("baz", types.Struct(
+					types.StructField("foo", types.TypeString),
+					types.StructField("bar", types.TypeInt64),
+					types.StructField("baz", types.Tuple(
+						types.TypeString, types.TypeInt64,
 					)),
 				))
 			},

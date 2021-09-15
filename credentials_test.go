@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
@@ -9,7 +10,7 @@ import (
 
 func TestCredentialsString(t *testing.T) {
 	for _, test := range []struct {
-		c Credentials
+		c credentials.Credentials
 		s string
 	}{
 		{
@@ -17,19 +18,19 @@ func TestCredentialsString(t *testing.T) {
 			"",
 		},
 		{
-			NewAnonymousCredentials(""),
+			credentials.NewAnonymousCredentials(""),
 			"anonymousCredentials",
 		},
 		{
-			NewAnonymousCredentials("test"),
+			credentials.NewAnonymousCredentials("test"),
 			"anonymousCredentials created from test",
 		},
 		{
-			NewAuthTokenCredentials("", ""),
+			credentials.NewAuthTokenCredentials("", ""),
 			"AuthTokenCredentials",
 		},
 		{
-			NewAuthTokenCredentials("", "test"),
+			credentials.NewAuthTokenCredentials("", "test"),
 			"AuthTokenCredentials created from test",
 		},
 	} {

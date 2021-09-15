@@ -4,7 +4,7 @@ I hereby agree to the terms of the CLA available at: https://yandex.ru/legal/cla
 
 ## Pull request type
 
-<!-- Please try to limit your pull request to one type, submit multiple pull requests if needed. -->
+<!-- Please try to limit your pull request to one types, submit multiple pull requests if needed. -->
 
 Please check the type of change your PR introduces:
 

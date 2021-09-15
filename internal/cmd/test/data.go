@@ -1,49 +1,48 @@
 package main
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
-func seriesData(id uint64, released time.Time, title, info, comment string) ydb.Value {
-	var commentv ydb.Value
+func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
+	var commentv types.Value
 	if comment == "" {
-		commentv = ydb.NullValue(ydb.TypeUTF8)
+		commentv = types.NullValue(types.TypeUTF8)
 	} else {
-		commentv = ydb.OptionalValue(ydb.UTF8Value(comment))
+		commentv = types.OptionalValue(types.UTF8Value(comment))
 	}
-	return ydb.StructValue(
-		ydb.StructFieldValue("series_id", ydb.Uint64Value(id)),
-		ydb.StructFieldValue("release_date", ydb.DateValueFromTime(released)),
-		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
-		ydb.StructFieldValue("series_info", ydb.UTF8Value(info)),
-		ydb.StructFieldValue("comment", commentv),
+	return types.StructValue(
+		types.StructFieldValue("series_id", types.Uint64Value(id)),
+		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
+		types.StructFieldValue("title", types.UTF8Value(title)),
+		types.StructFieldValue("series_info", types.UTF8Value(info)),
+		types.StructFieldValue("comment", commentv),
 	)
 }
 
-func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) ydb.Value {
-	return ydb.StructValue(
-		ydb.StructFieldValue("series_id", ydb.Uint64Value(seriesID)),
-		ydb.StructFieldValue("season_id", ydb.Uint64Value(seasonID)),
-		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
-		ydb.StructFieldValue("first_aired", ydb.DateValueFromTime(first)),
-		ydb.StructFieldValue("last_aired", ydb.DateValueFromTime(last)),
+func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) types.Value {
+	return types.StructValue(
+		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
+		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
+		types.StructFieldValue("title", types.UTF8Value(title)),
+		types.StructFieldValue("first_aired", types.DateValueFromTime(first)),
+		types.StructFieldValue("last_aired", types.DateValueFromTime(last)),
 	)
 }
 
-func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.Time) ydb.Value {
-	return ydb.StructValue(
-		ydb.StructFieldValue("series_id", ydb.Uint64Value(seriesID)),
-		ydb.StructFieldValue("season_id", ydb.Uint64Value(seasonID)),
-		ydb.StructFieldValue("episode_id", ydb.Uint64Value(episodeID)),
-		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
-		ydb.StructFieldValue("air_date", ydb.DateValueFromTime(date)),
+func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.Time) types.Value {
+	return types.StructValue(
+		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
+		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
+		types.StructFieldValue("episode_id", types.Uint64Value(episodeID)),
+		types.StructFieldValue("title", types.UTF8Value(title)),
+		types.StructFieldValue("air_date", types.DateValueFromTime(date)),
 	)
 }
 
-func getSeriesData() ydb.Value {
-	return ydb.ListValue(
+func getSeriesData() types.Value {
+	return types.ListValue(
 		seriesData(
 			1, days("2006-02-03"), "IT Crowd", ""+
 				"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
@@ -59,8 +58,8 @@ func getSeriesData() ydb.Value {
 	)
 }
 
-func getSeasonsData() ydb.Value {
-	return ydb.ListValue(
+func getSeasonsData() types.Value {
+	return types.ListValue(
 		seasonData(1, 1, "Season 1", days("2006-02-03"), days("2006-03-03")),
 		seasonData(1, 2, "Season 2", days("2007-08-24"), days("2007-09-28")),
 		seasonData(1, 3, "Season 3", days("2008-11-21"), days("2008-12-26")),
@@ -73,8 +72,8 @@ func getSeasonsData() ydb.Value {
 	)
 }
 
-func getEpisodesData() ydb.Value {
-	return ydb.ListValue(
+func getEpisodesData() types.Value {
+	return types.ListValue(
 		episodeData(1, 1, 1, "Yesterday's Jam", days("2006-02-03")),
 		episodeData(1, 1, 2, "Calamity Jen", days("2006-02-03")),
 		episodeData(1, 1, 3, "Fifty-Fifty", days("2006-02-10")),

@@ -198,7 +198,7 @@ configuration level (which is struct tag) defines non-optional `uint32` type:
 //ydb:gen
 //ydb:set wrap:none
 type User struct {
-	Age int32 `ydb:"type:uint32,column:user_age"`
+	Age int32 `ydb:"types:uint32,column:user_age"`
 }
 ```
 
@@ -294,7 +294,7 @@ values and their conversion to YDB types:
 
 //ydb:gen
 type User struct {
-	Updated time.Time `ydb:"type:timestamp?"`
+	Updated time.Time `ydb:"types:timestamp?"`
 }
 ```
 
@@ -307,7 +307,7 @@ type User struct {
 
 //ydb:gen
 type User struct {
-	Tags []string `ydb:"type:list<string>"`
+	Tags []string `ydb:"types:list<string>"`
 }
 ```
 

@@ -1,6 +1,7 @@
 package table
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -65,7 +66,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 	{
 		opt := WithProfile(
 			WithPartitioningPolicy(
-				WithPartitioningPolicyExplicitPartitions(ydb.Int64Value(1)),
+				WithPartitioningPolicyExplicitPartitions(types.Int64Value(1)),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -76,7 +77,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
-			internal.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{internal.ValueToYDB(ydb.Int64Value(1))})
+			internal.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{internal.ValueToYDB(types.Int64Value(1))})
 		}
 	}
 	{
@@ -148,7 +149,7 @@ func TestStoragePolicyOptions(t *testing.T) {
 
 func TestAlterTableOptions(t *testing.T) {
 	{
-		opt := WithAddColumn("a", ydb.TypeBool)
+		opt := WithAddColumn("a", types.TypeBool)
 		req := Ydb_Table.AlterTableRequest{}
 		opt((*alterTableDesc)(&req))
 		if len(req.AddColumns) != 1 ||
@@ -159,7 +160,7 @@ func TestAlterTableOptions(t *testing.T) {
 	{
 		column := Column{
 			Name:   "a",
-			Type:   ydb.TypeBool,
+			Type:   types.TypeBool,
 			Family: "b",
 		}
 		opt := WithAddColumnMeta(column)

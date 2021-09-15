@@ -3,102 +3,102 @@
 package tests
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = ydb.StringValue
+	_ = types.StringValue
 	_ = table.NewQueryParameters
 )
 
 func (c *Container) QueryParameters() *table.QueryParameters {
-	var v0 ydb.Value
+	var v0 types.Value
 	{
-		var v1 ydb.Value
+		var v1 types.Value
 		{
-			var v2 ydb.Value
+			var v2 types.Value
 			{
-				vp0 := ydb.OptionalValue(ydb.UTF8Value(c.Struct.ID))
+				vp0 := types.OptionalValue(types.UTF8Value(c.Struct.ID))
 				v2 = vp0
 			}
-			var v3 ydb.Value
+			var v3 types.Value
 			{
-				var list0 ydb.Value
-				vs0 := make([]ydb.Value, len(c.Struct.Ints))
+				var list0 types.Value
+				vs0 := make([]types.Value, len(c.Struct.Ints))
 				for i0, item0 := range c.Struct.Ints {
-					var v4 ydb.Value
+					var v4 types.Value
 					{
-						vp0 := ydb.OptionalValue(ydb.Int32Value(item0))
+						vp0 := types.OptionalValue(types.Int32Value(item0))
 						v4 = vp0
 					}
 					vs0[i0] = v4
 				}
 				if len(vs0) == 0 {
-					var t1 ydb.Type
+					var t1 types.Type
 					{
-						tp0 := ydb.TypeInt32
-						t1 = ydb.Optional(tp0)
+						tp0 := types.TypeInt32
+						t1 = types.Optional(tp0)
 					}
-					t0 := ydb.List(t1)
-					list0 = ydb.ZeroValue(t0)
+					t0 := types.List(t1)
+					list0 = types.ZeroValue(t0)
 				} else {
-					list0 = ydb.ListValue(vs0...)
+					list0 = types.ListValue(vs0...)
 				}
 				v3 = list0
 			}
-			v1 = ydb.StructValue(
-				ydb.StructFieldValue("id", v2),
-				ydb.StructFieldValue("ints", v3),
+			v1 = types.StructValue(
+				types.StructFieldValue("id", v2),
+				types.StructFieldValue("ints", v3),
 			)
 		}
 		v0 = v1
 	}
-	var v1 ydb.Value
+	var v1 types.Value
 	{
-		var list0 ydb.Value
-		vs0 := make([]ydb.Value, len(c.Structs))
+		var list0 types.Value
+		vs0 := make([]types.Value, len(c.Structs))
 		for i0, item0 := range c.Structs {
-			var v2 ydb.Value
+			var v2 types.Value
 			{
-				var v3 ydb.Value
+				var v3 types.Value
 				{
-					var v4 ydb.Value
+					var v4 types.Value
 					{
-						vp0 := ydb.OptionalValue(ydb.UTF8Value(item0.ID))
+						vp0 := types.OptionalValue(types.UTF8Value(item0.ID))
 						v4 = vp0
 					}
-					var v5 ydb.Value
+					var v5 types.Value
 					{
-						var list1 ydb.Value
-						vs1 := make([]ydb.Value, len(item0.Ints))
+						var list1 types.Value
+						vs1 := make([]types.Value, len(item0.Ints))
 						for i1, item1 := range item0.Ints {
-							var v6 ydb.Value
+							var v6 types.Value
 							{
-								vp0 := ydb.OptionalValue(ydb.Int32Value(item1))
+								vp0 := types.OptionalValue(types.Int32Value(item1))
 								v6 = vp0
 							}
 							vs1[i1] = v6
 						}
 						if len(vs1) == 0 {
-							var t1 ydb.Type
+							var t1 types.Type
 							{
-								tp0 := ydb.TypeInt32
-								t1 = ydb.Optional(tp0)
+								tp0 := types.TypeInt32
+								t1 = types.Optional(tp0)
 							}
-							t0 := ydb.List(t1)
-							list1 = ydb.ZeroValue(t0)
+							t0 := types.List(t1)
+							list1 = types.ZeroValue(t0)
 						} else {
-							list1 = ydb.ListValue(vs1...)
+							list1 = types.ListValue(vs1...)
 						}
 						v5 = list1
 					}
-					v3 = ydb.StructValue(
-						ydb.StructFieldValue("id", v4),
-						ydb.StructFieldValue("ints", v5),
+					v3 = types.StructValue(
+						types.StructFieldValue("id", v4),
+						types.StructFieldValue("ints", v5),
 					)
 				}
 				v2 = v3
@@ -106,92 +106,92 @@ func (c *Container) QueryParameters() *table.QueryParameters {
 			vs0[i0] = v2
 		}
 		if len(vs0) == 0 {
-			var t1 ydb.Type
+			var t1 types.Type
 			{
-				var t2 ydb.Type
+				var t2 types.Type
 				{
-					fs0 := make([]ydb.StructOption, 2)
-					var t3 ydb.Type
+					fs0 := make([]types.StructOption, 2)
+					var t3 types.Type
 					{
-						tp0 := ydb.TypeUTF8
-						t3 = ydb.Optional(tp0)
+						tp0 := types.TypeUTF8
+						t3 = types.Optional(tp0)
 					}
-					fs0[0] = ydb.StructField("id", t3)
-					var t4 ydb.Type
+					fs0[0] = types.StructField("id", t3)
+					var t4 types.Type
 					{
-						var t6 ydb.Type
+						var t6 types.Type
 						{
-							tp0 := ydb.TypeInt32
-							t6 = ydb.Optional(tp0)
+							tp0 := types.TypeInt32
+							t6 = types.Optional(tp0)
 						}
-						t5 := ydb.List(t6)
+						t5 := types.List(t6)
 						t4 = t5
 					}
-					fs0[1] = ydb.StructField("ints", t4)
-					t2 = ydb.Struct(fs0...)
+					fs0[1] = types.StructField("ints", t4)
+					t2 = types.Struct(fs0...)
 				}
 				t1 = t2
 			}
-			t0 := ydb.List(t1)
-			list0 = ydb.ZeroValue(t0)
+			t0 := types.List(t1)
+			list0 = types.ZeroValue(t0)
 		} else {
-			list0 = ydb.ListValue(vs0...)
+			list0 = types.ListValue(vs0...)
 		}
 		v1 = list0
 	}
-	var v2 ydb.Value
+	var v2 types.Value
 	{
-		var list0 ydb.Value
-		vs0 := make([]ydb.Value, len(c.Bytes))
+		var list0 types.Value
+		vs0 := make([]types.Value, len(c.Bytes))
 		for i0, item0 := range c.Bytes {
-			var v3 ydb.Value
+			var v3 types.Value
 			{
-				vp0 := ydb.Uint32Value(uint32(item0))
+				vp0 := types.Uint32Value(uint32(item0))
 				v3 = vp0
 			}
 			vs0[i0] = v3
 		}
 		if len(vs0) == 0 {
-			var t1 ydb.Type
+			var t1 types.Type
 			{
-				tp0 := ydb.TypeUint32
+				tp0 := types.TypeUint32
 				t1 = tp0
 			}
-			t0 := ydb.List(t1)
-			list0 = ydb.ZeroValue(t0)
+			t0 := types.List(t1)
+			list0 = types.ZeroValue(t0)
 		} else {
-			list0 = ydb.ListValue(vs0...)
+			list0 = types.ListValue(vs0...)
 		}
 		v2 = list0
 	}
-	var v3 ydb.Value
+	var v3 types.Value
 	{
-		var list0 ydb.Value
-		vs0 := make([]ydb.Value, len(c.Strings))
+		var list0 types.Value
+		vs0 := make([]types.Value, len(c.Strings))
 		for i0, item0 := range c.Strings {
-			var v4 ydb.Value
+			var v4 types.Value
 			{
-				vp0 := ydb.StringValue([]uint8(item0))
+				vp0 := types.StringValue([]uint8(item0))
 				v4 = vp0
 			}
 			vs0[i0] = v4
 		}
 		if len(vs0) == 0 {
-			var t1 ydb.Type
+			var t1 types.Type
 			{
-				tp0 := ydb.TypeString
+				tp0 := types.TypeString
 				t1 = tp0
 			}
-			t0 := ydb.List(t1)
-			list0 = ydb.ZeroValue(t0)
+			t0 := types.List(t1)
+			list0 = types.ZeroValue(t0)
 		} else {
-			list0 = ydb.ListValue(vs0...)
+			list0 = types.ListValue(vs0...)
 		}
 		v3 = list0
 	}
-	var v4 ydb.Value
+	var v4 types.Value
 	{
-		vp0 := ydb.OptionalValue(ydb.StringValue(c.String))
+		vp0 := types.OptionalValue(types.StringValue(c.String))
 		v4 = vp0
 	}
 	return table.NewQueryParameters(
@@ -203,92 +203,92 @@ func (c *Container) QueryParameters() *table.QueryParameters {
 	)
 }
 
-func (c *Container) StructValue() ydb.Value {
-	var v0 ydb.Value
+func (c *Container) StructValue() types.Value {
+	var v0 types.Value
 	{
-		var v1 ydb.Value
+		var v1 types.Value
 		{
-			var v2 ydb.Value
+			var v2 types.Value
 			{
-				var v3 ydb.Value
+				var v3 types.Value
 				{
-					vp0 := ydb.OptionalValue(ydb.UTF8Value(c.Struct.ID))
+					vp0 := types.OptionalValue(types.UTF8Value(c.Struct.ID))
 					v3 = vp0
 				}
-				var v4 ydb.Value
+				var v4 types.Value
 				{
-					var list0 ydb.Value
-					vs0 := make([]ydb.Value, len(c.Struct.Ints))
+					var list0 types.Value
+					vs0 := make([]types.Value, len(c.Struct.Ints))
 					for i0, item0 := range c.Struct.Ints {
-						var v5 ydb.Value
+						var v5 types.Value
 						{
-							vp0 := ydb.OptionalValue(ydb.Int32Value(item0))
+							vp0 := types.OptionalValue(types.Int32Value(item0))
 							v5 = vp0
 						}
 						vs0[i0] = v5
 					}
 					if len(vs0) == 0 {
-						var t1 ydb.Type
+						var t1 types.Type
 						{
-							tp0 := ydb.TypeInt32
-							t1 = ydb.Optional(tp0)
+							tp0 := types.TypeInt32
+							t1 = types.Optional(tp0)
 						}
-						t0 := ydb.List(t1)
-						list0 = ydb.ZeroValue(t0)
+						t0 := types.List(t1)
+						list0 = types.ZeroValue(t0)
 					} else {
-						list0 = ydb.ListValue(vs0...)
+						list0 = types.ListValue(vs0...)
 					}
 					v4 = list0
 				}
-				v2 = ydb.StructValue(
-					ydb.StructFieldValue("id", v3),
-					ydb.StructFieldValue("ints", v4),
+				v2 = types.StructValue(
+					types.StructFieldValue("id", v3),
+					types.StructFieldValue("ints", v4),
 				)
 			}
 			v1 = v2
 		}
-		var v2 ydb.Value
+		var v2 types.Value
 		{
-			var list0 ydb.Value
-			vs0 := make([]ydb.Value, len(c.Structs))
+			var list0 types.Value
+			vs0 := make([]types.Value, len(c.Structs))
 			for i0, item0 := range c.Structs {
-				var v3 ydb.Value
+				var v3 types.Value
 				{
-					var v4 ydb.Value
+					var v4 types.Value
 					{
-						var v5 ydb.Value
+						var v5 types.Value
 						{
-							vp0 := ydb.OptionalValue(ydb.UTF8Value(item0.ID))
+							vp0 := types.OptionalValue(types.UTF8Value(item0.ID))
 							v5 = vp0
 						}
-						var v6 ydb.Value
+						var v6 types.Value
 						{
-							var list1 ydb.Value
-							vs1 := make([]ydb.Value, len(item0.Ints))
+							var list1 types.Value
+							vs1 := make([]types.Value, len(item0.Ints))
 							for i1, item1 := range item0.Ints {
-								var v7 ydb.Value
+								var v7 types.Value
 								{
-									vp0 := ydb.OptionalValue(ydb.Int32Value(item1))
+									vp0 := types.OptionalValue(types.Int32Value(item1))
 									v7 = vp0
 								}
 								vs1[i1] = v7
 							}
 							if len(vs1) == 0 {
-								var t1 ydb.Type
+								var t1 types.Type
 								{
-									tp0 := ydb.TypeInt32
-									t1 = ydb.Optional(tp0)
+									tp0 := types.TypeInt32
+									t1 = types.Optional(tp0)
 								}
-								t0 := ydb.List(t1)
-								list1 = ydb.ZeroValue(t0)
+								t0 := types.List(t1)
+								list1 = types.ZeroValue(t0)
 							} else {
-								list1 = ydb.ListValue(vs1...)
+								list1 = types.ListValue(vs1...)
 							}
 							v6 = list1
 						}
-						v4 = ydb.StructValue(
-							ydb.StructFieldValue("id", v5),
-							ydb.StructFieldValue("ints", v6),
+						v4 = types.StructValue(
+							types.StructFieldValue("id", v5),
+							types.StructFieldValue("ints", v6),
 						)
 					}
 					v3 = v4
@@ -296,204 +296,204 @@ func (c *Container) StructValue() ydb.Value {
 				vs0[i0] = v3
 			}
 			if len(vs0) == 0 {
-				var t1 ydb.Type
+				var t1 types.Type
 				{
-					var t2 ydb.Type
+					var t2 types.Type
 					{
-						fs0 := make([]ydb.StructOption, 2)
-						var t3 ydb.Type
+						fs0 := make([]types.StructOption, 2)
+						var t3 types.Type
 						{
-							tp0 := ydb.TypeUTF8
-							t3 = ydb.Optional(tp0)
+							tp0 := types.TypeUTF8
+							t3 = types.Optional(tp0)
 						}
-						fs0[0] = ydb.StructField("id", t3)
-						var t4 ydb.Type
+						fs0[0] = types.StructField("id", t3)
+						var t4 types.Type
 						{
-							var t6 ydb.Type
+							var t6 types.Type
 							{
-								tp0 := ydb.TypeInt32
-								t6 = ydb.Optional(tp0)
+								tp0 := types.TypeInt32
+								t6 = types.Optional(tp0)
 							}
-							t5 := ydb.List(t6)
+							t5 := types.List(t6)
 							t4 = t5
 						}
-						fs0[1] = ydb.StructField("ints", t4)
-						t2 = ydb.Struct(fs0...)
+						fs0[1] = types.StructField("ints", t4)
+						t2 = types.Struct(fs0...)
 					}
 					t1 = t2
 				}
-				t0 := ydb.List(t1)
-				list0 = ydb.ZeroValue(t0)
+				t0 := types.List(t1)
+				list0 = types.ZeroValue(t0)
 			} else {
-				list0 = ydb.ListValue(vs0...)
+				list0 = types.ListValue(vs0...)
 			}
 			v2 = list0
 		}
-		var v3 ydb.Value
+		var v3 types.Value
 		{
-			var list0 ydb.Value
-			vs0 := make([]ydb.Value, len(c.Bytes))
+			var list0 types.Value
+			vs0 := make([]types.Value, len(c.Bytes))
 			for i0, item0 := range c.Bytes {
-				var v4 ydb.Value
+				var v4 types.Value
 				{
-					vp0 := ydb.Uint32Value(uint32(item0))
+					vp0 := types.Uint32Value(uint32(item0))
 					v4 = vp0
 				}
 				vs0[i0] = v4
 			}
 			if len(vs0) == 0 {
-				var t1 ydb.Type
+				var t1 types.Type
 				{
-					tp0 := ydb.TypeUint32
+					tp0 := types.TypeUint32
 					t1 = tp0
 				}
-				t0 := ydb.List(t1)
-				list0 = ydb.ZeroValue(t0)
+				t0 := types.List(t1)
+				list0 = types.ZeroValue(t0)
 			} else {
-				list0 = ydb.ListValue(vs0...)
+				list0 = types.ListValue(vs0...)
 			}
 			v3 = list0
 		}
-		var v4 ydb.Value
+		var v4 types.Value
 		{
-			var list0 ydb.Value
-			vs0 := make([]ydb.Value, len(c.Strings))
+			var list0 types.Value
+			vs0 := make([]types.Value, len(c.Strings))
 			for i0, item0 := range c.Strings {
-				var v5 ydb.Value
+				var v5 types.Value
 				{
-					vp0 := ydb.StringValue([]uint8(item0))
+					vp0 := types.StringValue([]uint8(item0))
 					v5 = vp0
 				}
 				vs0[i0] = v5
 			}
 			if len(vs0) == 0 {
-				var t1 ydb.Type
+				var t1 types.Type
 				{
-					tp0 := ydb.TypeString
+					tp0 := types.TypeString
 					t1 = tp0
 				}
-				t0 := ydb.List(t1)
-				list0 = ydb.ZeroValue(t0)
+				t0 := types.List(t1)
+				list0 = types.ZeroValue(t0)
 			} else {
-				list0 = ydb.ListValue(vs0...)
+				list0 = types.ListValue(vs0...)
 			}
 			v4 = list0
 		}
-		var v5 ydb.Value
+		var v5 types.Value
 		{
-			vp0 := ydb.OptionalValue(ydb.StringValue(c.String))
+			vp0 := types.OptionalValue(types.StringValue(c.String))
 			v5 = vp0
 		}
-		v0 = ydb.StructValue(
-			ydb.StructFieldValue("struct", v1),
-			ydb.StructFieldValue("structs", v2),
-			ydb.StructFieldValue("bytes", v3),
-			ydb.StructFieldValue("strings", v4),
-			ydb.StructFieldValue("string", v5),
+		v0 = types.StructValue(
+			types.StructFieldValue("struct", v1),
+			types.StructFieldValue("structs", v2),
+			types.StructFieldValue("bytes", v3),
+			types.StructFieldValue("strings", v4),
+			types.StructFieldValue("string", v5),
 		)
 	}
 	return v0
 }
 
-func (c *Container) StructType() ydb.Type {
-	var t0 ydb.Type
+func (c *Container) StructType() types.Type {
+	var t0 types.Type
 	{
-		fs0 := make([]ydb.StructOption, 5)
-		var t1 ydb.Type
+		fs0 := make([]types.StructOption, 5)
+		var t1 types.Type
 		{
-			var t2 ydb.Type
+			var t2 types.Type
 			{
-				fs1 := make([]ydb.StructOption, 2)
-				var t3 ydb.Type
+				fs1 := make([]types.StructOption, 2)
+				var t3 types.Type
 				{
-					tp0 := ydb.TypeUTF8
-					t3 = ydb.Optional(tp0)
+					tp0 := types.TypeUTF8
+					t3 = types.Optional(tp0)
 				}
-				fs1[0] = ydb.StructField("id", t3)
-				var t4 ydb.Type
+				fs1[0] = types.StructField("id", t3)
+				var t4 types.Type
 				{
-					var t6 ydb.Type
+					var t6 types.Type
 					{
-						tp0 := ydb.TypeInt32
-						t6 = ydb.Optional(tp0)
+						tp0 := types.TypeInt32
+						t6 = types.Optional(tp0)
 					}
-					t5 := ydb.List(t6)
+					t5 := types.List(t6)
 					t4 = t5
 				}
-				fs1[1] = ydb.StructField("ints", t4)
-				t2 = ydb.Struct(fs1...)
+				fs1[1] = types.StructField("ints", t4)
+				t2 = types.Struct(fs1...)
 			}
 			t1 = t2
 		}
-		fs0[0] = ydb.StructField("struct", t1)
-		var t2 ydb.Type
+		fs0[0] = types.StructField("struct", t1)
+		var t2 types.Type
 		{
-			var t4 ydb.Type
+			var t4 types.Type
 			{
-				var t5 ydb.Type
+				var t5 types.Type
 				{
-					fs1 := make([]ydb.StructOption, 2)
-					var t6 ydb.Type
+					fs1 := make([]types.StructOption, 2)
+					var t6 types.Type
 					{
-						tp0 := ydb.TypeUTF8
-						t6 = ydb.Optional(tp0)
+						tp0 := types.TypeUTF8
+						t6 = types.Optional(tp0)
 					}
-					fs1[0] = ydb.StructField("id", t6)
-					var t7 ydb.Type
+					fs1[0] = types.StructField("id", t6)
+					var t7 types.Type
 					{
-						var t9 ydb.Type
+						var t9 types.Type
 						{
-							tp0 := ydb.TypeInt32
-							t9 = ydb.Optional(tp0)
+							tp0 := types.TypeInt32
+							t9 = types.Optional(tp0)
 						}
-						t8 := ydb.List(t9)
+						t8 := types.List(t9)
 						t7 = t8
 					}
-					fs1[1] = ydb.StructField("ints", t7)
-					t5 = ydb.Struct(fs1...)
+					fs1[1] = types.StructField("ints", t7)
+					t5 = types.Struct(fs1...)
 				}
 				t4 = t5
 			}
-			t3 := ydb.List(t4)
+			t3 := types.List(t4)
 			t2 = t3
 		}
-		fs0[1] = ydb.StructField("structs", t2)
-		var t3 ydb.Type
+		fs0[1] = types.StructField("structs", t2)
+		var t3 types.Type
 		{
-			var t5 ydb.Type
+			var t5 types.Type
 			{
-				tp0 := ydb.TypeUint32
+				tp0 := types.TypeUint32
 				t5 = tp0
 			}
-			t4 := ydb.List(t5)
+			t4 := types.List(t5)
 			t3 = t4
 		}
-		fs0[2] = ydb.StructField("bytes", t3)
-		var t4 ydb.Type
+		fs0[2] = types.StructField("bytes", t3)
+		var t4 types.Type
 		{
-			var t6 ydb.Type
+			var t6 types.Type
 			{
-				tp0 := ydb.TypeString
+				tp0 := types.TypeString
 				t6 = tp0
 			}
-			t5 := ydb.List(t6)
+			t5 := types.List(t6)
 			t4 = t5
 		}
-		fs0[3] = ydb.StructField("strings", t4)
-		var t5 ydb.Type
+		fs0[3] = types.StructField("strings", t4)
+		var t5 types.Type
 		{
-			tp0 := ydb.TypeString
-			t5 = ydb.Optional(tp0)
+			tp0 := types.TypeString
+			t5 = types.Optional(tp0)
 		}
-		fs0[4] = ydb.StructField("string", t5)
-		t0 = ydb.Struct(fs0...)
+		fs0[4] = types.StructField("string", t5)
+		t0 = types.Struct(fs0...)
 	}
 	return t0
 }
 
 type structfield3 []int32
 
-func (s *structfield3) UnmarshalYDB(res ydb.RawValue) error {
+func (s *structfield3) UnmarshalYDB(res types.RawValue) error {
 	n0 := res.ListIn()
 	xs0 := make([]int32, n0)
 	for i0 := 0; i0 < n0; i0++ {
@@ -513,33 +513,33 @@ func (f *Foo) Scan(res *table.Result) (err error) {
 }
 
 func (f *Foo) QueryParameters() *table.QueryParameters {
-	var v0 ydb.Value
+	var v0 types.Value
 	{
-		vp0 := ydb.OptionalValue(ydb.UTF8Value(f.ID))
+		vp0 := types.OptionalValue(types.UTF8Value(f.ID))
 		v0 = vp0
 	}
-	var v1 ydb.Value
+	var v1 types.Value
 	{
-		var list0 ydb.Value
-		vs0 := make([]ydb.Value, len(f.Ints))
+		var list0 types.Value
+		vs0 := make([]types.Value, len(f.Ints))
 		for i0, item0 := range f.Ints {
-			var v2 ydb.Value
+			var v2 types.Value
 			{
-				vp0 := ydb.OptionalValue(ydb.Int32Value(item0))
+				vp0 := types.OptionalValue(types.Int32Value(item0))
 				v2 = vp0
 			}
 			vs0[i0] = v2
 		}
 		if len(vs0) == 0 {
-			var t1 ydb.Type
+			var t1 types.Type
 			{
-				tp0 := ydb.TypeInt32
-				t1 = ydb.Optional(tp0)
+				tp0 := types.TypeInt32
+				t1 = types.Optional(tp0)
 			}
-			t0 := ydb.List(t1)
-			list0 = ydb.ZeroValue(t0)
+			t0 := types.List(t1)
+			list0 = types.ZeroValue(t0)
 		} else {
-			list0 = ydb.ListValue(vs0...)
+			list0 = types.ListValue(vs0...)
 		}
 		v1 = list0
 	}
@@ -549,69 +549,69 @@ func (f *Foo) QueryParameters() *table.QueryParameters {
 	)
 }
 
-func (f *Foo) StructValue() ydb.Value {
-	var v0 ydb.Value
+func (f *Foo) StructValue() types.Value {
+	var v0 types.Value
 	{
-		var v1 ydb.Value
+		var v1 types.Value
 		{
-			vp0 := ydb.OptionalValue(ydb.UTF8Value(f.ID))
+			vp0 := types.OptionalValue(types.UTF8Value(f.ID))
 			v1 = vp0
 		}
-		var v2 ydb.Value
+		var v2 types.Value
 		{
-			var list0 ydb.Value
-			vs0 := make([]ydb.Value, len(f.Ints))
+			var list0 types.Value
+			vs0 := make([]types.Value, len(f.Ints))
 			for i0, item0 := range f.Ints {
-				var v3 ydb.Value
+				var v3 types.Value
 				{
-					vp0 := ydb.OptionalValue(ydb.Int32Value(item0))
+					vp0 := types.OptionalValue(types.Int32Value(item0))
 					v3 = vp0
 				}
 				vs0[i0] = v3
 			}
 			if len(vs0) == 0 {
-				var t1 ydb.Type
+				var t1 types.Type
 				{
-					tp0 := ydb.TypeInt32
-					t1 = ydb.Optional(tp0)
+					tp0 := types.TypeInt32
+					t1 = types.Optional(tp0)
 				}
-				t0 := ydb.List(t1)
-				list0 = ydb.ZeroValue(t0)
+				t0 := types.List(t1)
+				list0 = types.ZeroValue(t0)
 			} else {
-				list0 = ydb.ListValue(vs0...)
+				list0 = types.ListValue(vs0...)
 			}
 			v2 = list0
 		}
-		v0 = ydb.StructValue(
-			ydb.StructFieldValue("id", v1),
-			ydb.StructFieldValue("ints", v2),
+		v0 = types.StructValue(
+			types.StructFieldValue("id", v1),
+			types.StructFieldValue("ints", v2),
 		)
 	}
 	return v0
 }
 
-func (f *Foo) StructType() ydb.Type {
-	var t0 ydb.Type
+func (f *Foo) StructType() types.Type {
+	var t0 types.Type
 	{
-		fs0 := make([]ydb.StructOption, 2)
-		var t1 ydb.Type
+		fs0 := make([]types.StructOption, 2)
+		var t1 types.Type
 		{
-			tp0 := ydb.TypeUTF8
-			t1 = ydb.Optional(tp0)
+			tp0 := types.TypeUTF8
+			t1 = types.Optional(tp0)
 		}
-		fs0[0] = ydb.StructField("id", t1)
-		var t2 ydb.Type
+		fs0[0] = types.StructField("id", t1)
+		var t2 types.Type
 		{
-			var t4 ydb.Type
+			var t4 types.Type
 			{
-				tp0 := ydb.TypeInt32
-				t4 = ydb.Optional(tp0)
+				tp0 := types.TypeInt32
+				t4 = types.Optional(tp0)
 			}
-			t3 := ydb.List(t4)
+			t3 := types.List(t4)
 			t2 = t3
 		}
-		fs0[1] = ydb.StructField("ints", t2)
-		t0 = ydb.Struct(fs0...)
+		fs0[1] = types.StructField("ints", t2)
+		t0 = types.Struct(fs0...)
 	}
 	return t0
 }
@@ -635,7 +635,7 @@ func ydbConvU32ToB(x uint32) byte {
 	if abs&mask != abs {
 		panic(
 			"ydbgen: convassert: " + strconv.FormatUint(uint64(x), 10) +
-				" (type uint32) overflows byte",
+				" (types uint32) overflows byte",
 		)
 	}
 	return byte(x)

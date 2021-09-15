@@ -29,7 +29,7 @@ import (
 //     }
 //
 // If current value under scan
-// is not requested type, then res.Err() become non-nil.
+// is not requested types, then res.Err() become non-nil.
 // After that, NextResultSet(), NextRow() will return false.
 type Result struct {
 	result.Scanner

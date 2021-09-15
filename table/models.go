@@ -1,6 +1,7 @@
 package table
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -34,7 +35,7 @@ type SessionInfo struct {
 
 type Column struct {
 	Name   string
-	Type   ydb.Type
+	Type   types.Type
 	Family string
 }
 
@@ -390,8 +391,8 @@ type (
 )
 
 type KeyRange struct {
-	From ydb.Value
-	To   ydb.Value
+	From types.Value
+	To   types.Value
 }
 
 // Deprecated use TimeToLiveSettings instead.

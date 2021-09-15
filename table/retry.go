@@ -3,8 +3,9 @@ package table
 import (
 	"context"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"time"
 )
 
@@ -64,7 +65,7 @@ func (f SessionProviderFunc) CloseSession(ctx context.Context, s *Session) error
 
 // SingleSession returns SessionProvider that uses only given session during
 // retries.
-func SingleSession(s *Session, b ydb.Backoff) SessionProvider {
+func SingleSession(s *Session, b retry2.Backoff) SessionProvider {
 	return &singleSession{s: s, b: b}
 }
 
@@ -76,7 +77,7 @@ var (
 
 type singleSession struct {
 	s     *Session
-	b     ydb.Backoff
+	b     retry2.Backoff
 	empty bool
 }
 
@@ -128,8 +129,8 @@ func (s *singleSession) CloseSession(ctx context.Context, x *Session) error {
 func retry(
 	ctx context.Context,
 	p SessionProvider,
-	fastBackoff ydb.Backoff,
-	slowBackoff ydb.Backoff,
+	fastBackoff retry2.Backoff,
+	slowBackoff retry2.Backoff,
 	retryNoIdempotent bool,
 	op RetryOperation,
 ) (err error) {
@@ -140,7 +141,7 @@ func retry(
 
 		code   = int32(0)
 		start  = time.Now()
-		onDone = ydb.OnRetry(ctx)
+		onDone = trace.OnRetry(ctx)
 	)
 	defer func() {
 		onDone(ctx, time.Since(start), attempts)
@@ -177,7 +178,7 @@ func retry(
 			if err = op(ctx, s); err == nil {
 				return
 			}
-			m := ydb.Check(err)
+			m := retry2.Check(err)
 			if m.StatusCode() != code {
 				i = 0
 			}
@@ -188,7 +189,7 @@ func retry(
 			if !m.MustRetry(retryNoIdempotent) {
 				return err
 			}
-			if e := ydb.Wait(ctx, fastBackoff, slowBackoff, m, i); e != nil {
+			if e := retry2.Wait(ctx, fastBackoff, slowBackoff, m, i); e != nil {
 				return err
 			}
 			code = m.StatusCode()

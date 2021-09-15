@@ -3,9 +3,9 @@ package connect
 import (
 	"context"
 	"crypto/tls"
+	"github.com/ydb-platform/ydb-go-sdk/v3/dial"
+	"github.com/ydb-platform/ydb-go-sdk/v3/driver/config"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 // New connects to database and return database connection
@@ -35,8 +35,8 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connecti
 		grpcConnTTL = *c.options.grpcConnTTL
 	}
 
-	c.cluster, err = (&ydb.Dialer{
-		DriverConfig: &ydb.DriverConfig{
+	c.cluster, err = (&dial.Dialer{
+		DriverConfig: &config.Config{
 			Database:    params.Database(),
 			Credentials: c.options.credentials,
 			GrpcConnTTL: grpcConnTTL,

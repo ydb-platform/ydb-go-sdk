@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/dial"
+	driver2 "github.com/ydb-platform/ydb-go-sdk/v3/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -18,11 +21,11 @@ var (
 
 type ConnectorOption func(*connector)
 
-func WithDialer(d ydb.Dialer) ConnectorOption {
+func WithDialer(d dial.Dialer) ConnectorOption {
 	return func(c *connector) {
 		c.dialer = d
 		if c.dialer.DriverConfig == nil {
-			c.dialer.DriverConfig = new(ydb.DriverConfig)
+			c.dialer.DriverConfig = new(driver2.Config)
 		}
 	}
 }
@@ -39,13 +42,13 @@ func WithEndpoint(addr string) ConnectorOption {
 	}
 }
 
-func WithDriverConfig(config ydb.DriverConfig) ConnectorOption {
+func WithDriverConfig(config driver2.Config) ConnectorOption {
 	return func(c *connector) {
 		*(c.dialer.DriverConfig) = config
 	}
 }
 
-func WithCredentials(creds ydb.Credentials) ConnectorOption {
+func WithCredentials(creds credentials.Credentials) ConnectorOption {
 	return func(c *connector) {
 		c.dialer.DriverConfig.Credentials = creds
 	}
@@ -57,7 +60,7 @@ func WithDatabase(db string) ConnectorOption {
 	}
 }
 
-func WithDriverTrace(t ydb.DriverTrace) ConnectorOption {
+func WithDriverTrace(t trace.DriverTrace) ConnectorOption {
 	return func(c *connector) {
 		c.dialer.DriverConfig.Trace = t
 	}
@@ -125,8 +128,8 @@ func WithDefaultExecScanQueryOption(opts ...table.ExecuteScanQueryOption) Connec
 
 func Connector(opts ...ConnectorOption) driver.Connector {
 	c := &connector{
-		dialer: ydb.Dialer{
-			DriverConfig: new(ydb.DriverConfig),
+		dialer: dial.Dialer{
+			DriverConfig: new(driver2.Config),
 		},
 		defaultTxControl: table.TxControl(
 			table.BeginTx(
@@ -143,7 +146,7 @@ func Connector(opts ...ConnectorOption) driver.Connector {
 
 // USE CONNECTOR ONLY
 type connector struct {
-	dialer   ydb.Dialer
+	dialer   dial.Dialer
 	endpoint string
 
 	clientTrace table.ClientTrace
@@ -233,7 +236,7 @@ func (c *connector) unwrap(ctx context.Context) (*table.Client, error) {
 }
 
 // Driver is an adapter to allow the use table client as sql.Driver instance.
-// The main purpose of this type is exported is an ability to call Unwrap()
+// The main purpose of this types is exported is an ability to call Unwrap()
 // method on it to receive raw *table.Client instance.
 type Driver struct {
 	c *connector

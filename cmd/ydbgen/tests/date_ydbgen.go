@@ -3,32 +3,32 @@
 package tests
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = ydb.StringValue
+	_ = types.StringValue
 	_ = table.NewQueryParameters
 )
 
 func (t *Times) QueryParameters() *table.QueryParameters {
-	var v0 ydb.Value
+	var v0 types.Value
 	{
-		var v1 ydb.Value
+		var v1 types.Value
 		var x0 time.Time
 		ok0 := !t.Date.IsZero()
 		if ok0 {
 			x0 = t.Date
 		}
 		if ok0 {
-			v1 = ydb.OptionalValue(ydb.DateValueFromTime(x0))
+			v1 = types.OptionalValue(types.DateValueFromTime(x0))
 		} else {
-			v1 = ydb.NullValue(ydb.TypeDate)
+			v1 = types.NullValue(types.TypeDate)
 		}
 		v0 = v1
 	}
@@ -37,42 +37,42 @@ func (t *Times) QueryParameters() *table.QueryParameters {
 	)
 }
 
-func (t *Times) StructValue() ydb.Value {
-	var v0 ydb.Value
+func (t *Times) StructValue() types.Value {
+	var v0 types.Value
 	{
-		var v1 ydb.Value
+		var v1 types.Value
 		{
-			var v2 ydb.Value
+			var v2 types.Value
 			var x0 time.Time
 			ok0 := !t.Date.IsZero()
 			if ok0 {
 				x0 = t.Date
 			}
 			if ok0 {
-				v2 = ydb.OptionalValue(ydb.DateValueFromTime(x0))
+				v2 = types.OptionalValue(types.DateValueFromTime(x0))
 			} else {
-				v2 = ydb.NullValue(ydb.TypeDate)
+				v2 = types.NullValue(types.TypeDate)
 			}
 			v1 = v2
 		}
-		v0 = ydb.StructValue(
-			ydb.StructFieldValue("date", v1),
+		v0 = types.StructValue(
+			types.StructFieldValue("date", v1),
 		)
 	}
 	return v0
 }
 
-func (t *Times) StructType() ydb.Type {
-	var t0 ydb.Type
+func (t *Times) StructType() types.Type {
+	var t0 types.Type
 	{
-		fs0 := make([]ydb.StructOption, 1)
-		var t1 ydb.Type
+		fs0 := make([]types.StructOption, 1)
+		var t1 types.Type
 		{
-			tp0 := ydb.TypeDate
-			t1 = ydb.Optional(tp0)
+			tp0 := types.TypeDate
+			t1 = types.Optional(tp0)
 		}
-		fs0[0] = ydb.StructField("date", t1)
-		t0 = ydb.Struct(fs0...)
+		fs0[0] = types.StructField("date", t1)
+		t0 = types.Struct(fs0...)
 	}
 	return t0
 }

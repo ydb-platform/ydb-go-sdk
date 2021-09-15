@@ -6,6 +6,9 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -23,7 +26,7 @@ type ydbWrapper struct {
 	dst *driver.Value
 }
 
-func (d *ydbWrapper) UnmarshalYDB(res ydb.RawValue) error {
+func (d *ydbWrapper) UnmarshalYDB(res types.RawValue) error {
 	if res.IsOptional() {
 		res.Unwrap()
 	}
@@ -345,7 +348,7 @@ type TxDoer struct {
 //       return rows.Err()
 //   }))
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
-	return ydb.Retry(
+	return retry.Retry(
 		ctx,
 		ydb.ContextRetryNoIdempotent(ctx),
 		func(ctx context.Context) (err error) {
@@ -464,7 +467,7 @@ func checkNamedValue(v *driver.NamedValue) (err error) {
 	}
 
 	switch x := v.Value.(type) {
-	case ydb.Value:
+	case types.Value:
 		// OK.
 
 	case valuer:
@@ -473,36 +476,36 @@ func checkNamedValue(v *driver.NamedValue) (err error) {
 		v.Value = x.Value()
 
 	case bool:
-		v.Value = ydb.BoolValue(x)
+		v.Value = types.BoolValue(x)
 	case int8:
-		v.Value = ydb.Int8Value(x)
+		v.Value = types.Int8Value(x)
 	case uint8:
-		v.Value = ydb.Uint8Value(x)
+		v.Value = types.Uint8Value(x)
 	case int16:
-		v.Value = ydb.Int16Value(x)
+		v.Value = types.Int16Value(x)
 	case uint16:
-		v.Value = ydb.Uint16Value(x)
+		v.Value = types.Uint16Value(x)
 	case int32:
-		v.Value = ydb.Int32Value(x)
+		v.Value = types.Int32Value(x)
 	case uint32:
-		v.Value = ydb.Uint32Value(x)
+		v.Value = types.Uint32Value(x)
 	case int64:
-		v.Value = ydb.Int64Value(x)
+		v.Value = types.Int64Value(x)
 	case uint64:
-		v.Value = ydb.Uint64Value(x)
+		v.Value = types.Uint64Value(x)
 	case float32:
-		v.Value = ydb.FloatValue(x)
+		v.Value = types.FloatValue(x)
 	case float64:
-		v.Value = ydb.DoubleValue(x)
+		v.Value = types.DoubleValue(x)
 	case []byte:
-		v.Value = ydb.StringValue(x)
+		v.Value = types.StringValue(x)
 	case string:
-		v.Value = ydb.UTF8Value(x)
+		v.Value = types.UTF8Value(x)
 	case [16]byte:
-		v.Value = ydb.UUIDValue(x)
+		v.Value = types.UUIDValue(x)
 
 	default:
-		return fmt.Errorf("ydbsql: unsupported type: %T", x)
+		return fmt.Errorf("ydbsql: unsupported types: %T", x)
 	}
 
 	v.Name = "$" + v.Name
@@ -518,7 +521,7 @@ func params(args []driver.NamedValue) *table.QueryParameters {
 	for i, arg := range args {
 		opts[i] = table.ValueParam(
 			arg.Name,
-			arg.Value.(ydb.Value),
+			arg.Value.(types.Value),
 		)
 	}
 	return table.NewQueryParameters(opts...)
@@ -611,7 +614,7 @@ func (r result) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (r result) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
 func mapBadSessionError(err error) error {
-	if ydb.IsOpError(err, ydb.StatusBadSession) {
+	if errors2.IsOpError(err, errors2.StatusBadSession) {
 		return driver.ErrBadConn
 	}
 	return err

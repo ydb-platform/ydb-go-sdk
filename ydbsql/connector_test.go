@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/driver/config"
 	"net"
 	"testing"
 	"time"
@@ -11,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -28,16 +29,16 @@ func TestConnectorDialOnPing(t *testing.T) {
 	dial := make(chan struct{})
 	c := Connector(
 		WithEndpoint("127.0.0.1:9999"),
-		WithDialer(ydb.Dialer{
+		WithDialer(dial.Dialer{
 			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
 				dial <- struct{}{}
 				return client, nil
 			},
-			DriverConfig: &ydb.DriverConfig{
-				Credentials: ydb.NewAnonymousCredentials("test"),
+			DriverConfig: &config.Config{
+				Credentials: credentials.NewAnonymousCredentials("test"),
 			},
 		}),
-		WithCredentials(ydb.NewAnonymousCredentials("TestConnectorDialOnPing")),
+		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorDialOnPing")),
 	)
 
 	db := sql.OpenDB(c)
@@ -73,7 +74,7 @@ func TestConnectorRedialOnError(t *testing.T) {
 	dial := false
 	c := Connector(
 		WithEndpoint("127.0.0.1:9999"),
-		WithDialer(ydb.Dialer{
+		WithDialer(dial.Dialer{
 			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
 				dial = true
 				select {
@@ -84,11 +85,11 @@ func TestConnectorRedialOnError(t *testing.T) {
 					return nil, errors.New("any error")
 				}
 			},
-			DriverConfig: &ydb.DriverConfig{
-				Credentials: ydb.NewAnonymousCredentials("test"),
+			DriverConfig: &config.Config{
+				Credentials: credentials.NewAnonymousCredentials("test"),
 			},
 		}),
-		WithCredentials(ydb.NewAnonymousCredentials("TestConnectorRedialOnError")),
+		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorRedialOnError")),
 		WithDefaultTxControl(table.TxControl(
 			table.BeginTx(
 				table.WithStaleReadOnly(),

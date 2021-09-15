@@ -3,14 +3,14 @@ package ydbsql
 import (
 	"database/sql"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 type valuer interface {
-	Value() ydb.Value
+	Value() types.Value
 }
 
 type nullable struct {
@@ -39,8 +39,8 @@ func (d *Date) Scan(x interface{}) error {
 	return nil
 }
 
-func (d Date) Value() ydb.Value {
-	return ydb.DateValueFromTime(time.Time(d))
+func (d Date) Value() types.Value {
+	return types.DateValueFromTime(time.Time(d))
 }
 
 type Datetime time.Time
@@ -54,8 +54,8 @@ func (d *Datetime) Scan(x interface{}) error {
 	return nil
 }
 
-func (d Datetime) Value() ydb.Value {
-	return ydb.DatetimeValueFromTime(time.Time(d))
+func (d Datetime) Value() types.Value {
+	return types.DatetimeValueFromTime(time.Time(d))
 }
 
 type Timestamp time.Time
@@ -69,8 +69,8 @@ func (d *Timestamp) Scan(x interface{}) error {
 	return nil
 }
 
-func (d Timestamp) Value() ydb.Value {
-	return ydb.TimestampValueFromTime(time.Time(d))
+func (d Timestamp) Value() types.Value {
+	return types.TimestampValueFromTime(time.Time(d))
 }
 
 type Interval time.Duration
@@ -84,8 +84,8 @@ func (d *Interval) Scan(x interface{}) error {
 	return nil
 }
 
-func (d Interval) Value() ydb.Value {
-	return ydb.IntervalValueFromDuration(time.Duration(d))
+func (d Interval) Value() types.Value {
+	return types.IntervalValueFromDuration(time.Duration(d))
 }
 
 type TzDate time.Time
@@ -103,8 +103,8 @@ func (d *TzDate) Scan(x interface{}) error {
 	return nil
 }
 
-func (d TzDate) Value() ydb.Value {
-	return ydb.TzDateValueFromTime(time.Time(d))
+func (d TzDate) Value() types.Value {
+	return types.TzDateValueFromTime(time.Time(d))
 }
 
 type TzDatetime time.Time
@@ -122,8 +122,8 @@ func (d *TzDatetime) Scan(x interface{}) error {
 	return nil
 }
 
-func (d TzDatetime) Value() ydb.Value {
-	return ydb.TzDatetimeValueFromTime(time.Time(d))
+func (d TzDatetime) Value() types.Value {
+	return types.TzDatetimeValueFromTime(time.Time(d))
 }
 
 type TzTimestamp time.Time
@@ -141,8 +141,8 @@ func (d *TzTimestamp) Scan(x interface{}) error {
 	return nil
 }
 
-func (d TzTimestamp) Value() ydb.Value {
-	return ydb.TzTimestampValueFromTime(time.Time(d))
+func (d TzTimestamp) Value() types.Value {
+	return types.TzTimestampValueFromTime(time.Time(d))
 }
 
 type Decimal struct {
@@ -162,7 +162,7 @@ func (d *Decimal) Scan(x interface{}) error {
 
 func convertError(dst, src interface{}) error {
 	return fmt.Errorf(
-		"ydbsql: can not convert value type %[1]T (%[1]v) to a %[2]T",
+		"ydbsql: can not convert value types %[1]T (%[1]v) to a %[2]T",
 		src, dst,
 	)
 }

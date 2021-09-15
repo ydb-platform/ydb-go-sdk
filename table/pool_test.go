@@ -3,6 +3,8 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/errors"
 	"math/rand"
 	"path"
 	"runtime"
@@ -15,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil/timetest"
@@ -1029,8 +1030,8 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	}
 
 	// Now fail the Keepalive() call from above.
-	keepaliveResult <- &ydb.OpError{
-		Reason: ydb.StatusBadSession,
+	keepaliveResult <- &errors.OpError{
+		Reason: errors.StatusBadSession,
 	}
 
 	// Block the keeper()'s deletion routine.
@@ -1121,8 +1122,8 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
-							return nil, &ydb.OpError{
-								Reason: ydb.StatusBadSession,
+							return nil, &errors.OpError{
+								Reason: errors.StatusBadSession,
 							}
 						},
 						testutil.TableDeleteSession: okHandler,
@@ -1348,7 +1349,7 @@ func simpleSession() *Session {
 	return newSession(testutil.NewCluster(), "")
 }
 
-func newSession(cluster ydb.Cluster, id string) *Session {
+func newSession(cluster conn.Cluster, id string) *Session {
 	return &Session{
 		ID: id,
 		c: Client{

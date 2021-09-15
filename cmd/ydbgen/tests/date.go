@@ -4,11 +4,11 @@ import "time"
 
 //ydb:gen
 type Times struct {
-	Date time.Time `ydb:"type:Date?"`
-	//Datetime    time.Time `ydb:"type:Datetime"`
-	//Timestamp   time.Time `ydb:"type:Timestamp"`
-	//Interval    time.Time `ydb:"type:Interval"`
-	//TzDate      time.Time `ydb:"type:TzDate"`
-	//TzDatetime  time.Time `ydb:"type:TzDatetime"`
-	//TzTimestamp time.Time `ydb:"type:TzTimestamp"`
+	Date time.Time `ydb:"types:Date?"`
+	//Datetime    time.Time `ydb:"types:Datetime"`
+	//Timestamp   time.Time `ydb:"types:Timestamp"`
+	//Interval    time.Time `ydb:"types:Interval"`
+	//TzDate      time.Time `ydb:"types:TzDate"`
+	//TzDatetime  time.Time `ydb:"types:TzDatetime"`
+	//TzTimestamp time.Time `ydb:"types:TzTimestamp"`
 }

@@ -3,11 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"log"
 	"path"
 	"text/template"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -200,7 +200,7 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		func(ctx context.Context, s *table.Session) (err error) {
 			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
-					table.ValueParam("$seriesID", ydb.Uint64Value(1)),
+					table.ValueParam("$seriesID", types.Uint64Value(1)),
 				),
 				table.WithQueryCachePolicy(
 					table.WithQueryCachePolicyKeepInCache(),
@@ -262,9 +262,9 @@ func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) 
 			res, err = s.StreamExecuteScanQuery(ctx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$series",
-						ydb.ListValue(
-							ydb.Uint64Value(1),
-							ydb.Uint64Value(10),
+						types.ListValue(
+							types.Uint64Value(1),
+							types.Uint64Value(10),
 						),
 					),
 				),
@@ -331,11 +331,11 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
-				table.WithColumn("series_id", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("title", ydb.Optional(ydb.TypeUTF8)),
-				table.WithColumn("series_info", ydb.Optional(ydb.TypeUTF8)),
-				table.WithColumn("release_date", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("comment", ydb.Optional(ydb.TypeUTF8)),
+				table.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				table.WithColumn("title", types.Optional(types.TypeUTF8)),
+				table.WithColumn("series_info", types.Optional(types.TypeUTF8)),
+				table.WithColumn("release_date", types.Optional(types.TypeUint64)),
+				table.WithColumn("comment", types.Optional(types.TypeUTF8)),
 				table.WithPrimaryKeyColumn("series_id"),
 			)
 		},
@@ -349,11 +349,11 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "seasons"),
-				table.WithColumn("series_id", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("season_id", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("title", ydb.Optional(ydb.TypeUTF8)),
-				table.WithColumn("first_aired", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("last_aired", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				table.WithColumn("season_id", types.Optional(types.TypeUint64)),
+				table.WithColumn("title", types.Optional(types.TypeUTF8)),
+				table.WithColumn("first_aired", types.Optional(types.TypeUint64)),
+				table.WithColumn("last_aired", types.Optional(types.TypeUint64)),
 				table.WithPrimaryKeyColumn("series_id", "season_id"),
 			)
 		},
@@ -367,11 +367,11 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "episodes"),
-				table.WithColumn("series_id", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("season_id", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("episode_id", ydb.Optional(ydb.TypeUint64)),
-				table.WithColumn("title", ydb.Optional(ydb.TypeUTF8)),
-				table.WithColumn("air_date", ydb.Optional(ydb.TypeUint64)),
+				table.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				table.WithColumn("season_id", types.Optional(types.TypeUint64)),
+				table.WithColumn("episode_id", types.Optional(types.TypeUint64)),
+				table.WithColumn("title", types.Optional(types.TypeUTF8)),
+				table.WithColumn("air_date", types.Optional(types.TypeUint64)),
 				table.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			)
 		},

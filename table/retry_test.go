@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"math/rand"
 	"testing"
@@ -19,17 +21,17 @@ import (
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorResourceExhausted,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorResourceExhausted,
 		},
-		fmt.Errorf("wrap transport error: %w", &ydb.TransportError{
-			Reason: ydb.TransportErrorResourceExhausted,
+		fmt.Errorf("wrap transport error: %w", &errors2.TransportError{
+			Reason: errors2.TransportErrorResourceExhausted,
 		}),
-		&ydb.OpError{
-			Reason: ydb.StatusOverloaded,
+		&errors2.OpError{
+			Reason: errors2.StatusOverloaded,
 		},
-		fmt.Errorf("wrap op error: %w", &ydb.OpError{
-			Reason: ydb.StatusOverloaded,
+		fmt.Errorf("wrap op error: %w", &errors2.OpError{
+			Reason: errors2.StatusOverloaded,
 		}),
 	} {
 		t.Run("", func(t *testing.T) {
@@ -68,26 +70,26 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 
 func TestRetryerImmediateRetry(t *testing.T) {
 	for testErr, session := range map[error]*Session{
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorResourceExhausted,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorResourceExhausted,
 		}: newSession(nil, "1"),
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorAborted,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorAborted,
 		}: newSession(nil, "2"),
-		&ydb.OpError{
-			Reason: ydb.StatusUnavailable,
+		&errors2.OpError{
+			Reason: errors2.StatusUnavailable,
 		}: newSession(nil, "3"),
-		&ydb.OpError{
-			Reason: ydb.StatusOverloaded,
+		&errors2.OpError{
+			Reason: errors2.StatusOverloaded,
 		}: newSession(nil, "4"),
-		&ydb.OpError{
-			Reason: ydb.StatusAborted,
+		&errors2.OpError{
+			Reason: errors2.StatusAborted,
 		}: newSession(nil, "5"),
-		&ydb.OpError{
-			Reason: ydb.StatusNotFound,
+		&errors2.OpError{
+			Reason: errors2.StatusNotFound,
 		}: newSession(nil, "6"),
-		fmt.Errorf("wrap op error: %w", &ydb.OpError{
-			Reason: ydb.StatusAborted,
+		fmt.Errorf("wrap op error: %w", &errors2.OpError{
+			Reason: errors2.StatusAborted,
 		}): newSession(nil, "7"),
 	} {
 		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
@@ -127,12 +129,12 @@ func TestRetryerBadSession(t *testing.T) {
 		false,
 		func(ctx context.Context, s *Session) error {
 			sessions = append(sessions, s)
-			return &ydb.OpError{
-				Reason: ydb.StatusBadSession,
+			return &errors2.OpError{
+				Reason: errors2.StatusBadSession,
 			}
 		},
 	)
-	if !ydb.IsOpError(err, ydb.StatusBadSession) {
+	if !errors2.IsOpError(err, errors2.StatusBadSession) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	seen := make(map[*Session]bool, len(sessions))
@@ -196,8 +198,8 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 		false,
 		func(ctx context.Context, s *Session) error {
 			if bad[s] {
-				return &ydb.OpError{
-					Reason: ydb.StatusBadSession,
+				return &errors2.OpError{
+					Reason: errors2.StatusBadSession,
 				}
 			}
 			return nil
@@ -215,17 +217,17 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 
 func TestRetryerImmediateReturn(t *testing.T) {
 	for _, testErr := range []error{
-		&ydb.OpError{
-			Reason: ydb.StatusGenericError,
+		&errors2.OpError{
+			Reason: errors2.StatusGenericError,
 		},
-		fmt.Errorf("wrap op error: %w", &ydb.OpError{
-			Reason: ydb.StatusGenericError,
+		fmt.Errorf("wrap op error: %w", &errors2.OpError{
+			Reason: errors2.StatusGenericError,
 		}),
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorPermissionDenied,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorPermissionDenied,
 		},
-		fmt.Errorf("wrap transport error: %w", &ydb.TransportError{
-			Reason: ydb.TransportErrorPermissionDenied,
+		fmt.Errorf("wrap transport error: %w", &errors2.TransportError{
+			Reason: errors2.TransportErrorPermissionDenied,
 		}),
 		errors.New("whoa"),
 	} {
@@ -281,113 +283,113 @@ func TestRetryContextDeadline(t *testing.T) {
 		io.EOF,
 		context.DeadlineExceeded,
 		fmt.Errorf("test error"),
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnknownCode,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorUnknownCode,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorCanceled,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorCanceled,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnknown,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorUnknown,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorInvalidArgument,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorInvalidArgument,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorDeadlineExceeded,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorDeadlineExceeded,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorNotFound,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorNotFound,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorAlreadyExists,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorAlreadyExists,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorPermissionDenied,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorPermissionDenied,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorResourceExhausted,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorResourceExhausted,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorFailedPrecondition,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorFailedPrecondition,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorAborted,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorAborted,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorOutOfRange,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorOutOfRange,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnimplemented,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorUnimplemented,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorInternal,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorInternal,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnavailable,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorUnavailable,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorDataLoss,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorDataLoss,
 		},
-		&ydb.TransportError{
-			Reason: ydb.TransportErrorUnauthenticated,
+		&errors2.TransportError{
+			Reason: errors2.TransportErrorUnauthenticated,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusUnknownStatus,
+		&errors2.OpError{
+			Reason: errors2.StatusUnknownStatus,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusBadRequest,
+		&errors2.OpError{
+			Reason: errors2.StatusBadRequest,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusUnauthorized,
+		&errors2.OpError{
+			Reason: errors2.StatusUnauthorized,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusInternalError,
+		&errors2.OpError{
+			Reason: errors2.StatusInternalError,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusAborted,
+		&errors2.OpError{
+			Reason: errors2.StatusAborted,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusUnavailable,
+		&errors2.OpError{
+			Reason: errors2.StatusUnavailable,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusOverloaded,
+		&errors2.OpError{
+			Reason: errors2.StatusOverloaded,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusSchemeError,
+		&errors2.OpError{
+			Reason: errors2.StatusSchemeError,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusGenericError,
+		&errors2.OpError{
+			Reason: errors2.StatusGenericError,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusTimeout,
+		&errors2.OpError{
+			Reason: errors2.StatusTimeout,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusBadSession,
+		&errors2.OpError{
+			Reason: errors2.StatusBadSession,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusPreconditionFailed,
+		&errors2.OpError{
+			Reason: errors2.StatusPreconditionFailed,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusAlreadyExists,
+		&errors2.OpError{
+			Reason: errors2.StatusAlreadyExists,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusNotFound,
+		&errors2.OpError{
+			Reason: errors2.StatusNotFound,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusSessionExpired,
+		&errors2.OpError{
+			Reason: errors2.StatusSessionExpired,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusCancelled,
+		&errors2.OpError{
+			Reason: errors2.StatusCancelled,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusUndetermined,
+		&errors2.OpError{
+			Reason: errors2.StatusUndetermined,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusUnsupported,
+		&errors2.OpError{
+			Reason: errors2.StatusUnsupported,
 		},
-		&ydb.OpError{
-			Reason: ydb.StatusSessionBusy,
+		&errors2.OpError{
+			Reason: errors2.StatusSessionBusy,
 		},
 	}
 	client := &Client{
@@ -407,9 +409,9 @@ func TestRetryContextDeadline(t *testing.T) {
 				_ = pool.Retry(
 					ydb.WithRetryTrace(
 						ctx,
-						ydb.RetryTrace{
-							OnRetry: func(info ydb.RetryLoopStartInfo) func(ydb.RetryLoopDoneInfo) {
-								return func(info ydb.RetryLoopDoneInfo) {
+						trace.RetryTrace{
+							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+								return func(info trace.RetryLoopDoneInfo) {
 									if info.Latency-timeouts[i] > tolerance {
 										t.Errorf("unexpected latency: %v (attempts %d)", info.Latency, info.Attempts)
 									}

@@ -4,6 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn/addr"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/driver"
+	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/endpoint"
 	"reflect"
 	"strings"
 
@@ -12,8 +17,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -107,7 +110,7 @@ func setField(name string, dst, value interface{}) {
 	v := reflect.ValueOf(value)
 	if f.Type.Kind() != v.Type().Kind() {
 		panic(fmt.Sprintf(
-			"ydb/testutil: struct %s field %q is type of %s, not %s",
+			"ydb/testutil: struct %s field %q is types of %s, not %s",
 			t, name, f.Type, v.Type(),
 		))
 	}
@@ -139,7 +142,7 @@ func getField(name string, src, dst interface{}) bool {
 		}
 		if v.Type().Elem().Kind() != fv.Type().Kind() {
 			panic(fmt.Sprintf(
-				"ydb/testutil: struct %s field %q is type of %s, not %s",
+				"ydb/testutil: struct %s field %q is types of %s, not %s",
 				t, name, f.Type, v.Type(),
 			))
 		}
@@ -161,7 +164,7 @@ func (c *Cluster) Invoke(ctx context.Context, method string, args interface{}, r
 	if c.onInvoke == nil {
 		return fmt.Errorf("Cluster.onInvoke() not implemented")
 	}
-	if apply, ok := ydb.ContextClientConnApplier(ctx); ok {
+	if apply, ok := driver.ContextClientConnApplier(ctx); ok {
 		cc, err := c.Get(ctx)
 		if err != nil {
 			return err
@@ -178,14 +181,14 @@ func (c *Cluster) NewStream(ctx context.Context, desc *grpc.StreamDesc, method s
 	return c.onNewStream(ctx, desc, method, opts...)
 }
 
-func (c *Cluster) Get(context.Context) (conn ydb.ClientConnInterface, err error) {
+func (c *Cluster) Get(context.Context) (conn conn.ClientConnInterface, err error) {
 	return &clientConn{
 		onInvoke:    c.onInvoke,
 		onNewStream: c.onNewStream,
 	}, nil
 }
 
-func (c *Cluster) Stats(func(ydb.Endpoint, ydb.ConnStats)) {
+func (c *Cluster) Stats(func(errors2.Endpoint, stats.Stats)) {
 }
 
 func (c *Cluster) Close() error {
@@ -256,7 +259,7 @@ func NewCluster(opts ...NewClusterOption) *Cluster {
 type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onAddress   func() string
+	onAddr      func() addr.Addr
 }
 
 func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -273,11 +276,11 @@ func (c *clientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, metho
 	return c.onNewStream(ctx, desc, method, opts...)
 }
 
-func (c *clientConn) Address() string {
-	if c.onAddress == nil {
-		return ""
+func (c *clientConn) Addr() addr.Addr {
+	if c.onAddr == nil {
+		return addr.Addr{}
 	}
-	return c.onAddress()
+	return c.onAddr()
 }
 
 type ClientStream struct {

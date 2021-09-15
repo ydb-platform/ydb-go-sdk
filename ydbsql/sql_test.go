@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"log"
 	"os"
@@ -14,7 +17,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -153,7 +155,7 @@ func TestIsolationMapping(t *testing.T) {
 
 func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
-		dtrace ydb.DriverTrace
+		dtrace trace.DriverTrace
 		ctrace table.ClientTrace
 		strace table.SessionPoolTrace
 	)
@@ -170,7 +172,7 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 	db := sql.OpenDB(Connector(
 		WithEndpoint("ydb-ru.yandex.net:2135"),
 		WithDatabase("/ru/home/kamardin/mydb"),
-		WithCredentials(ydb.AuthTokenCredentials{
+		WithCredentials(credentials.AuthTokenCredentials{
 			AuthToken: os.Getenv("YDB_TOKEN"),
 		}),
 		WithDriverTrace(dtrace),
@@ -471,8 +473,8 @@ func TestDriver(t *testing.T) {
 	log.Println("date now:", a, b)
 }
 
-func getSeriesData() ydb.Value {
-	return ydb.ListValue(
+func getSeriesData() types.Value {
+	return types.ListValue(
 		seriesData(1, days("2006-02-03"), "IT Crowd", ""+
 			"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
 			"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry."),
@@ -482,12 +484,12 @@ func getSeriesData() ydb.Value {
 	)
 }
 
-func seriesData(id uint64, released time.Time, title, info string) ydb.Value {
-	return ydb.StructValue(
-		ydb.StructFieldValue("series_id", ydb.Uint64Value(id)),
-		ydb.StructFieldValue("release_date", ydb.DateValueFromTime(released)),
-		ydb.StructFieldValue("title", ydb.UTF8Value(title)),
-		ydb.StructFieldValue("series_info", ydb.UTF8Value(info)),
+func seriesData(id uint64, released time.Time, title, info string) types.Value {
+	return types.StructValue(
+		types.StructFieldValue("series_id", types.Uint64Value(id)),
+		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
+		types.StructFieldValue("title", types.UTF8Value(title)),
+		types.StructFieldValue("series_info", types.UTF8Value(info)),
 	)
 }
 

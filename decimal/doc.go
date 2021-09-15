@@ -1,5 +1,5 @@
 /*
-Package decimal provides tools for working with YDB's decimal type.
+Package decimal provides tools for working with YDB's decimal types.
 
 Decimal types are stored as int128 values inside YDB and represented as 16-byte
 arrays in ydb package and as *math/big.Int in ydb/decimal package.

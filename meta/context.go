@@ -1,0 +1,17 @@
+package meta
+
+import (
+	"context"
+
+	"google.golang.org/grpc/metadata"
+)
+
+// WithTraceID returns a copy of parent context with traceID
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, metaTraceID, traceID)
+}
+
+// WithUserAgent returns a copy of parent context with custom user-agent info
+func WithUserAgent(ctx context.Context, userAgent string) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, metaUserAgent, userAgent)
+}

@@ -3,10 +3,13 @@ package connect
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn/stats"
+	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/errors"
 	"path"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 
 	"google.golang.org/grpc"
@@ -15,7 +18,7 @@ import (
 type Connection struct {
 	database string
 	options  options
-	cluster  ydb.Cluster
+	cluster  conn.Cluster
 	table    *tableWrapper
 	scheme   *schemeWrapper
 }
@@ -28,7 +31,7 @@ func (c *Connection) NewStream(ctx context.Context, desc *grpc.StreamDesc, metho
 	return c.cluster.NewStream(ctx, desc, method, opts...)
 }
 
-func (c *Connection) Stats(it func(ydb.Endpoint, ydb.ConnStats)) {
+func (c *Connection) Stats(it func(errors2.Endpoint, stats.Stats)) {
 	c.cluster.Stats(it)
 }
 
@@ -54,8 +57,8 @@ func (c *Connection) EnsurePathExists(ctx context.Context, path string) error {
 		i += x
 		sub := path[:i+1]
 		info, err := c.Scheme().DescribePath(ctx, sub)
-		operr, ok := err.(*ydb.OpError)
-		if ok && operr.Reason == ydb.StatusSchemeError {
+		operr, ok := err.(*errors.OpError)
+		if ok && operr.Reason == errors.StatusSchemeError {
 			err = c.Scheme().MakeDirectory(ctx, sub)
 		}
 		if err != nil {
@@ -88,8 +91,8 @@ func (c *Connection) CleanupDatabase(ctx context.Context, prefix string, names .
 	var list func(int, string) error
 	list = func(i int, p string) error {
 		dir, err := c.Scheme().ListDirectory(ctx, p)
-		operr, ok := err.(*ydb.OpError)
-		if ok && operr.Reason == ydb.StatusSchemeError {
+		operr, ok := err.(*errors.OpError)
+		if ok && operr.Reason == errors.StatusSchemeError {
 			return nil
 		}
 		if err != nil {

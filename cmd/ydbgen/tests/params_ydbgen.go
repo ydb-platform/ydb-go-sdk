@@ -3,32 +3,32 @@
 package tests
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = ydb.StringValue
+	_ = types.StringValue
 	_ = table.NewQueryParameters
 )
 
 func (p *Params) QueryParameters() *table.QueryParameters {
-	var v0 ydb.Value
+	var v0 types.Value
 	{
-		vp0 := ydb.OptionalValue(ydb.UTF8Value(p.Name))
+		vp0 := types.OptionalValue(types.UTF8Value(p.Name))
 		v0 = vp0
 	}
-	var v1 ydb.Value
+	var v1 types.Value
 	{
-		vp0 := ydb.Uint32Value(ydbConvI16ToU32(p.Int16ToUint32))
+		vp0 := types.Uint32Value(ydbConvI16ToU32(p.Int16ToUint32))
 		v1 = vp0
 	}
-	var v2 ydb.Value
+	var v2 types.Value
 	{
-		vp0 := ydb.Int64Value(int64(p.IntToInt64))
+		vp0 := types.Int64Value(int64(p.IntToInt64))
 		v2 = vp0
 	}
 	return table.NewQueryParameters(

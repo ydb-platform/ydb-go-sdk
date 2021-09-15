@@ -131,7 +131,7 @@ func valueToString(buf *bytes.Buffer, t T, v *Ydb.Value) {
 			t = x.T
 
 		default:
-			panic("ydb: unknown nested type")
+			panic("ydb: unknown nested types")
 		}
 		valueToString(buf, t, x.NestedValue)
 		return
@@ -150,7 +150,7 @@ func valueToString(buf *bytes.Buffer, t T, v *Ydb.Value) {
 		case TupleType:
 			copy(types, x.Elems)
 		default:
-			panic("ydb: unknown iterable type")
+			panic("ydb: unknown iterable types")
 		}
 		for i, item := range v.Items {
 			valueToString(buf, types[i], item)
@@ -508,13 +508,13 @@ func DictValue(n int, it func(int) V) Value {
 		p := it(i + 1).(Value)
 		if !TypesEqual(k.t, keyT) {
 			panic(fmt.Sprintf(
-				"unexpected key type: %s; want %s",
+				"unexpected key types: %s; want %s",
 				k.t, keyT,
 			))
 		}
 		if !TypesEqual(p.t, payloadT) {
 			panic(fmt.Sprintf(
-				"unexpected payload type: %s; want %s",
+				"unexpected payload types: %s; want %s",
 				p.t, payloadT,
 			))
 		}
@@ -539,7 +539,7 @@ func ListValue(n int, it func(int) V) Value {
 		v := it(i).(Value)
 		if !TypesEqual(v.t, t) {
 			panic(fmt.Sprintf(
-				"unexpected item type: %s; want %s",
+				"unexpected item types: %s; want %s",
 				v.t, t,
 			))
 		}
@@ -556,7 +556,7 @@ func ListValue(n int, it func(int) V) Value {
 func VariantValue(x V, i uint32, t T) Value {
 	v, ok := t.(VariantType)
 	if !ok {
-		panic(fmt.Sprintf("not a variant type: %s", t))
+		panic(fmt.Sprintf("not a variant types: %s", t))
 	}
 	exp, ok := v.at(int(i))
 	if !ok {
@@ -565,7 +565,7 @@ func VariantValue(x V, i uint32, t T) Value {
 	val := x.(Value)
 	if !TypesEqual(exp, val.t) {
 		panic(fmt.Sprintf(
-			"unexpected type for %d-th variant: %s; want %s",
+			"unexpected types for %d-th variant: %s; want %s",
 			i, val.t, exp,
 		))
 	}
@@ -628,7 +628,7 @@ func ZeroValue(t T) Value {
 			v.Value = new(Ydb.Value_Low_128)
 
 		default:
-			panic("uncovered primitive type")
+			panic("uncovered primitive types")
 		}
 
 	case OptionalType, VoidType:
@@ -641,10 +641,10 @@ func ZeroValue(t T) Value {
 		v.Value = new(Ydb.Value_Low_128)
 
 	case VariantType:
-		panic("do not know what to do with variant type for zero value")
+		panic("do not know what to do with variant types for zero value")
 
 	default:
-		panic("uncovered type")
+		panic("uncovered types")
 	}
 	return Value{
 		t: t,
@@ -652,10 +652,10 @@ func ZeroValue(t T) Value {
 	}
 }
 
-// NullValue returns NULL value of given type T.
+// NullValue returns NULL value of given types T.
 //
 // For example, if T is Int32Type, then NullValue(Int32Type) will return value
-// of type Optional<Int32Type> with NULL value.
+// of types Optional<Int32Type> with NULL value.
 //
 // Nested optional types are handled also.
 func NullValue(t T) Value {

@@ -3,9 +3,9 @@ package table
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func WithShardKeyBounds() DescribeTableOption {
@@ -45,7 +45,7 @@ type (
 	cachingPolicy      Ydb_Table.CachingPolicy
 )
 
-func WithColumn(name string, typ ydb.Type) CreateTableOption {
+func WithColumn(name string, typ types.Type) CreateTableOption {
 	return func(d *createTableDesc) {
 		d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
 			Name: name,
@@ -281,7 +281,7 @@ func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption 
 		}
 	}
 }
-func WithPartitioningPolicyExplicitPartitions(splitPoints ...ydb.Value) PartitioningPolicyOption {
+func WithPartitioningPolicyExplicitPartitions(splitPoints ...types.Value) PartitioningPolicyOption {
 	return func(p *partitioningPolicy) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
 		for i := range values {
@@ -375,7 +375,7 @@ type (
 	AlterTableOption func(*alterTableDesc)
 )
 
-func WithAddColumn(name string, typ ydb.Type) AlterTableOption {
+func WithAddColumn(name string, typ types.Type) AlterTableOption {
 	return func(d *alterTableDesc) {
 		d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
 			Name: name,
@@ -679,7 +679,7 @@ func ReadKeyRange(x KeyRange) ReadTableOption {
 	}
 }
 
-func ReadGreater(x ydb.Value) ReadTableOption {
+func ReadGreater(x types.Value) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_Greater{
@@ -688,7 +688,7 @@ func ReadGreater(x ydb.Value) ReadTableOption {
 	}
 }
 
-func ReadGreaterOrEqual(x ydb.Value) ReadTableOption {
+func ReadGreaterOrEqual(x types.Value) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
@@ -697,7 +697,7 @@ func ReadGreaterOrEqual(x ydb.Value) ReadTableOption {
 	}
 }
 
-func ReadLess(x ydb.Value) ReadTableOption {
+func ReadLess(x types.Value) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
@@ -706,7 +706,7 @@ func ReadLess(x ydb.Value) ReadTableOption {
 	}
 }
 
-func ReadLessOrEqual(x ydb.Value) ReadTableOption {
+func ReadLessOrEqual(x types.Value) ReadTableOption {
 	return func(desc *readTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_LessOrEqual{

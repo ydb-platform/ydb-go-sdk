@@ -3,6 +3,9 @@ package ydbtest_test
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/dial"
+	"github.com/ydb-platform/ydb-go-sdk/v3/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"log"
 	"net"
 	"testing"
@@ -10,7 +13,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ydbtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/traceutil"
@@ -37,7 +39,7 @@ func TestClusterTracking(t *testing.T) {
 	endpoint := db.StartEndpoint()
 	defer endpoint.Close()
 
-	var dtrace ydb.DriverTrace
+	var dtrace trace.DriverTrace
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf(
 			"[driver] %s: %+v",
@@ -48,8 +50,8 @@ func TestClusterTracking(t *testing.T) {
 		dialTicket = make(chan func(net.Conn) net.Conn, 1)
 	)
 
-	dialer := &ydb.Dialer{
-		DriverConfig: &ydb.DriverConfig{
+	dialer := &dial.Dialer{
+		DriverConfig: &config.Config{
 			Database:          "xxx",
 			DiscoveryInterval: time.Hour,
 			Trace:             dtrace,

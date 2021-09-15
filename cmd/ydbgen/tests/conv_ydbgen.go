@@ -3,15 +3,15 @@
 package tests
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = ydb.StringValue
+	_ = types.StringValue
 	_ = table.NewQueryParameters
 )
 
@@ -29,7 +29,7 @@ func ydbConvI16ToI8(x int16) int8 {
 	if abs&mask != abs {
 		panic(
 			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) +
-				" (type int16) overflows int8",
+				" (types int16) overflows int8",
 		)
 	}
 	return int8(x)
@@ -52,7 +52,7 @@ func ydbConvI32ToB(x int32) byte {
 	if abs&mask != abs {
 		panic(
 			"ydbgen: convassert: " + strconv.FormatInt(int64(x), 10) +
-				" (type int32) overflows byte",
+				" (types int32) overflows byte",
 		)
 	}
 	return byte(x)
@@ -67,7 +67,7 @@ func ydbConvU64ToI8(x uint64) int8 {
 	if abs&mask != abs {
 		panic(
 			"ydbgen: convassert: " + strconv.FormatUint(uint64(x), 10) +
-				" (type uint64) overflows int8",
+				" (types uint64) overflows int8",
 		)
 	}
 	return int8(x)

@@ -2,19 +2,20 @@ package connect
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/driver/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 type Option func(ctx context.Context, client *Connection) error
 
 type options struct {
 	connectTimeout                       *time.Duration
-	driverTrace                          *ydb.DriverTrace
-	driverConfig                         *ydb.DriverConfig
-	credentials                          ydb.Credentials
+	driverTrace                          *trace.DriverTrace
+	driverConfig                         *config.Config
+	credentials                          credentials.Credentials
 	grpcConnTTL                          *time.Duration
 	discoveryInterval                    *time.Duration
 	tableSessionPoolTrace                *table.SessionPoolTrace
@@ -29,17 +30,17 @@ type options struct {
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
-		ydb.NewAuthTokenCredentials(accessToken, "connect.WithAccessTokenCredentials(accessToken)"), // hide access token for logs
+		credentials.NewAuthTokenCredentials(accessToken, "connect.WithAccessTokenCredentials(accessToken)"), // hide access token for logs
 	)
 }
 
 func WithAnonymousCredentials() Option {
 	return WithCredentials(
-		ydb.NewAnonymousCredentials("connect.WithAnonymousCredentials()"),
+		credentials.NewAnonymousCredentials("connect.WithAnonymousCredentials()"),
 	)
 }
 
-func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (ydb.Credentials, error)) Option {
+func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (credentials.Credentials, error)) Option {
 	return func(ctx context.Context, c *Connection) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
@@ -50,13 +51,13 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (ydb.
 	}
 }
 
-func WithCredentials(credentials ydb.Credentials) Option {
-	return WithCreateCredentialsFunc(func(context.Context) (ydb.Credentials, error) {
-		return credentials, nil
+func WithCredentials(c credentials.Credentials) Option {
+	return WithCreateCredentialsFunc(func(context.Context) (credentials.Credentials, error) {
+		return c, nil
 	})
 }
 
-func WithDriverConfig(config *ydb.DriverConfig) Option {
+func WithDriverConfig(config *config.Config) Option {
 	return func(ctx context.Context, c *Connection) error {
 		c.options.driverConfig = config
 		return nil
@@ -120,7 +121,7 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 }
 
 // WithDriverTrace returns context which has associated DriverTrace with it.
-func WithDriverTrace(trace ydb.DriverTrace) Option {
+func WithDriverTrace(trace trace.DriverTrace) Option {
 	return func(ctx context.Context, c *Connection) error {
 		c.options.driverTrace = &trace
 		return nil

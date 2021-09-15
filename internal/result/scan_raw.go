@@ -2,6 +2,7 @@ package result
 
 import (
 	"bytes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
 	"reflect"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
@@ -125,7 +125,7 @@ func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
 	return n, nil
 }
 
-func (s *rawConverter) Type() ydb.Type {
+func (s *rawConverter) Type() types.Type {
 	return s.getType()
 }
 
@@ -241,8 +241,8 @@ func (s *rawConverter) DyNumber() (v string) {
 	return s.text()
 }
 
-// Value returns current item under scan as ydb.Value type.
-func (s *rawConverter) Value() ydb.Value {
+// Value returns current item under scan as ydb.Value types.
+func (s *rawConverter) Value() types.Value {
 	if s.err != nil {
 		return nil
 	}
@@ -469,7 +469,7 @@ func (s *rawConverter) Unwrap() {
 	})
 }
 
-func (s *rawConverter) Decimal(t ydb.Type) (v [16]byte) {
+func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
 	if s.err != nil || !s.assertCurrentTypeDecimal(t) {
 		return
 	}
@@ -484,7 +484,7 @@ func (s *rawConverter) UnwrapDecimal() (v [16]byte, precision, scale uint32) {
 	return s.uint128(), d.DecimalType.Precision, d.DecimalType.Scale
 }
 
-func (s *rawConverter) ODecimal(t ydb.Type) (v [16]byte) {
+func (s *rawConverter) ODecimal(t types.Type) (v [16]byte) {
 	if s.err != nil || !s.assertCurrentTypeOptionalDecimal(t) {
 		return
 	}
@@ -494,7 +494,7 @@ func (s *rawConverter) ODecimal(t ydb.Type) (v [16]byte) {
 	return s.uint128()
 }
 
-func (s *rawConverter) AssertType(t ydb.Type) bool {
+func (s *rawConverter) AssertType(t types.Type) bool {
 	return s.assertCurrentTypeIs(t)
 }
 
@@ -551,7 +551,7 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 		return m.Name, m.Type
 
 	default:
-		panic("ydb/table: unexpected variant items type")
+		panic("ydb/table: unexpected variant items types")
 	}
 }
 
@@ -562,9 +562,9 @@ func (s *rawConverter) boundsError(n, i int) {
 	)
 }
 
-func (s *rawConverter) decimalTypeError(t ydb.Type) {
+func (s *rawConverter) decimalTypeError(t types.Type) {
 	s.errorf(
-		"unexpected decimal type at %q %s: want %s",
+		"unexpected decimal types at %q %s: want %s",
 		s.Path(), s.getType(), t,
 	)
 }
@@ -595,22 +595,22 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 	if isOptional(p.t) {
 		return true
 	}
-	s.errorf("not nullable type at %q: %s (%d %s %s)", s.Path(), s.Type(), s.stack.size(), c.t, p.t)
+	s.errorf("not nullable types at %q: %s (%d %s %s)", s.Path(), s.Type(), s.stack.size(), c.t, p.t)
 	return false
 }
-func (s *rawConverter) assertCurrentTypeIs(t ydb.Type) bool {
+func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	c := s.stack.current()
 	act := internal.TypeFromYDB(c.t)
 	if !internal.TypesEqual(act, t) {
 		s.errorf(
-			"unexpected type at %q %s: %s; want %s",
+			"unexpected types at %q %s: %s; want %s",
 			s.Path(), s.Type(), act, t,
 		)
 		return false
 	}
 	return true
 }
-func (s *rawConverter) assertCurrentTypeDecimal(t ydb.Type) bool {
+func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
 		return false
@@ -621,7 +621,7 @@ func (s *rawConverter) assertCurrentTypeDecimal(t ydb.Type) bool {
 	}
 	return true
 }
-func (s *rawConverter) assertCurrentTypeOptionalDecimal(t ydb.Type) bool {
+func (s *rawConverter) assertCurrentTypeOptionalDecimal(t types.Type) bool {
 	typ := s.stack.current().t
 	if t, _ := typ.Type.(*Ydb.Type_OptionalType); t != nil {
 		typ = t.OptionalType.Item
@@ -723,7 +723,7 @@ func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType
 	return
 }
 
-func isEqualDecimal(d *Ydb.DecimalType, t ydb.Type) bool {
+func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
 	w := t.(internal.DecimalType)
 	return d.Precision == w.Precision && d.Scale == w.Scale
 }

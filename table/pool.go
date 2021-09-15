@@ -4,6 +4,8 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/errors"
+	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"sync"
 	"time"
 
@@ -175,10 +177,10 @@ func isCreateSessionErrorRetriable(err error) bool {
 	switch {
 	case
 		errors.Is(err, ErrSessionPoolOverflow),
-		ydb.IsOpError(err, ydb.StatusOverloaded),
-		ydb.IsTransportError(err, ydb.TransportErrorResourceExhausted),
-		ydb.IsTransportError(err, ydb.TransportErrorDeadlineExceeded),
-		ydb.IsTransportError(err, ydb.TransportErrorUnavailable):
+		errors2.IsOpError(err, errors2.StatusOverloaded),
+		errors2.IsTransportError(err, errors2.TransportErrorResourceExhausted),
+		errors2.IsTransportError(err, errors2.TransportErrorDeadlineExceeded),
+		errors2.IsTransportError(err, errors2.TransportErrorUnavailable):
 		return true
 	default:
 		return false
@@ -566,7 +568,7 @@ type RetryOperation func(context.Context, *Session) (err error)
 // - retry operation returned nil as error
 // Warning: if context without deadline or cancellation func Retry will be worked infinite
 func (p *SessionPool) Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error) {
-	return retry(ctx, p, ydb.FastBackoff, ydb.SlowBackoff, retryNoIdempotent, op)
+	return retry(ctx, p, retry2.FastBackoff, retry2.SlowBackoff, retryNoIdempotent, op)
 }
 
 func (p *SessionPool) Stats() SessionPoolStats {
@@ -660,9 +662,9 @@ func (p *SessionPool) keeper() {
 				if err != nil {
 					switch {
 					case
-						ydb.IsOpError(err, ydb.StatusBadSession),
-						ydb.IsTransportError(err, ydb.TransportErrorCanceled),
-						ydb.IsTransportError(err, ydb.TransportErrorDeadlineExceeded):
+						errors2.IsOpError(err, errors2.StatusBadSession),
+						errors2.IsTransportError(err, errors2.TransportErrorCanceled),
+						errors2.IsTransportError(err, errors2.TransportErrorDeadlineExceeded):
 						toDelete = append(toDelete, s)
 					default:
 						toTryAgain = append(toTryAgain, s)

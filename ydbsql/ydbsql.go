@@ -4,9 +4,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"net/url"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 func init() {
@@ -39,7 +38,7 @@ func urlConnectorOptions(u *url.URL) []ConnectorOption {
 	return []ConnectorOption{
 		WithEndpoint(u.Host),
 		WithDatabase(u.Path),
-		WithCredentials(ydb.AuthTokenCredentials{
+		WithCredentials(credentials.AuthTokenCredentials{
 			AuthToken: u.Query().Get(urlAuthToken),
 		}),
 	}

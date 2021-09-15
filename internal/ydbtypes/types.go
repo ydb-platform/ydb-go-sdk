@@ -65,7 +65,7 @@ func PrimitiveTypeFromString(s string) (t internal.PrimitiveType, err error) {
 	case "dynumber":
 		t = internal.TypeDyNumber
 	default:
-		err = fmt.Errorf("ydbtypes: unknown type: %q", s)
+		err = fmt.Errorf("ydbtypes: unknown types: %q", s)
 	}
 	return
 }
@@ -107,12 +107,12 @@ func PrimitiveTypeFromGoType(typ types.Type) (t internal.PrimitiveType, err erro
 
 		case types.Int, types.Uint:
 			return 0, fmt.Errorf(
-				"ydbtypes: ambiguous mapping for go %s type exists",
+				"ydbtypes: ambiguous mapping for go %s types exists",
 				typ,
 			)
 		}
 	}
-	return 0, fmt.Errorf("ydbtypes: unsupported type: %s", typ)
+	return 0, fmt.Errorf("ydbtypes: unsupported types: %s", typ)
 }
 
 var (
@@ -198,6 +198,6 @@ func GoTypeFromPrimitiveType(t internal.PrimitiveType) types.Type {
 		return bytesSlice
 
 	default:
-		panic("uncovered primitive type")
+		panic("uncovered primitive types")
 	}
 }

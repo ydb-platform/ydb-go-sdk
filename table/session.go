@@ -3,6 +3,10 @@ package table
 import (
 	"bytes"
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/driver"
+	"github.com/ydb-platform/ydb-go-sdk/v3/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
 	"sync"
 	"time"
@@ -12,14 +16,13 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 // Client contains logic of creation of ydb table sessions.
 type Client struct {
 	Trace   ClientTrace
-	cluster ydb.Cluster
+	cluster conn.Cluster
 }
 
 type ClientOption func(c *Client)
@@ -30,7 +33,7 @@ func WithClientTraceOption(trace ClientTrace) ClientOption {
 	}
 }
 
-func NewClient(cluster ydb.Cluster, opts ...ClientOption) *Client {
+func NewClient(cluster conn.Cluster, opts ...ClientOption) *Client {
 	c := &Client{
 		cluster: cluster,
 	}
@@ -52,15 +55,15 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
 	)
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
-	var conn ydb.ClientConnInterface
+	var cc conn.ClientConnInterface
 	response, err = Ydb_Table_V1.NewTableServiceClient(c.cluster).CreateSession(
-		ydb.WithClientConnApplier(
+		driver.WithClientConnApplier(
 			ctx,
-			func(c ydb.ClientConnInterface) {
-				conn = c
+			func(c conn.ClientConnInterface) {
+				cc = c
 			},
 		),
 		&Ydb_Table.CreateSessionRequest{},
@@ -74,8 +77,8 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 	}
 	s = &Session{
 		ID:           result.SessionId,
-		conn:         conn,
-		tableService: Ydb_Table_V1.NewTableServiceClient(conn),
+		conn:         cc,
+		tableService: Ydb_Table_V1.NewTableServiceClient(cc),
 		c:            *c,
 	}
 	return
@@ -96,7 +99,7 @@ func (c *Client) Close() (err error) {
 type Session struct {
 	ID string
 
-	conn         ydb.ClientConnInterface
+	conn         conn.ClientConnInterface
 	tableService Ydb_Table_V1.TableServiceClient
 	c            Client
 	closeMux     sync.Mutex
@@ -128,8 +131,8 @@ func (s *Session) Close(ctx context.Context) (err error) {
 		}
 		deleteSessionDone(ctx, s, time.Since(start), err)
 	}()
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	_, err = s.tableService.DeleteSession(ctx, &Ydb_Table.DeleteSessionRequest{
 		SessionId: s.ID,
@@ -139,7 +142,7 @@ func (s *Session) Close(ctx context.Context) (err error) {
 
 func (s *Session) Address() string {
 	if s != nil && s.conn != nil {
-		return s.conn.Address()
+		return s.conn.Addr().String()
 	}
 	return ""
 }
@@ -151,8 +154,8 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 		keepAliveDone(ctx, s, info, err)
 	}()
 	var result Ydb_Table.KeepAliveResult
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	if s == nil {
 		panic("nil session")
@@ -224,7 +227,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...Descri
 	}
 
 	rs := make([]KeyRange, len(result.GetShardKeyBounds())+1)
-	var last ydb.Value
+	var last types.Value
 	for i, b := range result.GetShardKeyBounds() {
 		if last != nil {
 			rs[i].From = last
@@ -354,8 +357,8 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
 	)
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	response, err = s.tableService.ExplainDataQuery(ctx, &Ydb_Table.ExplainDataQueryRequest{
 		SessionId: s.ID,
@@ -437,8 +440,8 @@ func (s *Session) Prepare(
 		prepareDataQueryDone(ctx, s, query, q, cached, err)
 	}()
 
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	response, err = s.tableService.PrepareDataQuery(ctx, &Ydb_Table.PrepareDataQueryRequest{
 		SessionId: s.ID,
@@ -540,8 +543,8 @@ func (s *Session) executeDataQuery(
 	for _, opt := range opts {
 		opt((*executeDataQueryDesc)(request))
 	}
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	response, err = s.tableService.ExecuteDataQuery(ctx, request)
 	if err != nil {
@@ -807,7 +810,7 @@ func (s *Session) StreamExecuteScanQuery(
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.
-func (s *Session) BulkUpsert(ctx context.Context, table string, rows ydb.Value) (err error) {
+func (s *Session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
 	_, err = s.tableService.BulkUpsert(ctx, &Ydb_Table.BulkUpsertRequest{
 		Table: table,
 		Rows:  internal.ValueToYDB(rows),
@@ -826,8 +829,8 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 		result   Ydb_Table.BeginTransactionResult
 		response *Ydb_Table.BeginTransactionResponse
 	)
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	response, err = s.tableService.BeginTransaction(ctx, &Ydb_Table.BeginTransactionRequest{
 		SessionId:  s.ID,
@@ -892,8 +895,8 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOp
 	for _, opt := range opts {
 		opt((*commitTransactionDesc)(request))
 	}
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	response, err = tx.s.tableService.CommitTransaction(ctx, request)
 	if err != nil {
@@ -912,8 +915,8 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	defer func() {
 		rollbackTransactionDone(ctx, tx.s, tx.id, err)
 	}()
-	if m, _ := ydb.ContextOperationMode(ctx); m == ydb.OperationModeUnknown {
-		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
+	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
+		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	_, err = tx.s.tableService.RollbackTransaction(ctx, &Ydb_Table.RollbackTransactionRequest{
 		SessionId: tx.s.ID,
@@ -984,7 +987,7 @@ func (q *QueryParameters) params() queryParams {
 	return q.m
 }
 
-func (q *QueryParameters) Each(it func(name string, value ydb.Value)) {
+func (q *QueryParameters) Each(it func(name string, value types.Value)) {
 	if q == nil {
 		return
 	}
@@ -999,7 +1002,7 @@ func (q *QueryParameters) Each(it func(name string, value ydb.Value)) {
 func (q *QueryParameters) String() string {
 	var buf bytes.Buffer
 	buf.WriteByte('(')
-	q.Each(func(name string, value ydb.Value) {
+	q.Each(func(name string, value types.Value) {
 		buf.WriteString("((")
 		buf.WriteString(name)
 		buf.WriteByte(')')
@@ -1029,7 +1032,7 @@ func (q *QueryParameters) Add(opts ...ParameterOption) {
 	}
 }
 
-func ValueParam(name string, v ydb.Value) ParameterOption {
+func ValueParam(name string, v types.Value) ParameterOption {
 	return func(q queryParams) {
 		q[name] = internal.ValueToYDB(v)
 	}
