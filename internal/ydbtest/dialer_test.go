@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"log"
 	"net"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ydbtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/traceutil"
 )
 
 func TestClusterTracking(t *testing.T) {

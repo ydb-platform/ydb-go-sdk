@@ -2,10 +2,9 @@ package tracetest
 
 import (
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
 	"reflect"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/traceutil"
 )
 
 func TestSingleTrace(t *testing.T, x interface{}, traceName string) {
