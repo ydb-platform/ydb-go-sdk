@@ -1,3 +1,6 @@
+## 2.9.2
+* Added errors without panic
+
 ## 2.9.1
 * Added check nil grpc.ClientConn connection
 * Processed nil connection error in keeper loop
