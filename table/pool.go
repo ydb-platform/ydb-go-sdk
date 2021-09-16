@@ -660,6 +660,7 @@ func (p *SessionPool) keeper() {
 				if err != nil {
 					switch {
 					case
+						errors.Is(err, ydb.ErrNilConnection),
 						ydb.IsOpError(err, ydb.StatusBadSession),
 						ydb.IsTransportError(err, ydb.TransportErrorCanceled),
 						ydb.IsTransportError(err, ydb.TransportErrorDeadlineExceeded):

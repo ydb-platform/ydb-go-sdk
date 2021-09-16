@@ -170,6 +170,10 @@ func (s *Scanner) columns(it func(name string, typ internal.T)) {
 
 // ResultSetTruncated returns true if current result set has been truncated by server
 func (s *Scanner) ResultSetTruncated() bool {
+	if s.set == nil {
+		s.errorf("there are no sets in the scanner")
+		return false
+	}
 	return s.set.Truncated
 }
 
@@ -347,8 +351,7 @@ func (s *Scanner) noValueError() {
 
 func (s *Scanner) noColumnError(name string) {
 	s.errorf(
-		"no column %q at %q",
-		name, s.path(),
+		"no column %q", name,
 	)
 }
 
@@ -945,6 +948,10 @@ func (s *Scanner) scan(values []interface{}) error {
 			return s.err
 		}
 	}
+	if s.ColumnCount() < len(values) {
+		s.errorf("scan row failed: count of columns less then values")
+		return s.err
+	}
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
 	}
@@ -1036,6 +1043,9 @@ func (s *scanStack) parent() item {
 func (s *scanStack) current() item {
 	if !s.scanItem.isEmpty() {
 		return s.scanItem
+	}
+	if s.v == nil {
+		return emptyItem
 	}
 	return s.v[s.p]
 }

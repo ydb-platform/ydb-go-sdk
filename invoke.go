@@ -18,6 +18,9 @@ func invoke(
 ) (
 	err error,
 ) {
+	if conn == nil {
+		return ErrNilConnection
+	}
 	err = conn.Invoke(ctx, method, req, resp.GetResponseProto(), opts...)
 	switch {
 	case err != nil:
