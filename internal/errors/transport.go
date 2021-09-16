@@ -46,6 +46,40 @@ type TransportError struct {
 	err     error
 }
 
+type teOpt func(ops *TransportError)
+
+func WithTEReason(reason TransportErrorCode) teOpt {
+	return func(te *TransportError) {
+		te.Reason = reason
+	}
+}
+
+func WithTEError(err error) teOpt {
+	return func(te *TransportError) {
+		te.err = err
+	}
+}
+
+func WithTEMessage(message string) teOpt {
+	return func(te *TransportError) {
+		te.message = message
+	}
+}
+
+func WithTEOperation(operation operation) teOpt {
+	return func(te *TransportError) {
+		te.Reason = TransportErrorCode(operation.GetStatus())
+	}
+}
+
+func NewTransportError(opts ...teOpt) *TransportError {
+	te := &TransportError{}
+	for _, f := range opts {
+		f(te)
+	}
+	return te
+}
+
 func (t *TransportError) Error() string {
 	s := "ydb: transport error: " + t.Reason.String()
 	if t.message != "" {

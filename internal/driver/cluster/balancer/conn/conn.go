@@ -228,7 +228,7 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 			err = errors.ErrOperationNotReady
 
 		case opResponse.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-			err = errors.NewOpError(opResponse.GetOperation())
+			err = errors.NewOpError(errors.WithOEOperation(opResponse.GetOperation()))
 		}
 	}
 

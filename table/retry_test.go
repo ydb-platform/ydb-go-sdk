@@ -2,7 +2,6 @@ package table
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -14,25 +13,20 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
-		&errors.TransportError{
-			Reason: errors.TransportErrorResourceExhausted,
-		},
-		fmt.Errorf("wrap transport error: %w", &errors.TransportError{
-			Reason: errors.TransportErrorResourceExhausted,
-		}),
-		&errors.OpError{
-			Reason: errors.StatusOverloaded,
-		},
-		fmt.Errorf("wrap op error: %w", &errors.OpError{
-			Reason: errors.StatusOverloaded,
-		}),
+		errors.NewTransportError(
+			errors.TransportErrorResourceExhausted,
+		),
+		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
+			errors.TransportErrorResourceExhausted,
+		)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded)),
+		fmt.Errorf("wrap op error: %w", errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded))),
 	} {
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
@@ -42,8 +36,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 					ch := make(chan time.Time)
 					backoff <- ch
 					return ch
-				},
-				),
+				}),
 			)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -70,27 +63,27 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 
 func TestRetryerImmediateRetry(t *testing.T) {
 	for testErr, session := range map[error]*Session{
-		&errors.TransportError{
-			Reason: errors.TransportErrorResourceExhausted,
-		}: newSession(nil, "1"),
-		&errors.TransportError{
-			Reason: errors.TransportErrorAborted,
-		}: newSession(nil, "2"),
-		&errors.OpError{
-			Reason: errors.StatusUnavailable,
-		}: newSession(nil, "3"),
-		&errors.OpError{
-			Reason: errors.StatusOverloaded,
-		}: newSession(nil, "4"),
-		&errors.OpError{
-			Reason: errors.StatusAborted,
-		}: newSession(nil, "5"),
-		&errors.OpError{
-			Reason: errors.StatusNotFound,
-		}: newSession(nil, "6"),
-		fmt.Errorf("wrap op error: %w", &errors.OpError{
-			Reason: errors.StatusAborted,
-		}): newSession(nil, "7"),
+		errors.NewTransportError(
+			errors.TransportErrorResourceExhausted,
+		): newSession(nil, "1"),
+		errors.NewTransportError(
+			errors.TransportErrorAborted,
+		): newSession(nil, "2"),
+		errors.NewOpError(
+			errors.WithOEReason(errors.StatusUnavailable),
+		): newSession(nil, "3"),
+		errors.NewOpError(
+			errors.WithOEReason(errors.StatusOverloaded),
+		): newSession(nil, "4"),
+		errors.NewOpError(
+			errors.WithOEReason(errors.StatusAborted),
+		): newSession(nil, "5"),
+		errors.NewOpError(
+			errors.WithOEReason(errors.StatusNotFound),
+		): newSession(nil, "6"),
+		fmt.Errorf("wrap op error: %w", errors.NewOpError(
+			errors.WithOEReason(errors.StatusAborted),
+		)): newSession(nil, "7"),
 	} {
 		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
 			pool := SingleSession(
@@ -129,9 +122,7 @@ func TestRetryerBadSession(t *testing.T) {
 		false,
 		func(ctx context.Context, s *Session) error {
 			sessions = append(sessions, s)
-			return &errors.OpError{
-				Reason: errors.StatusBadSession,
-			}
+			return errors.NewOpError(errors.WithOEReason(errors.StatusBadSession))
 		},
 	)
 	if !errors.IsOpError(err, errors.StatusBadSession) {
@@ -190,7 +181,7 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 			return nil
 		},
 		OnRetry: func(ctx context.Context, operation RetryOperation) error {
-			return retry(ctx, pool, backoff, backoff, false, operation)
+			return retryBackoff(ctx, pool, backoff, backoff, false, operation)
 		},
 	}
 	_ = pool.Retry(
@@ -198,9 +189,7 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 		false,
 		func(ctx context.Context, s *Session) error {
 			if bad[s] {
-				return &errors.OpError{
-					Reason: errors.StatusBadSession,
-				}
+				return errors.NewOpError(errors.WithOEReason(errors.StatusBadSession))
 			}
 			return nil
 		},
@@ -217,18 +206,18 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 
 func TestRetryerImmediateReturn(t *testing.T) {
 	for _, testErr := range []error{
-		&errors.OpError{
-			Reason: errors.StatusGenericError,
-		},
-		fmt.Errorf("wrap op error: %w", &errors.OpError{
-			Reason: errors.StatusGenericError,
-		}),
-		&errors.TransportError{
-			Reason: errors.TransportErrorPermissionDenied,
-		},
-		fmt.Errorf("wrap transport error: %w", &errors.TransportError{
-			Reason: errors.TransportErrorPermissionDenied,
-		}),
+		errors.NewOpError(
+			errors.WithOEReason(errors.StatusGenericError),
+		),
+		fmt.Errorf("wrap op error: %w", errors.NewOpError(
+			errors.WithOEReason(errors.StatusGenericError),
+		)),
+		errors.NewTransportError(
+			errors.TransportErrorPermissionDenied,
+		),
+		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
+			errors.TransportErrorPermissionDenied,
+		)),
 		errors.New("whoa"),
 	} {
 		t.Run("", func(t *testing.T) {
@@ -283,114 +272,76 @@ func TestRetryContextDeadline(t *testing.T) {
 		io.EOF,
 		context.DeadlineExceeded,
 		fmt.Errorf("test error"),
-		&errors.TransportError{
-			Reason: errors.TransportErrorUnknownCode,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorCanceled,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorUnknown,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorInvalidArgument,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorDeadlineExceeded,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorNotFound,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorAlreadyExists,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorPermissionDenied,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorResourceExhausted,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorFailedPrecondition,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorAborted,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorOutOfRange,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorUnimplemented,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorInternal,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorUnavailable,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorDataLoss,
-		},
-		&errors.TransportError{
-			Reason: errors.TransportErrorUnauthenticated,
-		},
-		&errors.OpError{
-			Reason: errors.StatusUnknownStatus,
-		},
-		&errors.OpError{
-			Reason: errors.StatusBadRequest,
-		},
-		&errors.OpError{
-			Reason: errors.StatusUnauthorized,
-		},
-		&errors.OpError{
-			Reason: errors.StatusInternalError,
-		},
-		&errors.OpError{
-			Reason: errors.StatusAborted,
-		},
-		&errors.OpError{
-			Reason: errors.StatusUnavailable,
-		},
-		&errors.OpError{
-			Reason: errors.StatusOverloaded,
-		},
-		&errors.OpError{
-			Reason: errors.StatusSchemeError,
-		},
-		&errors.OpError{
-			Reason: errors.StatusGenericError,
-		},
-		&errors.OpError{
-			Reason: errors.StatusTimeout,
-		},
-		&errors.OpError{
-			Reason: errors.StatusBadSession,
-		},
-		&errors.OpError{
-			Reason: errors.StatusPreconditionFailed,
-		},
-		&errors.OpError{
-			Reason: errors.StatusAlreadyExists,
-		},
-		&errors.OpError{
-			Reason: errors.StatusNotFound,
-		},
-		&errors.OpError{
-			Reason: errors.StatusSessionExpired,
-		},
-		&errors.OpError{
-			Reason: errors.StatusCancelled,
-		},
-		&errors.OpError{
-			Reason: errors.StatusUndetermined,
-		},
-		&errors.OpError{
-			Reason: errors.StatusUnsupported,
-		},
-		&errors.OpError{
-			Reason: errors.StatusSessionBusy,
-		},
+		errors.NewTransportError(
+			errors.TransportErrorUnknownCode,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorCanceled,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorUnknown,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorInvalidArgument,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorDeadlineExceeded,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorNotFound,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorAlreadyExists,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorPermissionDenied,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorResourceExhausted,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorFailedPrecondition,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorAborted,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorOutOfRange,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorUnimplemented,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorInternal,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorUnavailable,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorDataLoss,
+		),
+		errors.NewTransportError(
+			errors.TransportErrorUnauthenticated,
+		),
+		errors.NewOpError(errors.WithOEReason(errors.StatusUnknownStatus)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusBadRequest)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusUnauthorized)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusInternalError)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusAborted)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusUnavailable)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusSchemeError)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusGenericError)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusTimeout)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusBadSession)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusPreconditionFailed)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusAlreadyExists)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusNotFound)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusSessionExpired)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusCancelled)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusUndetermined)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusUnsupported)),
+		errors.NewOpError(errors.WithOEReason(errors.StatusSessionBusy)),
 	}
 	client := &Client{
 		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
@@ -407,7 +358,7 @@ func TestRetryContextDeadline(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 				_ = pool.Retry(
-					ydb.WithRetryTrace(
+					trace.WithRetryTrace(
 						ctx,
 						trace.RetryTrace{
 							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {

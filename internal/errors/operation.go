@@ -19,11 +19,33 @@ type operation interface {
 	GetIssues() []*Ydb_Issue.IssueMessage
 }
 
-func NewOpError(operation operation) *OpError {
-	return &OpError{
-		Reason: statusCode(operation.GetStatus()),
-		issues: operation.GetIssues(),
+func WithOEIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
+	return func(oe *OpError) {
+		oe.issues = issues
 	}
+}
+
+func WithOEReason(reason StatusCode) oeOpt {
+	return func(oe *OpError) {
+		oe.Reason = reason
+	}
+}
+
+func WithOEOperation(operation operation) oeOpt {
+	return func(oe *OpError) {
+		oe.Reason = statusCode(operation.GetStatus())
+		oe.issues = operation.GetIssues()
+	}
+}
+
+type oeOpt func(ops *OpError)
+
+func NewOpError(opts ...oeOpt) *OpError {
+	oe := &OpError{}
+	for _, f := range opts {
+		f(oe)
+	}
+	return oe
 }
 
 func (e *OpError) Issues() IssueIterator {
