@@ -2,7 +2,7 @@ package retry
 
 import (
 	"context"
-	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"math"
 	"math/rand"
@@ -76,18 +76,18 @@ func Retry(ctx context.Context, retryNoIdempotent bool, op retryOperation) (err 
 
 // Check returns retry mode for err.
 func Check(err error) (m retryMode) {
-	var te *errors2.TransportError
-	var oe *errors2.OpError
+	var te *errors.TransportError
+	var oe *errors.OpError
 
 	switch {
-	case errors2.As(err, &te):
+	case errors.As(err, &te):
 		return retryMode{
 			statusCode:    int32(te.Reason),
 			retry:         te.Reason.RetryType(),
 			backoff:       te.Reason.BackoffType(),
 			deleteSession: te.Reason.MustDeleteSession(),
 		}
-	case errors2.As(err, &oe):
+	case errors.As(err, &oe):
 		return retryMode{
 			statusCode:    int32(oe.Reason),
 			retry:         oe.Reason.RetryType(),
@@ -97,8 +97,8 @@ func Check(err error) (m retryMode) {
 	default:
 		return retryMode{
 			statusCode:    -1,
-			retry:         errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retry:         errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		}
 	}
@@ -107,11 +107,11 @@ func Check(err error) (m retryMode) {
 func Wait(ctx context.Context, fastBackoff Backoff, slowBackoff Backoff, m retryMode, i int) error {
 	var b Backoff
 	switch m.BackoffType() {
-	case errors2.BackoffTypeNoBackoff:
+	case errors.BackoffTypeNoBackoff:
 		return nil
-	case errors2.BackoffTypeFastBackoff:
+	case errors.BackoffTypeFastBackoff:
 		b = fastBackoff
-	case errors2.BackoffTypeSlowBackoff:
+	case errors.BackoffTypeSlowBackoff:
 		b = slowBackoff
 	}
 	return waitBackoff(ctx, b, i)
@@ -176,25 +176,25 @@ func max(a, b uint) uint {
 // properties.
 type retryMode struct {
 	statusCode    int32
-	retry         errors2.RetryType
-	backoff       errors2.BackoffType
+	retry         errors.RetryType
+	backoff       errors.BackoffType
 	deleteSession bool
 }
 
 func (m retryMode) MustRetry(retryNoIdempotent bool) bool {
 	switch m.retry {
-	case errors2.RetryTypeNoRetry:
+	case errors.RetryTypeNoRetry:
 		return false
-	case errors2.RetryTypeNoIdempotent:
+	case errors.RetryTypeNoIdempotent:
 		return retryNoIdempotent
 	default:
 		return true
 	}
 }
-func (m retryMode) StatusCode() int32                { return m.statusCode }
-func (m retryMode) MustBackoff() bool                { return m.backoff&errors2.BackoffTypeBackoffAny != 0 }
-func (m retryMode) BackoffType() errors2.BackoffType { return m.backoff }
-func (m retryMode) MustDeleteSession() bool          { return m.deleteSession }
+func (m retryMode) StatusCode() int32               { return m.statusCode }
+func (m retryMode) MustBackoff() bool               { return m.backoff&errors.BackoffTypeBackoffAny != 0 }
+func (m retryMode) BackoffType() errors.BackoffType { return m.backoff }
+func (m retryMode) MustDeleteSession() bool         { return m.deleteSession }
 
 // Backoff is the interface that contains logic of delaying operation retry.
 type Backoff interface {

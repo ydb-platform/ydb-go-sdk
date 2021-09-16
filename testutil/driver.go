@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
-	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"reflect"
 	"strings"
 
@@ -188,7 +188,7 @@ func (c *Cluster) Get(context.Context) (conn conn.ClientConnInterface, err error
 	}, nil
 }
 
-func (c *Cluster) Stats(func(errors2.Endpoint, stats.Stats)) {
+func (c *Cluster) Stats(func(endpoint.Endpoint, stats.Stats)) {
 }
 
 func (c *Cluster) Close() error {

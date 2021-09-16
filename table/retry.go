@@ -3,7 +3,7 @@ package table
 import (
 	"context"
 	"errors"
-	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"time"
@@ -54,7 +54,7 @@ func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
 
 func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op RetryOperation) error {
 	if f.OnRetry == nil {
-		return retry(ctx, f, nil, nil, false, op)
+		return retryBackoff(ctx, f, nil, nil, false, op)
 	}
 	return f.OnRetry(ctx, op)
 }
@@ -65,7 +65,7 @@ func (f SessionProviderFunc) CloseSession(ctx context.Context, s *Session) error
 
 // SingleSession returns SessionProvider that uses only given session during
 // retries.
-func SingleSession(s *Session, b retry2.Backoff) SessionProvider {
+func SingleSession(s *Session, b retry.Backoff) SessionProvider {
 	return &singleSession{s: s, b: b}
 }
 
@@ -77,12 +77,12 @@ var (
 
 type singleSession struct {
 	s     *Session
-	b     retry2.Backoff
+	b     retry.Backoff
 	empty bool
 }
 
 func (s *singleSession) Retry(ctx context.Context, _ bool, op RetryOperation) (err error) {
-	return retry(ctx, s, s.b, s.b, false, op)
+	return retryBackoff(ctx, s, s.b, s.b, false, op)
 }
 
 func (s *singleSession) Get(context.Context) (*Session, error) {
@@ -104,17 +104,6 @@ func (s *singleSession) Put(_ context.Context, x *Session) error {
 	return nil
 }
 
-func (s *singleSession) PutBusy(ctx context.Context, x *Session) error {
-	if x != s.s {
-		return errUnexpectedSession
-	}
-	if !s.empty {
-		return errSessionOverflow
-	}
-	s.empty = true
-	return x.Close(ctx)
-}
-
 func (s *singleSession) CloseSession(ctx context.Context, x *Session) error {
 	if x != s.s {
 		return errUnexpectedSession
@@ -126,11 +115,11 @@ func (s *singleSession) CloseSession(ctx context.Context, x *Session) error {
 	return x.Close(ctx)
 }
 
-func retry(
+func retryBackoff(
 	ctx context.Context,
 	p SessionProvider,
-	fastBackoff retry2.Backoff,
-	slowBackoff retry2.Backoff,
+	fastBackoff retry.Backoff,
+	slowBackoff retry.Backoff,
 	retryNoIdempotent bool,
 	op RetryOperation,
 ) (err error) {
@@ -178,7 +167,7 @@ func retry(
 			if err = op(ctx, s); err == nil {
 				return
 			}
-			m := retry2.Check(err)
+			m := retry.Check(err)
 			if m.StatusCode() != code {
 				i = 0
 			}
@@ -189,7 +178,7 @@ func retry(
 			if !m.MustRetry(retryNoIdempotent) {
 				return err
 			}
-			if e := retry2.Wait(ctx, fastBackoff, slowBackoff, m, i); e != nil {
+			if e := retry.Wait(ctx, fastBackoff, slowBackoff, m, i); e != nil {
 				return err
 			}
 			code = m.StatusCode()

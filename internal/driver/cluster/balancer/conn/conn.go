@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime"
-	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	operation2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"sync"
 	"time"
 
@@ -151,10 +151,10 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		}
 	}()
 	if t := c.driver.OperationTimeout(); t > 0 {
-		ctx = operation2.WithOperationTimeout(ctx, t)
+		ctx = operation.WithOperationTimeout(ctx, t)
 	}
 	if t := c.driver.OperationCancelAfter(); t > 0 {
-		ctx = operation2.WithOperationCancelAfter(ctx, t)
+		ctx = operation.WithOperationCancelAfter(ctx, t)
 	}
 
 	// Get credentials (token actually) for the request.
@@ -167,9 +167,9 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	params := operation2.ContextParams(ctx)
+	params := operation.ContextParams(ctx)
 	if !params.Empty() {
-		operation2.SetOperationParams(request, params)
+		operation.SetOperationParams(request, params)
 	}
 
 	start := timeutil.Now()
@@ -193,7 +193,7 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 						Error:  err,
 					},
 				)
-				err := errors2.ErrIf(errors2.IsTimeoutError(err), err)
+				err := errors.ErrIf(errors.IsTimeoutError(err), err)
 				c.runtime.OperationDone(
 					start, timeutil.Now(),
 					err,
@@ -204,8 +204,8 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 
 	raw, err := c.Conn(ctx)
 	if err != nil {
-		err = errors2.MapGRPCError(err)
-		if errors2.MustPessimizeEndpoint(err) {
+		err = errors.MapGRPCError(err)
+		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
 		}
 		return
@@ -214,8 +214,8 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 	err = raw.Invoke(ctx, method, request, response, opts...)
 
 	if err != nil {
-		err = errors2.MapGRPCError(err)
-		if errors2.MustPessimizeEndpoint(err) {
+		err = errors.MapGRPCError(err)
+		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
 		}
 		return
@@ -225,10 +225,10 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		issues = opResponse.GetOperation().GetIssues()
 		switch {
 		case !opResponse.GetOperation().GetReady():
-			err = errors2.ErrOperationNotReady
+			err = errors.ErrOperationNotReady
 
 		case opResponse.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-			err = errors2.NewOpError(opResponse.GetOperation())
+			err = errors.NewOpError(opResponse.GetOperation())
 		}
 	}
 
@@ -276,8 +276,8 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 
 	raw, err := c.Conn(ctx)
 	if err != nil {
-		err = errors2.MapGRPCError(err)
-		if errors2.MustPessimizeEndpoint(err) {
+		err = errors.MapGRPCError(err)
+		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
 		}
 		return
@@ -285,7 +285,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 
 	s, err := raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 	if err != nil {
-		return nil, errors2.MapGRPCError(err)
+		return nil, errors.MapGRPCError(err)
 	}
 
 	return &grpcClientStream{

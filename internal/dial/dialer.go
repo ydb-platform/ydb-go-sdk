@@ -3,7 +3,6 @@ package dial
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
@@ -231,9 +230,6 @@ func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*grpc
 	}
 
 	cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
-
-	state := cc.GetState()
-	fmt.Println(state.String())
 
 	if dialDone != nil {
 		dialDone(trace.DialDoneInfo{

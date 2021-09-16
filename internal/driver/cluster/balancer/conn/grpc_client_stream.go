@@ -2,7 +2,7 @@ package conn
 
 import (
 	"context"
-	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"google.golang.org/grpc"
@@ -36,12 +36,12 @@ func (s *grpcClientStream) Trailer() metadata.MD {
 func (s *grpcClientStream) CloseSend() (err error) {
 	err = s.s.CloseSend()
 	if err != nil {
-		err = errors2.MapGRPCError(err)
+		err = errors.MapGRPCError(err)
 	}
-	s.c.runtime.StreamDone(timeutil.Now(), errors2.HideEOF(err))
+	s.c.runtime.StreamDone(timeutil.Now(), errors.HideEOF(err))
 	if s.done != nil {
 		s.done(trace.StreamDoneInfo{
-			Error: errors2.HideEOF(err),
+			Error: errors.HideEOF(err),
 		})
 	}
 	if s.cancel != nil {
@@ -57,7 +57,7 @@ func (s *grpcClientStream) Context() context.Context {
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	err = s.s.SendMsg(m)
 	if err != nil {
-		err = errors2.MapGRPCError(err)
+		err = errors.MapGRPCError(err)
 	}
 	return
 }
@@ -68,8 +68,8 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	err = s.s.RecvMsg(m)
 
 	if err != nil {
-		err = errors2.MapGRPCError(err)
-		if errors2.MustPessimizeEndpoint(err) {
+		err = errors.MapGRPCError(err)
+		if errors.MustPessimizeEndpoint(err) {
 			s.c.pessimize(s.ctx, err)
 		}
 		return
@@ -77,13 +77,13 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	if operation, ok := m.(internal.StreamOperationResponse); ok {
 		if s := operation.GetStatus(); s != Ydb.StatusIds_SUCCESS {
-			err = errors2.NewOpError(operation)
+			err = errors.NewOpError(operation)
 		}
 	}
 
 	if s.recv != nil {
 		s.done = s.recv(trace.StreamRecvDoneInfo{
-			Error: errors2.HideEOF(err),
+			Error: errors.HideEOF(err),
 		})
 	}
 

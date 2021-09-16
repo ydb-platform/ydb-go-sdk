@@ -4,9 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"errors"
 	"fmt"
-	errors3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
@@ -42,8 +41,8 @@ func (d *ydbWrapper) UnmarshalYDB(res types.RawValue) error {
 	return res.Err()
 }
 
-// conn is a connection to the ydb.
-type conn struct {
+// sqlConn is a connection to the ydb.
+type sqlConn struct {
 	connector *connector     // Immutable and r/o usage.
 	session   *table.Session // Immutable and r/o usage.
 
@@ -53,7 +52,7 @@ type conn struct {
 	txc *table.TransactionControl
 }
 
-func (c *conn) takeSession(ctx context.Context) bool {
+func (c *sqlConn) takeSession(ctx context.Context) bool {
 	if !c.idle {
 		return true
 	}
@@ -64,7 +63,7 @@ func (c *conn) takeSession(ctx context.Context) bool {
 	return true
 }
 
-func (c *conn) ResetSession(ctx context.Context) error {
+func (c *sqlConn) ResetSession(ctx context.Context) error {
 	if c.idle {
 		return nil
 	}
@@ -76,7 +75,7 @@ func (c *conn) ResetSession(ctx context.Context) error {
 	return nil
 }
 
-func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+func (c *sqlConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
@@ -134,7 +133,7 @@ func txIsolationOrControl(opts driver.TxOptions) (isolation table.TxOption, cont
 	)
 }
 
-func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx, err error) {
+func (c *sqlConn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx, err error) {
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
@@ -159,7 +158,7 @@ func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx
 
 // Rollback implements driver.Tx interface.
 // Note that it is called by driver even if a user did not called it.
-func (c *conn) Rollback() error {
+func (c *sqlConn) Rollback() error {
 	if c.tx == nil && c.txc == nil {
 		return ErrNoActiveTransaction
 	}
@@ -174,7 +173,7 @@ func (c *conn) Rollback() error {
 	return nil
 }
 
-func (c *conn) Commit() (err error) {
+func (c *sqlConn) Commit() (err error) {
 	if c.tx == nil && c.txc == nil {
 		return ErrNoActiveTransaction
 	}
@@ -189,7 +188,7 @@ func (c *conn) Commit() (err error) {
 	return
 }
 
-func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func (c *sqlConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	_, err := c.exec(ctx, &reqQuery{text: query}, params(args))
 	if err != nil {
 		return nil, err
@@ -197,7 +196,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	return result{}, nil
 }
 
-func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (c *sqlConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	if ContextScanQueryMode(ctx) {
 		// Allow to use scanQuery only through QueryContext API.
 		return c.scanQueryContext(ctx, query, args)
@@ -205,7 +204,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	return c.queryContext(ctx, query, args)
 }
 
-func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (c *sqlConn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	res, err := c.exec(ctx, &reqQuery{text: query}, params(args))
 	if err != nil {
 		return nil, err
@@ -214,7 +213,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	return &rows{res: res}, nil
 }
 
-func (c *conn) scanQueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (c *sqlConn) scanQueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	res, err := c.exec(ctx, &reqScanQuery{text: query}, params(args))
 	if err != nil {
 		return nil, err
@@ -223,11 +222,11 @@ func (c *conn) scanQueryContext(ctx context.Context, query string, args []driver
 	return &stream{ctx: ctx, res: res}, res.Err()
 }
 
-func (c *conn) CheckNamedValue(v *driver.NamedValue) error {
+func (c *sqlConn) CheckNamedValue(v *driver.NamedValue) error {
 	return checkNamedValue(v)
 }
 
-func (c *conn) Ping(ctx context.Context) error {
+func (c *sqlConn) Ping(ctx context.Context) error {
 	if !c.takeSession(ctx) {
 		return driver.ErrBadConn
 	}
@@ -235,7 +234,7 @@ func (c *conn) Ping(ctx context.Context) error {
 	return mapBadSessionError(err)
 }
 
-func (c *conn) Close() error {
+func (c *sqlConn) Close() error {
 	ctx := context.Background()
 	if !c.takeSession(ctx) {
 		return driver.ErrBadConn
@@ -244,15 +243,15 @@ func (c *conn) Close() error {
 	return mapBadSessionError(err)
 }
 
-func (c *conn) Prepare(string) (driver.Stmt, error) {
+func (c *sqlConn) Prepare(string) (driver.Stmt, error) {
 	return nil, ErrDeprecated
 }
 
-func (c *conn) Begin() (driver.Tx, error) {
+func (c *sqlConn) Begin() (driver.Tx, error) {
 	return nil, ErrDeprecated
 }
 
-func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParameters) (res *table.Result, err error) {
+func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryParameters) (res *table.Result, err error) {
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
@@ -267,34 +266,34 @@ func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParam
 	return nil, err
 }
 
-func (c *conn) txControl() *table.TransactionControl {
+func (c *sqlConn) txControl() *table.TransactionControl {
 	if c.txc == nil {
 		return c.connector.defaultTxControl
 	}
 	return c.txc
 }
 
-func (c *conn) dataOpts() []table.ExecuteDataQueryOption {
+func (c *sqlConn) dataOpts() []table.ExecuteDataQueryOption {
 	return c.connector.dataOpts
 }
 
-func (c *conn) scanOpts() []table.ExecuteScanQueryOption {
+func (c *sqlConn) scanOpts() []table.ExecuteScanQueryOption {
 	return c.connector.scanOpts
 }
 
-func (c *conn) pool() *table.SessionPool {
+func (c *sqlConn) pool() *table.SessionPool {
 	return &c.connector.pool
 }
 
 type processor interface {
-	process(context.Context, *conn, *table.QueryParameters) (*table.Result, error)
+	process(context.Context, *sqlConn, *table.QueryParameters) (*table.Result, error)
 }
 
 type reqStmt struct {
 	stmt *table.Statement
 }
 
-func (o *reqStmt) process(ctx context.Context, c *conn, params *table.QueryParameters) (*table.Result, error) {
+func (o *reqStmt) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (*table.Result, error) {
 	_, res, err := o.stmt.Execute(ctx, c.txControl(), params, c.dataOpts()...)
 	return res, err
 }
@@ -303,7 +302,7 @@ type reqQuery struct {
 	text string
 }
 
-func (o *reqQuery) process(ctx context.Context, c *conn, params *table.QueryParameters) (*table.Result, error) {
+func (o *reqQuery) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (*table.Result, error) {
 	_, res, err := c.session.Execute(ctx, c.txControl(), o.text, params, c.dataOpts()...)
 	return res, err
 }
@@ -312,7 +311,7 @@ type reqScanQuery struct {
 	text string
 }
 
-func (o *reqScanQuery) process(ctx context.Context, c *conn, params *table.QueryParameters) (*table.Result, error) {
+func (o *reqScanQuery) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (*table.Result, error) {
 	return c.session.StreamExecuteScanQuery(ctx, o.text, params, c.scanOpts()...)
 }
 
@@ -395,7 +394,7 @@ func nameIsolationLevel(x sql.IsolationLevel) string {
 }
 
 type stmt struct {
-	conn *conn
+	conn *sqlConn
 	stmt *table.Statement
 }
 
@@ -613,7 +612,7 @@ func (r result) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (r result) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
 func mapBadSessionError(err error) error {
-	if errors3.IsOpError(err, errors3.StatusBadSession) {
+	if errors.IsOpError(err, errors.StatusBadSession) {
 		return driver.ErrBadConn
 	}
 	return err

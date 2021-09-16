@@ -3,10 +3,9 @@ package table
 import (
 	"container/list"
 	"context"
-	"errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	errors3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"sync"
 	"time"
 
@@ -177,10 +176,10 @@ func isCreateSessionErrorRetriable(err error) bool {
 	switch {
 	case
 		errors.Is(err, ErrSessionPoolOverflow),
-		errors3.IsOpError(err, errors3.StatusOverloaded),
-		errors3.IsTransportError(err, errors3.TransportErrorResourceExhausted),
-		errors3.IsTransportError(err, errors3.TransportErrorDeadlineExceeded),
-		errors3.IsTransportError(err, errors3.TransportErrorUnavailable):
+		errors.IsOpError(err, errors.StatusOverloaded),
+		errors.IsTransportError(err, errors.TransportErrorResourceExhausted),
+		errors.IsTransportError(err, errors.TransportErrorDeadlineExceeded),
+		errors.IsTransportError(err, errors.TransportErrorUnavailable):
 		return true
 	default:
 		return false
@@ -568,7 +567,7 @@ type RetryOperation func(context.Context, *Session) (err error)
 // - retry operation returned nil as error
 // Warning: if context without deadline or cancellation func Retry will be worked infinite
 func (p *SessionPool) Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error) {
-	return retry(ctx, p, retry2.FastBackoff, retry2.SlowBackoff, retryNoIdempotent, op)
+	return retryBackoff(ctx, p, retry.FastBackoff, retry.SlowBackoff, retryNoIdempotent, op)
 }
 
 func (p *SessionPool) Stats() SessionPoolStats {
@@ -662,9 +661,9 @@ func (p *SessionPool) keeper() {
 				if err != nil {
 					switch {
 					case
-						errors3.IsOpError(err, errors3.StatusBadSession),
-						errors3.IsTransportError(err, errors3.TransportErrorCanceled),
-						errors3.IsTransportError(err, errors3.TransportErrorDeadlineExceeded):
+						errors.IsOpError(err, errors.StatusBadSession),
+						errors.IsTransportError(err, errors.TransportErrorCanceled),
+						errors.IsTransportError(err, errors.TransportErrorDeadlineExceeded):
 						toDelete = append(toDelete, s)
 					default:
 						toTryAgain = append(toTryAgain, s)

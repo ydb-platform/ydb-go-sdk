@@ -25,7 +25,7 @@ import (
 
 // Interface checks.
 var (
-	c conn
+	c sqlConn
 
 	_ driver.Conn               = &c
 	_ driver.ExecerContext      = &c

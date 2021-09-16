@@ -3,7 +3,7 @@ package retry
 import (
 	"context"
 	"fmt"
-	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"math/rand"
 	"testing"
 	"time"
@@ -111,316 +111,316 @@ func TestLogBackoff(t *testing.T) {
 
 func TestRetryModes(t *testing.T) {
 	type Case struct {
-		err           error               // given error
-		retryType     errors2.RetryType   // types of retry: no retry, retry always idempotent, retry conditionally with user allow retry for unidempotent operations
-		backoff       errors2.BackoffType // types of Backoff: no Backoff (=== no retry), fast Backoff, slow Backoff
-		deleteSession bool                // close session and delete from pool
+		err           error              // given error
+		retryType     errors.RetryType   // types of retry: no retry, retry always idempotent, retry conditionally with user allow retry for unidempotent operations
+		backoff       errors.BackoffType // types of Backoff: no Backoff (=== no retry), fast Backoff, slow Backoff
+		deleteSession bool               // close session and delete from pool
 	}
 	errs := []Case{
 		{
 			err:           fmt.Errorf("unknown error"), // retryer given unknown error - we will not retry and will close session
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
 			err:           context.DeadlineExceeded, // golang context deadline exceeded
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
 			err:           context.Canceled, // golang context cancelled
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorUnknownCode,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorUnknownCode,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorCanceled,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorCanceled,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorUnknown,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorUnknown,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorInvalidArgument,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorInvalidArgument,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorDeadlineExceeded,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorDeadlineExceeded,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorNotFound,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorNotFound,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorAlreadyExists,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorAlreadyExists,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorPermissionDenied,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorPermissionDenied,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorResourceExhausted,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorResourceExhausted,
 			},
-			retryType:     errors2.RetryTypeAny,
-			backoff:       errors2.BackoffTypeSlowBackoff,
+			retryType:     errors.RetryTypeAny,
+			backoff:       errors.BackoffTypeSlowBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorFailedPrecondition,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorFailedPrecondition,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorAborted,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorAborted,
 			},
-			retryType:     errors2.RetryTypeAny,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeAny,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorOutOfRange,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorOutOfRange,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorUnimplemented,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorUnimplemented,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorInternal,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorInternal,
 			},
-			retryType:     errors2.RetryTypeIdempotent,
-			backoff:       errors2.BackoffTypeFastBackoff,
+			retryType:     errors.RetryTypeIdempotent,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorUnavailable,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorUnavailable,
 			},
-			retryType:     errors2.RetryTypeIdempotent,
-			backoff:       errors2.BackoffTypeFastBackoff,
+			retryType:     errors.RetryTypeIdempotent,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorDataLoss,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorDataLoss,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.TransportError{
-				Reason: errors2.TransportErrorUnauthenticated,
+			err: &errors.TransportError{
+				Reason: errors.TransportErrorUnauthenticated,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusUnknownStatus,
+			err: &errors.OpError{
+				Reason: errors.StatusUnknownStatus,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusBadRequest,
+			err: &errors.OpError{
+				Reason: errors.StatusBadRequest,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusUnauthorized,
+			err: &errors.OpError{
+				Reason: errors.StatusUnauthorized,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusInternalError,
+			err: &errors.OpError{
+				Reason: errors.StatusInternalError,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusAborted,
+			err: &errors.OpError{
+				Reason: errors.StatusAborted,
 			},
-			retryType:     errors2.RetryTypeAny,
-			backoff:       errors2.BackoffTypeFastBackoff,
+			retryType:     errors.RetryTypeAny,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusUnavailable,
+			err: &errors.OpError{
+				Reason: errors.StatusUnavailable,
 			},
-			retryType:     errors2.RetryTypeAny,
-			backoff:       errors2.BackoffTypeFastBackoff,
+			retryType:     errors.RetryTypeAny,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusOverloaded,
+			err: &errors.OpError{
+				Reason: errors.StatusOverloaded,
 			},
-			retryType:     errors2.RetryTypeAny,
-			backoff:       errors2.BackoffTypeSlowBackoff,
+			retryType:     errors.RetryTypeAny,
+			backoff:       errors.BackoffTypeSlowBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusSchemeError,
+			err: &errors.OpError{
+				Reason: errors.StatusSchemeError,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusGenericError,
+			err: &errors.OpError{
+				Reason: errors.StatusGenericError,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusTimeout,
+			err: &errors.OpError{
+				Reason: errors.StatusTimeout,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusBadSession,
+			err: &errors.OpError{
+				Reason: errors.StatusBadSession,
 			},
-			retryType:     errors2.RetryTypeAny,
-			backoff:       errors2.BackoffTypeFastBackoff,
+			retryType:     errors.RetryTypeAny,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusPreconditionFailed,
+			err: &errors.OpError{
+				Reason: errors.StatusPreconditionFailed,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusAlreadyExists,
+			err: &errors.OpError{
+				Reason: errors.StatusAlreadyExists,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusNotFound,
+			err: &errors.OpError{
+				Reason: errors.StatusNotFound,
 			},
-			retryType:     errors2.RetryTypeAny,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeAny,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusSessionExpired,
+			err: &errors.OpError{
+				Reason: errors.StatusSessionExpired,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusCancelled,
+			err: &errors.OpError{
+				Reason: errors.StatusCancelled,
 			},
-			retryType:     errors2.RetryTypeIdempotent,
-			backoff:       errors2.BackoffTypeFastBackoff,
+			retryType:     errors.RetryTypeIdempotent,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusUndetermined,
+			err: &errors.OpError{
+				Reason: errors.StatusUndetermined,
 			},
-			retryType:     errors2.RetryTypeIdempotent,
-			backoff:       errors2.BackoffTypeFastBackoff,
+			retryType:     errors.RetryTypeIdempotent,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusUnsupported,
+			err: &errors.OpError{
+				Reason: errors.StatusUnsupported,
 			},
-			retryType:     errors2.RetryTypeNoRetry,
-			backoff:       errors2.BackoffTypeNoBackoff,
+			retryType:     errors.RetryTypeNoRetry,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err: &errors2.OpError{
-				Reason: errors2.StatusSessionBusy,
+			err: &errors.OpError{
+				Reason: errors.StatusSessionBusy,
 			},
-			retryType:     errors2.RetryTypeAny,
-			backoff:       errors2.BackoffTypeFastBackoff,
+			retryType:     errors.RetryTypeAny,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
 		},
 	}

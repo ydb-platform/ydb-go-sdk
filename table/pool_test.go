@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"math/rand"
 	"path"
 	"runtime"
@@ -1030,8 +1030,8 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	}
 
 	// Now fail the Keepalive() call from above.
-	keepaliveResult <- &errors2.OpError{
-		Reason: errors2.StatusBadSession,
+	keepaliveResult <- &errors.OpError{
+		Reason: errors.StatusBadSession,
 	}
 
 	// Block the keeper()'s deletion routine.
@@ -1122,8 +1122,8 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
-							return nil, &errors2.OpError{
-								Reason: errors2.StatusBadSession,
+							return nil, &errors.OpError{
+								Reason: errors.StatusBadSession,
 							}
 						},
 						testutil.TableDeleteSession: okHandler,

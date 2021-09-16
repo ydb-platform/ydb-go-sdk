@@ -4,21 +4,62 @@
 
 [godoc](https://godoc.org/github.com/ydb-platform/ydb-go-sdk/v3/)
 
-## Overview
+## Table of contents
+1. [Overview](#Overview)
+2. [About semantic versioning](#SemVer)
+3. [Prerequisites](#Prerequisites)
+4. [Installation](#Install)
+5. [Usage](#Usage)
+    * [Native API](#Native)
+    * [Database/sql API](#database-sql)
+6. [Credentials](#Credentials)
+7. [Generating code](#ydbgen)
+    * [Installation](#ydbgen-install)
+    * [Usage](#ydbgen-usage)
+    * [Configuration](#ydbgen-configuration)
+      * [Binary flags](#ydbgen-binary-flags)
+      * [Comment markers](#ydbgen-comment-markers)
+      * [Struct tags and values](#ydbgen-struct-tags-and-values)
+    * [Customization](#ydbgen-customization)
+      * [Optional types](#ydbgen-customization-optional-types)
+      * [Dealing with `time.Time`](#ydbgen-customization-time)
+      * [Dealing with container types](#ydbgen-customization-container)
+8. [Examples](#examples)
 
-Currently package ydb provides **scheme** and **table** API client implementations for YDB.
+## Overview <a name="Overview"></a>
 
-## Prerequisites
+Currently package ydb provides `scheme` and `table` API client implementations for `YDB`.
+
+## About semantic versioning <a name="SemVer"></a>
+
+We follow the **[SemVer 2.0.0](https://semver.org)**. In particular, we provide backward compatibility in the `MAJOR` releases. New features without loss of backward compatibility appear on the `MINOR` release. In the minor version, the patch number starts from `0`. Bug fixes and internal changes are released with the third digit (`PATCH`) in the version.
+
+There are, however, some changes with the loss of backward compatibility that we consider to be `MINOR`:
+* extension or modification of internal `ydb-go-sdk` interfaces. We understand that this will break the compatibility of custom implementations of the `ydb-go-sdk` internal interfaces. But we believe that the internal interfaces of `ydb-go-sdk` are implemented well enough that they do not require custom implementation. We are working to ensure that all internal interfaces have limited access only inside `ydb-go-sdk`.
+* major changes to (including removal of) the public interfaces and types that have been previously exported by `ydb-go-sdk`. We understand that these changes will break the backward compatibility of early adopters of these interfaces. However, these changes are generally coordinated with early adopters and have the concise interfacing with `ydb-go-sdk` as a goal.
+
+Internal interfaces outside from `internal` directory are marked with comment such as
+```
+// Warning: only for internal usage inside ydb-go-sdk
+```
+
+We publish the planned breaking `MAJOR` changes:
+* via the comment `Deprecated` in the code indicating what should be used instead
+* through the file [`NEXT_MAJOR_RELEASE.md`](#NEXT_MAJOR_RELEASE.md)
+
+## Prerequisites <a name="Prerequisites"></a>
 
 Requires Go 1.13 or later.
 
-## Install
+## Installation <a name="Installation"></a>
 
 ```
 go get -u github.com/ydb-platform/ydb-go-sdk/v3
 ```
 
-## Usage
+## Usage <a name="Usage"></a>
+
+## Native usage <a name="Native"></a>
 
 The straightforward example of querying data may looks similar to this:
 
@@ -101,7 +142,7 @@ if res.Err() != nil {
 This example can be tested as `ydb/example/from_readme`
 
 YDB sessions may become staled and appropriate error will be returned. To
-reduce boilerplate overhead for such cases `ydb` provides generic retry logic:
+reduce boilerplate overhead for such cases `ydb-go-sdk` provides generic retry logic:
 
 ```go
 	var res *table.Result
@@ -125,36 +166,37 @@ That is, instead of manual creation of `table.Session`, we give a
 
 See `table.Retryer` docs for more information about retry options.
 
-### database/sql driver
+### Database/sql driver <a name="database-sql"></a>
 
 There is a `database/sql` driver for the sql-based applications or those which
 by some reasons need to use additional layer of absctraction between user code
 and storage backend.
 
-For more information please see the docs of `ydb/ydbsql` package which provides
+For more information please see the docs of `ydbsql` package which provides
 `database/sql` driver implementation.
 
-## Credentials
+## Credentials <a name="Credentials"></a>
 
 There are different variants to get `ydb.Credentials` object to get authorized.
 Usage examples can be found [here](example/internal/cli/driver.go) at `func credentials(...) ydb.Credentials`.
 
-## Generating code
+## Generating code <a name="ydbgen"></a>
 
-### Overview
+### Overview <a name="ydbgen-overview"></a>
 
 There is lot of boilerplate code for scanning values from query result and for
 passing values to prepare query. There is an **experimental** tool named
 `ydbgen` aimed to solve this.
 
-#### Install ydbgen
+#### Installation ydbgen <a name="ydbgen-install"></a>
 
 ```
 go get -u github.com/ydb-platform/ydb-go-sdk/v3/cmd/ydbgen
 ```
 
+### Usage ydbgen <a name="ydbgen-usage"></a>
 
-Currently it is possible to generate such things:
+`ydbgen` helps to generate such things:
 - scanning values from result into a struct or slice of structs;
 - building query parameters from struct
 - building ydb's struct value from struct
@@ -178,7 +220,7 @@ After running `go generate path/to/somepkg/dir` file with suffix `_ydbgen.go`
 will be generated. It will contain method `Scan()` for `User` type, as
 requested in the *generate comment*.
 
-### Configuration
+### Configuration <a name="ydbgen-configuration"></a>
 
 Generation may be configured at three levels starting from top:
 - ydbgen binary flags (package level)
@@ -203,7 +245,7 @@ type User struct {
 ```
 
 
-#### Binary flags
+#### Binary flags <a name="ydbgen-binary-flags"></a>
 
  Flag   | Value      | Default | Meaning
 --------|:----------:|:-------:|---------
@@ -212,12 +254,12 @@ type User struct {
  `seek` | `column`   | +       | Uses res.SeekItem() call to find out next field to scan.
  `seek` | `position` |         | Uses res.NextItem() call to find out next field to scan.
 
-#### Comment markers options
+#### Comment markers options <a name="ydbgen-comment-markers"></a>
 
 Options for comment markers are similar to flags, except the form of
 serialization.
 
-#### Struct tags and values overview
+#### Struct tags and values overview <a name="ydbgen-struct-tags-and-values"></a>
 
  Tag      | Value    | Default | Meaning
 ----------|:--------:|:-------:|---------
@@ -232,11 +274,11 @@ Also the shorthand tags are possible: when using tag without `key:value` form,
 tag with `-` value is interpreted as field must be ignored; in other way it is
 interpreted as the column name.
 
-### Customization
+### Customization <a name="ydbgen-customization"></a>
 
 There are few additional options existing for flexibility purposes.
 
-#### Optional Types
+#### Optional Types <a name="ydbgen-customization-optional-types"></a>
 
 Previously only basic Go types were mentioned as ones that able to be converted
 to ydb types. But it is possible generate code that maps defined type to YDB
@@ -284,7 +326,7 @@ type User struct {
 }
 ```
 
-#### Dealing with time.Time
+#### Dealing with `time.Time` <a name="ydbgen-customization-time"></a>
 
 There is additional feature that makes it easier to work with `time.Time`
 values and their conversion to YDB types:
@@ -298,7 +340,7 @@ type User struct {
 }
 ```
 
-#### Dealing with container types.
+#### Dealing with container types <a name="ydbgen-customization-container"></a>
 
 `ydbgen` supports scanning and serializing container types such as `List<T>` or `Struct<T>`.
 
@@ -319,7 +361,7 @@ not a container by setting `type` field tag.
 
 > For more info please look at `ydb/examples/generation` folder.
 
-## Examples
+## Examples <a name="examples"></a>
 
 More examples are listed in `ydb/examples` directory.
 

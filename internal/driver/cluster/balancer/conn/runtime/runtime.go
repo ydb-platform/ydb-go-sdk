@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/state"
-	stats2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
 	"sync"
 	"time"
 
@@ -15,7 +15,7 @@ const (
 )
 
 type Runtime interface {
-	Stats() stats2.Stats
+	Stats() stats.Stats
 	GetState() (s state.State)
 	SetState(s state.State)
 	OperationStart(start time.Time)
@@ -33,26 +33,26 @@ type runtime struct {
 	opStarted    uint64
 	opSucceed    uint64
 	opFailed     uint64
-	opTime       *stats2.Series
-	opRate       *stats2.Series
-	errRate      *stats2.Series
+	opTime       *stats.Series
+	opRate       *stats.Series
+	errRate      *stats.Series
 }
 
 func New() Runtime {
 	return &runtime{
-		opTime:  stats2.NewSeries(statsDuration, statsBuckets),
-		opRate:  stats2.NewSeries(statsDuration, statsBuckets),
-		errRate: stats2.NewSeries(statsDuration, statsBuckets),
+		opTime:  stats.NewSeries(statsDuration, statsBuckets),
+		opRate:  stats.NewSeries(statsDuration, statsBuckets),
+		errRate: stats.NewSeries(statsDuration, statsBuckets),
 	}
 }
 
-func (c *runtime) Stats() stats2.Stats {
+func (c *runtime) Stats() stats.Stats {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	now := timeutil.Now()
 
-	r := stats2.Stats{
+	r := stats.Stats{
 		State:        c.state,
 		OpStarted:    c.opStarted,
 		OpSucceed:    c.opSucceed,

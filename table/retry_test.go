@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	errors3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"math/rand"
@@ -21,17 +21,17 @@ import (
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorResourceExhausted,
+		&errors.TransportError{
+			Reason: errors.TransportErrorResourceExhausted,
 		},
-		fmt.Errorf("wrap transport error: %w", &errors3.TransportError{
-			Reason: errors3.TransportErrorResourceExhausted,
+		fmt.Errorf("wrap transport error: %w", &errors.TransportError{
+			Reason: errors.TransportErrorResourceExhausted,
 		}),
-		&errors3.OpError{
-			Reason: errors3.StatusOverloaded,
+		&errors.OpError{
+			Reason: errors.StatusOverloaded,
 		},
-		fmt.Errorf("wrap op error: %w", &errors3.OpError{
-			Reason: errors3.StatusOverloaded,
+		fmt.Errorf("wrap op error: %w", &errors.OpError{
+			Reason: errors.StatusOverloaded,
 		}),
 	} {
 		t.Run("", func(t *testing.T) {
@@ -70,26 +70,26 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 
 func TestRetryerImmediateRetry(t *testing.T) {
 	for testErr, session := range map[error]*Session{
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorResourceExhausted,
+		&errors.TransportError{
+			Reason: errors.TransportErrorResourceExhausted,
 		}: newSession(nil, "1"),
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorAborted,
+		&errors.TransportError{
+			Reason: errors.TransportErrorAborted,
 		}: newSession(nil, "2"),
-		&errors3.OpError{
-			Reason: errors3.StatusUnavailable,
+		&errors.OpError{
+			Reason: errors.StatusUnavailable,
 		}: newSession(nil, "3"),
-		&errors3.OpError{
-			Reason: errors3.StatusOverloaded,
+		&errors.OpError{
+			Reason: errors.StatusOverloaded,
 		}: newSession(nil, "4"),
-		&errors3.OpError{
-			Reason: errors3.StatusAborted,
+		&errors.OpError{
+			Reason: errors.StatusAborted,
 		}: newSession(nil, "5"),
-		&errors3.OpError{
-			Reason: errors3.StatusNotFound,
+		&errors.OpError{
+			Reason: errors.StatusNotFound,
 		}: newSession(nil, "6"),
-		fmt.Errorf("wrap op error: %w", &errors3.OpError{
-			Reason: errors3.StatusAborted,
+		fmt.Errorf("wrap op error: %w", &errors.OpError{
+			Reason: errors.StatusAborted,
 		}): newSession(nil, "7"),
 	} {
 		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
@@ -129,12 +129,12 @@ func TestRetryerBadSession(t *testing.T) {
 		false,
 		func(ctx context.Context, s *Session) error {
 			sessions = append(sessions, s)
-			return &errors3.OpError{
-				Reason: errors3.StatusBadSession,
+			return &errors.OpError{
+				Reason: errors.StatusBadSession,
 			}
 		},
 	)
-	if !errors3.IsOpError(err, errors3.StatusBadSession) {
+	if !errors.IsOpError(err, errors.StatusBadSession) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	seen := make(map[*Session]bool, len(sessions))
@@ -198,8 +198,8 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 		false,
 		func(ctx context.Context, s *Session) error {
 			if bad[s] {
-				return &errors3.OpError{
-					Reason: errors3.StatusBadSession,
+				return &errors.OpError{
+					Reason: errors.StatusBadSession,
 				}
 			}
 			return nil
@@ -217,17 +217,17 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 
 func TestRetryerImmediateReturn(t *testing.T) {
 	for _, testErr := range []error{
-		&errors3.OpError{
-			Reason: errors3.StatusGenericError,
+		&errors.OpError{
+			Reason: errors.StatusGenericError,
 		},
-		fmt.Errorf("wrap op error: %w", &errors3.OpError{
-			Reason: errors3.StatusGenericError,
+		fmt.Errorf("wrap op error: %w", &errors.OpError{
+			Reason: errors.StatusGenericError,
 		}),
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorPermissionDenied,
+		&errors.TransportError{
+			Reason: errors.TransportErrorPermissionDenied,
 		},
-		fmt.Errorf("wrap transport error: %w", &errors3.TransportError{
-			Reason: errors3.TransportErrorPermissionDenied,
+		fmt.Errorf("wrap transport error: %w", &errors.TransportError{
+			Reason: errors.TransportErrorPermissionDenied,
 		}),
 		errors.New("whoa"),
 	} {
@@ -283,113 +283,113 @@ func TestRetryContextDeadline(t *testing.T) {
 		io.EOF,
 		context.DeadlineExceeded,
 		fmt.Errorf("test error"),
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorUnknownCode,
+		&errors.TransportError{
+			Reason: errors.TransportErrorUnknownCode,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorCanceled,
+		&errors.TransportError{
+			Reason: errors.TransportErrorCanceled,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorUnknown,
+		&errors.TransportError{
+			Reason: errors.TransportErrorUnknown,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorInvalidArgument,
+		&errors.TransportError{
+			Reason: errors.TransportErrorInvalidArgument,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorDeadlineExceeded,
+		&errors.TransportError{
+			Reason: errors.TransportErrorDeadlineExceeded,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorNotFound,
+		&errors.TransportError{
+			Reason: errors.TransportErrorNotFound,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorAlreadyExists,
+		&errors.TransportError{
+			Reason: errors.TransportErrorAlreadyExists,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorPermissionDenied,
+		&errors.TransportError{
+			Reason: errors.TransportErrorPermissionDenied,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorResourceExhausted,
+		&errors.TransportError{
+			Reason: errors.TransportErrorResourceExhausted,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorFailedPrecondition,
+		&errors.TransportError{
+			Reason: errors.TransportErrorFailedPrecondition,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorAborted,
+		&errors.TransportError{
+			Reason: errors.TransportErrorAborted,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorOutOfRange,
+		&errors.TransportError{
+			Reason: errors.TransportErrorOutOfRange,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorUnimplemented,
+		&errors.TransportError{
+			Reason: errors.TransportErrorUnimplemented,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorInternal,
+		&errors.TransportError{
+			Reason: errors.TransportErrorInternal,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorUnavailable,
+		&errors.TransportError{
+			Reason: errors.TransportErrorUnavailable,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorDataLoss,
+		&errors.TransportError{
+			Reason: errors.TransportErrorDataLoss,
 		},
-		&errors3.TransportError{
-			Reason: errors3.TransportErrorUnauthenticated,
+		&errors.TransportError{
+			Reason: errors.TransportErrorUnauthenticated,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusUnknownStatus,
+		&errors.OpError{
+			Reason: errors.StatusUnknownStatus,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusBadRequest,
+		&errors.OpError{
+			Reason: errors.StatusBadRequest,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusUnauthorized,
+		&errors.OpError{
+			Reason: errors.StatusUnauthorized,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusInternalError,
+		&errors.OpError{
+			Reason: errors.StatusInternalError,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusAborted,
+		&errors.OpError{
+			Reason: errors.StatusAborted,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusUnavailable,
+		&errors.OpError{
+			Reason: errors.StatusUnavailable,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusOverloaded,
+		&errors.OpError{
+			Reason: errors.StatusOverloaded,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusSchemeError,
+		&errors.OpError{
+			Reason: errors.StatusSchemeError,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusGenericError,
+		&errors.OpError{
+			Reason: errors.StatusGenericError,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusTimeout,
+		&errors.OpError{
+			Reason: errors.StatusTimeout,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusBadSession,
+		&errors.OpError{
+			Reason: errors.StatusBadSession,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusPreconditionFailed,
+		&errors.OpError{
+			Reason: errors.StatusPreconditionFailed,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusAlreadyExists,
+		&errors.OpError{
+			Reason: errors.StatusAlreadyExists,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusNotFound,
+		&errors.OpError{
+			Reason: errors.StatusNotFound,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusSessionExpired,
+		&errors.OpError{
+			Reason: errors.StatusSessionExpired,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusCancelled,
+		&errors.OpError{
+			Reason: errors.StatusCancelled,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusUndetermined,
+		&errors.OpError{
+			Reason: errors.StatusUndetermined,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusUnsupported,
+		&errors.OpError{
+			Reason: errors.StatusUnsupported,
 		},
-		&errors3.OpError{
-			Reason: errors3.StatusSessionBusy,
+		&errors.OpError{
+			Reason: errors.StatusSessionBusy,
 		},
 	}
 	client := &Client{

@@ -5,7 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
-	driver2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
@@ -25,7 +25,7 @@ func WithDialer(d dial.Dialer) ConnectorOption {
 	return func(c *connector) {
 		c.dialer = d
 		if c.dialer.DriverConfig == nil {
-			c.dialer.DriverConfig = new(driver2.Config)
+			c.dialer.DriverConfig = new(config.Config)
 		}
 	}
 }
@@ -42,7 +42,7 @@ func WithEndpoint(addr string) ConnectorOption {
 	}
 }
 
-func WithDriverConfig(config driver2.Config) ConnectorOption {
+func WithDriverConfig(config config.Config) ConnectorOption {
 	return func(c *connector) {
 		*(c.dialer.DriverConfig) = config
 	}
@@ -129,7 +129,7 @@ func WithDefaultExecScanQueryOption(opts ...table.ExecuteScanQueryOption) Connec
 func Connector(opts ...ConnectorOption) driver.Connector {
 	c := &connector{
 		dialer: dial.Dialer{
-			DriverConfig: new(driver2.Config),
+			DriverConfig: new(config.Config),
 		},
 		defaultTxControl: table.TxControl(
 			table.BeginTx(
@@ -218,7 +218,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	if s == nil {
 		panic("ydbsql: abnormal result of pool.Create()")
 	}
-	return &conn{
+	return &sqlConn{
 		connector: c,
 		session:   s,
 	}, nil
