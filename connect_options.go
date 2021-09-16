@@ -2,7 +2,7 @@ package ydb
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"

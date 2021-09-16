@@ -50,8 +50,12 @@ type Config struct {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval time.Duration
 
-	// TODO: add description
-	GrpcConnTTL time.Duration
+	// ConnectionTTL is a time to live duration for close idle grpc connection
+	// If ConnectionTTL less or equal zero grpc connections will always stay
+	// online. If ConnectionTTL is positive^ then grpc connections will be used
+	// with lazy dialing and idle connections will be automatically closed after
+	// expiration ConnectionTTL
+	ConnectionTTL time.Duration
 
 	// BalancingConfig is an optional configuration related to selected
 	// BalancingMethod. That is, some balancing methods allow to be configured.

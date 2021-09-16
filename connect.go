@@ -3,8 +3,8 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
 	"time"
 )
 
@@ -37,9 +37,9 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connecti
 
 	c.cluster, err = (&dial.Dialer{
 		DriverConfig: &config.Config{
-			Database:    params.Database(),
-			Credentials: c.options.credentials,
-			GrpcConnTTL: grpcConnTTL,
+			Database:      params.Database(),
+			Credentials:   c.options.credentials,
+			ConnectionTTL: grpcConnTTL,
 		},
 		TLSConfig: tlsConfig,
 	}).Dial(ctx, params.Endpoint())

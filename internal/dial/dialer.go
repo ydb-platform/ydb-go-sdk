@@ -3,6 +3,7 @@ package dial
 import (
 	"context"
 	"crypto/tls"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
@@ -11,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pem"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
@@ -105,7 +105,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ conn.Driver, err erro
 	endpoint := d.endpointByAddr(addr)
 	c := cluster.New(
 		d.dialHostPort,
-		d.config.GrpcConnTTL,
+		d.config.ConnectionTTL,
 		d.config.Trace,
 		func() balancer.Balancer {
 			if d.config.DiscoveryInterval == 0 {

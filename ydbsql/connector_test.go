@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"net"
 	"testing"

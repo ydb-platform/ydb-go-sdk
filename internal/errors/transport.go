@@ -46,7 +46,7 @@ type TransportError struct {
 	err     error
 }
 
-type teOpt func(ops *TransportError)
+type teOpt func(te *TransportError)
 
 func WithTEReason(reason TransportErrorCode) teOpt {
 	return func(te *TransportError) {
