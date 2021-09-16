@@ -3,16 +3,16 @@ package connect
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn/stats"
-	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/errors"
 	"path"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-
 	"google.golang.org/grpc"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 )
 
 type Connection struct {
@@ -31,7 +31,7 @@ func (c *Connection) NewStream(ctx context.Context, desc *grpc.StreamDesc, metho
 	return c.cluster.NewStream(ctx, desc, method, opts...)
 }
 
-func (c *Connection) Stats(it func(errors2.Endpoint, stats.Stats)) {
+func (c *Connection) Stats(it func(endpoint.Endpoint, stats.Stats)) {
 	c.cluster.Stats(it)
 }
 

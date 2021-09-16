@@ -3,8 +3,8 @@ package connect
 import (
 	"context"
 	"crypto/tls"
-	"github.com/ydb-platform/ydb-go-sdk/v3/dial"
-	"github.com/ydb-platform/ydb-go-sdk/v3/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
 	"time"
 )
 

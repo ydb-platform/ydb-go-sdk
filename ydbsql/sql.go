@@ -6,12 +6,11 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	errors2 "github.com/ydb-platform/ydb-go-sdk/v3/errors"
+	errors3 "github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -259,7 +258,7 @@ func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParam
 	}
 	c.pool().Retry(
 		ctx,
-		ydb.ContextRetryNoIdempotent(ctx),
+		retry.ContextRetryNoIdempotent(ctx),
 		func(ctx context.Context, session *table.Session) (err error) {
 			res, err = req.process(ctx, c, params)
 			return err
@@ -350,7 +349,7 @@ type TxDoer struct {
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 	return retry.Retry(
 		ctx,
-		ydb.ContextRetryNoIdempotent(ctx),
+		retry.ContextRetryNoIdempotent(ctx),
 		func(ctx context.Context) (err error) {
 			return d.do(ctx, f)
 		},
@@ -614,7 +613,7 @@ func (r result) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (r result) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
 func mapBadSessionError(err error) error {
-	if errors2.IsOpError(err, errors2.StatusBadSession) {
+	if errors3.IsOpError(err, errors3.StatusBadSession) {
 		return driver.ErrBadConn
 	}
 	return err

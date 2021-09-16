@@ -3,12 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/types"
 	"log"
 	"path"
 	"text/template"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 )
 
 type templateConfig struct {

@@ -2,13 +2,13 @@ package result
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/types"
 )
 
 type column struct {

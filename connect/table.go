@@ -2,8 +2,8 @@ package connect
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 )
 
 type tableWrapper struct {

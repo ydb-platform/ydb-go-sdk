@@ -1,8 +1,8 @@
 package connect
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 )
 
 type schemeWrapper struct {

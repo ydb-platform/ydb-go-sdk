@@ -2,7 +2,6 @@ package result
 
 import (
 	"bytes"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
 	"reflect"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/types"
 )
 
 type rawConverter struct {

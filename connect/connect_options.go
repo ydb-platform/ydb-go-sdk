@@ -2,9 +2,9 @@ package connect
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/driver/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"time"
 )

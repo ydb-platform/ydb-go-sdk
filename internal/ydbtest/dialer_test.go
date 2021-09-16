@@ -3,8 +3,8 @@ package ydbtest_test
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/dial"
-	"github.com/ydb-platform/ydb-go-sdk/v3/driver/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"log"
 	"net"

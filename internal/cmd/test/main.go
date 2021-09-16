@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"os"
 	"path"
 	"sync"

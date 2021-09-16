@@ -4,9 +4,9 @@ package trace
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"strings"
 )
 
