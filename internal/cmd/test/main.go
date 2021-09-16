@@ -11,14 +11,14 @@ import (
 	"time"
 )
 
-func credentials() ydb_go_sdk_private.Option {
+func credentials() ydb.Option {
 	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		return ydb_go_sdk_private.WithAccessTokenCredentials(token)
+		return ydb.WithAccessTokenCredentials(token)
 	}
 	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
-		return ydb_go_sdk_private.WithAnonymousCredentials()
+		return ydb.WithAnonymousCredentials()
 	}
-	return func(ctx context.Context, client *ydb_go_sdk_private.Connection) error {
+	return func(ctx context.Context, client *ydb.Connection) error {
 		return nil
 	}
 }
@@ -26,7 +26,7 @@ func credentials() ydb_go_sdk_private.Option {
 func main() {
 	ctx := context.Background()
 
-	connectParams, err := ydb_go_sdk_private.ConnectionString(os.Getenv("YDB"))
+	connectParams, err := ydb.ConnectionString(os.Getenv("YDB"))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "cannot create connect params from connection string env['YDB'] = '%s': %v\n", os.Getenv("YDB"), err)
 		os.Exit(1)
@@ -35,13 +35,13 @@ func main() {
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	db, err := ydb_go_sdk_private.New(
+	db, err := ydb.New(
 		connectCtx,
 		connectParams,
 		credentials(),
-		ydb_go_sdk_private.WithSessionPoolIdleThreshold(time.Second*5),
-		ydb_go_sdk_private.WithSessionPoolKeepAliveMinSize(-1),
-		ydb_go_sdk_private.WithDiscoveryInterval(5*time.Second),
+		ydb.WithSessionPoolIdleThreshold(time.Second*5),
+		ydb.WithSessionPoolKeepAliveMinSize(-1),
+		ydb.WithDiscoveryInterval(5*time.Second),
 	)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)

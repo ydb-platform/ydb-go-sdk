@@ -1,10 +1,10 @@
-package ydb_go_sdk_private
+package ydb
 
 import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type tableWrapper struct {

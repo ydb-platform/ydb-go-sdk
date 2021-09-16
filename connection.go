@@ -1,4 +1,4 @@
-package ydb_go_sdk_private
+package ydb
 
 import (
 	"context"

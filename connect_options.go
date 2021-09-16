@@ -1,10 +1,10 @@
-package ydb_go_sdk_private
+package ydb
 
 import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"time"
 )
@@ -16,7 +16,7 @@ type options struct {
 	driverTrace                          *trace.DriverTrace
 	driverConfig                         *config.Config
 	credentials                          credentials.Credentials
-	grpcConnTTL                          *time.Duration
+	connectionTTL                        *time.Duration
 	discoveryInterval                    *time.Duration
 	tableSessionPoolTrace                *table.SessionPoolTrace
 	tableSessionPoolSizeLimit            *int
@@ -64,9 +64,9 @@ func WithDriverConfig(config *config.Config) Option {
 	}
 }
 
-func WithGrpcConnTTL(ttl time.Duration) Option {
+func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *Connection) error {
-		c.options.grpcConnTTL = &ttl
+		c.options.connectionTTL = &ttl
 		return nil
 	}
 }

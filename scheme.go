@@ -1,4 +1,4 @@
-package ydb_go_sdk_private
+package ydb
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"

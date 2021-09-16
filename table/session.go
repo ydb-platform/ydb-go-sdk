@@ -17,7 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 // Client contains logic of creation of ydb table sessions.

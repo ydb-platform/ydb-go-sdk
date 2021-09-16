@@ -11,7 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type rawConverter struct {

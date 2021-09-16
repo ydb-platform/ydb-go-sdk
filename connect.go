@@ -1,4 +1,4 @@
-package ydb_go_sdk_private
+package ydb
 
 import (
 	"context"
@@ -31,8 +31,8 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connecti
 		defer cancel()
 	}
 	var grpcConnTTL time.Duration
-	if c.options.grpcConnTTL != nil {
-		grpcConnTTL = *c.options.grpcConnTTL
+	if c.options.connectionTTL != nil {
+		grpcConnTTL = *c.options.connectionTTL
 	}
 
 	c.cluster, err = (&dial.Dialer{
