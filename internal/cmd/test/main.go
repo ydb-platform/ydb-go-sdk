@@ -3,23 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"os"
 	"path"
 	"sync"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/connect"
 )
 
-func credentials() connect.Option {
+func credentials() ydb_go_sdk_private.Option {
 	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		return connect.WithAccessTokenCredentials(token)
+		return ydb_go_sdk_private.WithAccessTokenCredentials(token)
 	}
 	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
-		return connect.WithAnonymousCredentials()
+		return ydb_go_sdk_private.WithAnonymousCredentials()
 	}
-	return func(ctx context.Context, client *connect.Connection) error {
+	return func(ctx context.Context, client *ydb_go_sdk_private.Connection) error {
 		return nil
 	}
 }
@@ -27,7 +26,7 @@ func credentials() connect.Option {
 func main() {
 	ctx := context.Background()
 
-	connectParams, err := connect.ConnectionString(os.Getenv("YDB"))
+	connectParams, err := ydb_go_sdk_private.ConnectionString(os.Getenv("YDB"))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "cannot create connect params from connection string env['YDB'] = '%s': %v\n", os.Getenv("YDB"), err)
 		os.Exit(1)
@@ -36,13 +35,13 @@ func main() {
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	db, err := connect.New(
+	db, err := ydb_go_sdk_private.New(
 		connectCtx,
 		connectParams,
 		credentials(),
-		connect.WithSessionPoolIdleThreshold(time.Second*5),
-		connect.WithSessionPoolKeepAliveMinSize(-1),
-		connect.WithDiscoveryInterval(5*time.Second),
+		ydb_go_sdk_private.WithSessionPoolIdleThreshold(time.Second*5),
+		ydb_go_sdk_private.WithSessionPoolKeepAliveMinSize(-1),
+		ydb_go_sdk_private.WithDiscoveryInterval(5*time.Second),
 	)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)

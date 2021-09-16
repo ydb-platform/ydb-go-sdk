@@ -1,4 +1,4 @@
-package connect
+package ydb_go_sdk_private
 
 import (
 	"errors"
