@@ -1,3 +1,7 @@
+## 2.9.1
+* Added check nil grpc.ClientConn connection
+* Processed nil connection error in keeper loop
+
 ## 2.9.0
 * Added RawValue and supported ydb.Scanner in Scan
 
