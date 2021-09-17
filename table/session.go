@@ -160,8 +160,7 @@ func (c *client) Do(ctx context.Context, retryNoIdempotent bool, op RetryOperati
 
 // Close closes session client instance.
 func (c *client) Close(ctx context.Context) (err error) {
-	// TODO: close pool
-	return nil
+	return c.pool.Close(ctx)
 }
 
 // Session represents a single table API session.
