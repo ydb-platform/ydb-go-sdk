@@ -17,13 +17,13 @@ type (
 		Context context.Context
 	}
 	RetryLoopDoneInfo struct {
-		Context  context.Context
-		Latency  time.Duration
-		Attempts int
+		Context context.Context
+		Latency time.Duration
+		Issues  []error
 	}
 )
 
-func OnRetry(ctx context.Context) func(ctx context.Context, latency time.Duration, attempts int) {
+func OnRetry(ctx context.Context) func(ctx context.Context, latency time.Duration, issues []error) {
 	onStart := ContextRetryTrace(ctx).OnRetry
 	var onDone func(RetryLoopDoneInfo)
 	if onStart != nil {
@@ -32,11 +32,11 @@ func OnRetry(ctx context.Context) func(ctx context.Context, latency time.Duratio
 	if onDone == nil {
 		onDone = func(info RetryLoopDoneInfo) {}
 	}
-	return func(ctx context.Context, latency time.Duration, attempts int) {
+	return func(ctx context.Context, latency time.Duration, issues []error) {
 		onDone(RetryLoopDoneInfo{
-			Context:  ctx,
-			Latency:  latency,
-			Attempts: attempts,
+			Context: ctx,
+			Latency: latency,
+			Issues:  issues,
 		})
 	}
 }

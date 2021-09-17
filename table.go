@@ -19,9 +19,9 @@ func (t *lazyTable) Close(ctx context.Context) error {
 	return t.client.Close(ctx)
 }
 
-func (t *lazyTable) Do(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error) {
+func (t *lazyTable) Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error) {
 	t.init()
-	return t.client.Do(ctx, retryNoIdempotent, op)
+	return t.client.Retry(ctx, retryNoIdempotent, op)
 }
 
 func newTable(db DB, config table.Config) *lazyTable {

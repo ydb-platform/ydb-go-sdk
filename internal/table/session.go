@@ -152,7 +152,7 @@ func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {
 	return
 }
 
-func (c *client) Do(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error) {
+func (c *client) Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error, issues []error) {
 	return c.pool.Retry(ctx, retryNoIdempotent, op)
 }
 

@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -36,7 +37,7 @@ type retryOperation func(context.Context) (err error)
 // - context was cancelled or deadlined
 // - retry operation returned nil as error
 // Warning: if context without deadline or cancellation func Retry will be worked infinite
-func Retry(ctx context.Context, retryNoIdempotent bool, op retryOperation) (err error) {
+func Retry(ctx context.Context, retryNoIdempotent bool, op retryOperation) (err error, issues []error) {
 	var (
 		i        int
 		attempts int
@@ -46,33 +47,40 @@ func Retry(ctx context.Context, retryNoIdempotent bool, op retryOperation) (err 
 		onDone = trace.OnRetry(ctx)
 	)
 	defer func() {
-		onDone(ctx, time.Since(start), attempts)
+		onDone(ctx, time.Since(start), issues)
 	}()
 	for {
 		i++
 		attempts++
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			issues = append(issues, fmt.Errorf("retry.Retry: context is done: %w", ctx.Err()))
+			return ctx.Err(), issues
 
 		default:
-			if err = op(ctx); err == nil {
+			err = op(ctx)
+			if err == nil {
 				return
 			}
 			m := Check(err)
 			if m.StatusCode() != code {
 				i = 0
 			}
+			if m.MustRetry(retryNoIdempotent) {
+				issues = append(issues, fmt.Errorf("retry.Retry: retriable error: %w", err))
+			}
 			if !m.MustRetry(retryNoIdempotent) {
-				return err
+				issues = append(issues, fmt.Errorf("retry.Retry: non-retriable error: %w", err))
+				return
 			}
 			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
-				return err
+				issues = append(issues, fmt.Errorf("retry.Retry: wait failed: %w", err))
+				return
 			}
 			code = m.StatusCode()
 		}
 	}
-	return err
+	return
 }
 
 // Check returns retry mode for err.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log"
+	"os"
 	"path"
 	"text/template"
 
@@ -71,9 +72,9 @@ SELECT
 FROM AS_TABLE($episodesData);
 `))
 
-func readTable(ctx context.Context, c table.Client, path string) (err error) {
+func readTable(ctx context.Context, c table.Client, path string) error {
 	var res resultset.Result
-	err = c.Do(
+	err, issues := c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -87,6 +88,11 @@ func readTable(ctx context.Context, c table.Client, path string) (err error) {
 		},
 	)
 	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> readTable issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
 		return err
 	}
 	log.Printf("\n> read_table:")
@@ -132,9 +138,9 @@ func readTable(ctx context.Context, c table.Client, path string) (err error) {
 	return nil
 }
 
-func describeTableOptions(ctx context.Context, c table.Client) (err error) {
+func describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
-	err = c.Do(
+	err, issues := c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -143,6 +149,11 @@ func describeTableOptions(ctx context.Context, c table.Client) (err error) {
 		},
 	)
 	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> describeTableOptions issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
 		return err
 	}
 	log.Println("\n> describe_table_options:")
@@ -172,7 +183,7 @@ func describeTableOptions(ctx context.Context, c table.Client) (err error) {
 	return nil
 }
 
-func selectSimple(ctx context.Context, c table.Client, prefix string) (err error) {
+func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -198,7 +209,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 		table.CommitTx(),
 	)
 	var res resultset.Result
-	err = c.Do(
+	err, issues := c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -215,6 +226,11 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 		},
 	)
 	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> selectSimple issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
 		return err
 	}
 
@@ -242,7 +258,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 	return nil
 }
 
-func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err error) {
+func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -259,7 +275,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err er
 	)
 
 	var res resultset.Result
-	err = c.Do(
+	err, issues := c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -277,6 +293,11 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err er
 		},
 	)
 	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> scanQuerySelect issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
 		return err
 	}
 	var (
@@ -301,7 +322,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err er
 	return nil
 }
 
-func fillTablesWithData(ctx context.Context, c table.Client, prefix string) (err error) {
+func fillTablesWithData(ctx context.Context, c table.Client, prefix string) error {
 	// Prepare write transaction.
 	writeTx := table.TxControl(
 		table.BeginTx(
@@ -309,7 +330,7 @@ func fillTablesWithData(ctx context.Context, c table.Client, prefix string) (err
 		),
 		table.CommitTx(),
 	)
-	return c.Do(
+	err, issues := c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -327,10 +348,18 @@ func fillTablesWithData(ctx context.Context, c table.Client, prefix string) (err
 			return
 		},
 	)
+	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> fillTablesWithData issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
+	}
+	return err
 }
 
-func createTables(ctx context.Context, c table.Client, prefix string) (err error) {
-	err = c.Do(
+func createTables(ctx context.Context, c table.Client, prefix string) error {
+	err, issues := c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -345,10 +374,15 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 		},
 	)
 	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> createTables issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
 		return err
 	}
 
-	err = c.Do(
+	err, issues = c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -363,10 +397,15 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 		},
 	)
 	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> createTables issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
 		return err
 	}
 
-	return c.Do(
+	err, issues = c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -380,10 +419,18 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 			)
 		},
 	)
+	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> createTables issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
+	}
+	return err
 }
 
 func describeTable(ctx context.Context, c table.Client, path string) (err error) {
-	return c.Do(
+	err, issues := c.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -398,6 +445,14 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 			return
 		},
 	)
+	if err != nil {
+		log.SetOutput(os.Stderr)
+		log.Printf("\n> describeTable issues:\n")
+		for _, e := range issues {
+			log.Printf("\t> %v\n", e)
+		}
+	}
+	return err
 }
 
 func render(t *template.Template, data interface{}) string {
