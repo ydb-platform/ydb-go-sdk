@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"google.golang.org/grpc"
 	"time"
@@ -23,6 +24,7 @@ type Connection interface {
 	Table() table.Client
 	Scheme() scheme.Client
 	Coordination() coordination.Client
+	RateLimiter() ratelimiter.Client
 }
 
 type db struct {
@@ -32,6 +34,7 @@ type db struct {
 	table        *lazyTable
 	scheme       *lazyScheme
 	coordination *lazyCoordination
+	ratelimiter  *lazyRatelimiter
 }
 
 func (db *db) Name() string {
@@ -67,6 +70,10 @@ func (db *db) Scheme() scheme.Client {
 
 func (db *db) Coordination() coordination.Client {
 	return db.coordination
+}
+
+func (db *db) RateLimiter() ratelimiter.Client {
+	return db.ratelimiter
 }
 
 // New connects to name and return name runtime holder
@@ -109,5 +116,6 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 	c.table = newTable(c.cluster, tableConfig(c.options))
 	c.scheme = newScheme(c.cluster)
 	c.coordination = newCoordination(c.cluster)
+	c.ratelimiter = newRatelimiter(c.cluster)
 	return c, nil
 }

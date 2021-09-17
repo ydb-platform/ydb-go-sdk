@@ -2,7 +2,7 @@ package ydb
 
 import (
 	"context"
-	config "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	coordination2 "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"sync"
@@ -14,12 +14,12 @@ type lazyCoordination struct {
 	once   sync.Once
 }
 
-func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config config.Config) (err error) {
+func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config coordination2.Config) (err error) {
 	c.init()
 	return c.client.CreateNode(ctx, path, config)
 }
 
-func (c *lazyCoordination) AlterNode(ctx context.Context, path string, config config.Config) (err error) {
+func (c *lazyCoordination) AlterNode(ctx context.Context, path string, config coordination2.Config) (err error) {
 	c.init()
 	return c.client.AlterNode(ctx, path, config)
 }
@@ -29,7 +29,7 @@ func (c *lazyCoordination) DropNode(ctx context.Context, path string) (err error
 	return c.client.DropNode(ctx, path)
 }
 
-func (c *lazyCoordination) DescribeNode(ctx context.Context, path string) (_ *scheme.Entry, _ *config.Config, err error) {
+func (c *lazyCoordination) DescribeNode(ctx context.Context, path string) (_ *scheme.Entry, _ *coordination2.Config, err error) {
 	c.init()
 	return c.client.DescribeNode(ctx, path)
 }
