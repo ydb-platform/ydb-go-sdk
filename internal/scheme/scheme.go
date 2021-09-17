@@ -48,7 +48,7 @@ func (t EntryType) String() string {
 	case EntryPersQueueGroup:
 		return "PersQueueGroup"
 	case EntryDatabase:
-		return "Database"
+		return "Name"
 	case EntryRtmrVolume:
 		return "RtmrVolume"
 	case EntryBlockStoreVolume:
@@ -77,23 +77,23 @@ type Directory struct {
 }
 
 type client struct {
-	cluster cluster.Cluster
-	scheme  Ydb_Scheme_V1.SchemeServiceClient
+	db      cluster.DB
+	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
-func (c *client) Close(ctx context.Context) error {
+func (c *client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(cluster cluster.Cluster) Client {
+func New(db cluster.DB) Client {
 	return &client{
-		cluster: cluster,
-		scheme:  Ydb_Scheme_V1.NewSchemeServiceClient(cluster),
+		db:      db,
+		service: Ydb_Scheme_V1.NewSchemeServiceClient(db),
 	}
 }
 
 func (c *client) EnsurePathExists(ctx context.Context, path string) error {
-	for i := len(c.cluster.Database()); i < len(path); i++ {
+	for i := len(c.db.Name()); i < len(path); i++ {
 		x := strings.IndexByte(path[i:], '/')
 		if x == -1 {
 			x = len(path[i:]) - 1
@@ -158,7 +158,7 @@ func (c *client) CleanupDatabase(ctx context.Context, prefix string, names ...st
 
 			case EntryTable:
 				if err = func() error {
-					session, err := table.NewClient(c.cluster, table.Config{}).CreateSession(ctx)
+					session, err := table.NewClient(c.db, table.Config{}).CreateSession(ctx)
 					if err != nil {
 						return err
 					}
@@ -180,14 +180,14 @@ func (c *client) CleanupDatabase(ctx context.Context, prefix string, names ...st
 }
 
 func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
-	_, err = c.scheme.MakeDirectory(ctx, &Ydb_Scheme.MakeDirectoryRequest{
+	_, err = c.service.MakeDirectory(ctx, &Ydb_Scheme.MakeDirectoryRequest{
 		Path: path,
 	})
 	return err
 }
 
 func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
-	_, err = c.scheme.RemoveDirectory(ctx, &Ydb_Scheme.RemoveDirectoryRequest{
+	_, err = c.service.RemoveDirectory(ctx, &Ydb_Scheme.RemoveDirectoryRequest{
 		Path: path,
 	})
 	return err
@@ -198,7 +198,7 @@ func (c *client) ListDirectory(ctx context.Context, path string) (d Directory, e
 		response *Ydb_Scheme.ListDirectoryResponse
 		result   Ydb_Scheme.ListDirectoryResult
 	)
-	response, err = c.scheme.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
+	response, err = c.service.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
 	})
 	if err != nil {
@@ -219,7 +219,7 @@ func (c *client) DescribePath(ctx context.Context, path string) (e Entry, err er
 		response *Ydb_Scheme.DescribePathResponse
 		result   Ydb_Scheme.DescribePathResult
 	)
-	response, err = c.scheme.DescribePath(ctx, &Ydb_Scheme.DescribePathRequest{
+	response, err = c.service.DescribePath(ctx, &Ydb_Scheme.DescribePathRequest{
 		Path: path,
 	})
 	if err != nil {
@@ -238,7 +238,7 @@ func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...Per
 	for _, opt := range opts {
 		opt(&desc)
 	}
-	_, err = c.scheme.ModifyPermissions(ctx, &Ydb_Scheme.ModifyPermissionsRequest{
+	_, err = c.service.ModifyPermissions(ctx, &Ydb_Scheme.ModifyPermissionsRequest{
 		Path:             path,
 		Actions:          desc.actions,
 		ClearPermissions: desc.clear,

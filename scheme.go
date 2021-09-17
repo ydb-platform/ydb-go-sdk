@@ -2,15 +2,14 @@ package ydb
 
 import (
 	context "context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"sync"
 )
 
 type lazyScheme struct {
-	cluster cluster.Cluster
-	client  scheme.Client
-	once    sync.Once
+	db     DB
+	client scheme.Client
+	once   sync.Once
 }
 
 func (s *lazyScheme) Close(ctx context.Context) error {
@@ -20,7 +19,7 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 
 func (s *lazyScheme) init() {
 	s.once.Do(func() {
-		s.client = scheme.New(s.cluster)
+		s.client = scheme.New(s.db)
 	})
 }
 
@@ -54,8 +53,8 @@ func (s *lazyScheme) RemoveDirectory(ctx context.Context, path string) (err erro
 	return s.client.RemoveDirectory(ctx, path)
 }
 
-func newScheme(cluster cluster.Cluster) *lazyScheme {
+func newScheme(db DB) *lazyScheme {
 	return &lazyScheme{
-		cluster: cluster,
+		db: db,
 	}
 }

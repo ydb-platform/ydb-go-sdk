@@ -1,15 +1,14 @@
-package driver
+package cluster
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 )
 
 type (
 	ctxClientConnApplierKey struct{}
 )
 
-type ClientConnApplier func(c cluster.ClientConnInterface)
+type ClientConnApplier func(c ClientConnInterface)
 
 // WithClientConnApplier returns a copy of parent context with client Conn applier function
 func WithClientConnApplier(ctx context.Context, apply ClientConnApplier) context.Context {
@@ -17,7 +16,7 @@ func WithClientConnApplier(ctx context.Context, apply ClientConnApplier) context
 		return context.WithValue(
 			ctx,
 			ctxClientConnApplierKey{},
-			ClientConnApplier(func(conn cluster.ClientConnInterface) {
+			ClientConnApplier(func(conn ClientConnInterface) {
 				exist(conn)
 				apply(conn)
 			}),

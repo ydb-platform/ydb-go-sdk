@@ -25,7 +25,7 @@ type driver struct {
 	clusterGet       func(ctx context.Context) (conn conn.Conn, err error)
 }
 
-func (d *driver) Database() string {
+func (d *driver) Name() string {
 	return d.Config.Database
 }
 

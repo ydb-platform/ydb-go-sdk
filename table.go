@@ -2,17 +2,16 @@ package ydb
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type lazyTable struct {
-	cluster cluster.Cluster
-	config  table.Config
-	client  table.Client
-	once    sync.Once
+	db     DB
+	config table.Config
+	client table.Client
+	once   sync.Once
 }
 
 func (t *lazyTable) Close(ctx context.Context) error {
@@ -25,16 +24,16 @@ func (t *lazyTable) Do(ctx context.Context, retryNoIdempotent bool, op table.Ret
 	return t.client.Do(ctx, retryNoIdempotent, op)
 }
 
-func newTable(cluster cluster.Cluster, config table.Config) *lazyTable {
+func newTable(db DB, config table.Config) *lazyTable {
 	return &lazyTable{
-		cluster: cluster,
-		config:  config,
+		db:     db,
+		config: config,
 	}
 }
 
 func (t *lazyTable) init() {
 	t.once.Do(func() {
-		t.client = table.NewClient(t.cluster, t.config)
+		t.client = table.NewClient(t.db, t.config)
 	})
 }
 

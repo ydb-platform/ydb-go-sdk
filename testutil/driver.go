@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"reflect"
 	"strings"
@@ -162,7 +161,7 @@ func (c *Cluster) Invoke(ctx context.Context, method string, args interface{}, r
 	if c.onInvoke == nil {
 		return fmt.Errorf("Cluster.onInvoke() not implemented")
 	}
-	if apply, ok := driver.ContextClientConnApplier(ctx); ok {
+	if apply, ok := cluster.ContextClientConnApplier(ctx); ok {
 		cc, err := c.Get(ctx)
 		if err != nil {
 			return err

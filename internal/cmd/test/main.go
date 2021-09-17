@@ -11,16 +11,6 @@ import (
 	"time"
 )
 
-func credentials() ydb.Option {
-	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		return ydb.WithAccessTokenCredentials(token)
-	}
-	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
-		return ydb.WithAnonymousCredentials()
-	}
-	return nil
-}
-
 func main() {
 	ctx := context.Background()
 
@@ -33,13 +23,22 @@ func main() {
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	options := []ydb.Option{
+		ydb.WithSessionPoolIdleThreshold(time.Second * 5),
+		ydb.WithSessionPoolKeepAliveMinSize(-1),
+		ydb.WithDiscoveryInterval(5 * time.Second),
+	}
+	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
+		options = append(options, ydb.WithAccessTokenCredentials(token))
+	}
+	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
+		options = append(options, ydb.WithAnonymousCredentials())
+	}
+
 	db, err := ydb.New(
 		connectCtx,
 		connectParams,
-		credentials(),
-		ydb.WithSessionPoolIdleThreshold(time.Second*5),
-		ydb.WithSessionPoolKeepAliveMinSize(-1),
-		ydb.WithDiscoveryInterval(5*time.Second),
+		options...,
 	)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)

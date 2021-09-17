@@ -15,16 +15,15 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 // client contains logic of creation of ydb table sessions.
 type client struct {
-	trace   Trace
-	cluster cluster.Cluster
-	pool    SessionProvider
+	trace Trace
+	db    cluster.DB
+	pool  SessionProvider
 }
 
 type Client interface {
@@ -93,9 +92,9 @@ type Config struct {
 	DeleteTimeout time.Duration
 }
 
-func NewClient(cluster cluster.Cluster, config Config) Client {
+func NewClient(db cluster.DB, config Config) Client {
 	c := &client{
-		cluster: cluster,
+		db: db,
 	}
 	c.pool = &SessionPool{
 		Trace:                  config.Trace.SessionPoolTrace,
@@ -127,8 +126,8 @@ func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	var cc cluster.ClientConnInterface
-	response, err = Ydb_Table_V1.NewTableServiceClient(c.cluster).CreateSession(
-		driver.WithClientConnApplier(
+	response, err = Ydb_Table_V1.NewTableServiceClient(c.db).CreateSession(
+		cluster.WithClientConnApplier(
 			ctx,
 			func(c cluster.ClientConnInterface) {
 				cc = c

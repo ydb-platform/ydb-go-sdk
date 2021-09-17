@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -14,52 +15,65 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 )
 
-type DB interface {
-	grpc.ClientConnInterface
+type DB cluster.DB
+
+type Connection interface {
+	DB
 
 	Table() table.Client
 	Scheme() scheme.Client
+	Coordination() coordination.Client
 }
 
 type db struct {
-	database string
-	options  options
-	cluster  cluster.Cluster
-	table    *lazyTable
-	scheme   *lazyScheme
+	name         string
+	options      options
+	cluster      cluster.Cluster
+	table        *lazyTable
+	scheme       *lazyScheme
+	coordination *lazyCoordination
 }
 
-func (c *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-	return c.cluster.Invoke(ctx, method, args, reply, opts...)
+func (db *db) Name() string {
+	return db.name
 }
 
-func (c *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	return c.cluster.NewStream(ctx, desc, method, opts...)
+func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	return db.cluster.Invoke(ctx, method, args, reply, opts...)
 }
 
-func (c *db) Stats(it func(cluster.Endpoint, stats.Stats)) {
-	c.cluster.Stats(it)
+func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return db.cluster.NewStream(ctx, desc, method, opts...)
 }
 
-func (c *db) Close() error {
-	_ = c.Table().Close(context.Background())
-	_ = c.Scheme().Close(context.Background())
-	return c.cluster.Close()
+func (db *db) Stats(it func(cluster.Endpoint, stats.Stats)) {
+	db.cluster.Stats(it)
 }
 
-func (c *db) Table() table.Client {
-	return c.table
+func (db *db) Close() error {
+	_ = db.Table().Close(context.Background())
+	_ = db.Scheme().Close(context.Background())
+	_ = db.Coordination().Close(context.Background())
+	return db.cluster.Close()
 }
 
-func (c *db) Scheme() scheme.Client {
-	return c.scheme
+func (db *db) Table() table.Client {
+	return db.table
 }
 
-// New connects to database and return database runtime holder
-func New(ctx context.Context, params ConnectParams, opts ...Option) (_ DB, err error) {
+func (db *db) Scheme() scheme.Client {
+	return db.scheme
+}
+
+func (db *db) Coordination() coordination.Client {
+	return db.coordination
+}
+
+// New connects to name and return name runtime holder
+func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connection, err error) {
 	c := &db{
-		database: params.Database(),
-		table:    &lazyTable{},
+		name:  params.Database(),
+		table: &lazyTable{},
 	}
 	for _, opt := range opts {
 		err = opt(ctx, c)
@@ -94,5 +108,6 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ DB, err e
 	}
 	c.table = newTable(c.cluster, tableConfig(c.options))
 	c.scheme = newScheme(c.cluster)
+	c.coordination = newCoordination(c.cluster)
 	return c, nil
 }
