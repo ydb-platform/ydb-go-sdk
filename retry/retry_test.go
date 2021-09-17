@@ -3,10 +3,11 @@ package retry
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
 func TestLogBackoff(t *testing.T) {

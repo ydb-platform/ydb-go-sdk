@@ -4,14 +4,18 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+
+	sessiontrace "github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -30,7 +34,7 @@ func WithDialer(d dial.Dialer) ConnectorOption {
 	}
 }
 
-func WithClient(client *table.client) ConnectorOption {
+func WithClient(client *table.Client) ConnectorOption {
 	return func(c *connector) {
 		c.client = client
 	}
@@ -66,15 +70,15 @@ func WithDriverTrace(t trace.DriverTrace) ConnectorOption {
 	}
 }
 
-func WithClientTrace(t table.Trace) ConnectorOption {
+func WithClientTrace(t sessiontrace.Trace) ConnectorOption {
 	return func(c *connector) {
 		c.clientTrace = t
 	}
 }
 
-func WithSessionPoolTrace(t table.SessionPoolTrace) ConnectorOption {
+func WithSessionPoolTrace(t sessiontrace.SessionPoolTrace) ConnectorOption {
 	return func(c *connector) {
-		c.pool.Trace = t
+		//c.pool.Trace = t
 	}
 }
 
@@ -114,13 +118,13 @@ func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
 	}
 }
 
-func WithDefaultExecDataQueryOption(opts ...table.ExecuteDataQueryOption) ConnectorOption {
+func WithDefaultExecDataQueryOption(opts ...options.ExecuteDataQueryOption) ConnectorOption {
 	return func(c *connector) {
 		c.dataOpts = append(c.dataOpts, opts...)
 	}
 }
 
-func WithDefaultExecScanQueryOption(opts ...table.ExecuteScanQueryOption) ConnectorOption {
+func WithDefaultExecScanQueryOption(opts ...options.ExecuteScanQueryOption) ConnectorOption {
 	return func(c *connector) {
 		c.scanOpts = append(c.scanOpts, opts...)
 	}
@@ -149,17 +153,17 @@ type connector struct {
 	dialer   dial.Dialer
 	endpoint string
 
-	clientTrace table.Trace
+	clientTrace sessiontrace.Trace
 
 	mu     sync.Mutex
 	ready  chan struct{}
-	client *table.client
+	client *table.Client
 	pool   table.SessionPool // Used as a template for created connections.
 
 	defaultTxControl *table.TransactionControl
 
-	dataOpts []table.ExecuteDataQueryOption
-	scanOpts []table.ExecuteScanQueryOption
+	dataOpts []options.ExecuteDataQueryOption
+	scanOpts []options.ExecuteScanQueryOption
 }
 
 func (c *connector) init(ctx context.Context) (err error) {
@@ -187,7 +191,7 @@ func (c *connector) init(ctx context.Context) (err error) {
 	return
 }
 
-func (c *connector) dial(ctx context.Context) (*table.client, error) {
+func (c *connector) dial(ctx context.Context) (*table.Client, error) {
 	d, err := c.dialer.Dial(ctx, c.endpoint)
 	if err != nil {
 		if c == nil {
@@ -204,7 +208,7 @@ func (c *connector) dial(ctx context.Context) (*table.client, error) {
 		}
 		return nil, fmt.Errorf("dial error: %w", err)
 	}
-	return table.NewClient(d, table.WithClientTraceOption(c.clientTrace)), nil
+	return table.NewClient(d), nil
 }
 
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -216,7 +220,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, err
 	}
 	if s == nil {
-		panic("ydbsql: abnormal result of pool.Create()")
+		panic("ydbsql: abnormal resultset of pool.Create()")
 	}
 	return &sqlConn{
 		connector: c,
@@ -228,7 +232,7 @@ func (c *connector) Driver() driver.Driver {
 	return &Driver{c}
 }
 
-func (c *connector) unwrap(ctx context.Context) (*table.client, error) {
+func (c *connector) unwrap(ctx context.Context) (*table.Client, error) {
 	if err := c.init(ctx); err != nil {
 		return nil, err
 	}
@@ -256,6 +260,6 @@ func (d *Driver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
 }
 
-func (d *Driver) Unwrap(ctx context.Context) (*table.client, error) {
+func (d *Driver) Unwrap(ctx context.Context) (*table.Client, error) {
 	return d.c.unwrap(ctx)
 }

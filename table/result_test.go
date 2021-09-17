@@ -3,9 +3,14 @@ package table
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"reflect"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -15,12 +20,12 @@ import (
 func TestResultAny(t *testing.T) {
 	for _, test := range []struct {
 		name    string
-		columns []Column
+		columns []options.Column
 		values  []types.Value
 		exp     []interface{}
 	}{
 		{
-			columns: []Column{
+			columns: []options.Column{
 				{"column0", types.Optional(types.TypeUint32), "family0"},
 			},
 			values: []types.Value{
@@ -50,7 +55,7 @@ func TestResultAny(t *testing.T) {
 					}
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
 						t.Errorf(
-							"unexpected Any() result: %[1]v (%[1]T); want %[2]v (%[2]T)",
+							"unexpected Any() resultset: %[1]v (%[1]T); want %[2]v (%[2]T)",
 							act, exp,
 						)
 					}
@@ -67,12 +72,12 @@ func TestResultAny(t *testing.T) {
 func TestResultOUint32(t *testing.T) {
 	for _, test := range []struct {
 		name    string
-		columns []Column
+		columns []options.Column
 		values  []types.Value
 		exp     []uint32
 	}{
 		{
-			columns: []Column{
+			columns: []options.Column{
 				{"column0", types.Optional(types.TypeUint32), "family0"},
 				{"column1", types.TypeUint32, "family0"},
 			},
@@ -100,7 +105,7 @@ func TestResultOUint32(t *testing.T) {
 					_ = res.ScanWithDefaults(&act)
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
 						t.Errorf(
-							"unexpected OUint32() result: %[1]v (%[1]T); want %[2]v (%[2]T)",
+							"unexpected OUint32() resultset: %[1]v (%[1]T); want %[2]v (%[2]T)",
 							act, exp,
 						)
 					}
@@ -118,7 +123,7 @@ type resultSetDesc Ydb.ResultSet
 
 type ResultSetOption func(*resultSetDesc)
 
-func WithColumns(cs ...Column) ResultSetOption {
+func WithColumns(cs ...options.Column) ResultSetOption {
 	return func(r *resultSetDesc) {
 		for _, c := range cs {
 			r.Columns = append(r.Columns, &Ydb.Column{
@@ -174,8 +179,8 @@ func NewResultSet(opts ...ResultSetOption) *Ydb.ResultSet {
 	return (*Ydb.ResultSet)(&d)
 }
 
-func NewResult(sets ...*Ydb.ResultSet) *Result {
-	return &Result{
-		sets: sets,
+func NewResult(sets ...*Ydb.ResultSet) *scanner.Result {
+	return &scanner.Result{
+		Sets: sets,
 	}
 }

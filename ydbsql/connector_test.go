@@ -4,17 +4,22 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -90,11 +95,11 @@ func TestConnectorRedialOnError(t *testing.T) {
 			},
 		}),
 		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorRedialOnError")),
-		WithDefaultTxControl(table.TxControl(
-			table.BeginTx(
-				table.WithStaleReadOnly(),
+		WithDefaultTxControl(scanner.TxControl(
+			scanner.BeginTx(
+				scanner.WithStaleReadOnly(),
 			),
-			table.CommitTx()),
+			scanner.CommitTx()),
 		),
 	)
 
@@ -120,31 +125,31 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 		name                   string
 		prepareCount           int
 		prepareRequestsCount   int
-		queryCachePolicyOption []table.QueryCachePolicyOption
+		queryCachePolicyOption []options.QueryCachePolicyOption
 	}{
 		{
 			name:                   "with server cache, one request proxed to server",
 			prepareCount:           10,
 			prepareRequestsCount:   1,
-			queryCachePolicyOption: []table.QueryCachePolicyOption{table.WithQueryCachePolicyKeepInCache()},
+			queryCachePolicyOption: []options.QueryCachePolicyOption{options.WithQueryCachePolicyKeepInCache()},
 		},
 		{
 			name:                   "with server cache, all requests proxed to server",
 			prepareCount:           10,
 			prepareRequestsCount:   10,
-			queryCachePolicyOption: []table.QueryCachePolicyOption{table.WithQueryCachePolicyKeepInCache()},
+			queryCachePolicyOption: []options.QueryCachePolicyOption{options.WithQueryCachePolicyKeepInCache()},
 		},
 		{
 			name:                   "no server cache, one request proxed to server",
 			prepareCount:           10,
 			prepareRequestsCount:   1,
-			queryCachePolicyOption: []table.QueryCachePolicyOption{},
+			queryCachePolicyOption: []options.QueryCachePolicyOption{},
 		},
 		{
 			name:                   "no server cache, all requests proxed to server",
 			prepareCount:           10,
 			prepareRequestsCount:   10,
-			queryCachePolicyOption: []table.QueryCachePolicyOption{},
+			queryCachePolicyOption: []options.QueryCachePolicyOption{},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -158,7 +163,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 
 			c := Connector(
 				WithClient(
-					table.NewClient(
+					table2.NewClient(
 						testutil.NewCluster(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
@@ -176,7 +181,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 						),
 					),
 				),
-				WithDefaultExecDataQueryOption(table.WithQueryCachePolicy(test.queryCachePolicyOption...)),
+				WithDefaultExecDataQueryOption(options.WithQueryCachePolicy(test.queryCachePolicyOption...)),
 			)
 			db := sql.OpenDB(c)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)

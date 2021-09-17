@@ -3,14 +3,15 @@ package scheme
 import (
 	"context"
 	"fmt"
+	"path"
+	"strings"
+
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"google.golang.org/protobuf/proto"
-	"path"
-	"strings"
 )
 
 type Client interface {

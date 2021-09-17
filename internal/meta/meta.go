@@ -3,6 +3,7 @@ package meta
 import (
 	"context"
 	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 
 	"google.golang.org/grpc/metadata"
@@ -15,7 +16,7 @@ const (
 	metaTicket      = "x-ydb-auth-ticket"
 	metaVersion     = "x-ydb-sdk-build-info"
 	metaRequestType = "x-ydb-request-types"
-	metaTraceID     = "x-ydb-trace-id"
+	metaTraceID     = "x-ydb-sessiontrace-id"
 	metaUserAgent   = "x-ydb-user-agent"
 )
 

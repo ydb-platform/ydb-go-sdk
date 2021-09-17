@@ -4,22 +4,27 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"log"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+
+	sessiontrace "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/sessiontrace"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -41,8 +46,8 @@ func TestIsolationMapping(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		opts   driver.TxOptions
-		txExp  table.TxOption
-		txcExp []table.TxControlOption
+		txExp  scanner.TxOption
+		txcExp []scanner.TxControlOption
 		err    bool
 	}{
 		{
@@ -51,7 +56,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelDefault),
 				ReadOnly:  false,
 			},
-			txExp: table.WithSerializableReadWrite(),
+			txExp: scanner.WithSerializableReadWrite(),
 		},
 		{
 			name: "serializable",
@@ -59,7 +64,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSerializable),
 				ReadOnly:  false,
 			},
-			txExp: table.WithSerializableReadWrite(),
+			txExp: scanner.WithSerializableReadWrite(),
 		},
 		{
 			name: "linearizable",
@@ -67,7 +72,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelLinearizable),
 				ReadOnly:  false,
 			},
-			txExp: table.WithSerializableReadWrite(),
+			txExp: scanner.WithSerializableReadWrite(),
 		},
 		{
 			name: "default ro",
@@ -75,7 +80,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelDefault),
 				ReadOnly:  true,
 			},
-			txExp: table.WithSerializableReadWrite(),
+			txExp: scanner.WithSerializableReadWrite(),
 		},
 		{
 			name: "serializable ro",
@@ -83,7 +88,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSerializable),
 				ReadOnly:  true,
 			},
-			txExp: table.WithSerializableReadWrite(),
+			txExp: scanner.WithSerializableReadWrite(),
 		},
 		{
 			name: "linearizable ro",
@@ -91,7 +96,7 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelLinearizable),
 				ReadOnly:  true,
 			},
-			txExp: table.WithSerializableReadWrite(),
+			txExp: scanner.WithSerializableReadWrite(),
 		},
 		{
 			name: "read uncommitted",
@@ -99,13 +104,13 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelReadUncommitted),
 				ReadOnly:  true,
 			},
-			txcExp: []table.TxControlOption{
-				table.BeginTx(
-					table.WithOnlineReadOnly(
-						table.WithInconsistentReads(),
+			txcExp: []scanner.TxControlOption{
+				scanner.BeginTx(
+					scanner.WithOnlineReadOnly(
+						scanner.WithInconsistentReads(),
 					),
 				),
-				table.CommitTx(),
+				scanner.CommitTx(),
 			},
 		},
 		{
@@ -114,11 +119,11 @@ func TestIsolationMapping(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelReadCommitted),
 				ReadOnly:  true,
 			},
-			txcExp: []table.TxControlOption{
-				table.BeginTx(
-					table.WithOnlineReadOnly(),
+			txcExp: []scanner.TxControlOption{
+				scanner.BeginTx(
+					scanner.WithOnlineReadOnly(),
 				),
-				table.CommitTx(),
+				scanner.CommitTx(),
 			},
 		},
 	} {
@@ -131,22 +136,22 @@ func TestIsolationMapping(t *testing.T) {
 				t.Fatalf("expected error; got nil")
 			}
 
-			var sAct, sExp *table.TransactionSettings
+			var sAct, sExp *scanner.TransactionSettings
 			if txAct != nil {
-				sAct = table.TxSettings(txAct)
+				sAct = scanner.TxSettings(txAct)
 			}
 			if test.txExp != nil {
-				sExp = table.TxSettings(test.txExp)
+				sExp = scanner.TxSettings(test.txExp)
 			}
 
 			internal.Equal(t, sAct, sExp)
 
-			var cAct, cExp *table.TransactionControl
+			var cAct, cExp *scanner.TransactionControl
 			if txcAct != nil {
-				cAct = table.TxControl(txcAct...)
+				cAct = scanner.TxControl(txcAct...)
 			}
 			if test.txcExp != nil {
-				cExp = table.TxControl(test.txcExp...)
+				cExp = scanner.TxControl(test.txcExp...)
 			}
 			internal.Equal(t, cAct, cExp)
 		})
@@ -156,8 +161,8 @@ func TestIsolationMapping(t *testing.T) {
 func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
 		dtrace trace.DriverTrace
-		ctrace table.Trace
-		strace table.SessionPoolTrace
+		ctrace sessiontrace.Trace
+		strace sessiontrace.SessionPoolTrace
 	)
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, traceutil.ClearContext(args))
@@ -187,7 +192,7 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 func TestQuery(t *testing.T) {
 	c := Connector(
 		WithClient(
-			table.NewClient(
+			table2.NewClient(
 				testutil.NewCluster(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
@@ -322,7 +327,7 @@ func TestDatabaseSelect(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			log.Printf("result=%v", res)
+			log.Printf("resultset=%v", res)
 		})
 		t.Run("query", func(t *testing.T) {
 			db, err := openDB(ctx)

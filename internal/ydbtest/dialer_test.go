@@ -3,19 +3,20 @@ package ydbtest_test
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"log"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ydbtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 func TestClusterTracking(t *testing.T) {

@@ -1,4 +1,4 @@
-package result
+package scanner
 
 import (
 	"fmt"
@@ -112,7 +112,7 @@ var scannerData = []struct {
 		setColumns: []string{"int8", "int16", "int32"},
 	},
 	{
-		name:  "Scan YSON, DOUBLE. Zero rows in the result",
+		name:  "Scan YSON, DOUBLE. Zero rows in the resultset",
 		count: 0,
 		columns: []*column{{
 			name:   "yson",

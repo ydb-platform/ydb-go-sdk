@@ -1,7 +1,8 @@
-package result
+package scanner
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -9,11 +10,157 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
+
+type ResultSet interface {
+	Columns(it func(options.Column))
+	Truncated() bool
+	ColumnCount() int
+	RowCount() int
+	ItemCount() int
+}
+
+type Result struct {
+	Scanner
+
+	Sets    []*Ydb.ResultSet
+	nextSet int
+
+	QueryStats *Ydb_TableStats.QueryStats
+
+	SetCh       chan *Ydb.ResultSet
+	SetChErr    *error
+	SetChCancel func()
+
+	err    error
+	closed bool
+}
+
+// Stats returns query execution QueryStats.
+func (r *Result) Stats() QueryStats {
+	var s QueryStats
+	s.stats = r.QueryStats
+	s.processCPUTime = time.Microsecond * time.Duration(r.QueryStats.GetProcessCpuTimeUs())
+	s.pos = 0
+	return s
+}
+
+// ResultSetCount returns number of resultset sets.
+// Note that it does not work if r is the resultset of streaming operation.
+func (r *Result) ResultSetCount() int {
+	return len(r.Sets)
+}
+
+// TotalRowCount returns the number of rows among the all resultset sets.
+// Note that it does not work if r is the resultset of streaming operation.
+func (r *Result) TotalRowCount() (n int) {
+	for _, s := range r.Sets {
+		n += len(s.Rows)
+	}
+	return
+}
+
+// Close closes the Result, preventing further iteration.
+func (r *Result) Close() error {
+	if r.closed {
+		return nil
+	}
+	r.closed = true
+	if r.SetCh != nil {
+		r.SetChCancel()
+	}
+	return nil
+}
+
+/*
+// Err return scanner error
+// To handle errors, do not need to check after scanning each row
+// It is enough to check after reading all ResultSet
+func (r *Result) Err() error {
+	if r.err != nil {
+		return r.err
+	}
+	return r.Scanner.Err()
+}
+*/
+func (r *Result) inactive() bool {
+	return r.closed || r.err != nil || r.Scanner.Err() != nil
+}
+
+// HasNextResultSet reports whether resultset set may be advanced.
+//
+// It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
+// without advancing the resultset set.
+//
+// Note that it does not work with sets from stream.
+func (r *Result) HasNextResultSet() bool {
+	if r.inactive() || r.nextSet == len(r.Sets) {
+		return false
+	}
+	return true
+}
+
+// NextResultSet selects next resultset set in the resultset.
+// columns - names of columns in the resultSet that will be scanned
+// It returns false if there are no more resultset sets.
+// Stream sets are supported.
+func (r *Result) NextResultSet(ctx context.Context, columns ...string) bool {
+	if !r.HasNextResultSet() {
+		return r.nextStreamSet(ctx, columns...)
+	}
+	Reset(&r.Scanner, r.Sets[r.nextSet], columns...)
+	r.nextSet++
+	return true
+}
+
+func (r *Result) CurrentResultSet() ResultSet {
+	return r
+}
+
+// NextStreamSet selects next resultset set from the resultset of streaming operation.
+// columns - names of columns in the resultSet that will be scanned
+// It returns false if stream is closed or ctx is canceled.
+// Note that in case of context cancelation it marks via error set.
+func (r *Result) nextStreamSet(ctx context.Context, columns ...string) bool {
+	if r.inactive() || r.SetCh == nil {
+		return false
+	}
+	select {
+	case s, ok := <-r.SetCh:
+		if !ok {
+			if r.SetChErr != nil {
+				r.err = *r.SetChErr
+			}
+			return false
+		}
+		Reset(&r.Scanner, s, columns...)
+		return true
+
+	case <-ctx.Done():
+		if r.err == nil {
+			r.err = ctx.Err()
+		}
+		Reset(&r.Scanner, nil)
+		return false
+	}
+}
+
+// Columns allows to iterate over all columns of the current resultset set.
+func (r *Result) Columns(it func(options.Column)) {
+	Columns(&r.Scanner, func(name string, typ internal.T) {
+		it(options.Column{
+			Name: name,
+			Type: typ,
+		})
+	})
+}
 
 func Reset(s *Scanner, set *Ydb.ResultSet, columnNames ...string) {
 	s.reset(set)
@@ -111,16 +258,16 @@ func (s *Scanner) setColumnIndexes(columns []string) {
 	}
 }
 
-// HasNextRow reports whether result row may be advanced.
+// HasNextRow reports whether resultset row may be advanced.
 //
 // It may be useful to call HasNextRow() instead of NextRow() to look ahead
-// without advancing the result rows.
+// without advancing the resultset rows.
 func (s *Scanner) HasNextRow() bool {
 	return s.err == nil && s.set != nil && s.nextRow < len(s.set.Rows)
 }
 
-// NextRow selects next row in the current result set.
-// It returns false if there are no more rows in the result set.
+// NextRow selects next row in the current resultset set.
+// It returns false if there are no more rows in the resultset set.
 func (s *Scanner) NextRow() bool {
 	if !s.HasNextRow() {
 		return false
@@ -133,7 +280,7 @@ func (s *Scanner) NextRow() bool {
 	return true
 }
 
-// ColumnCount returns number of columns in the current result set.
+// ColumnCount returns number of columns in the current resultset set.
 func (s *Scanner) ColumnCount() int {
 	if s.set == nil {
 		return 0
@@ -141,7 +288,7 @@ func (s *Scanner) ColumnCount() int {
 	return len(s.set.Columns)
 }
 
-// RowCount returns number of rows in the result set.
+// RowCount returns number of rows in the resultset set.
 func (s *Scanner) RowCount() int {
 	if s.set == nil {
 		return 0
@@ -157,7 +304,7 @@ func (s *Scanner) ItemCount() int {
 	return len(s.row.Items)
 }
 
-// columns allows to iterate over all columns of the current result set.
+// columns allows to iterate over all columns of the current resultset set.
 // Must not be exported.
 func (s *Scanner) columns(it func(name string, typ internal.T)) {
 	if s.set == nil {
@@ -168,8 +315,8 @@ func (s *Scanner) columns(it func(name string, typ internal.T)) {
 	}
 }
 
-// ResultSetTruncated returns true if current result set has been truncated by server
-func (s *Scanner) ResultSetTruncated() bool {
+// Truncated returns true if current resultset set has been truncated by server
+func (s *Scanner) Truncated() bool {
 	if s.set == nil {
 		s.errorf("there are no sets in the scanner")
 		return false

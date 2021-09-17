@@ -1,4 +1,4 @@
-package table
+package sessiontrace
 
 import "context"
 

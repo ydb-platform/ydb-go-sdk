@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	sessiontrace "github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -14,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -26,8 +27,8 @@ const (
 func openDB(ctx context.Context) (cluster.DB, error) {
 	var (
 		dtrace trace.DriverTrace
-		ctrace table.Trace
-		strace table.SessionPoolTrace
+		ctrace sessiontrace.Trace
+		strace sessiontrace.SessionPoolTrace
 	)
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, traceutil.ClearContext(args))

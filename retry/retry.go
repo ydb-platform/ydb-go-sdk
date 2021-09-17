@@ -2,11 +2,12 @@ package retry
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"math"
 	"math/rand"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Default parameters used by Retry() functions within different sub packages.

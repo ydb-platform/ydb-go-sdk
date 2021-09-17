@@ -3,10 +3,11 @@ package table
 import (
 	"context"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -118,7 +121,7 @@ func TestSessionDescribeTable(t *testing.T) {
 		expect := Description{
 			Name:       "testName",
 			PrimaryKey: []string{"testKey"},
-			Columns: []Column{
+			Columns: []options.Column{
 				{
 					Name:   "testColumn",
 					Type:   types.Void(),
@@ -140,7 +143,7 @@ func TestSessionDescribeTable(t *testing.T) {
 					Name:         "testFamily",
 					Data:         StoragePool{},
 					Compression:  ColumnFamilyCompressionLZ4,
-					KeepInMemory: FeatureEnabled,
+					KeepInMemory: options.FeatureEnabled,
 				},
 			},
 			Attributes: map[string]string{},
@@ -152,7 +155,7 @@ func TestSessionDescribeTable(t *testing.T) {
 				TableCommitLog0:    StoragePool{Media: "m1"},
 				TableCommitLog1:    StoragePool{Media: "m2"},
 				External:           StoragePool{Media: "m3"},
-				StoreExternalBlobs: FeatureEnabled,
+				StoreExternalBlobs: options.FeatureEnabled,
 			},
 			Indexes: []IndexDescription{},
 		}
@@ -228,7 +231,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
-				_, _, err := s.Execute(ctx, TxControl(), "", NewQueryParameters())
+				_, _, err := s.Execute(ctx, scanner.TxControl(), "", NewQueryParameters())
 				internal.NoError(t, err)
 			},
 		},
@@ -278,7 +281,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
-				_, err := s.BeginTransaction(ctx, TxSettings())
+				_, err := s.BeginTransaction(ctx, scanner.TxSettings())
 				internal.NoError(t, err)
 			},
 		},

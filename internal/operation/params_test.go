@@ -2,11 +2,12 @@ package operation
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/timeutil"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 )
 
 func TestOperationParams(t *testing.T) {
