@@ -42,10 +42,8 @@ func WithClientTraceOption(trace Trace) ClientOption {
 }
 
 type Config struct {
-	ClientTrace Trace
-
 	// Trace is an optional session lifetime tracing options.
-	Trace SessionPoolTrace
+	Trace Trace
 
 	// SizeLimit is an upper bound of pooled sessions.
 	// If SizeLimit is less than or equal to zero then the
@@ -100,7 +98,7 @@ func NewClient(cluster cluster.Cluster, config Config) Client {
 		cluster: cluster,
 	}
 	c.pool = &SessionPool{
-		Trace:                  config.Trace,
+		Trace:                  config.Trace.SessionPoolTrace,
 		Builder:                c,
 		SizeLimit:              config.SizeLimit,
 		KeepAliveMinSize:       config.KeepAliveMinSize,

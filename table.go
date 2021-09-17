@@ -41,10 +41,7 @@ func (t *lazyTable) init() {
 func tableConfig(o options) table.Config {
 	config := table.Config{}
 	if o.tableClientTrace != nil {
-		config.ClientTrace = *o.tableClientTrace
-	}
-	if o.tableSessionPoolTrace != nil {
-		config.Trace = *o.tableSessionPoolTrace
+		config.Trace = *o.tableClientTrace
 	}
 	if o.tableSessionPoolSizeLimit != nil {
 		config.SizeLimit = *o.tableSessionPoolSizeLimit

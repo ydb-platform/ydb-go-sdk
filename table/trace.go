@@ -12,6 +12,8 @@ type (
 	//gtrace:gen
 	//gtrace:set shortcut
 	Trace struct {
+		SessionPoolTrace
+
 		OnCreateSession          func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
 		OnKeepAlive              func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
 		OnDeleteSession          func(DeleteSessionStartInfo) func(DeleteSessionDoneInfo)
