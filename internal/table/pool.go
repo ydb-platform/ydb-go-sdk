@@ -576,7 +576,7 @@ type RetryOperation func(context.Context, *Session) (err error)
 // - context was cancelled or deadlined
 // - retry operation returned nil as error
 // Warning: if context without deadline or cancellation func Retry will be worked infinite
-func (p *SessionPool) Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error) {
+func (p *SessionPool) Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error, issues []error) {
 	return retryBackoff(ctx, p, retry.FastBackoff, retry.SlowBackoff, retryNoIdempotent, op)
 }
 

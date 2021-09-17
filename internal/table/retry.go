@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -30,7 +31,7 @@ type SessionProvider interface {
 	// - context was cancelled or deadlined
 	// - retry operation returned nil as error
 	// If context without deadline used session pool RetryTimeout
-	Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error)
+	Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error, issues []error)
 
 	// Close provide cleanup sessions
 	Close(ctx context.Context) error
@@ -39,7 +40,7 @@ type SessionProvider interface {
 type SessionProviderFunc struct {
 	OnGet   func(context.Context) (*Session, error)
 	OnPut   func(context.Context, *Session) error
-	OnRetry func(context.Context, RetryOperation) error
+	OnRetry func(context.Context, RetryOperation) (error, []error)
 	OnClose func(context.Context) error
 }
 
@@ -64,7 +65,7 @@ func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
 	return f.OnPut(ctx, s)
 }
 
-func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op RetryOperation) error {
+func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op RetryOperation) (err error, issues []error) {
 	if f.OnRetry == nil {
 		return retryBackoff(ctx, f, nil, nil, false, op)
 	}
@@ -97,7 +98,7 @@ func (s *singleSession) Close(ctx context.Context) error {
 	return s.CloseSession(ctx, s.s)
 }
 
-func (s *singleSession) Retry(ctx context.Context, _ bool, op RetryOperation) (err error) {
+func (s *singleSession) Retry(ctx context.Context, _ bool, op RetryOperation) (err error, issues []error) {
 	return retryBackoff(ctx, s, s.b, s.b, false, op)
 }
 
@@ -138,28 +139,26 @@ func retryBackoff(
 	slowBackoff retry.Backoff,
 	retryNoIdempotent bool,
 	op RetryOperation,
-) (err error) {
+) (err error, issues []error) {
 	var (
-		s        *Session
-		i        int
-		attempts int
+		s *Session
+		i int
 
 		code   = int32(0)
 		start  = time.Now()
 		onDone = trace.OnRetry(ctx)
 	)
 	defer func() {
-		onDone(ctx, time.Since(start), attempts)
+		onDone(ctx, time.Since(start), issues)
 		if s != nil {
 			_ = p.Put(ctx, s)
 		}
 	}()
-	for {
-		i++
-		attempts++
+	for ; ; i++ {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			issues = append(issues, fmt.Errorf("retryBackoff: context is done: %w", ctx.Err()))
+			return ctx.Err(), issues
 
 		default:
 			if s == nil {
@@ -169,6 +168,7 @@ func retryBackoff(
 					panic("only one of pair <session, error> must be not nil")
 				}
 				if e != nil {
+					issues = append(issues, fmt.Errorf("retryBackoff: get session error: %w", err))
 					if err == nil {
 						// It is initial attempt to get a Session.
 						// Otherwise s could be nil only when status bad session
@@ -191,14 +191,19 @@ func retryBackoff(
 				_ = p.CloseSession(ctx, s)
 				s = nil
 			}
+			if m.MustRetry(retryNoIdempotent) {
+				issues = append(issues, fmt.Errorf("retryBackoff: retriable error: %w", err))
+			}
 			if !m.MustRetry(retryNoIdempotent) {
-				return err
+				issues = append(issues, fmt.Errorf("retryBackoff: non-retriable error: %w", err))
+				return
 			}
 			if e := retry.Wait(ctx, fastBackoff, slowBackoff, m, i); e != nil {
-				return err
+				issues = append(issues, fmt.Errorf("retryBackoff: wait failed: %w", e))
+				return
 			}
 			code = m.StatusCode()
 		}
 	}
-	return err
+	return
 }
