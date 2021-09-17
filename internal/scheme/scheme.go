@@ -21,6 +21,7 @@ type Client interface {
 
 	CleanupDatabase(ctx context.Context, prefix string, names ...string) error
 	EnsurePathExists(ctx context.Context, path string) error
+
 	Close(ctx context.Context) error
 }
 
@@ -158,7 +159,9 @@ func (c *client) CleanupDatabase(ctx context.Context, prefix string, names ...st
 
 			case EntryTable:
 				if err = func() error {
-					session, err := table.NewClient(c.db, table.Config{}).CreateSession(ctx)
+					client := table.NewClient(c.db, table.Config{})
+					defer client.Close(ctx)
+					session, err := client.CreateSession(ctx)
 					if err != nil {
 						return err
 					}
