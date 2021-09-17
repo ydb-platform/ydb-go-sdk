@@ -73,7 +73,9 @@ func WithTEOperation(operation operation) teOpt {
 }
 
 func NewTransportError(opts ...teOpt) *TransportError {
-	te := &TransportError{}
+	te := &TransportError{
+		Reason: TransportErrorUnknownCode,
+	}
 	for _, f := range opts {
 		f(te)
 	}

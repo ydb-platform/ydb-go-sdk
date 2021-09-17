@@ -41,7 +41,9 @@ func WithOEOperation(operation operation) oeOpt {
 type oeOpt func(ops *OpError)
 
 func NewOpError(opts ...oeOpt) *OpError {
-	oe := &OpError{}
+	oe := &OpError{
+		Reason: StatusUnknownStatus,
+	}
 	for _, f := range opts {
 		f(oe)
 	}
