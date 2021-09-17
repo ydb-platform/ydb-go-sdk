@@ -186,7 +186,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	//	c.mu.RUnlock()
 	//	select {
 	//	case <-ctx.Done():
-	//		return nil, ctx.Err()
+	//		return nil, ctx.err()
 	//	default:
 	//		switch {
 	//		case closed:
@@ -235,7 +235,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	//			case <-wait():
 	//
 	//			case <-ctx.Done():
-	//				return nil, ctx.Err()
+	//				return nil, ctx.err()
 	//			}
 	//		}
 	//	}

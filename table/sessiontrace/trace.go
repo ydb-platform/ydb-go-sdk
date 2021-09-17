@@ -242,21 +242,3 @@ type (
 		Error   error
 	}
 )
-
-type (
-	//gtrace:gen
-	//gtrace:set shortcut
-	createSessionTrace struct {
-		OnCheckEnoughSpace            func(enoughSpace bool)
-		OnCreateSessionGoroutineStart func() func(r createSessionResult)
-		OnStartSelect                 func()
-		OnReadResult                  func(r createSessionResult)
-		OnContextDone                 func()
-		OnPutSession                  func(session *table.Session, err error)
-	}
-)
-
-type createSessionResult struct {
-	s   *table.Session
-	err error
-}

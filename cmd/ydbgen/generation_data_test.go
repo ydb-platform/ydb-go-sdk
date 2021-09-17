@@ -121,7 +121,7 @@ func (c *Container) Scan(res *table.Result) (err error) {
 	res.SeekItem("string")
 	c.String = res.OString()
 
-	return res.Err()
+	return res.err()
 }
 
 func (c *Container) QueryParameters() *table.QueryParameters {
@@ -616,7 +616,7 @@ func (f *Foo) Scan(res *table.Result) (err error) {
 	f.Ints = xs0
 	res.ListOut()
 
-	return res.Err()
+	return res.err()
 }
 
 func (f *Foo) QueryParameters() *table.QueryParameters {
@@ -741,11 +741,11 @@ func (fs *Foos) Scan(res *table.Result) (err error) {
 		x0.Ints = xs0
 		res.ListOut()
 
-		if res.Err() == nil {
+		if res.err() == nil {
 			*fs = append(*fs, x0)
 		}
 	}
-	return res.Err()
+	return res.err()
 }
 
 func ydbConvU32ToB(x uint32) byte {
@@ -910,7 +910,7 @@ func (p *Painter) Scan(res *table.Result) (err error) {
 	res.SeekItem("string")
 	p.String = res.OString()
 
-	return res.Err()
+	return res.err()
 }
 
 func (p *Painter) QueryParameters() *table.QueryParameters {
@@ -1675,7 +1675,7 @@ func (p *Place) Scan(res *table.Result) (err error) {
 	}
 	res.StructOut()
 
-	return res.Err()
+	return res.err()
 }
 
 func (p *Place) QueryParameters() *table.QueryParameters {
@@ -1774,7 +1774,7 @@ func (p *Point) Scan(res *table.Result) (err error) {
 	res.SeekItem("y")
 	p.y = float64(res.Float())
 
-	return res.Err()
+	return res.err()
 }
 
 func (p *Point) QueryParameters() *table.QueryParameters {
@@ -1874,7 +1874,7 @@ func (f *Figure) Scan(res *table.Result) (err error) {
 	f.Points = xs0
 	res.ListOut()
 
-	return res.Err()
+	return res.err()
 }
 
 func (f *Figure) QueryParameters() *table.QueryParameters {
@@ -2148,11 +2148,11 @@ func (ps *Points) Scan(res *table.Result) (err error) {
 		res.SeekItem("y")
 		x0.y = float64(res.Float())
 
-		if res.Err() == nil {
+		if res.err() == nil {
 			*ps = append(*ps, x0)
 		}
 	}
-	return res.Err()
+	return res.err()
 }
 
 func ydbConvU32ToB(x uint32) byte {
@@ -2309,7 +2309,7 @@ func (m *MultipleTags) Scan(res *table.Result) (err error) {
 	res.SeekItem("b")
 	m.b = res.Int64()
 
-	return res.Err()
+	return res.err()
 }
 
 func (m *MultipleTags) QueryParameters() *table.QueryParameters {
@@ -2411,7 +2411,7 @@ func (t *Times) Scan(res *table.Result) (err error) {
 		}
 	}
 
-	return res.Err()
+	return res.err()
 }
 
 func (t *Times) QueryParameters() *table.QueryParameters {
@@ -2511,7 +2511,7 @@ func (c *ConvertType) Scan(res *table.Result) (err error) {
 	res.SeekItem("field2")
 	c.Field2 = int32(res.Uint32())
 
-	return res.Err()
+	return res.err()
 }
 
 func (c *ConvertType) QueryParameters() *table.QueryParameters {
@@ -2603,11 +2603,11 @@ func (ps *Primitive) Scan(res *table.Result) (err error) {
 	for res.NextRow() {
 		var x0 uint32
 		x0 = res.Uint32()
-		if res.Err() == nil {
+		if res.err() == nil {
 			*ps = append(*ps, x0)
 		}
 	}
-	return res.Err()
+	return res.err()
 }
 
 func (Primitive) ListType() ydb.Type {
@@ -2678,7 +2678,7 @@ func (s *SetOptional) Scan(res *table.Result) (err error) {
 	res.SeekItem("opt_field")
 	s.optField = res.OInt32()
 
-	return res.Err()
+	return res.err()
 }
 
 func (s *SetOptional) QueryParameters() *table.QueryParameters {
@@ -2770,7 +2770,7 @@ func (g *GetterSetter) Scan(res *table.Result) (err error) {
 		g.GetSetField.Set(x0)
 	}
 
-	return res.Err()
+	return res.err()
 }
 
 func (g *GetterSetter) QueryParameters() *table.QueryParameters {
@@ -2833,7 +2833,7 @@ func (g *GetterSetterField) Scan(res *table.Result) (err error) {
 	res.SeekItem("defined")
 	g.defined = res.OBool()
 
-	return res.Err()
+	return res.err()
 }
 
 `,

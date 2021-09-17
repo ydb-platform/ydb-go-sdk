@@ -20,12 +20,12 @@ import (
 //             res.Scan(&id,&name)
 //         }
 //     }
-//     if err := res.Err() { // get any error encountered during iteration
+//     if err := res.err() { // get any error encountered during iteration
 //         // handle error
 //     }
 //
 // If current value under scan
-// is not requested types, then res.Err() become non-nil.
+// is not requested types, then res.err() become non-nil.
 // After that, NextResultSet(), NextRow() will return false.
 type Result interface {
 	ResultSetCount() int

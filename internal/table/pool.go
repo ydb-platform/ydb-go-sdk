@@ -3,6 +3,7 @@ package table
 import (
 	"container/list"
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"sync"
 	"time"
 
@@ -187,98 +188,103 @@ func isCreateSessionErrorRetriable(err error) bool {
 	}
 }
 
+type createSessionResult struct {
+	s   *Session
+	err error
+}
+
 // p.mu must NOT be held.
 func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
-	/*
-		sessiontrace := contextCreateSessionTrace(ctx)
-		// pre-check the pool size
-		p.mu.Lock()
-		enoughSpace := p.createInProgress+len(p.index) < p.limit
-		if enoughSpace {
-			p.createInProgress++
-		}
-		p.mu.Unlock()
-		sessiontrace.onCheckEnoughSpace(enoughSpace)
+	//sessiontrace := contextCreateSessionTrace(ctx)
+	// pre-check the pool size
+	p.mu.Lock()
+	enoughSpace := p.createInProgress+len(p.index) < p.limit
+	if enoughSpace {
+		p.createInProgress++
+	}
+	p.mu.Unlock()
+	//sessiontrace.onCheckEnoughSpace(enoughSpace)
 
-		if !enoughSpace {
-			return nil, ErrSessionPoolOverflow
-		}
+	if !enoughSpace {
+		return nil, ErrSessionPoolOverflow
+	}
 
-		resCh := make(chan sessiontrace.createSessionResult, 1) // for non-block write
+	resCh := make(chan createSessionResult, 1) // for non-block write
 
-		createSessionGoroutineDone := sessiontrace.onCreateSessionGoroutineStart()
-		go func() {
-			var r sessiontrace.createSessionResult
+	//createSessionGoroutineDone := sessiontrace.onCreateSessionGoroutineStart()
+	go func() {
+		var r createSessionResult
 
-			ctx, cancel := context.WithTimeout(
-				internal.ContextWithoutDeadline(ctx),
-				p.CreateSessionTimeout,
-			)
+		ctx, cancel := context.WithTimeout(
+			internal.ContextWithoutDeadline(ctx),
+			p.CreateSessionTimeout,
+		)
 
-			defer func() {
-				cancel()
-				close(resCh)
-				createSessionGoroutineDone(r)
-			}()
-
-			r.s, r.err = p.Builder.CreateSession(ctx)
-			// if session not nil - error must be nil and vice versa
-			if r.s == nil && r.err == nil {
-				panic("ydb: abnormal result of pool.Builder.CreateSession()")
-			}
-
-			if r.err != nil {
-				p.mu.Lock()
-				p.createInProgress--
-				p.mu.Unlock()
-				resCh <- r
-				return
-			}
-			r.s.OnClose(func() {
-				p.mu.Lock()
-				defer p.mu.Unlock()
-				info, has := p.index[r.s]
-				if !has {
-					return
-				}
-
-				delete(p.index, r.s)
-				p.notify(nil)
-
-				if info.idle != nil {
-					panic("ydb: table: session closed while still in idle pool")
-				}
-			})
-
-			// Slot for session already reserved early
-			p.mu.Lock()
-			p.index[r.s] = sessionInfo{}
-			p.createInProgress--
-			p.mu.Unlock()
-
-			resCh <- r
+		defer func() {
+			cancel()
+			close(resCh)
+			//createSessionGoroutineDone(r)
 		}()
 
-		sessiontrace.onStartSelect()
-
-		select {
-		case r := <-resCh:
-			sessiontrace.onReadResult(r)
-			if r.s == nil && r.err == nil {
-				panic("ydb: abnormal result of pool.createSession()")
-			}
-			return r.s, r.err
-		case <-ctx.Done():
-			sessiontrace.onContextDone()
-			// read result from resCh for prevention of forgetting session
-			go func() {
-				if r, ok := <-resCh; ok && r.s != nil {
-					sessiontrace.onPutSession(r.s, r.s.Close(internal.ContextWithoutDeadline(ctx)))
-				}
-			}()
-			return nil, ctx.Err()
+		r.s, r.err = p.Builder.CreateSession(ctx)
+		// if session not nil - error must be nil and vice versa
+		if r.s == nil && r.err == nil {
+			panic("ydb: abnormal result of pool.Builder.CreateSession()")
 		}
-	*/
+
+		if r.err != nil {
+			p.mu.Lock()
+			p.createInProgress--
+			p.mu.Unlock()
+			resCh <- r
+			return
+		}
+		r.s.OnClose(func() {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			info, has := p.index[r.s]
+			if !has {
+				return
+			}
+
+			delete(p.index, r.s)
+			p.notify(nil)
+
+			if info.idle != nil {
+				panic("ydb: table: session closed while still in idle pool")
+			}
+		})
+
+		// Slot for session already reserved early
+		p.mu.Lock()
+		p.index[r.s] = sessionInfo{}
+		p.createInProgress--
+		p.mu.Unlock()
+
+		resCh <- r
+	}()
+
+	//sessiontrace.onStartSelect()
+
+	select {
+	case r := <-resCh:
+		//sessiontrace.onReadResult(r)
+		if r.s == nil && r.err == nil {
+			panic("ydb: abnormal result of pool.createSession()")
+		}
+		return r.s, r.err
+	case <-ctx.Done():
+		//sessiontrace.onContextDone()
+		// read result from resCh for prevention of forgetting session
+		go func() {
+			if r, ok := <-resCh; ok && r.s != nil {
+				err := r.s.Close(internal.ContextWithoutDeadline(ctx))
+				err = err
+				//sessiontrace.onPutSession(r.s, err)
+			}
+		}()
+		return nil, ctx.Err()
+	}
 	return nil, nil
 }
 
@@ -292,10 +298,10 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		i = 0
 		//start = time.Now()
 	)
-	/*getDone := table.sessionPoolTraceOnGet(p.Trace, ctx)
-	defer func() {
-		getDone(ctx, s, time.Since(start), i, err)
-	}()*/
+	//getDone := table.sessionPoolTraceOnGet(p.Trace, ctx)
+	//defer func() {
+	//	getDone(ctx, s, time.Since(start), i, err)
+	//}()
 
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
@@ -392,10 +398,10 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 	p.init()
 
-	/*putDone := table.sessionPoolTraceOnPut(p.Trace, ctx, s)
-	defer func() {
-		putDone(ctx, s, err)
-	}()*/
+	//putDone := table.sessionPoolTraceOnPut(p.Trace, ctx, s)
+	//defer func() {
+	//	putDone(ctx, s, err)
+	//}()
 
 	p.mu.Lock()
 	switch {
@@ -476,10 +482,10 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 	p.init()
 
-	/*createDone := table.sessionPoolTraceOnCreate(p.Trace, ctx)
-	defer func() {
-		createDone(ctx, s, err)
-	}()*/
+	//createDone := table.sessionPoolTraceOnCreate(p.Trace, ctx)
+	//defer func() {
+	//	createDone(ctx, s, err)
+	//}()
 
 	const maxAttempts = 10
 	for i := 0; i < maxAttempts; i++ {
@@ -520,10 +526,10 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 func (p *SessionPool) Close(ctx context.Context) (err error) {
 	p.init()
 
-	/*closeDone := table.sessionPoolTraceOnClose(p.Trace, ctx)
-	defer func() {
-		closeDone(ctx, err)
-	}()*/
+	//closeDone := table.sessionPoolTraceOnClose(p.Trace, ctx)
+	//defer func() {
+	//	closeDone(ctx, err)
+	//}()
 
 	if p.isClosed() {
 		return
@@ -854,16 +860,15 @@ func (p *SessionPool) notify(s *Session) (notified bool) {
 // instead of plain session.Close.
 // CloseSession must be fast. If necessary, can be async.
 func (p *SessionPool) CloseSession(ctx context.Context, s *Session) error {
-	/*ctx, cancel := context.WithTimeout(
+	ctx, cancel := context.WithTimeout(
 		internal.ContextWithoutDeadline(ctx),
 		p.DeleteTimeout,
 	)
-	closeSessionDone := table.sessionPoolTraceOnCloseSession(p.Trace, ctx, s)
+	//closeSessionDone := table.sessionPoolTraceOnCloseSession(p.Trace, ctx, s)
 	go func() {
 		defer cancel()
-		closeSessionDone(ctx, s, s.Close(ctx))
+		//closeSessionDone(ctx, s, s.Close(ctx))
 	}()
-	*/
 	return nil
 }
 

@@ -242,7 +242,7 @@ func (g *Generator) generateStructScan(bw *bufio.Writer, s *Struct) {
 	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
 	line(bw, `Scan(`, res, ` *table.Result) (`, err, ` error) {`)
 	g.writeStructFieldsScan(bw, 1, res, rcvr, s)
-	line(bw, tab(1), `return `, res, `.Err()`)
+	line(bw, tab(1), `return `, res, `.err()`)
 	line(bw, `}`)
 	line(bw)
 }
@@ -259,7 +259,7 @@ func (g *Generator) generateStructContainerScan(bw *bufio.Writer, s *Struct) {
 	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
 	line(bw, `ScanContainer(`, res, ` *table.Result) (`, err, ` error) {`)
 	g.writeStructContainerScan(bw, 1, res, rcvr, s)
-	line(bw, tab(1), `return `, res, `.Err()`)
+	line(bw, tab(1), `return `, res, `.err()`)
 	line(bw, `}`)
 	line(bw)
 }
@@ -334,14 +334,14 @@ func (g *Generator) generateSliceScan(bw *bufio.Writer, s *Slice) {
 		line(bw, tab(2), `var `, x, ` `, goTypeString(s.T))
 		g.writeScan(bw, 2, res, x, s.T)
 
-		line(bw, tab(2), `if `, res, `.Err() == nil {`)
+		line(bw, tab(2), `if `, res, `.err() == nil {`)
 		line(bw, tab(3), `*`, rcvr, ` = append(*`, rcvr, `, `, x, `)`)
 		line(bw, tab(2), `}`)
 		line(bw, tab(1), `}`)
 	}
 	g.leaveScope()
 
-	line(bw, tab(1), `return `, res, `.Err()`)
+	line(bw, tab(1), `return `, res, `.err()`)
 	line(bw, `}`)
 	line(bw)
 }

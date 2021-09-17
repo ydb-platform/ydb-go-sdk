@@ -347,7 +347,7 @@ type TxDoer struct {
 //       for rows.Next() {
 //           results = append(results, ...)
 //       }
-//       return rows.Err()
+//       return rows.err()
 //   }))
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 	return retry.Retry(
