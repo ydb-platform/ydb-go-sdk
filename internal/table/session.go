@@ -207,14 +207,14 @@ func (s *Session) Close(ctx context.Context) (err error) {
 		return nil
 	}
 	s.closed = true
-	/*deleteSessionDone := table.clientTraceOnDeleteSession(s.c.sessiontrace, ctx, s)
-	start := time.Now()
+	//deleteSessionDone := table.clientTraceOnDeleteSession(s.c.sessiontrace, ctx, s)
+	//start := time.Now()
 	defer func() {
 		for _, cb := range s.onClose {
 			cb()
 		}
-		deleteSessionDone(ctx, s, time.Since(start), err)
-	}()*/
+		//deleteSessionDone(ctx, s, time.Since(start), err)
+	}()
 	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
