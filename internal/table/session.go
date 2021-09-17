@@ -93,6 +93,18 @@ type Config struct {
 	DeleteTimeout time.Duration
 }
 
+func DefaultConfig() Config {
+	return Config{
+		SizeLimit:              DefaultSessionPoolSizeLimit,
+		KeepAliveMinSize:       DefaultKeepAliveMinSize,
+		IdleKeepAliveThreshold: DefaultIdleKeepAliveThreshold,
+		IdleThreshold:          DefaultSessionPoolIdleThreshold,
+		KeepAliveTimeout:       DefaultSessionPoolKeepAliveTimeout,
+		CreateSessionTimeout:   DefaultSessionPoolCreateSessionTimeout,
+		DeleteTimeout:          DefaultSessionPoolDeleteTimeout,
+	}
+}
+
 func NewClient(db cluster.DB, config Config) Client {
 	c := &client{
 		db: db,

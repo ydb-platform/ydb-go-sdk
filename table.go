@@ -38,7 +38,7 @@ func (t *lazyTable) init() {
 }
 
 func tableConfig(o options) table.Config {
-	config := table.Config{}
+	config := table.DefaultConfig()
 	if o.tableClientTrace != nil {
 		//config.Trace = *o.tableClientTrace
 	}
