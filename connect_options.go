@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type Option func(ctx context.Context, client *Connection) error
+type Option func(ctx context.Context, client *db) error
 
 type options struct {
 	connectTimeout                       *time.Duration
@@ -26,7 +26,7 @@ type options struct {
 	tableSessionPoolKeepAliveTimeout     *time.Duration
 	tableSessionPoolCreateSessionTimeout *time.Duration
 	tableSessionPoolDeleteTimeout        *time.Duration
-	tableClientTrace                     *table.ClientTrace
+	tableClientTrace                     *table.Trace
 }
 
 func WithAccessTokenCredentials(accessToken string) Option {
@@ -42,7 +42,7 @@ func WithAnonymousCredentials() Option {
 }
 
 func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (icredentials.Credentials, error)) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
 			return err
@@ -59,63 +59,63 @@ func WithCredentials(c icredentials.Credentials) Option {
 }
 
 func WithDriverConfig(config *config.Config) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.driverConfig = config
 		return nil
 	}
 }
 
 func WithConnectionTTL(ttl time.Duration) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.connectionTTL = &ttl
 		return nil
 	}
 }
 
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.discoveryInterval = &discoveryInterval
 		return nil
 	}
 }
 
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolSizeLimit = &sizeLimit
 		return nil
 	}
 }
 
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolKeepAliveMinSize = &keepAliveMinSize
 		return nil
 	}
 }
 
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolIdleThreshold = &idleThreshold
 		return nil
 	}
 }
 
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolKeepAliveTimeout = &keepAliveTimeout
 		return nil
 	}
 }
 
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolCreateSessionTimeout = &createSessionTimeout
 		return nil
 	}
 }
 
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolDeleteTimeout = &deleteTimeout
 		return nil
 	}
@@ -123,15 +123,15 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 
 // WithDriverTrace returns context which has associated DriverTrace with it.
 func WithDriverTrace(trace trace.DriverTrace) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.driverTrace = &trace
 		return nil
 	}
 }
 
 // WithTableClientTrace returns context which has associated DriverTrace with it.
-func WithTableClientTrace(trace table.ClientTrace) Option {
-	return func(ctx context.Context, c *Connection) error {
+func WithTableClientTrace(trace table.Trace) Option {
+	return func(ctx context.Context, c *db) error {
 		c.options.tableClientTrace = &trace
 		return nil
 	}
@@ -139,14 +139,14 @@ func WithTableClientTrace(trace table.ClientTrace) Option {
 
 // WithTableSessionPoolTrace returns context which has associated DriverTrace with it.
 func WithTableSessionPoolTrace(trace table.SessionPoolTrace) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolTrace = &trace
 		return nil
 	}
 }
 
 func WithConnectTimeout(connectTimeout time.Duration) Option {
-	return func(ctx context.Context, c *Connection) error {
+	return func(ctx context.Context, c *db) error {
 		c.options.connectTimeout = &connectTimeout
 		return nil
 	}

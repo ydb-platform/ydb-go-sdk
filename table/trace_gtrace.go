@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-// Compose returns a new ClientTrace which has functional fields composed
+// Compose returns a new Trace which has functional fields composed
 // both from t and x.
-func (t ClientTrace) Compose(x ClientTrace) (ret ClientTrace) {
+func (t Trace) Compose(x Trace) (ret Trace) {
 	switch {
 	case t.OnCreateSession == nil:
 		ret.OnCreateSession = x.OnCreateSession
@@ -252,7 +252,7 @@ func (t ClientTrace) Compose(x ClientTrace) (ret ClientTrace) {
 	}
 	return ret
 }
-func (t ClientTrace) onCreateSession(c1 CreateSessionStartInfo) func(CreateSessionDoneInfo) {
+func (t Trace) onCreateSession(c1 CreateSessionStartInfo) func(CreateSessionDoneInfo) {
 	fn := t.OnCreateSession
 	if fn == nil {
 		return func(CreateSessionDoneInfo) {
@@ -267,7 +267,7 @@ func (t ClientTrace) onCreateSession(c1 CreateSessionStartInfo) func(CreateSessi
 	}
 	return res
 }
-func (t ClientTrace) onKeepAlive(k KeepAliveStartInfo) func(KeepAliveDoneInfo) {
+func (t Trace) onKeepAlive(k KeepAliveStartInfo) func(KeepAliveDoneInfo) {
 	fn := t.OnKeepAlive
 	if fn == nil {
 		return func(KeepAliveDoneInfo) {
@@ -282,7 +282,7 @@ func (t ClientTrace) onKeepAlive(k KeepAliveStartInfo) func(KeepAliveDoneInfo) {
 	}
 	return res
 }
-func (t ClientTrace) onDeleteSession(d DeleteSessionStartInfo) func(DeleteSessionDoneInfo) {
+func (t Trace) onDeleteSession(d DeleteSessionStartInfo) func(DeleteSessionDoneInfo) {
 	fn := t.OnDeleteSession
 	if fn == nil {
 		return func(DeleteSessionDoneInfo) {
@@ -297,7 +297,7 @@ func (t ClientTrace) onDeleteSession(d DeleteSessionStartInfo) func(DeleteSessio
 	}
 	return res
 }
-func (t ClientTrace) onPrepareDataQuery(p PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo) {
+func (t Trace) onPrepareDataQuery(p PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo) {
 	fn := t.OnPrepareDataQuery
 	if fn == nil {
 		return func(PrepareDataQueryDoneInfo) {
@@ -312,7 +312,7 @@ func (t ClientTrace) onPrepareDataQuery(p PrepareDataQueryStartInfo) func(Prepar
 	}
 	return res
 }
-func (t ClientTrace) onExecuteDataQuery(e ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo) {
+func (t Trace) onExecuteDataQuery(e ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo) {
 	fn := t.OnExecuteDataQuery
 	if fn == nil {
 		return func(ExecuteDataQueryDoneInfo) {
@@ -327,7 +327,7 @@ func (t ClientTrace) onExecuteDataQuery(e ExecuteDataQueryStartInfo) func(Execut
 	}
 	return res
 }
-func (t ClientTrace) onStreamReadTable(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
+func (t Trace) onStreamReadTable(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
 	fn := t.OnStreamReadTable
 	if fn == nil {
 		return func(StreamReadTableDoneInfo) {
@@ -342,7 +342,7 @@ func (t ClientTrace) onStreamReadTable(s StreamReadTableStartInfo) func(StreamRe
 	}
 	return res
 }
-func (t ClientTrace) onStreamExecuteScanQuery(s StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) {
+func (t Trace) onStreamExecuteScanQuery(s StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) {
 	fn := t.OnStreamExecuteScanQuery
 	if fn == nil {
 		return func(StreamExecuteScanQueryDoneInfo) {
@@ -357,7 +357,7 @@ func (t ClientTrace) onStreamExecuteScanQuery(s StreamExecuteScanQueryStartInfo)
 	}
 	return res
 }
-func (t ClientTrace) onBeginTransaction(b BeginTransactionStartInfo) func(BeginTransactionDoneInfo) {
+func (t Trace) onBeginTransaction(b BeginTransactionStartInfo) func(BeginTransactionDoneInfo) {
 	fn := t.OnBeginTransaction
 	if fn == nil {
 		return func(BeginTransactionDoneInfo) {
@@ -372,7 +372,7 @@ func (t ClientTrace) onBeginTransaction(b BeginTransactionStartInfo) func(BeginT
 	}
 	return res
 }
-func (t ClientTrace) onCommitTransaction(c1 CommitTransactionStartInfo) func(CommitTransactionDoneInfo) {
+func (t Trace) onCommitTransaction(c1 CommitTransactionStartInfo) func(CommitTransactionDoneInfo) {
 	fn := t.OnCommitTransaction
 	if fn == nil {
 		return func(CommitTransactionDoneInfo) {
@@ -387,7 +387,7 @@ func (t ClientTrace) onCommitTransaction(c1 CommitTransactionStartInfo) func(Com
 	}
 	return res
 }
-func (t ClientTrace) onRollbackTransaction(r RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo) {
+func (t Trace) onRollbackTransaction(r RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo) {
 	fn := t.OnRollbackTransaction
 	if fn == nil {
 		return func(RollbackTransactionDoneInfo) {
@@ -849,7 +849,7 @@ func (t createSessionTrace) onPutSession(session *Session, err error) {
 	}
 	fn(session, err)
 }
-func clientTraceOnCreateSession(t ClientTrace, c context.Context) func(_ context.Context, _ *Session, endpoint string, latency time.Duration, _ error) {
+func clientTraceOnCreateSession(t Trace, c context.Context) func(_ context.Context, _ *Session, endpoint string, latency time.Duration, _ error) {
 	var p CreateSessionStartInfo
 	p.Context = c
 	res := t.onCreateSession(p)
@@ -863,7 +863,7 @@ func clientTraceOnCreateSession(t ClientTrace, c context.Context) func(_ context
 		res(p)
 	}
 }
-func clientTraceOnKeepAlive(t ClientTrace, c context.Context, s *Session) func(context.Context, *Session, SessionInfo, error) {
+func clientTraceOnKeepAlive(t Trace, c context.Context, s *Session) func(context.Context, *Session, SessionInfo, error) {
 	var p KeepAliveStartInfo
 	p.Context = c
 	p.Session = s
@@ -877,7 +877,7 @@ func clientTraceOnKeepAlive(t ClientTrace, c context.Context, s *Session) func(c
 		res(p)
 	}
 }
-func clientTraceOnDeleteSession(t ClientTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, latency time.Duration, _ error) {
+func clientTraceOnDeleteSession(t Trace, c context.Context, s *Session) func(_ context.Context, _ *Session, latency time.Duration, _ error) {
 	var p DeleteSessionStartInfo
 	p.Context = c
 	p.Session = s
@@ -891,7 +891,7 @@ func clientTraceOnDeleteSession(t ClientTrace, c context.Context, s *Session) fu
 		res(p)
 	}
 }
-func clientTraceOnPrepareDataQuery(t ClientTrace, c context.Context, s *Session, query string) func(_ context.Context, _ *Session, query string, result *DataQuery, cached bool, _ error) {
+func clientTraceOnPrepareDataQuery(t Trace, c context.Context, s *Session, query string) func(_ context.Context, _ *Session, query string, result *DataQuery, cached bool, _ error) {
 	var p PrepareDataQueryStartInfo
 	p.Context = c
 	p.Session = s
@@ -908,7 +908,7 @@ func clientTraceOnPrepareDataQuery(t ClientTrace, c context.Context, s *Session,
 		res(p)
 	}
 }
-func clientTraceOnExecuteDataQuery(t ClientTrace, c context.Context, s *Session, txID string, query *DataQuery, parameters *QueryParameters) func(_ context.Context, _ *Session, txID string, query *DataQuery, parameters *QueryParameters, prepared bool, _ *Result, _ error) {
+func clientTraceOnExecuteDataQuery(t Trace, c context.Context, s *Session, txID string, query *DataQuery, parameters *QueryParameters) func(_ context.Context, _ *Session, txID string, query *DataQuery, parameters *QueryParameters, prepared bool, _ *Result, _ error) {
 	var p ExecuteDataQueryStartInfo
 	p.Context = c
 	p.Session = s
@@ -929,7 +929,7 @@ func clientTraceOnExecuteDataQuery(t ClientTrace, c context.Context, s *Session,
 		res(p)
 	}
 }
-func clientTraceOnStreamReadTable(t ClientTrace, c context.Context, s *Session) func(context.Context, *Session, *Result, error) {
+func clientTraceOnStreamReadTable(t Trace, c context.Context, s *Session) func(context.Context, *Session, *Result, error) {
 	var p StreamReadTableStartInfo
 	p.Context = c
 	p.Session = s
@@ -943,7 +943,7 @@ func clientTraceOnStreamReadTable(t ClientTrace, c context.Context, s *Session) 
 		res(p)
 	}
 }
-func clientTraceOnStreamExecuteScanQuery(t ClientTrace, c context.Context, s *Session, query *DataQuery, parameters *QueryParameters) func(_ context.Context, _ *Session, query *DataQuery, parameters *QueryParameters, _ *Result, _ error) {
+func clientTraceOnStreamExecuteScanQuery(t Trace, c context.Context, s *Session, query *DataQuery, parameters *QueryParameters) func(_ context.Context, _ *Session, query *DataQuery, parameters *QueryParameters, _ *Result, _ error) {
 	var p StreamExecuteScanQueryStartInfo
 	p.Context = c
 	p.Session = s
@@ -961,7 +961,7 @@ func clientTraceOnStreamExecuteScanQuery(t ClientTrace, c context.Context, s *Se
 		res(p)
 	}
 }
-func clientTraceOnBeginTransaction(t ClientTrace, c context.Context, s *Session) func(_ context.Context, _ *Session, txID string, _ error) {
+func clientTraceOnBeginTransaction(t Trace, c context.Context, s *Session) func(_ context.Context, _ *Session, txID string, _ error) {
 	var p BeginTransactionStartInfo
 	p.Context = c
 	p.Session = s
@@ -975,7 +975,7 @@ func clientTraceOnBeginTransaction(t ClientTrace, c context.Context, s *Session)
 		res(p)
 	}
 }
-func clientTraceOnCommitTransaction(t ClientTrace, c context.Context, s *Session, txID string) func(_ context.Context, _ *Session, txID string, _ error) {
+func clientTraceOnCommitTransaction(t Trace, c context.Context, s *Session, txID string) func(_ context.Context, _ *Session, txID string, _ error) {
 	var p CommitTransactionStartInfo
 	p.Context = c
 	p.Session = s
@@ -990,7 +990,7 @@ func clientTraceOnCommitTransaction(t ClientTrace, c context.Context, s *Session
 		res(p)
 	}
 }
-func clientTraceOnRollbackTransaction(t ClientTrace, c context.Context, s *Session, txID string) func(_ context.Context, _ *Session, txID string, _ error) {
+func clientTraceOnRollbackTransaction(t Trace, c context.Context, s *Session, txID string) func(_ context.Context, _ *Session, txID string, _ error) {
 	var p RollbackTransactionStartInfo
 	p.Context = c
 	p.Session = s

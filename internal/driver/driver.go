@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -14,56 +15,48 @@ import (
 )
 
 type driver struct {
+	config.Config
+
+	meta meta.Meta
+
 	clusterPessimize func(addr cluster.Addr) error
 	clusterStats     func(it func(cluster.Endpoint, stats.Stats))
 	clusterClose     func() error
 	clusterGet       func(ctx context.Context) (conn conn.Conn, err error)
+}
 
-	meta  meta.Meta
-	trace trace.DriverTrace
-
-	requestTimeout       time.Duration
-	streamTimeout        time.Duration
-	operationTimeout     time.Duration
-	operationCancelAfter time.Duration
+func (d *driver) Database() string {
+	return d.Config.Database
 }
 
 func New(
+	config config.Config,
 	meta meta.Meta,
-	trace trace.DriverTrace,
-	requestTimeout time.Duration,
-	streamTimeout time.Duration,
-	operationTimeout time.Duration,
-	operationCancelAfter time.Duration,
 	get func(ctx context.Context) (conn conn.Conn, err error),
 	pessimize func(addr cluster.Addr) error,
 	stats func(it func(cluster.Endpoint, stats.Stats)),
 	close func() error,
 ) conn.Driver {
 	return &driver{
-		meta:                 meta,
-		trace:                trace,
-		requestTimeout:       requestTimeout,
-		streamTimeout:        streamTimeout,
-		operationTimeout:     operationTimeout,
-		operationCancelAfter: operationCancelAfter,
-		clusterGet:           get,
-		clusterPessimize:     pessimize,
-		clusterStats:         stats,
-		clusterClose:         close,
+		Config:           config,
+		meta:             meta,
+		clusterGet:       get,
+		clusterPessimize: pessimize,
+		clusterStats:     stats,
+		clusterClose:     close,
 	}
 }
 
 func (d *driver) RequestTimeout() time.Duration {
-	return d.requestTimeout
+	return d.Config.RequestTimeout
 }
 
 func (d *driver) OperationTimeout() time.Duration {
-	return d.operationTimeout
+	return d.Config.OperationTimeout
 }
 
 func (d *driver) OperationCancelAfter() time.Duration {
-	return d.operationCancelAfter
+	return d.Config.OperationCancelAfter
 }
 
 func (d *driver) Meta(ctx context.Context) (metadata.MD, error) {
@@ -71,7 +64,7 @@ func (d *driver) Meta(ctx context.Context) (metadata.MD, error) {
 }
 
 func (d *driver) Trace(ctx context.Context) trace.DriverTrace {
-	return trace.ContextDriverTrace(ctx).Compose(d.trace)
+	return trace.ContextDriverTrace(ctx).Compose(d.Config.Trace)
 }
 
 func (d *driver) Pessimize(addr cluster.Addr) error {
@@ -79,5 +72,5 @@ func (d *driver) Pessimize(addr cluster.Addr) error {
 }
 
 func (d *driver) StreamTimeout() time.Duration {
-	return d.streamTimeout
+	return d.Config.StreamTimeout
 }

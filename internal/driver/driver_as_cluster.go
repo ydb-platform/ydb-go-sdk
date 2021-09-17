@@ -62,7 +62,7 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	t := trace.ContextDriverTrace(ctx).Compose(d.trace)
+	t := trace.ContextDriverTrace(ctx).Compose(d.Config.Trace)
 	var getConnDone func(trace.GetConnDoneInfo)
 	if t.OnGetConn != nil {
 		getConnDone = t.OnGetConn(trace.GetConnStartInfo{

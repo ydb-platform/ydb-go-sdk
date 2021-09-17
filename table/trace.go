@@ -7,30 +7,21 @@ import (
 	"time"
 )
 
-// ClientTrace contains options for tracing table client activity.
+// Trace contains options for tracing table client activity.
 type (
 	//gtrace:gen
 	//gtrace:set shortcut
-	ClientTrace struct {
-		OnCreateSession func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
-
-		OnKeepAlive func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
-
-		OnDeleteSession func(DeleteSessionStartInfo) func(DeleteSessionDoneInfo)
-
-		OnPrepareDataQuery func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo)
-
-		OnExecuteDataQuery func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo)
-
-		OnStreamReadTable func(StreamReadTableStartInfo) func(StreamReadTableDoneInfo)
-
+	Trace struct {
+		OnCreateSession          func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
+		OnKeepAlive              func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
+		OnDeleteSession          func(DeleteSessionStartInfo) func(DeleteSessionDoneInfo)
+		OnPrepareDataQuery       func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo)
+		OnExecuteDataQuery       func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo)
+		OnStreamReadTable        func(StreamReadTableStartInfo) func(StreamReadTableDoneInfo)
 		OnStreamExecuteScanQuery func(StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo)
-
-		OnBeginTransaction func(BeginTransactionStartInfo) func(BeginTransactionDoneInfo)
-
-		OnCommitTransaction func(CommitTransactionStartInfo) func(CommitTransactionDoneInfo)
-
-		OnRollbackTransaction func(RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo)
+		OnBeginTransaction       func(BeginTransactionStartInfo) func(BeginTransactionDoneInfo)
+		OnCommitTransaction      func(CommitTransactionStartInfo) func(CommitTransactionDoneInfo)
+		OnRollbackTransaction    func(RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo)
 	}
 )
 

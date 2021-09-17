@@ -18,9 +18,7 @@ func credentials() ydb.Option {
 	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
 		return ydb.WithAnonymousCredentials()
 	}
-	return func(ctx context.Context, client *ydb.Connection) error {
-		return nil
-	}
+	return nil
 }
 
 func main() {
@@ -49,31 +47,31 @@ func main() {
 	}
 	//defer func() { _ = db.Close() }()
 
-	err = db.CleanupDatabase(ctx, connectParams.Database(), "series", "episodes", "seasons")
+	err = db.Scheme().CleanupDatabase(ctx, connectParams.Database(), "series", "episodes", "seasons")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "cleaunup database failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = db.EnsurePathExists(ctx, connectParams.Database())
+	err = db.Scheme().EnsurePathExists(ctx, connectParams.Database())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "ensure path exists failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = describeTableOptions(ctx, db.Table().Pool())
+	err = describeTableOptions(ctx, db.Table())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "describe table options error: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = createTables(ctx, db.Table().Pool(), connectParams.Database())
+	err = createTables(ctx, db.Table(), connectParams.Database())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "create tables error: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = describeTable(ctx, db.Table().Pool(), path.Join(
+	err = describeTable(ctx, db.Table(), path.Join(
 		connectParams.Database(), "series",
 	))
 	if err != nil {
@@ -81,7 +79,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = fillTablesWithData(ctx, db.Table().Pool(), connectParams.Database())
+	err = fillTablesWithData(ctx, db.Table(), connectParams.Database())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "fill tables with data error: %v\n", err)
 		os.Exit(1)
@@ -93,19 +91,19 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			err = selectSimple(ctx, db.Table().Pool(), connectParams.Database())
+			err = selectSimple(ctx, db.Table(), connectParams.Database())
 			if err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
 			}
 
-			err = scanQuerySelect(ctx, db.Table().Pool(), connectParams.Database())
+			err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
 			if err != nil {
 				if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
 					_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
 				}
 			}
 
-			err = readTable(ctx, db.Table().Pool(), path.Join(
+			err = readTable(ctx, db.Table(), path.Join(
 				connectParams.Database(), "series",
 			))
 			if err != nil {

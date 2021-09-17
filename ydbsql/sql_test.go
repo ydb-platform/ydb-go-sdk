@@ -156,7 +156,7 @@ func TestIsolationMapping(t *testing.T) {
 func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
 		dtrace trace.DriverTrace
-		ctrace table.ClientTrace
+		ctrace table.Trace
 		strace table.SessionPoolTrace
 	)
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {

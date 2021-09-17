@@ -66,7 +66,7 @@ func WithDriverTrace(t trace.DriverTrace) ConnectorOption {
 	}
 }
 
-func WithClientTrace(t table.ClientTrace) ConnectorOption {
+func WithClientTrace(t table.Trace) ConnectorOption {
 	return func(c *connector) {
 		c.clientTrace = t
 	}
@@ -149,7 +149,7 @@ type connector struct {
 	dialer   dial.Dialer
 	endpoint string
 
-	clientTrace table.ClientTrace
+	clientTrace table.Trace
 
 	mu     sync.Mutex
 	ready  chan struct{}

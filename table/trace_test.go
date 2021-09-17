@@ -7,7 +7,7 @@ import (
 )
 
 func TestClientTrace(t *testing.T) {
-	tracetest.TestSingleTrace(t, ClientTrace{}, "ClientTrace")
+	tracetest.TestSingleTrace(t, Trace{}, "Trace")
 }
 
 func TestRetryTrace(t *testing.T) {

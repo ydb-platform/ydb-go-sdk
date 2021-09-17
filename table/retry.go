@@ -30,12 +30,23 @@ type SessionProvider interface {
 	// - retry operation returned nil as error
 	// If context without deadline used session pool RetryTimeout
 	Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error)
+
+	// Close provide cleanup sessions
+	Close(ctx context.Context) error
 }
 
 type SessionProviderFunc struct {
 	OnGet   func(context.Context) (*Session, error)
 	OnPut   func(context.Context, *Session) error
 	OnRetry func(context.Context, RetryOperation) error
+	OnClose func(context.Context) error
+}
+
+func (f SessionProviderFunc) Close(ctx context.Context) error {
+	if f.OnClose == nil {
+		return nil
+	}
+	return f.OnClose(ctx)
 }
 
 func (f SessionProviderFunc) Get(ctx context.Context) (*Session, error) {
@@ -79,6 +90,10 @@ type singleSession struct {
 	s     *Session
 	b     retry.Backoff
 	empty bool
+}
+
+func (s *singleSession) Close(ctx context.Context) error {
+	return s.CloseSession(ctx, s.s)
 }
 
 func (s *singleSession) Retry(ctx context.Context, _ bool, op RetryOperation) (err error) {

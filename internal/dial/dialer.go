@@ -119,12 +119,8 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ conn.Driver, err erro
 		}
 	}()
 	driver := driver.New(
+		d.config,
 		d.meta,
-		d.config.Trace,
-		d.config.RequestTimeout,
-		d.config.StreamTimeout,
-		d.config.OperationTimeout,
-		d.config.OperationCancelAfter,
 		c.Get,
 		c.Pessimize,
 		c.Stats,

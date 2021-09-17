@@ -67,9 +67,9 @@ SELECT
 FROM AS_TABLE($episodesData);
 `))
 
-func readTable(ctx context.Context, sp *table.SessionPool, path string) (err error) {
+func readTable(ctx context.Context, c table.Client, path string) (err error) {
 	var res *table.Result
-	err = sp.Retry(
+	err = c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -128,9 +128,9 @@ func readTable(ctx context.Context, sp *table.SessionPool, path string) (err err
 	return nil
 }
 
-func describeTableOptions(ctx context.Context, sp *table.SessionPool) (err error) {
+func describeTableOptions(ctx context.Context, c table.Client) (err error) {
 	var desc table.TableOptionsDescription
-	err = sp.Retry(
+	err = c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -168,7 +168,7 @@ func describeTableOptions(ctx context.Context, sp *table.SessionPool) (err error
 	return nil
 }
 
-func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (err error) {
+func selectSimple(ctx context.Context, c table.Client, prefix string) (err error) {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -194,7 +194,7 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		table.CommitTx(),
 	)
 	var res *table.Result
-	err = sp.Retry(
+	err = c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -238,7 +238,7 @@ func selectSimple(ctx context.Context, sp *table.SessionPool, prefix string) (er
 	return nil
 }
 
-func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) (err error) {
+func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err error) {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -255,7 +255,7 @@ func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) 
 	)
 
 	var res *table.Result
-	err = sp.Retry(
+	err = c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -297,7 +297,7 @@ func scanQuerySelect(ctx context.Context, sp *table.SessionPool, prefix string) 
 	return nil
 }
 
-func fillTablesWithData(ctx context.Context, sp *table.SessionPool, prefix string) (err error) {
+func fillTablesWithData(ctx context.Context, c table.Client, prefix string) (err error) {
 	// Prepare write transaction.
 	writeTx := table.TxControl(
 		table.BeginTx(
@@ -305,7 +305,7 @@ func fillTablesWithData(ctx context.Context, sp *table.SessionPool, prefix strin
 		),
 		table.CommitTx(),
 	)
-	return sp.Retry(
+	return c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -325,8 +325,8 @@ func fillTablesWithData(ctx context.Context, sp *table.SessionPool, prefix strin
 	)
 }
 
-func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (err error) {
-	err = sp.Retry(
+func createTables(ctx context.Context, c table.Client, prefix string) (err error) {
+	err = c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -344,7 +344,7 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		return err
 	}
 
-	err = sp.Retry(
+	err = c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -362,7 +362,7 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 		return err
 	}
 
-	return sp.Retry(
+	return c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
@@ -378,8 +378,8 @@ func createTables(ctx context.Context, sp *table.SessionPool, prefix string) (er
 	)
 }
 
-func describeTable(ctx context.Context, sp *table.SessionPool, path string) (err error) {
-	return sp.Retry(
+func describeTable(ctx context.Context, c table.Client, path string) (err error) {
+	return c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {

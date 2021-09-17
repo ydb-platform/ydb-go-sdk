@@ -22,28 +22,93 @@ import (
 
 // client contains logic of creation of ydb table sessions.
 type client struct {
-	trace   ClientTrace
+	trace   Trace
 	cluster cluster.Cluster
+	pool    SessionProvider
 }
 
 type Client interface {
 	CreateSession(ctx context.Context) (*Session, error)
+	Do(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error)
+	Close(ctx context.Context) error
 }
 
 type ClientOption func(c *client)
 
-func WithClientTraceOption(trace ClientTrace) ClientOption {
+func WithClientTraceOption(trace Trace) ClientOption {
 	return func(c *client) {
 		c.trace = trace
 	}
 }
 
-func NewClient(cluster cluster.Cluster, opts ...ClientOption) Client {
+type Config struct {
+	ClientTrace Trace
+
+	// Trace is an optional session lifetime tracing options.
+	Trace SessionPoolTrace
+
+	// SizeLimit is an upper bound of pooled sessions.
+	// If SizeLimit is less than or equal to zero then the
+	// DefaultSessionPoolSizeLimit variable is used as a limit.
+	SizeLimit int
+
+	// KeepAliveMinSize is a lower bound for sessions in the pool. If there are more sessions open, then
+	// the excess idle ones will be closed and removed after IdleKeepAliveThreshold is reached for each of them.
+	// If KeepAliveMinSize is less than zero, then no sessions will be preserved
+	// If KeepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
+	KeepAliveMinSize int
+
+	// IdleKeepAliveThreshold is a number of keepAlive messages to call before the
+	// Session is removed if it is an excess session (see KeepAliveMinSize)
+	// This means that session will be deleted after the expiration of lifetime = IdleThreshold * IdleKeepAliveThreshold
+	// If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
+	// be removed ever.
+	// If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
+	IdleKeepAliveThreshold int
+
+	// IdleLimit is an upper bound of pooled sessions without any activity
+	// within.
+	// IdleLimit int
+
+	// IdleThreshold is a maximum duration between any activity within session.
+	// If this threshold reached, KeepAlive() method will be called on idle
+	// session.
+	//
+	// If IdleThreshold is less than zero then there is no idle limit.
+	// If IdleThreshold is zero, then the DefaultSessionPoolIdleThreshold value
+	// is used.
+	IdleThreshold time.Duration
+
+	// KeepAliveTimeout limits maximum time spent on KeepAlive request
+	// If KeepAliveTimeout is less than or equal to zero then the
+	// DefaultSessionPoolKeepAliveTimeout is used.
+	KeepAliveTimeout time.Duration
+
+	// CreateSessionTimeout limits maximum time spent on Create session request
+	// If CreateSessionTimeout is less than or equal to zero then the
+	// DefaultSessionPoolCreateSessionTimeout is used.
+	CreateSessionTimeout time.Duration
+
+	// DeleteTimeout limits maximum time spent on Delete request
+	// If DeleteTimeout is less than or equal to zero then the
+	// DefaultSessionPoolDeleteTimeout is used.
+	DeleteTimeout time.Duration
+}
+
+func NewClient(cluster cluster.Cluster, config Config) Client {
 	c := &client{
 		cluster: cluster,
 	}
-	for _, opt := range opts {
-		opt(c)
+	c.pool = &SessionPool{
+		Trace:                  config.Trace,
+		Builder:                c,
+		SizeLimit:              config.SizeLimit,
+		KeepAliveMinSize:       config.KeepAliveMinSize,
+		IdleKeepAliveThreshold: config.IdleKeepAliveThreshold,
+		IdleThreshold:          config.IdleThreshold,
+		KeepAliveTimeout:       config.KeepAliveTimeout,
+		CreateSessionTimeout:   config.CreateSessionTimeout,
+		DeleteTimeout:          config.DeleteTimeout,
 	}
 	return c
 }
@@ -89,9 +154,14 @@ func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {
 	return
 }
 
+func (c *client) Do(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error) {
+	return c.pool.Retry(ctx, retryNoIdempotent, op)
+}
+
 // Close closes session client instance.
-func (c *client) Close() (err error) {
-	return c.cluster.Close()
+func (c *client) Close(ctx context.Context) (err error) {
+	// TODO: close pool
+	return nil
 }
 
 // Session represents a single table API session.

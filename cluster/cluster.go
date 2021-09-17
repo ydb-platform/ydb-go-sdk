@@ -20,6 +20,8 @@ type Cluster interface {
 	// Cluster may be put into code-generated client constructor as is.
 	grpc.ClientConnInterface
 
+	Database() string
+
 	// Stats provide getting connections stats
 	Stats(it func(Endpoint, stats.Stats))
 

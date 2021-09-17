@@ -8,12 +8,11 @@ import (
 	"time"
 )
 
-// New connects to database and return database connection
-func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connection, err error) {
-	c = &Connection{
+// New connects to database and return database runtime holder
+func New(ctx context.Context, params ConnectParams, opts ...Option) (_ DB, err error) {
+	c := &db{
 		database: params.Database(),
 		table:    &lazyTable{},
-		scheme:   &lazyScheme{},
 	}
 	for _, opt := range opts {
 		err = opt(ctx, c)
@@ -46,7 +45,7 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connecti
 	if err != nil {
 		return nil, err
 	}
-	c.table.set(c.cluster, c.options)
-	c.scheme.set(c.cluster, c.options)
+	c.table = newTable(c.cluster, tableConfig(c.options))
+	c.scheme = newScheme(c.cluster)
 	return c, nil
 }

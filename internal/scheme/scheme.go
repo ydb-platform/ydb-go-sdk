@@ -2,11 +2,27 @@ package scheme
 
 import (
 	"context"
+	"fmt"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"google.golang.org/protobuf/proto"
+	"path"
+	"strings"
 )
+
+type Client interface {
+	DescribePath(ctx context.Context, path string) (e Entry, err error)
+	MakeDirectory(ctx context.Context, path string) (err error)
+	ListDirectory(ctx context.Context, path string) (d Directory, err error)
+	RemoveDirectory(ctx context.Context, path string) (err error)
+
+	CleanupDatabase(ctx context.Context, prefix string, names ...string) error
+	EnsurePathExists(ctx context.Context, path string) error
+	Close(ctx context.Context) error
+}
 
 type EntryType uint
 
@@ -60,36 +76,129 @@ type Directory struct {
 	Children []Entry
 }
 
-type Client struct {
-	schemeService Ydb_Scheme_V1.SchemeServiceClient
+type client struct {
+	cluster cluster.Cluster
+	scheme  Ydb_Scheme_V1.SchemeServiceClient
 }
 
-func NewClient(cluster cluster.Cluster) *Client {
-	return &Client{
-		schemeService: Ydb_Scheme_V1.NewSchemeServiceClient(cluster),
+func (c *client) Close(ctx context.Context) error {
+	return nil
+}
+
+func New(cluster cluster.Cluster) Client {
+	return &client{
+		cluster: cluster,
+		scheme:  Ydb_Scheme_V1.NewSchemeServiceClient(cluster),
 	}
 }
 
-func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
-	_, err = c.schemeService.MakeDirectory(ctx, &Ydb_Scheme.MakeDirectoryRequest{
+func (c *client) EnsurePathExists(ctx context.Context, path string) error {
+	for i := len(c.cluster.Database()); i < len(path); i++ {
+		x := strings.IndexByte(path[i:], '/')
+		if x == -1 {
+			x = len(path[i:]) - 1
+		}
+		i += x
+		sub := path[:i+1]
+		info, err := c.DescribePath(ctx, sub)
+		operr, ok := err.(*errors.OpError)
+		if ok && operr.Reason == errors.StatusSchemeError {
+			err = c.MakeDirectory(ctx, sub)
+		}
+		if err != nil {
+			return err
+		}
+		if ok {
+			continue
+		}
+		switch info.Type {
+		case
+			EntryDatabase,
+			EntryDirectory:
+			// OK
+		default:
+			return fmt.Errorf(
+				"entry %q exists but it is a %s",
+				sub, info.Type,
+			)
+		}
+	}
+
+	return nil
+}
+
+func (c *client) CleanupDatabase(ctx context.Context, prefix string, names ...string) error {
+	filter := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		filter[n] = struct{}{}
+	}
+	var list func(int, string) error
+	list = func(i int, p string) error {
+		dir, err := c.ListDirectory(ctx, p)
+		operr, ok := err.(*errors.OpError)
+		if ok && operr.Reason == errors.StatusSchemeError {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		for _, child := range dir.Children {
+			if _, has := filter[child.Name]; !has {
+				continue
+			}
+			pt := path.Join(p, child.Name)
+			switch child.Type {
+			case EntryDirectory:
+				if err := list(i+1, pt); err != nil {
+					return err
+				}
+				if err := c.RemoveDirectory(ctx, pt); err != nil {
+					return err
+				}
+
+			case EntryTable:
+				if err = func() error {
+					session, err := table.NewClient(c.cluster, table.Config{}).CreateSession(ctx)
+					if err != nil {
+						return err
+					}
+					defer func() {
+						_ = session.Close(ctx)
+					}()
+					return session.DropTable(ctx, pt)
+				}(); err != nil {
+					return err
+				}
+
+			default:
+
+			}
+		}
+		return nil
+	}
+	return list(0, prefix)
+}
+
+func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
+	_, err = c.scheme.MakeDirectory(ctx, &Ydb_Scheme.MakeDirectoryRequest{
 		Path: path,
 	})
 	return err
 }
 
-func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
-	_, err = c.schemeService.RemoveDirectory(ctx, &Ydb_Scheme.RemoveDirectoryRequest{
+func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
+	_, err = c.scheme.RemoveDirectory(ctx, &Ydb_Scheme.RemoveDirectoryRequest{
 		Path: path,
 	})
 	return err
 }
 
-func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, err error) {
+func (c *client) ListDirectory(ctx context.Context, path string) (d Directory, err error) {
 	var (
 		response *Ydb_Scheme.ListDirectoryResponse
 		result   Ydb_Scheme.ListDirectoryResult
 	)
-	response, err = c.schemeService.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
+	response, err = c.scheme.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
 	})
 	if err != nil {
@@ -105,12 +214,12 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d Directory, e
 	return d, nil
 }
 
-func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err error) {
+func (c *client) DescribePath(ctx context.Context, path string) (e Entry, err error) {
 	var (
 		response *Ydb_Scheme.DescribePathResponse
 		result   Ydb_Scheme.DescribePathResult
 	)
-	response, err = c.schemeService.DescribePath(ctx, &Ydb_Scheme.DescribePathRequest{
+	response, err = c.scheme.DescribePath(ctx, &Ydb_Scheme.DescribePathRequest{
 		Path: path,
 	})
 	if err != nil {
@@ -124,12 +233,12 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e Entry, err er
 	return e, nil
 }
 
-func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...PermissionsOption) (err error) {
+func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...PermissionsOption) (err error) {
 	var desc permissionsDesc
 	for _, opt := range opts {
 		opt(&desc)
 	}
-	_, err = c.schemeService.ModifyPermissions(ctx, &Ydb_Scheme.ModifyPermissionsRequest{
+	_, err = c.scheme.ModifyPermissions(ctx, &Ydb_Scheme.ModifyPermissionsRequest{
 		Path:             path,
 		Actions:          desc.actions,
 		ClearPermissions: desc.clear,

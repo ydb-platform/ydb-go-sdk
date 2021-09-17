@@ -4,19 +4,19 @@ import "context"
 
 type clientTraceContextKey struct{}
 
-// WithClientTrace returns context which has associated ClientTrace with it.
-func WithClientTrace(ctx context.Context, t ClientTrace) context.Context {
+// WithClientTrace returns context which has associated Trace with it.
+func WithClientTrace(ctx context.Context, t Trace) context.Context {
 	return context.WithValue(ctx,
 		clientTraceContextKey{},
 		ContextClientTrace(ctx).Compose(t),
 	)
 }
 
-// ContextClientTrace returns ClientTrace associated with ctx.
-// If there is no ClientTrace associated with ctx then zero value
-// of ClientTrace is returned.
-func ContextClientTrace(ctx context.Context) ClientTrace {
-	t, _ := ctx.Value(clientTraceContextKey{}).(ClientTrace)
+// ContextClientTrace returns Trace associated with ctx.
+// If there is no Trace associated with ctx then zero value
+// of Trace is returned.
+func ContextClientTrace(ctx context.Context) Trace {
+	t, _ := ctx.Value(clientTraceContextKey{}).(Trace)
 	return t
 }
 
