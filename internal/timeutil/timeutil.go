@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Now returns resultset of time.Now() if no TestHookTimeNow set up.
+// Now returns result of time.Now() if no TestHookTimeNow set up.
 func Now() time.Time {
 	if f := testHookTimeNow; f != nil {
 		return f()

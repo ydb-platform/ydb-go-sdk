@@ -327,7 +327,7 @@ func TestDatabaseSelect(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			log.Printf("resultset=%v", res)
+			log.Printf("result=%v", res)
 		})
 		t.Run("query", func(t *testing.T) {
 			db, err := openDB(ctx)

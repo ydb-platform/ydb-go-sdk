@@ -8,7 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 )
@@ -91,7 +91,7 @@ type (
 		Query      *table.DataQuery
 		Parameters *table.QueryParameters
 		Prepared   bool
-		Result     *table2.Result
+		Result     *resultset.Result
 		Error      error
 	}
 	StreamReadTableStartInfo struct {
@@ -101,7 +101,7 @@ type (
 	StreamReadTableDoneInfo struct {
 		Context context.Context
 		Session *table.Session
-		Result  *table2.Result
+		Result  *resultset.Result
 		Error   error
 	}
 	StreamExecuteScanQueryStartInfo struct {
@@ -115,7 +115,7 @@ type (
 		Session    *table.Session
 		Query      *table.DataQuery
 		Parameters *table.QueryParameters
-		Result     *table2.Result
+		Result     *resultset.Result
 		Error      error
 	}
 	BeginTransactionStartInfo struct {

@@ -220,7 +220,7 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, err
 	}
 	if s == nil {
-		panic("ydbsql: abnormal resultset of pool.Create()")
+		panic("ydbsql: abnormal result of pool.Create()")
 	}
 	return &sqlConn{
 		connector: c,

@@ -16,7 +16,7 @@ const (
 	metaTicket      = "x-ydb-auth-ticket"
 	metaVersion     = "x-ydb-sdk-build-info"
 	metaRequestType = "x-ydb-request-types"
-	metaTraceID     = "x-ydb-sessiontrace-id"
+	metaTraceID     = "x-ydb-trace-id"
 	metaUserAgent   = "x-ydb-user-agent"
 )
 

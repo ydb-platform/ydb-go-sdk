@@ -51,7 +51,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			select {
 			case <-backoff:
 			case err := <-result:
-				t.Fatalf("unexpected resultset: %v", err)
+				t.Fatalf("unexpected result: %v", err)
 			}
 
 			cancel()

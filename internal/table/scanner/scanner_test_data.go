@@ -112,7 +112,7 @@ var scannerData = []struct {
 		setColumns: []string{"int8", "int16", "int32"},
 	},
 	{
-		name:  "Scan YSON, DOUBLE. Zero rows in the resultset",
+		name:  "Scan YSON, DOUBLE. Zero rows in the result",
 		count: 0,
 		columns: []*column{{
 			name:   "yson",

@@ -8,7 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 )
@@ -914,7 +914,7 @@ func clientTraceOnPrepareDataQuery(t Trace, c context.Context, s *table.Session,
 		res(p)
 	}
 }
-func clientTraceOnExecuteDataQuery(t Trace, c context.Context, s *table.Session, txID string, query *table.DataQuery, parameters *table.QueryParameters) func(_ context.Context, _ *table.Session, txID string, query *table.DataQuery, parameters *table.QueryParameters, prepared bool, _ *table2.Result, _ error) {
+func clientTraceOnExecuteDataQuery(t Trace, c context.Context, s *table.Session, txID string, query *table.DataQuery, parameters *table.QueryParameters) func(_ context.Context, _ *table.Session, txID string, query *table.DataQuery, parameters *table.QueryParameters, prepared bool, _ *resultset.Result, _ error) {
 	var p ExecuteDataQueryStartInfo
 	p.Context = c
 	p.Session = s
@@ -922,7 +922,7 @@ func clientTraceOnExecuteDataQuery(t Trace, c context.Context, s *table.Session,
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onExecuteDataQuery(p)
-	return func(c context.Context, s *table.Session, txID string, query *table.DataQuery, parameters *table.QueryParameters, prepared bool, r *table2.Result, e error) {
+	return func(c context.Context, s *table.Session, txID string, query *table.DataQuery, parameters *table.QueryParameters, prepared bool, r *resultset.Result, e error) {
 		var p ExecuteDataQueryDoneInfo
 		p.Context = c
 		p.Session = s
@@ -935,12 +935,12 @@ func clientTraceOnExecuteDataQuery(t Trace, c context.Context, s *table.Session,
 		res(p)
 	}
 }
-func clientTraceOnStreamReadTable(t Trace, c context.Context, s *table.Session) func(context.Context, *table.Session, *table2.Result, error) {
+func clientTraceOnStreamReadTable(t Trace, c context.Context, s *table.Session) func(context.Context, *table.Session, *resultset.Result, error) {
 	var p StreamReadTableStartInfo
 	p.Context = c
 	p.Session = s
 	res := t.onStreamReadTable(p)
-	return func(c context.Context, s *table.Session, r *table2.Result, e error) {
+	return func(c context.Context, s *table.Session, r *resultset.Result, e error) {
 		var p StreamReadTableDoneInfo
 		p.Context = c
 		p.Session = s
@@ -949,14 +949,14 @@ func clientTraceOnStreamReadTable(t Trace, c context.Context, s *table.Session) 
 		res(p)
 	}
 }
-func clientTraceOnStreamExecuteScanQuery(t Trace, c context.Context, s *table.Session, query *table.DataQuery, parameters *table.QueryParameters) func(_ context.Context, _ *table.Session, query *table.DataQuery, parameters *table.QueryParameters, _ *table2.Result, _ error) {
+func clientTraceOnStreamExecuteScanQuery(t Trace, c context.Context, s *table.Session, query *table.DataQuery, parameters *table.QueryParameters) func(_ context.Context, _ *table.Session, query *table.DataQuery, parameters *table.QueryParameters, _ *resultset.Result, _ error) {
 	var p StreamExecuteScanQueryStartInfo
 	p.Context = c
 	p.Session = s
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onStreamExecuteScanQuery(p)
-	return func(c context.Context, s *table.Session, query *table.DataQuery, parameters *table.QueryParameters, r *table2.Result, e error) {
+	return func(c context.Context, s *table.Session, query *table.DataQuery, parameters *table.QueryParameters, r *resultset.Result, e error) {
 		var p StreamExecuteScanQueryDoneInfo
 		p.Context = c
 		p.Session = s

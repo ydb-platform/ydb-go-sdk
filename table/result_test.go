@@ -55,7 +55,7 @@ func TestResultAny(t *testing.T) {
 					}
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
 						t.Errorf(
-							"unexpected Any() resultset: %[1]v (%[1]T); want %[2]v (%[2]T)",
+							"unexpected Any() result: %[1]v (%[1]T); want %[2]v (%[2]T)",
 							act, exp,
 						)
 					}
@@ -105,7 +105,7 @@ func TestResultOUint32(t *testing.T) {
 					_ = res.ScanWithDefaults(&act)
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
 						t.Errorf(
-							"unexpected OUint32() resultset: %[1]v (%[1]T); want %[2]v (%[2]T)",
+							"unexpected OUint32() result: %[1]v (%[1]T); want %[2]v (%[2]T)",
 							act, exp,
 						)
 					}

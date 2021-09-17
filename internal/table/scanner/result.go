@@ -52,14 +52,14 @@ func (r *Result) Stats() QueryStats {
 	return s
 }
 
-// ResultSetCount returns number of resultset sets.
-// Note that it does not work if r is the resultset of streaming operation.
+// ResultSetCount returns number of result sets.
+// Note that it does not work if r is the result of streaming operation.
 func (r *Result) ResultSetCount() int {
 	return len(r.Sets)
 }
 
-// TotalRowCount returns the number of rows among the all resultset sets.
-// Note that it does not work if r is the resultset of streaming operation.
+// TotalRowCount returns the number of rows among the all result sets.
+// Note that it does not work if r is the result of streaming operation.
 func (r *Result) TotalRowCount() (n int) {
 	for _, s := range r.Sets {
 		n += len(s.Rows)
@@ -94,10 +94,10 @@ func (r *Result) inactive() bool {
 	return r.closed || r.err != nil || r.Scanner.Err() != nil
 }
 
-// HasNextResultSet reports whether resultset set may be advanced.
+// HasNextResultSet reports whether result set may be advanced.
 //
 // It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
-// without advancing the resultset set.
+// without advancing the result set.
 //
 // Note that it does not work with sets from stream.
 func (r *Result) HasNextResultSet() bool {
@@ -107,9 +107,9 @@ func (r *Result) HasNextResultSet() bool {
 	return true
 }
 
-// NextResultSet selects next resultset set in the resultset.
+// NextResultSet selects next result set in the result.
 // columns - names of columns in the resultSet that will be scanned
-// It returns false if there are no more resultset sets.
+// It returns false if there are no more result sets.
 // Stream sets are supported.
 func (r *Result) NextResultSet(ctx context.Context, columns ...string) bool {
 	if !r.HasNextResultSet() {
@@ -124,7 +124,7 @@ func (r *Result) CurrentResultSet() ResultSet {
 	return r
 }
 
-// NextStreamSet selects next resultset set from the resultset of streaming operation.
+// NextStreamSet selects next result set from the result of streaming operation.
 // columns - names of columns in the resultSet that will be scanned
 // It returns false if stream is closed or ctx is canceled.
 // Note that in case of context cancelation it marks via error set.
@@ -152,7 +152,7 @@ func (r *Result) nextStreamSet(ctx context.Context, columns ...string) bool {
 	}
 }
 
-// Columns allows to iterate over all columns of the current resultset set.
+// Columns allows to iterate over all columns of the current result set.
 func (r *Result) Columns(it func(options.Column)) {
 	Columns(&r.Scanner, func(name string, typ internal.T) {
 		it(options.Column{
@@ -258,16 +258,16 @@ func (s *Scanner) setColumnIndexes(columns []string) {
 	}
 }
 
-// HasNextRow reports whether resultset row may be advanced.
+// HasNextRow reports whether result row may be advanced.
 //
 // It may be useful to call HasNextRow() instead of NextRow() to look ahead
-// without advancing the resultset rows.
+// without advancing the result rows.
 func (s *Scanner) HasNextRow() bool {
 	return s.err == nil && s.set != nil && s.nextRow < len(s.set.Rows)
 }
 
-// NextRow selects next row in the current resultset set.
-// It returns false if there are no more rows in the resultset set.
+// NextRow selects next row in the current result set.
+// It returns false if there are no more rows in the result set.
 func (s *Scanner) NextRow() bool {
 	if !s.HasNextRow() {
 		return false
@@ -280,7 +280,7 @@ func (s *Scanner) NextRow() bool {
 	return true
 }
 
-// ColumnCount returns number of columns in the current resultset set.
+// ColumnCount returns number of columns in the current result set.
 func (s *Scanner) ColumnCount() int {
 	if s.set == nil {
 		return 0
@@ -288,7 +288,7 @@ func (s *Scanner) ColumnCount() int {
 	return len(s.set.Columns)
 }
 
-// RowCount returns number of rows in the resultset set.
+// RowCount returns number of rows in the result set.
 func (s *Scanner) RowCount() int {
 	if s.set == nil {
 		return 0
@@ -304,7 +304,7 @@ func (s *Scanner) ItemCount() int {
 	return len(s.row.Items)
 }
 
-// columns allows to iterate over all columns of the current resultset set.
+// columns allows to iterate over all columns of the current result set.
 // Must not be exported.
 func (s *Scanner) columns(it func(name string, typ internal.T)) {
 	if s.set == nil {
@@ -315,7 +315,7 @@ func (s *Scanner) columns(it func(name string, typ internal.T)) {
 	}
 }
 
-// Truncated returns true if current resultset set has been truncated by server
+// Truncated returns true if current result set has been truncated by server
 func (s *Scanner) Truncated() bool {
 	if s.set == nil {
 		s.errorf("there are no sets in the scanner")

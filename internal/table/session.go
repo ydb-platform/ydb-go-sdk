@@ -417,7 +417,7 @@ func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...option
 	return err
 }
 
-// DataQueryExplanation is a resultset of ExplainDataQuery call.
+// DataQueryExplanation is a result of ExplainDataQuery call.
 type DataQueryExplanation struct {
 	AST  string
 	Plan string
@@ -579,7 +579,7 @@ func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
 }
 
 // executeQueryResult returns Transaction and Result built from received
-// resultset.
+// result.
 func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (*Transaction, resultset.Result, error) {
 	t := &Transaction{
 		id: res.GetTxMeta().GetId(),
@@ -747,7 +747,7 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options.TableO
 // StreamReadTable reads table at given path with given options.
 //
 // Note that given ctx controls the lifetime of the whole read, not only this
-// StreamReadTable() call; that is, the time until returned resultset is closed
+// StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextSet() calls.
 func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ resultset.Result, err error) {
 	var (
@@ -809,7 +809,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...opti
 // StreamExecuteScanQuery scan-reads table at given path with given options.
 //
 // Note that given ctx controls the lifetime of the whole read, not only this
-// StreamExecuteScanQuery() call; that is, the time until returned resultset is closed
+// StreamExecuteScanQuery() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextSet() calls.
 func (s *Session) StreamExecuteScanQuery(
 	ctx context.Context,

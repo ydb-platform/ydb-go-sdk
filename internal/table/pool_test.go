@@ -61,7 +61,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 						},
 						OnReadResult: func(r table.createSessionResult) {
 							if r.s == nil && r.err == nil {
-								t.Fatalf("unexpected resultset: <%v, %vz>", r.s, r.err)
+								t.Fatalf("unexpected result: <%v, %vz>", r.s, r.err)
 							}
 						},
 						OnPutSession: func(s *Session, err error) {
@@ -71,7 +71,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 				),
 			)
 			if s == nil && err == nil {
-				t.Fatalf("unexpected resultset: <%v, %v>", s, err)
+				t.Fatalf("unexpected result: <%v, %v>", s, err)
 			}
 		})
 	}
@@ -222,7 +222,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 					)
 				}
 			case <-time.After(timeout):
-				t.Fatalf("no resultset after %s", timeout)
+				t.Fatalf("no result after %s", timeout)
 			}
 		})
 	}
@@ -909,7 +909,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 
 	touchDone := p.touchCond()
 
-	// Now keeper routine must be sticked on awaiting resultset of keep alive request.
+	// Now keeper routine must be sticked on awaiting result of keep alive request.
 	// That is perfect time to emulate race condition of pushing s2 back to the
 	// pool with time, that is greater than `now` of s1 being touched.
 	shiftTime(idleThreshold / 2)
@@ -1010,7 +1010,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	// deletion after failed Keepalive().
 	//
 	// So first step is to force keepalive. Note that we do not send keepalive
-	// resultset here making Keepalive() being blocked.
+	// result here making Keepalive() being blocked.
 	shiftTime(5 * time.Second)
 	timer.C <- timeutil.Now()
 	<-keepalive

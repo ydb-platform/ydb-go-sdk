@@ -224,7 +224,7 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 			r.s, r.err = p.Builder.CreateSession(ctx)
 			// if session not nil - error must be nil and vice versa
 			if r.s == nil && r.err == nil {
-				panic("ydb: abnormal resultset of pool.Builder.CreateSession()")
+				panic("ydb: abnormal result of pool.Builder.CreateSession()")
 			}
 
 			if r.err != nil {
@@ -265,12 +265,12 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 		case r := <-resCh:
 			sessiontrace.onReadResult(r)
 			if r.s == nil && r.err == nil {
-				panic("ydb: abnormal resultset of pool.createSession()")
+				panic("ydb: abnormal result of pool.createSession()")
 			}
 			return r.s, r.err
 		case <-ctx.Done():
 			sessiontrace.onContextDone()
-			// read resultset from resCh for prevention of forgetting session
+			// read result from resCh for prevention of forgetting session
 			go func() {
 				if r, ok := <-resCh; ok && r.s != nil {
 					sessiontrace.onPutSession(r.s, r.s.Close(internal.ContextWithoutDeadline(ctx)))

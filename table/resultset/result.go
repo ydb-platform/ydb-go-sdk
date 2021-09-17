@@ -6,9 +6,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 )
 
-// Result is a resultset of a query.
+// Result is a result of a query.
 //
-// Use NextResultSet(), NextRow() and Scan() to advance through the resultset sets,
+// Use NextResultSet(), NextRow() and Scan() to advance through the result sets,
 // its rows and row's items.
 //
 //     res, err := s.Execute(ctx, txc, "SELECT ...")
