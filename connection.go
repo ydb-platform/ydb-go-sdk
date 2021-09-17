@@ -3,14 +3,13 @@ package ydb
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"path"
 	"strings"
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 )
@@ -18,9 +17,9 @@ import (
 type Connection struct {
 	database string
 	options  options
-	cluster  conn.Cluster
-	table    *tableWrapper
-	scheme   *schemeWrapper
+	cluster  cluster.Cluster
+	table    *lazyTable
+	scheme   *lazyScheme
 }
 
 func (c *Connection) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -31,7 +30,7 @@ func (c *Connection) NewStream(ctx context.Context, desc *grpc.StreamDesc, metho
 	return c.cluster.NewStream(ctx, desc, method, opts...)
 }
 
-func (c *Connection) Stats(it func(endpoint.Endpoint, stats.Stats)) {
+func (c *Connection) Stats(it func(cluster.Endpoint, stats.Stats)) {
 	c.cluster.Stats(it)
 }
 
@@ -40,7 +39,7 @@ func (c *Connection) Close() error {
 	return c.cluster.Close()
 }
 
-func (c *Connection) Table() *tableWrapper {
+func (c *Connection) Table() *lazyTable {
 	return c.table
 }
 

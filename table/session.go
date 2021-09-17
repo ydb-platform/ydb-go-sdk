@@ -3,6 +3,7 @@ package table
 import (
 	"bytes"
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"io"
 	"sync"
 	"time"
@@ -15,27 +16,30 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-// Client contains logic of creation of ydb table sessions.
-type Client struct {
-	Trace   ClientTrace
-	cluster conn.Cluster
+// client contains logic of creation of ydb table sessions.
+type client struct {
+	trace   ClientTrace
+	cluster cluster.Cluster
 }
 
-type ClientOption func(c *Client)
+type Client interface {
+	CreateSession(ctx context.Context) (*Session, error)
+}
+
+type ClientOption func(c *client)
 
 func WithClientTraceOption(trace ClientTrace) ClientOption {
-	return func(c *Client) {
-		c.Trace = trace
+	return func(c *client) {
+		c.trace = trace
 	}
 }
 
-func NewClient(cluster conn.Cluster, opts ...ClientOption) *Client {
-	c := &Client{
+func NewClient(cluster cluster.Cluster, opts ...ClientOption) Client {
+	c := &client{
 		cluster: cluster,
 	}
 	for _, opt := range opts {
@@ -46,8 +50,8 @@ func NewClient(cluster conn.Cluster, opts ...ClientOption) *Client {
 
 // CreateSession creates new session instance.
 // Unused sessions must be destroyed.
-func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
-	createSessionDone := clientTraceOnCreateSession(c.Trace, ctx)
+func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {
+	createSessionDone := clientTraceOnCreateSession(c.trace, ctx)
 	start := time.Now()
 	defer func() {
 		createSessionDone(ctx, s, s.Address(), time.Since(start), err)
@@ -59,11 +63,11 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
-	var cc conn.ClientConnInterface
+	var cc cluster.ClientConnInterface
 	response, err = Ydb_Table_V1.NewTableServiceClient(c.cluster).CreateSession(
 		driver.WithClientConnApplier(
 			ctx,
-			func(c conn.ClientConnInterface) {
+			func(c cluster.ClientConnInterface) {
 				cc = c
 			},
 		),
@@ -86,7 +90,7 @@ func (c *Client) CreateSession(ctx context.Context) (s *Session, err error) {
 }
 
 // Close closes session client instance.
-func (c *Client) Close() (err error) {
+func (c *client) Close() (err error) {
 	return c.cluster.Close()
 }
 
@@ -100,9 +104,9 @@ func (c *Client) Close() (err error) {
 type Session struct {
 	ID string
 
-	conn         conn.ClientConnInterface
+	conn         cluster.ClientConnInterface
 	tableService Ydb_Table_V1.TableServiceClient
-	c            Client
+	c            client
 	closeMux     sync.Mutex
 	closed       bool
 	onClose      []func()
@@ -124,7 +128,7 @@ func (s *Session) Close(ctx context.Context) (err error) {
 		return nil
 	}
 	s.closed = true
-	deleteSessionDone := clientTraceOnDeleteSession(s.c.Trace, ctx, s)
+	deleteSessionDone := clientTraceOnDeleteSession(s.c.trace, ctx, s)
 	start := time.Now()
 	defer func() {
 		for _, cb := range s.onClose {
@@ -150,7 +154,7 @@ func (s *Session) Address() string {
 
 // KeepAlive keeps idle session alive.
 func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
-	keepAliveDone := clientTraceOnKeepAlive(s.c.Trace, ctx, s)
+	keepAliveDone := clientTraceOnKeepAlive(s.c.trace, ctx, s)
 	defer func() {
 		keepAliveDone(ctx, s, info, err)
 	}()
@@ -394,7 +398,7 @@ func (s *Statement) Execute(
 ) (
 	txr *Transaction, r *Result, err error,
 ) {
-	executeDataQueryDone := clientTraceOnExecuteDataQuery(s.session.c.Trace, ctx, s.session, tx.id(), s.query, params)
+	executeDataQueryDone := clientTraceOnExecuteDataQuery(s.session.c.trace, ctx, s.session, tx.id(), s.query, params)
 	defer func() {
 		executeDataQueryDone(ctx, s.session, GetTransactionID(txr), s.query, params, true, r, err)
 	}()
@@ -436,7 +440,7 @@ func (s *Session) Prepare(
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 	)
-	prepareDataQueryDone := clientTraceOnPrepareDataQuery(s.c.Trace, ctx, s, query)
+	prepareDataQueryDone := clientTraceOnPrepareDataQuery(s.c.trace, ctx, s, query)
 	defer func() {
 		prepareDataQueryDone(ctx, s, query, q, cached, err)
 	}()
@@ -480,7 +484,7 @@ func (s *Session) Execute(
 	q := new(DataQuery)
 	q.initFromText(query)
 
-	executeDataQueryDone := clientTraceOnExecuteDataQuery(s.c.Trace, ctx, s, tx.id(), q, params)
+	executeDataQueryDone := clientTraceOnExecuteDataQuery(s.c.trace, ctx, s, tx.id(), q, params)
 	defer func() {
 		executeDataQueryDone(ctx, s, GetTransactionID(txr), q, params, true, r, err)
 	}()
@@ -695,7 +699,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...Read
 
 	client, err = s.tableService.StreamReadTable(ctx, &request)
 
-	streamReadTableDone := clientTraceOnStreamReadTable(s.c.Trace, ctx, s)
+	streamReadTableDone := clientTraceOnStreamReadTable(s.c.trace, ctx, s)
 	if err != nil {
 		cancel()
 		streamReadTableDone(ctx, s, nil, err)
@@ -767,7 +771,7 @@ func (s *Session) StreamExecuteScanQuery(
 
 	client, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
 
-	streamExecuteScanQueryDone := clientTraceOnStreamExecuteScanQuery(s.c.Trace, ctx, s, q, params)
+	streamExecuteScanQueryDone := clientTraceOnStreamExecuteScanQuery(s.c.trace, ctx, s, q, params)
 	if err != nil {
 		cancel()
 		streamExecuteScanQueryDone(ctx, s, q, params, nil, err)
@@ -822,7 +826,7 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows types.Value
 // BeginTransaction begins new transaction within given session with given
 // settings.
 func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings) (x *Transaction, err error) {
-	beginTransactionDone := clientTraceOnBeginTransaction(s.c.Trace, ctx, s)
+	beginTransactionDone := clientTraceOnBeginTransaction(s.c.trace, ctx, s)
 	defer func() {
 		beginTransactionDone(ctx, s, GetTransactionID(x), err)
 	}()
@@ -881,7 +885,7 @@ func (tx *Transaction) ExecuteStatement(
 
 // CommitTx commits specified active transaction.
 func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOption) (r *Result, err error) {
-	commitTransactionDone := clientTraceOnCommitTransaction(tx.s.c.Trace, ctx, tx.s, tx.id)
+	commitTransactionDone := clientTraceOnCommitTransaction(tx.s.c.trace, ctx, tx.s, tx.id)
 	defer func() {
 		commitTransactionDone(ctx, tx.s, tx.id, err)
 	}()
@@ -912,7 +916,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...CommitTransactionOp
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *Transaction) Rollback(ctx context.Context) (err error) {
-	rollbackTransactionDone := clientTraceOnRollbackTransaction(tx.s.c.Trace, ctx, tx.s, tx.id)
+	rollbackTransactionDone := clientTraceOnRollbackTransaction(tx.s.c.trace, ctx, tx.s, tx.id)
 	defer func() {
 		rollbackTransactionDone(ctx, tx.s, tx.id, err)
 	}()

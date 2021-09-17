@@ -3,24 +3,22 @@ package balancer
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/state"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"testing"
 )
 
 var (
 	testData = [...]struct {
 		name   string
-		add    []endpoint.Endpoint
-		del    []endpoint.Endpoint
+		add    []cluster.Endpoint
+		del    []cluster.Endpoint
 		banned map[string]struct{}
 		repeat int
 		exp    map[string]int
 		err    bool
 	}{
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo"},
 				{Addr: "bar"},
 			},
@@ -31,7 +29,7 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 0.2},
 				{Addr: "bar", LoadFactor: 1},
 				{Addr: "baz", LoadFactor: 1},
@@ -44,7 +42,7 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 1},
 				{Addr: "bar", LoadFactor: 0.1},
 				{Addr: "baz", LoadFactor: 0.9},
@@ -57,12 +55,12 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 0.25},
 				{Addr: "bar", LoadFactor: 1},
 				{Addr: "baz", LoadFactor: 1},
 			},
-			del: []endpoint.Endpoint{
+			del: []cluster.Endpoint{
 				{Addr: "foo"},
 			},
 			repeat: 1000,
@@ -72,12 +70,12 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 1},
 				{Addr: "bar", LoadFactor: 0.25},
 				{Addr: "baz", LoadFactor: 0.25},
 			},
-			del: []endpoint.Endpoint{
+			del: []cluster.Endpoint{
 				{Addr: "foo"},
 			},
 			repeat: 1000,
@@ -87,12 +85,12 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 1},
 				{Addr: "bar", LoadFactor: 0.75},
 				{Addr: "baz", LoadFactor: 0.25},
 			},
-			del: []endpoint.Endpoint{
+			del: []cluster.Endpoint{
 				{Addr: "bar"},
 			},
 			repeat: 1200,
@@ -102,12 +100,12 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 0},
 				{Addr: "bar", LoadFactor: 0},
 				{Addr: "baz", LoadFactor: 0},
 			},
-			del: []endpoint.Endpoint{
+			del: []cluster.Endpoint{
 				{Addr: "baz"},
 			},
 			repeat: 1000,
@@ -117,12 +115,12 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 0},
 				{Addr: "bar", LoadFactor: 0},
 				{Addr: "baz", LoadFactor: 0},
 			},
-			del: []endpoint.Endpoint{
+			del: []cluster.Endpoint{
 				{Addr: "foo"},
 				{Addr: "bar"},
 				{Addr: "baz"},
@@ -131,7 +129,7 @@ var (
 			err:    true,
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 0},
 				{Addr: "bar", LoadFactor: 0},
 				{Addr: "baz", LoadFactor: 0},
@@ -147,7 +145,7 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 0},
 				{Addr: "bar", LoadFactor: 0},
 				{Addr: "baz", LoadFactor: 0},
@@ -163,7 +161,7 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 0},
 				{Addr: "bar", LoadFactor: 0},
 				{Addr: "baz", LoadFactor: 0},
@@ -182,7 +180,7 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 10},
 				{Addr: "bar", LoadFactor: 20},
 				{Addr: "baz", LoadFactor: 30},
@@ -201,7 +199,7 @@ var (
 			},
 		},
 		{
-			add: []endpoint.Endpoint{
+			add: []cluster.Endpoint{
 				{Addr: "foo", LoadFactor: 10},
 				{Addr: "bar", LoadFactor: 20},
 				{Addr: "baz", LoadFactor: 30},
@@ -231,7 +229,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(addr.Addr{}, nil, 0)
+				c := conn.New(cluster.Addr{}, nil, 0)
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Addr
 				maddr[e.Addr] = c
@@ -284,7 +282,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(addr.Addr{}, nil, 0)
+				c := conn.New(cluster.Addr{}, nil, 0)
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Addr
 				maddr[e.Addr] = c

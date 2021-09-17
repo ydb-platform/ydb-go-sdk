@@ -1,4 +1,4 @@
-package addr
+package cluster
 
 import (
 	"net"

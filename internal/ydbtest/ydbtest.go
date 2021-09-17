@@ -6,7 +6,7 @@ package ydbtest
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"net"
 	"strconv"
@@ -74,7 +74,7 @@ type YDB struct {
 	descs []grpc.ServiceDesc
 
 	mu        sync.Mutex
-	endpoints map[endpoint.Endpoint]*Endpoint
+	endpoints map[cluster.Endpoint]*Endpoint
 }
 
 func (s *YDB) init() {
@@ -104,14 +104,14 @@ func (s *YDB) init() {
 			})
 		}
 
-		s.endpoints = make(map[endpoint.Endpoint]*Endpoint)
+		s.endpoints = make(map[cluster.Endpoint]*Endpoint)
 	})
 }
 
 type Endpoint struct {
 	db     *YDB
 	ln     *Listener
-	id     endpoint.Endpoint
+	id     cluster.Endpoint
 	server *grpc.Server
 }
 
@@ -127,7 +127,7 @@ func (s *YDB) StartEndpoint() *Endpoint {
 	if err != nil {
 		s.T.Fatal(err)
 	}
-	e := endpoint.Endpoint{
+	e := cluster.Endpoint{
 		Addr: host,
 		Port: port,
 	}
@@ -238,7 +238,7 @@ func (s *YDB) StartBalancer() *Balancer {
 }
 
 func (s *YDB) DialContext(ctx context.Context, addr string) (_ net.Conn, err error) {
-	var e endpoint.Endpoint
+	var e cluster.Endpoint
 	e.Addr, e.Port, err = SplitHostPort(addr)
 	if err != nil {
 		return

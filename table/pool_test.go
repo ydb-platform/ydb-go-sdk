@@ -3,7 +3,7 @@ package table
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"math/rand"
 	"path"
@@ -1349,10 +1349,10 @@ func simpleSession() *Session {
 	return newSession(testutil.NewCluster(), "")
 }
 
-func newSession(cluster conn.Cluster, id string) *Session {
+func newSession(cluster cluster.Cluster, id string) *Session {
 	return &Session{
 		ID: id,
-		c: Client{
+		c: client{
 			cluster: cluster,
 		},
 		tableService: Ydb_Table_V1.NewTableServiceClient(cluster),

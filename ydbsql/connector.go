@@ -30,7 +30,7 @@ func WithDialer(d dial.Dialer) ConnectorOption {
 	}
 }
 
-func WithClient(client *table.Client) ConnectorOption {
+func WithClient(client *table.client) ConnectorOption {
 	return func(c *connector) {
 		c.client = client
 	}
@@ -153,7 +153,7 @@ type connector struct {
 
 	mu     sync.Mutex
 	ready  chan struct{}
-	client *table.Client
+	client *table.client
 	pool   table.SessionPool // Used as a template for created connections.
 
 	defaultTxControl *table.TransactionControl
@@ -187,7 +187,7 @@ func (c *connector) init(ctx context.Context) (err error) {
 	return
 }
 
-func (c *connector) dial(ctx context.Context) (*table.Client, error) {
+func (c *connector) dial(ctx context.Context) (*table.client, error) {
 	d, err := c.dialer.Dial(ctx, c.endpoint)
 	if err != nil {
 		if c == nil {
@@ -228,7 +228,7 @@ func (c *connector) Driver() driver.Driver {
 	return &Driver{c}
 }
 
-func (c *connector) unwrap(ctx context.Context) (*table.Client, error) {
+func (c *connector) unwrap(ctx context.Context) (*table.client, error) {
 	if err := c.init(ctx); err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (c *connector) unwrap(ctx context.Context) (*table.Client, error) {
 
 // Driver is an adapter to allow the use table client as sql.Driver instance.
 // The main purpose of this types is exported is an ability to call Unwrap()
-// method on it to receive raw *table.Client instance.
+// method on it to receive raw *table.client instance.
 type Driver struct {
 	c *connector
 }
@@ -256,6 +256,6 @@ func (d *Driver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
 }
 
-func (d *Driver) Unwrap(ctx context.Context) (*table.Client, error) {
+func (d *Driver) Unwrap(ctx context.Context) (*table.client, error) {
 	return d.c.unwrap(ctx)
 }

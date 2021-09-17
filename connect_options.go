@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	icredentials "github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -15,7 +16,7 @@ type options struct {
 	connectTimeout                       *time.Duration
 	driverTrace                          *trace.DriverTrace
 	driverConfig                         *config.Config
-	credentials                          credentials.Credentials
+	credentials                          icredentials.Credentials
 	connectionTTL                        *time.Duration
 	discoveryInterval                    *time.Duration
 	tableSessionPoolTrace                *table.SessionPoolTrace
@@ -40,7 +41,7 @@ func WithAnonymousCredentials() Option {
 	)
 }
 
-func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (credentials.Credentials, error)) Option {
+func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (icredentials.Credentials, error)) Option {
 	return func(ctx context.Context, c *Connection) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
@@ -51,8 +52,8 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 	}
 }
 
-func WithCredentials(c credentials.Credentials) Option {
-	return WithCreateCredentialsFunc(func(context.Context) (credentials.Credentials, error) {
+func WithCredentials(c icredentials.Credentials) Option {
+	return WithCreateCredentialsFunc(func(context.Context) (icredentials.Credentials, error) {
 		return c, nil
 	})
 }

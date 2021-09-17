@@ -1,4 +1,4 @@
-package stats
+package series
 
 import (
 	"bytes"

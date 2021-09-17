@@ -2,10 +2,9 @@ package driver
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"time"
 
@@ -15,8 +14,8 @@ import (
 )
 
 type driver struct {
-	clusterPessimize func(addr addr.Addr) error
-	clusterStats     func(it func(endpoint.Endpoint, stats.Stats))
+	clusterPessimize func(addr cluster.Addr) error
+	clusterStats     func(it func(cluster.Endpoint, stats.Stats))
 	clusterClose     func() error
 	clusterGet       func(ctx context.Context) (conn conn.Conn, err error)
 
@@ -37,8 +36,8 @@ func New(
 	operationTimeout time.Duration,
 	operationCancelAfter time.Duration,
 	get func(ctx context.Context) (conn conn.Conn, err error),
-	pessimize func(addr addr.Addr) error,
-	stats func(it func(endpoint.Endpoint, stats.Stats)),
+	pessimize func(addr cluster.Addr) error,
+	stats func(it func(cluster.Endpoint, stats.Stats)),
 	close func() error,
 ) conn.Driver {
 	return &driver{
@@ -75,7 +74,7 @@ func (d *driver) Trace(ctx context.Context) trace.DriverTrace {
 	return trace.ContextDriverTrace(ctx).Compose(d.trace)
 }
 
-func (d *driver) Pessimize(addr addr.Addr) error {
+func (d *driver) Pessimize(addr cluster.Addr) error {
 	return d.clusterPessimize(addr)
 }
 

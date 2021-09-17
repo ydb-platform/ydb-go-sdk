@@ -2,17 +2,17 @@ package ydb
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-type tableWrapper struct {
-	client      *table.Client
+type lazyTable struct {
+	client      table.Client
 	sessionPool *table.SessionPool
 }
 
-func (t *tableWrapper) set(cluster conn.Cluster, o options) {
+func (t *lazyTable) set(cluster cluster.Cluster, o options) {
 	{
 		var opts []table.ClientOption
 		if o.tableClientTrace != nil {
@@ -47,10 +47,10 @@ func (t *tableWrapper) set(cluster conn.Cluster, o options) {
 	t.sessionPool.Builder = t.client
 }
 
-func (t *tableWrapper) CreateSession(ctx context.Context) (*table.Session, error) {
+func (t *lazyTable) CreateSession(ctx context.Context) (*table.Session, error) {
 	return t.client.CreateSession(ctx)
 }
 
-func (t *tableWrapper) Pool() *table.SessionPool {
+func (t *lazyTable) Pool() *table.SessionPool {
 	return t.sessionPool
 }

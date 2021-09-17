@@ -2,7 +2,7 @@ package conn
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
@@ -24,7 +24,7 @@ import (
 type Conn interface {
 	grpc.ClientConnInterface
 
-	Addr() addr.Addr
+	Addr() cluster.Addr
 	Runtime() runtime.Runtime
 	Close() error
 	SetDriver(d Driver)
@@ -38,7 +38,7 @@ type conn struct {
 	sync.Mutex
 
 	dial    func(context.Context, string, int) (*grpc.ClientConn, error)
-	addr    addr.Addr
+	addr    cluster.Addr
 	runtime runtime.Runtime
 	done    chan struct{}
 
@@ -55,7 +55,7 @@ func (c *conn) SetDriver(d Driver) {
 	c.Unlock()
 }
 
-func (c *conn) Addr() addr.Addr {
+func (c *conn) Addr() cluster.Addr {
 	return c.addr
 }
 
@@ -297,7 +297,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}, nil
 }
 
-func New(addr addr.Addr, dial func(context.Context, string, int) (*grpc.ClientConn, error), ttl time.Duration) Conn {
+func New(addr cluster.Addr, dial func(context.Context, string, int) (*grpc.ClientConn, error), ttl time.Duration) Conn {
 	if ttl <= 0 {
 		ttl = time.Minute
 	}

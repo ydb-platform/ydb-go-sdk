@@ -1,4 +1,4 @@
-package endpoint
+package cluster
 
 type Endpoint struct {
 	Addr       string

@@ -12,8 +12,8 @@ import (
 func New(ctx context.Context, params ConnectParams, opts ...Option) (c *Connection, err error) {
 	c = &Connection{
 		database: params.Database(),
-		table:    &tableWrapper{},
-		scheme:   &schemeWrapper{},
+		table:    &lazyTable{},
+		scheme:   &lazyScheme{},
 	}
 	for _, opt := range opts {
 		err = opt(ctx, c)

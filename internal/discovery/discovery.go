@@ -2,7 +2,7 @@ package discovery
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
@@ -11,7 +11,7 @@ import (
 )
 
 type Client interface {
-	Discover(ctx context.Context) ([]endpoint.Endpoint, error)
+	Discover(ctx context.Context) ([]cluster.Endpoint, error)
 }
 
 func New(conn grpc.ClientConnInterface, database string, tls bool) Client {
@@ -28,7 +28,7 @@ type client struct {
 	ssl              bool
 }
 
-func (d *client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
+func (d *client) Discover(ctx context.Context) ([]cluster.Endpoint, error) {
 	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: d.database,
 	}
@@ -41,10 +41,10 @@ func (d *client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	endpoints := make([]endpoint.Endpoint, 0, len(listEndpointsResult.Endpoints))
+	endpoints := make([]cluster.Endpoint, 0, len(listEndpointsResult.Endpoints))
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
-			endpoints = append(endpoints, endpoint.Endpoint{
+			endpoints = append(endpoints, cluster.Endpoint{
 				Addr:  e.Address,
 				Port:  int(e.Port),
 				Local: e.Location == listEndpointsResult.SelfLocation,

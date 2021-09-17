@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"sync"
 	"sync/atomic"
@@ -30,7 +30,7 @@ func (b *ClusterBuilder) log(msg string, args ...interface{}) {
 	b.Logf(fmt.Sprint("db stub: ", fmt.Sprintf(msg, args...)))
 }
 
-func (b *ClusterBuilder) Build() conn.Cluster {
+func (b *ClusterBuilder) Build() cluster.Cluster {
 	type session struct {
 		sync.Mutex
 		busy bool

@@ -1,14 +1,14 @@
 package ydb
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 )
 
-type schemeWrapper struct {
+type lazyScheme struct {
 	client *scheme.Client
 }
 
-func (s *schemeWrapper) set(cluster conn.Cluster, o options) {
+func (s *lazyScheme) set(cluster cluster.Cluster, o options) {
 	s.client = scheme.NewClient(cluster)
 }

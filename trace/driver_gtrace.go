@@ -4,7 +4,7 @@ package trace
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
@@ -403,11 +403,11 @@ func driverTraceOnGetCredentials(t DriverTrace, c context.Context) func(_ contex
 		res(p)
 	}
 }
-func driverTraceOnDiscovery(t DriverTrace, c context.Context) func(_ context.Context, endpoints []endpoint.Endpoint, _ error) {
+func driverTraceOnDiscovery(t DriverTrace, c context.Context) func(_ context.Context, endpoints []cluster.Endpoint, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
 	res := t.onDiscovery(p)
-	return func(c context.Context, endpoints []endpoint.Endpoint, e error) {
+	return func(c context.Context, endpoints []cluster.Endpoint, e error) {
 		var p DiscoveryDoneInfo
 		p.Context = c
 		p.Endpoints = endpoints

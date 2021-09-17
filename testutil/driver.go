@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"reflect"
 	"strings"
 
@@ -181,14 +179,14 @@ func (c *Cluster) NewStream(ctx context.Context, desc *grpc.StreamDesc, method s
 	return c.onNewStream(ctx, desc, method, opts...)
 }
 
-func (c *Cluster) Get(context.Context) (conn conn.ClientConnInterface, err error) {
+func (c *Cluster) Get(context.Context) (conn cluster.ClientConnInterface, err error) {
 	return &clientConn{
 		onInvoke:    c.onInvoke,
 		onNewStream: c.onNewStream,
 	}, nil
 }
 
-func (c *Cluster) Stats(func(endpoint.Endpoint, stats.Stats)) {
+func (c *Cluster) Stats(func(cluster.Endpoint, stats.Stats)) {
 }
 
 func (c *Cluster) Close() error {
@@ -259,7 +257,7 @@ func NewCluster(opts ...NewClusterOption) *Cluster {
 type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onAddr      func() addr.Addr
+	onAddr      func() cluster.Addr
 }
 
 func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -276,9 +274,9 @@ func (c *clientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, metho
 	return c.onNewStream(ctx, desc, method, opts...)
 }
 
-func (c *clientConn) Addr() addr.Addr {
+func (c *clientConn) Addr() cluster.Addr {
 	if c.onAddr == nil {
-		return addr.Addr{}
+		return cluster.Addr{}
 	}
 	return c.onAddr()
 }

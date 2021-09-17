@@ -3,14 +3,13 @@ package dial
 import (
 	"context"
 	"crypto/tls"
+	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pem"
@@ -219,7 +218,7 @@ func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*grpc
 		ctx, cancel = context.WithTimeout(ctx, d.timeout)
 		defer cancel()
 	}
-	s := addr.String(host, port)
+	s := cluster2.String(host, port)
 	t := trace.ContextDriverTrace(ctx).Compose(d.config.Trace)
 	var dialDone func(trace.DialDoneInfo)
 	if t.OnDial != nil {
@@ -294,7 +293,7 @@ func (d *dialer) mustSplitHostPort(addr string) (host string, port int) {
 	return host, port
 }
 
-func (d *dialer) endpointByAddr(addr string) (e endpoint.Endpoint) {
+func (d *dialer) endpointByAddr(addr string) (e cluster2.Endpoint) {
 	e.Addr, e.Port = d.mustSplitHostPort(addr)
 	return
 }

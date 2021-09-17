@@ -144,7 +144,7 @@ func TestRetryerBadSession(t *testing.T) {
 }
 
 func TestRetryerBadSessionReuse(t *testing.T) {
-	client := &Client{
+	client := &client{
 		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.CreateSessionResult{}, nil
@@ -343,7 +343,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		errors.NewOpError(errors.WithOEReason(errors.StatusUnsupported)),
 		errors.NewOpError(errors.WithOEReason(errors.StatusSessionBusy)),
 	}
-	client := &Client{
+	client := &client{
 		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	pool := SessionProviderFunc{

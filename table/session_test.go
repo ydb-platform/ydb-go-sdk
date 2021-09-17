@@ -219,11 +219,11 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 	}
 	for _, test := range []struct {
 		method testutil.MethodCode
-		do     func(t *testing.T, ctx context.Context, c Client)
+		do     func(t *testing.T, ctx context.Context, c client)
 	}{
 		{
 			method: testutil.TableExecuteDataQuery,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				s := &Session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
@@ -234,7 +234,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableExplainDataQuery,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				s := &Session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
@@ -245,7 +245,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TablePrepareDataQuery,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				s := &Session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
@@ -256,14 +256,14 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableCreateSession,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				_, err := c.CreateSession(ctx)
 				internal.NoError(t, err)
 			},
 		},
 		{
 			method: testutil.TableDeleteSession,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				s := &Session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
@@ -273,7 +273,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableBeginTransaction,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				s := &Session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
@@ -284,7 +284,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableCommitTransaction,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				tx := &Transaction{
 					s: &Session{
 						c:            c,
@@ -297,7 +297,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableRollbackTransaction,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				tx := &Transaction{
 					s: &Session{
 						c:            c,
@@ -310,7 +310,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableKeepAlive,
-			do: func(t *testing.T, ctx context.Context, c Client) {
+			do: func(t *testing.T, ctx context.Context, c client) {
 				s := &Session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
@@ -325,7 +325,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client := Client{
+						client := client{
 							cluster: testutil.NewCluster(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{

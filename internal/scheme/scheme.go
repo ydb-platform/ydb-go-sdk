@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -64,7 +64,7 @@ type Client struct {
 	schemeService Ydb_Scheme_V1.SchemeServiceClient
 }
 
-func NewClient(cluster conn.Cluster) *Client {
+func NewClient(cluster cluster.Cluster) *Client {
 	return &Client{
 		schemeService: Ydb_Scheme_V1.NewSchemeServiceClient(cluster),
 	}

@@ -1,16 +1,14 @@
-package conn
+package cluster
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/addr"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"google.golang.org/grpc"
 )
 
 type ClientConnInterface interface {
 	grpc.ClientConnInterface
 
-	Addr() addr.Addr
+	Addr() Addr
 }
 
 // Cluster interface provide main usage of YDB driver with
@@ -23,7 +21,7 @@ type Cluster interface {
 	grpc.ClientConnInterface
 
 	// Stats provide getting connections stats
-	Stats(it func(endpoint.Endpoint, stats.Stats))
+	Stats(it func(Endpoint, stats.Stats))
 
 	// Close clears resources and close all connections to YDB
 	Close() error

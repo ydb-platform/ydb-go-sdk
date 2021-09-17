@@ -1,8 +1,9 @@
 package runtime
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/state"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/series"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"sync"
 	"time"
 
@@ -33,16 +34,16 @@ type runtime struct {
 	opStarted    uint64
 	opSucceed    uint64
 	opFailed     uint64
-	opTime       *stats.Series
-	opRate       *stats.Series
-	errRate      *stats.Series
+	opTime       *series.Series
+	opRate       *series.Series
+	errRate      *series.Series
 }
 
 func New() Runtime {
 	return &runtime{
-		opTime:  stats.NewSeries(statsDuration, statsBuckets),
-		opRate:  stats.NewSeries(statsDuration, statsBuckets),
-		errRate: stats.NewSeries(statsDuration, statsBuckets),
+		opTime:  series.NewSeries(statsDuration, statsBuckets),
+		opRate:  series.NewSeries(statsDuration, statsBuckets),
+		errRate: series.NewSeries(statsDuration, statsBuckets),
 	}
 }
 

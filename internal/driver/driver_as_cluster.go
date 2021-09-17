@@ -2,9 +2,9 @@ package driver
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -40,7 +40,7 @@ func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method st
 	)
 }
 
-func (d *driver) Stats(it func(endpoint.Endpoint, stats.Stats)) {
+func (d *driver) Stats(it func(cluster.Endpoint, stats.Stats)) {
 	d.clusterStats(it)
 }
 
