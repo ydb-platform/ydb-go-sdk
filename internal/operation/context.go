@@ -3,8 +3,9 @@ package operation
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 )
 
 func ContextParams(ctx context.Context) (p Params) {

@@ -4,6 +4,11 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
 	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
@@ -13,10 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
-	"sort"
-	"strings"
-	"sync"
-	"time"
 
 	"google.golang.org/grpc"
 
@@ -441,7 +442,7 @@ func (c *cluster) Stats(it func(cluster2.Endpoint, stats.Stats)) {
 
 //// c.mu must be held.
 //func (c *cluster) track(conn conn.Conn) (el *list.Element) {
-//	c.trackDone = c.trace.OnTrackConn(trace.TrackConnStartInfo{
+//	c.trackDone = c.sessiontrace.OnTrackConn(sessiontrace.TrackConnStartInfo{
 //		Address: conn.Addr().String(),
 //	})
 //	el = c.trackerQueue.PushBack(conn)

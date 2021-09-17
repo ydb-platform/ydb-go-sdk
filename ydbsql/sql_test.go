@@ -4,22 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"log"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -156,8 +158,8 @@ func TestIsolationMapping(t *testing.T) {
 func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
 		dtrace trace.DriverTrace
-		ctrace table.Trace
-		strace table.SessionPoolTrace
+		ctrace sessiontrace.Trace
+		strace sessiontrace.SessionPoolTrace
 	)
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, traceutil.ClearContext(args))

@@ -1,12 +1,13 @@
-package result
+package scanner
 
 import (
 	"encoding/binary"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"math/rand"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 

@@ -1,10 +1,16 @@
-package table
+package sessiontrace
 
 //go:generate gtrace
 
 import (
 	"context"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 )
 
 // Trace contains options for tracing table client activity.
@@ -33,114 +39,114 @@ type (
 	}
 	CreateSessionDoneInfo struct {
 		Context  context.Context
-		Session  *Session
+		Session  *table.Session
 		Endpoint string
 		Latency  time.Duration
 		Error    error
 	}
 	KeepAliveStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 	}
 	KeepAliveDoneInfo struct {
 		Context     context.Context
-		Session     *Session
-		SessionInfo SessionInfo
+		Session     *table.Session
+		SessionInfo options.SessionInfo
 		Error       error
 	}
 	DeleteSessionStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 	}
 	DeleteSessionDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		Latency time.Duration
 		Error   error
 	}
 	PrepareDataQueryStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		Query   string
 	}
 	PrepareDataQueryDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		Query   string
-		Result  *DataQuery
+		Result  *table.DataQuery
 		Cached  bool
 		Error   error
 	}
 	ExecuteDataQueryStartInfo struct {
 		Context    context.Context
-		Session    *Session
+		Session    *table.Session
 		TxID       string
-		Query      *DataQuery
-		Parameters *QueryParameters
+		Query      *table.DataQuery
+		Parameters *table.QueryParameters
 	}
 	ExecuteDataQueryDoneInfo struct {
 		Context    context.Context
-		Session    *Session
+		Session    *table.Session
 		TxID       string
-		Query      *DataQuery
-		Parameters *QueryParameters
+		Query      *table.DataQuery
+		Parameters *table.QueryParameters
 		Prepared   bool
-		Result     *Result
+		Result     *resultset.Result
 		Error      error
 	}
 	StreamReadTableStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 	}
 	StreamReadTableDoneInfo struct {
 		Context context.Context
-		Session *Session
-		Result  *Result
+		Session *table.Session
+		Result  *resultset.Result
 		Error   error
 	}
 	StreamExecuteScanQueryStartInfo struct {
 		Context    context.Context
-		Session    *Session
-		Query      *DataQuery
-		Parameters *QueryParameters
+		Session    *table.Session
+		Query      *table.DataQuery
+		Parameters *table.QueryParameters
 	}
 	StreamExecuteScanQueryDoneInfo struct {
 		Context    context.Context
-		Session    *Session
-		Query      *DataQuery
-		Parameters *QueryParameters
-		Result     *Result
+		Session    *table.Session
+		Query      *table.DataQuery
+		Parameters *table.QueryParameters
+		Result     *resultset.Result
 		Error      error
 	}
 	BeginTransactionStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 	}
 	BeginTransactionDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		TxID    string
 		Error   error
 	}
 	CommitTransactionStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		TxID    string
 	}
 	CommitTransactionDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		TxID    string
 		Error   error
 	}
 	RollbackTransactionStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		TxID    string
 	}
 	RollbackTransactionDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		TxID    string
 		Error   error
 	}
@@ -175,7 +181,7 @@ type (
 	}
 	SessionPoolCreateDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		Error   error
 	}
 	SessionPoolGetStartInfo struct {
@@ -183,7 +189,7 @@ type (
 	}
 	SessionPoolGetDoneInfo struct {
 		Context       context.Context
-		Session       *Session
+		Session       *table.Session
 		Latency       time.Duration
 		RetryAttempts int
 		Error         error
@@ -193,39 +199,39 @@ type (
 	}
 	SessionPoolWaitDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		Error   error
 	}
 	SessionPoolTakeStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 	}
 	SessionPoolTakeWaitInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 	}
 	SessionPoolTakeDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		Took    bool
 		Error   error
 	}
 	SessionPoolPutStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 	}
 	SessionPoolPutDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		Error   error
 	}
 	SessionPoolCloseSessionStartInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 	}
 	SessionPoolCloseSessionDoneInfo struct {
 		Context context.Context
-		Session *Session
+		Session *table.Session
 		Error   error
 	}
 	SessionPoolCloseStartInfo struct {
@@ -246,11 +252,11 @@ type (
 		OnStartSelect                 func()
 		OnReadResult                  func(r createSessionResult)
 		OnContextDone                 func()
-		OnPutSession                  func(session *Session, err error)
+		OnPutSession                  func(session *table.Session, err error)
 	}
 )
 
 type createSessionResult struct {
-	s   *Session
+	s   *table.Session
 	err error
 }

@@ -1,34 +1,33 @@
-package table
+package options
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func WithShardKeyBounds() DescribeTableOption {
-	return func(d *describeTableDesc) {
+	return func(d *DescribeTableDesc) {
 		d.IncludeShardKeyBounds = true
 	}
 }
 
 func WithTableStats() DescribeTableOption {
-	return func(d *describeTableDesc) {
+	return func(d *DescribeTableDesc) {
 		d.IncludeTableStats = true
 	}
 }
 
 func WithPartitionStats() DescribeTableOption {
-	return func(d *describeTableDesc) {
+	return func(d *DescribeTableDesc) {
 		d.IncludePartitionStats = true
 	}
 }
 
 type (
-	createTableDesc   Ydb_Table.CreateTableRequest
-	CreateTableOption func(d *createTableDesc)
+	CreateTableDesc   Ydb_Table.CreateTableRequest
+	CreateTableOption func(d *CreateTableDesc)
 )
 
 type (
@@ -46,7 +45,7 @@ type (
 )
 
 func WithColumn(name string, typ types.Type) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
 			Name: name,
 			Type: internal.TypeToYDB(typ),
@@ -55,25 +54,25 @@ func WithColumn(name string, typ types.Type) CreateTableOption {
 }
 
 func WithColumnMeta(column Column) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.Columns = append(d.Columns, column.toYDB())
 	}
 }
 
 func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.PrimaryKey = append(d.PrimaryKey, columns...)
 	}
 }
 
 func WithTimeToLiveSettings(settings TimeToLiveSettings) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.TtlSettings = settings.ToYDB()
 	}
 }
 
 func WithAttribute(key, value string) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		if d.Attributes == nil {
 			d.Attributes = make(map[string]string)
 		}
@@ -87,7 +86,7 @@ type (
 )
 
 func WithIndex(name string, opts ...IndexOption) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		x := &Ydb_Table.TableIndex{
 			Name: name,
 		}
@@ -111,7 +110,7 @@ func WithIndexType(t IndexType) IndexOption {
 }
 
 func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.ColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
 		for i, c := range cf {
 			d.ColumnFamilies[i] = c.toYDB()
@@ -120,25 +119,25 @@ func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
 }
 
 func WithReadReplicasSettings(rr ReadReplicasSettings) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.ReadReplicasSettings = rr.toYDB()
 	}
 }
 
 func WithStorageSettings(ss StorageSettings) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.StorageSettings = ss.toYDB()
 	}
 }
 
 func WithKeyBloomFilter(f FeatureFlag) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.KeyBloomFilter = f.ToYDB()
 	}
 }
 
 func WithProfile(opts ...ProfileOption) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		if d.Profile == nil {
 			d.Profile = new(Ydb_Table.TableProfile)
 		}
@@ -329,7 +328,7 @@ func WithCachingPolicyPreset(name string) CachingPolicyOption {
 }
 
 func WithPartitioningSettingsObject(ps PartitioningSettings) CreateTableOption {
-	return func(d *createTableDesc) {
+	return func(d *CreateTableDesc) {
 		d.PartitioningSettings = ps.toYDB()
 	}
 }
@@ -366,17 +365,17 @@ func WithMaxPartitionsCount(maxPartitionsCount uint64) PartitioningSettingsOptio
 }
 
 type (
-	dropTableDesc   Ydb_Table.DropTableRequest
-	DropTableOption func(*dropTableDesc)
+	DropTableDesc   Ydb_Table.DropTableRequest
+	DropTableOption func(*DropTableDesc)
 )
 
 type (
-	alterTableDesc   Ydb_Table.AlterTableRequest
-	AlterTableOption func(*alterTableDesc)
+	AlterTableDesc   Ydb_Table.AlterTableRequest
+	AlterTableOption func(*AlterTableDesc)
 )
 
 func WithAddColumn(name string, typ types.Type) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
 			Name: name,
 			Type: internal.TypeToYDB(typ),
@@ -385,7 +384,7 @@ func WithAddColumn(name string, typ types.Type) AlterTableOption {
 }
 
 func WithAlterAttribute(key, value string) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		if d.AlterAttributes == nil {
 			d.AlterAttributes = make(map[string]string)
 		}
@@ -394,19 +393,19 @@ func WithAlterAttribute(key, value string) AlterTableOption {
 }
 
 func WithAddColumnMeta(column Column) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.AddColumns = append(d.AddColumns, column.toYDB())
 	}
 }
 
 func WithDropColumn(name string) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.DropColumns = append(d.DropColumns, name)
 	}
 }
 
 func WithAddColumnFamilies(cf ...ColumnFamily) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
 		for i, c := range cf {
 			d.AddColumnFamilies[i] = c.toYDB()
@@ -415,7 +414,7 @@ func WithAddColumnFamilies(cf ...ColumnFamily) AlterTableOption {
 }
 
 func WithAlterColumnFamilies(cf ...ColumnFamily) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
 		for i, c := range cf {
 			d.AddColumnFamilies[i] = c.toYDB()
@@ -424,31 +423,31 @@ func WithAlterColumnFamilies(cf ...ColumnFamily) AlterTableOption {
 }
 
 func WithAlterReadReplicasSettings(rr ReadReplicasSettings) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.SetReadReplicasSettings = rr.toYDB()
 	}
 }
 
 func WithAlterStorageSettings(ss StorageSettings) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.AlterStorageSettings = ss.toYDB()
 	}
 }
 
 func WithAlterKeyBloomFilter(f FeatureFlag) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.SetKeyBloomFilter = f.ToYDB()
 	}
 }
 
 func WithAlterPartitionSettingsObject(ps PartitioningSettings) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.AlterPartitioningSettings = ps.toYDB()
 	}
 }
 
 func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
 			SetTtlSettings: settings.ToYDB(),
 		}
@@ -456,29 +455,29 @@ func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
 }
 
 func WithDropTimeToLive() AlterTableOption {
-	return func(d *alterTableDesc) {
+	return func(d *AlterTableDesc) {
 		d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
 	}
 }
 
 type (
-	copyTableDesc   Ydb_Table.CopyTableRequest
-	CopyTableOption func(*copyTableDesc)
+	CopyTableDesc   Ydb_Table.CopyTableRequest
+	CopyTableOption func(*CopyTableDesc)
 )
 
 type (
-	executeSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
-	ExecuteSchemeQueryOption func(*executeSchemeQueryDesc)
+	ExecuteSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
+	ExecuteSchemeQueryOption func(*ExecuteSchemeQueryDesc)
 )
 
 type (
-	executeDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
-	ExecuteDataQueryOption func(*executeDataQueryDesc)
+	ExecuteDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
+	ExecuteDataQueryOption func(*ExecuteDataQueryDesc)
 )
 
 type (
-	commitTransactionDesc   Ydb_Table.CommitTransactionRequest
-	CommitTransactionOption func(*commitTransactionDesc)
+	CommitTransactionDesc   Ydb_Table.CommitTransactionRequest
+	CommitTransactionOption func(*CommitTransactionDesc)
 )
 
 type (
@@ -493,7 +492,7 @@ func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
 }
 
 func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
-	return func(d *executeDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc) {
 		if d.QueryCachePolicy == nil {
 			d.QueryCachePolicy = new(Ydb_Table.QueryCachePolicy)
 		}
@@ -504,162 +503,54 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 }
 
 func WithCommitCollectStatsModeNone() CommitTransactionOption {
-	return func(d *commitTransactionDesc) {
+	return func(d *CommitTransactionDesc) {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
 	}
 }
 
 func WithCommitCollectStatsModeBasic() CommitTransactionOption {
-	return func(d *commitTransactionDesc) {
+	return func(d *CommitTransactionDesc) {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
 	}
 }
 
 func WithCollectStatsModeNone() ExecuteDataQueryOption {
-	return func(d *executeDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc) {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
 	}
 }
 
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
-	return func(d *executeDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc) {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
 	}
 }
 
 type (
-	executeScanQueryDesc   Ydb_Table.ExecuteScanQueryRequest
-	ExecuteScanQueryOption func(*executeScanQueryDesc)
+	ExecuteScanQueryDesc   Ydb_Table.ExecuteScanQueryRequest
+	ExecuteScanQueryOption func(*ExecuteScanQueryDesc)
 )
 
 func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {
-	return func(desc *executeScanQueryDesc) {
+	return func(desc *ExecuteScanQueryDesc) {
 		desc.Mode = m.toYDB()
 	}
 }
 
-// Transaction control options
-type (
-	txDesc   Ydb_Table.TransactionSettings
-	TxOption func(*txDesc)
-)
-
-type TransactionSettings struct {
-	settings Ydb_Table.TransactionSettings
-}
-
-func TxSettings(opts ...TxOption) *TransactionSettings {
-	s := new(TransactionSettings)
-	for _, opt := range opts {
-		opt((*txDesc)(&s.settings))
-	}
-	return s
-}
-
-func BeginTx(opts ...TxOption) TxControlOption {
-	return func(d *txControlDesc) {
-		s := TxSettings(opts...)
-		d.TxSelector = &Ydb_Table.TransactionControl_BeginTx{
-			BeginTx: &s.settings,
-		}
-	}
-}
-
-func WithTx(t *Transaction) TxControlOption {
-	return func(d *txControlDesc) {
-		d.TxSelector = &Ydb_Table.TransactionControl_TxId{
-			TxId: t.id,
-		}
-	}
-}
-
-func CommitTx() TxControlOption {
-	return func(d *txControlDesc) {
-		d.CommitTx = true
-	}
-}
-
-var (
-	serializableReadWrite = &Ydb_Table.TransactionSettings_SerializableReadWrite{
-		SerializableReadWrite: &Ydb_Table.SerializableModeSettings{},
-	}
-	staleReadOnly = &Ydb_Table.TransactionSettings_StaleReadOnly{
-		StaleReadOnly: &Ydb_Table.StaleModeSettings{},
-	}
-)
-
-func WithSerializableReadWrite() TxOption {
-	return func(d *txDesc) {
-		d.TxMode = serializableReadWrite
-	}
-}
-
-func WithStaleReadOnly() TxOption {
-	return func(d *txDesc) {
-		d.TxMode = staleReadOnly
-	}
-}
-
-func WithOnlineReadOnly(opts ...TxOnlineReadOnlyOption) TxOption {
-	return func(d *txDesc) {
-		var ro txOnlineReadOnly
-		for _, opt := range opts {
-			opt(&ro)
-		}
-		d.TxMode = &Ydb_Table.TransactionSettings_OnlineReadOnly{
-			OnlineReadOnly: (*Ydb_Table.OnlineModeSettings)(&ro),
-		}
-	}
-}
-
-type txOnlineReadOnly Ydb_Table.OnlineModeSettings
-
-type TxOnlineReadOnlyOption func(*txOnlineReadOnly)
-
-func WithInconsistentReads() TxOnlineReadOnlyOption {
-	return func(d *txOnlineReadOnly) {
-		d.AllowInconsistentReads = true
-	}
-}
-
-type (
-	txControlDesc   Ydb_Table.TransactionControl
-	TxControlOption func(*txControlDesc)
-)
-
-type TransactionControl struct {
-	desc Ydb_Table.TransactionControl
-}
-
-func (t *TransactionControl) id() string {
-	if tx, ok := t.desc.TxSelector.(*Ydb_Table.TransactionControl_TxId); ok {
-		return tx.TxId
-	}
-	return ""
-}
-
-func TxControl(opts ...TxControlOption) *TransactionControl {
-	c := new(TransactionControl)
-	for _, opt := range opts {
-		opt((*txControlDesc)(&c.desc))
-	}
-	return c
-}
-
 // Read table options
 type (
-	readTableDesc   Ydb_Table.ReadTableRequest
-	ReadTableOption func(*readTableDesc)
+	ReadTableDesc   Ydb_Table.ReadTableRequest
+	ReadTableOption func(*ReadTableDesc)
 )
 
 func ReadColumn(name string) ReadTableOption {
-	return func(desc *readTableDesc) {
+	return func(desc *ReadTableDesc) {
 		desc.Columns = append(desc.Columns, name)
 	}
 }
 
 func ReadOrdered() ReadTableOption {
-	return func(desc *readTableDesc) {
+	return func(desc *ReadTableDesc) {
 		desc.Ordered = true
 	}
 }
@@ -669,7 +560,7 @@ func ReadOrdered() ReadTableOption {
 //
 // Both x.From and x.To may be nil.
 func ReadKeyRange(x KeyRange) ReadTableOption {
-	return func(desc *readTableDesc) {
+	return func(desc *ReadTableDesc) {
 		if x.From != nil {
 			ReadGreaterOrEqual(x.From)(desc)
 		}
@@ -680,7 +571,7 @@ func ReadKeyRange(x KeyRange) ReadTableOption {
 }
 
 func ReadGreater(x types.Value) ReadTableOption {
-	return func(desc *readTableDesc) {
+	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_Greater{
 			Greater: internal.ValueToYDB(x),
@@ -689,7 +580,7 @@ func ReadGreater(x types.Value) ReadTableOption {
 }
 
 func ReadGreaterOrEqual(x types.Value) ReadTableOption {
-	return func(desc *readTableDesc) {
+	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
 			GreaterOrEqual: internal.ValueToYDB(x),
@@ -698,7 +589,7 @@ func ReadGreaterOrEqual(x types.Value) ReadTableOption {
 }
 
 func ReadLess(x types.Value) ReadTableOption {
-	return func(desc *readTableDesc) {
+	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
 			Less: internal.ValueToYDB(x),
@@ -707,7 +598,7 @@ func ReadLess(x types.Value) ReadTableOption {
 }
 
 func ReadLessOrEqual(x types.Value) ReadTableOption {
-	return func(desc *readTableDesc) {
+	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_LessOrEqual{
 			LessOrEqual: internal.ValueToYDB(x),
@@ -715,12 +606,12 @@ func ReadLessOrEqual(x types.Value) ReadTableOption {
 	}
 }
 func ReadRowLimit(n uint64) ReadTableOption {
-	return func(desc *readTableDesc) {
+	return func(desc *ReadTableDesc) {
 		desc.RowLimit = n
 	}
 }
 
-func (d *readTableDesc) initKeyRange() {
+func (d *ReadTableDesc) initKeyRange() {
 	if d.KeyRange == nil {
 		d.KeyRange = new(Ydb_Table.KeyRange)
 	}

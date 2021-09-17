@@ -3,12 +3,13 @@ package table
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"

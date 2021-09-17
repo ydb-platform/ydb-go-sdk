@@ -5,12 +5,16 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"io"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (
@@ -251,7 +255,7 @@ func (c *sqlConn) Begin() (driver.Tx, error) {
 	return nil, ErrDeprecated
 }
 
-func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryParameters) (res *table.Result, err error) {
+func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryParameters) (res resultset.Result, err error) {
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
@@ -273,11 +277,11 @@ func (c *sqlConn) txControl() *table.TransactionControl {
 	return c.txc
 }
 
-func (c *sqlConn) dataOpts() []table.ExecuteDataQueryOption {
+func (c *sqlConn) dataOpts() []options.ExecuteDataQueryOption {
 	return c.connector.dataOpts
 }
 
-func (c *sqlConn) scanOpts() []table.ExecuteScanQueryOption {
+func (c *sqlConn) scanOpts() []options.ExecuteScanQueryOption {
 	return c.connector.scanOpts
 }
 
@@ -286,14 +290,14 @@ func (c *sqlConn) pool() *table.SessionPool {
 }
 
 type processor interface {
-	process(context.Context, *sqlConn, *table.QueryParameters) (*table.Result, error)
+	process(context.Context, *sqlConn, *table.QueryParameters) (resultset.Result, error)
 }
 
 type reqStmt struct {
 	stmt *table.Statement
 }
 
-func (o *reqStmt) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (*table.Result, error) {
+func (o *reqStmt) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (resultset.Result, error) {
 	_, res, err := o.stmt.Execute(ctx, c.txControl(), params, c.dataOpts()...)
 	return res, err
 }
@@ -302,7 +306,7 @@ type reqQuery struct {
 	text string
 }
 
-func (o *reqQuery) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (*table.Result, error) {
+func (o *reqQuery) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (resultset.Result, error) {
 	_, res, err := c.session.Execute(ctx, c.txControl(), o.text, params, c.dataOpts()...)
 	return res, err
 }
@@ -311,7 +315,7 @@ type reqScanQuery struct {
 	text string
 }
 
-func (o *reqScanQuery) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (*table.Result, error) {
+func (o *reqScanQuery) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (resultset.Result, error) {
 	return c.session.StreamExecuteScanQuery(ctx, o.text, params, c.scanOpts()...)
 }
 
@@ -526,13 +530,13 @@ func params(args []driver.NamedValue) *table.QueryParameters {
 }
 
 type rows struct {
-	res *table.Result
+	res resultset.Result
 }
 
 func (r *rows) Columns() []string {
 	var i int
-	cs := make([]string, r.res.ColumnCount())
-	r.res.Columns(func(m table.Column) {
+	cs := make([]string, r.res.CurrentResultSet().ColumnCount())
+	r.res.CurrentResultSet().Columns(func(m options.Column) {
 		cs[i] = m.Name
 		i++
 	})
@@ -567,14 +571,14 @@ func (r *rows) Close() error {
 }
 
 type stream struct {
-	res *table.Result
+	res resultset.Result
 	ctx context.Context
 }
 
 func (r *stream) Columns() []string {
 	var i int
-	cs := make([]string, r.res.ColumnCount())
-	r.res.Columns(func(m table.Column) {
+	cs := make([]string, r.res.CurrentResultSet().ColumnCount())
+	r.res.CurrentResultSet().Columns(func(m options.Column) {
 		cs[i] = m.Name
 		i++
 	})

@@ -3,12 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"log"
 	"path"
 	"text/template"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type templateConfig struct {
@@ -68,16 +72,16 @@ FROM AS_TABLE($episodesData);
 `))
 
 func readTable(ctx context.Context, c table.Client, path string) (err error) {
-	var res *table.Result
+	var res resultset.Result
 	err = c.Do(
 		ctx,
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			res, err = s.StreamReadTable(ctx, path,
-				table.ReadOrdered(),
-				table.ReadColumn("series_id"),
-				table.ReadColumn("title"),
-				table.ReadColumn("release_date"),
+				options.ReadOrdered(),
+				options.ReadColumn("series_id"),
+				options.ReadColumn("title"),
+				options.ReadColumn("release_date"),
 			)
 			return
 		},
@@ -129,7 +133,7 @@ func readTable(ctx context.Context, c table.Client, path string) (err error) {
 }
 
 func describeTableOptions(ctx context.Context, c table.Client) (err error) {
-	var desc table.TableOptionsDescription
+	var desc options.TableOptionsDescription
 	err = c.Do(
 		ctx,
 		false,
@@ -193,7 +197,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 		),
 		table.CommitTx(),
 	)
-	var res *table.Result
+	var res resultset.Result
 	err = c.Do(
 		ctx,
 		false,
@@ -202,10 +206,10 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 				table.NewQueryParameters(
 					table.ValueParam("$seriesID", types.Uint64Value(1)),
 				),
-				table.WithQueryCachePolicy(
-					table.WithQueryCachePolicyKeepInCache(),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
 				),
-				table.WithCollectStatsModeBasic(),
+				options.WithCollectStatsModeBasic(),
 			)
 			return
 		},
@@ -254,7 +258,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err er
 		},
 	)
 
-	var res *table.Result
+	var res resultset.Result
 	err = c.Do(
 		ctx,
 		false,
@@ -331,12 +335,12 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
-				table.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				table.WithColumn("title", types.Optional(types.TypeUTF8)),
-				table.WithColumn("series_info", types.Optional(types.TypeUTF8)),
-				table.WithColumn("release_date", types.Optional(types.TypeUint64)),
-				table.WithColumn("comment", types.Optional(types.TypeUTF8)),
-				table.WithPrimaryKeyColumn("series_id"),
+				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
+				options.WithColumn("release_date", types.Optional(types.TypeUint64)),
+				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
+				options.WithPrimaryKeyColumn("series_id"),
 			)
 		},
 	)
@@ -349,12 +353,12 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "seasons"),
-				table.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				table.WithColumn("season_id", types.Optional(types.TypeUint64)),
-				table.WithColumn("title", types.Optional(types.TypeUTF8)),
-				table.WithColumn("first_aired", types.Optional(types.TypeUint64)),
-				table.WithColumn("last_aired", types.Optional(types.TypeUint64)),
-				table.WithPrimaryKeyColumn("series_id", "season_id"),
+				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("first_aired", types.Optional(types.TypeUint64)),
+				options.WithColumn("last_aired", types.Optional(types.TypeUint64)),
+				options.WithPrimaryKeyColumn("series_id", "season_id"),
 			)
 		},
 	)
@@ -367,12 +371,12 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "episodes"),
-				table.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				table.WithColumn("season_id", types.Optional(types.TypeUint64)),
-				table.WithColumn("episode_id", types.Optional(types.TypeUint64)),
-				table.WithColumn("title", types.Optional(types.TypeUTF8)),
-				table.WithColumn("air_date", types.Optional(types.TypeUint64)),
-				table.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
+				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("air_date", types.Optional(types.TypeUint64)),
+				options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			)
 		},
 	)

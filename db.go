@@ -3,15 +3,17 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
+	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"google.golang.org/grpc"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 )

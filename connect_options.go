@@ -2,12 +2,14 @@ package ydb
 
 import (
 	"context"
+	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	icredentials "github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"time"
 )
 
 type Option func(ctx context.Context, client *db) error
@@ -19,14 +21,14 @@ type options struct {
 	credentials                          icredentials.Credentials
 	connectionTTL                        *time.Duration
 	discoveryInterval                    *time.Duration
-	tableSessionPoolTrace                *table.SessionPoolTrace
+	tableSessionPoolTrace                *sessiontrace.SessionPoolTrace
 	tableSessionPoolSizeLimit            *int
 	tableSessionPoolKeepAliveMinSize     *int
 	tableSessionPoolIdleThreshold        *time.Duration
 	tableSessionPoolKeepAliveTimeout     *time.Duration
 	tableSessionPoolCreateSessionTimeout *time.Duration
 	tableSessionPoolDeleteTimeout        *time.Duration
-	tableClientTrace                     *table.Trace
+	tableClientTrace                     *sessiontrace.Trace
 }
 
 func WithAccessTokenCredentials(accessToken string) Option {
@@ -130,7 +132,7 @@ func WithDriverTrace(trace trace.DriverTrace) Option {
 }
 
 // WithTableClientTrace returns context which has associated DriverTrace with it.
-func WithTableClientTrace(trace table.Trace) Option {
+func WithTableClientTrace(trace sessiontrace.Trace) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.tableClientTrace = &trace
 		return nil
@@ -138,7 +140,7 @@ func WithTableClientTrace(trace table.Trace) Option {
 }
 
 // WithTableSessionPoolTrace returns context which has associated DriverTrace with it.
-func WithTableSessionPoolTrace(trace table.SessionPoolTrace) Option {
+func WithTableSessionPoolTrace(trace sessiontrace.SessionPoolTrace) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolTrace = &trace
 		return nil

@@ -3,10 +3,11 @@ package table
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"time"
 )
 
 // SessionProvider is the interface that holds session lifecycle logic.

@@ -1,8 +1,11 @@
 package table
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -16,60 +19,60 @@ var (
 
 func TestSessionOptionsProfile(t *testing.T) {
 	{
-		opt := WithProfile(
-			WithProfilePreset(abc),
+		opt := options.WithProfile(
+			options.WithProfilePreset(abc),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		if req.Profile.PresetName != abc {
 			t.Errorf("Preset is not as expected")
 		}
 	}
 	{
-		opt := WithProfile(
-			WithCompactionPolicy(WithCompactionPolicyPreset(abc)),
+		opt := options.WithProfile(
+			options.WithCompactionPolicy(options.WithCompactionPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		if req.Profile.CompactionPolicy.PresetName != abc {
 			t.Errorf("Compaction policy is not as expected")
 		}
 	}
 	{
-		opt := WithProfile(
-			WithPartitioningPolicy(
-				WithPartitioningPolicyPreset(abc),
-				WithPartitioningPolicyMode(PartitioningAutoSplit),
+		opt := options.WithProfile(
+			options.WithPartitioningPolicy(
+				options.WithPartitioningPolicyPreset(abc),
+				options.WithPartitioningPolicyMode(PartitioningAutoSplit),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		p := req.Profile.PartitioningPolicy
 		if p.PresetName != abc || p.AutoPartitioning != Ydb_Table.PartitioningPolicy_AUTO_SPLIT {
 			t.Errorf("Partitioning policy is not as expected")
 		}
 	}
 	{
-		opt := WithProfile(
-			WithPartitioningPolicy(
-				WithPartitioningPolicyUniformPartitions(3),
+		opt := options.WithProfile(
+			options.WithPartitioningPolicy(
+				options.WithPartitioningPolicyUniformPartitions(3),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		p := req.Profile.PartitioningPolicy
 		if pp, ok := p.Partitions.(*Ydb_Table.PartitioningPolicy_UniformPartitions); !ok || pp.UniformPartitions != 3 {
 			t.Errorf("Uniform partitioning policy is not as expected")
 		}
 	}
 	{
-		opt := WithProfile(
-			WithPartitioningPolicy(
-				WithPartitioningPolicyExplicitPartitions(types.Int64Value(1)),
+		opt := options.WithProfile(
+			options.WithPartitioningPolicy(
+				options.WithPartitioningPolicyExplicitPartitions(types.Int64Value(1)),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		p := req.Profile.PartitioningPolicy
 
 		pp, ok := p.Partitions.(*Ydb_Table.PartitioningPolicy_ExplicitPartitions)
@@ -80,26 +83,26 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := WithProfile(
-			WithExecutionPolicy(WithExecutionPolicyPreset(abc)),
+		opt := options.WithProfile(
+			options.WithExecutionPolicy(options.WithExecutionPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		if req.Profile.ExecutionPolicy.PresetName != abc {
 			t.Errorf("Execution policy is not as expected")
 		}
 	}
 	{
-		opt := WithProfile(
-			WithReplicationPolicy(
-				WithReplicationPolicyPreset(abc),
-				WithReplicationPolicyReplicasCount(3),
-				WithReplicationPolicyCreatePerAZ(FeatureEnabled),
-				WithReplicationPolicyAllowPromotion(FeatureDisabled),
+		opt := options.WithProfile(
+			options.WithReplicationPolicy(
+				options.WithReplicationPolicyPreset(abc),
+				options.WithReplicationPolicyReplicasCount(3),
+				options.WithReplicationPolicyCreatePerAZ(options.FeatureEnabled),
+				options.WithReplicationPolicyAllowPromotion(options.FeatureDisabled),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		p := req.Profile.ReplicationPolicy
 		if p.PresetName != abc ||
 			p.ReplicasCount != 3 ||
@@ -109,11 +112,11 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := WithProfile(
-			WithCachingPolicy(WithCachingPolicyPreset(abc)),
+		opt := options.WithProfile(
+			options.WithCachingPolicy(options.WithCachingPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		if req.Profile.CachingPolicy.PresetName != abc {
 			t.Errorf("Caching policy is not as expected")
 		}
@@ -122,18 +125,18 @@ func TestSessionOptionsProfile(t *testing.T) {
 
 func TestStoragePolicyOptions(t *testing.T) {
 	{
-		opt := WithProfile(
-			WithStoragePolicy(
-				WithStoragePolicyPreset(abc),
-				WithStoragePolicySyslog("any1"),
-				WithStoragePolicyLog("any2"),
-				WithStoragePolicyData("any3"),
-				WithStoragePolicyExternal("any4"),
-				WithStoragePolicyKeepInMemory(FeatureEnabled),
+		opt := options.WithProfile(
+			options.WithStoragePolicy(
+				options.WithStoragePolicyPreset(abc),
+				options.WithStoragePolicySyslog("any1"),
+				options.WithStoragePolicyLog("any2"),
+				options.WithStoragePolicyData("any3"),
+				options.WithStoragePolicyExternal("any4"),
+				options.WithStoragePolicyKeepInMemory(options.FeatureEnabled),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
-		opt((*createTableDesc)(&req))
+		opt((*scanner.createTableDesc)(&req))
 		p := req.Profile.StoragePolicy
 		if p.PresetName != abc ||
 			p.Syslog.Media != "any1" ||
@@ -157,7 +160,7 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 	}
 	{
-		column := Column{
+		column := options.Column{
 			Name:   "a",
 			Type:   types.TypeBool,
 			Family: "b",
@@ -188,7 +191,7 @@ func TestAlterTableOptions(t *testing.T) {
 				Media: "ssd",
 			},
 			Compression:  ColumnFamilyCompressionLZ4,
-			KeepInMemory: FeatureEnabled,
+			KeepInMemory: options.FeatureEnabled,
 		}
 		opt := WithAlterColumnFamilies(cf)
 		req := Ydb_Table.AlterTableRequest{}

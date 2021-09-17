@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 )
 
 type lazyTable struct {
@@ -40,7 +40,7 @@ func (t *lazyTable) init() {
 func tableConfig(o options) table.Config {
 	config := table.Config{}
 	if o.tableClientTrace != nil {
-		config.Trace = *o.tableClientTrace
+		//config.Trace = *o.tableClientTrace
 	}
 	if o.tableSessionPoolSizeLimit != nil {
 		config.SizeLimit = *o.tableSessionPoolSizeLimit
