@@ -18,12 +18,22 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 )
 
-type DB cluster.DB
+type DB interface {
+	cluster.DB
 
-type Connection interface {
+	// Close clears resources and close all connections to YDB
+	Close() error
+}
+
+type dbWithTable interface {
 	DB
 
 	Table() table.Client
+}
+
+type Connection interface {
+	dbWithTable
+
 	Scheme() scheme.Client
 	Coordination() coordination.Client
 	RateLimiter() ratelimiter.Client
@@ -116,7 +126,7 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 		return nil, err
 	}
 	c.table = newTable(c.cluster, tableConfig(c.options))
-	c.scheme = newScheme(c.cluster)
+	c.scheme = newScheme(c)
 	c.coordination = newCoordination(c.cluster)
 	c.ratelimiter = newRatelimiter(c.cluster)
 	return c, nil

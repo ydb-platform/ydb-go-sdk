@@ -2,26 +2,24 @@ package scheme
 
 import (
 	"context"
-	"fmt"
-	"path"
-	"strings"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"google.golang.org/protobuf/proto"
 )
 
 type Client interface {
+	Scheme
+
+	CleanupDatabase(ctx context.Context, prefix string, names ...string) error
+	EnsurePathExists(ctx context.Context, path string) error
+}
+
+type Scheme interface {
 	DescribePath(ctx context.Context, path string) (e Entry, err error)
 	MakeDirectory(ctx context.Context, path string) (err error)
 	ListDirectory(ctx context.Context, path string) (d Directory, err error)
 	RemoveDirectory(ctx context.Context, path string) (err error)
-
-	CleanupDatabase(ctx context.Context, prefix string, names ...string) error
-	EnsurePathExists(ctx context.Context, path string) error
 
 	Close(ctx context.Context) error
 }
@@ -87,100 +85,11 @@ func (c *client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(db cluster.DB) Client {
+func New(db cluster.DB) Scheme {
 	return &client{
 		db:      db,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(db),
 	}
-}
-
-func (c *client) EnsurePathExists(ctx context.Context, path string) error {
-	for i := len(c.db.Name()); i < len(path); i++ {
-		x := strings.IndexByte(path[i:], '/')
-		if x == -1 {
-			x = len(path[i:]) - 1
-		}
-		i += x
-		sub := path[:i+1]
-		info, err := c.DescribePath(ctx, sub)
-		operr, ok := err.(*errors.OpError)
-		if ok && operr.Reason == errors.StatusSchemeError {
-			err = c.MakeDirectory(ctx, sub)
-		}
-		if err != nil {
-			return err
-		}
-		if ok {
-			continue
-		}
-		switch info.Type {
-		case
-			EntryDatabase,
-			EntryDirectory:
-			// OK
-		default:
-			return fmt.Errorf(
-				"entry %q exists but it is a %s",
-				sub, info.Type,
-			)
-		}
-	}
-
-	return nil
-}
-
-func (c *client) CleanupDatabase(ctx context.Context, prefix string, names ...string) error {
-	filter := make(map[string]struct{}, len(names))
-	for _, n := range names {
-		filter[n] = struct{}{}
-	}
-	var list func(int, string) error
-	list = func(i int, p string) error {
-		dir, err := c.ListDirectory(ctx, p)
-		operr, ok := err.(*errors.OpError)
-		if ok && operr.Reason == errors.StatusSchemeError {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		for _, child := range dir.Children {
-			if _, has := filter[child.Name]; !has {
-				continue
-			}
-			pt := path.Join(p, child.Name)
-			switch child.Type {
-			case EntryDirectory:
-				if err := list(i+1, pt); err != nil {
-					return err
-				}
-				if err := c.RemoveDirectory(ctx, pt); err != nil {
-					return err
-				}
-
-			case EntryTable:
-				if err = func() error {
-					client := table.NewClient(c.db, table.Config{})
-					defer client.Close(ctx)
-					session, err := client.CreateSession(ctx)
-					if err != nil {
-						return err
-					}
-					defer func() {
-						_ = session.Close(ctx)
-					}()
-					return session.DropTable(ctx, pt)
-				}(); err != nil {
-					return err
-				}
-
-			default:
-
-			}
-		}
-		return nil
-	}
-	return list(0, prefix)
 }
 
 func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
