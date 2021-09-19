@@ -20,6 +20,9 @@ type DB interface {
 
 	// Name returns database name
 	Name() string
+
+	// Close clears resources and close all connections to YDB
+	Close() error
 }
 
 // Cluster interface provide main usage of YDB driver with
@@ -29,7 +32,4 @@ type Cluster interface {
 
 	// Stats provide getting connections stats
 	Stats(it func(Endpoint, stats.Stats))
-
-	// Close clears resources and close all connections to YDB
-	Close() error
 }
