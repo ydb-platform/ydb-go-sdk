@@ -28,8 +28,8 @@ import (
 // client contains logic of creation of ydb table sessions.
 type client struct {
 	//sessiontrace sessiontrace.Trace
-	db   cluster.DB
-	pool SessionProvider
+	cluster cluster.DB
+	pool    SessionProvider
 }
 
 type ClientOption func(c *client)
@@ -106,7 +106,7 @@ func DefaultConfig() Config {
 
 func NewClient(db cluster.DB, config Config) Client {
 	c := &client{
-		db: db,
+		cluster: db,
 	}
 	c.pool = &SessionPool{
 		//Trace:            config.Trace.SessionPoolTrace,
@@ -138,7 +138,7 @@ func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	var cc cluster.ClientConnInterface
-	response, err = Ydb_Table_V1.NewTableServiceClient(c.db).CreateSession(
+	response, err = Ydb_Table_V1.NewTableServiceClient(c.cluster).CreateSession(
 		cluster.WithClientConnApplier(
 			ctx,
 			func(c cluster.ClientConnInterface) {

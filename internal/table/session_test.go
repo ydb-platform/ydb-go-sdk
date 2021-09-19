@@ -32,7 +32,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewCluster(
+		Cluster: testutil.NewDB(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
@@ -89,7 +89,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewCluster(
+		Cluster: testutil.NewDB(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -329,7 +329,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := client{
-							cluster: testutil.NewCluster(
+							cluster: testutil.NewDB(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
 										testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {

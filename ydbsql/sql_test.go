@@ -190,7 +190,7 @@ func TestQuery(t *testing.T) {
 	c := Connector(
 		WithClient(
 			table.NewClient(
-				testutil.NewCluster(
+				testutil.NewDB(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
 							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -226,6 +226,7 @@ func TestQuery(t *testing.T) {
 						},
 					),
 				),
+				table.DefaultConfig(),
 			),
 		),
 		WithDefaultExecDataQueryOption(),

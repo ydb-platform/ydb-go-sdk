@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"reflect"
 	"strings"
 
@@ -185,7 +184,8 @@ func (c *Cluster) Get(context.Context) (conn cluster.ClientConnInterface, err er
 	}, nil
 }
 
-func (c *Cluster) Stats(func(cluster.Endpoint, stats.Stats)) {
+func (c *Cluster) Name() string {
+	return "testutil.Cluster"
 }
 
 func (c *Cluster) Close() error {
@@ -245,7 +245,7 @@ func WithClose(onClose func() error) NewClusterOption {
 	}
 }
 
-func NewCluster(opts ...NewClusterOption) *Cluster {
+func NewDB(opts ...NewClusterOption) *Cluster {
 	c := &Cluster{}
 	for _, opt := range opts {
 		opt(c)

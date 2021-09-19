@@ -31,7 +31,7 @@ func (b *ClusterBuilder) log(msg string, args ...interface{}) {
 	b.Logf(fmt.Sprint("db stub: ", fmt.Sprintf(msg, args...)))
 }
 
-func (b *ClusterBuilder) Build() cluster.Cluster {
+func (b *ClusterBuilder) Build() cluster.DB {
 	type session struct {
 		sync.Mutex
 		busy bool
@@ -43,7 +43,7 @@ func (b *ClusterBuilder) Build() cluster.Cluster {
 
 		sessions = map[string]*session{}
 	)
-	return testutil.NewCluster(
+	return testutil.NewDB(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -164,7 +164,7 @@ func TestTxDoerStmt(t *testing.T) {
 
 	db := sql.OpenDB(Connector(
 		WithSessionPoolIdleThreshold(time.Hour),
-		WithClient(table.NewClient(cluster)),
+		WithClient(table.NewClient(cluster, table.DefaultConfig())),
 	))
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)

@@ -30,7 +30,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1000,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -93,7 +93,7 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -160,7 +160,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				Builder: &StubBuilder{
 					T:     t,
 					Limit: 1,
-					Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+					Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						}})),
@@ -236,7 +236,7 @@ func TestSessionPoolClose(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 3,
-			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
 				}})),
@@ -328,7 +328,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				Builder: &StubBuilder{
 					T:     t,
 					Limit: 2,
-					Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+					Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						}})),
@@ -471,7 +471,7 @@ func TestSessionPoolPutInFull(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
 				}})),
@@ -512,7 +512,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				Builder: &StubBuilder{
 					T:     t,
 					Limit: 1,
-					Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+					Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						}})),
@@ -608,7 +608,7 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -710,7 +710,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 	p := &SessionPool{
 		SizeLimit: 1,
 		Builder: &StubBuilder{
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -756,7 +756,7 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
 				}})),
@@ -792,7 +792,7 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
@@ -867,7 +867,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -934,7 +934,7 @@ func TestSessionPoolDoublePut(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
 				}})),
@@ -981,7 +981,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -1053,7 +1053,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 4,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -1116,7 +1116,7 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 4,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -1158,7 +1158,7 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
-			Cluster: testutil.NewCluster(
+			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
 						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
@@ -1347,7 +1347,7 @@ var okHandler = func(request interface{}) (proto.Message, error) {
 }
 
 func simpleSession() *Session {
-	return newSession(testutil.NewCluster(), "")
+	return newSession(testutil.NewDB(), "")
 }
 
 func newSession(cluster cluster.Cluster, id string) *Session {

@@ -164,7 +164,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 			c := Connector(
 				WithClient(
 					table2.NewClient(
-						testutil.NewCluster(
+						testutil.NewDB(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
 									testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {

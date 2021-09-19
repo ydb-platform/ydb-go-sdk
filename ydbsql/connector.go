@@ -34,7 +34,7 @@ func WithDialer(d dial.Dialer) ConnectorOption {
 	}
 }
 
-func WithClient(client *table.Client) ConnectorOption {
+func WithClient(client table.Client) ConnectorOption {
 	return func(c *connector) {
 		c.client = client
 	}
@@ -157,7 +157,7 @@ type connector struct {
 
 	mu     sync.Mutex
 	ready  chan struct{}
-	client *table.Client
+	client table.Client
 	pool   table.SessionPool // Used as a template for created connections.
 
 	defaultTxControl *table.TransactionControl
@@ -191,7 +191,7 @@ func (c *connector) init(ctx context.Context) (err error) {
 	return
 }
 
-func (c *connector) dial(ctx context.Context) (*table.Client, error) {
+func (c *connector) dial(ctx context.Context) (table.Client, error) {
 	d, err := c.dialer.Dial(ctx, c.endpoint)
 	if err != nil {
 		if c == nil {
@@ -208,7 +208,7 @@ func (c *connector) dial(ctx context.Context) (*table.Client, error) {
 		}
 		return nil, fmt.Errorf("dial error: %w", err)
 	}
-	return table.NewClient(d), nil
+	return table.NewClient(d, ContextTableConfig(ctx)), nil
 }
 
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -232,7 +232,7 @@ func (c *connector) Driver() driver.Driver {
 	return &Driver{c}
 }
 
-func (c *connector) unwrap(ctx context.Context) (*table.Client, error) {
+func (c *connector) unwrap(ctx context.Context) (table.Client, error) {
 	if err := c.init(ctx); err != nil {
 		return nil, err
 	}
@@ -246,9 +246,9 @@ type Driver struct {
 	c *connector
 }
 
-func (d *Driver) Close() error {
+func (d *Driver) Close(ctx context.Context) error {
 	_ = d.c.pool.Close(context.Background())
-	return d.c.client.Close()
+	return d.c.client.Close(ctx)
 }
 
 // Open returns a new connection to the ydb.
@@ -260,6 +260,6 @@ func (d *Driver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
 }
 
-func (d *Driver) Unwrap(ctx context.Context) (*table.Client, error) {
+func (d *Driver) Unwrap(ctx context.Context) (table.Client, error) {
 	return d.c.unwrap(ctx)
 }
