@@ -350,13 +350,14 @@ type TxDoer struct {
 //       return rows.err()
 //   }))
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
-	return retry.Retry(
+	err, _ = retry.Retry(
 		ctx,
 		retry.ContextRetryNoIdempotent(ctx),
 		func(ctx context.Context) (err error) {
 			return d.do(ctx, f)
 		},
 	)
+	return err
 }
 
 func (d TxDoer) do(ctx context.Context, f TxOperationFunc) error {
