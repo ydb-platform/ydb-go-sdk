@@ -11,7 +11,7 @@ import (
 type lazyCoordination struct {
 	db     DB
 	client coordination.Client
-	once   sync.Once
+	m      sync.Mutex
 }
 
 func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config coordination2.Config) (err error) {
@@ -35,14 +35,18 @@ func (c *lazyCoordination) DescribeNode(ctx context.Context, path string) (_ *sc
 }
 
 func (c *lazyCoordination) Close(ctx context.Context) error {
-	c.init()
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.client == nil {
+		return nil
+	}
 	return c.client.Close(ctx)
 }
 
 func (c *lazyCoordination) init() {
-	c.once.Do(func() {
-		c.client = coordination.New(c.db)
-	})
+	c.m.Lock()
+	c.client = coordination.New(c.db)
+	c.m.Unlock()
 }
 
 func newCoordination(db DB) *lazyCoordination {

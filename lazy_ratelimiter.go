@@ -11,7 +11,16 @@ import (
 type lazyRatelimiter struct {
 	db     DB
 	client ratelimiter.Client
-	once   sync.Once
+	m      sync.Mutex
+}
+
+func (c *lazyRatelimiter) Close(ctx context.Context) error {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.client == nil {
+		return nil
+	}
+	return c.client.Close(ctx)
 }
 
 func (c *lazyRatelimiter) CreateResource(ctx context.Context, coordinationNodePath string, resource resource.Resource) (err error) {
@@ -45,9 +54,9 @@ func (c *lazyRatelimiter) AcquireResource(ctx context.Context, coordinationNodeP
 }
 
 func (c *lazyRatelimiter) init() {
-	c.once.Do(func() {
-		c.client = ratelimiter.New(c.db)
-	})
+	c.m.Lock()
+	c.client = ratelimiter.New(c.db)
+	c.m.Unlock()
 }
 
 func newRatelimiter(db DB) *lazyRatelimiter {

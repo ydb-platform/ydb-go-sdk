@@ -25,15 +25,10 @@ type DB interface {
 	Close() error
 }
 
-type dbWithTable interface {
+type Connection interface {
 	DB
 
 	Table() table.Client
-}
-
-type Connection interface {
-	dbWithTable
-
 	Scheme() scheme.Client
 	Coordination() coordination.Client
 	RateLimiter() ratelimiter.Client

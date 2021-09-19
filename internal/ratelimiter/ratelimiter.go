@@ -17,10 +17,15 @@ type Client interface {
 	ListResource(ctx context.Context, coordinationNodePath string, resourcePath string, recursive bool) (_ []string, err error)
 	DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (_ *ratelimiter.Resource, err error)
 	AcquireResource(ctx context.Context, coordinationNodePath string, resourcePath string, amount uint64, isUsedAmount bool) (err error)
+	Close(ctx context.Context) error
 }
 
 type client struct {
 	ratelimiterService Ydb_RateLimiter_V1.RateLimiterServiceClient
+}
+
+func (c *client) Close(ctx context.Context) error {
+	return nil
 }
 
 func New(cluster cluster.DB) Client {

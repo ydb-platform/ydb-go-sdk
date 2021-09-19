@@ -11,11 +11,15 @@ type lazyTable struct {
 	db     DB
 	config table.Config
 	client table.Client
-	once   sync.Once
+	m      sync.Mutex
 }
 
 func (t *lazyTable) Close(ctx context.Context) error {
-	t.init()
+	t.m.Lock()
+	defer t.m.Unlock()
+	if t.client == nil {
+		return nil
+	}
 	return t.client.Close(ctx)
 }
 
@@ -32,9 +36,9 @@ func newTable(db DB, config table.Config) *lazyTable {
 }
 
 func (t *lazyTable) init() {
-	t.once.Do(func() {
-		t.client = table.NewClient(t.db, t.config)
-	})
+	t.m.Lock()
+	t.client = table.NewClient(t.db, t.config)
+	t.m.Unlock()
 }
 
 func tableConfig(o options) table.Config {

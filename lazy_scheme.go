@@ -11,35 +11,45 @@ import (
 	"sync"
 )
 
+type dbWithTable interface {
+	DB
+
+	Table() table.Client
+}
+
 type lazyScheme struct {
 	db     dbWithTable
 	client scheme.Scheme
-	once   sync.Once
+	m      sync.Mutex
 }
 
 func (s *lazyScheme) Close(ctx context.Context) error {
-	s.init()
+	s.m.Lock()
+	defer s.m.Unlock()
+	if s.client == nil {
+		return nil
+	}
 	return s.client.Close(ctx)
 }
 
 func (s *lazyScheme) init() {
-	s.once.Do(func() {
-		s.client = scheme.New(s.db)
-	})
+	s.m.Lock()
+	s.client = scheme.New(s.db)
+	s.m.Unlock()
 }
 
-func (c *lazyScheme) EnsurePathExists(ctx context.Context, path string) error {
-	for i := len(c.db.Name()); i < len(path); i++ {
+func (s *lazyScheme) EnsurePathExists(ctx context.Context, path string) error {
+	for i := len(s.db.Name()); i < len(path); i++ {
 		x := strings.IndexByte(path[i:], '/')
 		if x == -1 {
 			x = len(path[i:]) - 1
 		}
 		i += x
 		sub := path[:i+1]
-		info, err := c.DescribePath(ctx, sub)
+		info, err := s.DescribePath(ctx, sub)
 		operr, ok := err.(*errors.OpError)
 		if ok && operr.Reason == errors.StatusSchemeError {
-			err = c.MakeDirectory(ctx, sub)
+			err = s.MakeDirectory(ctx, sub)
 		}
 		if err != nil {
 			return err
@@ -63,14 +73,14 @@ func (c *lazyScheme) EnsurePathExists(ctx context.Context, path string) error {
 	return nil
 }
 
-func (c *lazyScheme) CleanupDatabase(ctx context.Context, prefix string, names ...string) error {
+func (s *lazyScheme) CleanupDatabase(ctx context.Context, prefix string, names ...string) error {
 	filter := make(map[string]struct{}, len(names))
 	for _, n := range names {
 		filter[n] = struct{}{}
 	}
 	var list func(int, string) error
 	list = func(i int, p string) error {
-		dir, err := c.ListDirectory(ctx, p)
+		dir, err := s.ListDirectory(ctx, p)
 		operr, ok := err.(*errors.OpError)
 		if ok && operr.Reason == errors.StatusSchemeError {
 			return nil
@@ -88,12 +98,12 @@ func (c *lazyScheme) CleanupDatabase(ctx context.Context, prefix string, names .
 				if err := list(i+1, pt); err != nil {
 					return err
 				}
-				if err := c.RemoveDirectory(ctx, pt); err != nil {
+				if err := s.RemoveDirectory(ctx, pt); err != nil {
 					return err
 				}
 
 			case scheme.EntryTable:
-				err, _ = c.db.Table().Retry(ctx, false, func(ctx context.Context, session *table.Session) (err error) {
+				err, _ = s.db.Table().Retry(ctx, false, func(ctx context.Context, session *table.Session) (err error) {
 					return session.DropTable(ctx, pt)
 				})
 				if err != nil {
