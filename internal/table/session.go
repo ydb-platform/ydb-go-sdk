@@ -3,24 +3,22 @@ package table
 import (
 	"bytes"
 	"context"
-	options2 "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"io"
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -230,7 +228,7 @@ func (s *Session) Address() string {
 }
 
 // KeepAlive keeps idle session alive.
-func (s *Session) KeepAlive(ctx context.Context) (info options2.SessionInfo, err error) {
+func (s *Session) KeepAlive(ctx context.Context) (info options.SessionInfo, err error) {
 	//keepAliveDone := table.clientTraceOnKeepAlive(s.c.sessiontrace, ctx, s)
 	//defer func() {
 	//	keepAliveDone(ctx, s, info, err)
@@ -257,28 +255,28 @@ func (s *Session) KeepAlive(ctx context.Context) (info options2.SessionInfo, err
 	}
 	switch result.SessionStatus {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
-		info.Status = options2.SessionReady
+		info.Status = options.SessionReady
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
-		info.Status = options2.SessionBusy
+		info.Status = options.SessionBusy
 	}
 	return
 }
 
 // CreateTable creates table at given path with given options.
-func (s *Session) CreateTable(ctx context.Context, path string, opts ...options2.CreateTableOption) (err error) {
+func (s *Session) CreateTable(ctx context.Context, path string, opts ...options.CreateTableOption) (err error) {
 	request := Ydb_Table.CreateTableRequest{
 		SessionId: s.ID,
 		Path:      path,
 	}
 	for _, opt := range opts {
-		opt((*options2.CreateTableDesc)(&request))
+		opt((*options.CreateTableDesc)(&request))
 	}
 	_, err = s.tableService.CreateTable(ctx, &request)
 	return err
 }
 
 // DescribeTable describes table at given path.
-func (s *Session) DescribeTable(ctx context.Context, path string, opts ...options2.DescribeTableOption) (desc options2.Description, err error) {
+func (s *Session) DescribeTable(ctx context.Context, path string, opts ...options.DescribeTableOption) (desc options.Description, err error) {
 	var (
 		response *Ydb_Table.DescribeTableResponse
 		result   Ydb_Table.DescribeTableResult
@@ -288,7 +286,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		Path:      path,
 	}
 	for _, opt := range opts {
-		opt((*options2.DescribeTableDesc)(&request))
+		opt((*options.DescribeTableDesc)(&request))
 	}
 	response, err = s.tableService.DescribeTable(ctx, &request)
 	if err != nil {
@@ -299,16 +297,16 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		return
 	}
 
-	cs := make([]options2.Column, len(result.GetColumns()))
+	cs := make([]options.Column, len(result.GetColumns()))
 	for i, c := range result.Columns {
-		cs[i] = options2.Column{
+		cs[i] = options.Column{
 			Name:   c.GetName(),
 			Type:   internal.TypeFromYDB(c.GetType()),
 			Family: c.GetFamily(),
 		}
 	}
 
-	rs := make([]options2.KeyRange, len(result.GetShardKeyBounds())+1)
+	rs := make([]options.KeyRange, len(result.GetShardKeyBounds())+1)
 	var last types.Value
 	for i, b := range result.GetShardKeyBounds() {
 		if last != nil {
@@ -325,10 +323,10 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		rs[i].From = last
 	}
 
-	var stats *options2.TableStats
+	var stats *options.TableStats
 	if result.GetTableStats() != nil {
 		resStats := result.GetTableStats()
-		partStats := make([]options2.PartitionStats, len(result.GetTableStats().GetPartitionStats()))
+		partStats := make([]options.PartitionStats, len(result.GetTableStats().GetPartitionStats()))
 		for i, v := range result.TableStats.PartitionStats {
 			partStats[i].RowsEstimate = v.GetRowsEstimate()
 			partStats[i].StoreSize = v.GetStoreSize()
@@ -341,7 +339,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 			modificationTime = time.Unix(resStats.GetModificationTime().GetSeconds(), int64(resStats.GetModificationTime().GetNanos()))
 		}
 
-		stats = &options2.TableStats{
+		stats = &options.TableStats{
 			PartitionStats:   partStats,
 			RowsEstimate:     resStats.GetRowsEstimate(),
 			StoreSize:        resStats.GetStoreSize(),
@@ -351,9 +349,9 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		}
 	}
 
-	cf := make([]options2.ColumnFamily, len(result.GetColumnFamilies()))
+	cf := make([]options.ColumnFamily, len(result.GetColumnFamilies()))
 	for i, c := range result.GetColumnFamilies() {
-		cf[i] = options2.NewColumnFamily(c)
+		cf[i] = options.NewColumnFamily(c)
 	}
 
 	attrs := make(map[string]string, len(result.GetAttributes()))
@@ -361,16 +359,16 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		attrs[k] = v
 	}
 
-	indexes := make([]options2.IndexDescription, len(result.Indexes))
+	indexes := make([]options.IndexDescription, len(result.Indexes))
 	for i, idx := range result.GetIndexes() {
-		indexes[i] = options2.IndexDescription{
+		indexes[i] = options.IndexDescription{
 			Name:         idx.GetName(),
 			IndexColumns: idx.GetIndexColumns(),
 			Status:       idx.GetStatus(),
 		}
 	}
 
-	return options2.Description{
+	return options.Description{
 		Name:                 result.GetSelf().GetName(),
 		PrimaryKey:           result.GetPrimaryKey(),
 		Columns:              cs,
@@ -378,50 +376,50 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		Stats:                stats,
 		ColumnFamilies:       cf,
 		Attributes:           attrs,
-		ReadReplicaSettings:  options2.NewReadReplicasSettings(result.GetReadReplicasSettings()),
-		StorageSettings:      options2.NewStorageSettings(result.GetStorageSettings()),
+		ReadReplicaSettings:  options.NewReadReplicasSettings(result.GetReadReplicasSettings()),
+		StorageSettings:      options.NewStorageSettings(result.GetStorageSettings()),
 		KeyBloomFilter:       internal.FeatureFlagFromYDB(result.GetKeyBloomFilter()),
-		PartitioningSettings: options2.NewPartitioningSettings(result.GetPartitioningSettings()),
+		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
 		Indexes:              indexes,
-		TimeToLiveSettings:   options2.NewTimeToLiveSettings(result.GetTtlSettings()),
+		TimeToLiveSettings:   options.NewTimeToLiveSettings(result.GetTtlSettings()),
 	}, nil
 }
 
 // DropTable drops table at given path with given options.
-func (s *Session) DropTable(ctx context.Context, path string, opts ...options2.DropTableOption) (err error) {
+func (s *Session) DropTable(ctx context.Context, path string, opts ...options.DropTableOption) (err error) {
 	request := Ydb_Table.DropTableRequest{
 		SessionId: s.ID,
 		Path:      path,
 	}
 	for _, opt := range opts {
-		opt((*options2.DropTableDesc)(&request))
+		opt((*options.DropTableDesc)(&request))
 	}
 	_, err = s.tableService.DropTable(ctx, &request)
 	return err
 }
 
 // AlterTable modifies schema of table at given path with given options.
-func (s *Session) AlterTable(ctx context.Context, path string, opts ...options2.AlterTableOption) (err error) {
+func (s *Session) AlterTable(ctx context.Context, path string, opts ...options.AlterTableOption) (err error) {
 	request := Ydb_Table.AlterTableRequest{
 		SessionId: s.ID,
 		Path:      path,
 	}
 	for _, opt := range opts {
-		opt((*options2.AlterTableDesc)(&request))
+		opt((*options.AlterTableDesc)(&request))
 	}
 	_, err = s.tableService.AlterTable(ctx, &request)
 	return err
 }
 
 // CopyTable creates copy of table at given path.
-func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...options2.CopyTableOption) (err error) {
+func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...options.CopyTableOption) (err error) {
 	request := Ydb_Table.CopyTableRequest{
 		SessionId:       s.ID,
 		SourcePath:      src,
 		DestinationPath: dst,
 	}
 	for _, opt := range opts {
-		opt((*options2.CopyTableDesc)(&request))
+		opt((*options.CopyTableDesc)(&request))
 	}
 	_, err = s.tableService.CopyTable(ctx, &request)
 	return err
@@ -471,7 +469,7 @@ type Statement struct {
 func (s *Statement) Execute(
 	ctx context.Context, tx *TransactionControl,
 	params *QueryParameters,
-	opts ...options2.ExecuteDataQueryOption,
+	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr *Transaction, r resultset.Result, err error,
 ) {
@@ -486,7 +484,7 @@ func (s *Statement) Execute(
 func (s *Statement) execute(
 	ctx context.Context, tx *TransactionControl,
 	params *QueryParameters,
-	opts ...options2.ExecuteDataQueryOption,
+	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr *Transaction, r resultset.Result, err error,
 ) {
@@ -554,7 +552,7 @@ func (s *Session) Execute(
 	tx *TransactionControl,
 	query string,
 	params *QueryParameters,
-	opts ...options2.ExecuteDataQueryOption,
+	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr *Transaction, r resultset.Result, err error,
 ) {
@@ -606,7 +604,7 @@ func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (*Transa
 func (s *Session) executeDataQuery(
 	ctx context.Context, tx *TransactionControl,
 	query *DataQuery, params *QueryParameters,
-	opts ...options2.ExecuteDataQueryOption,
+	opts ...options.ExecuteDataQueryOption,
 ) (
 	request *Ydb_Table.ExecuteDataQueryRequest,
 	result *Ydb_Table.ExecuteQueryResult,
@@ -623,7 +621,7 @@ func (s *Session) executeDataQuery(
 		Query:      &query.query,
 	}
 	for _, opt := range opts {
-		opt((*options2.ExecuteDataQueryDesc)(request))
+		opt((*options.ExecuteDataQueryDesc)(request))
 	}
 	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
@@ -639,21 +637,21 @@ func (s *Session) executeDataQuery(
 // ExecuteSchemeQuery executes scheme query.
 func (s *Session) ExecuteSchemeQuery(
 	ctx context.Context, query string,
-	opts ...options2.ExecuteSchemeQueryOption,
+	opts ...options.ExecuteSchemeQueryOption,
 ) (err error) {
 	request := Ydb_Table.ExecuteSchemeQueryRequest{
 		SessionId: s.ID,
 		YqlText:   query,
 	}
 	for _, opt := range opts {
-		opt((*options2.ExecuteSchemeQueryDesc)(&request))
+		opt((*options.ExecuteSchemeQueryDesc)(&request))
 	}
 	_, err = s.tableService.ExecuteSchemeQuery(ctx, &request)
 	return err
 }
 
 // DescribeTableOptions describes supported table options.
-func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.TableOptionsDescription, err error) {
+func (s *Session) DescribeTableOptions(ctx context.Context) (desc options.TableOptionsDescription, err error) {
 	var (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult
@@ -668,9 +666,9 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.Table
 		return
 	}
 	{
-		xs := make([]options2.TableProfileDescription, len(result.GetTableProfilePresets()))
+		xs := make([]options.TableProfileDescription, len(result.GetTableProfilePresets()))
 		for i, p := range result.GetTableProfilePresets() {
-			xs[i] = options2.TableProfileDescription{
+			xs[i] = options.TableProfileDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
 
@@ -692,9 +690,9 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.Table
 		desc.TableProfilePresets = xs
 	}
 	{
-		xs := make([]options2.StoragePolicyDescription, len(result.GetStoragePolicyPresets()))
+		xs := make([]options.StoragePolicyDescription, len(result.GetStoragePolicyPresets()))
 		for i, p := range result.GetStoragePolicyPresets() {
-			xs[i] = options2.StoragePolicyDescription{
+			xs[i] = options.StoragePolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
 			}
@@ -702,9 +700,9 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.Table
 		desc.StoragePolicyPresets = xs
 	}
 	{
-		xs := make([]options2.CompactionPolicyDescription, len(result.GetCompactionPolicyPresets()))
+		xs := make([]options.CompactionPolicyDescription, len(result.GetCompactionPolicyPresets()))
 		for i, p := range result.GetCompactionPolicyPresets() {
-			xs[i] = options2.CompactionPolicyDescription{
+			xs[i] = options.CompactionPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
 			}
@@ -712,9 +710,9 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.Table
 		desc.CompactionPolicyPresets = xs
 	}
 	{
-		xs := make([]options2.PartitioningPolicyDescription, len(result.GetPartitioningPolicyPresets()))
+		xs := make([]options.PartitioningPolicyDescription, len(result.GetPartitioningPolicyPresets()))
 		for i, p := range result.GetPartitioningPolicyPresets() {
-			xs[i] = options2.PartitioningPolicyDescription{
+			xs[i] = options.PartitioningPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
 			}
@@ -722,9 +720,9 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.Table
 		desc.PartitioningPolicyPresets = xs
 	}
 	{
-		xs := make([]options2.ExecutionPolicyDescription, len(result.GetExecutionPolicyPresets()))
+		xs := make([]options.ExecutionPolicyDescription, len(result.GetExecutionPolicyPresets()))
 		for i, p := range result.GetExecutionPolicyPresets() {
-			xs[i] = options2.ExecutionPolicyDescription{
+			xs[i] = options.ExecutionPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
 			}
@@ -732,9 +730,9 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.Table
 		desc.ExecutionPolicyPresets = xs
 	}
 	{
-		xs := make([]options2.ReplicationPolicyDescription, len(result.GetReplicationPolicyPresets()))
+		xs := make([]options.ReplicationPolicyDescription, len(result.GetReplicationPolicyPresets()))
 		for i, p := range result.GetReplicationPolicyPresets() {
-			xs[i] = options2.ReplicationPolicyDescription{
+			xs[i] = options.ReplicationPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
 			}
@@ -742,9 +740,9 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.Table
 		desc.ReplicationPolicyPresets = xs
 	}
 	{
-		xs := make([]options2.CachingPolicyDescription, len(result.GetCachingPolicyPresets()))
+		xs := make([]options.CachingPolicyDescription, len(result.GetCachingPolicyPresets()))
 		for i, p := range result.GetCachingPolicyPresets() {
-			xs[i] = options2.CachingPolicyDescription{
+			xs[i] = options.CachingPolicyDescription{
 				Name:   p.GetName(),
 				Labels: p.GetLabels(),
 			}
@@ -759,7 +757,7 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options2.Table
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextSet() calls.
-func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...options2.ReadTableOption) (_ resultset.Result, err error) {
+func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ resultset.Result, err error) {
 	var (
 		request = Ydb_Table.ReadTableRequest{
 			SessionId: s.ID,
@@ -769,7 +767,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		client   Ydb_Table_V1.TableService_StreamReadTableClient
 	)
 	for _, opt := range opts {
-		opt((*options2.ReadTableDesc)(&request))
+		opt((*options.ReadTableDesc)(&request))
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -825,7 +823,7 @@ func (s *Session) StreamExecuteScanQuery(
 	ctx context.Context,
 	query string,
 	params *QueryParameters,
-	opts ...options2.ExecuteScanQueryOption,
+	opts ...options.ExecuteScanQueryOption,
 ) (
 	_ resultset.Result, err error,
 ) {
@@ -841,7 +839,7 @@ func (s *Session) StreamExecuteScanQuery(
 		client   Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 	)
 	for _, opt := range opts {
-		opt((*options2.ExecuteScanQueryDesc)(&request))
+		opt((*options.ExecuteScanQueryDesc)(&request))
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -944,7 +942,7 @@ type Transaction struct {
 func (tx *Transaction) Execute(
 	ctx context.Context,
 	query string, params *QueryParameters,
-	opts ...options2.ExecuteDataQueryOption,
+	opts ...options.ExecuteDataQueryOption,
 ) (r resultset.Result, err error) {
 	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
 	return
@@ -954,14 +952,14 @@ func (tx *Transaction) Execute(
 func (tx *Transaction) ExecuteStatement(
 	ctx context.Context,
 	stmt *Statement, params *QueryParameters,
-	opts ...options2.ExecuteDataQueryOption,
+	opts ...options.ExecuteDataQueryOption,
 ) (r resultset.Result, err error) {
 	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
 	return
 }
 
 // CommitTx commits specified active transaction.
-func (tx *Transaction) CommitTx(ctx context.Context, opts ...options2.CommitTransactionOption) (r resultset.Result, err error) {
+func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r resultset.Result, err error) {
 	//commitTransactionDone := table.clientTraceOnCommitTransaction(tx.s.c.sessiontrace, ctx, tx.s, tx.id)
 	//defer func() {
 	//	commitTransactionDone(ctx, tx.s, tx.id, err)
@@ -975,7 +973,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options2.CommitTran
 		result   = new(Ydb_Table.CommitTransactionResult)
 	)
 	for _, opt := range opts {
-		opt((*options2.CommitTransactionDesc)(request))
+		opt((*options.CommitTransactionDesc)(request))
 	}
 	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)

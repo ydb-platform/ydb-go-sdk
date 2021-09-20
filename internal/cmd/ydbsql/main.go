@@ -69,13 +69,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	/*err = describeTableOptions(ctx, db)
+	cl, err := getClient(ctx, db)
+
+	err = describeTableOptions(ctx, cl)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "describe table options error: %v\n", err)
 		os.Exit(1)
-	}*/
+	}
 
-	cl, err := getClient(ctx, db)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "get client error: %v\n", err)
 		os.Exit(1)
@@ -86,13 +87,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	/*err = describeTable(ctx, db, path.Join(
+	err = describeTable(ctx, cl, path.Join(
 		connectParams.Database(), "series",
 	))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "describe table error: %v\n", err)
 		os.Exit(1)
-	}*/
+	}
 
 	err = fillTablesWithData(ctx, cl, connectParams.Database())
 	if err != nil {
