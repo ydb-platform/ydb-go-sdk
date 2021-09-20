@@ -8,9 +8,7 @@ import (
 	"time"
 )
 
-type Driver interface {
-	cluster.Cluster
-
+type Config interface {
 	RequestTimeout() time.Duration
 	OperationTimeout() time.Duration
 	OperationCancelAfter() time.Duration
@@ -18,4 +16,5 @@ type Driver interface {
 	Trace(ctx context.Context) trace.DriverTrace
 	Pessimize(addr cluster.Addr) error
 	StreamTimeout() time.Duration
+	ConnectionTLL() time.Duration
 }

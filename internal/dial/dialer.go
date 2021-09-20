@@ -5,18 +5,13 @@ import (
 	"crypto/tls"
 	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pem"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 	"net"
 	"strconv"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -60,7 +55,7 @@ type Dialer struct {
 }
 
 // Dial dials given addr and initializes driver instance on success.
-func (d *Dialer) Dial(ctx context.Context, addr string) (_ conn.Driver, err error) {
+func (d *Dialer) Dial(ctx context.Context, addr string) (_ cluster2.Cluster, err error) {
 	config := d.DriverConfig.WithDefaults()
 	grpcKeepalive := d.Keepalive
 	if grpcKeepalive == 0 {
@@ -100,12 +95,10 @@ type dialer struct {
 	meta      meta.Meta
 }
 
-func (d *dialer) dial(ctx context.Context, addr string) (_ conn.Driver, err error) {
+func (d *dialer) dial(ctx context.Context, addr string) (_ cluster2.Cluster, err error) {
 	endpoint := d.endpointByAddr(addr)
 	c := cluster.New(
 		d.dialHostPort,
-		d.config.ConnectionTTL,
-		d.config.Trace,
 		func() balancer.Balancer {
 			if d.config.DiscoveryInterval == 0 {
 				return balancer.Single()
@@ -139,71 +132,9 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ conn.Driver, err erro
 		return nil, err
 	}
 	if d.config.DiscoveryInterval > 0 {
-		discoveryClient := discovery.New(conn, d.config.Database, d.useTLS())
-
-		curr, err := discoveryClient.Discover(ctx)
-		if err != nil {
+		if err := d.discover(ctx, c, conn, driver); err != nil {
 			return nil, err
 		}
-		// Endpoints must be sorted to merge
-		cluster.SortEndpoints(curr)
-		wg := wg.New()
-		wg.Add(len(curr))
-		for _, e := range curr {
-			go c.Insert(ctx, e, cluster.WithWG(wg))
-		}
-		if d.config.FastDial {
-			wg.WaitFirst()
-		} else {
-			wg.Wait()
-		}
-		c.SetExplorer(
-			repeater.NewRepeater(
-				d.config.DiscoveryInterval,
-				func(ctx context.Context) {
-					next, err := discoveryClient.Discover(ctx)
-					if err != nil {
-						return
-					}
-					// if nothing endpoint - re-discover after one second
-					// and use old endpoint list
-					if len(next) == 0 {
-						go func() {
-							time.Sleep(time.Second)
-							c.Force()
-
-						}()
-						return
-					}
-					// NOTE: curr endpoints must be sorted here.
-					cluster.SortEndpoints(next)
-
-					wg := new(sync.WaitGroup)
-					max := len(next) + len(curr)
-					wg.Add(max) // set to max possible amount
-					actual := 0
-					cluster.DiffEndpoints(curr, next,
-						func(i, j int) {
-							actual++
-							// Endpoints are equal, but we still need to update meta
-							// data such that load factor and others.
-							go c.Update(ctx, next[j], cluster.WithWG(wg))
-						},
-						func(i, j int) {
-							actual++
-							go c.Insert(ctx, next[j], cluster.WithWG(wg))
-						},
-						func(i, j int) {
-							actual++
-							go c.Remove(ctx, curr[i], cluster.WithWG(wg))
-						},
-					)
-					wg.Add(actual - max) // adjust
-					wg.Wait()
-					curr = next
-				},
-			),
-		)
 	}
 	return driver, nil
 }

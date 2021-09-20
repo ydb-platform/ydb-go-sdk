@@ -42,10 +42,8 @@ var (
 
 type cluster struct {
 	dial     func(context.Context, string, int) (*grpc.ClientConn, error)
-	ttl      time.Duration
 	balancer balancer.Balancer
 	explorer repeater.Repeater
-	trace    trace.DriverTrace
 
 	mu    sync.RWMutex
 	once  sync.Once
@@ -88,15 +86,11 @@ type Cluster interface {
 
 func New(
 	dial func(context.Context, string, int) (*grpc.ClientConn, error),
-	ttl time.Duration,
-	trace trace.DriverTrace,
 	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
 		index:    make(map[cluster2.Addr]entry.Entry),
 		dial:     dial,
-		ttl:      ttl,
-		trace:    trace,
 		balancer: balancer,
 	}
 }
@@ -243,7 +237,8 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 }
 
 type options struct {
-	wg wg.WG
+	wg         wg.WG
+	connConfig conn.Config
 }
 
 type option func(options *options)
@@ -251,6 +246,12 @@ type option func(options *options)
 func WithWG(wg wg.WG) option {
 	return func(options *options) {
 		options.wg = wg
+	}
+}
+
+func WithConnConfig(connConfig conn.Config) option {
+	return func(options *options) {
+		options.connConfig = connConfig
 	}
 }
 
@@ -271,7 +272,7 @@ func (c *cluster) Insert(ctx context.Context, e cluster2.Endpoint, opts ...optio
 		LoadFactor: e.LoadFactor,
 		Local:      e.Local,
 	}
-	conn := conn.New(addr, c.dial, c.ttl)
+	conn := conn.New(addr, c.dial, opt.connConfig)
 	var wait chan struct{}
 	defer func() {
 		if wait != nil {
