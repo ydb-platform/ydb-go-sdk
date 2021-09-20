@@ -4,16 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
@@ -30,12 +29,12 @@ func TestConnectorDialOnPing(t *testing.T) {
 		_ = server.Close()
 	}()
 
-	dial := make(chan struct{})
+	dialCh := make(chan struct{})
 	c := Connector(
 		WithEndpoint("127.0.0.1:9999"),
 		WithDialer(dial.Dialer{
 			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
-				dial <- struct{}{}
+				dialCh <- struct{}{}
 				return client, nil
 			},
 			DriverConfig: &config.Config{
@@ -47,7 +46,7 @@ func TestConnectorDialOnPing(t *testing.T) {
 
 	db := sql.OpenDB(c)
 	select {
-	case <-dial:
+	case <-dialCh:
 		t.Fatalf("unexpected dial")
 	case <-time.After(timeout):
 	}
@@ -59,7 +58,7 @@ func TestConnectorDialOnPing(t *testing.T) {
 	}()
 
 	select {
-	case <-dial:
+	case <-dialCh:
 	case <-time.After(timeout):
 		t.Fatalf("no dial after %s", timeout)
 	}
@@ -75,12 +74,12 @@ func TestConnectorRedialOnError(t *testing.T) {
 	}()
 	success := make(chan bool, 1)
 
-	dial := false
+	dialFlag := false
 	c := Connector(
 		WithEndpoint("127.0.0.1:9999"),
 		WithDialer(dial.Dialer{
 			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
-				dial = true
+				dialFlag = true
 				select {
 				case <-success:
 					// it will still fails on grpc dial
@@ -94,14 +93,13 @@ func TestConnectorRedialOnError(t *testing.T) {
 			},
 		}),
 		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorRedialOnError")),
-		WithDefaultTxControl(scanner.TxControl(
-			scanner.BeginTx(
-				scanner.WithStaleReadOnly(),
+		WithDefaultTxControl(table.TxControl(
+			table.BeginTx(
+				table.WithStaleReadOnly(),
 			),
-			scanner.CommitTx()),
+			table.CommitTx()),
 		),
 	)
-
 	db := sql.OpenDB(c)
 	for i := 0; i < 3; i++ {
 		success <- i%2 == 0
@@ -112,10 +110,10 @@ func TestConnectorRedialOnError(t *testing.T) {
 			}
 		}()
 		_ = db.PingContext(ctx)
-		if !dial {
+		if !dialFlag {
 			t.Fatalf("no dial on re-ping at %v iteration", i)
 		}
-		dial = false
+		dialFlag = false
 	}
 }
 
@@ -162,7 +160,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 
 			c := Connector(
 				WithClient(
-					table2.NewClient(
+					table.NewClient(
 						testutil.NewDB(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
@@ -177,7 +175,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 									},
 								},
 							),
-						),
+						), table.Config{},
 					),
 				),
 				WithDefaultExecDataQueryOption(options.WithQueryCachePolicy(test.queryCachePolicyOption...)),

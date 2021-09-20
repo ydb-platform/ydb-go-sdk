@@ -7,13 +7,26 @@ import (
 	"os"
 	"path"
 	"sync"
-	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ydbsql"
 )
+
+func getClient(ctx context.Context, db *sql.DB) (table.Client, error) {
+	drv, ok := db.Driver().(*ydbsql.Driver)
+	if !ok {
+		return nil, fmt.Errorf("unexpected driver type")
+	}
+	client, err := drv.Unwrap(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get client: %w", err)
+	}
+	return client, nil
+}
 
 func main() {
 	connectParams := ydb.MustConnectionString(os.Getenv("YDB"))
@@ -56,27 +69,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = describeTableOptions(ctx, db)
+	/*err = describeTableOptions(ctx, db)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "describe table options error: %v\n", err)
 		os.Exit(1)
-	}
+	}*/
 
-	err = createTables(ctx, db, connectParams.Database())
+	cl, err := getClient(ctx, db)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "get client error: %v\n", err)
+		os.Exit(1)
+	}
+	err = createTables(ctx, cl, connectParams.Database())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "create tables error: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = describeTable(ctx, db, path.Join(
+	/*err = describeTable(ctx, db, path.Join(
 		connectParams.Database(), "series",
 	))
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "describe table error: %v\n", err)
 		os.Exit(1)
-	}
+	}*/
 
-	err = fillTablesWithData(ctx, db, connectParams.Database())
+	err = fillTablesWithData(ctx, cl, connectParams.Database())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "fill tables with data error: %v\n", err)
 		os.Exit(1)
@@ -88,12 +106,12 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			err = selectSimple(ctx, db, connectParams.Database())
+			err = selectSimple(ctx, cl, connectParams.Database())
 			if err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
 			}
 
-			err = scanQuerySelect(ctx, db, connectParams.Database())
+			err = scanQuerySelect(ctx, cl, connectParams.Database())
 			if err != nil {
 				if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
 					_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
