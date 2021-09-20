@@ -4,9 +4,8 @@ package sessiontrace
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 

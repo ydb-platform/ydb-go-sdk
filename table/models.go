@@ -1,7 +1,7 @@
 package table
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 

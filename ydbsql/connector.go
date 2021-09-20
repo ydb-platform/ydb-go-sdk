@@ -2,12 +2,13 @@ package ydbsql
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql/driver"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"sync"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
 	sessiontrace "github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 
@@ -38,6 +39,25 @@ func WithClient(client table.Client) ConnectorOption {
 	return func(c *connector) {
 		c.client = client
 	}
+}
+
+func WithConnectParams(params ydb.ConnectParams) ConnectorOption {
+	return func(c *connector) {
+		c.endpoint = params.Endpoint()
+		if c.dialer.DriverConfig == nil {
+			c.dialer.DriverConfig = &config.Config{}
+		}
+		c.dialer.DriverConfig.Database = params.Database()
+		if params.UseTLS() {
+			c.dialer.TLSConfig = &tls.Config{}
+		} else {
+			c.dialer.TLSConfig = nil
+		}
+	}
+}
+
+func WithConnectionString(connection string) ConnectorOption {
+	return WithConnectParams(ydb.MustConnectionString(connection))
 }
 
 func WithEndpoint(addr string) ConnectorOption {

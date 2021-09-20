@@ -4,11 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"net"
 	"testing"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 

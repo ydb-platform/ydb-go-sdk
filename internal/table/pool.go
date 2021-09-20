@@ -4,10 +4,9 @@ import (
 	"container/list"
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"sync"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"

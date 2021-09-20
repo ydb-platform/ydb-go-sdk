@@ -1,9 +1,8 @@
 package table
 
 import (
+	options2 "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
@@ -19,8 +18,8 @@ var (
 
 func TestSessionOptionsProfile(t *testing.T) {
 	{
-		opt := options.WithProfile(
-			options.WithProfilePreset(abc),
+		opt := options2.WithProfile(
+			options2.WithProfilePreset(abc),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*scanner.createTableDesc)(&req))
@@ -29,8 +28,8 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := options.WithProfile(
-			options.WithCompactionPolicy(options.WithCompactionPolicyPreset(abc)),
+		opt := options2.WithProfile(
+			options2.WithCompactionPolicy(options2.WithCompactionPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*scanner.createTableDesc)(&req))
@@ -39,10 +38,10 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := options.WithProfile(
-			options.WithPartitioningPolicy(
-				options.WithPartitioningPolicyPreset(abc),
-				options.WithPartitioningPolicyMode(PartitioningAutoSplit),
+		opt := options2.WithProfile(
+			options2.WithPartitioningPolicy(
+				options2.WithPartitioningPolicyPreset(abc),
+				options2.WithPartitioningPolicyMode(PartitioningAutoSplit),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -53,9 +52,9 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := options.WithProfile(
-			options.WithPartitioningPolicy(
-				options.WithPartitioningPolicyUniformPartitions(3),
+		opt := options2.WithProfile(
+			options2.WithPartitioningPolicy(
+				options2.WithPartitioningPolicyUniformPartitions(3),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -66,9 +65,9 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := options.WithProfile(
-			options.WithPartitioningPolicy(
-				options.WithPartitioningPolicyExplicitPartitions(types.Int64Value(1)),
+		opt := options2.WithProfile(
+			options2.WithPartitioningPolicy(
+				options2.WithPartitioningPolicyExplicitPartitions(types.Int64Value(1)),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -83,8 +82,8 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := options.WithProfile(
-			options.WithExecutionPolicy(options.WithExecutionPolicyPreset(abc)),
+		opt := options2.WithProfile(
+			options2.WithExecutionPolicy(options2.WithExecutionPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*scanner.createTableDesc)(&req))
@@ -93,12 +92,12 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := options.WithProfile(
-			options.WithReplicationPolicy(
-				options.WithReplicationPolicyPreset(abc),
-				options.WithReplicationPolicyReplicasCount(3),
-				options.WithReplicationPolicyCreatePerAZ(options.FeatureEnabled),
-				options.WithReplicationPolicyAllowPromotion(options.FeatureDisabled),
+		opt := options2.WithProfile(
+			options2.WithReplicationPolicy(
+				options2.WithReplicationPolicyPreset(abc),
+				options2.WithReplicationPolicyReplicasCount(3),
+				options2.WithReplicationPolicyCreatePerAZ(options2.FeatureEnabled),
+				options2.WithReplicationPolicyAllowPromotion(options2.FeatureDisabled),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -112,8 +111,8 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := options.WithProfile(
-			options.WithCachingPolicy(options.WithCachingPolicyPreset(abc)),
+		opt := options2.WithProfile(
+			options2.WithCachingPolicy(options2.WithCachingPolicyPreset(abc)),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt((*scanner.createTableDesc)(&req))
@@ -125,14 +124,14 @@ func TestSessionOptionsProfile(t *testing.T) {
 
 func TestStoragePolicyOptions(t *testing.T) {
 	{
-		opt := options.WithProfile(
-			options.WithStoragePolicy(
-				options.WithStoragePolicyPreset(abc),
-				options.WithStoragePolicySyslog("any1"),
-				options.WithStoragePolicyLog("any2"),
-				options.WithStoragePolicyData("any3"),
-				options.WithStoragePolicyExternal("any4"),
-				options.WithStoragePolicyKeepInMemory(options.FeatureEnabled),
+		opt := options2.WithProfile(
+			options2.WithStoragePolicy(
+				options2.WithStoragePolicyPreset(abc),
+				options2.WithStoragePolicySyslog("any1"),
+				options2.WithStoragePolicyLog("any2"),
+				options2.WithStoragePolicyData("any3"),
+				options2.WithStoragePolicyExternal("any4"),
+				options2.WithStoragePolicyKeepInMemory(options2.FeatureEnabled),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -160,7 +159,7 @@ func TestAlterTableOptions(t *testing.T) {
 		}
 	}
 	{
-		column := options.Column{
+		column := options2.Column{
 			Name:   "a",
 			Type:   types.TypeBool,
 			Family: "b",
@@ -191,7 +190,7 @@ func TestAlterTableOptions(t *testing.T) {
 				Media: "ssd",
 			},
 			Compression:  ColumnFamilyCompressionLZ4,
-			KeepInMemory: options.FeatureEnabled,
+			KeepInMemory: options2.FeatureEnabled,
 		}
 		opt := WithAlterColumnFamilies(cf)
 		req := Ydb_Table.AlterTableRequest{}

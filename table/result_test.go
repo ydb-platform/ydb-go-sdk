@@ -3,10 +3,9 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"reflect"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 

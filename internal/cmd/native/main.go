@@ -44,7 +44,7 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)
 		os.Exit(1)
 	}
-	//defer func() { _ = db.Close() }()
+	defer func() { _ = db.Close() }()
 
 	err = db.Scheme().CleanupDatabase(ctx, connectParams.Database(), "series", "episodes", "seasons")
 	if err != nil {

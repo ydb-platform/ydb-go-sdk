@@ -37,10 +37,18 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+func NewAuthTokenCredentials(accessToken string) credentials.Credentials {
+	return credentials.NewAuthTokenCredentials(accessToken, "connect.NewAuthTokenCredentials(accessToken)") // hide access token for logs
+}
+
 func WithAnonymousCredentials() Option {
 	return WithCredentials(
 		credentials.NewAnonymousCredentials("connect.WithAnonymousCredentials()"),
 	)
+}
+
+func NewAnonymousCredentials() credentials.Credentials {
+	return credentials.NewAnonymousCredentials("connect.NewAnonymousCredentials()")
 }
 
 func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (icredentials.Credentials, error)) Option {

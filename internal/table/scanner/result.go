@@ -5,12 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"io"
 	"math"
 	"reflect"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/options"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"

@@ -66,6 +66,9 @@ func EndpointDatabase(endpoint string, database string, tls bool) ConnectParams 
 }
 
 func ConnectionString(uri string) (ConnectParams, error) {
+	if uri == "" {
+		return nil, fmt.Errorf("empty uri")
+	}
 	schema, endpoint, database, err := parseConnectionString(uri)
 	if err != nil {
 		return nil, err
