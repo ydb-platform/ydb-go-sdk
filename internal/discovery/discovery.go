@@ -14,11 +14,11 @@ type Client interface {
 	Discover(ctx context.Context) ([]cluster.Endpoint, error)
 }
 
-func New(conn grpc.ClientConnInterface, database string, tls bool) Client {
+func New(conn grpc.ClientConnInterface, database string, ssl bool) Client {
 	return &client{
 		discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(conn),
 		database:         database,
-		ssl:              tls,
+		ssl:              ssl,
 	}
 }
 

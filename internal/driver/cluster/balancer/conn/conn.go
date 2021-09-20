@@ -2,13 +2,13 @@ package conn
 
 import (
 	"context"
-	"sync"
-	"time"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"math"
+	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -28,7 +28,6 @@ type Conn interface {
 	Addr() cluster.Addr
 	Runtime() runtime.Runtime
 	Close() error
-	SetDriver(d Driver)
 }
 
 func (c *conn) Address() string {
@@ -43,17 +42,10 @@ type conn struct {
 	runtime runtime.Runtime
 	done    chan struct{}
 
-	driver Driver
+	config Config
 
 	timer    timeutil.Timer
-	ttl      time.Duration
 	grpcConn *grpc.ClientConn
-}
-
-func (c *conn) SetDriver(d Driver) {
-	c.Lock()
-	c.driver = d
-	c.Unlock()
 }
 
 func (c *conn) Addr() cluster.Addr {
@@ -74,7 +66,7 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 		}
 		c.grpcConn = raw
 	}
-	c.timer.Reset(c.ttl)
+	c.timer.Reset(c.config.ConnectionTLL())
 	return c.grpcConn, nil
 }
 
@@ -93,6 +85,7 @@ func (c *conn) IsReady() bool {
 }
 
 func (c *conn) waitClose() {
+	c.timer.Reset(c.config.ConnectionTLL())
 	for {
 		select {
 		case <-c.done:
@@ -123,7 +116,7 @@ func (c *conn) Close() error {
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
-	c.driver.Trace(ctx).OnPessimization(
+	c.config.Trace(ctx).OnPessimization(
 		trace.PessimizationStartInfo{
 			Context: ctx,
 			Address: c.Addr().String(),
@@ -131,7 +124,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 		},
 	)(
 		trace.PessimizationDoneInfo{
-			Error: c.driver.Pessimize(c.addr),
+			Error: c.config.Pessimize(c.addr),
 		},
 	)
 
@@ -143,7 +136,7 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		opId   string
 		issues []*Ydb_Issue.IssueMessage
 	)
-	if t := c.driver.RequestTimeout(); t > 0 {
+	if t := c.config.RequestTimeout(); t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
 	}
 	defer func() {
@@ -151,16 +144,16 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 			cancel()
 		}
 	}()
-	if t := c.driver.OperationTimeout(); t > 0 {
+	if t := c.config.OperationTimeout(); t > 0 {
 		ctx = operation.WithOperationTimeout(ctx, t)
 	}
-	if t := c.driver.OperationCancelAfter(); t > 0 {
+	if t := c.config.OperationCancelAfter(); t > 0 {
 		ctx = operation.WithOperationCancelAfter(ctx, t)
 	}
 
 	// Get credentials (token actually) for the request.
 	var md metadata.MD
-	md, err = c.driver.Meta(ctx)
+	md, err = c.config.Meta(ctx)
 	if err != nil {
 		return
 	}
@@ -175,7 +168,7 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 
 	start := timeutil.Now()
 	c.runtime.OperationStart(start)
-	t := c.driver.Trace(ctx)
+	t := c.config.Trace(ctx)
 	if t.OnOperation != nil {
 		operationDone := t.OnOperation(
 			trace.OperationStartInfo{
@@ -241,7 +234,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	rawCtx := ctx
 
 	var cancel context.CancelFunc
-	if t := c.driver.StreamTimeout(); t > 0 {
+	if t := c.config.StreamTimeout(); t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer func() {
 			if err != nil {
@@ -251,7 +244,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	// Get credentials (token actually) for the request.
-	md, err := c.driver.Meta(ctx)
+	md, err := c.config.Meta(ctx)
 	if err != nil {
 		return
 	}
@@ -260,7 +253,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	c.runtime.StreamStart(timeutil.Now())
-	t := c.driver.Trace(ctx)
+	t := c.config.Trace(ctx)
 	var streamRecv func(trace.StreamRecvDoneInfo) func(trace.StreamDoneInfo)
 	if t.OnStream != nil {
 		streamRecv = t.OnStream(trace.StreamStartInfo{
@@ -298,18 +291,17 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}, nil
 }
 
-func New(addr cluster.Addr, dial func(context.Context, string, int) (*grpc.ClientConn, error), ttl time.Duration) Conn {
-	if ttl <= 0 {
-		ttl = time.Minute
-	}
+func New(addr cluster.Addr, dial func(context.Context, string, int) (*grpc.ClientConn, error), cfg Config) Conn {
 	c := &conn{
 		addr:    addr,
 		dial:    dial,
-		ttl:     ttl,
-		timer:   timeutil.NewTimer(ttl),
+		config:  cfg,
+		timer:   timeutil.NewTimer(time.Duration(math.MaxInt64)),
 		done:    make(chan struct{}),
 		runtime: runtime.New(),
 	}
-	go c.waitClose()
+	if cfg.ConnectionTLL() > 0 {
+		go c.waitClose()
+	}
 	return c
 }

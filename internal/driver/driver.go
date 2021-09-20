@@ -36,7 +36,7 @@ func New(
 	pessimize func(addr cluster.Addr) error,
 	stats func(it func(cluster.Endpoint, stats.Stats)),
 	close func() error,
-) conn.Driver {
+) *driver {
 	return &driver{
 		Config:           config,
 		meta:             meta,
@@ -73,4 +73,8 @@ func (d *driver) Pessimize(addr cluster.Addr) error {
 
 func (d *driver) StreamTimeout() time.Duration {
 	return d.Config.StreamTimeout
+}
+
+func (d *driver) ConnectionTLL() time.Duration {
+	return d.Config.ConnectionTTL
 }

@@ -17,7 +17,7 @@ import (
 type grpcClientStream struct {
 	ctx    context.Context
 	c      *conn
-	d      *Driver
+	d      *Config
 	method trace.Method
 	s      grpc.ClientStream
 	cancel context.CancelFunc

@@ -85,6 +85,5 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	if apply, ok := cluster.ContextClientConnApplier(rawCtx); ok {
 		apply(c)
 	}
-	c.SetDriver(d)
 	return c, err
 }
