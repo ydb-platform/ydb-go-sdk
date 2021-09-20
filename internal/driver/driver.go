@@ -9,8 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"time"
 
-	"google.golang.org/grpc/metadata"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -59,7 +57,7 @@ func (d *driver) OperationCancelAfter() time.Duration {
 	return d.Config.OperationCancelAfter
 }
 
-func (d *driver) Meta(ctx context.Context) (metadata.MD, error) {
+func (d *driver) Meta(ctx context.Context) (context.Context, error) {
 	return d.meta.Meta(ctx)
 }
 

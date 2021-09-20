@@ -21,7 +21,7 @@ const (
 )
 
 type Meta interface {
-	Meta(ctx context.Context) (md metadata.MD, err error)
+	Meta(ctx context.Context) (context.Context, error)
 }
 
 func New(
@@ -45,9 +45,9 @@ type meta struct {
 	requestsType string
 }
 
-func (m *meta) Meta(ctx context.Context) (md metadata.MD, err error) {
-	var has bool
-	if md, has = metadata.FromOutgoingContext(ctx); !has {
+func (m *meta) Meta(ctx context.Context) (_ context.Context, err error) {
+	md, has := metadata.FromOutgoingContext(ctx)
+	if !has {
 		md = metadata.MD{}
 	}
 	md.Set(metaDatabase, m.database)
@@ -80,5 +80,5 @@ func (m *meta) Meta(ctx context.Context) (md metadata.MD, err error) {
 		}
 		md.Set(metaTicket, token)
 	}
-	return md, nil
+	return metadata.NewOutgoingContext(ctx, md), nil
 }

@@ -2,11 +2,11 @@ package discovery
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"google.golang.org/grpc"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -14,11 +14,12 @@ type Client interface {
 	Discover(ctx context.Context) ([]cluster.Endpoint, error)
 }
 
-func New(conn grpc.ClientConnInterface, database string, ssl bool) Client {
+func New(conn grpc.ClientConnInterface, database string, ssl bool, meta meta.Meta) Client {
 	return &client{
 		discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(conn),
 		database:         database,
 		ssl:              ssl,
+		meta:             meta,
 	}
 }
 
@@ -26,11 +27,16 @@ type client struct {
 	discoveryService Ydb_Discovery_V1.DiscoveryServiceClient
 	database         string
 	ssl              bool
+	meta             meta.Meta
 }
 
 func (d *client) Discover(ctx context.Context) ([]cluster.Endpoint, error) {
 	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: d.database,
+	}
+	ctx, err := d.meta.Meta(ctx)
+	if err != nil {
+		return nil, err
 	}
 	response, err := d.discoveryService.ListEndpoints(ctx, &request)
 	if err != nil {

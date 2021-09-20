@@ -7,10 +7,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"google.golang.org/grpc"
 )
 
 func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
@@ -62,13 +60,9 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	rawCtx := ctx
 
 	// Get credentials (token actually) for the request.
-	var md metadata.MD
-	md, err = d.meta.Meta(ctx)
+	ctx, err = d.meta.Meta(ctx)
 	if err != nil {
 		return
-	}
-	if len(md) > 0 {
-		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
 	t := trace.ContextDriverTrace(ctx).Compose(d.Config.Trace)

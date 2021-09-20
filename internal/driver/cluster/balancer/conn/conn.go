@@ -11,12 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/metadata"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
@@ -156,13 +154,9 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 	}
 
 	// Get credentials (token actually) for the request.
-	var md metadata.MD
-	md, err = c.config.Meta(ctx)
+	ctx, err = c.config.Meta(ctx)
 	if err != nil {
 		return
-	}
-	if len(md) > 0 {
-		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
 	params := operation.ContextParams(ctx)
@@ -248,12 +242,9 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	// Get credentials (token actually) for the request.
-	md, err := c.config.Meta(ctx)
+	ctx, err = c.config.Meta(ctx)
 	if err != nil {
 		return
-	}
-	if len(md) > 0 {
-		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
 	c.runtime.StreamStart(timeutil.Now())

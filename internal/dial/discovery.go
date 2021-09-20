@@ -13,7 +13,12 @@ import (
 )
 
 func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn grpc.ClientConnInterface, connConfig conn.Config) error {
-	discoveryClient := discovery.New(conn, d.config.Database, d.useTLS())
+	discoveryClient := discovery.New(conn, d.config.Database, d.useTLS(), d.meta)
+
+	ctx, err := d.meta.Meta(ctx)
+	if err != nil {
+		return err
+	}
 
 	curr, err := discoveryClient.Discover(ctx)
 	if err != nil {
