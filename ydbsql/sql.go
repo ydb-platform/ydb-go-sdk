@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	options2 "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"io"
+
+	options2 "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 
@@ -258,7 +259,7 @@ func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryPa
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
-	c.pool().Retry(
+	err, _ = c.pool().Retry(
 		ctx,
 		retry.ContextRetryNoIdempotent(ctx),
 		func(ctx context.Context, session *table.Session) (err error) {

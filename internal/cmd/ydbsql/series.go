@@ -89,7 +89,7 @@ func ensurePathExists(ctx context.Context, db *sql.DB) error {
 }
 
 func readTable(ctx context.Context, db *sql.DB, path string) error {
-	rows, err := db.QueryContext(ctx, "select series_id,title,release_date from series order by series_id")
+	rows, err := db.QueryContext(ctx, "select series_id,title,release_date from 'series' order by series_id;")
 	if err != nil {
 		return err
 	}
