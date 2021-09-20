@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"reflect"
 	"strings"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
@@ -193,6 +195,10 @@ func (c *Cluster) Close() error {
 		return fmt.Errorf("Cluster.Close() not implemented")
 	}
 	return c.onClose()
+}
+
+func (c *Cluster) Stats(it func(cluster.Endpoint, stats.Stats)) {
+	return
 }
 
 type (

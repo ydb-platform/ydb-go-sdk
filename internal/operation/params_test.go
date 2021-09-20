@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 )
 
@@ -90,13 +89,13 @@ func TestOperationParams(t *testing.T) {
 
 			ctx := context.Background()
 			if t := test.opTimeout; t > 0 {
-				ctx = ydb.WithOperationTimeout(ctx, t)
+				ctx = WithOperationTimeout(ctx, t)
 			}
 			if t := test.opCancel; t > 0 {
-				ctx = ydb.WithOperationCancelAfter(ctx, t)
+				ctx = WithOperationCancelAfter(ctx, t)
 			}
 			if m := test.opMode; m != 0 {
-				ctx = ydb.WithOperationMode(ctx, m)
+				ctx = WithOperationMode(ctx, m)
 			}
 			if t := test.ctxTimeout; t > 0 {
 				var cancel context.CancelFunc

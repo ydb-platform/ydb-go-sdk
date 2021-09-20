@@ -2,13 +2,12 @@ package meta
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"testing"
 
-	"google.golang.org/grpc/metadata"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+
+	"google.golang.org/grpc/metadata"
 )
 
 func TestMetaRequiredHeaders(t *testing.T) {
@@ -22,9 +21,9 @@ func TestMetaRequiredHeaders(t *testing.T) {
 
 	ctx := context.Background()
 
-	ctx = ydb.WithUserAgent(ctx, "userAgent")
+	ctx = WithUserAgent(ctx, "userAgent")
 
-	ctx = ydb.WithTraceID(ctx, "traceID")
+	ctx = WithTraceID(ctx, "traceID")
 
 	ctx = metadata.AppendToOutgoingContext(ctx, "some-user-header", "some-user-value")
 

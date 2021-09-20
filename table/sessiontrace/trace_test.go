@@ -10,10 +10,6 @@ func TestClientTrace(t *testing.T) {
 	tracetest.TestSingleTrace(t, Trace{}, "Trace")
 }
 
-func TestRetryTrace(t *testing.T) {
-	tracetest.TestSingleTrace(t, RetryTrace{}, "RetryTrace")
-}
-
 func TestSessionPoolTrace(t *testing.T) {
 	tracetest.TestSingleTrace(t, SessionPoolTrace{}, "SessionPoolTrace")
 }
