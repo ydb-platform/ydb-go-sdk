@@ -3,11 +3,9 @@ package dial
 import (
 	"context"
 	"crypto/tls"
-	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pem"
 	"net"
@@ -55,7 +53,7 @@ type Dialer struct {
 }
 
 // Dial dials given addr and initializes driver instance on success.
-func (d *Dialer) Dial(ctx context.Context, addr string) (_ cluster2.Cluster, err error) {
+func (d *Dialer) Dial(ctx context.Context, addr string) (_ cluster.Cluster, err error) {
 	config := d.DriverConfig.WithDefaults()
 	grpcKeepalive := d.Keepalive
 	if grpcKeepalive == 0 {
@@ -95,17 +93,9 @@ type dialer struct {
 	meta      meta.Meta
 }
 
-func (d *dialer) dial(ctx context.Context, addr string) (_ cluster2.Cluster, err error) {
+func (d *dialer) dial(ctx context.Context, addr string) (_ cluster.Cluster, err error) {
 	endpoint := d.endpointByAddr(addr)
-	c := cluster.New(
-		d.dialHostPort,
-		func() balancer.Balancer {
-			if d.config.DiscoveryInterval == 0 {
-				return balancer.Single()
-			}
-			return balancer.New(d.config.BalancingConfig)
-		}(),
-	)
+	c := d.newCluster()
 	defer func() {
 		if err != nil {
 			_ = c.Close()
@@ -145,7 +135,7 @@ func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*grpc
 		ctx, cancel = context.WithTimeout(ctx, d.timeout)
 		defer cancel()
 	}
-	s := cluster2.String(host, port)
+	s := cluster.String(host, port)
 	t := trace.ContextDriverTrace(ctx).Compose(d.config.Trace)
 	var dialDone func(trace.DialDoneInfo)
 	if t.OnDial != nil {
@@ -220,7 +210,7 @@ func (d *dialer) mustSplitHostPort(addr string) (host string, port int) {
 	return host, port
 }
 
-func (d *dialer) endpointByAddr(addr string) (e cluster2.Endpoint) {
+func (d *dialer) endpointByAddr(addr string) (e cluster.Endpoint) {
 	e.Addr, e.Port = d.mustSplitHostPort(addr)
 	return
 }
