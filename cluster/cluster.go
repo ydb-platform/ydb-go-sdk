@@ -31,5 +31,5 @@ type Cluster interface {
 	DB
 
 	// Stats provide getting connections stats
-	Stats(it func(Endpoint, stats.Stats))
+	Stats() map[Endpoint]stats.Stats
 }

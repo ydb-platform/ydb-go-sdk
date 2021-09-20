@@ -41,6 +41,7 @@ type runtime struct {
 
 func New() Runtime {
 	return &runtime{
+		state:   state.Offline,
 		opTime:  series.NewSeries(statsDuration, statsBuckets),
 		opRate:  series.NewSeries(statsDuration, statsBuckets),
 		errRate: series.NewSeries(statsDuration, statsBuckets),
