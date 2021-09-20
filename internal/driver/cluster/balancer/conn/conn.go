@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"math"
@@ -65,6 +66,9 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 			return nil, err
 		}
 		c.grpcConn = raw
+		if c.runtime.GetState() != state.Banned {
+			c.runtime.SetState(state.Online)
+		}
 	}
 	c.timer.Reset(c.config.ConnectionTLL())
 	return c.grpcConn, nil

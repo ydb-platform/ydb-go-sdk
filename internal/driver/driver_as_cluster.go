@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
@@ -41,8 +42,15 @@ func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method st
 	)
 }
 
-func (d *driver) Stats(it func(cluster.Endpoint, stats.Stats)) {
-	d.clusterStats(it)
+func (d *driver) Stats() map[cluster.Endpoint]stats.Stats {
+	endpoints := make(map[cluster.Endpoint]stats.Stats)
+	m := sync.Mutex{}
+	d.clusterStats(func(endpoint cluster.Endpoint, s stats.Stats) {
+		m.Lock()
+		endpoints[endpoint] = s
+		m.Unlock()
+	})
+	return endpoints
 }
 
 func (d *driver) Close() error {

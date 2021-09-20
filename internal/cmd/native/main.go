@@ -111,4 +111,8 @@ func main() {
 		}()
 	}
 	wg.Wait()
+
+	for e, s := range db.Stats() {
+		fmt.Printf("endpoint '%v' stats: %v\n", e, s)
+	}
 }

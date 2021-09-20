@@ -21,6 +21,9 @@ import (
 type DB interface {
 	cluster.DB
 
+	// Stats return cluster stats
+	Stats() map[cluster.Endpoint]stats.Stats
+
 	// Close clears resources and close all connections to YDB
 	Close() error
 }
@@ -56,8 +59,8 @@ func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method strin
 	return db.cluster.NewStream(ctx, desc, method, opts...)
 }
 
-func (db *db) Stats(it func(cluster.Endpoint, stats.Stats)) {
-	db.cluster.Stats(it)
+func (db *db) Stats() map[cluster.Endpoint]stats.Stats {
+	return db.cluster.Stats()
 }
 
 func (db *db) Close() error {
