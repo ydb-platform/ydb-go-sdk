@@ -14,49 +14,52 @@ type lazyRatelimiter struct {
 	m      sync.Mutex
 }
 
-func (c *lazyRatelimiter) Close(ctx context.Context) error {
-	c.m.Lock()
-	defer c.m.Unlock()
-	if c.client == nil {
+func (r *lazyRatelimiter) Close(ctx context.Context) error {
+	r.m.Lock()
+	defer r.m.Unlock()
+	if r.client == nil {
 		return nil
 	}
-	return c.client.Close(ctx)
+	defer func() {
+		r.client = nil
+	}()
+	return r.client.Close(ctx)
 }
 
-func (c *lazyRatelimiter) CreateResource(ctx context.Context, coordinationNodePath string, resource resource.Resource) (err error) {
-	c.init()
-	return c.client.CreateResource(ctx, coordinationNodePath, resource)
+func (r *lazyRatelimiter) CreateResource(ctx context.Context, coordinationNodePath string, resource resource.Resource) (err error) {
+	r.init()
+	return r.client.CreateResource(ctx, coordinationNodePath, resource)
 }
 
-func (c *lazyRatelimiter) AlterResource(ctx context.Context, coordinationNodePath string, resource resource.Resource) (err error) {
-	c.init()
-	return c.client.AlterResource(ctx, coordinationNodePath, resource)
+func (r *lazyRatelimiter) AlterResource(ctx context.Context, coordinationNodePath string, resource resource.Resource) (err error) {
+	r.init()
+	return r.client.AlterResource(ctx, coordinationNodePath, resource)
 }
 
-func (c *lazyRatelimiter) DropResource(ctx context.Context, coordinationNodePath string, resourcePath string) (err error) {
-	c.init()
-	return c.client.DropResource(ctx, coordinationNodePath, resourcePath)
+func (r *lazyRatelimiter) DropResource(ctx context.Context, coordinationNodePath string, resourcePath string) (err error) {
+	r.init()
+	return r.client.DropResource(ctx, coordinationNodePath, resourcePath)
 }
 
-func (c *lazyRatelimiter) ListResource(ctx context.Context, coordinationNodePath string, resourcePath string, recursive bool) (_ []string, err error) {
-	c.init()
-	return c.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
+func (r *lazyRatelimiter) ListResource(ctx context.Context, coordinationNodePath string, resourcePath string, recursive bool) (_ []string, err error) {
+	r.init()
+	return r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
 }
 
-func (c *lazyRatelimiter) DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (_ *resource.Resource, err error) {
-	c.init()
-	return c.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
+func (r *lazyRatelimiter) DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (_ *resource.Resource, err error) {
+	r.init()
+	return r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
 }
 
-func (c *lazyRatelimiter) AcquireResource(ctx context.Context, coordinationNodePath string, resourcePath string, amount uint64, isUsedAmount bool) (err error) {
-	c.init()
-	return c.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
+func (r *lazyRatelimiter) AcquireResource(ctx context.Context, coordinationNodePath string, resourcePath string, amount uint64, isUsedAmount bool) (err error) {
+	r.init()
+	return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
 }
 
-func (c *lazyRatelimiter) init() {
-	c.m.Lock()
-	c.client = ratelimiter.New(c.db)
-	c.m.Unlock()
+func (r *lazyRatelimiter) init() {
+	r.m.Lock()
+	r.client = ratelimiter.New(r.db)
+	r.m.Unlock()
 }
 
 func newRatelimiter(db DB) *lazyRatelimiter {

@@ -20,6 +20,9 @@ func (t *lazyTable) Close(ctx context.Context) error {
 	if t.client == nil {
 		return nil
 	}
+	defer func() {
+		t.client = nil
+	}()
 	return t.client.Close(ctx)
 }
 

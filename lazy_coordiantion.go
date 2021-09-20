@@ -40,6 +40,9 @@ func (c *lazyCoordination) Close(ctx context.Context) error {
 	if c.client == nil {
 		return nil
 	}
+	defer func() {
+		c.client = nil
+	}()
 	return c.client.Close(ctx)
 }
 

@@ -29,6 +29,9 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 	if s.client == nil {
 		return nil
 	}
+	defer func() {
+		s.client = nil
+	}()
 	return s.client.Close(ctx)
 }
 
