@@ -3,10 +3,11 @@ package table
 import (
 	"container/list"
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"sync"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
@@ -441,7 +442,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 	p.init()
 
 	//takeWait := table.sessionPoolTraceOnTake(p.Trace, ctx, s)
-	var takeDone func(_ context.Context, _ *Session, took bool, _ error)
+	//var takeDone func(_ context.Context, _ *Session, took bool, _ error)
 
 	if p.isClosed() {
 		return false, ErrSessionPoolClosed
@@ -464,9 +465,9 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 
 		p.mu.Lock()
 	}
-	defer func() {
+	/*defer func() {
 		takeDone(ctx, s, took, err)
-	}()
+	}()*/
 	p.mu.Unlock()
 
 	if !has {
