@@ -16,11 +16,16 @@ type driver struct {
 	config.Config
 
 	meta meta.Meta
+	tls  bool
 
 	clusterPessimize func(addr cluster.Addr) error
 	clusterStats     func(it func(cluster.Endpoint, stats.Stats))
 	clusterClose     func() error
 	clusterGet       func(ctx context.Context) (conn conn.Conn, err error)
+}
+
+func (d *driver) Secure() bool {
+	return d.tls
 }
 
 func (d *driver) Name() string {
@@ -30,6 +35,7 @@ func (d *driver) Name() string {
 func New(
 	config config.Config,
 	meta meta.Meta,
+	tls bool,
 	get func(ctx context.Context) (conn conn.Conn, err error),
 	pessimize func(addr cluster.Addr) error,
 	stats func(it func(cluster.Endpoint, stats.Stats)),
@@ -38,6 +44,7 @@ func New(
 	return &driver{
 		Config:           config,
 		meta:             meta,
+		tls:              tls,
 		clusterGet:       get,
 		clusterPessimize: pessimize,
 		clusterStats:     stats,

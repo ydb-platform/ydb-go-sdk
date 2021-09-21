@@ -19,8 +19,8 @@ var (
 	}{
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo"},
-				{Addr: "bar"},
+				{Host: "foo"},
+				{Host: "bar"},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -30,9 +30,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 0.2},
-				{Addr: "bar", LoadFactor: 1},
-				{Addr: "baz", LoadFactor: 1},
+				{Host: "foo", LoadFactor: 0.2},
+				{Host: "bar", LoadFactor: 1},
+				{Host: "baz", LoadFactor: 1},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -43,9 +43,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 1},
-				{Addr: "bar", LoadFactor: 0.1},
-				{Addr: "baz", LoadFactor: 0.9},
+				{Host: "foo", LoadFactor: 1},
+				{Host: "bar", LoadFactor: 0.1},
+				{Host: "baz", LoadFactor: 0.9},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -56,12 +56,12 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 0.25},
-				{Addr: "bar", LoadFactor: 1},
-				{Addr: "baz", LoadFactor: 1},
+				{Host: "foo", LoadFactor: 0.25},
+				{Host: "bar", LoadFactor: 1},
+				{Host: "baz", LoadFactor: 1},
 			},
 			del: []cluster.Endpoint{
-				{Addr: "foo"},
+				{Host: "foo"},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -71,12 +71,12 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 1},
-				{Addr: "bar", LoadFactor: 0.25},
-				{Addr: "baz", LoadFactor: 0.25},
+				{Host: "foo", LoadFactor: 1},
+				{Host: "bar", LoadFactor: 0.25},
+				{Host: "baz", LoadFactor: 0.25},
 			},
 			del: []cluster.Endpoint{
-				{Addr: "foo"},
+				{Host: "foo"},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -86,12 +86,12 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 1},
-				{Addr: "bar", LoadFactor: 0.75},
-				{Addr: "baz", LoadFactor: 0.25},
+				{Host: "foo", LoadFactor: 1},
+				{Host: "bar", LoadFactor: 0.75},
+				{Host: "baz", LoadFactor: 0.25},
 			},
 			del: []cluster.Endpoint{
-				{Addr: "bar"},
+				{Host: "bar"},
 			},
 			repeat: 1200,
 			exp: map[string]int{
@@ -101,12 +101,12 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 0},
-				{Addr: "bar", LoadFactor: 0},
-				{Addr: "baz", LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			del: []cluster.Endpoint{
-				{Addr: "baz"},
+				{Host: "baz"},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -116,23 +116,23 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 0},
-				{Addr: "bar", LoadFactor: 0},
-				{Addr: "baz", LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			del: []cluster.Endpoint{
-				{Addr: "foo"},
-				{Addr: "bar"},
-				{Addr: "baz"},
+				{Host: "foo"},
+				{Host: "bar"},
+				{Host: "baz"},
 			},
 			repeat: 1,
 			err:    true,
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 0},
-				{Addr: "bar", LoadFactor: 0},
-				{Addr: "baz", LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -146,9 +146,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 0},
-				{Addr: "bar", LoadFactor: 0},
-				{Addr: "baz", LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -162,9 +162,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 0},
-				{Addr: "bar", LoadFactor: 0},
-				{Addr: "baz", LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -181,9 +181,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 10},
-				{Addr: "bar", LoadFactor: 20},
-				{Addr: "baz", LoadFactor: 30},
+				{Host: "foo", LoadFactor: 10},
+				{Host: "bar", LoadFactor: 20},
+				{Host: "baz", LoadFactor: 30},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -200,9 +200,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Addr: "foo", LoadFactor: 10},
-				{Addr: "bar", LoadFactor: 20},
-				{Addr: "baz", LoadFactor: 30},
+				{Host: "foo", LoadFactor: 10},
+				{Host: "bar", LoadFactor: 20},
+				{Host: "baz", LoadFactor: 30},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -231,14 +231,14 @@ func TestRoundRobinBalancer(t *testing.T) {
 			for _, e := range test.add {
 				c := conn.New(cluster.Addr{}, nil, 0)
 				c.Runtime().SetState(state.Online)
-				mconn[c] = e.Addr
-				maddr[e.Addr] = c
-				melem[e.Addr] = r.Insert(c, cluster.connInfo{
+				mconn[c] = e.Host
+				maddr[e.Host] = c
+				melem[e.Host] = r.Insert(c, cluster.connInfo{
 					loadFactor: e.LoadFactor,
 				})
 			}
 			for _, e := range test.del {
-				r.Remove(melem[e.Addr])
+				r.Remove(melem[e.Host])
 			}
 			for addr := range test.banned {
 				if err := r.Pessimize(melem[addr]); err != nil {
@@ -284,14 +284,14 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			for _, e := range test.add {
 				c := conn.New(cluster.Addr{}, nil, 0)
 				c.Runtime().SetState(state.Online)
-				mconn[c] = e.Addr
-				maddr[e.Addr] = c
-				melem[e.Addr] = r.Insert(c, cluster.connInfo{
+				mconn[c] = e.Host
+				maddr[e.Host] = c
+				melem[e.Host] = r.Insert(c, cluster.connInfo{
 					loadFactor: e.LoadFactor,
 				})
 			}
 			for _, e := range test.del {
-				r.Remove(melem[e.Addr])
+				r.Remove(melem[e.Host])
 			}
 			for addr := range test.banned {
 				if err := r.Pessimize(melem[addr]); err != nil {

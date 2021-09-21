@@ -27,7 +27,7 @@ func TestMetaRequiredHeaders(t *testing.T) {
 
 	ctx = metadata.AppendToOutgoingContext(ctx, "some-user-header", "some-user-value")
 
-	md, err := m.Meta(ctx)
+	md, err := m.meta(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

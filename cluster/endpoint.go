@@ -1,8 +1,8 @@
 package cluster
 
 type Endpoint struct {
-	Addr       string
-	Port       int
+	Addr
+
 	LoadFactor float32
 	Local      bool
 }

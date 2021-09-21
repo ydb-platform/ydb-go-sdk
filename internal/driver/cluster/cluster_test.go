@@ -61,8 +61,8 @@ func TestClusterFastRedial(t *testing.T) {
 	}
 
 	ne := []cluster2.Endpoint{
-		{Addr: "foo"},
-		{Addr: "bad"},
+		{Host: "foo"},
+		{Host: "bad"},
 	}
 	mergeEndpointIntoCluster(ctx, c, []cluster2.Endpoint{}, ne)
 	select {
@@ -126,20 +126,20 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	}
 
 	endpoints := []cluster2.Endpoint{
-		{Addr: "foo"},
-		{Addr: "foo", Port: 123},
+		{Host: "foo"},
+		{Host: "foo", Port: 123},
 	}
 	badEndpoints := []cluster2.Endpoint{
-		{Addr: "bad"},
-		{Addr: "bad", Port: 123},
+		{Host: "bad"},
+		{Host: "bad", Port: 123},
 	}
 	nextEndpoints := []cluster2.Endpoint{
-		{Addr: "foo"},
-		{Addr: "bar"},
-		{Addr: "bar", Port: 123},
+		{Host: "foo"},
+		{Host: "bar"},
+		{Host: "bar", Port: 123},
 	}
 	nextBadEndpoints := []cluster2.Endpoint{
-		{Addr: "bad", Port: 23},
+		{Host: "bad", Port: 23},
 	}
 	t.Run("initial fill", func(t *testing.T) {
 		ne := append(endpoints, badEndpoints...)
@@ -218,7 +218,7 @@ func TestClusterRemoveTracking(t *testing.T) {
 		},
 	}
 
-	endpoint := cluster2.Endpoint{Addr: "foo"}
+	endpoint := cluster2.Endpoint{Host: "foo"}
 	c.Insert(ctx, endpoint)
 
 	// Await for connection to be established.
@@ -273,7 +273,7 @@ func TestClusterRemoveOffline(t *testing.T) {
 		},
 	}
 
-	endpoint := cluster2.Endpoint{Addr: "foo"}
+	endpoint := cluster2.Endpoint{Host: "foo"}
 	c.Insert(ctx, endpoint)
 	<-timer.Reset
 
@@ -345,7 +345,7 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 	}()
 
 	t.Run("test actual block of tracker", func(t *testing.T) {
-		endpoint := cluster2.Endpoint{Addr: "foo"}
+		endpoint := cluster2.Endpoint{Host: "foo"}
 		c.Insert(ctx, endpoint)
 
 		// Wait for connection become tracked.
@@ -613,23 +613,23 @@ func TestDiffEndpoint(t *testing.T) {
 	noEndpoints := []cluster2.Endpoint{}
 	someEndpoints := []cluster2.Endpoint{
 		{
-			Addr: "0",
+			Host: "0",
 			Port: 0,
 		},
 		{
-			Addr: "1",
+			Host: "1",
 			Port: 1,
 		},
 	}
 	sameSomeEndpoints := []cluster2.Endpoint{
 		{
-			Addr:       "0",
+			Host:       "0",
 			Port:       0,
 			LoadFactor: 1,
 			Local:      true,
 		},
 		{
-			Addr:       "1",
+			Host:       "1",
 			Port:       1,
 			LoadFactor: 2,
 			Local:      true,
@@ -637,27 +637,27 @@ func TestDiffEndpoint(t *testing.T) {
 	}
 	anotherEndpoints := []cluster2.Endpoint{
 		{
-			Addr: "2",
+			Host: "2",
 			Port: 0,
 		},
 		{
-			Addr: "3",
+			Host: "3",
 			Port: 1,
 		},
 	}
 	moreEndpointsOverlap := []cluster2.Endpoint{
 		{
-			Addr:       "0",
+			Host:       "0",
 			Port:       0,
 			LoadFactor: 1,
 			Local:      true,
 		},
 		{
-			Addr: "1",
+			Host: "1",
 			Port: 1,
 		},
 		{
-			Addr: "1",
+			Host: "1",
 			Port: 2,
 		},
 	}

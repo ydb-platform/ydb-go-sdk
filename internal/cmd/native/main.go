@@ -115,4 +115,7 @@ func main() {
 	for e, s := range db.Stats() {
 		fmt.Printf("endpoint '%v' stats: %v\n", e, s)
 	}
+
+	whoAmI, err := db.Discovery().WhoAmI(ctx)
+	fmt.Printf("whoAmI: %v ,%v\n", whoAmI, err)
 }

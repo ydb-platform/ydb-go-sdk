@@ -45,7 +45,7 @@ type meta struct {
 	requestsType string
 }
 
-func (m *meta) Meta(ctx context.Context) (_ context.Context, err error) {
+func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		md = metadata.MD{}
@@ -79,6 +79,14 @@ func (m *meta) Meta(ctx context.Context) (_ context.Context, err error) {
 			return nil, err
 		}
 		md.Set(metaTicket, token)
+	}
+	return md, nil
+}
+
+func (m *meta) Meta(ctx context.Context) (_ context.Context, err error) {
+	md, err := m.meta(ctx)
+	if err != nil {
+		return ctx, err
 	}
 	return metadata.NewOutgoingContext(ctx, md), nil
 }

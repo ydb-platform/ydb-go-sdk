@@ -128,7 +128,7 @@ func (s *YDB) StartEndpoint() *Endpoint {
 		s.T.Fatal(err)
 	}
 	e := cluster.Endpoint{
-		Addr: host,
+		Host: host,
 		Port: port,
 	}
 	srv := grpc.NewServer()
@@ -239,7 +239,7 @@ func (s *YDB) StartBalancer() *Balancer {
 
 func (s *YDB) DialContext(ctx context.Context, addr string) (_ net.Conn, err error) {
 	var e cluster.Endpoint
-	e.Addr, e.Port, err = SplitHostPort(addr)
+	e.Host, e.Port, err = SplitHostPort(addr)
 	if err != nil {
 		return
 	}
@@ -266,7 +266,7 @@ func (s *YDB) listEndpoints(db string) (resp *Ydb_Discovery.ListEndpointsResult,
 	es := make([]*Ydb_Discovery.EndpointInfo, 0, len(s.endpoints))
 	for e := range s.endpoints {
 		es = append(es, &Ydb_Discovery.EndpointInfo{
-			Address:    e.Addr,
+			Address:    e.Host,
 			Port:       uint32(e.Port),
 			LoadFactor: e.LoadFactor,
 		})

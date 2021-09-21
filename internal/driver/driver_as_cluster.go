@@ -59,12 +59,6 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 
-	// Get credentials (token actually) for the request.
-	ctx, err = d.meta.Meta(ctx)
-	if err != nil {
-		return
-	}
-
 	t := trace.ContextDriverTrace(ctx).Compose(d.Config.Trace)
 	var getConnDone func(trace.GetConnDoneInfo)
 	if t.OnGetConn != nil {

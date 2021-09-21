@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
@@ -35,6 +36,7 @@ type Connection interface {
 	Scheme() scheme.Client
 	Coordination() coordination.Client
 	RateLimiter() ratelimiter.Client
+	Discovery() discovery.Client
 }
 
 type db struct {
@@ -45,10 +47,19 @@ type db struct {
 	scheme       *lazyScheme
 	coordination *lazyCoordination
 	ratelimiter  *lazyRatelimiter
+	discovery    *lazyDiscovery
+}
+
+func (db *db) Discovery() discovery.Client {
+	return db.discovery
 }
 
 func (db *db) Name() string {
 	return db.name
+}
+
+func (db *db) Secure() bool {
+	return db.cluster.Secure()
 }
 
 func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -127,5 +138,6 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 	c.scheme = newScheme(c)
 	c.coordination = newCoordination(c.cluster)
 	c.ratelimiter = newRatelimiter(c.cluster)
+	c.discovery = newDiscovery(c.cluster)
 	return c, nil
 }
