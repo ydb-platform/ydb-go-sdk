@@ -8,10 +8,9 @@ import (
 	"path"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ydbsql"
 )
@@ -56,8 +55,9 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "ping failed: %v\n", err)
 		os.Exit(1)
 	}
+	cl, err := getClient(ctx, db)
 
-	err = cleanupDatabase(ctx, db, "series", "episodes", "seasons")
+	err = cleanupDatabase(ctx, cl, connectParams.Database(), "series", "episodes", "seasons")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "cleaunup database failed: %v\n", err)
 		os.Exit(1)
@@ -68,8 +68,6 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "ensure path exists failed: %v\n", err)
 		os.Exit(1)
 	}
-
-	cl, err := getClient(ctx, db)
 
 	err = describeTableOptions(ctx, cl)
 	if err != nil {
@@ -95,7 +93,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = fillTablesWithData(ctx, cl, connectParams.Database())
+	err = fillTablesWithData(ctx, db, connectParams.Database())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "fill tables with data error: %v\n", err)
 		os.Exit(1)
@@ -107,21 +105,19 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			err = selectSimple(ctx, cl, connectParams.Database())
+			err = selectSimple(ctx, db, connectParams.Database())
 			if err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
 			}
 
-			err = scanQuerySelect(ctx, cl, connectParams.Database())
+			err = scanQuerySelect(ctx, db, connectParams.Database())
 			if err != nil {
 				if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
 					_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
 				}
 			}
 
-			err = readTable(ctx, db, path.Join(
-				connectParams.Database(), "series",
-			))
+			err = readTable(ctx, db, connectParams.Database())
 			if err != nil {
 				fmt.Printf("read table error: %v\n", err)
 			}

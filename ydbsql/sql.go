@@ -267,7 +267,7 @@ func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryPa
 			return err
 		},
 	)
-	return nil, err
+	return res, err
 }
 
 func (c *sqlConn) txControl() *table.TransactionControl {
@@ -488,6 +488,10 @@ func checkNamedValue(v *driver.NamedValue) (err error) {
 		v.Value = types.Int16Value(x)
 	case uint16:
 		v.Value = types.Uint16Value(x)
+	case int:
+		v.Value = types.Int32Value(int32(x))
+	case uint:
+		v.Value = types.Uint32Value(uint32(x))
 	case int32:
 		v.Value = types.Int32Value(x)
 	case uint32:
@@ -559,12 +563,11 @@ func (r *rows) Next(dst []driver.Value) error {
 	if !r.res.NextRow() {
 		return io.EOF
 	}
+	wraps := make([]interface{}, len(dst))
 	for i := range dst {
-		// NOTE: for queries like "SELECT * FROM xxx" order of columns is
-		// undefined.
-		_ = r.res.Scan(&ydbWrapper{&dst[i]})
+		wraps[i] = &ydbWrapper{&dst[i]}
 	}
-	return r.res.Err()
+	return r.res.Scan(wraps...)
 }
 
 func (r *rows) Close() error {

@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
