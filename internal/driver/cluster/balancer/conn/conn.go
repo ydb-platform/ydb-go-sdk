@@ -153,12 +153,6 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		ctx = operation.WithOperationCancelAfter(ctx, t)
 	}
 
-	// Get credentials (token actually) for the request.
-	ctx, err = c.config.Meta(ctx)
-	if err != nil {
-		return
-	}
-
 	params := operation.ContextParams(ctx)
 	if !params.Empty() {
 		operation.SetOperationParams(request, params)
@@ -192,6 +186,11 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 				)
 			}()
 		}
+	}
+
+	ctx, err = c.config.Meta(ctx)
+	if err != nil {
+		return err
 	}
 
 	raw, err := c.Conn(ctx)
@@ -241,12 +240,6 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		}()
 	}
 
-	// Get credentials (token actually) for the request.
-	ctx, err = c.config.Meta(ctx)
-	if err != nil {
-		return
-	}
-
 	c.runtime.StreamStart(timeutil.Now())
 	t := c.config.Trace(ctx)
 	var streamRecv func(trace.StreamRecvDoneInfo) func(trace.StreamDoneInfo)
@@ -262,6 +255,11 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 			c.runtime.StreamDone(timeutil.Now(), err)
 		}
 	}()
+
+	ctx, err = c.config.Meta(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	raw, err := c.Conn(ctx)
 	if err != nil {

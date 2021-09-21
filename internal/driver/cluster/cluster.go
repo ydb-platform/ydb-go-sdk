@@ -97,7 +97,7 @@ func New(
 
 //func (c *cluster) init() {
 //	c.once.Do(func() {
-//		c.index = make(map[addr.Addr]Entry)
+//		c.index = make(map[addr.Host]Entry)
 //
 //		c.trackerCtx, c.trackerCancel = context.WithCancel(context.Background())
 //		c.trackerWake = make(chan struct{}, 1)
@@ -267,7 +267,7 @@ func (c *cluster) Insert(ctx context.Context, e public.Endpoint, opts ...option)
 
 	//c.init()
 	//
-	addr := public.Addr{e.Addr, e.Port}
+	addr := public.Addr{e.Host, e.Port}
 	info := info.Info{
 		LoadFactor: e.LoadFactor,
 		Local:      e.Local,
@@ -310,7 +310,7 @@ func (c *cluster) Update(_ context.Context, ep public.Endpoint, opts ...option) 
 		defer opt.wg.Done()
 	}
 
-	addr := public.Addr{ep.Addr, ep.Port}
+	addr := public.Addr{ep.Host, ep.Port}
 	info := info.Info{
 		LoadFactor: ep.LoadFactor,
 		Local:      ep.Local,
@@ -348,7 +348,7 @@ func (c *cluster) Remove(_ context.Context, e public.Endpoint, opts ...option) {
 		defer opt.wg.Done()
 	}
 
-	addr := public.Addr{e.Addr, e.Port}
+	addr := public.Addr{e.Host, e.Port}
 
 	c.mu.Lock()
 	if c.closed {
@@ -420,8 +420,10 @@ func (c *cluster) Stats(it func(public.Endpoint, stats.Stats)) {
 	}
 	call := func(conn conn.Conn, info info.Info) {
 		e := public.Endpoint{
-			Addr:       conn.Addr().Host,
-			Port:       conn.Addr().Port,
+			Addr: public.Addr{
+				Host: conn.Addr().Host,
+				Port: conn.Addr().Port,
+			},
 			LoadFactor: info.LoadFactor,
 			Local:      info.Local,
 		}
@@ -430,7 +432,7 @@ func (c *cluster) Stats(it func(public.Endpoint, stats.Stats)) {
 	}
 	//for el := c.trackerQueue.Front(); el != nil; el = el.Next() {
 	//	conn := el.Value.(conn.Conn)
-	//	entry := c.index[conn.Addr()]
+	//	entry := c.index[conn.Host()]
 	//	call(conn, entry.Info)
 	//}
 	for _, entry := range c.index {
@@ -443,7 +445,7 @@ func (c *cluster) Stats(it func(public.Endpoint, stats.Stats)) {
 //// c.mu must be held.
 //func (c *cluster) track(conn conn.Conn) (el *list.Element) {
 //	c.trackDone = c.sessiontrace.OnTrackConn(sessiontrace.TrackConnStartInfo{
-//		Address: conn.Addr().String(),
+//		Address: conn.Host().String(),
 //	})
 //	el = c.trackerQueue.PushBack(conn)
 //	select {
@@ -591,7 +593,7 @@ func (c *cluster) await() func() <-chan struct{} {
 }
 
 func compareEndpoints(a, b public.Endpoint) int {
-	if c := strings.Compare(a.Addr, b.Addr); c != 0 {
+	if c := strings.Compare(a.Host, b.Host); c != 0 {
 		return c
 	}
 	if c := a.Port - b.Port; c != 0 {

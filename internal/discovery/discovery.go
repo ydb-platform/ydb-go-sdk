@@ -2,43 +2,49 @@ package discovery
 
 import (
 	"context"
+	"fmt"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+	"strings"
 )
+
+type WhoAmI struct {
+	User   string
+	Groups []string
+}
+
+func (w WhoAmI) String() string {
+	return fmt.Sprintf("{User: %s, Groups: [%s]}", w.User, strings.Join(w.Groups, ","))
+}
 
 type Client interface {
 	Discover(ctx context.Context) ([]cluster.Endpoint, error)
+	WhoAmI(ctx context.Context) (*WhoAmI, error)
+	Close(ctx context.Context) error
 }
 
-func New(conn grpc.ClientConnInterface, database string, ssl bool, meta meta.Meta) Client {
+func New(conn grpc.ClientConnInterface, database string, ssl bool) Client {
 	return &client{
-		discoveryService: Ydb_Discovery_V1.NewDiscoveryServiceClient(conn),
-		database:         database,
-		ssl:              ssl,
-		meta:             meta,
+		service:  Ydb_Discovery_V1.NewDiscoveryServiceClient(conn),
+		database: database,
+		ssl:      ssl,
 	}
 }
 
 type client struct {
-	discoveryService Ydb_Discovery_V1.DiscoveryServiceClient
-	database         string
-	ssl              bool
-	meta             meta.Meta
+	service  Ydb_Discovery_V1.DiscoveryServiceClient
+	database string
+	ssl      bool
 }
 
 func (d *client) Discover(ctx context.Context) ([]cluster.Endpoint, error) {
 	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: d.database,
 	}
-	ctx, err := d.meta.Meta(ctx)
-	if err != nil {
-		return nil, err
-	}
-	response, err := d.discoveryService.ListEndpoints(ctx, &request)
+	response, err := d.service.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, err
 	}
@@ -51,11 +57,34 @@ func (d *client) Discover(ctx context.Context) ([]cluster.Endpoint, error) {
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
 			endpoints = append(endpoints, cluster.Endpoint{
-				Addr:  e.Address,
-				Port:  int(e.Port),
+				Addr: cluster.Addr{
+					Host: e.Address,
+					Port: int(e.Port),
+				},
 				Local: e.Location == listEndpointsResult.SelfLocation,
 			})
 		}
 	}
 	return endpoints, nil
+}
+
+func (d *client) WhoAmI(ctx context.Context) (*WhoAmI, error) {
+	request := Ydb_Discovery.WhoAmIRequest{}
+	response, err := d.service.WhoAmI(ctx, &request)
+	if err != nil {
+		return nil, err
+	}
+	whoAmIResultResult := Ydb_Discovery.WhoAmIResult{}
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &whoAmIResultResult)
+	if err != nil {
+		return nil, err
+	}
+	return &WhoAmI{
+		User:   whoAmIResultResult.GetUser(),
+		Groups: whoAmIResultResult.GetGroups(),
+	}, nil
+}
+
+func (d *client) Close(context.Context) error {
+	return nil
 }

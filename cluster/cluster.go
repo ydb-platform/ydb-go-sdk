@@ -21,6 +21,9 @@ type DB interface {
 	// Name returns database name
 	Name() string
 
+	// Secure returns true if database connection is secure
+	Secure() bool
+
 	// Close clears resources and close all connections to YDB
 	Close() error
 }
