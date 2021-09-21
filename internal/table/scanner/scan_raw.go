@@ -15,85 +15,15 @@ import (
 )
 
 type rawConverter struct {
-	*Scanner
-}
-
-func (s *rawConverter) Date() (v time.Time) {
-	s.unwrap()
-	return internal.UnmarshalDate(s.uint32())
-}
-func (s *rawConverter) Datetime() (v time.Time) {
-	s.unwrap()
-	return internal.UnmarshalDatetime(s.uint32())
-}
-func (s *rawConverter) Timestamp() (v time.Time) {
-	s.unwrap()
-	return internal.UnmarshalTimestamp(s.uint64())
-}
-func (s *rawConverter) Interval() (v time.Duration) {
-	s.unwrap()
-	return internal.UnmarshalInterval(s.int64())
-}
-func (s *rawConverter) TzDate() (v time.Time) {
-	s.unwrap()
-	if s.isNull() {
-		return
-	}
-	src, err := internal.UnmarshalTzDate(s.text())
-	if err != nil {
-		s.errorf("scan raw failed: %w", err)
-	}
-	return src
-}
-func (s *rawConverter) TzDatetime() (v time.Time) {
-	s.unwrap()
-	if s.isNull() {
-		return
-	}
-	src, err := internal.UnmarshalTzDatetime(s.text())
-	if err != nil {
-		s.errorf("scan raw failed: %w", err)
-	}
-	return src
-}
-func (s *rawConverter) TzTimestamp() (v time.Time) {
-	s.unwrap()
-	if s.isNull() {
-		return
-	}
-	src, err := internal.UnmarshalTzTimestamp(s.text())
-	if err != nil {
-		s.errorf("scan raw failed: %w", err)
-	}
-	return src
-}
-func (s *rawConverter) String() (v string) {
-	s.unwrap()
-	return string(s.bytes())
-}
-func (s *rawConverter) YSON() (v []byte) {
-	s.unwrap()
-	return []byte(s.text())
-}
-func (s *rawConverter) JSON() (v []byte) {
-	s.unwrap()
-	return []byte(s.text())
-}
-func (s *rawConverter) JSONDocument() (v []byte) {
-	s.unwrap()
-	return []byte(s.text())
-}
-
-func (s *rawConverter) Any() interface{} {
-	return s.any()
+	*scanner
 }
 
 func (s *rawConverter) HasItems() bool {
-	return s.err == nil && s.set != nil && s.row != nil
+	return s.hasItems()
 }
 
 func (s *rawConverter) HasNextItem() bool {
-	return s.HasItems() && s.nextItem < len(s.row.Items)
+	return s.hasItems() && s.nextItem < len(s.row.Items)
 }
 
 func (s *rawConverter) Path() string {
@@ -217,12 +147,88 @@ func (s *rawConverter) Double() (v float64) {
 	return s.double()
 }
 
+func (s *rawConverter) Date() (v time.Time) {
+	s.unwrap()
+	return internal.UnmarshalDate(s.uint32())
+}
+
+func (s *rawConverter) Datetime() (v time.Time) {
+	s.unwrap()
+	return internal.UnmarshalDatetime(s.uint32())
+}
+
+func (s *rawConverter) Timestamp() (v time.Time) {
+	s.unwrap()
+	return internal.UnmarshalTimestamp(s.uint64())
+}
+
+func (s *rawConverter) Interval() (v time.Duration) {
+	s.unwrap()
+	return internal.UnmarshalInterval(s.int64())
+}
+
+func (s *rawConverter) TzDate() (v time.Time) {
+	s.unwrap()
+	if s.isNull() {
+		return
+	}
+	src, err := internal.UnmarshalTzDate(s.text())
+	if err != nil {
+		s.errorf("scan raw failed: %w", err)
+	}
+	return src
+}
+
+func (s *rawConverter) TzDatetime() (v time.Time) {
+	s.unwrap()
+	if s.isNull() {
+		return
+	}
+	src, err := internal.UnmarshalTzDatetime(s.text())
+	if err != nil {
+		s.errorf("scan raw failed: %w", err)
+	}
+	return src
+}
+
+func (s *rawConverter) TzTimestamp() (v time.Time) {
+	s.unwrap()
+	if s.isNull() {
+		return
+	}
+	src, err := internal.UnmarshalTzTimestamp(s.text())
+	if err != nil {
+		s.errorf("scan raw failed: %w", err)
+	}
+	return src
+}
+
+func (s *rawConverter) String() (v string) {
+	s.unwrap()
+	return string(s.bytes())
+}
+
 func (s *rawConverter) UTF8() (v string) {
 	if s.err != nil {
 		return
 	}
 	s.unwrap()
 	return s.text()
+}
+
+func (s *rawConverter) YSON() (v []byte) {
+	s.unwrap()
+	return []byte(s.text())
+}
+
+func (s *rawConverter) JSON() (v []byte) {
+	s.unwrap()
+	return []byte(s.text())
+}
+
+func (s *rawConverter) JSONDocument() (v []byte) {
+	s.unwrap()
+	return []byte(s.text())
 }
 
 func (s *rawConverter) UUID() (v [16]byte) {
@@ -241,15 +247,45 @@ func (s *rawConverter) DyNumber() (v string) {
 	return s.text()
 }
 
+func (s *rawConverter) Any() interface{} {
+	return s.any()
+}
+
 // Value returns current item under scan as ydb.Value types.
 func (s *rawConverter) Value() types.Value {
 	if s.err != nil {
 		return nil
 	}
 	s.unwrap()
-	x := s.stack.current()
-	return internal.ValueFromYDB(x.t, x.v)
+	return s.value()
 }
+
+func (s *rawConverter) AssertType(t types.Type) bool {
+	return s.assertCurrentTypeIs(t)
+}
+
+func (s *rawConverter) Null() {
+	if s.err != nil || !s.assertCurrentTypeNullable() {
+		return
+	}
+	s.null()
+}
+
+func (s *rawConverter) IsNull() bool {
+	if s.err != nil {
+		return false
+	}
+	return s.isNull()
+}
+
+func (s *rawConverter) IsOptional() bool {
+	if s.err != nil {
+		return false
+	}
+	return s.isCurrentTypeOptional()
+}
+
+// --------non-primitive---------
 
 func (s *rawConverter) ListIn() (size int) {
 	if s.err != nil {
@@ -470,53 +506,30 @@ func (s *rawConverter) Unwrap() {
 }
 
 func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
-	if s.err != nil || !s.assertCurrentTypeDecimal(t) {
+	if s.err != nil {
+		return
+	}
+	s.unwrap()
+	if !s.assertCurrentTypeDecimal(t) {
 		return
 	}
 	return s.uint128()
 }
 
-func (s *rawConverter) UnwrapDecimal() (v [16]byte, precision, scale uint32) {
+func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
+	if s.err != nil {
+		return
+	}
+	s.unwrap()
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
 		return
 	}
-	return s.uint128(), d.DecimalType.Precision, d.DecimalType.Scale
-}
-
-func (s *rawConverter) ODecimal(t types.Type) (v [16]byte) {
-	if s.err != nil || !s.assertCurrentTypeOptionalDecimal(t) {
-		return
+	return types.Decimal{
+		Bytes:     s.uint128(),
+		Precision: d.DecimalType.Precision,
+		Scale:     d.DecimalType.Scale,
 	}
-	if s.isNull() {
-		return
-	}
-	return s.uint128()
-}
-
-func (s *rawConverter) AssertType(t types.Type) bool {
-	return s.assertCurrentTypeIs(t)
-}
-
-func (s *rawConverter) Null() {
-	if s.err != nil || !s.assertCurrentTypeNullable() {
-		return
-	}
-	s.null()
-}
-
-func (s *rawConverter) IsNull() bool {
-	if s.err != nil {
-		return false
-	}
-	return s.isNull()
-}
-
-func (s *rawConverter) IsOptional() bool {
-	if s.err != nil {
-		return false
-	}
-	return s.isCurrentTypeOptional()
 }
 
 func (s *rawConverter) IsDecimal() bool {
@@ -524,6 +537,11 @@ func (s *rawConverter) IsDecimal() bool {
 		return false
 	}
 	return s.isCurrentTypeDecimal()
+}
+
+func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
+	w := t.(internal.DecimalType)
+	return d.Precision == w.Precision && d.Scale == w.Scale
 }
 
 func (s *rawConverter) isCurrentTypeDecimal() bool {
@@ -555,27 +573,6 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 	}
 }
 
-func (s *rawConverter) boundsError(n, i int) {
-	s.errorf(
-		"index out of range: %d; have %d",
-		i, n,
-	)
-}
-
-func (s *rawConverter) decimalTypeError(t types.Type) {
-	s.errorf(
-		"unexpected decimal types at %q %s: want %s",
-		s.Path(), s.getType(), t,
-	)
-}
-
-func (s *rawConverter) null() {
-	x, _ := s.stack.currentValue().(*Ydb.Value_NullFlagValue)
-	if x == nil {
-		s.valueTypeError(s.stack.currentValue(), x)
-	}
-}
-
 func (s *rawConverter) variant() (v *Ydb.Value, index uint32) {
 	v = s.unwrapValue()
 	if v == nil {
@@ -583,6 +580,56 @@ func (s *rawConverter) variant() (v *Ydb.Value, index uint32) {
 	}
 	x := s.stack.current() // Is not nil if unwrapValue succeeded.
 	index = x.v.VariantIndex
+	return
+}
+
+func (s *rawConverter) itemsIn() int {
+	x := s.stack.current()
+	if x.isEmpty() {
+		return -1
+	}
+	s.stack.enter()
+	return len(x.v.Items)
+}
+
+func (s *rawConverter) itemsOut() {
+	s.stack.leave()
+}
+
+func (s *rawConverter) itemsBoundsCheck(xs []*Ydb.Value, i int) bool {
+	return s.boundsCheck(len(xs), i)
+}
+
+func (s *rawConverter) pairsIn() int {
+	x := s.stack.current()
+	if x.isEmpty() {
+		return -1
+	}
+	s.stack.enter()
+	return len(x.v.Pairs)
+}
+
+func (s *rawConverter) pairsOut() {
+	s.stack.leave()
+}
+
+func (s *rawConverter) pairsBoundsCheck(xs []*Ydb.ValuePair, i int) bool {
+	return s.boundsCheck(len(xs), i)
+}
+
+func (s *rawConverter) boundsCheck(n, i int) bool {
+	if i < 0 || n <= i {
+		s.boundsError(n, i)
+		return false
+	}
+	return true
+}
+
+func (s *scanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
+	x := typ.Type
+	if t, _ = x.(*Ydb.Type_OptionalType); t == nil {
+		s.typeError(x, t)
+	}
 	return
 }
 
@@ -598,6 +645,7 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 	s.errorf("not nullable types at %q: %s (%d %s %s)", s.Path(), s.Type(), s.stack.size(), c.t, p.t)
 	return false
 }
+
 func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	c := s.stack.current()
 	act := internal.TypeFromYDB(c.t)
@@ -610,6 +658,7 @@ func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	}
 	return true
 }
+
 func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
@@ -617,63 +666,6 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 	}
 	if !isEqualDecimal(d.DecimalType, t) {
 		s.decimalTypeError(t)
-		return false
-	}
-	return true
-}
-func (s *rawConverter) assertCurrentTypeOptionalDecimal(t types.Type) bool {
-	typ := s.stack.current().t
-	if t, _ := typ.Type.(*Ydb.Type_OptionalType); t != nil {
-		typ = t.OptionalType.Item
-	}
-	if typ == nil {
-		return false
-	}
-	d := s.assertTypeDecimal(typ)
-	if d == nil {
-		return false
-	}
-	if !isEqualDecimal(d.DecimalType, t) {
-		s.decimalTypeError(t)
-		return false
-	}
-	return true
-}
-
-func (s *rawConverter) itemsIn() int {
-	x := s.stack.current()
-	if x.isEmpty() {
-		return -1
-	}
-	s.stack.enter()
-	return len(x.v.Items)
-}
-
-func (s *rawConverter) itemsOut() {
-	s.stack.leave()
-}
-func (s *rawConverter) itemsBoundsCheck(xs []*Ydb.Value, i int) bool {
-	return s.boundsCheck(len(xs), i)
-}
-
-func (s *rawConverter) pairsIn() int {
-	x := s.stack.current()
-	if x.isEmpty() {
-		return -1
-	}
-	s.stack.enter()
-	return len(x.v.Pairs)
-}
-func (s *rawConverter) pairsOut() {
-	s.stack.leave()
-}
-func (s *rawConverter) pairsBoundsCheck(xs []*Ydb.ValuePair, i int) bool {
-	return s.boundsCheck(len(xs), i)
-}
-
-func (s *rawConverter) boundsCheck(n, i int) bool {
-	if i < 0 || n <= i {
-		s.boundsError(n, i)
 		return false
 	}
 	return true
@@ -723,9 +715,18 @@ func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType
 	return
 }
 
-func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
-	w := t.(internal.DecimalType)
-	return d.Precision == w.Precision && d.Scale == w.Scale
+func (s *rawConverter) boundsError(n, i int) {
+	s.errorf(
+		"index out of range: %d; have %d",
+		i, n,
+	)
+}
+
+func (s *rawConverter) decimalTypeError(t types.Type) {
+	s.errorf(
+		"unexpected decimal types at %q %s: want %s",
+		s.Path(), s.getType(), t,
+	)
 }
 
 func nameIface(v interface{}) string {

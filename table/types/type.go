@@ -72,15 +72,6 @@ func Optional(T Type) Type {
 	return internal.OptionalType{T: T}
 }
 
-var DefaultDecimal = Decimal(22, 9)
-
-func Decimal(precision, scale uint32) Type {
-	return internal.DecimalType{
-		Precision: precision,
-		Scale:     scale,
-	}
-}
-
 // TODO(kamardin): rename types to consistent format like values: BoolType,
 // IntType and so on. Do not forget about code generation.
 
@@ -239,11 +230,10 @@ type RawValue interface {
 
 	// Decimal returns decimal value represented by big-endian 128 bit signed integer.
 	Decimal(t Type) (v [16]byte)
-	ODecimal(t Type) (v [16]byte)
 
 	// UnwrapDecimal returns decimal value represented by big-endian 128 bit signed
 	// integer and its types information.
-	UnwrapDecimal() (v [16]byte, precision, scale uint32)
+	UnwrapDecimal() Decimal
 	IsDecimal() bool
 	Err() error
 }
@@ -251,4 +241,26 @@ type RawValue interface {
 // Scanner scanning non-primitive yql types
 type Scanner interface {
 	UnmarshalYDB(res RawValue) error
+}
+
+type Decimal struct {
+	Bytes     [16]byte
+	Precision uint32
+	Scale     uint32
+}
+
+func (d *Decimal) Scan(x interface{}) error {
+	v, ok := x.(Decimal)
+	if !ok {
+		return convertError(v, x)
+	}
+	*d = v
+	return nil
+}
+
+func convertError(dst, src interface{}) error {
+	return fmt.Errorf(
+		"ydbsql: can not convert value types %[1]T (%[1]v) to a %[2]T",
+		src, dst,
+	)
 }

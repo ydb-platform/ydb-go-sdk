@@ -33,12 +33,7 @@ func (d *ydbWrapper) UnmarshalYDB(res types.RawValue) error {
 		res.Unwrap()
 	}
 	if res.IsDecimal() {
-		b, p, s := res.UnwrapDecimal()
-		*d.dst = Decimal{
-			Bytes:     b,
-			Precision: p,
-			Scale:     s,
-		}
+		*d.dst = res.UnwrapDecimal()
 	} else {
 		*d.dst = res.Any()
 	}
@@ -472,12 +467,6 @@ func checkNamedValue(v *driver.NamedValue) (err error) {
 	switch x := v.Value.(type) {
 	case types.Value:
 		// OK.
-
-	case valuer:
-		// Some ydbsql level types implement valuer interface.
-		// Currently it is a date/time types.
-		v.Value = x.Value()
-
 	case bool:
 		v.Value = types.BoolValue(x)
 	case int8:

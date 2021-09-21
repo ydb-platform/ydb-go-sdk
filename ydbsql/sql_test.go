@@ -445,7 +445,7 @@ func TestDriver(t *testing.T) {
 			seriesID    uint64
 			title       string
 			seriesInfo  string
-			releaseDate Date
+			releaseDate time.Time
 		)
 		err := rows.Scan(
 			&seriesID,
@@ -464,16 +464,14 @@ func TestDriver(t *testing.T) {
 		DECLARE $dt AS Datetime;
 		SELECT NULL, $dt;
 	`,
-		sql.Named("dt", Datetime(time.Now())),
+		sql.Named("dt", types.DateValueFromTime(time.Now())),
 	)
-	var a, b time.Time
-	if err := row.Scan(
-		Nullable((*Datetime)(&a)),
-		(*Datetime)(&b),
-	); err != nil {
+	var a, b sql.NullTime
+	err = row.Scan(&a, &b)
+	if err != nil {
 		t.Fatal(err)
 	}
-	log.Println("date now:", a, b)
+	log.Println("date now:", a.Time, b.Time)
 }
 
 func getSeriesData() types.Value {

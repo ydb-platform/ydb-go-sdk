@@ -489,8 +489,8 @@ var scannerData = []struct {
 	},
 }
 
-func initScanner() *Scanner {
-	res := Scanner{
+func initScanner() *scanner {
+	res := scanner{
 		set: &Ydb.ResultSet{
 			Columns:   nil,
 			Rows:      nil,
@@ -501,16 +501,15 @@ func initScanner() *Scanner {
 			v: nil,
 			p: 0,
 		},
-		nextRow:        0,
-		nextItem:       0,
-		setColumnIndex: nil,
-		columnIndexes:  nil,
-		err:            nil,
+		nextRow:       0,
+		nextItem:      0,
+		columnIndexes: nil,
+		err:           nil,
 	}
 	return &res
 }
 
-func PrepareScannerPerformanceTest(count int) *Scanner {
+func PrepareScannerPerformanceTest(count int) *scanner {
 	res := initScanner()
 	res.set.Columns = []*Ydb.Column{{
 		Name: "series_id",
