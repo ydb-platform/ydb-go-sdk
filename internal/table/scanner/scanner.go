@@ -17,11 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func Reset(s *scanner, set *Ydb.ResultSet, columnNames ...string) {
-	s.reset(set)
-	s.setColumnIndexes(columnNames)
-}
-
 type scanner struct {
 	set       *Ydb.ResultSet
 	row       *Ydb.Value
@@ -147,13 +142,14 @@ func (s *scanner) Err() error {
 }
 
 // Must not be exported.
-func (s *scanner) reset(set *Ydb.ResultSet) {
+func (s *scanner) reset(set *Ydb.ResultSet, columnNames ...string) {
 	s.set = set
 	s.row = nil
 	s.nextRow = 0
 	s.nextItem = 0
 	s.columnIndexes = nil
 	s.defaultValueForOptional = true
+	s.setColumnIndexes(columnNames)
 	s.stack.reset()
 	s.converter = &rawConverter{
 		scanner: s,

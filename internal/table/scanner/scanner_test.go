@@ -513,7 +513,7 @@ func TestScanSqlTypes(t *testing.T) {
 	s := initScanner()
 	for _, test := range scannerData {
 		set, expected := getResultSet(test.count, test.columns)
-		Reset(s, set, test.setColumns...)
+		s.reset(set, test.setColumns...)
 		var err error
 		for s.NextRow() {
 			if test.columns[0].testDefault {

@@ -248,19 +248,3 @@ type Decimal struct {
 	Precision uint32
 	Scale     uint32
 }
-
-func (d *Decimal) Scan(x interface{}) error {
-	v, ok := x.(Decimal)
-	if !ok {
-		return convertError(v, x)
-	}
-	*d = v
-	return nil
-}
-
-func convertError(dst, src interface{}) error {
-	return fmt.Errorf(
-		"ydbsql: can not convert value types %[1]T (%[1]v) to a %[2]T",
-		src, dst,
-	)
-}

@@ -49,7 +49,7 @@ func (r *Result) NextResultSet(ctx context.Context, columns ...string) bool {
 	if !r.HasNextResultSet() {
 		return r.nextStreamSet(ctx, columns...)
 	}
-	Reset(&r.scanner, r.Sets[r.nextSet], columns...)
+	r.reset(r.Sets[r.nextSet], columns...)
 	r.nextSet++
 	return true
 }
@@ -100,14 +100,14 @@ func (r *Result) nextStreamSet(ctx context.Context, columns ...string) bool {
 			}
 			return false
 		}
-		Reset(&r.scanner, s, columns...)
+		r.reset(s, columns...)
 		return true
 
 	case <-ctx.Done():
 		if r.err == nil {
 			r.err = ctx.Err()
 		}
-		Reset(&r.scanner, nil)
+		r.reset(nil)
 		return false
 	}
 }
