@@ -1,10 +1,13 @@
 package balancer
 
 import (
+	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
-	"testing"
 )
 
 var (
@@ -19,8 +22,8 @@ var (
 	}{
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo"},
-				{Host: "bar"},
+				{Addr: cluster.Addr{Host: "foo"}},
+				{Addr: cluster.Addr{Host: "bar"}},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -30,9 +33,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 0.2},
-				{Host: "bar", LoadFactor: 1},
-				{Host: "baz", LoadFactor: 1},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0.2},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 1},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 1},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -43,9 +46,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 1},
-				{Host: "bar", LoadFactor: 0.1},
-				{Host: "baz", LoadFactor: 0.9},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 1},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0.1},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0.9},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -56,12 +59,12 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 0.25},
-				{Host: "bar", LoadFactor: 1},
-				{Host: "baz", LoadFactor: 1},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0.25},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 1},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 1},
 			},
 			del: []cluster.Endpoint{
-				{Host: "foo"},
+				{Addr: cluster.Addr{Host: "foo"}},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -71,12 +74,12 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 1},
-				{Host: "bar", LoadFactor: 0.25},
-				{Host: "baz", LoadFactor: 0.25},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 1},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0.25},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0.25},
 			},
 			del: []cluster.Endpoint{
-				{Host: "foo"},
+				{Addr: cluster.Addr{Host: "foo"}},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -86,12 +89,12 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 1},
-				{Host: "bar", LoadFactor: 0.75},
-				{Host: "baz", LoadFactor: 0.25},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 1},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0.75},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0.25},
 			},
 			del: []cluster.Endpoint{
-				{Host: "bar"},
+				{Addr: cluster.Addr{Host: "bar"}},
 			},
 			repeat: 1200,
 			exp: map[string]int{
@@ -101,12 +104,12 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
 			},
 			del: []cluster.Endpoint{
-				{Host: "baz"},
+				{Addr: cluster.Addr{Host: "baz"}},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -116,23 +119,23 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
 			},
 			del: []cluster.Endpoint{
-				{Host: "foo"},
-				{Host: "bar"},
-				{Host: "baz"},
+				{Addr: cluster.Addr{Host: "foo"}},
+				{Addr: cluster.Addr{Host: "bar"}},
+				{Addr: cluster.Addr{Host: "baz"}},
 			},
 			repeat: 1,
 			err:    true,
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -146,9 +149,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -162,9 +165,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -181,9 +184,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 10},
-				{Host: "bar", LoadFactor: 20},
-				{Host: "baz", LoadFactor: 30},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 10},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 20},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 30},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -200,9 +203,9 @@ var (
 		},
 		{
 			add: []cluster.Endpoint{
-				{Host: "foo", LoadFactor: 10},
-				{Host: "bar", LoadFactor: 20},
-				{Host: "baz", LoadFactor: 30},
+				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 10},
+				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 20},
+				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 30},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -233,8 +236,8 @@ func TestRoundRobinBalancer(t *testing.T) {
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
-				melem[e.Host] = r.Insert(c, cluster.connInfo{
-					loadFactor: e.LoadFactor,
+				melem[e.Host] = r.Insert(c, info.Info{
+					LoadFactor: e.LoadFactor,
 				})
 			}
 			for _, e := range test.del {
@@ -286,8 +289,8 @@ func TestRandomChoiceBalancer(t *testing.T) {
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
-				melem[e.Host] = r.Insert(c, cluster.connInfo{
-					loadFactor: e.LoadFactor,
+				melem[e.Host] = r.Insert(c, info.Info{
+					LoadFactor: e.LoadFactor,
 				})
 			}
 			for _, e := range test.del {
