@@ -6,14 +6,15 @@ package ydbtest
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"net"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"unsafe"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
@@ -127,9 +128,12 @@ func (s *YDB) StartEndpoint() *Endpoint {
 	if err != nil {
 		s.T.Fatal(err)
 	}
+
 	e := cluster.Endpoint{
-		Host: host,
-		Port: port,
+		Addr: cluster.Addr{
+			Host: host,
+			Port: port,
+		},
 	}
 	srv := grpc.NewServer()
 	for _, desc := range s.descs {

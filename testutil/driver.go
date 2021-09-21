@@ -158,6 +158,10 @@ type Cluster struct {
 	onClose     func() error
 }
 
+func (c *Cluster) Secure() bool {
+	return true
+}
+
 func (c *Cluster) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 	if c.onInvoke == nil {
 		return fmt.Errorf("Cluster.onInvoke() not implemented")
