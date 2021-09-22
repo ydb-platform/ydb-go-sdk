@@ -23,6 +23,6 @@ var (
 			Timeout:             MinKeepaliveInterval,
 			PermitWithoutStream: true,
 		},
-		TTL: 0,
+		TTL: DefaultGrpcConnectionTTL,
 	}
 )
