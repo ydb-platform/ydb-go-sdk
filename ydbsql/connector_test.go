@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
@@ -160,7 +162,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 
 			c := Connector(
 				WithClient(
-					table.NewClient(
+					table2.NewClient(
 						testutil.NewDB(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
@@ -175,7 +177,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 									},
 								},
 							),
-						), table.Config{},
+						), table2.Config{},
 					),
 				),
 				WithDefaultExecDataQueryOption(options.WithQueryCachePolicy(test.queryCachePolicyOption...)),

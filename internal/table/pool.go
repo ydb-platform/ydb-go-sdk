@@ -52,7 +52,7 @@ type SessionBuilder interface {
 // A SessionPool is safe for use by multiple goroutines simultaneously.
 type SessionPool struct {
 	// Trace is an optional session lifetime tracing options.
-	//Trace sessiontrace.SessionPoolTrace
+	Trace SessionPoolTrace
 
 	// Builder holds an object capable for creating and deleting sessions.
 	// It must not be nil.
@@ -195,7 +195,6 @@ type createSessionResult struct {
 
 // p.mu must NOT be held.
 func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
-	//sessiontrace := contextCreateSessionTrace(ctx)
 	// pre-check the pool size
 	p.mu.Lock()
 	enoughSpace := p.createInProgress+len(p.index) < p.limit
@@ -203,7 +202,6 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 		p.createInProgress++
 	}
 	p.mu.Unlock()
-	//sessiontrace.onCheckEnoughSpace(enoughSpace)
 
 	if !enoughSpace {
 		return nil, ErrSessionPoolOverflow
@@ -211,7 +209,6 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 
 	resCh := make(chan createSessionResult, 1) // for non-block write
 
-	//createSessionGoroutineDone := sessiontrace.onCreateSessionGoroutineStart()
 	go func() {
 		var r createSessionResult
 
@@ -223,7 +220,6 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 		defer func() {
 			cancel()
 			close(resCh)
-			//createSessionGoroutineDone(r)
 		}()
 
 		r.s, r.err = p.Builder.CreateSession(ctx)
@@ -264,23 +260,17 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 		resCh <- r
 	}()
 
-	//sessiontrace.onStartSelect()
-
 	select {
 	case r := <-resCh:
-		//sessiontrace.onReadResult(r)
 		if r.s == nil && r.err == nil {
 			panic("ydb: abnormal result of pool.createSession()")
 		}
 		return r.s, r.err
 	case <-ctx.Done():
-		//sessiontrace.onContextDone()
 		// read result from resCh for prevention of forgetting session
 		go func() {
 			if r, ok := <-resCh; ok && r.s != nil {
-				err := r.s.Close(internal.ContextWithoutDeadline(ctx))
-				err = err
-				//sessiontrace.onPutSession(r.s, err)
+				_ = r.s.Close(internal.ContextWithoutDeadline(ctx))
 			}
 		}()
 		return nil, ctx.Err()
@@ -295,13 +285,13 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 	p.init()
 
 	var (
-		i = 0
-		//start = time.Now()
+		i     = 0
+		start = time.Now()
 	)
-	//getDone := table.sessionPoolTraceOnGet(p.Trace, ctx)
-	//defer func() {
-	//	getDone(ctx, s, time.Since(start), i, err)
-	//}()
+	getDone := sessionPoolTraceOnGet(p.Trace, ctx)
+	defer func() {
+		getDone(ctx, s.id, time.Since(start), i, err)
+	}()
 
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
@@ -349,7 +339,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		if ch == nil {
 			continue
 		}
-		//waitDone := table.sessionPoolTraceOnWait(p.Trace, ctx)
+		waitDone := sessionPoolTraceOnWait(p.Trace, ctx)
 		var ok bool
 		select {
 		case s, ok = <-*ch:
@@ -365,7 +355,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 				// for the next waiter – session could be lost for a long time.
 				p.putWaitCh(ch)
 			}
-			//waitDone(ctx, s, err)
+			waitDone(ctx, s.id, err)
 
 		case <-ctx.Done():
 			p.mu.Lock()
@@ -375,7 +365,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			p.waitq.Remove(el)
 			p.mu.Unlock()
 			err = ctx.Err()
-			//waitDone(ctx, s, err)
+			waitDone(ctx, s.id, err)
 			return nil, err
 		}
 	}
@@ -398,10 +388,10 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 	p.init()
 
-	//putDone := table.sessionPoolTraceOnPut(p.Trace, ctx, s)
-	//defer func() {
-	//	putDone(ctx, s, err)
-	//}()
+	putDone := sessionPoolTraceOnPut(p.Trace, ctx, s.id)
+	defer func() {
+		putDone(ctx, s.id, err)
+	}()
 
 	p.mu.Lock()
 	switch {
@@ -441,8 +431,8 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err error) {
 	p.init()
 
-	//takeWait := table.sessionPoolTraceOnTake(p.Trace, ctx, s)
-	//var takeDone func(_ context.Context, _ *Session, took bool, _ error)
+	takeWait := sessionPoolTraceOnTake(p.Trace, ctx, s.id)
+	var takeDone func(_ context.Context, _ string, took bool, _ error)
 
 	if p.isClosed() {
 		return false, ErrSessionPoolClosed
@@ -452,7 +442,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
-		//takeDone = takeWait(ctx, s)
+		takeDone = takeWait(ctx, s.id)
 
 		// Keepalive processing takes place right now.
 		// Try to await touched session before creation of new one.
@@ -465,9 +455,9 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 
 		p.mu.Lock()
 	}
-	/*defer func() {
-		takeDone(ctx, s, took, err)
-	}()*/
+	defer func() {
+		takeDone(ctx, s.id, took, err)
+	}()
 	p.mu.Unlock()
 
 	if !has {
@@ -482,10 +472,10 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 	p.init()
 
-	//createDone := table.sessionPoolTraceOnCreate(p.Trace, ctx)
-	//defer func() {
-	//	createDone(ctx, s, err)
-	//}()
+	createDone := sessionPoolTraceOnCreate(p.Trace, ctx)
+	defer func() {
+		createDone(ctx, s.id, err)
+	}()
 
 	const maxAttempts = 10
 	for i := 0; i < maxAttempts; i++ {
@@ -526,10 +516,10 @@ func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
 func (p *SessionPool) Close(ctx context.Context) (err error) {
 	p.init()
 
-	//closeDone := table.sessionPoolTraceOnClose(p.Trace, ctx)
-	//defer func() {
-	//	closeDone(ctx, err)
-	//}()
+	closeDone := sessionPoolTraceOnClose(p.Trace, ctx)
+	defer func() {
+		closeDone(ctx, err)
+	}()
 
 	if p.isClosed() {
 		return
@@ -864,10 +854,10 @@ func (p *SessionPool) CloseSession(ctx context.Context, s *Session) error {
 		internal.ContextWithoutDeadline(ctx),
 		p.DeleteTimeout,
 	)
-	//closeSessionDone := table.sessionPoolTraceOnCloseSession(p.Trace, ctx, s)
+	closeSessionDone := sessionPoolTraceOnCloseSession(p.Trace, ctx, s.id)
 	go func() {
 		defer cancel()
-		//closeSessionDone(ctx, s, s.Close(ctx))
+		closeSessionDone(ctx, s.id, s.Close(ctx))
 	}()
 	return nil
 }
@@ -996,8 +986,4 @@ type SessionPoolStats struct {
 	MinSize          int
 	MaxSize          int
 	CreateInProgress int
-	// Deprecated: always zero
-	Ready int
-	// Deprecated: always zero
-	BusyCheck int
 }

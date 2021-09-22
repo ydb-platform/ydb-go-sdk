@@ -8,9 +8,10 @@ import (
 	"path"
 	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ydbsql"
 )

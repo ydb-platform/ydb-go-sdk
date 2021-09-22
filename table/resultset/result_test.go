@@ -1,19 +1,17 @@
-package table
+package resultset
 
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"reflect"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestResultAny(t *testing.T) {

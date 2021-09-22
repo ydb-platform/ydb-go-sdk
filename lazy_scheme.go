@@ -3,18 +3,20 @@ package ydb
 import (
 	context "context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type dbWithTable interface {
 	DB
 
-	Table() table.Client
+	Table() table2.Client
 }
 
 type lazyScheme struct {

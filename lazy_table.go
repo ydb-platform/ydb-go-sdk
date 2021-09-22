@@ -5,12 +5,13 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type lazyTable struct {
 	db     DB
-	config table.Config
-	client table.Client
+	config table2.Config
+	client table2.Client
 	m      sync.Mutex
 }
 
@@ -31,7 +32,7 @@ func (t *lazyTable) Retry(ctx context.Context, retryNoIdempotent bool, op table.
 	return t.client.Retry(ctx, retryNoIdempotent, op)
 }
 
-func newTable(db DB, config table.Config) *lazyTable {
+func newTable(db DB, config table2.Config) *lazyTable {
 	return &lazyTable{
 		db:     db,
 		config: config,
@@ -40,12 +41,12 @@ func newTable(db DB, config table.Config) *lazyTable {
 
 func (t *lazyTable) init() {
 	t.m.Lock()
-	t.client = table.NewClient(t.db, t.config)
+	t.client = table2.NewClient(t.db, t.config)
 	t.m.Unlock()
 }
 
-func tableConfig(o options) table.Config {
-	config := table.DefaultConfig()
+func tableConfig(o options) table2.Config {
+	config := table2.DefaultConfig()
 	if o.tableClientTrace != nil {
 		//config.Trace = *o.tableClientTrace
 	}

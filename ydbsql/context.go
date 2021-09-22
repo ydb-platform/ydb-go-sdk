@@ -2,7 +2,8 @@ package ydbsql
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type ctxScanQueryKey struct{}

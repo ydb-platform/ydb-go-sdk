@@ -22,29 +22,29 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-// client contains logic of creation of ydb table sessions.
-type client struct {
-	//trace   sessiontrace.Trace
-	cluster cluster.DB
-	pool    SessionProvider
+// Session represents a single table API session.
+//
+// Session methods are not goroutine safe. Simultaneous execution of requests
+// are forbidden within a single session.
+//
+// Note that after Session is no longer needed it should be destroyed by
+// Close() call.
+type Session struct {
+	id           string
+	conn         cluster.ClientConnInterface
+	tableService Ydb_Table_V1.TableServiceClient
+	trace        Trace
+	closeMux     sync.Mutex
+	closed       bool
+	onClose      []func()
 }
 
-type ClientOption func(c *client)
-
-/*func WithClientTraceOption(sessiontrace sessiontrace.Trace) ClientOption {
-	return func(c *client) {
-		c.trace = sessiontrace
-	}
-}
-*/
-// CreateSession creates new session instance.
-// Unused sessions must be destroyed.
-func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {
-	/*createSessionDone := table.clientTraceOnCreateSession(c.trace, ctx)
+func CreateSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session, err error) {
+	createSessionDone := traceOnCreateSession(trace, ctx)
 	start := time.Now()
 	defer func() {
-		createSessionDone(ctx, s, s.Address(), time.Since(start), err)
-	}()*/
+		createSessionDone(ctx, s.id, s.Address(), time.Since(start), err)
+	}()
 	var (
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
@@ -53,7 +53,7 @@ func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	var cc cluster.ClientConnInterface
-	response, err = Ydb_Table_V1.NewTableServiceClient(c.cluster).CreateSession(
+	response, err = Ydb_Table_V1.NewTableServiceClient(cl).CreateSession(
 		cluster.WithClientConnApplier(
 			ctx,
 			func(c cluster.ClientConnInterface) {
@@ -70,39 +70,16 @@ func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {
 		return nil, err
 	}
 	s = &Session{
-		ID:           result.SessionId,
+		id:           result.SessionId,
 		conn:         cc,
 		tableService: Ydb_Table_V1.NewTableServiceClient(cc),
-		c:            *c,
+		trace:        trace,
 	}
 	return
 }
 
-func (c *client) Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error, issues []error) {
-	return c.pool.Retry(ctx, retryNoIdempotent, op)
-}
-
-// Close closes session client instance.
-func (c *client) Close(ctx context.Context) (err error) {
-	return c.pool.Close(ctx)
-}
-
-// Session represents a single table API session.
-//
-// Session methods are not goroutine safe. Simultaneous execution of requests
-// are forbidden within a single session.
-//
-// Note that after Session is no longer needed it should be destroyed by
-// Close() call.
-type Session struct {
-	ID string
-
-	conn         cluster.ClientConnInterface
-	tableService Ydb_Table_V1.TableServiceClient
-	c            client
-	closeMux     sync.Mutex
-	closed       bool
-	onClose      []func()
+func (s *Session) GetID() string {
+	return s.id
 }
 
 func (s *Session) OnClose(cb func()) {
@@ -121,19 +98,19 @@ func (s *Session) Close(ctx context.Context) (err error) {
 		return nil
 	}
 	s.closed = true
-	//deleteSessionDone := table.clientTraceOnDeleteSession(s.c.sessiontrace, ctx, s)
-	//start := time.Now()
+	deleteSessionDone := traceOnDeleteSession(s.trace, ctx, s.id)
+	start := time.Now()
 	defer func() {
 		for _, cb := range s.onClose {
 			cb()
 		}
-		//deleteSessionDone(ctx, s, time.Since(start), err)
+		deleteSessionDone(ctx, s.id, time.Since(start), err)
 	}()
 	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	_, err = s.tableService.DeleteSession(ctx, &Ydb_Table.DeleteSessionRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 	})
 	return err
 }
@@ -147,10 +124,10 @@ func (s *Session) Address() string {
 
 // KeepAlive keeps idle session alive.
 func (s *Session) KeepAlive(ctx context.Context) (info options.SessionInfo, err error) {
-	//keepAliveDone := table.clientTraceOnKeepAlive(s.c.sessiontrace, ctx, s)
-	//defer func() {
-	//	keepAliveDone(ctx, s, info, err)
-	//}()
+	keepAliveDone := traceOnKeepAlive(s.trace, ctx, s.id)
+	defer func() {
+		keepAliveDone(ctx, s.id, info, err)
+	}()
 	var result Ydb_Table.KeepAliveResult
 	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
@@ -162,7 +139,7 @@ func (s *Session) KeepAlive(ctx context.Context) (info options.SessionInfo, err 
 		panic("nil table service")
 	}
 	resp, err := s.tableService.KeepAlive(ctx, &Ydb_Table.KeepAliveRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 	})
 	if err != nil {
 		return
@@ -183,7 +160,7 @@ func (s *Session) KeepAlive(ctx context.Context) (info options.SessionInfo, err 
 // CreateTable creates table at given path with given options.
 func (s *Session) CreateTable(ctx context.Context, path string, opts ...options.CreateTableOption) (err error) {
 	request := Ydb_Table.CreateTableRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 		Path:      path,
 	}
 	for _, opt := range opts {
@@ -200,7 +177,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		result   Ydb_Table.DescribeTableResult
 	)
 	request := Ydb_Table.DescribeTableRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 		Path:      path,
 	}
 	for _, opt := range opts {
@@ -306,7 +283,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 // DropTable drops table at given path with given options.
 func (s *Session) DropTable(ctx context.Context, path string, opts ...options.DropTableOption) (err error) {
 	request := Ydb_Table.DropTableRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 		Path:      path,
 	}
 	for _, opt := range opts {
@@ -319,7 +296,7 @@ func (s *Session) DropTable(ctx context.Context, path string, opts ...options.Dr
 // AlterTable modifies schema of table at given path with given options.
 func (s *Session) AlterTable(ctx context.Context, path string, opts ...options.AlterTableOption) (err error) {
 	request := Ydb_Table.AlterTableRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 		Path:      path,
 	}
 	for _, opt := range opts {
@@ -332,7 +309,7 @@ func (s *Session) AlterTable(ctx context.Context, path string, opts ...options.A
 // CopyTable creates copy of table at given path.
 func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...options.CopyTableOption) (err error) {
 	request := Ydb_Table.CopyTableRequest{
-		SessionId:       s.ID,
+		SessionId:       s.id,
 		SourcePath:      src,
 		DestinationPath: dst,
 	}
@@ -359,7 +336,7 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	response, err = s.tableService.ExplainDataQuery(ctx, &Ydb_Table.ExplainDataQueryRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 		YqlText:   query,
 	})
 	if err != nil {
@@ -391,10 +368,10 @@ func (s *Statement) Execute(
 ) (
 	txr *Transaction, r resultset.Result, err error,
 ) {
-	//executeDataQueryDone := table.clientTraceOnExecuteDataQuery(s.session.c.sessiontrace, ctx, s.session, tx.id(), s.query, params)
-	//defer func() {
-	//	executeDataQueryDone(ctx, s.session, GetTransactionID(txr), s.query, params, true, r, err)
-	//}()
+	executeDataQueryDone := traceOnExecuteDataQuery(s.session.trace, ctx, s.session.id, tx.id(), s.query, params)
+	defer func() {
+		executeDataQueryDone(ctx, s.session.id, GetTransactionID(txr), s.query, params, true, r, err)
+	}()
 	return s.execute(ctx, tx, params, opts...)
 }
 
@@ -424,21 +401,21 @@ func (s *Statement) Text() string {
 // Prepare prepares data query within session s.
 func (s *Session) Prepare(ctx context.Context, query string) (stmt *Statement, err error) {
 	var (
-		//cached   bool
+		cached   bool
 		q        *DataQuery
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 	)
-	//prepareDataQueryDone := table.clientTraceOnPrepareDataQuery(s.c.sessiontrace, ctx, s, query)
-	//defer func() {
-	//	prepareDataQueryDone(ctx, s, query, q, cached, err)
-	//}()
+	prepareDataQueryDone := traceOnPrepareDataQuery(s.trace, ctx, s.id, query)
+	defer func() {
+		prepareDataQueryDone(ctx, s.id, query, q, cached, err)
+	}()
 
 	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	response, err = s.tableService.PrepareDataQuery(ctx, &Ydb_Table.PrepareDataQueryRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 		YqlText:   query,
 	})
 	if err != nil {
@@ -473,10 +450,10 @@ func (s *Session) Execute(
 	q := new(DataQuery)
 	q.initFromText(query)
 
-	//executeDataQueryDone := table.clientTraceOnExecuteDataQuery(s.c.sessiontrace, ctx, s, tx.id(), q, params)
-	//defer func() {
-	//	executeDataQueryDone(ctx, s, GetTransactionID(txr), q, params, true, r, err)
-	//}()
+	executeDataQueryDone := traceOnExecuteDataQuery(s.trace, ctx, s.id, tx.id(), q, params)
+	defer func() {
+		executeDataQueryDone(ctx, s.id, GetTransactionID(txr), q, params, true, r, err)
+	}()
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
 	if err != nil {
@@ -529,7 +506,7 @@ func (s *Session) executeDataQuery(
 	)
 	result = &Ydb_Table.ExecuteQueryResult{}
 	request = &Ydb_Table.ExecuteDataQueryRequest{
-		SessionId:  s.ID,
+		SessionId:  s.id,
 		TxControl:  &tx.desc,
 		Parameters: params.params(),
 		Query:      &query.query,
@@ -551,7 +528,7 @@ func (s *Session) executeDataQuery(
 // ExecuteSchemeQuery executes scheme query.
 func (s *Session) ExecuteSchemeQuery(ctx context.Context, query string, opts ...options.ExecuteSchemeQueryOption) (err error) {
 	request := Ydb_Table.ExecuteSchemeQueryRequest{
-		SessionId: s.ID,
+		SessionId: s.id,
 		YqlText:   query,
 	}
 	for _, opt := range opts {
@@ -671,7 +648,7 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options.TableO
 func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ resultset.Result, err error) {
 	var (
 		request = Ydb_Table.ReadTableRequest{
-			SessionId: s.ID,
+			SessionId: s.id,
 			Path:      path,
 		}
 		response Ydb_Table.ReadTableResponse
@@ -685,10 +662,10 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...opti
 
 	client, err = s.tableService.StreamReadTable(ctx, &request)
 
-	//streamReadTableDone := table.clientTraceOnStreamReadTable(s.c.sessiontrace, ctx, s)
+	streamReadTableDone := traceOnStreamReadTable(s.trace, ctx, s.id)
 	if err != nil {
 		cancel()
-		//streamReadTableDone(ctx, s, nil, err)
+		streamReadTableDone(ctx, s.id, nil, err)
 		return nil, err
 	}
 
@@ -700,7 +677,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		defer func() {
 			close(r.SetCh)
 			cancel()
-			//streamReadTableDone(ctx, s, r, err)
+			streamReadTableDone(ctx, s.id, r, err)
 		}()
 		for {
 			select {
@@ -750,10 +727,10 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 	client, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
 
-	//streamExecuteScanQueryDone := table.clientTraceOnStreamExecuteScanQuery(s.c.sessiontrace, ctx, s, q, params)
+	streamExecuteScanQueryDone := traceOnStreamExecuteScanQuery(s.trace, ctx, s.id, q, params)
 	if err != nil {
 		cancel()
-		//streamExecuteScanQueryDone(ctx, s, q, params, nil, err)
+		streamExecuteScanQueryDone(ctx, s.id, q, params, nil, err)
 		return nil, err
 	}
 
@@ -765,7 +742,7 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		defer func() {
 			close(r.SetCh)
 			cancel()
-			//streamExecuteScanQueryDone(ctx, s, q, params, r, err)
+			streamExecuteScanQueryDone(ctx, s.id, q, params, r, err)
 		}()
 		for {
 			select {
@@ -805,10 +782,10 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows types.Value
 // BeginTransaction begins new transaction within given session with given
 // settings.
 func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings) (x *Transaction, err error) {
-	//beginTransactionDone := table.clientTraceOnBeginTransaction(s.c.sessiontrace, ctx, s)
-	//defer func() {
-	//	beginTransactionDone(ctx, s, GetTransactionID(x), err)
-	//}()
+	beginTransactionDone := traceOnBeginTransaction(s.trace, ctx, s.id)
+	defer func() {
+		beginTransactionDone(ctx, s.id, GetTransactionID(x), err)
+	}()
 	var (
 		result   Ydb_Table.BeginTransactionResult
 		response *Ydb_Table.BeginTransactionResponse
@@ -817,7 +794,7 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	response, err = s.tableService.BeginTransaction(ctx, &Ydb_Table.BeginTransactionRequest{
-		SessionId:  s.ID,
+		SessionId:  s.id,
 		TxSettings: &tx.settings,
 	})
 	if err != nil {
@@ -864,13 +841,13 @@ func (tx *Transaction) ExecuteStatement(
 
 // CommitTx commits specified active transaction.
 func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r resultset.Result, err error) {
-	//commitTransactionDone := table.clientTraceOnCommitTransaction(tx.s.c.sessiontrace, ctx, tx.s, tx.id)
-	//defer func() {
-	//	commitTransactionDone(ctx, tx.s, tx.id, err)
-	//}()
+	commitTransactionDone := traceOnCommitTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
+	defer func() {
+		commitTransactionDone(ctx, tx.s.id, tx.id, err)
+	}()
 	var (
 		request = &Ydb_Table.CommitTransactionRequest{
-			SessionId: tx.s.ID,
+			SessionId: tx.s.id,
 			TxId:      tx.id,
 		}
 		response *Ydb_Table.CommitTransactionResponse
@@ -895,15 +872,15 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *Transaction) Rollback(ctx context.Context) (err error) {
-	//rollbackTransactionDone := table.clientTraceOnRollbackTransaction(tx.s.c.sessiontrace, ctx, tx.s, tx.id)
-	//defer func() {
-	//	rollbackTransactionDone(ctx, tx.s, tx.id, err)
-	//}()
+	rollbackTransactionDone := traceOnRollbackTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
+	defer func() {
+		rollbackTransactionDone(ctx, tx.s.id, tx.id, err)
+	}()
 	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	_, err = tx.s.tableService.RollbackTransaction(ctx, &Ydb_Table.RollbackTransactionRequest{
-		SessionId: tx.s.ID,
+		SessionId: tx.s.id,
 		TxId:      tx.id,
 	})
 	return err
