@@ -19,7 +19,6 @@ type options struct {
 	driverTrace                          *trace.DriverTrace
 	driverConfig                         *config.Config
 	credentials                          icredentials.Credentials
-	connectionTTL                        *time.Duration
 	discoveryInterval                    *time.Duration
 	tableSessionPoolTrace                *sessiontrace.SessionPoolTrace
 	tableSessionPoolSizeLimit            *int
@@ -75,9 +74,9 @@ func WithDriverConfig(config *config.Config) Option {
 	}
 }
 
-func WithConnectionTTL(ttl time.Duration) Option {
+func WithKeepalivePolicy(policy *config.KeepalivePolicy) Option {
 	return func(ctx context.Context, c *db) error {
-		c.options.connectionTTL = &ttl
+		c.options.driverConfig.KeepalivePolicy = policy
 		return nil
 	}
 }

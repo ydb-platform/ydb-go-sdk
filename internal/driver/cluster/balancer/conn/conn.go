@@ -64,11 +64,13 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 			return nil, err
 		}
 		c.grpcConn = raw
-		if c.runtime.GetState() != state.Banned {
-			c.runtime.SetState(state.Online)
-		}
 	}
-	c.timer.Reset(c.config.ConnectionTLL())
+	if c.runtime.GetState() != state.Banned {
+		c.runtime.SetState(state.Online)
+	}
+	if c.config.KeepalivePolicy().Timeout < 0 {
+		c.timer.Reset(-c.config.KeepalivePolicy().Timeout)
+	}
 	return c.grpcConn, nil
 }
 
@@ -87,7 +89,10 @@ func (c *conn) IsReady() bool {
 }
 
 func (c *conn) waitClose() {
-	c.timer.Reset(c.config.ConnectionTLL())
+	if c.config.KeepalivePolicy().Timeout >= 0 {
+		return
+	}
+	c.timer.Reset(-c.config.KeepalivePolicy().Timeout)
 	for {
 		select {
 		case <-c.done:
@@ -284,7 +289,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}, nil
 }
 
-func New(addr cluster.Addr, dial func(context.Context, string, int) (*grpc.ClientConn, error), cfg Config) Conn {
+func New(ctx context.Context, addr cluster.Addr, dial func(context.Context, string, int) (*grpc.ClientConn, error), cfg Config) Conn {
 	c := &conn{
 		addr:    addr,
 		dial:    dial,
@@ -293,7 +298,13 @@ func New(addr cluster.Addr, dial func(context.Context, string, int) (*grpc.Clien
 		done:    make(chan struct{}),
 		runtime: runtime.New(),
 	}
-	if cfg.ConnectionTLL() > 0 {
+	if !cfg.KeepalivePolicy().LazyConnect {
+		raw, err := c.dial(ctx, c.addr.Host, c.addr.Port)
+		if err == nil {
+			c.grpcConn = raw
+		}
+	}
+	if cfg.KeepalivePolicy().Timeout < 0 {
 		go c.waitClose()
 	}
 	return c

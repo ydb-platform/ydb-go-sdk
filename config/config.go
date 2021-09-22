@@ -50,34 +50,13 @@ type Config struct {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval time.Duration
 
-	// ConnectionTTL is a time to live duration for close idle grpc connection
-	// If ConnectionTTL less or equal zero grpc connections will always stay
-	// online. If ConnectionTTL is positive^ then grpc connections will be used
-	// with lazy dialing and idle connections will be automatically closed after
-	// expiration ConnectionTTL
-	ConnectionTTL time.Duration
+	// KeepalivePolicy define lifecycle behaviour of grpc connection
+	// By default KeepalivePolicy is sets to DefaultKeepalivePolicy
+	KeepalivePolicy *KeepalivePolicy
 
 	// BalancingConfig is an optional configuration related to selected
 	// BalancingMethod. That is, some balancing methods allow to be configured.
 	BalancingConfig balancer.Config
-
-	// PreferLocalEndpoints adds endpoint selection logic when local endpoints
-	// are always used first.
-	// When no alive local endpoints left other endpoints will be used.
-	//
-	// NOTE: some balancing methods (such as p2c) also may use knowledge of
-	// endpoint's locality. Difference is that with PreferLocalEndpoints local
-	// endpoints selected separately from others. That is, if there at least
-	// one local endpoint it will be used regardless of its performance
-	// indicators.
-	//
-	// NOTE: currently driver (and even ydb itself) does not track load factor
-	// of each endpoint properly. Enabling this option may lead to the
-	// situation, when all but one nodes in local datacenter become inactive
-	// and all clients will overload this single instance very quickly. That
-	// is, currently this option may be called as experimental.
-	// You have been warned.
-	PreferLocalEndpoints bool
 
 	// RequestsType set an additional types hint to all requests.
 	// It is needed only for debug purposes and advanced cases.
@@ -88,12 +67,20 @@ type Config struct {
 	FastDial bool
 }
 
-func (d *Config) WithDefaults() (c Config) {
-	if d != nil {
-		c = *d
-	}
-	if c.DiscoveryInterval == 0 {
-		c.DiscoveryInterval = discovery.DefaultDiscoveryInterval
+type option func(c *Config)
+
+func New(opts ...option) *Config {
+	c := defaults()
+	for _, o := range opts {
+		o(c)
 	}
 	return c
+}
+
+func defaults() (c *Config) {
+	return &Config{
+		DiscoveryInterval: discovery.DefaultDiscoveryInterval,
+		KeepalivePolicy:   &DefaultKeepalivePolicy,
+		BalancingConfig:   balancer.Default,
+	}
 }

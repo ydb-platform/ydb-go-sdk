@@ -272,7 +272,7 @@ func (c *cluster) Insert(ctx context.Context, e public.Endpoint, opts ...option)
 		LoadFactor: e.LoadFactor,
 		Local:      e.Local,
 	}
-	conn := conn.New(addr, c.dial, opt.connConfig)
+	conn := conn.New(ctx, addr, c.dial, opt.connConfig)
 	var wait chan struct{}
 	defer func() {
 		if wait != nil {

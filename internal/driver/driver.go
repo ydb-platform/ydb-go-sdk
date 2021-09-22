@@ -80,6 +80,6 @@ func (d *driver) StreamTimeout() time.Duration {
 	return d.Config.StreamTimeout
 }
 
-func (d *driver) ConnectionTLL() time.Duration {
-	return d.Config.ConnectionTTL
+func (d *driver) KeepalivePolicy() *conn.KeepalivePolicy {
+	return (*conn.KeepalivePolicy)(d.Config.KeepalivePolicy)
 }
