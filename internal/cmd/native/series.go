@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
-	options2 "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"log"
 	"os"
 	"path"
 	"text/template"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 
@@ -78,10 +79,10 @@ func readTable(ctx context.Context, c table.Client, path string) error {
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			res, err = s.StreamReadTable(ctx, path,
-				options2.ReadOrdered(),
-				options2.ReadColumn("series_id"),
-				options2.ReadColumn("title"),
-				options2.ReadColumn("release_date"),
+				options.ReadOrdered(),
+				options.ReadColumn("series_id"),
+				options.ReadColumn("title"),
+				options.ReadColumn("release_date"),
 			)
 			return
 		},
@@ -138,7 +139,7 @@ func readTable(ctx context.Context, c table.Client, path string) error {
 }
 
 func describeTableOptions(ctx context.Context, c table.Client) error {
-	var desc options2.TableOptionsDescription
+	var desc options.TableOptionsDescription
 	err, issues := c.Retry(
 		ctx,
 		false,
@@ -216,10 +217,10 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 				table.NewQueryParameters(
 					table.ValueParam("$seriesID", types.Uint64Value(1)),
 				),
-				options2.WithQueryCachePolicy(
-					options2.WithQueryCachePolicyKeepInCache(),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
 				),
-				options2.WithCollectStatsModeBasic(),
+				options.WithCollectStatsModeBasic(),
 			)
 			return
 		},
@@ -363,12 +364,12 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
-				options2.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options2.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options2.WithColumn("series_info", types.Optional(types.TypeUTF8)),
-				options2.WithColumn("release_date", types.Optional(types.TypeUint64)),
-				options2.WithColumn("comment", types.Optional(types.TypeUTF8)),
-				options2.WithPrimaryKeyColumn("series_id"),
+				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
+				options.WithColumn("release_date", types.Optional(types.TypeUint64)),
+				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
+				options.WithPrimaryKeyColumn("series_id"),
 			)
 		},
 	)
@@ -386,12 +387,12 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "seasons"),
-				options2.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options2.WithColumn("season_id", types.Optional(types.TypeUint64)),
-				options2.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options2.WithColumn("first_aired", types.Optional(types.TypeUint64)),
-				options2.WithColumn("last_aired", types.Optional(types.TypeUint64)),
-				options2.WithPrimaryKeyColumn("series_id", "season_id"),
+				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("first_aired", types.Optional(types.TypeUint64)),
+				options.WithColumn("last_aired", types.Optional(types.TypeUint64)),
+				options.WithPrimaryKeyColumn("series_id", "season_id"),
 			)
 		},
 	)
@@ -409,12 +410,12 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 		false,
 		func(ctx context.Context, s *table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "episodes"),
-				options2.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options2.WithColumn("season_id", types.Optional(types.TypeUint64)),
-				options2.WithColumn("episode_id", types.Optional(types.TypeUint64)),
-				options2.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options2.WithColumn("air_date", types.Optional(types.TypeUint64)),
-				options2.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
+				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("air_date", types.Optional(types.TypeUint64)),
+				options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			)
 		},
 	)

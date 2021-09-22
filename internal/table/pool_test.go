@@ -55,22 +55,6 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 			)
 			defer cancel()
 			s, err := p.createSession(ctx)
-			/*withCreateSessionTrace(
-				ctx,
-				table.createSessionTrace{
-					OnStartSelect: func() {
-						runtime.Gosched() // for force run create session goroutine
-					},
-					OnReadResult: func(r table.createSessionResult) {
-						if r.s == nil && r.err == nil {
-							t.Fatalf("unexpected result: <%v, %vz>", r.s, r.err)
-						}
-					},
-					OnPutSession: func(s *Session, err error) {
-						fmt.Println("put session", s, err)
-					},
-				},
-			),*/
 
 			if s == nil && err == nil {
 				t.Fatalf("unexpected result: <%v, %v>", s, err)

@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"io"
 
-	options2 "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -272,11 +270,11 @@ func (c *sqlConn) txControl() *table.TransactionControl {
 	return c.txc
 }
 
-func (c *sqlConn) dataOpts() []options2.ExecuteDataQueryOption {
+func (c *sqlConn) dataOpts() []options.ExecuteDataQueryOption {
 	return c.connector.dataOpts
 }
 
-func (c *sqlConn) scanOpts() []options2.ExecuteScanQueryOption {
+func (c *sqlConn) scanOpts() []options.ExecuteScanQueryOption {
 	return c.connector.scanOpts
 }
 
@@ -530,7 +528,7 @@ type rows struct {
 func (r *rows) Columns() []string {
 	var i int
 	cs := make([]string, r.res.CurrentResultSet().ColumnCount())
-	r.res.CurrentResultSet().Columns(func(m options2.Column) {
+	r.res.CurrentResultSet().Columns(func(m options.Column) {
 		cs[i] = m.Name
 		i++
 	})
@@ -571,7 +569,7 @@ type stream struct {
 func (r *stream) Columns() []string {
 	var i int
 	cs := make([]string, r.res.CurrentResultSet().ColumnCount())
-	r.res.CurrentResultSet().Columns(func(m options2.Column) {
+	r.res.CurrentResultSet().Columns(func(m options.Column) {
 		cs[i] = m.Name
 		i++
 	})

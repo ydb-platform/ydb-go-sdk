@@ -20,24 +20,6 @@ func ContextClientTrace(ctx context.Context) Trace {
 	return t
 }
 
-type createSessionTraceContextKey struct{}
-
-//// withCreateSessionTrace returns context which has associated createSessionTrace with it.
-//func withCreateSessionTrace(ctx context.Context, t createSessionTrace) context.Context {
-//	return context.WithValue(ctx,
-//		createSessionTraceContextKey{},
-//		contextCreateSessionTrace(ctx).Compose(t),
-//	)
-//}
-//
-//// contextCreateSessionTrace returns createSessionTrace associated with ctx.
-//// If there is no createSessionTrace associated with ctx then zero value
-//// of createSessionTrace is returned.
-//func contextCreateSessionTrace(ctx context.Context) createSessionTrace {
-//	t, _ := ctx.Value(createSessionTraceContextKey{}).(createSessionTrace)
-//	return t
-//}
-
 type sessionPoolTraceContextKey struct{}
 
 // WithSessionPoolTrace returns context which has associated SessionPoolTrace with it.
