@@ -163,12 +163,12 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				got  = make(chan error)
 			)
 			go func() {
-				_, err := p.Get(sessiontrace.WithSessionPoolTrace(context.Background(), sessiontrace.SessionPoolTrace{
-					OnGet: func(sessiontrace.SessionPoolGetStartInfo) func(sessiontrace.SessionPoolGetDoneInfo) {
+				_, err := p.Get(sessiontrace.WithSessionPoolTrace(context.Background(), SessionPoolTrace{
+					OnGet: func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
 						get <- struct{}{}
 						return nil
 					},
-					OnWait: func(sessiontrace.SessionPoolWaitStartInfo) func(sessiontrace.SessionPoolWaitDoneInfo) {
+					OnWait: func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
 						return nil
 					},
@@ -264,16 +264,16 @@ func TestSessionPoolClose(t *testing.T) {
 	if err := p.Put(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
-			sessiontrace.SessionPoolTrace{
-				OnPut: func(info sessiontrace.SessionPoolPutStartInfo) func(sessiontrace.SessionPoolPutDoneInfo) {
+			SessionPoolTrace{
+				OnPut: func(info SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolPutDoneInfo) {
+					return func(info SessionPoolPutDoneInfo) {
 						wg.Done()
 					}
 				},
-				OnCloseSession: func(info sessiontrace.SessionPoolCloseSessionStartInfo) func(doneInfo sessiontrace.SessionPoolCloseSessionDoneInfo) {
+				OnCloseSession: func(info SessionPoolCloseSessionStartInfo) func(doneInfo SessionPoolCloseSessionDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolCloseSessionDoneInfo) {
+					return func(info SessionPoolCloseSessionDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -332,12 +332,12 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				defer func() {
 					close(got)
 				}()
-				_, _ = p.Get(sessiontrace.WithSessionPoolTrace(context.Background(), sessiontrace.SessionPoolTrace{
-					OnGet: func(sessiontrace.SessionPoolGetStartInfo) func(sessiontrace.SessionPoolGetDoneInfo) {
+				_, _ = p.Get(sessiontrace.WithSessionPoolTrace(context.Background(), SessionPoolTrace{
+					OnGet: func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
 						get <- struct{}{}
 						return nil
 					},
-					OnWait: func(sessiontrace.SessionPoolWaitStartInfo) func(sessiontrace.SessionPoolWaitDoneInfo) {
+					OnWait: func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
 						return nil
 					},
@@ -523,12 +523,12 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				got  = make(chan sessionAndError)
 			)
 			go func() {
-				ctx := sessiontrace.WithSessionPoolTrace(context.Background(), sessiontrace.SessionPoolTrace{
-					OnGet: func(sessiontrace.SessionPoolGetStartInfo) func(sessiontrace.SessionPoolGetDoneInfo) {
+				ctx := sessiontrace.WithSessionPoolTrace(context.Background(), SessionPoolTrace{
+					OnGet: func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
 						get <- struct{}{}
 						return nil
 					},
-					OnWait: func(sessiontrace.SessionPoolWaitStartInfo) func(sessiontrace.SessionPoolWaitDoneInfo) {
+					OnWait: func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
 						return nil
 					},
@@ -1215,10 +1215,10 @@ func mustCreateSession(t *testing.T, p *SessionPool) *Session {
 	s, err := p.Create(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
-			sessiontrace.SessionPoolTrace{
-				OnCreate: func(info sessiontrace.SessionPoolCreateStartInfo) func(sessiontrace.SessionPoolCreateDoneInfo) {
+			SessionPoolTrace{
+				OnCreate: func(info SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolCreateDoneInfo) {
+					return func(info SessionPoolCreateDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1237,10 +1237,10 @@ func mustGetSession(t *testing.T, p *SessionPool) *Session {
 	s, err := p.Get(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
-			sessiontrace.SessionPoolTrace{
-				OnGet: func(info sessiontrace.SessionPoolGetStartInfo) func(sessiontrace.SessionPoolGetDoneInfo) {
+			SessionPoolTrace{
+				OnGet: func(info SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolGetDoneInfo) {
+					return func(info SessionPoolGetDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1259,16 +1259,16 @@ func mustPutSession(t *testing.T, p *SessionPool, s *Session) {
 	if err := p.Put(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
-			sessiontrace.SessionPoolTrace{
-				OnPut: func(info sessiontrace.SessionPoolPutStartInfo) func(sessiontrace.SessionPoolPutDoneInfo) {
+			SessionPoolTrace{
+				OnPut: func(info SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolPutDoneInfo) {
+					return func(info SessionPoolPutDoneInfo) {
 						wg.Done()
 					}
 				},
-				OnCloseSession: func(info sessiontrace.SessionPoolCloseSessionStartInfo) func(doneInfo sessiontrace.SessionPoolCloseSessionDoneInfo) {
+				OnCloseSession: func(info SessionPoolCloseSessionStartInfo) func(doneInfo SessionPoolCloseSessionDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolCloseSessionDoneInfo) {
+					return func(info SessionPoolCloseSessionDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1286,11 +1286,11 @@ func mustTakeSession(t *testing.T, p *SessionPool, s *Session) {
 	took, err := p.Take(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
-			sessiontrace.SessionPoolTrace{
-				OnTake: func(info sessiontrace.SessionPoolTakeStartInfo) func(sessiontrace.SessionPoolTakeWaitInfo) func(sessiontrace.SessionPoolTakeDoneInfo) {
+			SessionPoolTrace{
+				OnTake: func(info SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
 					wg.Add(1)
-					return func(sessiontrace.SessionPoolTakeWaitInfo) func(sessiontrace.SessionPoolTakeDoneInfo) {
-						return func(sessiontrace.SessionPoolTakeDoneInfo) {
+					return func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+						return func(SessionPoolTakeDoneInfo) {
 							wg.Done()
 						}
 					}
@@ -1310,10 +1310,10 @@ func mustClose(t *testing.T, p *SessionPool) {
 	if err := p.Close(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
-			sessiontrace.SessionPoolTrace{
-				OnCloseSession: func(info sessiontrace.SessionPoolCloseSessionStartInfo) func(doneInfo sessiontrace.SessionPoolCloseSessionDoneInfo) {
+			SessionPoolTrace{
+				OnCloseSession: func(info SessionPoolCloseSessionStartInfo) func(doneInfo SessionPoolCloseSessionDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolCloseSessionDoneInfo) {
+					return func(info SessionPoolCloseSessionDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1339,8 +1339,8 @@ func simpleSession() *Session {
 
 func newSession(cluster cluster.Cluster, id string) *Session {
 	return &Session{
-		ID: id,
-		c: client{
+		id: id,
+		c: table.client{
 			cluster: cluster,
 		},
 		tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
@@ -1396,7 +1396,7 @@ func (p *SessionPool) debug() {
 	for el := p.idle.Front(); el != nil; el = el.Next() {
 		s := el.Value.(*Session)
 		x := p.index[s]
-		fmt.Printf("<-> %s(%d) ", s.ID, x.touched.Unix())
+		fmt.Printf("<-> %s(%d) ", s.id, x.touched.Unix())
 	}
 	fmt.Printf("<-> tail\n")
 }

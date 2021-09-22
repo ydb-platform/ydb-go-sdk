@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
@@ -158,8 +159,8 @@ func TestIsolationMapping(t *testing.T) {
 func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
 		dtrace trace.DriverTrace
-		ctrace sessiontrace.Trace
-		strace sessiontrace.SessionPoolTrace
+		ctrace table.Trace
+		strace table.SessionPoolTrace
 	)
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, traceutil.ClearContext(args))
@@ -189,7 +190,7 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 func TestQuery(t *testing.T) {
 	c := Connector(
 		WithClient(
-			table.NewClient(
+			table2.NewClient(
 				testutil.NewDB(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
@@ -226,7 +227,7 @@ func TestQuery(t *testing.T) {
 						},
 					),
 				),
-				table.DefaultConfig(),
+				table2.DefaultConfig(),
 			),
 		),
 		WithDefaultExecDataQueryOption(),

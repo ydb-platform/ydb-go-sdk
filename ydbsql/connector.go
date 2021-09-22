@@ -5,12 +5,13 @@ import (
 	"crypto/tls"
 	"database/sql/driver"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"sync"
 	"time"
 
-	sessiontrace "github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
@@ -35,7 +36,7 @@ func WithDialer(d dial.Dialer) ConnectorOption {
 	}
 }
 
-func WithClient(client table.Client) ConnectorOption {
+func WithClient(client table2.Client) ConnectorOption {
 	return func(c *connector) {
 		c.client = client
 	}
@@ -90,13 +91,13 @@ func WithDriverTrace(t trace.DriverTrace) ConnectorOption {
 	}
 }
 
-func WithClientTrace(t sessiontrace.Trace) ConnectorOption {
+func WithClientTrace(t table.Trace) ConnectorOption {
 	return func(c *connector) {
 		c.clientTrace = t
 	}
 }
 
-func WithSessionPoolTrace(t sessiontrace.SessionPoolTrace) ConnectorOption {
+func WithSessionPoolTrace(t table.SessionPoolTrace) ConnectorOption {
 	return func(c *connector) {
 		//c.pool.Trace = t
 	}
@@ -173,11 +174,11 @@ type connector struct {
 	dialer   dial.Dialer
 	endpoint string
 
-	clientTrace sessiontrace.Trace
+	clientTrace table.Trace
 
 	mu     sync.Mutex
 	ready  chan struct{}
-	client table.Client
+	client table2.Client
 	pool   table.SessionPool // Used as a template for created connections.
 
 	defaultTxControl *table.TransactionControl
@@ -211,7 +212,7 @@ func (c *connector) init(ctx context.Context) (err error) {
 	return
 }
 
-func (c *connector) dial(ctx context.Context) (table.Client, error) {
+func (c *connector) dial(ctx context.Context) (table2.Client, error) {
 	d, err := c.dialer.Dial(ctx, c.endpoint)
 	if err != nil {
 		if c == nil {
@@ -228,7 +229,7 @@ func (c *connector) dial(ctx context.Context) (table.Client, error) {
 		}
 		return nil, fmt.Errorf("dial error: %w", err)
 	}
-	return table.NewClient(d, ContextTableConfig(ctx)), nil
+	return table2.NewClient(d, ContextTableConfig(ctx)), nil
 }
 
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -252,7 +253,7 @@ func (c *connector) Driver() driver.Driver {
 	return &Driver{c}
 }
 
-func (c *connector) unwrap(ctx context.Context) (table.Client, error) {
+func (c *connector) unwrap(ctx context.Context) (table2.Client, error) {
 	if err := c.init(ctx); err != nil {
 		return nil, err
 	}
@@ -280,6 +281,6 @@ func (d *Driver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
 }
 
-func (d *Driver) Unwrap(ctx context.Context) (table.Client, error) {
+func (d *Driver) Unwrap(ctx context.Context) (table2.Client, error) {
 	return d.c.unwrap(ctx)
 }

@@ -5,17 +5,19 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 )
 
 type Client interface {
-	CreateSession(ctx context.Context) (*Session, error)
-	Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error, issues []error)
+	CreateSession(ctx context.Context) (*table.Session, error)
+	Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error)
 	Close(ctx context.Context) error
 }
 
 type Config struct {
 	// Trace is an optional session lifetime tracing options.
-	//Trace sessiontrace.Trace
+	Trace sessiontrace.SessionPoolTrace
 
 	// SizeLimit is an upper bound of pooled sessions.
 	// If SizeLimit is less than or equal to zero then the
@@ -67,13 +69,13 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		SizeLimit:              DefaultSessionPoolSizeLimit,
-		KeepAliveMinSize:       DefaultKeepAliveMinSize,
-		IdleKeepAliveThreshold: DefaultIdleKeepAliveThreshold,
-		IdleThreshold:          DefaultSessionPoolIdleThreshold,
-		KeepAliveTimeout:       DefaultSessionPoolKeepAliveTimeout,
-		CreateSessionTimeout:   DefaultSessionPoolCreateSessionTimeout,
-		DeleteTimeout:          DefaultSessionPoolDeleteTimeout,
+		SizeLimit:              table.DefaultSessionPoolSizeLimit,
+		KeepAliveMinSize:       table.DefaultKeepAliveMinSize,
+		IdleKeepAliveThreshold: table.DefaultIdleKeepAliveThreshold,
+		IdleThreshold:          table.DefaultSessionPoolIdleThreshold,
+		KeepAliveTimeout:       table.DefaultSessionPoolKeepAliveTimeout,
+		CreateSessionTimeout:   table.DefaultSessionPoolCreateSessionTimeout,
+		DeleteTimeout:          table.DefaultSessionPoolDeleteTimeout,
 	}
 }
 
@@ -81,8 +83,8 @@ func NewClient(db cluster.DB, config Config) Client {
 	c := &client{
 		cluster: db,
 	}
-	c.pool = &SessionPool{
-		//Trace:                  config.Trace.SessionPoolTrace,
+	c.pool = &table.SessionPool{
+		Trace:                  config.Trace.SessionPoolTrace,
 		Builder:                c,
 		SizeLimit:              config.SizeLimit,
 		KeepAliveMinSize:       config.KeepAliveMinSize,
@@ -93,4 +95,34 @@ func NewClient(db cluster.DB, config Config) Client {
 		DeleteTimeout:          config.DeleteTimeout,
 	}
 	return c
+}
+
+// client contains logic of creation of ydb table sessions.
+type client struct {
+	trace   sessiontrace.Trace
+	cluster cluster.DB
+	pool    table.SessionProvider
+}
+
+type ClientOption func(c *client)
+
+func WithClientTraceOption(trace sessiontrace.Trace) ClientOption {
+	return func(c *client) {
+		c.trace = trace
+	}
+}
+
+// CreateSession creates new session instance.
+// Unused sessions must be destroyed.
+func (c *client) CreateSession(ctx context.Context) (s *table.Session, err error) {
+	return table.CreateSession(ctx, c.cluster, c.trace.Trace)
+}
+
+func (c *client) Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error) {
+	return c.pool.Retry(ctx, retryNoIdempotent, op)
+}
+
+// Close closes session client instance.
+func (c *client) Close(ctx context.Context) (err error) {
+	return c.pool.Close(ctx)
 }

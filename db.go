@@ -3,18 +3,18 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
-	"google.golang.org/grpc"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type DB interface {

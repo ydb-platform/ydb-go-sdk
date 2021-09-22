@@ -1,4 +1,4 @@
-package sessiontrace
+package table
 
 import (
 	"testing"
