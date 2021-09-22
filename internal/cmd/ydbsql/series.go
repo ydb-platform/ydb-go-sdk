@@ -48,7 +48,7 @@ SELECT
 	series_id,
 	title,
 	series_info,
-	CAST(release_date AS Uint64) AS release_date,
+	release_date,
 	comment
 FROM AS_TABLE($seriesData);
 
@@ -106,7 +106,7 @@ func readTable(ctx context.Context, db *sql.DB, path string) error {
 	var (
 		id    *uint64
 		title *string
-		date  *uint64
+		date  sql.NullTime
 	)
 
 	for res.Next() {
@@ -114,7 +114,7 @@ func readTable(ctx context.Context, db *sql.DB, path string) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("#  %d %s %d", *id, *title, *date)
+		log.Printf("#  %d %s %d", *id, *title, date.Time.Unix())
 	}
 
 	if err = res.Err(); err != nil {
@@ -233,8 +233,13 @@ func scanQuerySelect(ctx context.Context, db *sql.DB, prefix string) error {
 			FROM seasons
 			WHERE series_id IN $series;
 
-			SELECT series_id, season_id, title, CAST(CAST(first_aired AS Date) AS String) AS first_aired
-			FROM seasons
+			SELECT * FROM (
+				  SELECT CAST("nan" AS Decimal(3,2)) as x UNION ALL
+				  SELECT CAST("-inf" AS Decimal(3,2)) as x UNION ALL
+				  SELECT CAST("2.72" AS Decimal(3,2)) as x UNION ALL
+				  SELECT CAST("+inf" AS Decimal(3,2)) as x UNION ALL
+				  SELECT CAST("3.14" AS Decimal(3,2)) as x
+				  ) ORDER BY x;
 		`)),
 		templateConfig{
 			TablePathPrefix: prefix,
@@ -266,14 +271,16 @@ func scanQuerySelect(ctx context.Context, db *sql.DB, prefix string) error {
 		}
 		log.Printf("#  Season, SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
 	}
+
+	var decimal types.Decimal
 	res.NextResultSet()
 	log.Print("\n> all rows in table:")
 	for res.Next() {
-		err = res.Scan(&seriesID, &seasonID, &title, &date)
+		err = res.Scan(&decimal)
 		if err != nil {
 			return err
 		}
-		log.Printf("#  Season, SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
+		log.Printf("#  Decimal, Bytes: %d, Scale: %d, Precision: %d", decimal.Bytes, decimal.Scale, decimal.Precision)
 	}
 	if err = res.Err(); err != nil {
 		return err
@@ -311,7 +318,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeUTF8)),
 				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
-				options.WithColumn("release_date", types.Optional(types.TypeUint64)),
+				options.WithColumn("release_date", types.Optional(types.TypeDate)),
 				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
 				options.WithPrimaryKeyColumn("series_id"),
 			)
