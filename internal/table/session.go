@@ -19,25 +19,24 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 // client contains logic of creation of ydb table sessions.
 type client struct {
-	trace   sessiontrace.Trace
+	//trace   sessiontrace.Trace
 	cluster cluster.DB
 	pool    SessionProvider
 }
 
 type ClientOption func(c *client)
 
-func WithClientTraceOption(sessiontrace sessiontrace.Trace) ClientOption {
+/*func WithClientTraceOption(sessiontrace sessiontrace.Trace) ClientOption {
 	return func(c *client) {
 		c.trace = sessiontrace
 	}
 }
-
+*/
 // CreateSession creates new session instance.
 // Unused sessions must be destroyed.
 func (c *client) CreateSession(ctx context.Context) (s *Session, err error) {

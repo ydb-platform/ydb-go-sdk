@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 )
 
 type Client interface {
@@ -16,7 +15,7 @@ type Client interface {
 
 type Config struct {
 	// Trace is an optional session lifetime tracing options.
-	Trace sessiontrace.Trace
+	//Trace sessiontrace.Trace
 
 	// SizeLimit is an upper bound of pooled sessions.
 	// If SizeLimit is less than or equal to zero then the
