@@ -85,30 +85,6 @@ func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
 		}
 	}
 	switch {
-	case t.OnTrackConn == nil:
-		ret.OnTrackConn = x.OnTrackConn
-	case x.OnTrackConn == nil:
-		ret.OnTrackConn = t.OnTrackConn
-	default:
-		h1 := t.OnTrackConn
-		h2 := x.OnTrackConn
-		ret.OnTrackConn = func(t TrackConnStartInfo) func(TrackConnDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TrackConnDoneInfo) {
-					r1(t)
-					r2(t)
-				}
-			}
-		}
-	}
-	switch {
 	case t.OnGetCredentials == nil:
 		ret.OnGetCredentials = x.OnGetCredentials
 	case x.OnGetCredentials == nil:
@@ -262,21 +238,6 @@ func (t DriverTrace) onPessimization(p PessimizationStartInfo) func(Pessimizatio
 	}
 	return res
 }
-func (t DriverTrace) onTrackConn(t1 TrackConnStartInfo) func(TrackConnDoneInfo) {
-	fn := t.OnTrackConn
-	if fn == nil {
-		return func(TrackConnDoneInfo) {
-			return
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TrackConnDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t DriverTrace) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
 	if fn == nil {
@@ -380,16 +341,6 @@ func driverTraceOnPessimization(t DriverTrace, c context.Context, address string
 	return func(e error) {
 		var p PessimizationDoneInfo
 		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnTrackConn(t DriverTrace, address string) func(address string) {
-	var p TrackConnStartInfo
-	p.Address = address
-	res := t.onTrackConn(p)
-	return func(address string) {
-		var p TrackConnDoneInfo
-		p.Address = address
 		res(p)
 	}
 }

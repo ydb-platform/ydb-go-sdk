@@ -20,8 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 
 	"google.golang.org/grpc"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 const (
@@ -51,17 +49,9 @@ type cluster struct {
 	ready int
 	wait  chan struct{}
 
-	//trackerCtx    context.Context
-	//trackerCancel context.CancelFunc
-	//trackerWake   chan struct{}
-	//trackerDone   chan struct{}
-	//trackerQueue  *list.List // list of *Conn.
-
 	closed bool
 
 	testHookTrackerQueue func([]*list.Element)
-	// tracer function. Set after the call driverTraceTrackConnStart .
-	trackDone func(trace.TrackConnDoneInfo)
 }
 
 func (c *cluster) Force() {
@@ -94,18 +84,6 @@ func New(
 		balancer: balancer,
 	}
 }
-
-//func (c *cluster) init() {
-//	c.once.Do(func() {
-//		c.index = make(map[addr.Host]Entry)
-//
-//		c.trackerCtx, c.trackerCancel = context.WithCancel(context.Background())
-//		c.trackerWake = make(chan struct{}, 1)
-//		c.trackerDone = make(chan struct{})
-//		c.trackerQueue = list.New()
-//		//go c.tracker(timeutil.NewTimer(time.Duration(1<<63 - 1)))
-//	})
-//}
 
 func (c *cluster) Close() (err error) {
 	var dummy bool
@@ -164,76 +142,6 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 		return nil, ErrClusterEmpty
 	}
 	return conn, nil
-	//
-	//// Hard limit for get operation.
-	//var cancel context.CancelFunc
-	//ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
-	//defer cancel()
-	//
-	//for {
-	//	c.mu.RLock()
-	//	closed := c.closed
-	//	wait := c.await()
-	//	ready := c.ready
-	//	size := len(c.index)
-	//	Conn = c.balancer.Next()
-	//	c.mu.RUnlock()
-	//	select {
-	//	case <-ctx.Done():
-	//		return nil, ctx.err()
-	//	default:
-	//		switch {
-	//		case closed:
-	//			return nil, ErrClusterClosed
-	//		case ready == 0 && Conn != nil:
-	//			panic("ydb: empty balancer has returned non-nil Conn")
-	//		case ready != 0 && Conn == nil:
-	//			panic("ydb: non-empty balancer has returned nil Conn")
-	//		case size == 0:
-	//			return nil, ErrClusterEmpty
-	//		case Conn != nil && Conn.IsReady():
-	//			return Conn, nil
-	//		case Conn != nil:
-	//			c.mu.Lock()
-	//			entry, has := c.index[Conn.addr]
-	//			if has && entry.Handle != nil {
-	//				// entry.Handle may become nil when some race happened and other
-	//				// goroutine already removed Conn from balancer and sent it
-	//				// to the tracker.
-	//				Conn.runtime.setState(Offline)
-	//
-	//				// NOTE: we setting entry.Conn to nil here to be more strict
-	//				// about the ownership of Conn. That is, tracker goroutine
-	//				// takes full ownership of Conn after c.track(Conn) call.
-	//				//
-	//				// Leaving non-nil Conn may lead to data races, when tracker
-	//				// changes Conn.Conn field (in case of unsuccessful initial
-	//				// dial) without any mutex used.
-	//				entry.removeFrom(c.balancer)
-	//				entry.Conn = nil
-	//				entry.TrackerQueueEl = c.track(Conn)
-	//
-	//				c.index[Conn.addr] = entry
-	//				c.ready--
-	//				ready = c.ready
-	//
-	//				// more then half connections under tracking - re-discover now
-	//				if c.explorer != nil && ready*2 < len(c.index) {
-	//					c.explorer.Force()
-	//				}
-	//			}
-	//			c.mu.Unlock()
-	//		case ready <= 0:
-	//			select {
-	//			// wait if no ready connections left
-	//			case <-wait():
-	//
-	//			case <-ctx.Done():
-	//				return nil, ctx.err()
-	//			}
-	//		}
-	//	}
-	//}
 }
 
 type options struct {
@@ -265,8 +173,6 @@ func (c *cluster) Insert(ctx context.Context, e public.Endpoint, opts ...option)
 		defer opt.wg.Done()
 	}
 
-	//c.init()
-	//
 	addr := public.Addr{e.Host, e.Port}
 	info := info.Info{
 		LoadFactor: e.LoadFactor,
@@ -299,8 +205,7 @@ func (c *cluster) Insert(ctx context.Context, e public.Endpoint, opts ...option)
 	c.index[addr] = entry
 }
 
-// Update updates existing connection's runtime stats such that load factor and
-// others.
+// Update updates existing connection's runtime stats such that load factor and others.
 func (c *cluster) Update(_ context.Context, ep public.Endpoint, opts ...option) {
 	opt := options{}
 	for _, o := range opts {
@@ -361,19 +266,13 @@ func (c *cluster) Remove(_ context.Context, e public.Endpoint, opts ...option) {
 		c.mu.Unlock()
 		panic("ydb: can't remove not-existing endpoint")
 	}
-	//if el := entry.TrackerQueueEl; el != nil {
-	//	// Connection is being tracked.
-	//	c.trackerQueue.Remove(el)
-	//} else {
 	entry.RemoveFrom(c.balancer)
 	c.ready--
-	//}
 	delete(c.index, addr)
 	c.mu.Unlock()
 
 	if entry.Conn != nil {
-		// entry.Conn may be nil when connection is being tracked after
-		// unsuccessful dial().
+		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
 		_ = entry.Conn.Close()
 	}
 }
@@ -404,7 +303,7 @@ func (c *cluster) Pessimize(addr public.Addr) (err error) {
 				online++
 			}
 		}
-		// more then half connections banned - re-discover now
+		// more than half connections banned - re-discover now
 		if online*2 < len(c.index) {
 			c.explorer.Force()
 		}
@@ -430,142 +329,12 @@ func (c *cluster) Stats(it func(public.Endpoint, stats.Stats)) {
 		s := conn.Runtime().Stats()
 		it(e, s)
 	}
-	//for el := c.trackerQueue.Front(); el != nil; el = el.Next() {
-	//	conn := el.Value.(conn.Conn)
-	//	entry := c.index[conn.Host()]
-	//	call(conn, entry.Info)
-	//}
 	for _, entry := range c.index {
 		if entry.Conn != nil {
 			call(entry.Conn, entry.Info)
 		}
 	}
 }
-
-//// c.mu must be held.
-//func (c *cluster) track(conn conn.Conn) (el *list.Element) {
-//	c.trackDone = c.sessiontrace.OnTrackConn(sessiontrace.TrackConnStartInfo{
-//		Address: conn.Host().String(),
-//	})
-//	el = c.trackerQueue.PushBack(conn)
-//	select {
-//	case c.trackerWake <- struct{}{}:
-//	default:
-//	}
-//	return
-//}
-
-//func (c *cluster) tracker(timer timeutil.Timer) {
-//	defer close(c.trackerDone)
-//
-//	var active bool
-//	if !timer.Stop() {
-//		panic("ydb: can't stop timer")
-//	}
-//	backoff := logBackoff{
-//		SlotDuration: 5 * time.Millisecond,
-//		Ceiling:      10, // ~1s (2^10ms)
-//		JitterLimit:  1,  // Without randomization.
-//	}
-//
-//	var queue []*list.Element
-//	fetchQueue := func(dest []*list.Element) []*list.Element {
-//		c.mu.RLock()
-//		defer c.mu.RUnlock()
-//		for el := c.trackerQueue.Front(); el != nil; el = el.Next() {
-//			dest = append(dest, el)
-//		}
-//		return dest
-//	}
-//	for i := 0; ; i++ {
-//		select {
-//		case <-c.trackerWake:
-//			if active && !timer.Stop() {
-//				<-timer.C()
-//			}
-//			i = 0
-//			timer.Reset(backoff.delay(i))
-//
-//		case <-timer.C():
-//			queue = fetchQueue(queue[:0])
-//			active = len(queue) > 0
-//
-//			if f := c.testHookTrackerQueue; f != nil {
-//				f(queue)
-//			}
-//
-//			ctx, cancel := context.WithTimeout(c.trackerCtx, time.Second)
-//			for _, el := range queue {
-//				Conn := el.Value.(*Conn)
-//				if Conn.raw != nil && (isBroken(Conn) || Conn.runtime.offlineCount%ConnResetOfflineRate == 0) {
-//					co := Conn.raw
-//					Conn.raw = nil
-//					go func() { _ = co.Close() }()
-//				}
-//
-//				addr := Conn.addr
-//				if Conn.raw == nil {
-//					x, err := c.dial(ctx, addr.addr, addr.port)
-//					if err == nil {
-//						Conn.raw = x.raw
-//					}
-//				}
-//				if !IsReady(Conn) {
-//					continue
-//				}
-//
-//				var wait chan struct{}
-//				c.mu.Lock()
-//				entry, has := c.index[addr]
-//				actual := has && entry.TrackerQueueEl == el
-//				if actual {
-//					// Element is still in the index and element is actual.
-//					//
-//					// NOTE: we are checking both `has` flag and equality with
-//					// `entry.TrackerQueueEl` to get rid of races, when
-//					// endpoint removed and added immediately while we stuck on
-//					// dialing above.
-//					c.trackerQueue.Remove(el)
-//					active = c.trackerQueue.Len() > 0
-//
-//					if Conn.runtime.getState() != Banned {
-//						Conn.runtime.setState(Online)
-//					}
-//
-//					c.trackDone(Conn.addr.String())
-//					entry.Conn = Conn
-//					entry.insertInto(c.balancer)
-//					c.index[addr] = entry
-//					c.ready++
-//
-//					wait = c.wait
-//					c.wait = nil
-//				}
-//				c.mu.Unlock()
-//				if !actual {
-//					_ = Conn.raw.Close()
-//				}
-//				if wait != nil {
-//					close(wait)
-//				}
-//			}
-//			cancel()
-//			if active {
-//				timer.Reset(backoff.delay(i))
-//			}
-//
-//		case <-c.trackerCtx.Done():
-//			queue = fetchQueue(queue[:0])
-//			for _, el := range queue {
-//				Conn := el.Value.(*Conn)
-//				if Conn.raw != nil {
-//					_ = Conn.raw.Close()
-//				}
-//			}
-//			return
-//		}
-//	}
-//}
 
 // c.mu read lock must be held.
 func (c *cluster) await() func() <-chan struct{} {

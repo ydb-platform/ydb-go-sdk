@@ -20,9 +20,6 @@ type (
 
 		OnPessimization func(PessimizationStartInfo) func(PessimizationDoneInfo)
 
-		// Only for background.
-		OnTrackConn func(TrackConnStartInfo) func(TrackConnDoneInfo)
-
 		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
 
 		OnDiscovery func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
@@ -79,12 +76,6 @@ type (
 	}
 	PessimizationDoneInfo struct {
 		Error error
-	}
-	TrackConnStartInfo struct {
-		Address string
-	}
-	TrackConnDoneInfo struct {
-		Address string
 	}
 	GetCredentialsStartInfo struct {
 		Context context.Context
