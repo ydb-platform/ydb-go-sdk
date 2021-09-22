@@ -68,8 +68,8 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 	if c.runtime.GetState() != state.Banned {
 		c.runtime.SetState(state.Online)
 	}
-	if c.config.KeepalivePolicy().Timeout < 0 {
-		c.timer.Reset(-c.config.KeepalivePolicy().Timeout)
+	if c.config.GrpcConnectionPolicy().TTL > 0 {
+		c.timer.Reset(c.config.GrpcConnectionPolicy().TTL)
 	}
 	return c.grpcConn, nil
 }
@@ -89,10 +89,10 @@ func (c *conn) IsReady() bool {
 }
 
 func (c *conn) waitClose() {
-	if c.config.KeepalivePolicy().Timeout >= 0 {
+	if c.config.GrpcConnectionPolicy().TTL <= 0 {
 		return
 	}
-	c.timer.Reset(-c.config.KeepalivePolicy().Timeout)
+	c.timer.Reset(c.config.GrpcConnectionPolicy().TTL)
 	for {
 		select {
 		case <-c.done:
@@ -298,14 +298,6 @@ func New(ctx context.Context, addr cluster.Addr, dial func(context.Context, stri
 		done:    make(chan struct{}),
 		runtime: runtime.New(),
 	}
-	if !cfg.KeepalivePolicy().LazyConnect {
-		raw, err := c.dial(ctx, c.addr.Host, c.addr.Port)
-		if err == nil {
-			c.grpcConn = raw
-		}
-	}
-	if cfg.KeepalivePolicy().Timeout < 0 {
-		go c.waitClose()
-	}
+	go c.waitClose()
 	return c
 }

@@ -74,9 +74,9 @@ func WithDriverConfig(config *config.Config) Option {
 	}
 }
 
-func WithKeepalivePolicy(policy *config.KeepalivePolicy) Option {
+func WithGrpcConnectionPolicy(policy *config.GrpcConnectionPolicy) Option {
 	return func(ctx context.Context, c *db) error {
-		c.options.driverConfig.KeepalivePolicy = policy
+		c.options.driverConfig.GrpcConnectionPolicy = policy
 		return nil
 	}
 }

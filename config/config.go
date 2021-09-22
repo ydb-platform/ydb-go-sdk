@@ -50,9 +50,9 @@ type Config struct {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval time.Duration
 
-	// KeepalivePolicy define lifecycle behaviour of grpc connection
-	// By default KeepalivePolicy is sets to DefaultKeepalivePolicy
-	KeepalivePolicy *KeepalivePolicy
+	// GrpcConnectionPolicy define lifecycle behaviour of grpc connection
+	// By default GrpcConnectionPolicy is sets to DefaultGrpcConnectionPolicy
+	GrpcConnectionPolicy *GrpcConnectionPolicy
 
 	// BalancingConfig is an optional configuration related to selected
 	// BalancingMethod. That is, some balancing methods allow to be configured.
@@ -79,8 +79,8 @@ func New(opts ...option) *Config {
 
 func defaults() (c *Config) {
 	return &Config{
-		DiscoveryInterval: discovery.DefaultDiscoveryInterval,
-		KeepalivePolicy:   &DefaultKeepalivePolicy,
-		BalancingConfig:   balancer.Default,
+		DiscoveryInterval:    discovery.DefaultDiscoveryInterval,
+		GrpcConnectionPolicy: &DefaultGrpcConnectionPolicy,
+		BalancingConfig:      balancer.Default,
 	}
 }

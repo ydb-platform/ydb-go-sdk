@@ -80,6 +80,6 @@ func (d *driver) StreamTimeout() time.Duration {
 	return d.Config.StreamTimeout
 }
 
-func (d *driver) KeepalivePolicy() *conn.KeepalivePolicy {
-	return (*conn.KeepalivePolicy)(d.Config.KeepalivePolicy)
+func (d *driver) GrpcConnectionPolicy() *conn.GrpcConnectionPolicy {
+	return (*conn.GrpcConnectionPolicy)(d.Config.GrpcConnectionPolicy)
 }

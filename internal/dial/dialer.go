@@ -13,11 +13,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/keepalive"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Dialer contains options of dialing and initialization of particular ydb
@@ -38,7 +36,7 @@ type Dialer struct {
 
 // Dial dials given addr and initializes driver instance on success.
 func (d *Dialer) Dial(ctx context.Context, addr string) (_ cluster.Cluster, err error) {
-	grpcKeepalive := d.DriverConfig.KeepalivePolicy.Timeout
+	grpcKeepalive := d.DriverConfig.GrpcConnectionPolicy.Timeout
 	if grpcKeepalive <= 0 {
 		grpcKeepalive = config.MinKeepaliveInterval
 	}
@@ -140,10 +138,7 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 		opts = append(opts, grpc.WithInsecure())
 	}
 	opts = append(opts,
-		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                d.keepalive,
-			PermitWithoutStream: true,
-		}),
+		grpc.WithKeepaliveParams(d.config.GrpcConnectionPolicy.ClientParameters),
 	)
 	opts = append(opts, grpc.WithDefaultCallOptions(
 		grpc.MaxCallRecvMsgSize(config.DefaultGRPCMsgSize),
