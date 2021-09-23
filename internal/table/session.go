@@ -2,6 +2,8 @@ package table
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"sync"
 	"time"
@@ -15,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -23,14 +24,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-// Session represents a single table API session.
+// session represents a single table API session.
 //
-// Session methods are not goroutine safe. Simultaneous execution of requests
+// session methods are not goroutine safe. Simultaneous execution of requests
 // are forbidden within a single session.
 //
-// Note that after Session is no longer needed it should be destroyed by
+// Note that after session is no longer needed it should be destroyed by
 // Close() call.
-type Session struct {
+type session struct {
 	id           string
 	conn         cluster.ClientConnInterface
 	tableService Ydb_Table_V1.TableServiceClient
@@ -40,7 +41,7 @@ type Session struct {
 	onClose      []func()
 }
 
-func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session, err error) {
+func newSession(ctx context.Context, c cluster.DB, trace Trace) (s table.Session, err error) {
 	createSessionDone := traceOnCreateSession(trace, ctx)
 	start := time.Now()
 	defer func() {
@@ -54,7 +55,7 @@ func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session, er
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	var cc cluster.ClientConnInterface
-	response, err = Ydb_Table_V1.NewTableServiceClient(cl).CreateSession(
+	response, err = Ydb_Table_V1.NewTableServiceClient(c).CreateSession(
 		cluster.WithClientConnApplier(
 			ctx,
 			func(c cluster.ClientConnInterface) {
@@ -70,7 +71,7 @@ func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session, er
 	if err != nil {
 		return nil, err
 	}
-	s = &Session{
+	s = &session{
 		id:           result.SessionId,
 		conn:         cc,
 		tableService: Ydb_Table_V1.NewTableServiceClient(cc),
@@ -79,11 +80,11 @@ func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session, er
 	return
 }
 
-func (s *Session) ID() string {
+func (s *session) ID() string {
 	return s.id
 }
 
-func (s *Session) OnClose(cb func()) {
+func (s *session) OnClose(cb func()) {
 	s.closeMux.Lock()
 	defer s.closeMux.Unlock()
 	if s.closed {
@@ -92,7 +93,13 @@ func (s *Session) OnClose(cb func()) {
 	s.onClose = append(s.onClose, cb)
 }
 
-func (s *Session) Close(ctx context.Context) (err error) {
+func (s *session) IsClosed() bool {
+	s.closeMux.Lock()
+	defer s.closeMux.Unlock()
+	return s.closed
+}
+
+func (s *session) Close(ctx context.Context) (err error) {
 	s.closeMux.Lock()
 	defer s.closeMux.Unlock()
 	if s.closed {
@@ -116,7 +123,7 @@ func (s *Session) Close(ctx context.Context) (err error) {
 	return err
 }
 
-func (s *Session) Address() string {
+func (s *session) Address() string {
 	if s != nil && s.conn != nil {
 		return s.conn.Addr().String()
 	}
@@ -124,7 +131,7 @@ func (s *Session) Address() string {
 }
 
 // KeepAlive keeps idle session alive.
-func (s *Session) KeepAlive(ctx context.Context) (info options.SessionInfo, err error) {
+func (s *session) KeepAlive(ctx context.Context) (info options.SessionInfo, err error) {
 	keepAliveDone := traceOnKeepAlive(s.trace, ctx, s.id)
 	defer func() {
 		keepAliveDone(ctx, s.id, info, err)
@@ -159,7 +166,7 @@ func (s *Session) KeepAlive(ctx context.Context) (info options.SessionInfo, err 
 }
 
 // CreateTable creates table at given path with given options.
-func (s *Session) CreateTable(ctx context.Context, path string, opts ...options.CreateTableOption) (err error) {
+func (s *session) CreateTable(ctx context.Context, path string, opts ...options.CreateTableOption) (err error) {
 	request := Ydb_Table.CreateTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -172,7 +179,7 @@ func (s *Session) CreateTable(ctx context.Context, path string, opts ...options.
 }
 
 // DescribeTable describes table at given path.
-func (s *Session) DescribeTable(ctx context.Context, path string, opts ...options.DescribeTableOption) (desc options.Description, err error) {
+func (s *session) DescribeTable(ctx context.Context, path string, opts ...options.DescribeTableOption) (desc options.Description, err error) {
 	var (
 		response *Ydb_Table.DescribeTableResponse
 		result   Ydb_Table.DescribeTableResult
@@ -197,7 +204,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 	for i, c := range result.Columns {
 		cs[i] = options.Column{
 			Name:   c.GetName(),
-			Type:   internal.TypeFromYDB(c.GetType()),
+			Type:   value.TypeFromYDB(c.GetType()),
 			Family: c.GetFamily(),
 		}
 	}
@@ -209,7 +216,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 			rs[i].From = last
 		}
 
-		bound := internal.ValueFromYDB(b.GetType(), b.GetValue())
+		bound := value.ValueFromYDB(b.GetType(), b.GetValue())
 		rs[i].To = bound
 
 		last = bound
@@ -274,7 +281,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		Attributes:           attrs,
 		ReadReplicaSettings:  options.NewReadReplicasSettings(result.GetReadReplicasSettings()),
 		StorageSettings:      options.NewStorageSettings(result.GetStorageSettings()),
-		KeyBloomFilter:       internal.FeatureFlagFromYDB(result.GetKeyBloomFilter()),
+		KeyBloomFilter:       feature.FeatureFlagFromYDB(result.GetKeyBloomFilter()),
 		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
 		Indexes:              indexes,
 		TimeToLiveSettings:   options.NewTimeToLiveSettings(result.GetTtlSettings()),
@@ -282,7 +289,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 }
 
 // DropTable drops table at given path with given options.
-func (s *Session) DropTable(ctx context.Context, path string, opts ...options.DropTableOption) (err error) {
+func (s *session) DropTable(ctx context.Context, path string, opts ...options.DropTableOption) (err error) {
 	request := Ydb_Table.DropTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -295,7 +302,7 @@ func (s *Session) DropTable(ctx context.Context, path string, opts ...options.Dr
 }
 
 // AlterTable modifies schema of table at given path with given options.
-func (s *Session) AlterTable(ctx context.Context, path string, opts ...options.AlterTableOption) (err error) {
+func (s *session) AlterTable(ctx context.Context, path string, opts ...options.AlterTableOption) (err error) {
 	request := Ydb_Table.AlterTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -308,7 +315,7 @@ func (s *Session) AlterTable(ctx context.Context, path string, opts ...options.A
 }
 
 // CopyTable creates copy of table at given path.
-func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...options.CopyTableOption) (err error) {
+func (s *session) CopyTable(ctx context.Context, dst, src string, opts ...options.CopyTableOption) (err error) {
 	request := Ydb_Table.CopyTableRequest{
 		SessionId:       s.id,
 		SourcePath:      src,
@@ -322,7 +329,7 @@ func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...option
 }
 
 // Explain explains data query represented by text.
-func (s *Session) Explain(ctx context.Context, query string) (exp table.DataQueryExplanation, err error) {
+func (s *session) Explain(ctx context.Context, query string) (exp table.DataQueryExplanation, err error) {
 	var (
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
@@ -347,10 +354,10 @@ func (s *Session) Explain(ctx context.Context, query string) (exp table.DataQuer
 	}, nil
 }
 
-// Statement is a prepared statement. Like a single Session, it is not safe for
+// Statement is a prepared statement. Like a single session, it is not safe for
 // concurrent use by multiple goroutines.
 type Statement struct {
-	session *Session
+	session *session
 	query   *dataQuery
 	params  map[string]*Ydb.Type
 }
@@ -394,7 +401,7 @@ func (s *Statement) Text() string {
 }
 
 // Prepare prepares data query within session s.
-func (s *Session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
+func (s *session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
 	var (
 		cached   bool
 		q        *dataQuery
@@ -433,7 +440,7 @@ func (s *Session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 }
 
 // Execute executes given data query represented by text.
-func (s *Session) Execute(
+func (s *session) Execute(
 	ctx context.Context,
 	tx *table.TransactionControl,
 	query string,
@@ -474,7 +481,7 @@ func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
 
 // executeQueryResult returns Transaction and Result built from received
 // result.
-func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.Transaction, resultset.Result, error) {
+func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.Transaction, resultset.Result, error) {
 	t := &Transaction{
 		id: res.GetTxMeta().GetId(),
 		s:  s,
@@ -487,7 +494,7 @@ func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.T
 }
 
 // executeDataQuery executes data query.
-func (s *Session) executeDataQuery(
+func (s *session) executeDataQuery(
 	ctx context.Context, tx *table.TransactionControl,
 	query *dataQuery, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
@@ -521,7 +528,7 @@ func (s *Session) executeDataQuery(
 }
 
 // ExecuteSchemeQuery executes scheme query.
-func (s *Session) ExecuteSchemeQuery(ctx context.Context, query string, opts ...options.ExecuteSchemeQueryOption) (err error) {
+func (s *session) ExecuteSchemeQuery(ctx context.Context, query string, opts ...options.ExecuteSchemeQueryOption) (err error) {
 	request := Ydb_Table.ExecuteSchemeQueryRequest{
 		SessionId: s.id,
 		YqlText:   query,
@@ -534,7 +541,7 @@ func (s *Session) ExecuteSchemeQuery(ctx context.Context, query string, opts ...
 }
 
 // DescribeTableOptions describes supported table options.
-func (s *Session) DescribeTableOptions(ctx context.Context) (desc options.TableOptionsDescription, err error) {
+func (s *session) DescribeTableOptions(ctx context.Context) (desc options.TableOptionsDescription, err error) {
 	var (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult
@@ -640,7 +647,7 @@ func (s *Session) DescribeTableOptions(ctx context.Context) (desc options.TableO
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextSet() calls.
-func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ resultset.Result, err error) {
+func (s *session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ resultset.Result, err error) {
 	var (
 		request = Ydb_Table.ReadTableRequest{
 			SessionId: s.id,
@@ -702,7 +709,7 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...opti
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamExecuteScanQuery() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextSet() calls.
-func (s *Session) StreamExecuteScanQuery(ctx context.Context, query string, params *table.QueryParameters, opts ...options.ExecuteScanQueryOption) (_ resultset.Result, err error) {
+func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, params *table.QueryParameters, opts ...options.ExecuteScanQueryOption) (_ resultset.Result, err error) {
 	q := new(dataQuery)
 	q.initFromText(query)
 	var (
@@ -766,17 +773,17 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, query string, para
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.
-func (s *Session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
+func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
 	_, err = s.tableService.BulkUpsert(ctx, &Ydb_Table.BulkUpsertRequest{
 		Table: table,
-		Rows:  internal.ValueToYDB(rows),
+		Rows:  value.ValueToYDB(rows),
 	})
 	return err
 }
 
 // BeginTransaction begins new transaction within given session with given
 // settings.
-func (s *Session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
+func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
 	beginTransactionDone := traceOnBeginTransaction(s.trace, ctx, s.id)
 	defer func() {
 		beginTransactionDone(ctx, s.id, getTransactionID(x), err)
@@ -810,7 +817,7 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *table.TransactionSet
 // safe either.
 type Transaction struct {
 	id string
-	s  *Session
+	s  *session
 	c  *table.TransactionControl
 }
 

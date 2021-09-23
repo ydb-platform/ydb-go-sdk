@@ -3,9 +3,8 @@ package ydb
 import (
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 func TestParseConnectionString(t *testing.T) {
@@ -50,17 +49,17 @@ func TestParseConnectionString(t *testing.T) {
 			if !errors.Is(err, test.error) {
 				t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
 			}
-			internal.Equal(t, test.schema, schema)
-			internal.Equal(t, test.endpoint, endpoint)
-			internal.Equal(t, test.database, database)
+			assert.Equal(t, test.schema, schema)
+			assert.Equal(t, test.endpoint, endpoint)
+			assert.Equal(t, test.database, database)
 		})
 	}
 }
 
 func assertConnectParams(t *testing.T, params ConnectParams) {
-	internal.NotNil(t, params)
-	internal.Equal(t, "endpoint", params.Endpoint())
-	internal.Equal(t, "name", params.Database())
+	assert.NotNil(t, params)
+	assert.Equal(t, "endpoint", params.Endpoint())
+	assert.Equal(t, "name", params.Database())
 	if !params.UseTLS() {
 		t.Fatal("UseTLS is not true")
 	}

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"math"
 	"reflect"
@@ -13,7 +15,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -46,7 +47,7 @@ func (s *scanner) Columns(it func(options.Column)) {
 	for _, m := range s.set.Columns {
 		it(options.Column{
 			Name: m.Name,
-			Type: internal.TypeFromYDB(m.Type),
+			Type: value.TypeFromYDB(m.Type),
 		})
 	}
 }
@@ -178,7 +179,7 @@ func (s *scanner) getType() types.Type {
 	if x.isEmpty() {
 		return nil
 	}
-	return internal.TypeFromYDB(x.t)
+	return value.TypeFromYDB(x.t)
 }
 
 func (s *scanner) hasItems() bool {
@@ -251,71 +252,71 @@ func (s *scanner) any() interface{} {
 		x = s.stack.current()
 	}
 
-	t := internal.TypeFromYDB(x.t)
-	p, primitive := t.(internal.PrimitiveType)
+	t := value.TypeFromYDB(x.t)
+	p, primitive := t.(value.PrimitiveType)
 	if !primitive {
 		return nil
 	}
 
 	switch p {
-	case internal.TypeBool:
+	case value.TypeBool:
 		return s.bool()
-	case internal.TypeInt8:
+	case value.TypeInt8:
 		return s.int8()
-	case internal.TypeUint8:
+	case value.TypeUint8:
 		return s.uint8()
-	case internal.TypeInt16:
+	case value.TypeInt16:
 		return s.int16()
-	case internal.TypeUint16:
+	case value.TypeUint16:
 		return s.uint16()
-	case internal.TypeInt32:
+	case value.TypeInt32:
 		return s.int32()
-	case internal.TypeFloat:
+	case value.TypeFloat:
 		return s.float()
-	case internal.TypeDouble:
+	case value.TypeDouble:
 		return s.double()
-	case internal.TypeString:
+	case value.TypeString:
 		return string(s.bytes())
-	case internal.TypeUUID:
+	case value.TypeUUID:
 		return s.uint128()
-	case internal.TypeUint32:
+	case value.TypeUint32:
 		return s.uint32()
-	case internal.TypeDate:
-		return internal.UnmarshalDate(s.uint32())
-	case internal.TypeDatetime:
-		return internal.UnmarshalDatetime(s.uint32())
-	case internal.TypeUint64:
+	case value.TypeDate:
+		return timeutil.UnmarshalDate(s.uint32())
+	case value.TypeDatetime:
+		return timeutil.UnmarshalDatetime(s.uint32())
+	case value.TypeUint64:
 		return s.uint64()
-	case internal.TypeTimestamp:
-		return internal.UnmarshalTimestamp(s.uint64())
-	case internal.TypeInt64:
+	case value.TypeTimestamp:
+		return timeutil.UnmarshalTimestamp(s.uint64())
+	case value.TypeInt64:
 		return s.int64()
-	case internal.TypeInterval:
-		return internal.UnmarshalInterval(s.int64())
-	case internal.TypeTzDate:
-		src, err := internal.UnmarshalTzDate(s.text())
+	case value.TypeInterval:
+		return timeutil.UnmarshalInterval(s.int64())
+	case value.TypeTzDate:
+		src, err := timeutil.UnmarshalTzDate(s.text())
 		if err != nil {
 			s.errorf("scan row failed: %w", err)
 		}
 		return src
-	case internal.TypeTzDatetime:
-		src, err := internal.UnmarshalTzDatetime(s.text())
+	case value.TypeTzDatetime:
+		src, err := timeutil.UnmarshalTzDatetime(s.text())
 		if err != nil {
 			s.errorf("scan row failed: %w", err)
 		}
 		return src
-	case internal.TypeTzTimestamp:
-		src, err := internal.UnmarshalTzTimestamp(s.text())
+	case value.TypeTzTimestamp:
+		src, err := timeutil.UnmarshalTzTimestamp(s.text())
 		if err != nil {
 			s.errorf("scan row failed: %w", err)
 		}
 		return src
-	case internal.TypeUTF8, internal.TypeDyNumber:
+	case value.TypeUTF8, value.TypeDyNumber:
 		return s.text()
 	case
-		internal.TypeYSON,
-		internal.TypeJSON,
-		internal.TypeJSONDocument:
+		value.TypeYSON,
+		value.TypeJSON,
+		value.TypeJSONDocument:
 		return []byte(s.text())
 	default:
 		s.errorf("ydb/table: unknown primitive types")
@@ -326,7 +327,7 @@ func (s *scanner) any() interface{} {
 // Value returns current item under scan as ydb.Value types.
 func (s *scanner) value() types.Value {
 	x := s.stack.current()
-	return internal.ValueFromYDB(x.t, x.v)
+	return value.ValueFromYDB(x.t, x.v)
 }
 
 func (s *scanner) isCurrentTypeOptional() bool {
@@ -509,7 +510,7 @@ func (s *scanner) uint128() (v [16]byte) {
 	}
 	lo := s.low128()
 	hi := c.v.High_128
-	return internal.BigEndianUint128(hi, lo)
+	return value.BigEndianUint128(hi, lo)
 }
 
 func (s *scanner) null() {
@@ -522,25 +523,25 @@ func (s *scanner) null() {
 func (s *scanner) setTime(dst *time.Time) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_DATE:
-		*dst = internal.UnmarshalDate(s.uint32())
+		*dst = timeutil.UnmarshalDate(s.uint32())
 	case Ydb.Type_DATETIME:
-		*dst = internal.UnmarshalDatetime(s.uint32())
+		*dst = timeutil.UnmarshalDatetime(s.uint32())
 	case Ydb.Type_TIMESTAMP:
-		*dst = internal.UnmarshalTimestamp(s.uint64())
+		*dst = timeutil.UnmarshalTimestamp(s.uint64())
 	case Ydb.Type_TZ_DATE:
-		src, err := internal.UnmarshalTzDate(s.text())
+		src, err := timeutil.UnmarshalTzDate(s.text())
 		if err != nil {
 			s.errorf("scan row failed: %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_DATETIME:
-		src, err := internal.UnmarshalTzDatetime(s.text())
+		src, err := timeutil.UnmarshalTzDatetime(s.text())
 		if err != nil {
 			s.errorf("scan row failed: %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_TIMESTAMP:
-		src, err := internal.UnmarshalTzTimestamp(s.text())
+		src, err := timeutil.UnmarshalTzTimestamp(s.text())
 		if err != nil {
 			s.errorf("scan row failed: %w", err)
 		}
@@ -646,7 +647,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	case *time.Time:
 		s.setTime(v)
 	case *time.Duration:
-		*v = internal.UnmarshalInterval(s.int64())
+		*v = timeutil.UnmarshalInterval(s.int64())
 	case *string:
 		s.setString(v)
 	case *[]byte:
@@ -792,7 +793,7 @@ func (s *scanner) scanOptional(value interface{}) {
 		if s.isNull() {
 			*v = nil
 		} else {
-			src := internal.UnmarshalInterval(s.int64())
+			src := timeutil.UnmarshalInterval(s.int64())
 			*v = &src
 		}
 	case **string:

@@ -5,11 +5,9 @@ import (
 	"crypto/tls"
 	"database/sql/driver"
 	"fmt"
-	"sync"
-	"time"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 
@@ -24,11 +22,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var (
-	DefaultIdleThreshold        = 5 * time.Second
-	DefaultSessionPoolSizeLimit = 1 << 12
-)
-
 type ConnectorOption func(*connector)
 
 func WithDialer(d dial.Dialer) ConnectorOption {
@@ -40,9 +33,9 @@ func WithDialer(d dial.Dialer) ConnectorOption {
 	}
 }
 
-func WithClient(client table.Client) ConnectorOption {
+func withClient(pool internal.ClientAsPool) ConnectorOption {
 	return func(c *connector) {
-		c.client = client
+		c.pool = pool
 	}
 }
 
@@ -107,36 +100,6 @@ func WithSessionPoolTrace(t sessiontrace.SessionPoolTrace) ConnectorOption {
 	}
 }
 
-func WithSessionPoolSizeLimit(n int) ConnectorOption {
-	return func(c *connector) {
-		c.pool.SizeLimit = n
-	}
-}
-
-func WithSessionPoolIdleThreshold(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.IdleThreshold = d
-	}
-}
-
-func WithSessionPoolKeepAliveTimeout(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.KeepAliveTimeout = d
-	}
-}
-
-func WithSessionPoolCreateSessionTimeout(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.CreateSessionTimeout = d
-	}
-}
-
-func WithSessionPoolDeleteTimeout(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.DeleteTimeout = d
-	}
-}
-
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
 	return func(c *connector) {
 		c.defaultTxControl = txControl
@@ -158,7 +121,7 @@ func WithDefaultExecScanQueryOption(opts ...options.ExecuteScanQueryOption) Conn
 func Connector(opts ...ConnectorOption) driver.Connector {
 	c := &connector{
 		dialer: dial.Dialer{
-			DriverConfig: new(config.Config),
+			DriverConfig: config.New(),
 		},
 		defaultTxControl: table.TxControl(
 			table.BeginTx(
@@ -180,10 +143,9 @@ type connector struct {
 
 	clientTrace sessiontrace.Trace
 
-	mu     sync.Mutex
-	ready  chan struct{}
-	client table.Client
-	pool   table2.SessionPool // Used as a template for created connections.
+	mu    sync.Mutex
+	ready chan struct{}
+	pool  internal.ClientAsPool // Used as a template for created connections.
 
 	defaultTxControl *table.TransactionControl
 
@@ -203,20 +165,14 @@ func (c *connector) init(ctx context.Context) (err error) {
 	// database/sql.DB.SetMaxIdleConns() call. Unfortunately, we can not
 	// receive that limit here and we do not want to force user to
 	// configure it twice (and pass it as an option to connector).
-	if c.pool.SizeLimit == 0 {
-		c.pool.SizeLimit = DefaultSessionPoolSizeLimit
-	}
-	if c.pool.IdleThreshold == 0 {
-		c.pool.IdleThreshold = DefaultIdleThreshold
-	}
-	if c.client == nil {
-		c.client, err = c.dial(ctx)
+	if c.pool == nil {
+		c.pool, err = c.dial(ctx)
 	}
 	//c.pool.Builder = c.client
 	return
 }
 
-func (c *connector) dial(ctx context.Context) (table.Client, error) {
+func (c *connector) dial(ctx context.Context) (internal.ClientAsPool, error) {
 	d, err := c.dialer.Dial(ctx, c.endpoint)
 	if err != nil {
 		if c == nil {
@@ -233,7 +189,7 @@ func (c *connector) dial(ctx context.Context) (table.Client, error) {
 		}
 		return nil, fmt.Errorf("dial error: %w", err)
 	}
-	return table2.NewClient(d, ContextTableConfig(ctx)), nil
+	return internal.NewClientAsPool(d, ContextTableConfig(ctx)), nil
 }
 
 func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
@@ -261,7 +217,7 @@ func (c *connector) unwrap(ctx context.Context) (table.Client, error) {
 	if err := c.init(ctx); err != nil {
 		return nil, err
 	}
-	return c.client, nil
+	return c.pool, nil
 }
 
 // Driver is an adapter to allow the use table client as sql.Driver instance.
@@ -272,8 +228,7 @@ type Driver struct {
 }
 
 func (d *Driver) Close(ctx context.Context) error {
-	_ = d.c.pool.Close(context.Background())
-	return d.c.client.Close(ctx)
+	return d.c.pool.Close(ctx)
 }
 
 // Open returns a new connection to the ydb.

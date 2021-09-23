@@ -1,8 +1,9 @@
-package internal
+package assert
 
 import (
 	"bytes"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"math/big"
 	"strings"
 
@@ -20,8 +21,8 @@ import (
 // Tuples and Lists are compared lexicographically. If tuples (lists) have different length and elements of the
 // shorter tuple (list) are all equal to corresponding elements of the other tuple (list), than the shorter tuple (list)
 // is considered less than the longer one.
-func Compare(l, r V) (int, error) {
-	return compare(unwrapTypedValue(l.toYDB()), unwrapTypedValue(r.toYDB()))
+func Compare(l, r value.V) (int, error) {
+	return compare(unwrapTypedValue(l.ToYDB()), unwrapTypedValue(r.ToYDB()))
 }
 
 func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {

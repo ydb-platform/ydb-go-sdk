@@ -2,11 +2,10 @@ package main
 
 import (
 	"bytes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"io"
 	"strings"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 func generateFromString(src string) (bytes.Buffer, error) {
@@ -39,7 +38,7 @@ func TestGenerator(t *testing.T) {
 				t.Log(err)
 			}
 			if err == nil {
-				internal.Equal(t, test.out, out.String())
+				assert.Equal(t, test.out, out.String())
 			}
 		})
 	}

@@ -1,6 +1,7 @@
-package internal
+package wrap
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -11,10 +12,10 @@ type Operation struct {
 	method string
 	req    proto.Message
 	res    proto.Message
-	resp   Response
+	resp   response.Response
 }
 
-func WrapWithResponse(method string, req proto.Message, resp Response) Operation {
+func WrapWithResponse(method string, req proto.Message, resp response.Response) Operation {
 	return Operation{
 		method: method,
 		req:    req,
@@ -30,7 +31,7 @@ func Wrap(method string, req, res proto.Message) Operation {
 	}
 }
 
-func Unwrap(op Operation) (method string, req, res proto.Message, resp Response) {
+func Unwrap(op Operation) (method string, req, res proto.Message, resp response.Response) {
 	return op.method, op.req, op.res, op.resp
 }
 

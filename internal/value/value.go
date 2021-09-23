@@ -1,4 +1,4 @@
-package internal
+package value
 
 import (
 	"bytes"
@@ -10,12 +10,12 @@ import (
 )
 
 type V interface {
-	toYDB() *Ydb.TypedValue
+	ToYDB() *Ydb.TypedValue
 	toString(*bytes.Buffer)
 }
 
 func ValueToYDB(v V) *Ydb.TypedValue {
-	return v.toYDB()
+	return v.ToYDB()
 }
 
 func ValueFromYDB(t *Ydb.Type, v *Ydb.Value) V {
@@ -173,7 +173,7 @@ func (v Value) toString(buf *bytes.Buffer) {
 	valueToString(buf, v.t, v.v)
 }
 
-func (v Value) toYDB() *Ydb.TypedValue {
+func (v Value) ToYDB() *Ydb.TypedValue {
 	// TODO: may be optimized -1 allocation: make all *Value() methods return
 	// *Value, put TypedValue, Value and Type on Value and then use pointer to
 	// already heap-allocated bytes.

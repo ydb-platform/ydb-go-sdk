@@ -1,6 +1,7 @@
-package internal
+package assert
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -8,8 +9,8 @@ import (
 )
 
 func TestUnwrapOptionalValue(t *testing.T) {
-	v := OptionalValue(OptionalValue(UTF8Value("a")))
-	val := unwrapTypedValue(v.toYDB())
+	v := value.OptionalValue(value.OptionalValue(value.UTF8Value("a")))
+	val := unwrapTypedValue(v.ToYDB())
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
@@ -22,8 +23,8 @@ func TestUnwrapOptionalValue(t *testing.T) {
 }
 
 func TestUnwrapPrimitiveValue(t *testing.T) {
-	v := UTF8Value("a")
-	val := unwrapTypedValue(v.toYDB())
+	v := value.UTF8Value("a")
+	val := unwrapTypedValue(v.ToYDB())
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
@@ -36,8 +37,8 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 }
 
 func TestUnwrapNullValue(t *testing.T) {
-	v := NullValue(TypeUTF8)
-	val := unwrapTypedValue(v.toYDB())
+	v := value.NullValue(value.TypeUTF8)
+	val := unwrapTypedValue(v.ToYDB())
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)

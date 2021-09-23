@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace/models"
 	"math/rand"
 	"path"
 	"runtime"
@@ -11,23 +12,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
-
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil/timetest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
-	p := &SessionPool{
+	p := &pool{
 		limit: 1000,
-		index: make(map[*Session]sessionInfo),
+		index: make(map[table.Session]sessionInfo),
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 1000,
@@ -72,7 +73,7 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 	var (
 		keepalive = make(chan struct{})
 	)
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     1,
 		IdleThreshold: time.Hour,
 		Builder: &StubBuilder{
@@ -140,7 +141,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			p := &SessionPool{
+			p := &pool{
 				SizeLimit: 1,
 				Builder: &StubBuilder{
 					T:     t,
@@ -164,11 +165,11 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			)
 			go func() {
 				_, err := p.Get(sessiontrace.WithSessionPoolTrace(context.Background(), sessiontrace.SessionPoolTrace{
-					OnGet: func(sessiontrace.SessionPoolGetStartInfo) func(sessiontrace.SessionPoolGetDoneInfo) {
+					OnGet: func(models.SessionPoolGetStartInfo) func(models.SessionPoolGetDoneInfo) {
 						get <- struct{}{}
 						return nil
 					},
-					OnWait: func(sessiontrace.SessionPoolWaitStartInfo) func(sessiontrace.SessionPoolWaitDoneInfo) {
+					OnWait: func(models.SessionPoolWaitStartInfo) func(models.SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
 						return nil
 					},
@@ -215,7 +216,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 }
 
 func TestSessionPoolClose(t *testing.T) {
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     3,
 		IdleThreshold: time.Hour,
 		Builder: &StubBuilder{
@@ -265,15 +266,15 @@ func TestSessionPoolClose(t *testing.T) {
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
 			sessiontrace.SessionPoolTrace{
-				OnPut: func(info sessiontrace.SessionPoolPutStartInfo) func(sessiontrace.SessionPoolPutDoneInfo) {
+				OnPut: func(info models.SessionPoolPutStartInfo) func(models.SessionPoolPutDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolPutDoneInfo) {
+					return func(info models.SessionPoolPutDoneInfo) {
 						wg.Done()
 					}
 				},
-				OnCloseSession: func(info sessiontrace.SessionPoolCloseSessionStartInfo) func(doneInfo sessiontrace.SessionPoolCloseSessionDoneInfo) {
+				OnCloseSession: func(info models.SessionPoolCloseSessionStartInfo) func(doneInfo models.SessionPoolCloseSessionDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolCloseSessionDoneInfo) {
+					return func(info models.SessionPoolCloseSessionDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -308,7 +309,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			p := &SessionPool{
+			p := &pool{
 				SizeLimit: 1,
 				Builder: &StubBuilder{
 					T:     t,
@@ -333,11 +334,11 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 					close(got)
 				}()
 				_, _ = p.Get(sessiontrace.WithSessionPoolTrace(context.Background(), sessiontrace.SessionPoolTrace{
-					OnGet: func(sessiontrace.SessionPoolGetStartInfo) func(sessiontrace.SessionPoolGetDoneInfo) {
+					OnGet: func(models.SessionPoolGetStartInfo) func(models.SessionPoolGetDoneInfo) {
 						get <- struct{}{}
 						return nil
 					},
-					OnWait: func(sessiontrace.SessionPoolWaitStartInfo) func(sessiontrace.SessionPoolWaitDoneInfo) {
+					OnWait: func(models.SessionPoolWaitStartInfo) func(models.SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
 						return nil
 					},
@@ -378,18 +379,18 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 func TestSessionPoolRacyGet(t *testing.T) {
 	type createReq struct {
 		release chan struct{}
-		session *Session
+		session table.Session
 	}
 	create := make(chan createReq)
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     1,
 		IdleThreshold: -1,
 		Builder: &StubBuilder{
 			Limit: 1,
-			OnCreateSession: func(ctx context.Context) (*Session, error) {
+			OnCreateSession: func(ctx context.Context) (table.Session, error) {
 				req := createReq{
 					release: make(chan struct{}),
-					session: simpleSession(),
+					session: simpleSession(t),
 				}
 				create <- req
 				<-req.release
@@ -398,7 +399,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		},
 	}
 	var (
-		expSession *Session
+		expSession table.Session
 		done       = make(chan struct{}, 2)
 	)
 
@@ -450,7 +451,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 }
 
 func TestSessionPoolPutInFull(t *testing.T) {
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     1,
 		IdleThreshold: -1,
 		Builder: &StubBuilder{
@@ -468,14 +469,14 @@ func TestSessionPoolPutInFull(t *testing.T) {
 		t.Fatalf("unexpected error on put session into non-full pool: %v, wand: %v", err, nil)
 	}
 
-	if err := p.Put(context.Background(), simpleSession()); err != ErrSessionPoolOverflow {
+	if err := p.Put(context.Background(), simpleSession(t)); err != ErrSessionPoolOverflow {
 		t.Fatalf("unexpected error on put session into full pool: %v, wand: %v", err, ErrSessionPoolOverflow)
 	}
 }
 
 func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 	type sessionAndError struct {
-		session *Session
+		session table.Session
 		err     error
 	}
 	for _, test := range []struct {
@@ -492,7 +493,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			p := &SessionPool{
+			p := &pool{
 				SizeLimit: 1,
 				Builder: &StubBuilder{
 					T:     t,
@@ -524,11 +525,11 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			)
 			go func() {
 				ctx := sessiontrace.WithSessionPoolTrace(context.Background(), sessiontrace.SessionPoolTrace{
-					OnGet: func(sessiontrace.SessionPoolGetStartInfo) func(sessiontrace.SessionPoolGetDoneInfo) {
+					OnGet: func(models.SessionPoolGetStartInfo) func(models.SessionPoolGetDoneInfo) {
 						get <- struct{}{}
 						return nil
 					},
-					OnWait: func(sessiontrace.SessionPoolWaitStartInfo) func(sessiontrace.SessionPoolWaitDoneInfo) {
+					OnWait: func(models.SessionPoolWaitStartInfo) func(models.SessionPoolWaitDoneInfo) {
 						wait <- struct{}{}
 						return nil
 					},
@@ -587,7 +588,7 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 		release   = make(chan struct{})
 		keepalive = make(chan struct{})
 	)
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     1,
 		IdleThreshold: time.Hour,
 		Builder: &StubBuilder{
@@ -692,7 +693,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 			)
 		}
 	}
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit: 1,
 		Builder: &StubBuilder{
 			Cluster: testutil.NewDB(
@@ -735,7 +736,7 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     1,
 		IdleThreshold: -1,
 		Builder: &StubBuilder{
@@ -771,7 +772,7 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 
 		keepAliveCount uint32
 	)
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     2,
 		IdleThreshold: idleThreshold,
 		Builder: &StubBuilder{
@@ -846,7 +847,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 		idleThreshold = 4 * time.Second
 		keepalive     = make(chan chan<- struct{})
 	)
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     2,
 		IdleThreshold: idleThreshold,
 		Builder: &StubBuilder{
@@ -913,7 +914,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 }
 
 func TestSessionPoolDoublePut(t *testing.T) {
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     2,
 		IdleThreshold: -1,
 		Builder: &StubBuilder{
@@ -938,7 +939,7 @@ func TestSessionPoolDoublePut(t *testing.T) {
 }
 
 func TestSessionPoolReuseWaitChannel(t *testing.T) {
-	p := SessionPool{}
+	p := pool{}
 	ch1 := p.getWaitCh()
 	p.putWaitCh(ch1)
 	ch2 := p.getWaitCh()
@@ -960,7 +961,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 		deleteSession       = make(chan interface{})
 		deleteSessionResult = make(chan error)
 	)
-	p := &SessionPool{
+	p := &pool{
 		SizeLimit:     1,
 		IdleThreshold: time.Second,
 		Builder: &StubBuilder{
@@ -1034,7 +1035,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	keepAliveCnt := 0
 	allKeepAlive := make(chan int)
-	p := &SessionPool{
+	p := &pool{
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 4,
@@ -1064,8 +1065,8 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	defer func() {
 		_ = p.Close(context.Background())
 	}()
-	sessionBuilder := func(t *testing.T, poll *SessionPool) (*Session, chan bool) {
-		s := mustCreateSession(t, poll)
+	sessionBuilder := func(t *testing.T, pool *pool) (table.Session, chan bool) {
+		s := mustCreateSession(t, pool)
 		mustPutSession(t, p, s)
 		closed := make(chan bool)
 		s.OnClose(func() {
@@ -1081,7 +1082,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	<-c1
 	<-c2
 
-	if s3.closed {
+	if s3.IsClosed() {
 		t.Fatalf("lower bound for sessions in the pool is not equal KeepAliveMinSize")
 	}
 
@@ -1097,7 +1098,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 }
 
 func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
-	p := &SessionPool{
+	p := &pool{
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 4,
@@ -1139,7 +1140,7 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	defer cleanupNow()
 
 	retry := true
-	p := &SessionPool{
+	p := &pool{
 		Builder: &StubBuilder{
 			T:     t,
 			Limit: 2,
@@ -1209,16 +1210,16 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 	}
 }
 
-func mustCreateSession(t *testing.T, p *SessionPool) *Session {
+func mustCreateSession(t *testing.T, p *pool) table.Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.Create(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
 			sessiontrace.SessionPoolTrace{
-				OnCreate: func(info sessiontrace.SessionPoolCreateStartInfo) func(sessiontrace.SessionPoolCreateDoneInfo) {
+				OnCreate: func(info models.SessionPoolCreateStartInfo) func(models.SessionPoolCreateDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolCreateDoneInfo) {
+					return func(info models.SessionPoolCreateDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1231,16 +1232,16 @@ func mustCreateSession(t *testing.T, p *SessionPool) *Session {
 	return s
 }
 
-func mustGetSession(t *testing.T, p *SessionPool) *Session {
+func mustGetSession(t *testing.T, p *pool) table.Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.Get(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
 			sessiontrace.SessionPoolTrace{
-				OnGet: func(info sessiontrace.SessionPoolGetStartInfo) func(sessiontrace.SessionPoolGetDoneInfo) {
+				OnGet: func(info models.SessionPoolGetStartInfo) func(models.SessionPoolGetDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolGetDoneInfo) {
+					return func(info models.SessionPoolGetDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1253,22 +1254,22 @@ func mustGetSession(t *testing.T, p *SessionPool) *Session {
 	return s
 }
 
-func mustPutSession(t *testing.T, p *SessionPool, s *Session) {
+func mustPutSession(t *testing.T, p *pool, s table.Session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Put(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
 			sessiontrace.SessionPoolTrace{
-				OnPut: func(info sessiontrace.SessionPoolPutStartInfo) func(sessiontrace.SessionPoolPutDoneInfo) {
+				OnPut: func(info models.SessionPoolPutStartInfo) func(models.SessionPoolPutDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolPutDoneInfo) {
+					return func(info models.SessionPoolPutDoneInfo) {
 						wg.Done()
 					}
 				},
-				OnCloseSession: func(info sessiontrace.SessionPoolCloseSessionStartInfo) func(doneInfo sessiontrace.SessionPoolCloseSessionDoneInfo) {
+				OnCloseSession: func(info models.SessionPoolCloseSessionStartInfo) func(doneInfo models.SessionPoolCloseSessionDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolCloseSessionDoneInfo) {
+					return func(info models.SessionPoolCloseSessionDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1280,17 +1281,17 @@ func mustPutSession(t *testing.T, p *SessionPool, s *Session) {
 	}
 }
 
-func mustTakeSession(t *testing.T, p *SessionPool, s *Session) {
+func mustTakeSession(t *testing.T, p *pool, s table.Session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	took, err := p.Take(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
 			sessiontrace.SessionPoolTrace{
-				OnTake: func(info sessiontrace.SessionPoolTakeStartInfo) func(sessiontrace.SessionPoolTakeWaitInfo) func(sessiontrace.SessionPoolTakeDoneInfo) {
+				OnTake: func(info models.SessionPoolTakeStartInfo) func(models.SessionPoolTakeWaitInfo) func(models.SessionPoolTakeDoneInfo) {
 					wg.Add(1)
-					return func(sessiontrace.SessionPoolTakeWaitInfo) func(sessiontrace.SessionPoolTakeDoneInfo) {
-						return func(sessiontrace.SessionPoolTakeDoneInfo) {
+					return func(models.SessionPoolTakeWaitInfo) func(models.SessionPoolTakeDoneInfo) {
+						return func(models.SessionPoolTakeDoneInfo) {
 							wg.Done()
 						}
 					}
@@ -1304,16 +1305,16 @@ func mustTakeSession(t *testing.T, p *SessionPool, s *Session) {
 	}
 }
 
-func mustClose(t *testing.T, p *SessionPool) {
+func mustClose(t *testing.T, p *pool) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Close(
 		sessiontrace.WithSessionPoolTrace(
 			context.Background(),
 			sessiontrace.SessionPoolTrace{
-				OnCloseSession: func(info sessiontrace.SessionPoolCloseSessionStartInfo) func(doneInfo sessiontrace.SessionPoolCloseSessionDoneInfo) {
+				OnCloseSession: func(info models.SessionPoolCloseSessionStartInfo) func(doneInfo models.SessionPoolCloseSessionDoneInfo) {
 					wg.Add(1)
-					return func(info sessiontrace.SessionPoolCloseSessionDoneInfo) {
+					return func(info models.SessionPoolCloseSessionDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1333,24 +1334,14 @@ var okHandler = func(request interface{}) (proto.Message, error) {
 	return nil, nil
 }
 
-func simpleSession() *Session {
-	return newSession(testutil.NewDB(), "")
-}
-
-func newSession(cluster cluster.Cluster, id string) *Session {
-	return &Session{
-		id: id,
-		c: table.client{
-			cluster: cluster,
-		},
-		tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
-	}
+func simpleSession(t *testing.T) table.Session {
+	return _newSession(t, testutil.NewDB())
 }
 
 type StubBuilder struct {
-	OnCreateSession func(ctx context.Context) (*Session, error)
+	OnCreateSession func(ctx context.Context) (table.Session, error)
 
-	Cluster *testutil.Cluster
+	Cluster cluster.Cluster
 	Limit   int
 	T       *testing.T
 
@@ -1358,7 +1349,7 @@ type StubBuilder struct {
 	actual int
 }
 
-func (s *StubBuilder) CreateSession(ctx context.Context) (session *Session, err error) {
+func (s *StubBuilder) CreateSession(ctx context.Context) (session table.Session, err error) {
 	defer func() {
 		s.mu.Lock()
 		if session != nil {
@@ -1377,31 +1368,20 @@ func (s *StubBuilder) CreateSession(ctx context.Context) (session *Session, err 
 		return f(ctx)
 	}
 
-	response, err := Ydb_Table_V1.NewTableServiceClient(s.Cluster).CreateSession(ctx, &Ydb_Table.CreateSessionRequest{})
-	if err != nil {
-		return
-	}
-
-	result := Ydb_Table.CreateSessionResult{}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
-	if err != nil {
-		return
-	}
-
-	return newSession(s.Cluster, result.SessionId), nil
+	return newSession(ctx, s.Cluster, Trace{})
 }
 
-func (p *SessionPool) debug() {
+func (p *pool) debug() {
 	fmt.Printf("head ")
 	for el := p.idle.Front(); el != nil; el = el.Next() {
-		s := el.Value.(*Session)
+		s := el.Value.(table.Session)
 		x := p.index[s]
-		fmt.Printf("<-> %s(%d) ", s.id, x.touched.Unix())
+		fmt.Printf("<-> %s(%d) ", s.ID(), x.touched.Unix())
 	}
 	fmt.Printf("<-> tail\n")
 }
 
-func whenWantWaitCh(p *SessionPool) <-chan struct{} {
+func whenWantWaitCh(p *pool) <-chan struct{} {
 	var (
 		prev = p.testHookGetWaitCh
 		ch   = make(chan struct{})

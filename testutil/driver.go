@@ -158,6 +158,10 @@ type Cluster struct {
 	onClose     func() error
 }
 
+func (c *Cluster) Stats() map[cluster.Endpoint]stats.Stats {
+	return nil
+}
+
 func (c *Cluster) Secure() bool {
 	return true
 }
@@ -199,10 +203,6 @@ func (c *Cluster) Close() error {
 		return fmt.Errorf("Cluster.Close() not implemented")
 	}
 	return c.onClose()
-}
-
-func (c *Cluster) Stats(it func(cluster.Endpoint, stats.Stats)) {
-	return
 }
 
 type (
@@ -255,7 +255,7 @@ func WithClose(onClose func() error) NewClusterOption {
 	}
 }
 
-func NewDB(opts ...NewClusterOption) *Cluster {
+func NewDB(opts ...NewClusterOption) cluster.Cluster {
 	c := &Cluster{}
 	for _, opt := range opts {
 		opt(c)

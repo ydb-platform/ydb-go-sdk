@@ -3,12 +3,12 @@ package resultset
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"reflect"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -125,7 +125,7 @@ func WithColumns(cs ...options.Column) ResultSetOption {
 		for _, c := range cs {
 			r.Columns = append(r.Columns, &Ydb.Column{
 				Name: c.Name,
-				Type: internal.TypeToYDB(c.Type),
+				Type: value.TypeToYDB(c.Type),
 			})
 		}
 	}
@@ -151,10 +151,10 @@ func WithValues(vs ...types.Value) ResultSetOption {
 					Items: make([]*Ydb.Value, n),
 				}
 			}
-			tv := internal.ValueToYDB(v)
-			act := internal.TypeFromYDB(tv.Type)
-			exp := internal.TypeFromYDB(r.Columns[j].Type)
-			if !internal.TypesEqual(act, exp) {
+			tv := value.ValueToYDB(v)
+			act := value.TypeFromYDB(tv.Type)
+			exp := value.TypeFromYDB(r.Columns[j].Type)
+			if !value.TypesEqual(act, exp) {
 				panic(fmt.Sprintf(
 					"unexpected types for #%d column: %s; want %s",
 					j, act, exp,

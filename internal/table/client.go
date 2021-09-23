@@ -8,11 +8,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-func NewClient(db cluster.DB, config Config) table.Client {
+func NewClientAsPool(db cluster.DB, config Config) ClientAsPool {
 	c := &client{
 		cluster: db,
 	}
-	c.pool = &SessionPool{
+	c.pool = &pool{
 		Trace:                  config.Trace,
 		Builder:                &SessionPoolBuilder{client: c},
 		SizeLimit:              config.SizeLimit,
@@ -31,7 +31,7 @@ type SessionPoolBuilder struct {
 	*client
 }
 
-func (c *SessionPoolBuilder) CreateSession(ctx context.Context) (s *Session, err error) {
+func (c *SessionPoolBuilder) CreateSession(ctx context.Context) (s table.Session, err error) {
 	return newSession(ctx, c.cluster, c.trace)
 }
 
@@ -39,7 +39,19 @@ func (c *SessionPoolBuilder) CreateSession(ctx context.Context) (s *Session, err
 type client struct {
 	trace   Trace
 	cluster cluster.DB
-	pool    SessionProvider
+	pool    Pool
+}
+
+func (c *client) Take(ctx context.Context, s table.Session) (took bool, err error) {
+	return c.pool.Take(ctx, s)
+}
+
+func (c *client) Put(ctx context.Context, s table.Session) (err error) {
+	return c.pool.Put(ctx, s)
+}
+
+func (c *client) Create(ctx context.Context) (s table.Session, err error) {
+	return c.pool.Create(ctx)
 }
 
 // CreateSession creates new session instance.
@@ -73,7 +85,7 @@ type Config struct {
 	KeepAliveMinSize int
 
 	// IdleKeepAliveThreshold is a number of keepAlive messages to call before the
-	// Session is removed if it is an excess session (see KeepAliveMinSize)
+	// session is removed if it is an excess session (see KeepAliveMinSize)
 	// This means that session will be deleted after the expiration of lifetime = IdleThreshold * IdleKeepAliveThreshold
 	// If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
 	// be removed ever.

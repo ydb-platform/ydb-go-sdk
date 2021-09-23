@@ -3,7 +3,7 @@ package options
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -48,7 +48,7 @@ func WithColumn(name string, typ types.Type) CreateTableOption {
 	return func(d *CreateTableDesc) {
 		d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
 			Name: name,
-			Type: internal.TypeToYDB(typ),
+			Type: value.TypeToYDB(typ),
 		})
 	}
 }
@@ -284,7 +284,7 @@ func WithPartitioningPolicyExplicitPartitions(splitPoints ...types.Value) Partit
 	return func(p *partitioningPolicy) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
 		for i := range values {
-			values[i] = internal.ValueToYDB(splitPoints[i])
+			values[i] = value.ValueToYDB(splitPoints[i])
 		}
 		p.Partitions = &Ydb_Table.PartitioningPolicy_ExplicitPartitions{
 			ExplicitPartitions: &Ydb_Table.ExplicitPartitions{
@@ -378,7 +378,7 @@ func WithAddColumn(name string, typ types.Type) AlterTableOption {
 	return func(d *AlterTableDesc) {
 		d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
 			Name: name,
-			Type: internal.TypeToYDB(typ),
+			Type: value.TypeToYDB(typ),
 		})
 	}
 }
@@ -574,7 +574,7 @@ func ReadGreater(x types.Value) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_Greater{
-			Greater: internal.ValueToYDB(x),
+			Greater: value.ValueToYDB(x),
 		}
 	}
 }
@@ -583,7 +583,7 @@ func ReadGreaterOrEqual(x types.Value) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
-			GreaterOrEqual: internal.ValueToYDB(x),
+			GreaterOrEqual: value.ValueToYDB(x),
 		}
 	}
 }
@@ -592,7 +592,7 @@ func ReadLess(x types.Value) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
-			Less: internal.ValueToYDB(x),
+			Less: value.ValueToYDB(x),
 		}
 	}
 }
@@ -601,7 +601,7 @@ func ReadLessOrEqual(x types.Value) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_LessOrEqual{
-			LessOrEqual: internal.ValueToYDB(x),
+			LessOrEqual: value.ValueToYDB(x),
 		}
 	}
 }

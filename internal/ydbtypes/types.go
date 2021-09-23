@@ -6,104 +6,103 @@ package ydbtypes
 
 import (
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"go/types"
 	"strings"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
-func PrimitiveTypeFromString(s string) (t internal.PrimitiveType, err error) {
+func PrimitiveTypeFromString(s string) (t value.PrimitiveType, err error) {
 	switch strings.ToLower(s) {
 	case "bool":
-		t = internal.TypeBool
+		t = value.TypeBool
 	case "int8":
-		t = internal.TypeInt8
+		t = value.TypeInt8
 	case "uint8":
-		t = internal.TypeUint8
+		t = value.TypeUint8
 	case "int16":
-		t = internal.TypeInt16
+		t = value.TypeInt16
 	case "uint16":
-		t = internal.TypeUint16
+		t = value.TypeUint16
 	case "int32":
-		t = internal.TypeInt32
+		t = value.TypeInt32
 	case "uint32":
-		t = internal.TypeUint32
+		t = value.TypeUint32
 	case "int64":
-		t = internal.TypeInt64
+		t = value.TypeInt64
 	case "uint64":
-		t = internal.TypeUint64
+		t = value.TypeUint64
 	case "float":
-		t = internal.TypeFloat
+		t = value.TypeFloat
 	case "double":
-		t = internal.TypeDouble
+		t = value.TypeDouble
 	case "date":
-		t = internal.TypeDate
+		t = value.TypeDate
 	case "datetime":
-		t = internal.TypeDatetime
+		t = value.TypeDatetime
 	case "timestamp":
-		t = internal.TypeTimestamp
+		t = value.TypeTimestamp
 	case "interval":
-		t = internal.TypeInterval
+		t = value.TypeInterval
 	case "tzdate":
-		t = internal.TypeTzDate
+		t = value.TypeTzDate
 	case "tzdatetime":
-		t = internal.TypeTzDatetime
+		t = value.TypeTzDatetime
 	case "tztimestamp":
-		t = internal.TypeTzTimestamp
+		t = value.TypeTzTimestamp
 	case "string":
-		t = internal.TypeString
+		t = value.TypeString
 	case "utf8":
-		t = internal.TypeUTF8
+		t = value.TypeUTF8
 	case "yson":
-		t = internal.TypeYSON
+		t = value.TypeYSON
 	case "json":
-		t = internal.TypeJSON
+		t = value.TypeJSON
 	case "uuid":
-		t = internal.TypeUUID
+		t = value.TypeUUID
 	case "jsondocument":
-		t = internal.TypeJSONDocument
+		t = value.TypeJSONDocument
 	case "dynumber":
-		t = internal.TypeDyNumber
+		t = value.TypeDyNumber
 	default:
 		err = fmt.Errorf("ydbtypes: unknown types: %q", s)
 	}
 	return
 }
 
-func PrimitiveTypeFromGoType(typ types.Type) (t internal.PrimitiveType, err error) {
+func PrimitiveTypeFromGoType(typ types.Type) (t value.PrimitiveType, err error) {
 	switch t := typ.(type) {
 	case *types.Slice:
 		b, basic := t.Elem().(*types.Basic)
 		if basic && b.Kind() == types.Byte {
-			return internal.TypeString, nil
+			return value.TypeString, nil
 		}
 
 	case *types.Basic:
 		switch t.Kind() {
 		case types.Bool:
-			return internal.TypeBool, nil
+			return value.TypeBool, nil
 		case types.Int8:
-			return internal.TypeInt8, nil
+			return value.TypeInt8, nil
 		case types.Int16:
-			return internal.TypeInt16, nil
+			return value.TypeInt16, nil
 		case types.Int32:
-			return internal.TypeInt32, nil
+			return value.TypeInt32, nil
 		case types.Int64:
-			return internal.TypeInt64, nil
+			return value.TypeInt64, nil
 		case types.Uint8:
-			return internal.TypeUint8, nil
+			return value.TypeUint8, nil
 		case types.Uint16:
-			return internal.TypeUint16, nil
+			return value.TypeUint16, nil
 		case types.Uint32:
-			return internal.TypeUint32, nil
+			return value.TypeUint32, nil
 		case types.Uint64:
-			return internal.TypeUint64, nil
+			return value.TypeUint64, nil
 		case types.Float32:
-			return internal.TypeFloat, nil
+			return value.TypeFloat, nil
 		case types.Float64:
-			return internal.TypeDouble, nil
+			return value.TypeDouble, nil
 		case types.String:
-			return internal.TypeUTF8, nil
+			return value.TypeUTF8, nil
 
 		case types.Int, types.Uint:
 			return 0, fmt.Errorf(
@@ -120,81 +119,81 @@ var (
 	bytesSlice   = types.NewSlice(types.Typ[types.Byte])
 )
 
-func GoTypeFromPrimitiveType(t internal.PrimitiveType) types.Type {
+func GoTypeFromPrimitiveType(t value.PrimitiveType) types.Type {
 	switch t {
-	case internal.TypeBool:
+	case value.TypeBool:
 		return types.Typ[types.Bool]
 
-	case internal.TypeInt8:
+	case value.TypeInt8:
 		return types.Typ[types.Int8]
 
-	case internal.TypeUint8:
+	case value.TypeUint8:
 		return types.Typ[types.Uint8]
 
-	case internal.TypeInt16:
+	case value.TypeInt16:
 		return types.Typ[types.Int16]
 
-	case internal.TypeUint16:
+	case value.TypeUint16:
 		return types.Typ[types.Uint16]
 
-	case internal.TypeInt32:
+	case value.TypeInt32:
 		return types.Typ[types.Int32]
 
-	case internal.TypeUint32:
+	case value.TypeUint32:
 		return types.Typ[types.Uint32]
 
-	case internal.TypeInt64:
+	case value.TypeInt64:
 		return types.Typ[types.Int64]
 
-	case internal.TypeUint64:
+	case value.TypeUint64:
 		return types.Typ[types.Uint64]
 
-	case internal.TypeFloat:
+	case value.TypeFloat:
 		return types.Typ[types.Float32]
 
-	case internal.TypeDouble:
+	case value.TypeDouble:
 		return types.Typ[types.Float64]
 
-	case internal.TypeDate:
+	case value.TypeDate:
 		return types.Typ[types.Uint32]
 
-	case internal.TypeDatetime:
+	case value.TypeDatetime:
 		return types.Typ[types.Uint32]
 
-	case internal.TypeTimestamp:
+	case value.TypeTimestamp:
 		return types.Typ[types.Uint64]
 
-	case internal.TypeInterval:
+	case value.TypeInterval:
 		return types.Typ[types.Int64]
 
-	case internal.TypeTzDate:
+	case value.TypeTzDate:
 		return types.Typ[types.String]
 
-	case internal.TypeTzDatetime:
+	case value.TypeTzDatetime:
 		return types.Typ[types.String]
 
-	case internal.TypeTzTimestamp:
+	case value.TypeTzTimestamp:
 		return types.Typ[types.String]
 
-	case internal.TypeUTF8:
+	case value.TypeUTF8:
 		return types.Typ[types.String]
 
-	case internal.TypeYSON:
+	case value.TypeYSON:
 		return types.Typ[types.String]
 
-	case internal.TypeJSON:
+	case value.TypeJSON:
 		return types.Typ[types.String]
 
-	case internal.TypeUUID:
+	case value.TypeUUID:
 		return bytesArray16
 
-	case internal.TypeJSONDocument:
+	case value.TypeJSONDocument:
 		return types.Typ[types.String]
 
-	case internal.TypeDyNumber:
+	case value.TypeDyNumber:
 		return types.Typ[types.String]
 
-	case internal.TypeString:
+	case value.TypeString:
 		return bytesSlice
 
 	default:

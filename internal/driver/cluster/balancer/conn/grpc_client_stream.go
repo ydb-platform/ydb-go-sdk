@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"google.golang.org/grpc"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 )
 
@@ -75,7 +75,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		return
 	}
 
-	if operation, ok := m.(internal.StreamOperationResponse); ok {
+	if operation, ok := m.(wrap.StreamOperationResponse); ok {
 		if s := operation.GetStatus(); s != Ydb.StatusIds_SUCCESS {
 			err = errors.NewOpError(errors.WithOEOperation(operation))
 		}

@@ -164,7 +164,7 @@ func TestTxDoerStmt(t *testing.T) {
 
 	db := sql.OpenDB(Connector(
 		WithSessionPoolIdleThreshold(time.Hour),
-		WithClient(table.NewClient(cluster, table.DefaultConfig())),
+		withClient(table.NewClient(cluster, table.DefaultConfig())),
 	))
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)

@@ -3,10 +3,9 @@ package table
 import (
 	"bytes"
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -32,6 +31,10 @@ type Session interface {
 	BulkUpsert(ctx context.Context, table string, rows types.Value) (err error)
 	BeginTransaction(ctx context.Context, tx *TransactionSettings) (x Transaction, err error)
 	Close(ctx context.Context) (err error)
+
+	OnClose(f func())
+	KeepAlive(ctx context.Context) (options.SessionInfo, error)
+	IsClosed() bool
 }
 
 type TransactionSettings struct {
@@ -186,14 +189,14 @@ func (q *QueryParameters) Params() queryParams {
 	return q.m
 }
 
-func (q *QueryParameters) Each(it func(name string, value types.Value)) {
+func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 	if q == nil {
 		return
 	}
-	for key, value := range q.m {
-		it(key, internal.ValueFromYDB(
-			value.Type,
-			value.Value,
+	for key, v := range q.m {
+		it(key, value.ValueFromYDB(
+			v.Type,
+			v.Value,
 		))
 	}
 }
@@ -201,12 +204,12 @@ func (q *QueryParameters) Each(it func(name string, value types.Value)) {
 func (q *QueryParameters) String() string {
 	var buf bytes.Buffer
 	buf.WriteByte('(')
-	q.Each(func(name string, value types.Value) {
+	q.Each(func(name string, v types.Value) {
 		buf.WriteString("((")
 		buf.WriteString(name)
 		buf.WriteByte(')')
 		buf.WriteByte('(')
-		internal.WriteValueStringTo(&buf, value)
+		value.WriteValueStringTo(&buf, v)
 		buf.WriteString("))")
 	})
 	buf.WriteByte(')')
@@ -229,6 +232,6 @@ func (q *QueryParameters) Add(opts ...ParameterOption) {
 
 func ValueParam(name string, v types.Value) ParameterOption {
 	return func(q queryParams) {
-		q[name] = internal.ValueToYDB(v)
+		q[name] = value.ValueToYDB(v)
 	}
 }

@@ -1,11 +1,12 @@
 package options
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -41,7 +42,7 @@ type Column struct {
 func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 	return &Ydb_Table.ColumnMeta{
 		Name:   c.Name,
-		Type:   internal.TypeToYDB(c.Type),
+		Type:   value.TypeToYDB(c.Type),
 		Family: c.Family,
 	}
 }
@@ -119,7 +120,7 @@ func NewColumnFamily(c *Ydb_Table.ColumnFamily) ColumnFamily {
 		Name:         c.GetName(),
 		Data:         storagePool(c.GetData()),
 		Compression:  columnFamilyCompression(c.GetCompression()),
-		KeepInMemory: internal.FeatureFlagFromYDB(c.GetKeepInMemory()),
+		KeepInMemory: feature.FeatureFlagFromYDB(c.GetKeepInMemory()),
 	}
 }
 
@@ -254,7 +255,7 @@ func NewStorageSettings(ss *Ydb_Table.StorageSettings) StorageSettings {
 		TableCommitLog0:    storagePool(ss.GetTabletCommitLog0()),
 		TableCommitLog1:    storagePool(ss.GetTabletCommitLog1()),
 		External:           storagePool(ss.GetExternal()),
-		StoreExternalBlobs: internal.FeatureFlagFromYDB(ss.GetStoreExternalBlobs()),
+		StoreExternalBlobs: feature.FeatureFlagFromYDB(ss.GetStoreExternalBlobs()),
 	}
 }
 
@@ -278,9 +279,9 @@ func (ps PartitioningSettings) toYDB() *Ydb_Table.PartitioningSettings {
 
 func NewPartitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSettings {
 	return PartitioningSettings{
-		PartitioningBySize: internal.FeatureFlagFromYDB(ps.GetPartitioningBySize()),
+		PartitioningBySize: feature.FeatureFlagFromYDB(ps.GetPartitioningBySize()),
 		PartitionSizeMb:    ps.GetPartitionSizeMb(),
-		PartitioningByLoad: internal.FeatureFlagFromYDB(ps.GetPartitioningByLoad()),
+		PartitioningByLoad: feature.FeatureFlagFromYDB(ps.GetPartitioningByLoad()),
 		MinPartitionsCount: ps.GetMinPartitionsCount(),
 		MaxPartitionsCount: ps.GetMaxPartitionsCount(),
 	}

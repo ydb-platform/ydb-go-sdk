@@ -1,4 +1,4 @@
-package internal
+package feature
 
 import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 

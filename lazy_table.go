@@ -41,7 +41,7 @@ func newTable(db DB, config table.Config) *lazyTable {
 
 func (t *lazyTable) init() {
 	t.m.Lock()
-	t.client = table.NewClient(t.db, t.config)
+	t.client = table.NewClientAsPool(t.db, t.config)
 	t.m.Unlock()
 }
 

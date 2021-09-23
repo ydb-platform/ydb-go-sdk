@@ -3,6 +3,8 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"io"
 	"math/rand"
 	"testing"
@@ -21,10 +23,10 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
 		errors.NewTransportError(
-			errors.TransportErrorResourceExhausted,
+			errors.WithTEReason(errors.TransportErrorResourceExhausted),
 		),
 		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
-			errors.TransportErrorResourceExhausted,
+			errors.WithTEReason(errors.TransportErrorResourceExhausted),
 		)),
 		errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded)),
 		fmt.Errorf("wrap op error: %w", errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded))),
@@ -43,9 +45,10 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			result := make(chan error)
 			go func() {
-				result <- pool.Retry(ctx, false, func(ctx context.Context, _ *Session) error {
+				err, _ := pool.Retry(ctx, false, func(ctx context.Context, _ table.Session) error {
 					return testErr
 				})
+				result <- err
 			}()
 
 			select {
@@ -62,29 +65,37 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	}
 }
 
+func _newSession(t *testing.T, cl cluster.DB) table.Session {
+	s, err := newSession(context.Background(), cl, Trace{})
+	if err != nil {
+		t.Fatalf("newSession unexpected error: %v", err)
+	}
+	return s
+}
+
 func TestRetryerImmediateRetry(t *testing.T) {
-	for testErr, session := range map[error]*Session{
+	for testErr, session := range map[error]table.Session{
 		errors.NewTransportError(
-			errors.TransportErrorResourceExhausted,
-		): newSession(nil, "1"),
+			errors.WithTEReason(errors.TransportErrorResourceExhausted),
+		): _newSession(t, nil),
 		errors.NewTransportError(
-			errors.TransportErrorAborted,
-		): newSession(nil, "2"),
+			errors.WithTEReason(errors.TransportErrorAborted),
+		): _newSession(t, nil),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusUnavailable),
-		): newSession(nil, "3"),
+		): _newSession(t, nil),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusOverloaded),
-		): newSession(nil, "4"),
+		): _newSession(t, nil),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusAborted),
-		): newSession(nil, "5"),
+		): _newSession(t, nil),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusNotFound),
-		): newSession(nil, "6"),
+		): _newSession(t, nil),
 		fmt.Errorf("wrap op error: %w", errors.NewOpError(
 			errors.WithOEReason(errors.StatusAborted),
-		)): newSession(nil, "7"),
+		)): _newSession(t, nil),
 	} {
 		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
 			pool := SingleSession(
@@ -94,10 +105,10 @@ func TestRetryerImmediateRetry(t *testing.T) {
 					return nil
 				}),
 			)
-			err := pool.Retry(
+			err, _ := pool.Retry(
 				context.Background(),
 				false,
-				func(ctx context.Context, _ *Session) error {
+				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
 			)
@@ -110,18 +121,18 @@ func TestRetryerImmediateRetry(t *testing.T) {
 
 func TestRetryerBadSession(t *testing.T) {
 	pool := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (*Session, error) {
+		OnGet: func(ctx context.Context) (table.Session, error) {
 			return simpleSession(), nil
 		},
 		OnPut:   nil,
 		OnRetry: nil,
 	}
 
-	var sessions []*Session
-	err := pool.Retry(
+	var sessions []table.Session
+	err, _ := pool.Retry(
 		context.Background(),
 		false,
-		func(ctx context.Context, s *Session) error {
+		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
 			return errors.NewOpError(errors.WithOEReason(errors.StatusBadSession))
 		},
@@ -129,32 +140,30 @@ func TestRetryerBadSession(t *testing.T) {
 	if !errors.IsOpError(err, errors.StatusBadSession) {
 		t.Errorf("unexpected error: %v", err)
 	}
-	seen := make(map[*Session]bool, len(sessions))
+	seen := make(map[table.Session]bool, len(sessions))
 	for _, s := range sessions {
 		if seen[s] {
 			t.Errorf("session used twice")
 		} else {
 			seen[s] = true
 		}
-		s.closeMux.Lock()
-		if !s.closed {
+		if !s.IsClosed() {
 			t.Errorf("bad session was not closed")
 		}
-		s.closeMux.Unlock()
 	}
 }
 
 func TestRetryerBadSessionReuse(t *testing.T) {
-	client := &table.client{
+	client := &client{
 		cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.CreateSessionResult{}, nil
 			}})),
 	}
 	var (
-		sessions = make([]*Session, 10)
-		bad      = make(map[*Session]bool)
-		reused   = make(map[*Session]bool)
+		sessions = make([]table.Session, 10)
+		bad      = make(map[table.Session]bool)
+		reused   = make(map[table.Session]bool)
 	)
 	for i := range sessions {
 		s, err := client.CreateSession(context.Background())
@@ -173,22 +182,22 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 		return nil
 	})
 	pool = SessionProviderFunc{
-		OnGet: func(_ context.Context) (*Session, error) {
+		OnGet: func(_ context.Context) (table.Session, error) {
 			defer func() { i++ }()
 			return sessions[i], nil
 		},
-		OnPut: func(_ context.Context, s *Session) error {
+		OnPut: func(_ context.Context, s table.Session) error {
 			reused[s] = true
 			return nil
 		},
-		OnRetry: func(ctx context.Context, operation RetryOperation) error {
+		OnRetry: func(ctx context.Context, operation table.RetryOperation) (error, []error) {
 			return retryBackoff(ctx, pool, backoff, backoff, false, operation)
 		},
 	}
-	_ = pool.Retry(
+	_, _ = pool.Retry(
 		context.Background(),
 		false,
-		func(ctx context.Context, s *Session) error {
+		func(ctx context.Context, s table.Session) error {
 			if bad[s] {
 				return errors.NewOpError(errors.WithOEReason(errors.StatusBadSession))
 			}
@@ -214,10 +223,10 @@ func TestRetryerImmediateReturn(t *testing.T) {
 			errors.WithOEReason(errors.StatusGenericError),
 		)),
 		errors.NewTransportError(
-			errors.TransportErrorPermissionDenied,
+			errors.WithTEReason(errors.TransportErrorPermissionDenied),
 		),
 		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
-			errors.TransportErrorPermissionDenied,
+			errors.WithTEReason(errors.TransportErrorPermissionDenied),
 		)),
 		errors.New("whoa"),
 	} {
@@ -233,10 +242,10 @@ func TestRetryerImmediateReturn(t *testing.T) {
 					panic("this code will not be called")
 				}),
 			)
-			err := pool.Retry(
+			err, _ := pool.Retry(
 				context.Background(),
 				false,
-				func(ctx context.Context, _ *Session) error {
+				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
 			)
@@ -274,55 +283,55 @@ func TestRetryContextDeadline(t *testing.T) {
 		context.DeadlineExceeded,
 		fmt.Errorf("test error"),
 		errors.NewTransportError(
-			errors.TransportErrorUnknownCode,
+			errors.WithTEReason(errors.TransportErrorUnknownCode),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorCanceled,
+			errors.WithTEReason(errors.TransportErrorCanceled),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorUnknown,
+			errors.WithTEReason(errors.TransportErrorUnknown),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorInvalidArgument,
+			errors.WithTEReason(errors.TransportErrorInvalidArgument),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorDeadlineExceeded,
+			errors.WithTEReason(errors.TransportErrorDeadlineExceeded),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorNotFound,
+			errors.WithTEReason(errors.TransportErrorNotFound),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorAlreadyExists,
+			errors.WithTEReason(errors.TransportErrorAlreadyExists),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorPermissionDenied,
+			errors.WithTEReason(errors.TransportErrorPermissionDenied),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorResourceExhausted,
+			errors.WithTEReason(errors.TransportErrorResourceExhausted),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorFailedPrecondition,
+			errors.WithTEReason(errors.TransportErrorFailedPrecondition),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorAborted,
+			errors.WithTEReason(errors.TransportErrorAborted),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorOutOfRange,
+			errors.WithTEReason(errors.TransportErrorOutOfRange),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorUnimplemented,
+			errors.WithTEReason(errors.TransportErrorUnimplemented),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorInternal,
+			errors.WithTEReason(errors.TransportErrorInternal),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorUnavailable,
+			errors.WithTEReason(errors.TransportErrorUnavailable),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorDataLoss,
+			errors.WithTEReason(errors.TransportErrorDataLoss),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorUnauthenticated,
+			errors.WithTEReason(errors.TransportErrorUnauthenticated),
 		),
 		errors.NewOpError(errors.WithOEReason(errors.StatusUnknownStatus)),
 		errors.NewOpError(errors.WithOEReason(errors.StatusBadRequest)),
@@ -344,7 +353,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		errors.NewOpError(errors.WithOEReason(errors.StatusUnsupported)),
 		errors.NewOpError(errors.WithOEReason(errors.StatusSessionBusy)),
 	}
-	client := &table.client{
+	client := &client{
 		cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	pool := SessionProviderFunc{
@@ -358,21 +367,21 @@ func TestRetryContextDeadline(t *testing.T) {
 				random := rand.New(rand.NewSource(time.Now().Unix()))
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
-				_ = pool.Retry(
-					trace.WithRetryTrace(
+				_, _ = pool.Retry(
+					trace.WithRetry(
 						ctx,
 						trace.RetryTrace{
 							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 								return func(info trace.RetryLoopDoneInfo) {
 									if info.Latency-timeouts[i] > tolerance {
-										t.Errorf("unexpected latency: %v (attempts %d)", info.Latency, info.Attempts)
+										t.Errorf("unexpected latency: %v (issues %d)", info.Latency, info.Issues)
 									}
 								}
 							},
 						},
 					),
 					false,
-					func(ctx context.Context, _ *Session) error {
+					func(ctx context.Context, _ table.Session) error {
 						select {
 						case <-ctx.Done():
 							return ctx.Err()
