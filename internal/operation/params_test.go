@@ -17,7 +17,7 @@ func TestOperationParams(t *testing.T) {
 
 		opTimeout time.Duration
 		opCancel  time.Duration
-		opMode    OperationMode
+		opMode    Mode
 
 		exp Params
 	}{
@@ -32,18 +32,18 @@ func TestOperationParams(t *testing.T) {
 		{
 			name:       "mode: sync, deadline timeout applied to operation timeout",
 			ctxTimeout: time.Second,
-			opMode:     OperationModeSync,
+			opMode:     ModeSync,
 			exp: Params{
 				Timeout: time.Second,
-				Mode:    OperationModeSync,
+				Mode:    ModeSync,
 			},
 		},
 		{
 			name:       "mode: async, deadline timeout not applied to operation timeout",
 			ctxTimeout: time.Second,
-			opMode:     OperationModeAsync,
+			opMode:     ModeAsync,
 			exp: Params{
-				Mode: OperationModeAsync,
+				Mode: ModeAsync,
 			},
 		},
 		{
@@ -57,21 +57,21 @@ func TestOperationParams(t *testing.T) {
 		{
 			name:       "mode: sync, deadline timeout override operation timeout",
 			ctxTimeout: time.Second,
-			opMode:     OperationModeSync,
+			opMode:     ModeSync,
 			opTimeout:  time.Hour,
 			exp: Params{
 				Timeout: time.Second,
-				Mode:    OperationModeSync,
+				Mode:    ModeSync,
 			},
 		},
 		{
 			name:       "mode: async, deadline timeout not override operation timeout",
 			ctxTimeout: time.Second,
-			opMode:     OperationModeAsync,
+			opMode:     ModeAsync,
 			opTimeout:  time.Hour,
 			exp: Params{
 				Timeout: time.Hour,
-				Mode:    OperationModeAsync,
+				Mode:    ModeAsync,
 			},
 		},
 		{
@@ -89,13 +89,13 @@ func TestOperationParams(t *testing.T) {
 
 			ctx := context.Background()
 			if t := test.opTimeout; t > 0 {
-				ctx = WithOperationTimeout(ctx, t)
+				ctx = WithTimeout(ctx, t)
 			}
 			if t := test.opCancel; t > 0 {
-				ctx = WithOperationCancelAfter(ctx, t)
+				ctx = WithCancelAfter(ctx, t)
 			}
 			if m := test.opMode; m != 0 {
-				ctx = WithOperationMode(ctx, m)
+				ctx = WithMode(ctx, m)
 			}
 			if t := test.ctxTimeout; t > 0 {
 				var cancel context.CancelFunc

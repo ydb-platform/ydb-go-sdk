@@ -2,7 +2,6 @@ package config
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"time"
@@ -56,7 +55,7 @@ type Config struct {
 
 	// BalancingConfig is an optional configuration related to selected
 	// BalancingMethod. That is, some balancing methods allow to be configured.
-	BalancingConfig balancer.Config
+	BalancingConfig BalancerConfig
 
 	// RequestsType set an additional types hint to all requests.
 	// It is needed only for debug purposes and advanced cases.
@@ -81,6 +80,6 @@ func defaults() (c *Config) {
 	return &Config{
 		DiscoveryInterval:    discovery.DefaultDiscoveryInterval,
 		GrpcConnectionPolicy: &DefaultGrpcConnectionPolicy,
-		BalancingConfig:      balancer.Default,
+		BalancingConfig:      DefaultBalancer,
 	}
 }

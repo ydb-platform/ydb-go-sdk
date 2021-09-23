@@ -202,7 +202,7 @@ type ReadReplicasSettings struct {
 	Count uint64
 }
 
-func (rr ReadReplicasSettings) toYDB() *Ydb_Table.ReadReplicasSettings {
+func (rr ReadReplicasSettings) ToYDB() *Ydb_Table.ReadReplicasSettings {
 	switch rr.Type {
 	case ReadReplicasPerAzReadReplicas:
 		return &Ydb_Table.ReadReplicasSettings{
@@ -249,7 +249,7 @@ type StorageSettings struct {
 	StoreExternalBlobs FeatureFlag
 }
 
-func (ss StorageSettings) toYDB() *Ydb_Table.StorageSettings {
+func (ss StorageSettings) ToYDB() *Ydb_Table.StorageSettings {
 	return &Ydb_Table.StorageSettings{
 		TabletCommitLog0:   ss.TableCommitLog0.toYDB(),
 		TabletCommitLog1:   ss.TableCommitLog1.toYDB(),

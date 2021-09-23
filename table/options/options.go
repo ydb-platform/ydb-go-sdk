@@ -120,13 +120,13 @@ func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
 
 func WithReadReplicasSettings(rr ReadReplicasSettings) CreateTableOption {
 	return func(d *CreateTableDesc) {
-		d.ReadReplicasSettings = rr.toYDB()
+		d.ReadReplicasSettings = rr.ToYDB()
 	}
 }
 
 func WithStorageSettings(ss StorageSettings) CreateTableOption {
 	return func(d *CreateTableDesc) {
-		d.StorageSettings = ss.toYDB()
+		d.StorageSettings = ss.ToYDB()
 	}
 }
 
@@ -424,13 +424,13 @@ func WithAlterColumnFamilies(cf ...ColumnFamily) AlterTableOption {
 
 func WithAlterReadReplicasSettings(rr ReadReplicasSettings) AlterTableOption {
 	return func(d *AlterTableDesc) {
-		d.SetReadReplicasSettings = rr.toYDB()
+		d.SetReadReplicasSettings = rr.ToYDB()
 	}
 }
 
 func WithAlterStorageSettings(ss StorageSettings) AlterTableOption {
 	return func(d *AlterTableDesc) {
-		d.AlterStorageSettings = ss.toYDB()
+		d.AlterStorageSettings = ss.ToYDB()
 	}
 }
 

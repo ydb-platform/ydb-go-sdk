@@ -3,6 +3,7 @@ package balancer
 import (
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"math/rand"
@@ -56,18 +57,18 @@ func defaultBalancer() Balancer {
 	}
 }
 
-func newBalancer(cfg Config) Balancer {
+func newBalancer(cfg config.BalancerConfig) Balancer {
 	switch cfg.Algorithm {
-	case RoundRobin:
+	case config.BalancingAlgorithmRoundRobin:
 		return &roundRobin{}
-	case P2C:
+	case config.BalancingAlgorithmP2C:
 		return &p2c{
 			Criterion: connRuntimeCriterion{
 				PreferLocal:     cfg.PreferLocal,
 				OpTimeThreshold: cfg.OpTimeThreshold,
 			},
 		}
-	case RandomChoice:
+	case config.BalancingAlgorithmRandomChoice:
 		return &randomChoice{
 			r: rand.New(rand.NewSource(time.Now().UnixNano())),
 		}
@@ -76,17 +77,17 @@ func newBalancer(cfg Config) Balancer {
 	}
 }
 
-func New(cfg Config) Balancer {
+func New(cfg config.BalancerConfig) Balancer {
 	if !cfg.PreferLocal {
 		return newBalancer(cfg)
 	}
-	return newMultiBalancer(
-		withBalancer(
+	return NewMultiBalancer(
+		WithBalancer(
 			newBalancer(cfg), func(_ conn.Conn, info info.Info) bool {
 				return info.Local
 			},
 		),
-		withBalancer(
+		WithBalancer(
 			newBalancer(cfg), func(_ conn.Conn, info info.Info) bool {
 				return !info.Local
 			},
@@ -107,7 +108,7 @@ type multiBalancer struct {
 	filter   []func(conn.Conn, info.Info) bool
 }
 
-func withBalancer(b Balancer, filter func(conn.Conn, info.Info) bool) balancerOption {
+func WithBalancer(b Balancer, filter func(conn.Conn, info.Info) bool) balancerOption {
 	return func(m *multiBalancer) {
 		m.balancer = append(m.balancer, b)
 		m.filter = append(m.filter, filter)
@@ -116,7 +117,7 @@ func withBalancer(b Balancer, filter func(conn.Conn, info.Info) bool) balancerOp
 
 type balancerOption func(*multiBalancer)
 
-func newMultiBalancer(opts ...balancerOption) *multiBalancer {
+func NewMultiBalancer(opts ...balancerOption) *multiBalancer {
 	m := new(multiBalancer)
 	for _, opt := range opts {
 		opt(m)

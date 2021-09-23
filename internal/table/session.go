@@ -52,8 +52,8 @@ func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Sessi
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
 	)
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	var cc cluster.ClientConnInterface
 	response, err = Ydb_Table_V1.NewTableServiceClient(c).CreateSession(
@@ -115,8 +115,8 @@ func (s *session) Close(ctx context.Context) (err error) {
 		}
 		deleteSessionDone(ctx, s.id, time.Since(start), err)
 	}()
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	_, err = s.tableService.DeleteSession(ctx, &Ydb_Table.DeleteSessionRequest{
 		SessionId: s.id,
@@ -138,8 +138,8 @@ func (s *session) KeepAlive(ctx context.Context) (info options.SessionInfo, err 
 		keepAliveDone(ctx, s.id, info, err)
 	}()
 	var result Ydb_Table.KeepAliveResult
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	if s == nil {
 		panic("nil session")
@@ -335,8 +335,8 @@ func (s *session) Explain(ctx context.Context, query string) (exp table.DataQuer
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
 	)
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	response, err = s.tableService.ExplainDataQuery(ctx, &Ydb_Table.ExplainDataQueryRequest{
 		SessionId: s.id,
@@ -414,8 +414,8 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		prepareDataQueryDone(ctx, s.id, query, q, cached, err)
 	}()
 
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	response, err = s.tableService.PrepareDataQuery(ctx, &Ydb_Table.PrepareDataQueryRequest{
 		SessionId: s.id,
@@ -517,8 +517,8 @@ func (s *session) executeDataQuery(
 	for _, opt := range opts {
 		opt((*options.ExecuteDataQueryDesc)(request))
 	}
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	response, err = s.tableService.ExecuteDataQuery(ctx, request)
 	if err != nil {
@@ -793,8 +793,8 @@ func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSet
 		result   Ydb_Table.BeginTransactionResult
 		response *Ydb_Table.BeginTransactionResponse
 	)
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	response, err = s.tableService.BeginTransaction(ctx, &Ydb_Table.BeginTransactionRequest{
 		SessionId:  s.id,
@@ -863,8 +863,8 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 	for _, opt := range opts {
 		opt((*options.CommitTransactionDesc)(request))
 	}
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	response, err = tx.s.tableService.CommitTransaction(ctx, request)
 	if err != nil {
@@ -883,8 +883,8 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	defer func() {
 		rollbackTransactionDone(ctx, tx.s.id, tx.id, err)
 	}()
-	if m, _ := operation.ContextOperationMode(ctx); m == operation.OperationModeUnknown {
-		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
+	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
+		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	_, err = tx.s.tableService.RollbackTransaction(ctx, &Ydb_Table.RollbackTransactionRequest{
 		SessionId: tx.s.id,

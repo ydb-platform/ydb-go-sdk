@@ -152,10 +152,10 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		}
 	}()
 	if t := c.config.OperationTimeout(); t > 0 {
-		ctx = operation.WithOperationTimeout(ctx, t)
+		ctx = operation.WithTimeout(ctx, t)
 	}
 	if t := c.config.OperationCancelAfter(); t > 0 {
-		ctx = operation.WithOperationCancelAfter(ctx, t)
+		ctx = operation.WithCancelAfter(ctx, t)
 	}
 
 	params := operation.ContextParams(ctx)

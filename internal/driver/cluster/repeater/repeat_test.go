@@ -3,10 +3,8 @@ package repeater
 import (
 	"context"
 	"fmt"
-	"path/filepath"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"reflect"
-	"runtime"
-	"strconv"
 	"testing"
 	"time"
 
@@ -100,17 +98,12 @@ func noRecv(ch interface{}, timeout time.Duration) error {
 
 func assertRecv(t *testing.T, timeout time.Duration, ch interface{}) {
 	if err := recv(ch, timeout); err != nil {
-		t.Fatalf("%s: %v", fileLine(2), err)
+		t.Fatalf("%s: %v", testutil.FileLine(2), err)
 	}
 }
 
 func assertNoRecv(t *testing.T, timeout time.Duration, ch interface{}) {
 	if err := noRecv(ch, timeout); err != nil {
-		t.Fatalf("%s: %v", fileLine(2), err)
+		t.Fatalf("%s: %v", testutil.FileLine(2), err)
 	}
-}
-
-func fileLine(skip int) string {
-	_, file, line, _ := runtime.Caller(skip)
-	return filepath.Base(file) + ":" + strconv.Itoa(line)
 }

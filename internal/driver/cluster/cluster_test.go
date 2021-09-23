@@ -1,16 +1,16 @@
 package cluster
 
 import (
-	"container/list"
 	"context"
 	"fmt"
 	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"net"
 	"sync"
 	"testing"
@@ -35,12 +35,8 @@ func TestClusterFastRedial(t *testing.T) {
 
 	cs, balancer := simpleBalancer()
 	c := &cluster{
-		dial: func(ctx context.Context, s string, p int) (conn.Conn, error) {
-			cc, err := ln.Dial(ctx)
-			return &conn.conn{
-				addr: public.Addr{s, p},
-				raw:  cc,
-			}, err
+		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
+			return ln.Dial(ctx)
 		},
 		balancer: balancer,
 	}
@@ -49,10 +45,10 @@ func TestClusterFastRedial(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			for i := 0; i < size*10; i++ {
-				con, err := c.Get(context.Background())
+				conn, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && con != nil && con.addr.addr == "bad" {
-					_ = con.raw.Close()
+				if err == nil && conn != nil && conn.Addr().Host == "bad" {
+					_ = conn.Close()
 				}
 			}
 			close(done)
@@ -61,8 +57,8 @@ func TestClusterFastRedial(t *testing.T) {
 	}
 
 	ne := []public.Endpoint{
-		{Host: "foo"},
-		{Host: "bad"},
+		{Addr: public.Addr{Host: "foo"}},
+		{Addr: public.Addr{Host: "bad"}},
 	}
 	mergeEndpointIntoCluster(ctx, c, []public.Endpoint{}, ne)
 	select {
@@ -71,13 +67,6 @@ func TestClusterFastRedial(t *testing.T) {
 	case <-time.After(time.Second * 10):
 		t.Fatalf("Time limit exceeded while %d endpoints in balance. Wait channel used", len(*cs))
 	}
-}
-
-func withDisabledTrackerQueue(c *cluster) *cluster {
-	c.index = make(map[public.Addr]entry.Entry)
-	c.trackerQueue = list.New()
-	c.once.Do(func() {})
-	return c
 }
 
 func TestClusterMergeEndpoints(t *testing.T) {
@@ -91,16 +80,6 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	}()
 
 	cs, balancer := simpleBalancer()
-	c := withDisabledTrackerQueue(&cluster{
-		dial: func(ctx context.Context, s string, p int) (conn.Conn, error) {
-			cc, err := ln.Dial(ctx)
-			return &conn.conn{
-				addr: public.Addr{s, p},
-				raw:  cc,
-			}, err
-		},
-		balancer: balancer,
-	})
 
 	pingConnects := func(size int) {
 		for i := 0; i < size*10; i++ {
@@ -109,7 +88,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			con, err := c.Get(sub)
 			// enforce close bad connects to track them
 			if err == nil && con != nil && con.addr.addr == "bad" {
-				_ = con.raw.Close()
+				_ = con.Conn().Close()
 			}
 		}
 	}
@@ -452,8 +431,8 @@ type stubBalancer struct {
 	OnContains  func(balancer.Element) bool
 }
 
-func simpleBalancer() (*list2.List, balancer.Balancer) {
-	cs := new(list2.List)
+func simpleBalancer() (*list.List, balancer.Balancer) {
+	cs := new(list.List)
 	var i int
 	return cs, stubBalancer{
 		OnNext: func() conn.Conn {
@@ -463,26 +442,26 @@ func simpleBalancer() (*list2.List, balancer.Balancer) {
 			}
 			e := (*cs)[i%n]
 			i++
-			return e.conn
+			return e.Conn
 		},
 		OnInsert: func(conn conn.Conn, info info.Info) balancer.Element {
 			return cs.Insert(conn, info)
 		},
 		OnRemove: func(x balancer.Element) {
-			e := x.(*list2.Element)
+			e := x.(*list.Element)
 			cs.Remove(e)
 		},
 		OnUpdate: func(x balancer.Element, info info.Info) {
-			e := x.(*list2.Element)
-			e.info = info
+			e := x.(*list.Element)
+			e.Info = info
 		},
 		OnPessimize: func(x balancer.Element) error {
-			e := x.(*list2.Element)
-			e.conn.runtime.setState(state.Banned)
+			e := x.(*list.Element)
+			e.Conn.Runtime().SetState(state.Banned)
 			return nil
 		},
 		OnContains: func(x balancer.Element) bool {
-			e := x.(*list2.Element)
+			e := x.(*list.Element)
 			return cs.Contains(e)
 		},
 	}
@@ -591,10 +570,10 @@ func assertRecvError(t *testing.T, d time.Duration, e <-chan error, exp error) {
 	select {
 	case act := <-e:
 		if act != exp {
-			t.Errorf("%s: unexpected error: %v; want %v", ydb.fileLine(2), act, exp)
+			t.Errorf("%s: unexpected error: %v; want %v", testutil.FileLine(2), act, exp)
 		}
 	case <-time.After(d):
-		t.Errorf("%s: nothing received after %s", ydb.fileLine(2), d)
+		t.Errorf("%s: nothing received after %s", testutil.FileLine(2), d)
 	}
 }
 
@@ -613,52 +592,70 @@ func TestDiffEndpoint(t *testing.T) {
 	noEndpoints := []public.Endpoint{}
 	someEndpoints := []public.Endpoint{
 		{
-			Host: "0",
-			Port: 0,
+			Addr: public.Addr{
+				Host: "0",
+				Port: 0,
+			},
 		},
 		{
-			Host: "1",
-			Port: 1,
+			Addr: public.Addr{
+				Host: "1",
+				Port: 1,
+			},
 		},
 	}
 	sameSomeEndpoints := []public.Endpoint{
 		{
-			Host:       "0",
-			Port:       0,
+			Addr: public.Addr{
+				Host: "0",
+				Port: 0,
+			},
 			LoadFactor: 1,
 			Local:      true,
 		},
 		{
-			Host:       "1",
-			Port:       1,
+			Addr: public.Addr{
+				Host: "1",
+				Port: 1,
+			},
 			LoadFactor: 2,
 			Local:      true,
 		},
 	}
 	anotherEndpoints := []public.Endpoint{
 		{
-			Host: "2",
-			Port: 0,
+			Addr: public.Addr{
+				Host: "2",
+				Port: 0,
+			},
 		},
 		{
-			Host: "3",
-			Port: 1,
+			Addr: public.Addr{
+				Host: "3",
+				Port: 1,
+			},
 		},
 	}
 	moreEndpointsOverlap := []public.Endpoint{
 		{
-			Host:       "0",
-			Port:       0,
+			Addr: public.Addr{
+				Host: "0",
+				Port: 0,
+			},
 			LoadFactor: 1,
 			Local:      true,
 		},
 		{
-			Host: "1",
-			Port: 1,
+			Addr: public.Addr{
+				Host: "1",
+				Port: 1,
+			},
 		},
 		{
-			Host: "1",
-			Port: 2,
+			Addr: public.Addr{
+				Host: "1",
+				Port: 2,
+			},
 		},
 	}
 

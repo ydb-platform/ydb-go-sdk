@@ -7,9 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
@@ -163,8 +162,7 @@ func TestTxDoerStmt(t *testing.T) {
 	cluster := b.Build()
 
 	db := sql.OpenDB(Connector(
-		WithSessionPoolIdleThreshold(time.Hour),
-		withClient(table.NewClient(cluster, table.DefaultConfig())),
+		withClient(table.NewClientAsPool(cluster, table.DefaultConfig())),
 	))
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)

@@ -1,6 +1,7 @@
-package balancer
+package cluster
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"strconv"
 	"testing"
 
@@ -21,27 +22,27 @@ func isOddConn(c conn.Conn, info info.Info) bool {
 }
 
 func TestMultiBalancer(t *testing.T) {
-	cs1, b1 := cluster.simpleBalancer()
-	cs2, b2 := cluster.simpleBalancer()
-	forEachList := func(it func(*cluster.connList)) {
+	cs1, b1 := simpleBalancer()
+	cs2, b2 := simpleBalancer()
+	forEachList := func(it func(*connList)) {
 		it(cs1)
 		it(cs2)
 	}
 	forEachConn := func(it func(conn.Conn, info.Info)) {
-		forEachList(func(cs *cluster.connList) {
+		forEachList(func(cs *connList) {
 			for _, e := range *cs {
 				it(e.conn, e.info)
 			}
 		})
 	}
-	m := newMultiBalancer(
-		withBalancer(b1, isOddConn),
-		withBalancer(b2, isEvenConn),
+	m := balancer.NewMultiBalancer(
+		balancer.WithBalancer(b1, isOddConn),
+		balancer.WithBalancer(b2, isEvenConn),
 	)
 	const n = 100
 	var (
-		es = make([]Element, n)
-		el = make(map[conn.Conn]Element, n)
+		es = make([]balancer.Element, n)
+		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
 		c := &conn.conn{
@@ -53,7 +54,7 @@ func TestMultiBalancer(t *testing.T) {
 		es[i] = e
 		el[c] = e
 	}
-	forEachList(func(cs *cluster.connList) {
+	forEachList(func(cs *connList) {
 		if act, exp := len(*cs), n/2; act != exp {
 			t.Errorf(
 				"unexepcted number of conns: %d; want %d",

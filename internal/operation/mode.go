@@ -2,29 +2,29 @@ package operation
 
 import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
-type OperationMode uint
+type Mode uint
 
 const (
-	OperationModeUnknown OperationMode = iota
-	OperationModeSync
-	OperationModeAsync
+	ModeUnknown Mode = iota
+	ModeSync
+	ModeAsync
 )
 
-func (m OperationMode) String() string {
+func (m Mode) String() string {
 	switch m {
-	case OperationModeSync:
+	case ModeSync:
 		return "sync"
-	case OperationModeAsync:
+	case ModeAsync:
 		return "async"
 	default:
 		return "unknown"
 	}
 }
-func (m OperationMode) toYDB() Ydb_Operations.OperationParams_OperationMode {
+func (m Mode) toYDB() Ydb_Operations.OperationParams_OperationMode {
 	switch m {
-	case OperationModeSync:
+	case ModeSync:
 		return Ydb_Operations.OperationParams_SYNC
-	case OperationModeAsync:
+	case ModeAsync:
 		return Ydb_Operations.OperationParams_ASYNC
 	default:
 		return Ydb_Operations.OperationParams_OPERATION_MODE_UNSPECIFIED

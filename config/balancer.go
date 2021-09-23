@@ -1,18 +1,18 @@
-package balancer
+package config
 
 import "time"
 
 type Algorithm uint8
 
 const (
-	RandomChoice = iota
-	RoundRobin
-	P2C
+	BalancingAlgorithmRandomChoice = iota
+	BalancingAlgorithmRoundRobin
+	BalancingAlgorithmP2C
 
-	DefaultAlgorithm = RandomChoice
+	DefaultBalancingAlgorithm = BalancingAlgorithmRandomChoice
 )
 
-type Config struct {
+type BalancerConfig struct {
 	// Algorithm define balancing algorithm
 	Algorithm Algorithm
 
@@ -40,5 +40,5 @@ type Config struct {
 }
 
 var (
-	Default = Config{Algorithm: DefaultAlgorithm}
+	DefaultBalancer = BalancerConfig{Algorithm: DefaultBalancingAlgorithm, PreferLocal: true}
 )

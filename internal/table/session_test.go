@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"reflect"
 	"testing"
 	"time"
@@ -17,8 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
@@ -64,8 +64,8 @@ func TestSessionKeepAlive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Status != SessionReady {
-			t.Fatalf("Result %v differ from, expectd %v", info.Status, SessionReady)
+		if info.Status() != options.SessionReady.String() {
+			t.Fatalf("Result %v differ from, expectd %v", info.Status(), options.SessionReady.String())
 		}
 	}
 	{
@@ -74,8 +74,8 @@ func TestSessionKeepAlive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Status != SessionBusy {
-			t.Fatalf("Result %v differ from, expectd %v", info.Status, SessionBusy)
+		if info.Status() != options.SessionBusy.String() {
+			t.Fatalf("Result %v differ from, expectd %v", info.Status, options.SessionBusy.String())
 		}
 	}
 }
@@ -119,7 +119,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	}
 	{
 		e = nil
-		expect := Description{
+		expect := options.Description{
 			Name:       "testName",
 			PrimaryKey: []string{"testKey"},
 			Columns: []options.Column{
@@ -129,7 +129,7 @@ func TestSessionDescribeTable(t *testing.T) {
 					Family: "testFamily",
 				},
 			},
-			KeyRanges: []KeyRange{
+			KeyRanges: []options.KeyRange{
 				{
 					From: nil,
 					To:   types.Int64Value(100500),
@@ -139,26 +139,26 @@ func TestSessionDescribeTable(t *testing.T) {
 					To:   nil,
 				},
 			},
-			ColumnFamilies: []ColumnFamily{
+			ColumnFamilies: []options.ColumnFamily{
 				{
 					Name:         "testFamily",
-					Data:         StoragePool{},
-					Compression:  ColumnFamilyCompressionLZ4,
+					Data:         options.StoragePool{},
+					Compression:  options.ColumnFamilyCompressionLZ4,
 					KeepInMemory: options.FeatureEnabled,
 				},
 			},
 			Attributes: map[string]string{},
-			ReadReplicaSettings: ReadReplicasSettings{
-				Type:  ReadReplicasAnyAzReadReplicas,
+			ReadReplicaSettings: options.ReadReplicasSettings{
+				Type:  options.ReadReplicasAnyAzReadReplicas,
 				Count: 42,
 			},
-			StorageSettings: StorageSettings{
-				TableCommitLog0:    StoragePool{Media: "m1"},
-				TableCommitLog1:    StoragePool{Media: "m2"},
-				External:           StoragePool{Media: "m3"},
+			StorageSettings: options.StorageSettings{
+				TableCommitLog0:    options.StoragePool{Media: "m1"},
+				TableCommitLog1:    options.StoragePool{Media: "m2"},
+				External:           options.StoragePool{Media: "m3"},
 				StoreExternalBlobs: options.FeatureEnabled,
 			},
-			Indexes: []IndexDescription{},
+			Indexes: []options.IndexDescription{},
 		}
 		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{
@@ -189,8 +189,8 @@ func TestSessionDescribeTable(t *testing.T) {
 					KeepInMemory: Ydb.FeatureFlag_ENABLED,
 				},
 			},
-			ReadReplicasSettings: expect.ReadReplicaSettings.toYDB(),
-			StorageSettings:      expect.StorageSettings.toYDB(),
+			ReadReplicasSettings: expect.ReadReplicaSettings.ToYDB(),
+			StorageSettings:      expect.StorageSettings.ToYDB(),
 		}
 
 		d, err := s.DescribeTable(ctx, "")
@@ -204,44 +204,43 @@ func TestSessionDescribeTable(t *testing.T) {
 }
 
 func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
+	cluster := testutil.NewDB()
 	fromTo := [...]struct {
-		srcMode ydb.OperationMode
-		dstMode ydb.OperationMode
+		srcMode operation.Mode
+		dstMode operation.Mode
 	}{
 		{
-			srcMode: ydb.OperationModeUnknown,
-			dstMode: ydb.OperationModeSync,
+			srcMode: operation.ModeUnknown,
+			dstMode: operation.ModeSync,
 		},
 		{
-			srcMode: ydb.OperationModeSync,
-			dstMode: ydb.OperationModeSync,
+			srcMode: operation.ModeSync,
+			dstMode: operation.ModeSync,
 		},
 		{
-			srcMode: ydb.OperationModeAsync,
-			dstMode: ydb.OperationModeAsync,
+			srcMode: operation.ModeAsync,
+			dstMode: operation.ModeAsync,
 		},
 	}
 	for _, test := range []struct {
 		method testutil.MethodCode
-		do     func(t *testing.T, ctx context.Context, c table.client)
+		do     func(t *testing.T, ctx context.Context, c table.Client)
 	}{
 		{
 			method: testutil.TableExecuteDataQuery,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				s := &session{
-					c:            c,
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 				}
-				_, _, err := s.Execute(ctx, scanner.TxControl(), "", NewQueryParameters())
+				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
 				assert.NoError(t, err)
 			},
 		},
 		{
 			method: testutil.TableExplainDataQuery,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				s := &session{
-					c:            c,
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 				}
 				_, err := s.Explain(ctx, "")
 				assert.NoError(t, err)
@@ -249,10 +248,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TablePrepareDataQuery,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				s := &session{
-					c:            c,
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 				}
 				_, err := s.Prepare(ctx, "")
 				assert.NoError(t, err)
@@ -260,39 +258,36 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableCreateSession,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				_, err := c.CreateSession(ctx)
 				assert.NoError(t, err)
 			},
 		},
 		{
 			method: testutil.TableDeleteSession,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				s := &session{
-					c:            c,
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 				}
 				assert.NoError(t, s.Close(ctx))
 			},
 		},
 		{
 			method: testutil.TableBeginTransaction,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				s := &session{
-					c:            c,
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 				}
-				_, err := s.BeginTransaction(ctx, scanner.TxSettings())
+				_, err := s.BeginTransaction(ctx, table.TxSettings())
 				assert.NoError(t, err)
 			},
 		},
 		{
 			method: testutil.TableCommitTransaction,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				tx := &Transaction{
 					s: &session{
-						c:            c,
-						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+						tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 					},
 				}
 				_, err := tx.CommitTx(ctx)
@@ -301,11 +296,10 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableRollbackTransaction,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				tx := &Transaction{
 					s: &session{
-						c:            c,
-						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+						tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 					},
 				}
 				err := tx.Rollback(ctx)
@@ -314,10 +308,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableKeepAlive,
-			do: func(t *testing.T, ctx context.Context, c table.client) {
+			do: func(t *testing.T, ctx context.Context, c table.Client) {
 				s := &session{
-					c:            c,
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
 				}
 				_, err := s.KeepAlive(ctx)
 				assert.NoError(t, err)
@@ -329,7 +322,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client := table.client{
+						client := &client{
 							cluster: testutil.NewDB(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
@@ -377,7 +370,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 							time.Second,
 						)
 						if srcDst.srcMode != 0 {
-							ctx = ydb.WithOperationMode(
+							ctx = operation.WithMode(
 								ctx,
 								srcDst.srcMode,
 							)

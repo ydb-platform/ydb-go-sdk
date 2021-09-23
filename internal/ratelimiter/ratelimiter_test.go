@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -27,17 +25,13 @@ const (
 func openDB(ctx context.Context) (cluster.DB, error) {
 	var (
 		dtrace trace.Driver
-		ctrace sessiontrace.Trace
-		strace sessiontrace.SessionPoolTrace
+		ctrace trace.Table
 	)
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, traceutil.ClearContext(args))
 	})
 	traceutil.Stub(&ctrace, func(name string, args ...interface{}) {
 		log.Printf("[client] %s: %+v", name, traceutil.ClearContext(args))
-	})
-	traceutil.Stub(&strace, func(name string, args ...interface{}) {
-		log.Printf("[session] %s: %+v", name, traceutil.ClearContext(args))
 	})
 
 	db, err := ydb.New(
@@ -53,7 +47,7 @@ func openDB(ctx context.Context) (cluster.DB, error) {
 			StreamTimeout:        time.Second * 2,
 			OperationTimeout:     time.Second * 2,
 			OperationCancelAfter: time.Second * 2,
-			PreferLocalEndpoints: false,
+			BalancingConfig:      config.DefaultBalancer,
 		}),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_TOKEN")),
 	)

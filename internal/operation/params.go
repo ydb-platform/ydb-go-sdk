@@ -8,7 +8,7 @@ import (
 type Params struct {
 	Timeout     time.Duration
 	CancelAfter time.Duration
-	Mode        OperationMode
+	Mode        Mode
 }
 
 func (p Params) Empty() bool {

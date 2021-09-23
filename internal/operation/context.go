@@ -11,11 +11,11 @@ import (
 func ContextParams(ctx context.Context) (p Params) {
 	var hasOpTimeout bool
 
-	p.Mode, _ = ContextOperationMode(ctx)
-	p.Timeout, hasOpTimeout = ContextOperationTimeout(ctx)
-	p.CancelAfter, _ = ContextOperationCancelAfter(ctx)
+	p.Mode, _ = ContextMode(ctx)
+	p.Timeout, hasOpTimeout = ContextTimeout(ctx)
+	p.CancelAfter, _ = ContextCancelAfter(ctx)
 
-	if p.Mode != OperationModeSync {
+	if p.Mode != ModeSync {
 		return
 	}
 
@@ -47,49 +47,49 @@ type ctxOpCancelAfterKey struct{}
 
 type ctxOpModeKey struct{}
 
-// WithOperationTimeout returns a copy of parent deadline in which YDB operation timeout
+// WithTimeout returns a copy of parent deadline in which YDB operation timeout
 // parameter is set to d. If parent deadline timeout is smaller than d, parent deadline
 // is returned.
-func WithOperationTimeout(ctx context.Context, d time.Duration) context.Context {
-	if cur, ok := ContextOperationTimeout(ctx); ok && d >= cur {
+func WithTimeout(ctx context.Context, d time.Duration) context.Context {
+	if cur, ok := ContextTimeout(ctx); ok && d >= cur {
 		// The current timeout is already smaller than the new one.
 		return ctx
 	}
 	return context.WithValue(ctx, ctxOpTimeoutKey{}, d)
 }
 
-// ContextOperationTimeout returns the timeout within given deadline after which
+// ContextTimeout returns the timeout within given deadline after which
 // YDB should try to cancel operation and return result regardless of the
 // cancelation.
-func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
+func ContextTimeout(ctx context.Context) (d time.Duration, ok bool) {
 	d, ok = ctx.Value(ctxOpTimeoutKey{}).(time.Duration)
 	return
 }
 
-// WithOperationCancelAfter returns a copy of parent deadline in which YDB operation
+// WithCancelAfter returns a copy of parent deadline in which YDB operation
 // cancel after parameter is set to d. If parent deadline cancelation timeout is smaller
 // than d, parent deadline deadline is returned.
-func WithOperationCancelAfter(ctx context.Context, d time.Duration) context.Context {
-	if cur, ok := ContextOperationCancelAfter(ctx); ok && d >= cur {
+func WithCancelAfter(ctx context.Context, d time.Duration) context.Context {
+	if cur, ok := ContextCancelAfter(ctx); ok && d >= cur {
 		// The current cancelation timeout is already smaller than the new one.
 		return ctx
 	}
 	return context.WithValue(ctx, ctxOpCancelAfterKey{}, d)
 }
 
-// ContextOperationCancelAfter returns the timeout within given deadline after which
+// ContextCancelAfter returns the timeout within given deadline after which
 // YDB should try to cancel operation and return result regardless of the
 // cancelation.
-func ContextOperationCancelAfter(ctx context.Context) (d time.Duration, ok bool) {
+func ContextCancelAfter(ctx context.Context) (d time.Duration, ok bool) {
 	d, ok = ctx.Value(ctxOpCancelAfterKey{}).(time.Duration)
 	return
 }
 
-// WithOperationMode returns a copy of parent deadline in which YDB operation mode
+// WithMode returns a copy of parent deadline in which YDB operation mode
 // parameter is set to m. If parent deadline mode is set and is not equal to m,
-// WithOperationMode will panic.
-func WithOperationMode(ctx context.Context, m OperationMode) context.Context {
-	if cur, ok := ContextOperationMode(ctx); ok {
+// WithMode will panic.
+func WithMode(ctx context.Context, m Mode) context.Context {
+	if cur, ok := ContextMode(ctx); ok {
 		if cur != m {
 			panic(fmt.Sprintf(
 				"ydb: deadline already has different operation mode: %v; %v given",
@@ -101,8 +101,8 @@ func WithOperationMode(ctx context.Context, m OperationMode) context.Context {
 	return context.WithValue(ctx, ctxOpModeKey{}, m)
 }
 
-// ContextOperationMode returns the mode of YDB operation within given deadline.
-func ContextOperationMode(ctx context.Context) (m OperationMode, ok bool) {
-	m, ok = ctx.Value(ctxOpModeKey{}).(OperationMode)
+// ContextMode returns the mode of YDB operation within given deadline.
+func ContextMode(ctx context.Context) (m Mode, ok bool) {
+	m, ok = ctx.Value(ctxOpModeKey{}).(Mode)
 	return
 }
