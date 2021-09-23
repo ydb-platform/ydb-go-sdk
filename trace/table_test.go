@@ -1,4 +1,4 @@
-package table
+package trace
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestClientTrace(t *testing.T) {
-	tracetest.TestSingleTrace(t, Trace{}, "Trace")
+	tracetest.TestSingleTrace(t, Table{}, "Table")
 }
 
 func TestSessionPoolTrace(t *testing.T) {

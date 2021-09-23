@@ -22,18 +22,36 @@ func ContextDriver(ctx context.Context) Driver {
 
 type retryContextKey struct{}
 
-// WithRetry returns context which has associated RetryTrace with it.
-func WithRetry(ctx context.Context, t RetryTrace) context.Context {
+// WithRetry returns context which has associated Retry with it.
+func WithRetry(ctx context.Context, t Retry) context.Context {
 	return context.WithValue(ctx,
 		retryContextKey{},
 		ContextRetry(ctx).Compose(t),
 	)
 }
 
-// ContextRetry returns RetryTrace associated with ctx.
-// If there is no RetryTrace associated with ctx then zero value
-// of RetryTrace is returned.
-func ContextRetry(ctx context.Context) RetryTrace {
-	t, _ := ctx.Value(retryContextKey{}).(RetryTrace)
+// ContextRetry returns Retry associated with ctx.
+// If there is no Retry associated with ctx then zero value
+// of Retry is returned.
+func ContextRetry(ctx context.Context) Retry {
+	t, _ := ctx.Value(retryContextKey{}).(Retry)
+	return t
+}
+
+type clientTraceContextKey struct{}
+
+// WithClientTrace returns context which has associated Trace with it.
+func WithClientTrace(ctx context.Context, t Table) context.Context {
+	return context.WithValue(ctx,
+		clientTraceContextKey{},
+		ContextTable(ctx).Compose(t),
+	)
+}
+
+// ContextTable returns Table associated with ctx.
+// If there is no Table associated with ctx then zero value
+// of Trace is returned.
+func ContextTable(ctx context.Context) Table {
+	t, _ := ctx.Value(clientTraceContextKey{}).(Table)
 	return t
 }

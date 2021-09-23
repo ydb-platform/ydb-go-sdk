@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
@@ -37,7 +38,7 @@ func (c *SessionPoolBuilder) CreateSession(ctx context.Context) (s table.Session
 
 // client contains logic of creation of ydb table sessions.
 type client struct {
-	trace   Trace
+	trace   trace.Table
 	cluster cluster.DB
 	pool    Pool
 }
@@ -71,7 +72,7 @@ func (c *client) Close(ctx context.Context) (err error) {
 
 type Config struct {
 	// Trace is an optional session lifetime tracing options.
-	Trace SessionPoolTrace
+	Trace trace.Table
 
 	// SizeLimit is an upper bound of pooled sessions.
 	// If SizeLimit is less than or equal to zero then the

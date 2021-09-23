@@ -1,8 +1,42 @@
-package models
+package trace
 
 import (
 	"context"
 	"time"
+)
+
+//go:generate gtrace
+
+// Table contains options for tracing table client activity.
+type (
+	//gtrace:gen
+	//gtrace:set Shortcut
+	Table struct {
+		TablePool
+
+		OnCreateSession          func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
+		OnKeepAlive              func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
+		OnDeleteSession          func(DeleteSessionStartInfo) func(DeleteSessionDoneInfo)
+		OnPrepareDataQuery       func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo)
+		OnExecuteDataQuery       func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo)
+		OnStreamReadTable        func(StreamReadTableStartInfo) func(StreamReadTableDoneInfo)
+		OnStreamExecuteScanQuery func(StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo)
+		OnBeginTransaction       func(BeginTransactionStartInfo) func(BeginTransactionDoneInfo)
+		OnCommitTransaction      func(CommitTransactionStartInfo) func(CommitTransactionDoneInfo)
+		OnRollbackTransaction    func(RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo)
+	}
+
+	//gtrace:gen
+	//gtrace:set Shortcut
+	TablePool struct {
+		OnCreate       func(SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo)
+		OnGet          func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo)
+		OnWait         func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo)
+		OnTake         func(SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo)
+		OnPut          func(SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo)
+		OnCloseSession func(SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo)
+		OnClose        func(SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo)
+	}
 )
 
 type (
@@ -130,14 +164,6 @@ type (
 		SessionID string
 		TxID      string
 		Error     error
-	}
-	RetryLoopStartInfo struct {
-		Context context.Context
-	}
-	RetryLoopDoneInfo struct {
-		Context  context.Context
-		Latency  time.Duration
-		Attempts int
 	}
 )
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"sync"
 	"time"
@@ -35,14 +36,14 @@ type session struct {
 	id           string
 	conn         cluster.ClientConnInterface
 	tableService Ydb_Table_V1.TableServiceClient
-	trace        Trace
+	trace        trace.Table
 	closeMux     sync.Mutex
 	closed       bool
 	onClose      []func()
 }
 
-func newSession(ctx context.Context, c cluster.DB, trace Trace) (s table.Session, err error) {
-	createSessionDone := traceOnCreateSession(trace, ctx)
+func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Session, err error) {
+	createSessionDone := trace.TableOnCreateSession(t, ctx)
 	start := time.Now()
 	defer func() {
 		createSessionDone(ctx, s.ID(), s.Address(), time.Since(start), err)
@@ -75,7 +76,7 @@ func newSession(ctx context.Context, c cluster.DB, trace Trace) (s table.Session
 		id:           result.SessionId,
 		conn:         cc,
 		tableService: Ydb_Table_V1.NewTableServiceClient(cc),
-		trace:        trace,
+		trace:        t,
 	}
 	return
 }
@@ -106,7 +107,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 		return nil
 	}
 	s.closed = true
-	deleteSessionDone := traceOnDeleteSession(s.trace, ctx, s.id)
+	deleteSessionDone := trace.TableOnDeleteSession(s.trace, ctx, s.id)
 	start := time.Now()
 	defer func() {
 		for _, cb := range s.onClose {
@@ -132,7 +133,7 @@ func (s *session) Address() string {
 
 // KeepAlive keeps idle session alive.
 func (s *session) KeepAlive(ctx context.Context) (info options.SessionInfo, err error) {
-	keepAliveDone := traceOnKeepAlive(s.trace, ctx, s.id)
+	keepAliveDone := trace.TableOnKeepAlive(s.trace, ctx, s.id)
 	defer func() {
 		keepAliveDone(ctx, s.id, info, err)
 	}()
@@ -158,9 +159,9 @@ func (s *session) KeepAlive(ctx context.Context) (info options.SessionInfo, err 
 	}
 	switch result.SessionStatus {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
-		info.Status = options.SessionReady
+		info.SetStatus(options.SessionReady)
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
-		info.Status = options.SessionBusy
+		info.SetStatus(options.SessionBusy)
 	}
 	return
 }
@@ -370,7 +371,7 @@ func (s *Statement) Execute(
 ) (
 	txr table.Transaction, r resultset.Result, err error,
 ) {
-	executeDataQueryDone := traceOnExecuteDataQuery(s.session.trace, ctx, s.session.id, transactionControlID(tx.Desc()), s.query, params)
+	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.session.trace, ctx, s.session.id, transactionControlID(tx.Desc()), s.query, params)
 	defer func() {
 		executeDataQueryDone(ctx, s.session.id, getTransactionID(txr), s.query, params, true, r, err)
 	}()
@@ -408,7 +409,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 	)
-	prepareDataQueryDone := traceOnPrepareDataQuery(s.trace, ctx, s.id, query)
+	prepareDataQueryDone := trace.TableOnPrepareDataQuery(s.trace, ctx, s.id, query)
 	defer func() {
 		prepareDataQueryDone(ctx, s.id, query, q, cached, err)
 	}()
@@ -452,7 +453,7 @@ func (s *session) Execute(
 	q := new(dataQuery)
 	q.initFromText(query)
 
-	executeDataQueryDone := traceOnExecuteDataQuery(s.trace, ctx, s.id, transactionControlID(tx.Desc()), q, params)
+	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.trace, ctx, s.id, transactionControlID(tx.Desc()), q, params)
 	defer func() {
 		executeDataQueryDone(ctx, s.id, getTransactionID(txr), q, params, true, r, err)
 	}()
@@ -664,7 +665,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 
 	client, err = s.tableService.StreamReadTable(ctx, &request)
 
-	streamReadTableDone := traceOnStreamReadTable(s.trace, ctx, s.id)
+	streamReadTableDone := trace.TableOnStreamReadTable(s.trace, ctx, s.id)
 	if err != nil {
 		cancel()
 		streamReadTableDone(ctx, s.id, nil, err)
@@ -729,7 +730,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 	client, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
 
-	streamExecuteScanQueryDone := traceOnStreamExecuteScanQuery(s.trace, ctx, s.id, q, params)
+	streamExecuteScanQueryDone := trace.TableOnStreamExecuteScanQuery(s.trace, ctx, s.id, q, params)
 	if err != nil {
 		cancel()
 		streamExecuteScanQueryDone(ctx, s.id, q, params, nil, err)
@@ -784,7 +785,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 // BeginTransaction begins new transaction within given session with given
 // settings.
 func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
-	beginTransactionDone := traceOnBeginTransaction(s.trace, ctx, s.id)
+	beginTransactionDone := trace.TableOnBeginTransaction(s.trace, ctx, s.id)
 	defer func() {
 		beginTransactionDone(ctx, s.id, getTransactionID(x), err)
 	}()
@@ -847,7 +848,7 @@ func (tx *Transaction) ExecuteStatement(
 
 // CommitTx commits specified active transaction.
 func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r resultset.Result, err error) {
-	commitTransactionDone := traceOnCommitTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
+	commitTransactionDone := trace.TableOnCommitTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
 	defer func() {
 		commitTransactionDone(ctx, tx.s.id, tx.id, err)
 	}()
@@ -878,7 +879,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *Transaction) Rollback(ctx context.Context) (err error) {
-	rollbackTransactionDone := traceOnRollbackTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
+	rollbackTransactionDone := trace.TableOnRollbackTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
 	defer func() {
 		rollbackTransactionDone(ctx, tx.s.id, tx.id, err)
 	}()

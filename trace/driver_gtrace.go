@@ -2,6 +2,13 @@
 
 package trace
 
+import (
+	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+)
+
 // Compose returns a new Driver which has functional fields composed
 // both from t and x.
 func (t Driver) Compose(x Driver) (ret Driver) {
@@ -301,5 +308,94 @@ func (t Driver) onStream(s StreamStartInfo) func(StreamRecvDoneInfo) func(Stream
 			}
 		}
 		return res
+	}
+}
+func DriverOnDial(t Driver, c context.Context, address string) func(error) {
+	var p DialStartInfo
+	p.Context = c
+	p.Address = address
+	res := t.onDial(p)
+	return func(e error) {
+		var p DialDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnGetConn(t Driver, c context.Context) func(address string, _ error) {
+	var p GetConnStartInfo
+	p.Context = c
+	res := t.onGetConn(p)
+	return func(address string, e error) {
+		var p GetConnDoneInfo
+		p.Address = address
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnPessimization(t Driver, c context.Context, address string, cause error) func(error) {
+	var p PessimizationStartInfo
+	p.Context = c
+	p.Address = address
+	p.Cause = cause
+	res := t.onPessimization(p)
+	return func(e error) {
+		var p PessimizationDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnGetCredentials(t Driver, c context.Context) func(tokenOk bool, _ error) {
+	var p GetCredentialsStartInfo
+	p.Context = c
+	res := t.onGetCredentials(p)
+	return func(tokenOk bool, e error) {
+		var p GetCredentialsDoneInfo
+		p.TokenOk = tokenOk
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnDiscovery(t Driver, c context.Context) func(_ context.Context, endpoints []cluster.Endpoint, _ error) {
+	var p DiscoveryStartInfo
+	p.Context = c
+	res := t.onDiscovery(p)
+	return func(c context.Context, endpoints []cluster.Endpoint, e error) {
+		var p DiscoveryDoneInfo
+		p.Context = c
+		p.Endpoints = endpoints
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnOperation(t Driver, c context.Context, address string, m Method, p operation.Params) func(opID string, issues errors.IssueIterator, _ error) {
+	var p1 OperationStartInfo
+	p1.Context = c
+	p1.Address = address
+	p1.Method = m
+	p1.Params = p
+	res := t.onOperation(p1)
+	return func(opID string, issues errors.IssueIterator, e error) {
+		var p OperationDoneInfo
+		p.OpID = opID
+		p.Issues = issues
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnStream(t Driver, c context.Context, address string, m Method) func(error) func(error) {
+	var p StreamStartInfo
+	p.Context = c
+	p.Address = address
+	p.Method = m
+	res := t.onStream(p)
+	return func(e error) func(error) {
+		var p StreamRecvDoneInfo
+		p.Error = e
+		res := res(p)
+		return func(e error) {
+			var p StreamDoneInfo
+			p.Error = e
+			res(p)
+		}
 	}
 }

@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	icredentials "github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
@@ -17,17 +15,16 @@ type Option func(ctx context.Context, client *db) error
 type options struct {
 	connectTimeout                       *time.Duration
 	traceDriver                          *trace.Driver
+	traceTable                           *trace.Table
 	driverConfig                         *config.Config
 	credentials                          icredentials.Credentials
 	discoveryInterval                    *time.Duration
-	tableSessionPoolTrace                *sessiontrace.SessionPoolTrace
 	tableSessionPoolSizeLimit            *int
 	tableSessionPoolKeepAliveMinSize     *int
 	tableSessionPoolIdleThreshold        *time.Duration
 	tableSessionPoolKeepAliveTimeout     *time.Duration
 	tableSessionPoolCreateSessionTimeout *time.Duration
 	tableSessionPoolDeleteTimeout        *time.Duration
-	tableClientTrace                     *sessiontrace.Trace
 }
 
 func WithAccessTokenCredentials(accessToken string) Option {
@@ -138,18 +135,10 @@ func WithTraceDriver(trace trace.Driver) Option {
 	}
 }
 
-// WithTraceTableClient returns context which has associated Driver with it.
-func WithTraceTableClient(trace sessiontrace.Trace) Option {
+// WithTraceTable returns context which has associated Driver with it.
+func WithTraceTable(trace trace.Table) Option {
 	return func(ctx context.Context, c *db) error {
-		c.options.tableClientTrace = &trace
-		return nil
-	}
-}
-
-// WithTraceTableSessionPool returns context which has associated Driver with it.
-func WithTraceTableSessionPool(trace sessiontrace.SessionPoolTrace) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options.tableSessionPoolTrace = &trace
+		c.options.traceTable = &trace
 		return nil
 	}
 }

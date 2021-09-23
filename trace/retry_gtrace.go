@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-// Compose returns a new RetryTrace which has functional fields composed
+// Compose returns a new Retry which has functional fields composed
 // both from t and x.
-func (t RetryTrace) Compose(x RetryTrace) (ret RetryTrace) {
+func (t Retry) Compose(x Retry) (ret Retry) {
 	switch {
 	case t.OnRetry == nil:
 		ret.OnRetry = x.OnRetry
@@ -36,7 +36,7 @@ func (t RetryTrace) Compose(x RetryTrace) (ret RetryTrace) {
 	}
 	return ret
 }
-func (t RetryTrace) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
+func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
 	fn := t.OnRetry
 	if fn == nil {
 		return func(RetryLoopDoneInfo) {
@@ -51,7 +51,7 @@ func (t RetryTrace) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
 	}
 	return res
 }
-func retryTraceOnRetry(t RetryTrace, c context.Context) func(_ context.Context, latency time.Duration, issues []error) {
+func RetryOnRetry(t Retry, c context.Context) func(_ context.Context, latency time.Duration, issues []error) {
 	var p RetryLoopStartInfo
 	p.Context = c
 	res := t.onRetry(p)

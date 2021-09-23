@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	context2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 	"time"
 
@@ -67,7 +68,7 @@ type ClientAsPool interface {
 // A pool is safe for use by multiple goroutines simultaneously.
 type pool struct {
 	// Trace is an optional session lifetime tracing options.
-	Trace SessionPoolTrace
+	Trace trace.Table
 
 	// Builder holds an object capable for creating and deleting sessions.
 	// It must not be nil.
@@ -303,7 +304,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 		i     = 0
 		start = time.Now()
 	)
-	getDone := sessionPoolTraceOnGet(p.Trace, ctx)
+	getDone := trace.TablePoolOnGet(p.Trace.TablePool, ctx)
 	defer func() {
 		getDone(ctx, s.ID(), time.Since(start), i, err)
 	}()
@@ -354,7 +355,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 		if ch == nil {
 			continue
 		}
-		waitDone := sessionPoolTraceOnWait(p.Trace, ctx)
+		waitDone := trace.TablePoolOnWait(p.Trace.TablePool, ctx)
 		var ok bool
 		select {
 		case s, ok = <-*ch:
@@ -403,7 +404,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 func (p *pool) Put(ctx context.Context, s table.Session) (err error) {
 	p.init()
 
-	putDone := sessionPoolTraceOnPut(p.Trace, ctx, s.ID())
+	putDone := trace.TablePoolOnPut(p.Trace.TablePool, ctx, s.ID())
 	defer func() {
 		putDone(ctx, s.ID(), err)
 	}()
@@ -446,7 +447,7 @@ func (p *pool) Put(ctx context.Context, s table.Session) (err error) {
 func (p *pool) Take(ctx context.Context, s table.Session) (took bool, err error) {
 	p.init()
 
-	takeWait := sessionPoolTraceOnTake(p.Trace, ctx, s.ID())
+	takeWait := trace.TablePoolOnTake(p.Trace.TablePool, ctx, s.ID())
 	var takeDone func(_ context.Context, _ string, took bool, _ error)
 
 	if p.isClosed() {
@@ -489,7 +490,7 @@ func (p *pool) Take(ctx context.Context, s table.Session) (took bool, err error)
 func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 	p.init()
 
-	createDone := sessionPoolTraceOnCreate(p.Trace, ctx)
+	createDone := trace.TablePoolOnCreate(p.Trace.TablePool, ctx)
 	defer func() {
 		createDone(ctx, s.ID(), err)
 	}()
@@ -533,7 +534,7 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 func (p *pool) Close(ctx context.Context) (err error) {
 	p.init()
 
-	closeDone := sessionPoolTraceOnClose(p.Trace, ctx)
+	closeDone := trace.TablePoolOnClose(p.Trace.TablePool, ctx)
 	defer func() {
 		closeDone(ctx, err)
 	}()
@@ -868,7 +869,7 @@ func (p *pool) CloseSession(ctx context.Context, s table.Session) error {
 		context2.ContextWithoutDeadline(ctx),
 		p.DeleteTimeout,
 	)
-	closeSessionDone := sessionPoolTraceOnCloseSession(p.Trace, ctx, s.ID())
+	closeSessionDone := trace.TablePoolOnCloseSession(p.Trace.TablePool, ctx, s.ID())
 	go func() {
 		defer cancel()
 		closeSessionDone(ctx, s.ID(), s.Close(ctx))

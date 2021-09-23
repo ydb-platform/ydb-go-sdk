@@ -30,7 +30,15 @@ func (s SessionStatus) String() string {
 }
 
 type SessionInfo struct {
-	Status SessionStatus
+	status SessionStatus
+}
+
+func (s SessionInfo) Status() string {
+	return s.status.String()
+}
+
+func (s SessionInfo) SetStatus(status SessionStatus) {
+	s.status = status
 }
 
 type Column struct {

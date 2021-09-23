@@ -148,7 +148,7 @@ func retryBackoff(
 
 		code   = int32(0)
 		start  = time.Now()
-		onDone = trace.OnRetry(ctx)
+		onDone = trace.RetryOnRetry(trace.ContextRetry(ctx), ctx)
 	)
 	defer func() {
 		onDone(ctx, time.Since(start), issues)

@@ -9,8 +9,6 @@ import (
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -88,15 +86,9 @@ func WithTraceDriver(t trace.Driver) ConnectorOption {
 	}
 }
 
-func WithClientTrace(t sessiontrace.Trace) ConnectorOption {
+func WithTrace(t trace.Table) ConnectorOption {
 	return func(c *connector) {
-		c.clientTrace = t
-	}
-}
-
-func WithSessionPoolTrace(t sessiontrace.SessionPoolTrace) ConnectorOption {
-	return func(c *connector) {
-		//c.pool.Trace = t
+		c.trace = t
 	}
 }
 
@@ -141,7 +133,7 @@ type connector struct {
 	dialer   dial.Dialer
 	endpoint string
 
-	clientTrace sessiontrace.Trace
+	trace trace.Table
 
 	mu    sync.Mutex
 	ready chan struct{}

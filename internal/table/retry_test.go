@@ -66,7 +66,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 }
 
 func _newSession(t *testing.T, cl cluster.DB) table.Session {
-	s, err := newSession(context.Background(), cl, Trace{})
+	s, err := newSession(context.Background(), cl, trace.Table{})
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
 	}
@@ -370,7 +370,7 @@ func TestRetryContextDeadline(t *testing.T) {
 				_, _ = pool.Retry(
 					trace.WithRetry(
 						ctx,
-						trace.RetryTrace{
+						trace.Retry{
 							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 								return func(info trace.RetryLoopDoneInfo) {
 									if info.Latency-timeouts[i] > tolerance {
