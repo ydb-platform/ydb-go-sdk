@@ -12,7 +12,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -42,10 +41,10 @@ func TestClusterTracking(t *testing.T) {
 	defer endpoint.Close()
 
 	var dtrace trace.Driver
-	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
+	trace.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf(
 			"[driver] %s: %+v",
-			name, traceutil.ClearContext(args),
+			name, trace.ClearContext(args),
 		)
 	})
 	var (
