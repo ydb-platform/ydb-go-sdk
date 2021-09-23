@@ -8,15 +8,19 @@ import (
 	"sync"
 	"time"
 
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -36,7 +40,7 @@ func WithDialer(d dial.Dialer) ConnectorOption {
 	}
 }
 
-func WithClient(client table2.Client) ConnectorOption {
+func WithClient(client table.Client) ConnectorOption {
 	return func(c *connector) {
 		c.client = client
 	}
@@ -91,13 +95,13 @@ func WithDriverTrace(t trace.DriverTrace) ConnectorOption {
 	}
 }
 
-func WithClientTrace(t table.Trace) ConnectorOption {
+func WithClientTrace(t sessiontrace.Trace) ConnectorOption {
 	return func(c *connector) {
 		c.clientTrace = t
 	}
 }
 
-func WithSessionPoolTrace(t table.SessionPoolTrace) ConnectorOption {
+func WithSessionPoolTrace(t sessiontrace.SessionPoolTrace) ConnectorOption {
 	return func(c *connector) {
 		//c.pool.Trace = t
 	}
@@ -174,12 +178,12 @@ type connector struct {
 	dialer   dial.Dialer
 	endpoint string
 
-	clientTrace table.Trace
+	clientTrace sessiontrace.Trace
 
 	mu     sync.Mutex
 	ready  chan struct{}
-	client table2.Client
-	pool   table.SessionPool // Used as a template for created connections.
+	client table.Client
+	pool   table2.SessionPool // Used as a template for created connections.
 
 	defaultTxControl *table.TransactionControl
 
@@ -208,11 +212,11 @@ func (c *connector) init(ctx context.Context) (err error) {
 	if c.client == nil {
 		c.client, err = c.dial(ctx)
 	}
-	c.pool.Builder = c.client
+	//c.pool.Builder = c.client
 	return
 }
 
-func (c *connector) dial(ctx context.Context) (table2.Client, error) {
+func (c *connector) dial(ctx context.Context) (table.Client, error) {
 	d, err := c.dialer.Dial(ctx, c.endpoint)
 	if err != nil {
 		if c == nil {
@@ -253,7 +257,7 @@ func (c *connector) Driver() driver.Driver {
 	return &Driver{c}
 }
 
-func (c *connector) unwrap(ctx context.Context) (table2.Client, error) {
+func (c *connector) unwrap(ctx context.Context) (table.Client, error) {
 	if err := c.init(ctx); err != nil {
 		return nil, err
 	}
@@ -281,6 +285,6 @@ func (d *Driver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
 }
 
-func (d *Driver) Unwrap(ctx context.Context) (table2.Client, error) {
+func (d *Driver) Unwrap(ctx context.Context) (table.Client, error) {
 	return d.c.unwrap(ctx)
 }

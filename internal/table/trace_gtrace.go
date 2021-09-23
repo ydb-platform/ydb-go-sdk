@@ -6,8 +6,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace/models"
 )
 
 // Compose returns a new Trace which has functional fields composed
@@ -21,7 +23,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnCreateSession
 		h2 := x.OnCreateSession
-		ret.OnCreateSession = func(c CreateSessionStartInfo) func(CreateSessionDoneInfo) {
+		ret.OnCreateSession = func(c models.CreateSessionStartInfo) func(models.CreateSessionDoneInfo) {
 			r1 := h1(c)
 			r2 := h2(c)
 			switch {
@@ -30,7 +32,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(c CreateSessionDoneInfo) {
+				return func(c models.CreateSessionDoneInfo) {
 					r1(c)
 					r2(c)
 				}
@@ -45,7 +47,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnKeepAlive
 		h2 := x.OnKeepAlive
-		ret.OnKeepAlive = func(k KeepAliveStartInfo) func(KeepAliveDoneInfo) {
+		ret.OnKeepAlive = func(k models.KeepAliveStartInfo) func(models.KeepAliveDoneInfo) {
 			r1 := h1(k)
 			r2 := h2(k)
 			switch {
@@ -54,7 +56,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(k KeepAliveDoneInfo) {
+				return func(k models.KeepAliveDoneInfo) {
 					r1(k)
 					r2(k)
 				}
@@ -69,7 +71,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnDeleteSession
 		h2 := x.OnDeleteSession
-		ret.OnDeleteSession = func(d DeleteSessionStartInfo) func(DeleteSessionDoneInfo) {
+		ret.OnDeleteSession = func(d models.DeleteSessionStartInfo) func(models.DeleteSessionDoneInfo) {
 			r1 := h1(d)
 			r2 := h2(d)
 			switch {
@@ -78,7 +80,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(d DeleteSessionDoneInfo) {
+				return func(d models.DeleteSessionDoneInfo) {
 					r1(d)
 					r2(d)
 				}
@@ -93,7 +95,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnPrepareDataQuery
 		h2 := x.OnPrepareDataQuery
-		ret.OnPrepareDataQuery = func(p PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo) {
+		ret.OnPrepareDataQuery = func(p models.PrepareDataQueryStartInfo) func(models.PrepareDataQueryDoneInfo) {
 			r1 := h1(p)
 			r2 := h2(p)
 			switch {
@@ -102,7 +104,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(p PrepareDataQueryDoneInfo) {
+				return func(p models.PrepareDataQueryDoneInfo) {
 					r1(p)
 					r2(p)
 				}
@@ -117,7 +119,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnExecuteDataQuery
 		h2 := x.OnExecuteDataQuery
-		ret.OnExecuteDataQuery = func(e ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo) {
+		ret.OnExecuteDataQuery = func(e models.ExecuteDataQueryStartInfo) func(models.ExecuteDataQueryDoneInfo) {
 			r1 := h1(e)
 			r2 := h2(e)
 			switch {
@@ -126,7 +128,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(e ExecuteDataQueryDoneInfo) {
+				return func(e models.ExecuteDataQueryDoneInfo) {
 					r1(e)
 					r2(e)
 				}
@@ -141,7 +143,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnStreamReadTable
 		h2 := x.OnStreamReadTable
-		ret.OnStreamReadTable = func(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
+		ret.OnStreamReadTable = func(s models.StreamReadTableStartInfo) func(models.StreamReadTableDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -150,7 +152,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s StreamReadTableDoneInfo) {
+				return func(s models.StreamReadTableDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -165,7 +167,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnStreamExecuteScanQuery
 		h2 := x.OnStreamExecuteScanQuery
-		ret.OnStreamExecuteScanQuery = func(s StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) {
+		ret.OnStreamExecuteScanQuery = func(s models.StreamExecuteScanQueryStartInfo) func(models.StreamExecuteScanQueryDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -174,7 +176,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s StreamExecuteScanQueryDoneInfo) {
+				return func(s models.StreamExecuteScanQueryDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -189,7 +191,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnBeginTransaction
 		h2 := x.OnBeginTransaction
-		ret.OnBeginTransaction = func(b BeginTransactionStartInfo) func(BeginTransactionDoneInfo) {
+		ret.OnBeginTransaction = func(b models.BeginTransactionStartInfo) func(models.BeginTransactionDoneInfo) {
 			r1 := h1(b)
 			r2 := h2(b)
 			switch {
@@ -198,7 +200,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(b BeginTransactionDoneInfo) {
+				return func(b models.BeginTransactionDoneInfo) {
 					r1(b)
 					r2(b)
 				}
@@ -213,7 +215,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnCommitTransaction
 		h2 := x.OnCommitTransaction
-		ret.OnCommitTransaction = func(c CommitTransactionStartInfo) func(CommitTransactionDoneInfo) {
+		ret.OnCommitTransaction = func(c models.CommitTransactionStartInfo) func(models.CommitTransactionDoneInfo) {
 			r1 := h1(c)
 			r2 := h2(c)
 			switch {
@@ -222,7 +224,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(c CommitTransactionDoneInfo) {
+				return func(c models.CommitTransactionDoneInfo) {
 					r1(c)
 					r2(c)
 				}
@@ -237,7 +239,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	default:
 		h1 := t.OnRollbackTransaction
 		h2 := x.OnRollbackTransaction
-		ret.OnRollbackTransaction = func(r RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo) {
+		ret.OnRollbackTransaction = func(r models.RollbackTransactionStartInfo) func(models.RollbackTransactionDoneInfo) {
 			r1 := h1(r)
 			r2 := h2(r)
 			switch {
@@ -246,7 +248,7 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(r RollbackTransactionDoneInfo) {
+				return func(r models.RollbackTransactionDoneInfo) {
 					r1(r)
 					r2(r)
 				}
@@ -255,151 +257,151 @@ func (t Trace) Compose(x Trace) (ret Trace) {
 	}
 	return ret
 }
-func (t Trace) onCreateSession(c1 CreateSessionStartInfo) func(CreateSessionDoneInfo) {
+func (t Trace) onCreateSession(c1 models.CreateSessionStartInfo) func(models.CreateSessionDoneInfo) {
 	fn := t.OnCreateSession
 	if fn == nil {
-		return func(CreateSessionDoneInfo) {
+		return func(models.CreateSessionDoneInfo) {
 			return
 		}
 	}
 	res := fn(c1)
 	if res == nil {
-		return func(CreateSessionDoneInfo) {
+		return func(models.CreateSessionDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onKeepAlive(k KeepAliveStartInfo) func(KeepAliveDoneInfo) {
+func (t Trace) onKeepAlive(k models.KeepAliveStartInfo) func(models.KeepAliveDoneInfo) {
 	fn := t.OnKeepAlive
 	if fn == nil {
-		return func(KeepAliveDoneInfo) {
+		return func(models.KeepAliveDoneInfo) {
 			return
 		}
 	}
 	res := fn(k)
 	if res == nil {
-		return func(KeepAliveDoneInfo) {
+		return func(models.KeepAliveDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onDeleteSession(d DeleteSessionStartInfo) func(DeleteSessionDoneInfo) {
+func (t Trace) onDeleteSession(d models.DeleteSessionStartInfo) func(models.DeleteSessionDoneInfo) {
 	fn := t.OnDeleteSession
 	if fn == nil {
-		return func(DeleteSessionDoneInfo) {
+		return func(models.DeleteSessionDoneInfo) {
 			return
 		}
 	}
 	res := fn(d)
 	if res == nil {
-		return func(DeleteSessionDoneInfo) {
+		return func(models.DeleteSessionDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onPrepareDataQuery(p PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo) {
+func (t Trace) onPrepareDataQuery(p models.PrepareDataQueryStartInfo) func(models.PrepareDataQueryDoneInfo) {
 	fn := t.OnPrepareDataQuery
 	if fn == nil {
-		return func(PrepareDataQueryDoneInfo) {
+		return func(models.PrepareDataQueryDoneInfo) {
 			return
 		}
 	}
 	res := fn(p)
 	if res == nil {
-		return func(PrepareDataQueryDoneInfo) {
+		return func(models.PrepareDataQueryDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onExecuteDataQuery(e ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo) {
+func (t Trace) onExecuteDataQuery(e models.ExecuteDataQueryStartInfo) func(models.ExecuteDataQueryDoneInfo) {
 	fn := t.OnExecuteDataQuery
 	if fn == nil {
-		return func(ExecuteDataQueryDoneInfo) {
+		return func(models.ExecuteDataQueryDoneInfo) {
 			return
 		}
 	}
 	res := fn(e)
 	if res == nil {
-		return func(ExecuteDataQueryDoneInfo) {
+		return func(models.ExecuteDataQueryDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onStreamReadTable(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
+func (t Trace) onStreamReadTable(s models.StreamReadTableStartInfo) func(models.StreamReadTableDoneInfo) {
 	fn := t.OnStreamReadTable
 	if fn == nil {
-		return func(StreamReadTableDoneInfo) {
+		return func(models.StreamReadTableDoneInfo) {
 			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(StreamReadTableDoneInfo) {
+		return func(models.StreamReadTableDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onStreamExecuteScanQuery(s StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) {
+func (t Trace) onStreamExecuteScanQuery(s models.StreamExecuteScanQueryStartInfo) func(models.StreamExecuteScanQueryDoneInfo) {
 	fn := t.OnStreamExecuteScanQuery
 	if fn == nil {
-		return func(StreamExecuteScanQueryDoneInfo) {
+		return func(models.StreamExecuteScanQueryDoneInfo) {
 			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(StreamExecuteScanQueryDoneInfo) {
+		return func(models.StreamExecuteScanQueryDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onBeginTransaction(b BeginTransactionStartInfo) func(BeginTransactionDoneInfo) {
+func (t Trace) onBeginTransaction(b models.BeginTransactionStartInfo) func(models.BeginTransactionDoneInfo) {
 	fn := t.OnBeginTransaction
 	if fn == nil {
-		return func(BeginTransactionDoneInfo) {
+		return func(models.BeginTransactionDoneInfo) {
 			return
 		}
 	}
 	res := fn(b)
 	if res == nil {
-		return func(BeginTransactionDoneInfo) {
+		return func(models.BeginTransactionDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onCommitTransaction(c1 CommitTransactionStartInfo) func(CommitTransactionDoneInfo) {
+func (t Trace) onCommitTransaction(c1 models.CommitTransactionStartInfo) func(models.CommitTransactionDoneInfo) {
 	fn := t.OnCommitTransaction
 	if fn == nil {
-		return func(CommitTransactionDoneInfo) {
+		return func(models.CommitTransactionDoneInfo) {
 			return
 		}
 	}
 	res := fn(c1)
 	if res == nil {
-		return func(CommitTransactionDoneInfo) {
+		return func(models.CommitTransactionDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Trace) onRollbackTransaction(r RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo) {
+func (t Trace) onRollbackTransaction(r models.RollbackTransactionStartInfo) func(models.RollbackTransactionDoneInfo) {
 	fn := t.OnRollbackTransaction
 	if fn == nil {
-		return func(RollbackTransactionDoneInfo) {
+		return func(models.RollbackTransactionDoneInfo) {
 			return
 		}
 	}
 	res := fn(r)
 	if res == nil {
-		return func(RollbackTransactionDoneInfo) {
+		return func(models.RollbackTransactionDoneInfo) {
 			return
 		}
 	}
@@ -417,7 +419,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	default:
 		h1 := t.OnCreate
 		h2 := x.OnCreate
-		ret.OnCreate = func(s SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
+		ret.OnCreate = func(s models.SessionPoolCreateStartInfo) func(models.SessionPoolCreateDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -426,7 +428,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s SessionPoolCreateDoneInfo) {
+				return func(s models.SessionPoolCreateDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -441,7 +443,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	default:
 		h1 := t.OnGet
 		h2 := x.OnGet
-		ret.OnGet = func(s SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
+		ret.OnGet = func(s models.SessionPoolGetStartInfo) func(models.SessionPoolGetDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -450,7 +452,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s SessionPoolGetDoneInfo) {
+				return func(s models.SessionPoolGetDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -465,7 +467,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	default:
 		h1 := t.OnWait
 		h2 := x.OnWait
-		ret.OnWait = func(s SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
+		ret.OnWait = func(s models.SessionPoolWaitStartInfo) func(models.SessionPoolWaitDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -474,7 +476,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s SessionPoolWaitDoneInfo) {
+				return func(s models.SessionPoolWaitDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -489,7 +491,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	default:
 		h1 := t.OnTake
 		h2 := x.OnTake
-		ret.OnTake = func(s SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+		ret.OnTake = func(s models.SessionPoolTakeStartInfo) func(models.SessionPoolTakeWaitInfo) func(models.SessionPoolTakeDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -498,7 +500,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+				return func(s models.SessionPoolTakeWaitInfo) func(models.SessionPoolTakeDoneInfo) {
 					r11 := r1(s)
 					r21 := r2(s)
 					switch {
@@ -507,7 +509,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 					case r21 == nil:
 						return r11
 					default:
-						return func(s SessionPoolTakeDoneInfo) {
+						return func(s models.SessionPoolTakeDoneInfo) {
 							r11(s)
 							r21(s)
 						}
@@ -524,7 +526,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	default:
 		h1 := t.OnPut
 		h2 := x.OnPut
-		ret.OnPut = func(s SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
+		ret.OnPut = func(s models.SessionPoolPutStartInfo) func(models.SessionPoolPutDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -533,7 +535,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s SessionPoolPutDoneInfo) {
+				return func(s models.SessionPoolPutDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -548,7 +550,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	default:
 		h1 := t.OnCloseSession
 		h2 := x.OnCloseSession
-		ret.OnCloseSession = func(s SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo) {
+		ret.OnCloseSession = func(s models.SessionPoolCloseSessionStartInfo) func(models.SessionPoolCloseSessionDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -557,7 +559,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s SessionPoolCloseSessionDoneInfo) {
+				return func(s models.SessionPoolCloseSessionDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -572,7 +574,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	default:
 		h1 := t.OnClose
 		h2 := x.OnClose
-		ret.OnClose = func(s SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo) {
+		ret.OnClose = func(s models.SessionPoolCloseStartInfo) func(models.SessionPoolCloseDoneInfo) {
 			r1 := h1(s)
 			r2 := h2(s)
 			switch {
@@ -581,7 +583,7 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(s SessionPoolCloseDoneInfo) {
+				return func(s models.SessionPoolCloseDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -590,129 +592,129 @@ func (t SessionPoolTrace) Compose(x SessionPoolTrace) (ret SessionPoolTrace) {
 	}
 	return ret
 }
-func (t SessionPoolTrace) onCreate(s SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
+func (t SessionPoolTrace) onCreate(s models.SessionPoolCreateStartInfo) func(models.SessionPoolCreateDoneInfo) {
 	fn := t.OnCreate
 	if fn == nil {
-		return func(SessionPoolCreateDoneInfo) {
+		return func(models.SessionPoolCreateDoneInfo) {
 			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(SessionPoolCreateDoneInfo) {
+		return func(models.SessionPoolCreateDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SessionPoolTrace) onGet(s SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
+func (t SessionPoolTrace) onGet(s models.SessionPoolGetStartInfo) func(models.SessionPoolGetDoneInfo) {
 	fn := t.OnGet
 	if fn == nil {
-		return func(SessionPoolGetDoneInfo) {
+		return func(models.SessionPoolGetDoneInfo) {
 			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(SessionPoolGetDoneInfo) {
+		return func(models.SessionPoolGetDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SessionPoolTrace) onWait(s SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
+func (t SessionPoolTrace) onWait(s models.SessionPoolWaitStartInfo) func(models.SessionPoolWaitDoneInfo) {
 	fn := t.OnWait
 	if fn == nil {
-		return func(SessionPoolWaitDoneInfo) {
+		return func(models.SessionPoolWaitDoneInfo) {
 			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(SessionPoolWaitDoneInfo) {
+		return func(models.SessionPoolWaitDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SessionPoolTrace) onTake(s SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+func (t SessionPoolTrace) onTake(s models.SessionPoolTakeStartInfo) func(models.SessionPoolTakeWaitInfo) func(models.SessionPoolTakeDoneInfo) {
 	fn := t.OnTake
 	if fn == nil {
-		return func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
-			return func(SessionPoolTakeDoneInfo) {
+		return func(models.SessionPoolTakeWaitInfo) func(models.SessionPoolTakeDoneInfo) {
+			return func(models.SessionPoolTakeDoneInfo) {
 				return
 			}
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
-			return func(SessionPoolTakeDoneInfo) {
+		return func(models.SessionPoolTakeWaitInfo) func(models.SessionPoolTakeDoneInfo) {
+			return func(models.SessionPoolTakeDoneInfo) {
 				return
 			}
 		}
 	}
-	return func(s SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
+	return func(s models.SessionPoolTakeWaitInfo) func(models.SessionPoolTakeDoneInfo) {
 		res := res(s)
 		if res == nil {
-			return func(SessionPoolTakeDoneInfo) {
+			return func(models.SessionPoolTakeDoneInfo) {
 				return
 			}
 		}
 		return res
 	}
 }
-func (t SessionPoolTrace) onPut(s SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
+func (t SessionPoolTrace) onPut(s models.SessionPoolPutStartInfo) func(models.SessionPoolPutDoneInfo) {
 	fn := t.OnPut
 	if fn == nil {
-		return func(SessionPoolPutDoneInfo) {
+		return func(models.SessionPoolPutDoneInfo) {
 			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(SessionPoolPutDoneInfo) {
+		return func(models.SessionPoolPutDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SessionPoolTrace) onCloseSession(s SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo) {
+func (t SessionPoolTrace) onCloseSession(s models.SessionPoolCloseSessionStartInfo) func(models.SessionPoolCloseSessionDoneInfo) {
 	fn := t.OnCloseSession
 	if fn == nil {
-		return func(SessionPoolCloseSessionDoneInfo) {
+		return func(models.SessionPoolCloseSessionDoneInfo) {
 			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(SessionPoolCloseSessionDoneInfo) {
+		return func(models.SessionPoolCloseSessionDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SessionPoolTrace) onClose(s SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo) {
+func (t SessionPoolTrace) onClose(s models.SessionPoolCloseStartInfo) func(models.SessionPoolCloseDoneInfo) {
 	fn := t.OnClose
 	if fn == nil {
-		return func(SessionPoolCloseDoneInfo) {
+		return func(models.SessionPoolCloseDoneInfo) {
 			return
 		}
 	}
 	res := fn(s)
 	if res == nil {
-		return func(SessionPoolCloseDoneInfo) {
+		return func(models.SessionPoolCloseDoneInfo) {
 			return
 		}
 	}
 	return res
 }
 func traceOnCreateSession(t Trace, c context.Context) func(_ context.Context, sessionID string, endpoint string, latency time.Duration, _ error) {
-	var p CreateSessionStartInfo
+	var p models.CreateSessionStartInfo
 	p.Context = c
 	res := t.onCreateSession(p)
 	return func(c context.Context, sessionID string, endpoint string, latency time.Duration, e error) {
-		var p CreateSessionDoneInfo
+		var p models.CreateSessionDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Endpoint = endpoint
@@ -722,12 +724,12 @@ func traceOnCreateSession(t Trace, c context.Context) func(_ context.Context, se
 	}
 }
 func traceOnKeepAlive(t Trace, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ options.SessionInfo, _ error) {
-	var p KeepAliveStartInfo
+	var p models.KeepAliveStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onKeepAlive(p)
 	return func(c context.Context, sessionID string, s options.SessionInfo, e error) {
-		var p KeepAliveDoneInfo
+		var p models.KeepAliveDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.SessionInfo = s
@@ -736,12 +738,12 @@ func traceOnKeepAlive(t Trace, c context.Context, sessionID string) func(_ conte
 	}
 }
 func traceOnDeleteSession(t Trace, c context.Context, sessionID string) func(_ context.Context, sessionID string, latency time.Duration, _ error) {
-	var p DeleteSessionStartInfo
+	var p models.DeleteSessionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onDeleteSession(p)
 	return func(c context.Context, sessionID string, latency time.Duration, e error) {
-		var p DeleteSessionDoneInfo
+		var p models.DeleteSessionDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Latency = latency
@@ -749,14 +751,14 @@ func traceOnDeleteSession(t Trace, c context.Context, sessionID string) func(_ c
 		res(p)
 	}
 }
-func traceOnPrepareDataQuery(t Trace, c context.Context, sessionID string, query string) func(_ context.Context, sessionID string, query string, result *DataQuery, cached bool, _ error) {
-	var p PrepareDataQueryStartInfo
+func traceOnPrepareDataQuery(t Trace, c context.Context, sessionID string, query string) func(_ context.Context, sessionID string, query string, result table.DataQuery, cached bool, _ error) {
+	var p models.PrepareDataQueryStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.Query = query
 	res := t.onPrepareDataQuery(p)
-	return func(c context.Context, sessionID string, query string, result *DataQuery, cached bool, e error) {
-		var p PrepareDataQueryDoneInfo
+	return func(c context.Context, sessionID string, query string, result table.DataQuery, cached bool, e error) {
+		var p models.PrepareDataQueryDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Query = query
@@ -766,16 +768,16 @@ func traceOnPrepareDataQuery(t Trace, c context.Context, sessionID string, query
 		res(p)
 	}
 }
-func traceOnExecuteDataQuery(t Trace, c context.Context, sessionID string, txID string, query *DataQuery, parameters *QueryParameters) func(_ context.Context, sessionID string, txID string, query *DataQuery, parameters *QueryParameters, prepared bool, _ resultset.Result, _ error) {
-	var p ExecuteDataQueryStartInfo
+func traceOnExecuteDataQuery(t Trace, c context.Context, sessionID string, txID string, query table.DataQuery, parameters *table.QueryParameters) func(_ context.Context, sessionID string, txID string, query table.DataQuery, parameters *table.QueryParameters, prepared bool, _ resultset.Result, _ error) {
+	var p models.ExecuteDataQueryStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.TxID = txID
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onExecuteDataQuery(p)
-	return func(c context.Context, sessionID string, txID string, query *DataQuery, parameters *QueryParameters, prepared bool, r resultset.Result, e error) {
-		var p ExecuteDataQueryDoneInfo
+	return func(c context.Context, sessionID string, txID string, query table.DataQuery, parameters *table.QueryParameters, prepared bool, r resultset.Result, e error) {
+		var p models.ExecuteDataQueryDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.TxID = txID
@@ -788,12 +790,12 @@ func traceOnExecuteDataQuery(t Trace, c context.Context, sessionID string, txID 
 	}
 }
 func traceOnStreamReadTable(t Trace, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ resultset.Result, _ error) {
-	var p StreamReadTableStartInfo
+	var p models.StreamReadTableStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onStreamReadTable(p)
 	return func(c context.Context, sessionID string, r resultset.Result, e error) {
-		var p StreamReadTableDoneInfo
+		var p models.StreamReadTableDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Result = r
@@ -801,15 +803,15 @@ func traceOnStreamReadTable(t Trace, c context.Context, sessionID string) func(_
 		res(p)
 	}
 }
-func traceOnStreamExecuteScanQuery(t Trace, c context.Context, sessionID string, query *DataQuery, parameters *QueryParameters) func(_ context.Context, sessionID string, query *DataQuery, parameters *QueryParameters, _ resultset.Result, _ error) {
-	var p StreamExecuteScanQueryStartInfo
+func traceOnStreamExecuteScanQuery(t Trace, c context.Context, sessionID string, query table.DataQuery, parameters *table.QueryParameters) func(_ context.Context, sessionID string, query table.DataQuery, parameters *table.QueryParameters, _ resultset.Result, _ error) {
+	var p models.StreamExecuteScanQueryStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onStreamExecuteScanQuery(p)
-	return func(c context.Context, sessionID string, query *DataQuery, parameters *QueryParameters, r resultset.Result, e error) {
-		var p StreamExecuteScanQueryDoneInfo
+	return func(c context.Context, sessionID string, query table.DataQuery, parameters *table.QueryParameters, r resultset.Result, e error) {
+		var p models.StreamExecuteScanQueryDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Query = query
@@ -820,12 +822,12 @@ func traceOnStreamExecuteScanQuery(t Trace, c context.Context, sessionID string,
 	}
 }
 func traceOnBeginTransaction(t Trace, c context.Context, sessionID string) func(_ context.Context, sessionID string, txID string, _ error) {
-	var p BeginTransactionStartInfo
+	var p models.BeginTransactionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onBeginTransaction(p)
 	return func(c context.Context, sessionID string, txID string, e error) {
-		var p BeginTransactionDoneInfo
+		var p models.BeginTransactionDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.TxID = txID
@@ -834,13 +836,13 @@ func traceOnBeginTransaction(t Trace, c context.Context, sessionID string) func(
 	}
 }
 func traceOnCommitTransaction(t Trace, c context.Context, sessionID string, txID string) func(_ context.Context, sessionID string, txID string, _ error) {
-	var p CommitTransactionStartInfo
+	var p models.CommitTransactionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.TxID = txID
 	res := t.onCommitTransaction(p)
 	return func(c context.Context, sessionID string, txID string, e error) {
-		var p CommitTransactionDoneInfo
+		var p models.CommitTransactionDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.TxID = txID
@@ -849,13 +851,13 @@ func traceOnCommitTransaction(t Trace, c context.Context, sessionID string, txID
 	}
 }
 func traceOnRollbackTransaction(t Trace, c context.Context, sessionID string, txID string) func(_ context.Context, sessionID string, txID string, _ error) {
-	var p RollbackTransactionStartInfo
+	var p models.RollbackTransactionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.TxID = txID
 	res := t.onRollbackTransaction(p)
 	return func(c context.Context, sessionID string, txID string, e error) {
-		var p RollbackTransactionDoneInfo
+		var p models.RollbackTransactionDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.TxID = txID
@@ -864,11 +866,11 @@ func traceOnRollbackTransaction(t Trace, c context.Context, sessionID string, tx
 	}
 }
 func sessionPoolTraceOnCreate(t SessionPoolTrace, c context.Context) func(_ context.Context, sessionID string, _ error) {
-	var p SessionPoolCreateStartInfo
+	var p models.SessionPoolCreateStartInfo
 	p.Context = c
 	res := t.onCreate(p)
 	return func(c context.Context, sessionID string, e error) {
-		var p SessionPoolCreateDoneInfo
+		var p models.SessionPoolCreateDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
@@ -876,11 +878,11 @@ func sessionPoolTraceOnCreate(t SessionPoolTrace, c context.Context) func(_ cont
 	}
 }
 func sessionPoolTraceOnGet(t SessionPoolTrace, c context.Context) func(_ context.Context, sessionID string, latency time.Duration, retryAttempts int, _ error) {
-	var p SessionPoolGetStartInfo
+	var p models.SessionPoolGetStartInfo
 	p.Context = c
 	res := t.onGet(p)
 	return func(c context.Context, sessionID string, latency time.Duration, retryAttempts int, e error) {
-		var p SessionPoolGetDoneInfo
+		var p models.SessionPoolGetDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Latency = latency
@@ -890,11 +892,11 @@ func sessionPoolTraceOnGet(t SessionPoolTrace, c context.Context) func(_ context
 	}
 }
 func sessionPoolTraceOnWait(t SessionPoolTrace, c context.Context) func(_ context.Context, sessionID string, _ error) {
-	var p SessionPoolWaitStartInfo
+	var p models.SessionPoolWaitStartInfo
 	p.Context = c
 	res := t.onWait(p)
 	return func(c context.Context, sessionID string, e error) {
-		var p SessionPoolWaitDoneInfo
+		var p models.SessionPoolWaitDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
@@ -902,17 +904,17 @@ func sessionPoolTraceOnWait(t SessionPoolTrace, c context.Context) func(_ contex
 	}
 }
 func sessionPoolTraceOnTake(t SessionPoolTrace, c context.Context, sessionID string) func(_ context.Context, sessionID string) func(_ context.Context, sessionID string, took bool, _ error) {
-	var p SessionPoolTakeStartInfo
+	var p models.SessionPoolTakeStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onTake(p)
 	return func(c context.Context, sessionID string) func(context.Context, string, bool, error) {
-		var p SessionPoolTakeWaitInfo
+		var p models.SessionPoolTakeWaitInfo
 		p.Context = c
 		p.SessionID = sessionID
 		res := res(p)
 		return func(c context.Context, sessionID string, took bool, e error) {
-			var p SessionPoolTakeDoneInfo
+			var p models.SessionPoolTakeDoneInfo
 			p.Context = c
 			p.SessionID = sessionID
 			p.Took = took
@@ -922,12 +924,12 @@ func sessionPoolTraceOnTake(t SessionPoolTrace, c context.Context, sessionID str
 	}
 }
 func sessionPoolTraceOnPut(t SessionPoolTrace, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ error) {
-	var p SessionPoolPutStartInfo
+	var p models.SessionPoolPutStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onPut(p)
 	return func(c context.Context, sessionID string, e error) {
-		var p SessionPoolPutDoneInfo
+		var p models.SessionPoolPutDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
@@ -935,12 +937,12 @@ func sessionPoolTraceOnPut(t SessionPoolTrace, c context.Context, sessionID stri
 	}
 }
 func sessionPoolTraceOnCloseSession(t SessionPoolTrace, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ error) {
-	var p SessionPoolCloseSessionStartInfo
+	var p models.SessionPoolCloseSessionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onCloseSession(p)
 	return func(c context.Context, sessionID string, e error) {
-		var p SessionPoolCloseSessionDoneInfo
+		var p models.SessionPoolCloseSessionDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
@@ -948,11 +950,11 @@ func sessionPoolTraceOnCloseSession(t SessionPoolTrace, c context.Context, sessi
 	}
 }
 func sessionPoolTraceOnClose(t SessionPoolTrace, c context.Context) func(context.Context, error) {
-	var p SessionPoolCloseStartInfo
+	var p models.SessionPoolCloseStartInfo
 	p.Context = c
 	res := t.onClose(p)
 	return func(c context.Context, e error) {
-		var p SessionPoolCloseDoneInfo
+		var p models.SessionPoolCloseDoneInfo
 		p.Context = c
 		p.Error = e
 		res(p)

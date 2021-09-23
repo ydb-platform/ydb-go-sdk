@@ -10,9 +10,7 @@ import (
 	"path"
 	"text/template"
 
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -73,7 +71,7 @@ SELECT
 FROM AS_TABLE($episodesData);
 `))
 
-func cleanupDatabase(ctx context.Context, c table2.Client, prefix string, names ...string) (err error) {
+func cleanupDatabase(ctx context.Context, c table.Client, prefix string, names ...string) (err error) {
 	session, err := c.CreateSession(ctx)
 	defer func() { _ = session.Close(ctx) }()
 	if err != nil {
@@ -125,12 +123,12 @@ func readTable(ctx context.Context, db *sql.DB, path string) error {
 	return nil
 }
 
-func describeTableOptions(ctx context.Context, c table2.Client) error {
+func describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
 			return
 		},
@@ -311,11 +309,11 @@ func fillTablesWithData(ctx context.Context, db *sql.DB, prefix string) error {
 	return tx.Commit()
 }
 
-func createTables(ctx context.Context, c table2.Client, prefix string) error {
+func createTables(ctx context.Context, c table.Client, prefix string) error {
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeUTF8)),
@@ -338,7 +336,7 @@ func createTables(ctx context.Context, c table2.Client, prefix string) error {
 	err, issues = c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "seasons"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
@@ -361,7 +359,7 @@ func createTables(ctx context.Context, c table2.Client, prefix string) error {
 	err, issues = c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "episodes"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
@@ -382,11 +380,11 @@ func createTables(ctx context.Context, c table2.Client, prefix string) error {
 	return err
 }
 
-func describeTable(ctx context.Context, c table2.Client, path string) (err error) {
+func describeTable(ctx context.Context, c table.Client, path string) (err error) {
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
 			if err != nil {
 				return

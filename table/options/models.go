@@ -46,6 +46,14 @@ func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 	}
 }
 
+func NewTableColumn(name string, typ types.Type, family string) Column {
+	return Column{
+		Name:   name,
+		Type:   typ,
+		Family: family,
+	}
+}
+
 type IndexDescription struct {
 	Name         string
 	IndexColumns []string

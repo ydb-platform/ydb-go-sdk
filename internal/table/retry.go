@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -31,7 +33,7 @@ type SessionProvider interface {
 	// - context was cancelled or deadlined
 	// - retry operation returned nil as error
 	// If context without deadline used session pool RetryTimeout
-	Retry(ctx context.Context, retryNoIdempotent bool, op RetryOperation) (err error, issues []error)
+	Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error)
 
 	// Close provide cleanup sessions
 	Close(ctx context.Context) error
@@ -40,7 +42,7 @@ type SessionProvider interface {
 type SessionProviderFunc struct {
 	OnGet   func(context.Context) (*Session, error)
 	OnPut   func(context.Context, *Session) error
-	OnRetry func(context.Context, RetryOperation) (error, []error)
+	OnRetry func(context.Context, table.RetryOperation) (error, []error)
 	OnClose func(context.Context) error
 }
 
@@ -65,7 +67,7 @@ func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
 	return f.OnPut(ctx, s)
 }
 
-func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op RetryOperation) (err error, issues []error) {
+func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op table.RetryOperation) (err error, issues []error) {
 	if f.OnRetry == nil {
 		return retryBackoff(ctx, f, nil, nil, false, op)
 	}
@@ -98,7 +100,7 @@ func (s *singleSession) Close(ctx context.Context) error {
 	return s.CloseSession(ctx, s.s)
 }
 
-func (s *singleSession) Retry(ctx context.Context, _ bool, op RetryOperation) (err error, issues []error) {
+func (s *singleSession) Retry(ctx context.Context, _ bool, op table.RetryOperation) (err error, issues []error) {
 	return retryBackoff(ctx, s, s.b, s.b, false, op)
 }
 
@@ -138,7 +140,7 @@ func retryBackoff(
 	fastBackoff retry.Backoff,
 	slowBackoff retry.Backoff,
 	retryNoIdempotent bool,
-	op RetryOperation,
+	op table.RetryOperation,
 ) (err error, issues []error) {
 	var (
 		s *Session

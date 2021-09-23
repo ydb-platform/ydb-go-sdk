@@ -10,7 +10,7 @@ import (
 
 type lazyTable struct {
 	db     DB
-	config table2.Config
+	config table.Config
 	client table2.Client
 	m      sync.Mutex
 }
@@ -27,12 +27,12 @@ func (t *lazyTable) Close(ctx context.Context) error {
 	return t.client.Close(ctx)
 }
 
-func (t *lazyTable) Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error) {
+func (t *lazyTable) Retry(ctx context.Context, retryNoIdempotent bool, op table2.RetryOperation) (err error, issues []error) {
 	t.init()
 	return t.client.Retry(ctx, retryNoIdempotent, op)
 }
 
-func newTable(db DB, config table2.Config) *lazyTable {
+func newTable(db DB, config table.Config) *lazyTable {
 	return &lazyTable{
 		db:     db,
 		config: config,
@@ -41,12 +41,12 @@ func newTable(db DB, config table2.Config) *lazyTable {
 
 func (t *lazyTable) init() {
 	t.m.Lock()
-	t.client = table2.NewClient(t.db, t.config)
+	t.client = table.NewClient(t.db, t.config)
 	t.m.Unlock()
 }
 
-func tableConfig(o options) table2.Config {
-	config := table2.DefaultConfig()
+func tableConfig(o options) table.Config {
+	config := table.DefaultConfig()
 	if o.tableClientTrace != nil {
 		//config.Trace = *o.tableClientTrace
 	}
@@ -71,7 +71,7 @@ func tableConfig(o options) table2.Config {
 	return config
 }
 
-func (t *lazyTable) CreateSession(ctx context.Context) (*table.Session, error) {
+func (t *lazyTable) CreateSession(ctx context.Context) (table2.Session, error) {
 	t.init()
 	return t.client.CreateSession(ctx)
 }
