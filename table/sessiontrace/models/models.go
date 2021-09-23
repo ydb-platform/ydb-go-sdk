@@ -3,13 +3,18 @@ package models
 import (
 	"context"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 )
 
 type (
+	QueryParameters interface {
+	}
+	DataQuery interface {
+	}
+	SessionInfo interface {
+		Status() string
+	}
+	Result interface {
+	}
 	CreateSessionStartInfo struct {
 		Context context.Context
 	}
@@ -27,7 +32,7 @@ type (
 	KeepAliveDoneInfo struct {
 		Context     context.Context
 		SessionID   string
-		SessionInfo options.SessionInfo
+		SessionInfo SessionInfo
 		Error       error
 	}
 	DeleteSessionStartInfo struct {
@@ -49,7 +54,7 @@ type (
 		Context   context.Context
 		SessionID string
 		Query     string
-		Result    table.DataQuery
+		Result    DataQuery
 		Cached    bool
 		Error     error
 	}
@@ -57,17 +62,17 @@ type (
 		Context    context.Context
 		SessionID  string
 		TxID       string
-		Query      table.DataQuery
-		Parameters *table.QueryParameters
+		Query      DataQuery
+		Parameters QueryParameters
 	}
 	ExecuteDataQueryDoneInfo struct {
 		Context    context.Context
 		SessionID  string
 		TxID       string
-		Query      table.DataQuery
-		Parameters *table.QueryParameters
+		Query      DataQuery
+		Parameters QueryParameters
 		Prepared   bool
-		Result     resultset.Result
+		Result     Result
 		Error      error
 	}
 	StreamReadTableStartInfo struct {
@@ -77,21 +82,21 @@ type (
 	StreamReadTableDoneInfo struct {
 		Context   context.Context
 		SessionID string
-		Result    resultset.Result
+		Result    Result
 		Error     error
 	}
 	StreamExecuteScanQueryStartInfo struct {
 		Context    context.Context
 		SessionID  string
-		Query      table.DataQuery
-		Parameters *table.QueryParameters
+		Query      DataQuery
+		Parameters QueryParameters
 	}
 	StreamExecuteScanQueryDoneInfo struct {
 		Context    context.Context
 		SessionID  string
-		Query      table.DataQuery
-		Parameters *table.QueryParameters
-		Result     resultset.Result
+		Query      DataQuery
+		Parameters QueryParameters
+		Result     Result
 		Error      error
 	}
 	BeginTransactionStartInfo struct {
