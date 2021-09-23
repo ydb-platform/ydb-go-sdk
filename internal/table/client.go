@@ -85,7 +85,7 @@ type Config struct {
 	KeepAliveMinSize int
 
 	// IdleKeepAliveThreshold is a number of keepAlive messages to call before the
-	// Session is removed if it is an excess session (see KeepAliveMinSize)
+	// session is removed if it is an excess session (see KeepAliveMinSize)
 	// This means that session will be deleted after the expiration of lifetime = IdleThreshold * IdleKeepAliveThreshold
 	// If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
 	// be removed ever.

@@ -228,7 +228,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableExecuteDataQuery,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
-				s := &Session{
+				s := &session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
@@ -239,7 +239,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableExplainDataQuery,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
-				s := &Session{
+				s := &session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
@@ -250,7 +250,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TablePrepareDataQuery,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
-				s := &Session{
+				s := &session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
@@ -268,7 +268,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableDeleteSession,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
-				s := &Session{
+				s := &session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
@@ -278,7 +278,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableBeginTransaction,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
-				s := &Session{
+				s := &session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
@@ -290,7 +290,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableCommitTransaction,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
 				tx := &Transaction{
-					s: &Session{
+					s: &session{
 						c:            c,
 						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
@@ -303,7 +303,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableRollbackTransaction,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
 				tx := &Transaction{
-					s: &Session{
+					s: &session{
 						c:            c,
 						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
@@ -315,7 +315,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableKeepAlive,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
-				s := &Session{
+				s := &session{
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}

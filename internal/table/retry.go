@@ -172,7 +172,7 @@ func retryBackoff(
 				if e != nil {
 					issues = append(issues, fmt.Errorf("retryBackoff: get session error: %w", err))
 					if err == nil {
-						// It is initial attempt to get a Session.
+						// It is initial attempt to get a session.
 						// Otherwise s could be nil only when status bad session
 						// received – that is, we must return bad session error to
 						// make it possible to lay on for the client.

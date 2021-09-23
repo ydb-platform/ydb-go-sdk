@@ -27,13 +27,13 @@ var (
 )
 
 var (
-	// ErrpoolClosed is returned by a pool instance to indicate
+	// ErrSessionPoolClosed is returned by a pool instance to indicate
 	// that pool is closed and not able to complete requested operation.
-	ErrpoolClosed = errors.New("ydb: table: session pool is closed")
+	ErrSessionPoolClosed = errors.New("ydb: table: session pool is closed")
 
-	// ErrpoolOverflow is returned by a pool instance to indicate
+	// ErrSessionPoolOverflow is returned by a pool instance to indicate
 	// that the pool is full and requested operation is not able to complete.
-	ErrpoolOverflow = errors.New("ydb: table: session pool overflow")
+	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
 
 	// ErrSessionUnknown is returned by a pool instance to indicate that
 	// requested session does not exist within the pool.
@@ -63,7 +63,7 @@ type ClientAsPool interface {
 	Pool
 }
 
-// pool is a set of Session instances that may be reused.
+// pool is a set of session instances that may be reused.
 // A pool is safe for use by multiple goroutines simultaneously.
 type pool struct {
 	// Trace is an optional session lifetime tracing options.
@@ -85,7 +85,7 @@ type pool struct {
 	KeepAliveMinSize int
 
 	// IdleKeepAliveThreshold is a number of keepAlive messages to call before the
-	// Session is removed if it is an excess session (see KeepAliveMinSize)
+	// session is removed if it is an excess session (see KeepAliveMinSize)
 	// This means that session will be deleted after the expiration of lifetime = IdleThreshold * IdleKeepAliveThreshold
 	// If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
 	// be removed ever.
@@ -125,8 +125,8 @@ type pool struct {
 	index            map[table.Session]sessionInfo
 	createInProgress int        // KIKIMR-9163: in-create-process counter
 	limit            int        // Upper bound for pool size.
-	idle             *list.List // list<table.Session>
-	waitq            *list.List // list<*chan table.Session>
+	idle             *list.List // list<table.session>
+	waitq            *list.List // list<*chan table.session>
 
 	keeperWake chan struct{} // Set by keeper.
 	keeperStop chan struct{}
@@ -192,7 +192,7 @@ func (p *pool) init() {
 func isCreateSessionErrorRetriable(err error) bool {
 	switch {
 	case
-		errors.Is(err, ErrpoolOverflow),
+		errors.Is(err, ErrSessionPoolOverflow),
 		errors.IsOpError(err, errors.StatusOverloaded),
 		errors.IsTransportError(err, errors.TransportErrorResourceExhausted),
 		errors.IsTransportError(err, errors.TransportErrorDeadlineExceeded),
@@ -219,7 +219,7 @@ func (p *pool) createSession(ctx context.Context) (table.Session, error) {
 	p.mu.Unlock()
 
 	if !enoughSpace {
-		return nil, ErrpoolOverflow
+		return nil, ErrSessionPoolOverflow
 	}
 
 	resCh := make(chan createSessionResult, 1) // for non-block write
@@ -316,7 +316,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 		)
 
 		if p.isClosed() {
-			return nil, ErrpoolClosed
+			return nil, ErrSessionPoolClosed
 		}
 		p.mu.Lock()
 		s = p.removeFirstIdle()
@@ -393,9 +393,9 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 
 // Put returns session to the pool for further reuse.
 // If pool is already closed Put() calls s.Close(ctx) and returns
-// ErrpoolClosed.
+// ErrSessionPoolClosed.
 // If pool is overflow calls s.Close(ctx) and returns
-// ErrpoolOverflow.
+// ErrSessionPoolOverflow.
 //
 // Note that Put() must be called only once after being created or received by
 // Get() or Take() calls. In other way it will produce unexpected behavior or
@@ -411,10 +411,10 @@ func (p *pool) Put(ctx context.Context, s table.Session) (err error) {
 	p.mu.Lock()
 	switch {
 	case p.closed:
-		err = ErrpoolClosed
+		err = ErrSessionPoolClosed
 
 	case p.idle.Len() >= p.limit:
-		err = ErrpoolOverflow
+		err = ErrSessionPoolOverflow
 
 	default:
 		if !p.notify(s) {
@@ -435,8 +435,8 @@ func (p *pool) Put(ctx context.Context, s table.Session) (err error) {
 //
 // The intended way of Take() use is to create session by calling Create() and
 // Put() it later to prepare KeepAlive tracking when session is idle. When
-// Session becomes active, one should call Take() to stop KeepAlive tracking
-// (simultaneous use of Session is prohibited).
+// session becomes active, one should call Take() to stop KeepAlive tracking
+// (simultaneous use of session is prohibited).
 //
 // After session returned to the pool by calling PutBusy() it can not be taken
 // by Take() any more. That is, semantically PutBusy() is the same as session's
@@ -450,7 +450,7 @@ func (p *pool) Take(ctx context.Context, s table.Session) (took bool, err error)
 	var takeDone func(_ context.Context, _ string, took bool, _ error)
 
 	if p.isClosed() {
-		return false, ErrpoolClosed
+		return false, ErrSessionPoolClosed
 	}
 	var has bool
 	p.mu.Lock()
@@ -498,7 +498,7 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 	for i := 0; i < maxAttempts; i++ {
 		p.mu.Lock()
 		// NOTE: here is a race condition with keeper() running.
-		// Session could be deleted by some reason after we released the mutex.
+		// session could be deleted by some reason after we released the mutex.
 		// We are not dealing with this because even if session is not deleted
 		// by keeper() it could be staled on the server and the same user
 		// experience will appear.
@@ -511,7 +511,7 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 
 		took, err := p.Take(ctx, s)
 		if err == nil && !took || errors.Is(err, ErrSessionUnknown) {
-			// Session was marked for deletion or deleted by keeper() - race happen - retry
+			// session was marked for deletion or deleted by keeper() - race happen - retry
 			s = nil
 			err = nil
 			continue
@@ -794,9 +794,9 @@ func (p *pool) peekFirstIdle() (s table.Session, touched time.Time) {
 	return s, info.touched
 }
 
-// removes first Session from idle and resets the keepAliveCount
+// removes first session from idle and resets the keepAliveCount
 // to prevent session from dying in the keeper after it was returned
-// to be used only in outgoing functions that make Session busy.
+// to be used only in outgoing functions that make session busy.
 // p.mu must be held.
 func (p *pool) removeFirstIdle() table.Session {
 	s, _ := p.peekFirstIdle()
@@ -895,9 +895,9 @@ func (p *pool) removeIdle(s table.Session) sessionInfo {
 	return info
 }
 
-// Removes Session from idle pool and resets keepAliveCount for it not
+// Removes session from idle pool and resets keepAliveCount for it not
 // to die in keeper when it will be returned
-// to be used only in outgoing functions that make Session busy.
+// to be used only in outgoing functions that make session busy.
 // p.mu must be held.
 func (p *pool) takeIdle(s table.Session) (has, took bool) {
 	var info sessionInfo
@@ -908,7 +908,7 @@ func (p *pool) takeIdle(s table.Session) (has, took bool) {
 		return
 	}
 	if info.idle == nil {
-		// Session s is not idle.
+		// session s is not idle.
 		return
 	}
 	took = true
