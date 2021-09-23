@@ -1,4 +1,4 @@
-package internal
+package response
 
 import (
 	"google.golang.org/protobuf/proto"

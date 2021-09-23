@@ -4,14 +4,13 @@ import (
 	"bufio"
 	"container/list"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"go/types"
 	"log"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 const GeneratedFileSuffix = "_ydbgen"
@@ -949,39 +948,39 @@ func code(bw *bufio.Writer, args ...string) {
 	}
 }
 
-func ydbTypeName(t internal.PrimitiveType) string {
+func ydbTypeName(t value.PrimitiveType) string {
 	switch t {
-	case internal.TypeBool:
-	case internal.TypeInt8:
-	case internal.TypeUint8:
-	case internal.TypeInt16:
-	case internal.TypeUint16:
-	case internal.TypeInt32:
-	case internal.TypeUint32:
-	case internal.TypeInt64:
-	case internal.TypeUint64:
-	case internal.TypeFloat:
-	case internal.TypeDouble:
-	case internal.TypeDate:
-	case internal.TypeDatetime:
-	case internal.TypeTimestamp:
-	case internal.TypeInterval:
-	case internal.TypeTzDate:
-	case internal.TypeTzDatetime:
-	case internal.TypeTzTimestamp:
-	case internal.TypeString:
+	case value.TypeBool:
+	case value.TypeInt8:
+	case value.TypeUint8:
+	case value.TypeInt16:
+	case value.TypeUint16:
+	case value.TypeInt32:
+	case value.TypeUint32:
+	case value.TypeInt64:
+	case value.TypeUint64:
+	case value.TypeFloat:
+	case value.TypeDouble:
+	case value.TypeDate:
+	case value.TypeDatetime:
+	case value.TypeTimestamp:
+	case value.TypeInterval:
+	case value.TypeTzDate:
+	case value.TypeTzDatetime:
+	case value.TypeTzTimestamp:
+	case value.TypeString:
 
-	case internal.TypeUTF8:
+	case value.TypeUTF8:
 		return "UTF8"
-	case internal.TypeYSON:
+	case value.TypeYSON:
 		return "YSON"
-	case internal.TypeJSON:
+	case value.TypeJSON:
 		return "JSON"
-	case internal.TypeUUID:
+	case value.TypeUUID:
 		return "UUID"
-	case internal.TypeJSONDocument:
+	case value.TypeJSONDocument:
 		return "JSONDocument"
-	case internal.TypeDyNumber:
+	case value.TypeDyNumber:
 		return "DyNumber"
 
 	default:

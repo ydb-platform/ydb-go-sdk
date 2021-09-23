@@ -8,11 +8,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-func NewClient(db cluster.DB, config Config) table.Client {
+func NewClientAsPool(db cluster.DB, config Config) ClientAsPool {
 	c := &client{
 		cluster: db,
 	}
-	c.pool = &SessionPool{
+	c.pool = &pool{
 		Trace:                  config.Trace,
 		Builder:                &SessionPoolBuilder{client: c},
 		SizeLimit:              config.SizeLimit,
@@ -39,7 +39,19 @@ func (c *SessionPoolBuilder) CreateSession(ctx context.Context) (s table.Session
 type client struct {
 	trace   Trace
 	cluster cluster.DB
-	pool    SessionProvider
+	pool    Pool
+}
+
+func (c *client) Take(ctx context.Context, s table.Session) (took bool, err error) {
+	return c.pool.Take(ctx, s)
+}
+
+func (c *client) Put(ctx context.Context, s table.Session) (err error) {
+	return c.pool.Put(ctx, s)
+}
+
+func (c *client) Create(ctx context.Context) (s table.Session, err error) {
+	return c.pool.Create(ctx)
 }
 
 // CreateSession creates new session instance.

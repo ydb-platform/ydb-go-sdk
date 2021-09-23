@@ -1,14 +1,15 @@
 package options
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 var (
@@ -77,7 +78,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
-			internal.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{internal.ValueToYDB(types.Int64Value(1))})
+			assert.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{value.ValueToYDB(types.Int64Value(1))})
 		}
 	}
 	{
@@ -168,7 +169,7 @@ func TestAlterTableOptions(t *testing.T) {
 		opt((*AlterTableDesc)(&req))
 		if len(req.AddColumns) != 1 ||
 			req.AddColumns[0].Name != column.Name ||
-			req.AddColumns[0].Type != internal.TypeToYDB(column.Type) ||
+			req.AddColumns[0].Type != value.TypeToYDB(column.Type) ||
 			req.AddColumns[0].Family != column.Family {
 			t.Errorf("Alter table options is not as expected")
 		}
@@ -236,7 +237,7 @@ func TestAlterTableOptions(t *testing.T) {
 			TableCommitLog0:    StoragePool{Media: "m1"},
 			TableCommitLog1:    StoragePool{Media: "m2"},
 			External:           StoragePool{Media: "m3"},
-			StoreExternalBlobs: internal.FeatureEnabled,
+			StoreExternalBlobs: feature.FeatureEnabled,
 		}
 		opt := WithAlterStorageSettings(ss)
 		req := Ydb_Table.AlterTableRequest{}

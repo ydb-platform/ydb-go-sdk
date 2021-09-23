@@ -2,6 +2,8 @@ package table
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"sync"
 	"time"
@@ -15,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -40,7 +41,7 @@ type Session struct {
 	onClose      []func()
 }
 
-func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s table.Session, err error) {
+func newSession(ctx context.Context, c cluster.DB, trace Trace) (s table.Session, err error) {
 	createSessionDone := traceOnCreateSession(trace, ctx)
 	start := time.Now()
 	defer func() {
@@ -54,7 +55,7 @@ func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s table.Sessio
 		ctx = operation.WithOperationMode(ctx, operation.OperationModeSync)
 	}
 	var cc cluster.ClientConnInterface
-	response, err = Ydb_Table_V1.NewTableServiceClient(cl).CreateSession(
+	response, err = Ydb_Table_V1.NewTableServiceClient(c).CreateSession(
 		cluster.WithClientConnApplier(
 			ctx,
 			func(c cluster.ClientConnInterface) {
@@ -90,6 +91,12 @@ func (s *Session) OnClose(cb func()) {
 		return
 	}
 	s.onClose = append(s.onClose, cb)
+}
+
+func (s *Session) IsClosed() bool {
+	s.closeMux.Lock()
+	defer s.closeMux.Unlock()
+	return s.closed
 }
 
 func (s *Session) Close(ctx context.Context) (err error) {
@@ -197,7 +204,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 	for i, c := range result.Columns {
 		cs[i] = options.Column{
 			Name:   c.GetName(),
-			Type:   internal.TypeFromYDB(c.GetType()),
+			Type:   value.TypeFromYDB(c.GetType()),
 			Family: c.GetFamily(),
 		}
 	}
@@ -209,7 +216,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 			rs[i].From = last
 		}
 
-		bound := internal.ValueFromYDB(b.GetType(), b.GetValue())
+		bound := value.ValueFromYDB(b.GetType(), b.GetValue())
 		rs[i].To = bound
 
 		last = bound
@@ -274,7 +281,7 @@ func (s *Session) DescribeTable(ctx context.Context, path string, opts ...option
 		Attributes:           attrs,
 		ReadReplicaSettings:  options.NewReadReplicasSettings(result.GetReadReplicasSettings()),
 		StorageSettings:      options.NewStorageSettings(result.GetStorageSettings()),
-		KeyBloomFilter:       internal.FeatureFlagFromYDB(result.GetKeyBloomFilter()),
+		KeyBloomFilter:       feature.FeatureFlagFromYDB(result.GetKeyBloomFilter()),
 		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
 		Indexes:              indexes,
 		TimeToLiveSettings:   options.NewTimeToLiveSettings(result.GetTtlSettings()),
@@ -769,7 +776,7 @@ func (s *Session) StreamExecuteScanQuery(ctx context.Context, query string, para
 func (s *Session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
 	_, err = s.tableService.BulkUpsert(ctx, &Ydb_Table.BulkUpsertRequest{
 		Table: table,
-		Rows:  internal.ValueToYDB(rows),
+		Rows:  value.ValueToYDB(rows),
 	})
 	return err
 }

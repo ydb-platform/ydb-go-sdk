@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"math"
 	"sync"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -137,7 +137,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 
 }
 
-func (c *conn) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
+func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {
 	var (
 		cancel context.CancelFunc
 		opId   string
@@ -160,7 +160,7 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 
 	params := operation.ContextParams(ctx)
 	if !params.Empty() {
-		operation.SetOperationParams(request, params)
+		operation.SetOperationParams(req, params)
 	}
 
 	start := timeutil.Now()
@@ -207,7 +207,7 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		return
 	}
 
-	err = raw.Invoke(ctx, method, request, response, opts...)
+	err = raw.Invoke(ctx, method, req, res, opts...)
 
 	if err != nil {
 		err = errors.MapGRPCError(err)
@@ -216,7 +216,7 @@ func (c *conn) Invoke(ctx context.Context, method string, request interface{}, r
 		}
 		return
 	}
-	if opResponse, ok := response.(internal.OpResponse); ok {
+	if opResponse, ok := res.(response.OpResponse); ok {
 		opId = opResponse.GetOperation().GetId()
 		issues = opResponse.GetOperation().GetIssues()
 		switch {

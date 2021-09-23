@@ -4,22 +4,22 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"net"
 	"testing"
 	"time"
 
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -161,8 +161,8 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 			}()
 
 			c := Connector(
-				WithClient(
-					table2.NewClient(
+				withClient(
+					internal.NewClientAsPool(
 						testutil.NewDB(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
@@ -172,12 +172,12 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 									testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
 										r := request.(*Ydb_Table.ExecuteDataQueryRequest)
 										keepInCache := r.QueryCachePolicy.KeepInCache
-										internal.Equal(t, len(test.queryCachePolicyOption) > 0, keepInCache)
+										assert.Equal(t, len(test.queryCachePolicyOption) > 0, keepInCache)
 										return &Ydb_Table.ExecuteQueryResult{}, nil
 									},
 								},
 							),
-						), table2.Config{},
+						), internal.Config{},
 					),
 				),
 				WithDefaultExecDataQueryOption(options.WithQueryCachePolicy(test.queryCachePolicyOption...)),
@@ -186,8 +186,8 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			rows, err := db.QueryContext(ctx, "SELECT 1")
-			internal.NoError(t, err)
-			internal.NotNil(t, rows)
+			assert.NoError(t, err)
+			assert.NotNil(t, rows)
 		})
 	}
 }

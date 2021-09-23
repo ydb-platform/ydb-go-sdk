@@ -2,6 +2,8 @@ package scanner
 
 import (
 	"encoding/binary"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -10,8 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
@@ -190,7 +190,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 				Uint32Value: v,
 			},
 		}
-		src := internal.UnmarshalDate(v)
+		src := timeutil.UnmarshalDate(v)
 		if c.scanner {
 			s := dateScanner(src)
 			return ydbval, &s
@@ -207,7 +207,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 				Uint32Value: v,
 			},
 		}
-		src := internal.UnmarshalDatetime(v)
+		src := timeutil.UnmarshalDatetime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -220,7 +220,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 				Uint64Value: v,
 			},
 		}
-		src := internal.UnmarshalTimestamp(v)
+		src := timeutil.UnmarshalTimestamp(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -245,7 +245,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 				Int64Value: v,
 			},
 		}
-		src := internal.UnmarshalInterval(v)
+		src := timeutil.UnmarshalInterval(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -253,13 +253,13 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 		return ydbval, &src
 	case Ydb.Type_TZ_DATE:
 		rv = rv % (time.Now().Unix() / 24 / 60 / 60)
-		v := internal.MarshalTzDate(internal.UnmarshalDate(uint32(rv)))
+		v := timeutil.MarshalTzDate(timeutil.UnmarshalDate(uint32(rv)))
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
 			},
 		}
-		src, _ := internal.UnmarshalTzDate(v)
+		src, _ := timeutil.UnmarshalTzDate(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -278,13 +278,13 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			return ydbval, &dv
 		}
 		rv = rv % time.Now().Unix()
-		v := internal.MarshalTzDatetime(internal.UnmarshalDatetime(uint32(rv)))
+		v := timeutil.MarshalTzDatetime(timeutil.UnmarshalDatetime(uint32(rv)))
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
 			},
 		}
-		src, _ := internal.UnmarshalTzDatetime(v)
+		src, _ := timeutil.UnmarshalTzDatetime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -292,13 +292,13 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 		return ydbval, &src
 	case Ydb.Type_TZ_TIMESTAMP:
 		rv = rv % time.Now().Unix()
-		v := internal.MarshalTzTimestamp(internal.UnmarshalTimestamp(uint64(rv)))
+		v := timeutil.MarshalTzTimestamp(timeutil.UnmarshalTimestamp(uint64(rv)))
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
 			},
 		}
-		src, _ := internal.UnmarshalTzTimestamp(v)
+		src, _ := timeutil.UnmarshalTzTimestamp(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -526,10 +526,10 @@ func TestScanSqlTypes(t *testing.T) {
 			}
 			if test.setColumnIndexes != nil {
 				for i, v := range test.setColumnIndexes {
-					internal.Equal(t, expected[0][v], test.values[i])
+					assert.Equal(t, expected[0][v], test.values[i])
 				}
 			} else {
-				internal.Equal(t, expected[0], test.values)
+				assert.Equal(t, expected[0], test.values)
 			}
 			expected = expected[1:]
 		}

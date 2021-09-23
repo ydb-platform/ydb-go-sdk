@@ -2,6 +2,8 @@ package scanner
 
 import (
 	"bytes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"reflect"
 	"strconv"
@@ -10,7 +12,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -149,22 +150,22 @@ func (s *rawConverter) Double() (v float64) {
 
 func (s *rawConverter) Date() (v time.Time) {
 	s.unwrap()
-	return internal.UnmarshalDate(s.uint32())
+	return timeutil.UnmarshalDate(s.uint32())
 }
 
 func (s *rawConverter) Datetime() (v time.Time) {
 	s.unwrap()
-	return internal.UnmarshalDatetime(s.uint32())
+	return timeutil.UnmarshalDatetime(s.uint32())
 }
 
 func (s *rawConverter) Timestamp() (v time.Time) {
 	s.unwrap()
-	return internal.UnmarshalTimestamp(s.uint64())
+	return timeutil.UnmarshalTimestamp(s.uint64())
 }
 
 func (s *rawConverter) Interval() (v time.Duration) {
 	s.unwrap()
-	return internal.UnmarshalInterval(s.int64())
+	return timeutil.UnmarshalInterval(s.int64())
 }
 
 func (s *rawConverter) TzDate() (v time.Time) {
@@ -172,7 +173,7 @@ func (s *rawConverter) TzDate() (v time.Time) {
 	if s.isNull() {
 		return
 	}
-	src, err := internal.UnmarshalTzDate(s.text())
+	src, err := timeutil.UnmarshalTzDate(s.text())
 	if err != nil {
 		s.errorf("scan raw failed: %w", err)
 	}
@@ -184,7 +185,7 @@ func (s *rawConverter) TzDatetime() (v time.Time) {
 	if s.isNull() {
 		return
 	}
-	src, err := internal.UnmarshalTzDatetime(s.text())
+	src, err := timeutil.UnmarshalTzDatetime(s.text())
 	if err != nil {
 		s.errorf("scan raw failed: %w", err)
 	}
@@ -196,7 +197,7 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 	if s.isNull() {
 		return
 	}
-	src, err := internal.UnmarshalTzTimestamp(s.text())
+	src, err := timeutil.UnmarshalTzTimestamp(s.text())
 	if err != nil {
 		s.errorf("scan raw failed: %w", err)
 	}
@@ -540,7 +541,7 @@ func (s *rawConverter) IsDecimal() bool {
 }
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
-	w := t.(internal.DecimalType)
+	w := t.(value.DecimalType)
 	return d.Precision == w.Precision && d.Scale == w.Scale
 }
 
@@ -648,8 +649,8 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 
 func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	c := s.stack.current()
-	act := internal.TypeFromYDB(c.t)
-	if !internal.TypesEqual(act, t) {
+	act := value.TypeFromYDB(c.t)
+	if !value.TypesEqual(act, t) {
 		s.errorf(
 			"unexpected types at %q %s: %s; want %s",
 			s.Path(), s.Type(), act, t,

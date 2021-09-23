@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"flag"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"go/ast"
 	"go/build"
 	"go/importer"
@@ -22,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ydbtypes"
 )
 
@@ -764,7 +764,7 @@ type Basic struct {
 	Face      FieldFace
 	Type      types.Type // Actual go types.
 	BaseType  types.Type // Column's go types.
-	Primitive internal.PrimitiveType
+	Primitive value.PrimitiveType
 }
 
 type T struct {

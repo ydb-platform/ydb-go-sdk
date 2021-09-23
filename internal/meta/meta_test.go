@@ -2,9 +2,9 @@ package meta
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 
 	"google.golang.org/grpc/metadata"
@@ -32,11 +32,11 @@ func TestMetaRequiredHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	internal.Equal(t, []string{"database"}, md.Get(metaDatabase))
-	internal.Equal(t, []string{"requestType"}, md.Get(metaRequestType))
-	internal.Equal(t, []string{"token"}, md.Get(metaTicket))
-	internal.Equal(t, []string{"userAgent"}, md.Get(metaUserAgent))
-	internal.Equal(t, []string{"traceID"}, md.Get(metaTraceID))
-	internal.Equal(t, []string{Version}, md.Get(metaVersion))
-	internal.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
+	assert.Equal(t, []string{"database"}, md.Get(metaDatabase))
+	assert.Equal(t, []string{"requestType"}, md.Get(metaRequestType))
+	assert.Equal(t, []string{"token"}, md.Get(metaTicket))
+	assert.Equal(t, []string{"userAgent"}, md.Get(metaUserAgent))
+	assert.Equal(t, []string{"traceID"}, md.Get(metaTraceID))
+	assert.Equal(t, []string{Version}, md.Get(metaVersion))
+	assert.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
 }

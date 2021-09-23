@@ -3,6 +3,8 @@ package table
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"reflect"
 	"testing"
 	"time"
@@ -16,7 +18,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -170,13 +171,13 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []*Ydb_Table.ColumnMeta{
 				{
 					Name:   expect.Columns[0].Name,
-					Type:   internal.TypeToYDB(expect.Columns[0].Type),
+					Type:   value.TypeToYDB(expect.Columns[0].Type),
 					Family: "testFamily",
 				},
 			},
 			PrimaryKey: expect.PrimaryKey,
 			ShardKeyBounds: []*Ydb.TypedValue{
-				internal.ValueToYDB(expect.KeyRanges[0].To),
+				value.ValueToYDB(expect.KeyRanges[0].To),
 			},
 			Indexes:    nil,
 			TableStats: nil,
@@ -232,7 +233,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, _, err := s.Execute(ctx, scanner.TxControl(), "", NewQueryParameters())
-				internal.NoError(t, err)
+				assert.NoError(t, err)
 			},
 		},
 		{
@@ -243,7 +244,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.Explain(ctx, "")
-				internal.NoError(t, err)
+				assert.NoError(t, err)
 			},
 		},
 		{
@@ -254,14 +255,14 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.Prepare(ctx, "")
-				internal.NoError(t, err)
+				assert.NoError(t, err)
 			},
 		},
 		{
 			method: testutil.TableCreateSession,
 			do: func(t *testing.T, ctx context.Context, c table.client) {
 				_, err := c.CreateSession(ctx)
-				internal.NoError(t, err)
+				assert.NoError(t, err)
 			},
 		},
 		{
@@ -271,7 +272,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					c:            c,
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
-				internal.NoError(t, s.Close(ctx))
+				assert.NoError(t, s.Close(ctx))
 			},
 		},
 		{
@@ -282,7 +283,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.BeginTransaction(ctx, scanner.TxSettings())
-				internal.NoError(t, err)
+				assert.NoError(t, err)
 			},
 		},
 		{
@@ -295,7 +296,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					},
 				}
 				_, err := tx.CommitTx(ctx)
-				internal.NoError(t, err)
+				assert.NoError(t, err)
 			},
 		},
 		{
@@ -308,7 +309,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					},
 				}
 				err := tx.Rollback(ctx)
-				internal.NoError(t, err)
+				assert.NoError(t, err)
 			},
 		},
 		{
@@ -319,7 +320,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.KeepAlive(ctx)
-				internal.NoError(t, err)
+				assert.NoError(t, err)
 			},
 		},
 	} {

@@ -3,38 +3,37 @@ package types
 import (
 	"bytes"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 )
 
 // Type describes YDB data types.
 type Type interface {
-	internal.T
+	value.T
 }
 
 func List(T Type) Type {
-	return internal.ListType{T: T}
+	return value.ListType{T: T}
 }
 
 func Tuple(elems ...Type) Type {
-	es := make([]internal.T, len(elems))
+	es := make([]value.T, len(elems))
 	for i, el := range elems {
 		es[i] = el
 	}
-	return internal.TupleType{
+	return value.TupleType{
 		Elems: es,
 	}
 }
 
-type tStructType internal.StructType
+type tStructType value.StructType
 
 type StructOption func(*tStructType)
 
 func StructField(name string, typ Type) StructOption {
 	return func(s *tStructType) {
-		s.Fields = append(s.Fields, internal.StructField{
+		s.Fields = append(s.Fields, value.StructField{
 			Name: name,
 			Type: typ,
 		})
@@ -46,17 +45,17 @@ func Struct(opts ...StructOption) Type {
 	for _, opt := range opts {
 		opt(&s)
 	}
-	return internal.StructType(s)
+	return value.StructType(s)
 }
 
 func Variant(x Type) Type {
 	switch v := x.(type) {
-	case internal.TupleType:
-		return internal.VariantType{
+	case value.TupleType:
+		return value.VariantType{
 			T: v,
 		}
-	case internal.StructType:
-		return internal.VariantType{
+	case value.StructType:
+		return value.VariantType{
 			S: v,
 		}
 	default:
@@ -65,11 +64,11 @@ func Variant(x Type) Type {
 }
 
 func Void() Type {
-	return internal.VoidType{}
+	return value.VoidType{}
 }
 
 func Optional(T Type) Type {
-	return internal.OptionalType{T: T}
+	return value.OptionalType{T: T}
 }
 
 // TODO(kamardin): rename types to consistent format like values: BoolType,
@@ -77,36 +76,36 @@ func Optional(T Type) Type {
 
 // Primitive types known by YDB.
 const (
-	TypeUnknown      = internal.TypeUnknown
-	TypeBool         = internal.TypeBool
-	TypeInt8         = internal.TypeInt8
-	TypeUint8        = internal.TypeUint8
-	TypeInt16        = internal.TypeInt16
-	TypeUint16       = internal.TypeUint16
-	TypeInt32        = internal.TypeInt32
-	TypeUint32       = internal.TypeUint32
-	TypeInt64        = internal.TypeInt64
-	TypeUint64       = internal.TypeUint64
-	TypeFloat        = internal.TypeFloat
-	TypeDouble       = internal.TypeDouble
-	TypeDate         = internal.TypeDate
-	TypeDatetime     = internal.TypeDatetime
-	TypeTimestamp    = internal.TypeTimestamp
-	TypeInterval     = internal.TypeInterval
-	TypeTzDate       = internal.TypeTzDate
-	TypeTzDatetime   = internal.TypeTzDatetime
-	TypeTzTimestamp  = internal.TypeTzTimestamp
-	TypeString       = internal.TypeString
-	TypeUTF8         = internal.TypeUTF8
-	TypeYSON         = internal.TypeYSON
-	TypeJSON         = internal.TypeJSON
-	TypeUUID         = internal.TypeUUID
-	TypeJSONDocument = internal.TypeJSONDocument
-	TypeDyNumber     = internal.TypeDyNumber
+	TypeUnknown      = value.TypeUnknown
+	TypeBool         = value.TypeBool
+	TypeInt8         = value.TypeInt8
+	TypeUint8        = value.TypeUint8
+	TypeInt16        = value.TypeInt16
+	TypeUint16       = value.TypeUint16
+	TypeInt32        = value.TypeInt32
+	TypeUint32       = value.TypeUint32
+	TypeInt64        = value.TypeInt64
+	TypeUint64       = value.TypeUint64
+	TypeFloat        = value.TypeFloat
+	TypeDouble       = value.TypeDouble
+	TypeDate         = value.TypeDate
+	TypeDatetime     = value.TypeDatetime
+	TypeTimestamp    = value.TypeTimestamp
+	TypeInterval     = value.TypeInterval
+	TypeTzDate       = value.TypeTzDate
+	TypeTzDatetime   = value.TypeTzDatetime
+	TypeTzTimestamp  = value.TypeTzTimestamp
+	TypeString       = value.TypeString
+	TypeUTF8         = value.TypeUTF8
+	TypeYSON         = value.TypeYSON
+	TypeJSON         = value.TypeJSON
+	TypeUUID         = value.TypeUUID
+	TypeJSONDocument = value.TypeJSONDocument
+	TypeDyNumber     = value.TypeDyNumber
 )
 
 func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
-	internal.WriteTypeStringTo(buf, t)
+	value.WriteTypeStringTo(buf, t)
 }
 
 // RawValue scanning non-primitive yql types or for own implementation scanner native API

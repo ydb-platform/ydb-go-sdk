@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"io"
 	"log"
 	"os"
@@ -12,10 +13,10 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
+	table "github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,7 +25,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -144,7 +144,7 @@ func TestIsolationMapping(t *testing.T) {
 				sExp = table.TxSettings(test.txExp)
 			}
 
-			internal.Equal(t, sAct, sExp)
+			assert.Equal(t, sAct, sExp)
 
 			var cAct, cExp *table.TransactionControl
 			if txcAct != nil {
@@ -153,7 +153,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txcExp != nil {
 				cExp = table.TxControl(test.txcExp...)
 			}
-			internal.Equal(t, cAct, cExp)
+			assert.Equal(t, cAct, cExp)
 		})
 	}
 }
@@ -183,7 +183,6 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 		WithTraceDriver(dtrace),
 		WithClientTrace(ctrace),
 		WithSessionPoolTrace(strace),
-		WithSessionPoolIdleThreshold(time.Second),
 	))
 
 	return db, db.PingContext(ctx)
@@ -191,8 +190,8 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 
 func TestQuery(t *testing.T) {
 	c := Connector(
-		WithClient(
-			table2.NewClient(
+		withClient(
+			internal.NewClientAsPool(
 				testutil.NewDB(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
@@ -229,7 +228,7 @@ func TestQuery(t *testing.T) {
 						},
 					),
 				),
-				table2.DefaultConfig(),
+				internal.DefaultConfig(),
 			),
 		),
 		WithDefaultExecDataQueryOption(),
@@ -256,22 +255,22 @@ func TestQuery(t *testing.T) {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := db.QueryContext(ctx, "SELECT 1")
-			internal.NoError(t, err)
-			internal.NotNil(t, rows)
+			assert.NoError(t, err)
+			assert.NotNil(t, rows)
 		})
 		t.Run("QueryContext/STMT/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			stmt, err := db.PrepareContext(ctx, "SELECT 1")
-			internal.NoError(t, err)
+			assert.NoError(t, err)
 			defer func() { _ = stmt.Close() }()
 			if test.scanQueryMode {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := stmt.QueryContext(ctx)
-			internal.NoError(t, err)
-			internal.NotNil(t, rows)
+			assert.NoError(t, err)
+			assert.NotNil(t, rows)
 		})
 		t.Run("ExecContext/Conn/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
@@ -281,22 +280,22 @@ func TestQuery(t *testing.T) {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := db.ExecContext(ctx, "SELECT 1")
-			internal.NoError(t, err)
-			internal.NotNil(t, rows)
+			assert.NoError(t, err)
+			assert.NotNil(t, rows)
 		})
 		t.Run("ExecContext/STMT/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			stmt, err := db.PrepareContext(ctx, "SELECT 1")
-			internal.NoError(t, err)
+			assert.NoError(t, err)
 			defer func() { _ = stmt.Close() }()
 			if test.scanQueryMode {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := stmt.ExecContext(ctx)
-			internal.NoError(t, err)
-			internal.NotNil(t, rows)
+			assert.NoError(t, err)
+			assert.NotNil(t, rows)
 		})
 	}
 }

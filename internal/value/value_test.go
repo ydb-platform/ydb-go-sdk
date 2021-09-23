@@ -1,4 +1,4 @@
-package internal
+package value
 
 import (
 	"bytes"

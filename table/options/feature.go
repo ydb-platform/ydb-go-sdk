@@ -1,10 +1,12 @@
 package options
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal"
+import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+)
 
-type FeatureFlag = internal.FeatureFlag
+type FeatureFlag = feature.FeatureFlag
 
 const (
-	FeatureEnabled  = internal.FeatureEnabled
-	FeatureDisabled = internal.FeatureDisabled
+	FeatureEnabled  = feature.FeatureEnabled
+	FeatureDisabled = feature.FeatureDisabled
 )
