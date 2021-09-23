@@ -3,17 +3,26 @@
 package tests
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = types.StringValue
+	_ = time.Now
 	_ = table.NewQueryParameters
+	_ = resultset.Result.Scan
+	_ = types.StringValue
 )
+
+func (c *Container) Scan(res resultset.Result) (err error) {
+	_ = res.ScanWithDefaults(&c.Struct, &c.Structs, &c.Bytes, &c.Strings, &c.String)
+	return res.Err()
+}
 
 func (c *Container) QueryParameters() *table.QueryParameters {
 	var v0 types.Value
@@ -491,25 +500,9 @@ func (c *Container) StructType() types.Type {
 	return t0
 }
 
-type structfield3 []int32
-
-func (s *structfield3) UnmarshalYDB(res types.RawValue) error {
-	n0 := res.ListIn()
-	xs0 := make([]int32, n0)
-	for i0 := 0; i0 < n0; i0++ {
-		res.ListItem(i0)
-		var x0 int32
-		x0 = res.Int32()
-		xs0[i0] = x0
-	}
-	*s = xs0
-	res.ListOut()
+func (f *Foo) Scan(res resultset.Result) (err error) {
+	_ = res.ScanWithDefaults(&f.ID, &f.Ints)
 	return res.Err()
-}
-
-func (f *Foo) Scan(res *table.Result) (err error) {
-	err = res.Scan(&f.ID, &f.Ints)
-	return
 }
 
 func (f *Foo) QueryParameters() *table.QueryParameters {
@@ -616,7 +609,18 @@ func (f *Foo) StructType() types.Type {
 	return t0
 }
 
-func (bs *Bar) Scan(res *table.Result) (err error) {
+func (fs *Foos) Scan(res resultset.Result) (err error) {
+	for res.NextRow() {
+		var x0 Foo
+		_ = res.ScanWithDefaults(&x0.ID, &x0.Ints)
+		if res.Err() == nil {
+			*fs = append(*fs, x0)
+		}
+	}
+	return res.Err()
+}
+
+func (bs *Bar) Scan(res resultset.Result) (err error) {
 	for res.NextRow() {
 		var x0 [][]string
 		if res.Err() == nil {
@@ -624,19 +628,4 @@ func (bs *Bar) Scan(res *table.Result) (err error) {
 		}
 	}
 	return res.Err()
-}
-
-func ydbConvU32ToB(x uint32) byte {
-	const (
-		bits = 8
-		mask = (1 << (bits)) - 1
-	)
-	abs := uint64(x)
-	if abs&mask != abs {
-		panic(
-			"ydbgen: convassert: " + strconv.FormatUint(uint64(x), 10) +
-				" (types uint32) overflows byte",
-		)
-	}
-	return byte(x)
 }

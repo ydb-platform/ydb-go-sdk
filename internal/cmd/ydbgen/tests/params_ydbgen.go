@@ -3,16 +3,20 @@
 package tests
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = types.StringValue
+	_ = time.Now
 	_ = table.NewQueryParameters
+	_ = resultset.Result.Scan
+	_ = types.StringValue
 )
 
 func (p *Params) QueryParameters() *table.QueryParameters {
@@ -44,3 +48,4 @@ func ydbConvI16ToU32(x int16) uint32 {
 	}
 	return uint32(x)
 }
+
