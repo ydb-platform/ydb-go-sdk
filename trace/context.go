@@ -38,12 +38,12 @@ func ContextRetry(ctx context.Context) Retry {
 	return t
 }
 
-type clientTraceContextKey struct{}
+type tableContextKey struct{}
 
-// WithClientTrace returns deadline which has associated Trace with it.
-func WithClientTrace(ctx context.Context, t Table) context.Context {
+// WithTable returns deadline which has associated Trace with it.
+func WithTable(ctx context.Context, t Table) context.Context {
 	return context.WithValue(ctx,
-		clientTraceContextKey{},
+		tableContextKey{},
 		ContextTable(ctx).Compose(t),
 	)
 }
@@ -52,6 +52,6 @@ func WithClientTrace(ctx context.Context, t Table) context.Context {
 // If there is no Table associated with ctx then zero value
 // of Trace is returned.
 func ContextTable(ctx context.Context) Table {
-	t, _ := ctx.Value(clientTraceContextKey{}).(Table)
+	t, _ := ctx.Value(tableContextKey{}).(Table)
 	return t
 }
