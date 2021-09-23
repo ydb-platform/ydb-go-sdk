@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
@@ -40,7 +41,9 @@ func TestConnectorDialOnPing(t *testing.T) {
 				return client, nil
 			},
 			DriverConfig: &config.Config{
-				Credentials: credentials.NewAnonymousCredentials("test"),
+				Credentials:          credentials.NewAnonymousCredentials("test"),
+				GrpcConnectionPolicy: &config.DefaultGrpcConnectionPolicy,
+				DiscoveryInterval:    time.Second,
 			},
 		}),
 		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorDialOnPing")),
@@ -91,7 +94,9 @@ func TestConnectorRedialOnError(t *testing.T) {
 				}
 			},
 			DriverConfig: &config.Config{
-				Credentials: credentials.NewAnonymousCredentials("test"),
+				Credentials:          credentials.NewAnonymousCredentials("test"),
+				GrpcConnectionPolicy: &config.DefaultGrpcConnectionPolicy,
+				DiscoveryInterval:    time.Second,
 			},
 		}),
 		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorRedialOnError")),

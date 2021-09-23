@@ -3,10 +3,11 @@ package table
 import (
 	"container/list"
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
@@ -306,7 +307,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 	)
 	getDone := trace.TablePoolOnGet(p.Trace.TablePool, ctx)
 	defer func() {
-		getDone(ctx, s.ID(), time.Since(start), i, err)
+		getDone(ctx, sessionID(s), time.Since(start), i, err)
 	}()
 
 	const maxAttempts = 100
@@ -371,7 +372,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 				// for the next waiter – session could be lost for a long time.
 				p.putWaitCh(ch)
 			}
-			waitDone(ctx, s.ID(), err)
+			waitDone(ctx, sessionID(s), err)
 
 		case <-ctx.Done():
 			p.mu.Lock()
@@ -381,7 +382,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 			p.waitq.Remove(el)
 			p.mu.Unlock()
 			err = ctx.Err()
-			waitDone(ctx, s.ID(), err)
+			waitDone(ctx, sessionID(s), err)
 			return nil, err
 		}
 	}
@@ -492,7 +493,7 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 
 	createDone := trace.TablePoolOnCreate(p.Trace.TablePool, ctx)
 	defer func() {
-		createDone(ctx, s.ID(), err)
+		createDone(ctx, sessionID(s), err)
 	}()
 
 	const maxAttempts = 10

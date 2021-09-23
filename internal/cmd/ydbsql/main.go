@@ -51,7 +51,7 @@ func main() {
 	db := sql.OpenDB(ydbsql.Connector(opts...))
 	defer func() { _ = db.Close() }()
 
-	err := db.Ping()
+	err := db.PingContext(ctx)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "ping failed: %v\n", err)
 		os.Exit(1)
@@ -101,7 +101,7 @@ func main() {
 	}
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
