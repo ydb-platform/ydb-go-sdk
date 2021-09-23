@@ -9,7 +9,7 @@ import (
 )
 
 func isEvenConn(c conn.Conn, _ info.Info) bool {
-	n, err := strconv.Atoi(c.addr.addr)
+	n, err := strconv.Atoi(c.Addr().String())
 	if err != nil {
 		panic(err)
 	}

@@ -34,9 +34,9 @@ type retryOperation func(context.Context) (err error)
 
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
-// - context was cancelled or deadlined
+// - deadline was cancelled or deadlined
 // - retry operation returned nil as error
-// Warning: if context without deadline or cancellation func Retry will be worked infinite
+// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func Retry(ctx context.Context, retryNoIdempotent bool, op retryOperation) (err error, issues []error) {
 	var (
 		i        int
@@ -54,7 +54,7 @@ func Retry(ctx context.Context, retryNoIdempotent bool, op retryOperation) (err 
 		attempts++
 		select {
 		case <-ctx.Done():
-			issues = append(issues, fmt.Errorf("retry.Retry: context is done: %w", ctx.Err()))
+			issues = append(issues, fmt.Errorf("retry.Retry: deadline is done: %w", ctx.Err()))
 			return ctx.Err(), issues
 
 		default:
@@ -217,7 +217,7 @@ type Backoff interface {
 
 // waitBackoff is a helper function that waits for i-th Backoff b or ctx
 // expiration.
-// It returns non-nil error if and only if context expiration branch wins.
+// It returns non-nil error if and only if deadline expiration branch wins.
 func waitBackoff(ctx context.Context, b Backoff, i int) error {
 	if b == nil {
 		return ctx.Err()

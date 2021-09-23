@@ -4,7 +4,7 @@ import "context"
 
 type driverContextKey struct{}
 
-// WithDriver returns context which has associated Driver with it.
+// WithDriver returns deadline which has associated Driver with it.
 func WithDriver(ctx context.Context, t Driver) context.Context {
 	return context.WithValue(ctx,
 		driverContextKey{},
@@ -22,7 +22,7 @@ func ContextDriver(ctx context.Context) Driver {
 
 type retryContextKey struct{}
 
-// WithRetry returns context which has associated Retry with it.
+// WithRetry returns deadline which has associated Retry with it.
 func WithRetry(ctx context.Context, t Retry) context.Context {
 	return context.WithValue(ctx,
 		retryContextKey{},
@@ -40,7 +40,7 @@ func ContextRetry(ctx context.Context) Retry {
 
 type clientTraceContextKey struct{}
 
-// WithClientTrace returns context which has associated Trace with it.
+// WithClientTrace returns deadline which has associated Trace with it.
 func WithClientTrace(ctx context.Context, t Table) context.Context {
 	return context.WithValue(ctx,
 		clientTraceContextKey{},

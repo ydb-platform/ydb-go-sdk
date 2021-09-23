@@ -256,7 +256,7 @@ func TestRetryerImmediateReturn(t *testing.T) {
 	}
 }
 
-// We are testing all suspentions of custom operation func against to all context
+// We are testing all suspentions of custom operation func against to all deadline
 // timeouts - all sub-tests must have latency less than timeouts (+tolerance)
 func TestRetryContextDeadline(t *testing.T) {
 	tolerance := 10 * time.Millisecond

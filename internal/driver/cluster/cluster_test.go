@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
@@ -38,7 +38,7 @@ func TestClusterFastRedial(t *testing.T) {
 		dial: func(ctx context.Context, s string, p int) (conn.Conn, error) {
 			cc, err := ln.Dial(ctx)
 			return &conn.conn{
-				addr: cluster2.Addr{s, p},
+				addr: public.Addr{s, p},
 				raw:  cc,
 			}, err
 		},
@@ -60,11 +60,11 @@ func TestClusterFastRedial(t *testing.T) {
 		return done
 	}
 
-	ne := []cluster2.Endpoint{
+	ne := []public.Endpoint{
 		{Host: "foo"},
 		{Host: "bad"},
 	}
-	mergeEndpointIntoCluster(ctx, c, []cluster2.Endpoint{}, ne)
+	mergeEndpointIntoCluster(ctx, c, []public.Endpoint{}, ne)
 	select {
 	case <-pingConnects(len(ne)):
 
@@ -74,7 +74,7 @@ func TestClusterFastRedial(t *testing.T) {
 }
 
 func withDisabledTrackerQueue(c *cluster) *cluster {
-	c.index = make(map[cluster2.Addr]entry.Entry)
+	c.index = make(map[public.Addr]entry.Entry)
 	c.trackerQueue = list.New()
 	c.once.Do(func() {})
 	return c
@@ -95,7 +95,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		dial: func(ctx context.Context, s string, p int) (conn.Conn, error) {
 			cc, err := ln.Dial(ctx)
 			return &conn.conn{
-				addr: cluster2.Addr{s, p},
+				addr: public.Addr{s, p},
 				raw:  cc,
 			}, err
 		},
@@ -125,26 +125,26 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		}
 	}
 
-	endpoints := []cluster2.Endpoint{
+	endpoints := []public.Endpoint{
 		{Host: "foo"},
 		{Host: "foo", Port: 123},
 	}
-	badEndpoints := []cluster2.Endpoint{
+	badEndpoints := []public.Endpoint{
 		{Host: "bad"},
 		{Host: "bad", Port: 123},
 	}
-	nextEndpoints := []cluster2.Endpoint{
+	nextEndpoints := []public.Endpoint{
 		{Host: "foo"},
 		{Host: "bar"},
 		{Host: "bar", Port: 123},
 	}
-	nextBadEndpoints := []cluster2.Endpoint{
+	nextBadEndpoints := []public.Endpoint{
 		{Host: "bad", Port: 23},
 	}
 	t.Run("initial fill", func(t *testing.T) {
 		ne := append(endpoints, badEndpoints...)
 		// merge new endpoints into balancer
-		mergeEndpointIntoCluster(ctx, c, []cluster2.Endpoint{}, ne)
+		mergeEndpointIntoCluster(ctx, c, []public.Endpoint{}, ne)
 		// try endpoints, filter out bad ones to tracking
 		pingConnects(len(ne))
 		assert(t, len(ne), len(endpoints), len(badEndpoints))
@@ -208,7 +208,7 @@ func TestClusterRemoveTracking(t *testing.T) {
 		dial: func(ctx context.Context, s string, p int) (conn.Conn, error) {
 			cc, err := ln.Dial(ctx)
 			return &conn.conn{
-				addr: cluster2.Addr{s, p},
+				addr: public.Addr{s, p},
 				raw:  cc,
 			}, err
 		},
@@ -218,7 +218,7 @@ func TestClusterRemoveTracking(t *testing.T) {
 		},
 	}
 
-	endpoint := cluster2.Endpoint{Host: "foo"}
+	endpoint := public.Endpoint{Host: "foo"}
 	c.Insert(ctx, endpoint)
 
 	// Await for connection to be established.
@@ -273,7 +273,7 @@ func TestClusterRemoveOffline(t *testing.T) {
 		},
 	}
 
-	endpoint := cluster2.Endpoint{Host: "foo"}
+	endpoint := public.Endpoint{Host: "foo"}
 	c.Insert(ctx, endpoint)
 	<-timer.Reset
 
@@ -325,7 +325,7 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 				return nil, fmt.Errorf("refused")
 			}
 			cc, err := ln.Dial(ctx)
-			ret := conn2.NewConn(cc, cluster2.Addr{s, p})
+			ret := conn2.NewConn(cc, public.Addr{s, p})
 			// Used to distinguish connections.
 			ret.Runtime().SetOpStarted(id)
 			return ret, err
@@ -345,7 +345,7 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 	}()
 
 	t.Run("test actual block of tracker", func(t *testing.T) {
-		endpoint := cluster2.Endpoint{Host: "foo"}
+		endpoint := public.Endpoint{Host: "foo"}
 		c.Insert(ctx, endpoint)
 
 		// Wait for connection become tracked.
@@ -436,7 +436,7 @@ func TestClusterAwait(t *testing.T) {
 		assertRecvError(t, timeout, got, ErrClusterEmpty)
 	}
 	{
-		c.Insert(context.Background(), cluster2.Endpoint{})
+		c.Insert(context.Background(), public.Endpoint{})
 		got, cancel := get()
 		defer cancel()
 		assertRecvError(t, timeout, got, nil)
@@ -598,7 +598,7 @@ func assertRecvError(t *testing.T, d time.Duration, e <-chan error, exp error) {
 	}
 }
 
-func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []cluster2.Endpoint) {
+func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []public.Endpoint) {
 	SortEndpoints(curr)
 	SortEndpoints(next)
 	DiffEndpoints(curr, next,
@@ -610,8 +610,8 @@ func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []clus
 
 func TestDiffEndpoint(t *testing.T) {
 	// lists must be sorted
-	noEndpoints := []cluster2.Endpoint{}
-	someEndpoints := []cluster2.Endpoint{
+	noEndpoints := []public.Endpoint{}
+	someEndpoints := []public.Endpoint{
 		{
 			Host: "0",
 			Port: 0,
@@ -621,7 +621,7 @@ func TestDiffEndpoint(t *testing.T) {
 			Port: 1,
 		},
 	}
-	sameSomeEndpoints := []cluster2.Endpoint{
+	sameSomeEndpoints := []public.Endpoint{
 		{
 			Host:       "0",
 			Port:       0,
@@ -635,7 +635,7 @@ func TestDiffEndpoint(t *testing.T) {
 			Local:      true,
 		},
 	}
-	anotherEndpoints := []cluster2.Endpoint{
+	anotherEndpoints := []public.Endpoint{
 		{
 			Host: "2",
 			Port: 0,
@@ -645,7 +645,7 @@ func TestDiffEndpoint(t *testing.T) {
 			Port: 1,
 		},
 	}
-	moreEndpointsOverlap := []cluster2.Endpoint{
+	moreEndpointsOverlap := []public.Endpoint{
 		{
 			Host:       "0",
 			Port:       0,
@@ -664,7 +664,7 @@ func TestDiffEndpoint(t *testing.T) {
 
 	type TC struct {
 		name         string
-		curr, next   []cluster2.Endpoint
+		curr, next   []public.Endpoint
 		eq, add, del int
 	}
 

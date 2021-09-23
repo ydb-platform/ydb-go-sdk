@@ -130,7 +130,7 @@ func (c *cluster) Close() (err error) {
 }
 
 // Get returns next available connection.
-// It returns error on given context cancellation or when cluster become closed.
+// It returns error on given deadline cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

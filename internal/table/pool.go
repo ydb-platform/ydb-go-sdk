@@ -3,7 +3,7 @@ package table
 import (
 	"container/list"
 	"context"
-	context2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 	"time"
@@ -229,7 +229,7 @@ func (p *pool) createSession(ctx context.Context) (table.Session, error) {
 		var r createSessionResult
 
 		ctx, cancel := context.WithTimeout(
-			context2.ContextWithoutDeadline(ctx),
+			deadline.ContextWithoutDeadline(ctx),
 			p.CreateSessionTimeout,
 		)
 
@@ -286,7 +286,7 @@ func (p *pool) createSession(ctx context.Context) (table.Session, error) {
 		// read result from resCh for prevention of forgetting session
 		go func() {
 			if r, ok := <-resCh; ok && r.s != nil {
-				_ = r.s.Close(context2.ContextWithoutDeadline(ctx))
+				_ = r.s.Close(deadline.ContextWithoutDeadline(ctx))
 			}
 		}()
 		return nil, ctx.Err()
@@ -578,9 +578,9 @@ func (p *pool) Close(ctx context.Context) (err error) {
 
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
-// - context was cancelled or deadlined
+// - deadline was cancelled or deadlined
 // - retry operation returned nil as error
-// Warning: if context without deadline or cancellation func Retry will be worked infinite
+// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (p *pool) Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error) {
 	return retryBackoff(ctx, p, retry.FastBackoff, retry.SlowBackoff, retryNoIdempotent, op)
 }
@@ -839,7 +839,7 @@ func (p *pool) notify(s table.Session) (notified bool) {
 		//
 		// It could be in this states:
 		//   1) Reached the select code and awaiting for a value in channel.
-		//   2) Reached the select code but already in branch of context
+		//   2) Reached the select code but already in branch of deadline
 		//   cancelation. In this case it is locked on p.mu.Lock().
 		//   3) Not reached the select code and thus not reading yet from the
 		//   channel.
@@ -866,7 +866,7 @@ func (p *pool) notify(s table.Session) (notified bool) {
 // CloseSession must be fast. If necessary, can be async.
 func (p *pool) CloseSession(ctx context.Context, s table.Session) error {
 	ctx, cancel := context.WithTimeout(
-		context2.ContextWithoutDeadline(ctx),
+		deadline.ContextWithoutDeadline(ctx),
 		p.DeleteTimeout,
 	)
 	closeSessionDone := trace.TablePoolOnCloseSession(p.Trace.TablePool, ctx, s.ID())

@@ -232,7 +232,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 }
 
 func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
-	// Remember raw context to pass it for the tracing functions.
+	// Remember raw deadline to pass it for the tracing functions.
 	rawCtx := ctx
 
 	var cancel context.CancelFunc

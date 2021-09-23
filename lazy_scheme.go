@@ -1,7 +1,7 @@
 package ydb
 
 import (
-	context "context"
+	"context"
 	"fmt"
 	"path"
 	"strings"
@@ -10,13 +10,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type dbWithTable interface {
 	DB
 
-	Table() table2.Client
+	Table() table.Client
 }
 
 type lazyScheme struct {

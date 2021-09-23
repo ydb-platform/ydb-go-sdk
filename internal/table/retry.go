@@ -30,9 +30,9 @@ type SessionProvider interface {
 
 	// Retry provide the best effort fo retrying operation
 	// Retry implements internal busy loop until one of the following conditions is met:
-	// - context was cancelled or deadlined
+	// - deadline was cancelled or deadlined
 	// - retry operation returned nil as error
-	// If context without deadline used session pool RetryTimeout
+	// If deadline without deadline used session pool RetryTimeout
 	Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error)
 
 	// Close provide cleanup sessions
@@ -159,7 +159,7 @@ func retryBackoff(
 	for ; ; i++ {
 		select {
 		case <-ctx.Done():
-			issues = append(issues, fmt.Errorf("retryBackoff: context is done: %w", ctx.Err()))
+			issues = append(issues, fmt.Errorf("retryBackoff: deadline is done: %w", ctx.Err()))
 			return ctx.Err(), issues
 
 		default:

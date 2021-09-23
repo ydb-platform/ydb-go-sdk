@@ -51,7 +51,7 @@ is just a shortcut) for this purpose:
 			// handle error
 		}
 
-		ctx, cancel := context.WithTimeout(10 * time.Second)
+		ctx, cancel := deadline.WithTimeout(10 * time.Second)
 		defer cancel()
 
 		err = db.ExecContext(ctx, ...) // Retries are implicit.
@@ -65,7 +65,7 @@ is just a shortcut) for this purpose:
 		}
 
 		// Explicit retries for transactions.
-		err = ydbsql.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+		err = ydbsql.DoTx(ctx, db, func(ctx deadline.Context, tx *sql.Tx) error {
 			// Execute statements here.
 			// Note that Commit()/Rollback() are not necessary here.
 		})
@@ -85,8 +85,8 @@ It is worth noting that YDB supports server side operation timeout. That is,
 client could set up operation timeout among other operation options. When this
 timeout exceeds, YDB will try to cancel operation execution and in any result
 of the cancelation appropriate timeout error will be returned. By default, this
-package "mirrors" context.Context deadlines and passes operation timeout option
-if context deadline is not empty. To configure or disable such behavior please
+package "mirrors" deadline.Context deadlines and passes operation timeout option
+if deadline deadline is not empty. To configure or disable such behavior please
 see appropriate Connector options.
 
 */

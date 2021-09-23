@@ -25,12 +25,12 @@ func TestOperationParams(t *testing.T) {
 			name: "nothing",
 		},
 		{
-			name:       "mode: unknown, context timeout",
+			name:       "mode: unknown, deadline timeout",
 			ctxTimeout: time.Second,
 			exp:        Params{},
 		},
 		{
-			name:       "mode: sync, context timeout applied to operation timeout",
+			name:       "mode: sync, deadline timeout applied to operation timeout",
 			ctxTimeout: time.Second,
 			opMode:     OperationModeSync,
 			exp: Params{
@@ -39,7 +39,7 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mode: async, context timeout not applied to operation timeout",
+			name:       "mode: async, deadline timeout not applied to operation timeout",
 			ctxTimeout: time.Second,
 			opMode:     OperationModeAsync,
 			exp: Params{
@@ -47,7 +47,7 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mode: unknown, context timeout not override operation timeout",
+			name:       "mode: unknown, deadline timeout not override operation timeout",
 			ctxTimeout: time.Second,
 			opTimeout:  time.Hour,
 			exp: Params{
@@ -55,7 +55,7 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mode: sync, context timeout override operation timeout",
+			name:       "mode: sync, deadline timeout override operation timeout",
 			ctxTimeout: time.Second,
 			opMode:     OperationModeSync,
 			opTimeout:  time.Hour,
@@ -65,7 +65,7 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 		{
-			name:       "mode: async, context timeout not override operation timeout",
+			name:       "mode: async, deadline timeout not override operation timeout",
 			ctxTimeout: time.Second,
 			opMode:     OperationModeAsync,
 			opTimeout:  time.Hour,

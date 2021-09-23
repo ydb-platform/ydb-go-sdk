@@ -330,7 +330,7 @@ type TxDoer struct {
 // commitment can be failed:
 //
 //   var results []int
-//   ydbsql.DoTx(ctx, db, TxOperationFunc(func(ctx context.Context, tx *sql.Tx) error {
+//   ydbsql.DoTx(ctx, db, TxOperationFunc(func(ctx deadline.Context, tx *sql.Tx) error {
 //       // Reset resulting slice to prevent duplicates when retry occurred.
 //       results = results[:0]
 //

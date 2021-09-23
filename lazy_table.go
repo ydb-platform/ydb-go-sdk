@@ -4,14 +4,14 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type lazyTable struct {
 	db     DB
-	config table.Config
-	client table2.Client
+	config internal.Config
+	client table.Client
 	m      sync.Mutex
 }
 
@@ -27,12 +27,12 @@ func (t *lazyTable) Close(ctx context.Context) error {
 	return t.client.Close(ctx)
 }
 
-func (t *lazyTable) Retry(ctx context.Context, retryNoIdempotent bool, op table2.RetryOperation) (err error, issues []error) {
+func (t *lazyTable) Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error) {
 	t.init()
 	return t.client.Retry(ctx, retryNoIdempotent, op)
 }
 
-func newTable(db DB, config table.Config) *lazyTable {
+func newTable(db DB, config internal.Config) *lazyTable {
 	return &lazyTable{
 		db:     db,
 		config: config,
@@ -41,12 +41,12 @@ func newTable(db DB, config table.Config) *lazyTable {
 
 func (t *lazyTable) init() {
 	t.m.Lock()
-	t.client = table.NewClientAsPool(t.db, t.config)
+	t.client = internal.NewClientAsPool(t.db, t.config)
 	t.m.Unlock()
 }
 
-func tableConfig(o options) table.Config {
-	config := table.DefaultConfig()
+func tableConfig(o options) internal.Config {
+	config := internal.DefaultConfig()
 	if o.traceTable != nil {
 		config.Trace = *o.traceTable
 	}
@@ -71,7 +71,7 @@ func tableConfig(o options) table.Config {
 	return config
 }
 
-func (t *lazyTable) CreateSession(ctx context.Context) (table2.Session, error) {
+func (t *lazyTable) CreateSession(ctx context.Context) (table.Session, error) {
 	t.init()
 	return t.client.CreateSession(ctx)
 }

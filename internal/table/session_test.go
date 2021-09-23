@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	options2 "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -122,7 +122,7 @@ func TestSessionDescribeTable(t *testing.T) {
 		expect := Description{
 			Name:       "testName",
 			PrimaryKey: []string{"testKey"},
-			Columns: []options2.Column{
+			Columns: []options.Column{
 				{
 					Name:   "testColumn",
 					Type:   types.Void(),
@@ -144,7 +144,7 @@ func TestSessionDescribeTable(t *testing.T) {
 					Name:         "testFamily",
 					Data:         StoragePool{},
 					Compression:  ColumnFamilyCompressionLZ4,
-					KeepInMemory: options2.FeatureEnabled,
+					KeepInMemory: options.FeatureEnabled,
 				},
 			},
 			Attributes: map[string]string{},
@@ -156,7 +156,7 @@ func TestSessionDescribeTable(t *testing.T) {
 				TableCommitLog0:    StoragePool{Media: "m1"},
 				TableCommitLog1:    StoragePool{Media: "m2"},
 				External:           StoragePool{Media: "m3"},
-				StoreExternalBlobs: options2.FeatureEnabled,
+				StoreExternalBlobs: options.FeatureEnabled,
 			},
 			Indexes: []IndexDescription{},
 		}

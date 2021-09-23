@@ -6,7 +6,7 @@ type (
 	ctxRetryNoIdempotentKey struct{}
 )
 
-// WithRetryNoIdempotent returns a copy of parent context with allow retry
+// WithRetryNoIdempotent returns a copy of parent deadline with allow retry
 // operations with no idempotent errors
 func WithRetryNoIdempotent(ctx context.Context) context.Context {
 	return context.WithValue(ctx, ctxRetryNoIdempotentKey{}, true)

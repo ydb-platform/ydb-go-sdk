@@ -56,7 +56,7 @@ func (d *driver) Close() error {
 }
 
 func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
-	// Remember raw context to pass it for the tracing functions.
+	// Remember raw deadline to pass it for the tracing functions.
 	rawCtx := ctx
 
 	t := trace.ContextDriver(ctx).Compose(d.Config.Trace)

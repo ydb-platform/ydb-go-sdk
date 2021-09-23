@@ -125,13 +125,13 @@ func TestRetryModes(t *testing.T) {
 			deleteSession: false,
 		},
 		{
-			err:           context.DeadlineExceeded, // golang context deadline exceeded
+			err:           context.DeadlineExceeded, // golang deadline deadline exceeded
 			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 		},
 		{
-			err:           context.Canceled, // golang context cancelled
+			err:           context.Canceled, // golang deadline cancelled
 			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,

@@ -127,7 +127,7 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithTraceDriver returns context which has associated Driver with it.
+// WithTraceDriver returns deadline which has associated Driver with it.
 func WithTraceDriver(trace trace.Driver) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.traceDriver = &trace
@@ -135,7 +135,7 @@ func WithTraceDriver(trace trace.Driver) Option {
 	}
 }
 
-// WithTraceTable returns context which has associated Driver with it.
+// WithTraceTable returns deadline which has associated Driver with it.
 func WithTraceTable(trace trace.Table) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.traceTable = &trace

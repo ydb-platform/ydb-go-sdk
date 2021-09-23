@@ -47,8 +47,8 @@ type ctxOpCancelAfterKey struct{}
 
 type ctxOpModeKey struct{}
 
-// WithOperationTimeout returns a copy of parent context in which YDB operation timeout
-// parameter is set to d. If parent context timeout is smaller than d, parent context
+// WithOperationTimeout returns a copy of parent deadline in which YDB operation timeout
+// parameter is set to d. If parent deadline timeout is smaller than d, parent deadline
 // is returned.
 func WithOperationTimeout(ctx context.Context, d time.Duration) context.Context {
 	if cur, ok := ContextOperationTimeout(ctx); ok && d >= cur {
@@ -58,7 +58,7 @@ func WithOperationTimeout(ctx context.Context, d time.Duration) context.Context 
 	return context.WithValue(ctx, ctxOpTimeoutKey{}, d)
 }
 
-// ContextOperationTimeout returns the timeout within given context after which
+// ContextOperationTimeout returns the timeout within given deadline after which
 // YDB should try to cancel operation and return result regardless of the
 // cancelation.
 func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
@@ -66,9 +66,9 @@ func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
 	return
 }
 
-// WithOperationCancelAfter returns a copy of parent context in which YDB operation
-// cancel after parameter is set to d. If parent context cancelation timeout is smaller
-// than d, parent context context is returned.
+// WithOperationCancelAfter returns a copy of parent deadline in which YDB operation
+// cancel after parameter is set to d. If parent deadline cancelation timeout is smaller
+// than d, parent deadline deadline is returned.
 func WithOperationCancelAfter(ctx context.Context, d time.Duration) context.Context {
 	if cur, ok := ContextOperationCancelAfter(ctx); ok && d >= cur {
 		// The current cancelation timeout is already smaller than the new one.
@@ -77,7 +77,7 @@ func WithOperationCancelAfter(ctx context.Context, d time.Duration) context.Cont
 	return context.WithValue(ctx, ctxOpCancelAfterKey{}, d)
 }
 
-// ContextOperationCancelAfter returns the timeout within given context after which
+// ContextOperationCancelAfter returns the timeout within given deadline after which
 // YDB should try to cancel operation and return result regardless of the
 // cancelation.
 func ContextOperationCancelAfter(ctx context.Context) (d time.Duration, ok bool) {
@@ -85,14 +85,14 @@ func ContextOperationCancelAfter(ctx context.Context) (d time.Duration, ok bool)
 	return
 }
 
-// WithOperationMode returns a copy of parent context in which YDB operation mode
-// parameter is set to m. If parent context mode is set and is not equal to m,
+// WithOperationMode returns a copy of parent deadline in which YDB operation mode
+// parameter is set to m. If parent deadline mode is set and is not equal to m,
 // WithOperationMode will panic.
 func WithOperationMode(ctx context.Context, m OperationMode) context.Context {
 	if cur, ok := ContextOperationMode(ctx); ok {
 		if cur != m {
 			panic(fmt.Sprintf(
-				"ydb: context already has different operation mode: %v; %v given",
+				"ydb: deadline already has different operation mode: %v; %v given",
 				cur, m,
 			))
 		}
@@ -101,7 +101,7 @@ func WithOperationMode(ctx context.Context, m OperationMode) context.Context {
 	return context.WithValue(ctx, ctxOpModeKey{}, m)
 }
 
-// ContextOperationMode returns the mode of YDB operation within given context.
+// ContextOperationMode returns the mode of YDB operation within given deadline.
 func ContextOperationMode(ctx context.Context) (m OperationMode, ok bool) {
 	m, ok = ctx.Value(ctxOpModeKey{}).(OperationMode)
 	return

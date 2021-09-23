@@ -87,7 +87,7 @@ func (r *Result) inactive() bool {
 // NextStreamSet selects next result set from the result of streaming operation.
 // columns - names of columns in the resultSet that will be scanned
 // It returns false if stream is closed or ctx is canceled.
-// Note that in case of context cancelation it marks via error set.
+// Note that in case of deadline cancelation it marks via error set.
 func (r *Result) nextStreamSet(ctx context.Context, columns ...string) bool {
 	if r.inactive() || r.SetCh == nil {
 		return false

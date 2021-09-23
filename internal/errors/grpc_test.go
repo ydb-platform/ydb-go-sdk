@@ -44,7 +44,7 @@ func TestTransportErrorWrapsContextError(t *testing.T) {
 		err:    context.Canceled,
 	})
 	if !errors.Is(err, context.Canceled) {
-		t.Errorf("expected %v to wrap context.Canceled", err)
+		t.Errorf("expected %v to wrap deadline.Canceled", err)
 	}
 }
 
