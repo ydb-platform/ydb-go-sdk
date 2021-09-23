@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"io"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
 
@@ -17,7 +18,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
@@ -164,14 +164,14 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 		ctrace sessiontrace.Trace
 		strace sessiontrace.SessionPoolTrace
 	)
-	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
-		log.Printf("[driver] %s: %+v", name, traceutil.ClearContext(args))
+	trace.Stub(&dtrace, func(name string, args ...interface{}) {
+		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
 	})
-	traceutil.Stub(&ctrace, func(name string, args ...interface{}) {
-		log.Printf("[client] %s: %+v", name, traceutil.ClearContext(args))
+	trace.Stub(&ctrace, func(name string, args ...interface{}) {
+		log.Printf("[client] %s: %+v", name, trace.ClearContext(args))
 	})
-	traceutil.Stub(&strace, func(name string, args ...interface{}) {
-		log.Printf("[session] %s: %+v", name, traceutil.ClearContext(args))
+	trace.Stub(&strace, func(name string, args ...interface{}) {
+		log.Printf("[session] %s: %+v", name, trace.ClearContext(args))
 	})
 
 	db := sql.OpenDB(Connector(

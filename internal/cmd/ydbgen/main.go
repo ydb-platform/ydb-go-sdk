@@ -5,7 +5,6 @@ import (
 	"container/list"
 	"flag"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"go/ast"
 	"go/build"
 	"go/importer"
@@ -22,6 +21,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ydbtypes"
 )

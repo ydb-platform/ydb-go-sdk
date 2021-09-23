@@ -3,28 +3,33 @@
 package tests
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = types.StringValue
+	_ = time.Now
 	_ = table.NewQueryParameters
+	_ = resultset.Result.Scan
+	_ = types.StringValue
 )
+
+func (t *Times) Scan(res resultset.Result) (err error) {
+	_ = res.ScanWithDefaults(&t.Date)
+	return res.Err()
+}
 
 func (t *Times) QueryParameters() *table.QueryParameters {
 	var v0 types.Value
 	{
 		var v1 types.Value
-		var x0 time.Time
+		var x0 =t.Date
 		ok0 := !t.Date.IsZero()
-		if ok0 {
-			x0 = t.Date
-		}
 		if ok0 {
 			v1 = types.OptionalValue(types.DateValueFromTime(x0))
 		} else {
@@ -43,11 +48,8 @@ func (t *Times) StructValue() types.Value {
 		var v1 types.Value
 		{
 			var v2 types.Value
-			var x0 time.Time
+			var x0 =t.Date
 			ok0 := !t.Date.IsZero()
-			if ok0 {
-				x0 = t.Date
-			}
 			if ok0 {
 				v2 = types.OptionalValue(types.DateValueFromTime(x0))
 			} else {
@@ -76,3 +78,4 @@ func (t *Times) StructType() types.Type {
 	}
 	return t0
 }
+

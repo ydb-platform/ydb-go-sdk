@@ -1,13 +1,28 @@
-package tracetest
+package trace
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/traceutil"
 	"reflect"
 	"testing"
 )
 
-func TestSingleTrace(t *testing.T, x interface{}, traceName string) {
+func TestClientTrace(t *testing.T) {
+	testSingleTrace(t, Table{}, "Table")
+}
+
+func TestTablePoolTrace(t *testing.T) {
+	testSingleTrace(t, TablePool{}, "SessionPoolTrace")
+}
+
+func TestTraceDriver(t *testing.T) {
+	testSingleTrace(t, Driver{}, "Driver")
+}
+
+func TestRetry(t *testing.T) {
+	testSingleTrace(t, Retry{}, "Driver")
+}
+
+func testSingleTrace(t *testing.T, x interface{}, traceName string) {
 	a := reflect.New(reflect.TypeOf(x))
 	defer assertCalled(t, traceName, stubEachFunc(a))
 	callEachFunc(a.Elem())
@@ -23,7 +38,7 @@ func assertCalled(t *testing.T, prefix string, called map[string]bool) {
 
 func stubEachFunc(x reflect.Value) map[string]bool {
 	fs := make(map[string]bool)
-	(traceutil.FieldStubber{
+	(FieldStubber{
 		OnStub: func(name string) {
 			fs[name] = false
 		},

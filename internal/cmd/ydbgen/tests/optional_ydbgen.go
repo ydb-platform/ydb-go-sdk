@@ -3,40 +3,37 @@
 package tests
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strconv"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (
 	_ = strconv.Itoa
-	_ = types.StringValue
+	_ = time.Now
 	_ = table.NewQueryParameters
+	_ = resultset.Result.Scan
+	_ = types.StringValue
 )
+
+func (o *Optional) Scan(res resultset.Result) (err error) {
+	_ = res.ScanWithDefaults(&o.Int64, &o.Str, &o.Int32)
+	return res.Err()
+}
 
 func (o *Optional) QueryParameters() *table.QueryParameters {
 	var v0 types.Value
 	{
-		var v1 types.Value
-		x0, ok0 := o.Int64.Get()
-		if ok0 {
-			v1 = types.OptionalValue(types.Int16Value(ydbConvI64ToI16(x0)))
-		} else {
-			v1 = types.NullValue(types.TypeInt16)
-		}
-		v0 = v1
+		vp0 := types.OptionalValue(types.Int16Value(ydbConvI64ToI16(o.Int64)))
+		v0 = vp0
 	}
 	var v1 types.Value
 	{
-		var v2 types.Value
-		x0, ok0 := o.Str.Get()
-		if ok0 {
-			v2 = types.StringValue([]uint8(x0))
-		} else {
-			panic("ydbgen: no value for non-optional types")
-		}
-		v1 = v2
+		vp0 := types.StringValue([]uint8(o.Str))
+		v1 = vp0
 	}
 	var v2 types.Value
 	{
@@ -55,25 +52,13 @@ func (o *Optional) StructValue() types.Value {
 	{
 		var v1 types.Value
 		{
-			var v2 types.Value
-			x0, ok0 := o.Int64.Get()
-			if ok0 {
-				v2 = types.OptionalValue(types.Int16Value(ydbConvI64ToI16(x0)))
-			} else {
-				v2 = types.NullValue(types.TypeInt16)
-			}
-			v1 = v2
+			vp0 := types.OptionalValue(types.Int16Value(ydbConvI64ToI16(o.Int64)))
+			v1 = vp0
 		}
 		var v2 types.Value
 		{
-			var v3 types.Value
-			x0, ok0 := o.Str.Get()
-			if ok0 {
-				v3 = types.StringValue([]uint8(x0))
-			} else {
-				panic("ydbgen: no value for non-optional types")
-			}
-			v2 = v3
+			vp0 := types.StringValue([]uint8(o.Str))
+			v2 = vp0
 		}
 		var v3 types.Value
 		{
@@ -135,3 +120,4 @@ func ydbConvI64ToI16(x int64) int16 {
 	}
 	return int16(x)
 }
+
