@@ -23,17 +23,14 @@ const (
 
 func openDB(ctx context.Context) (cluster.DB, error) {
 	var (
-		dtrace trace.Driver
-		ctrace trace.Table
+		driverTrace trace.Driver
+		tableTrace  trace.Table
 	)
-	trace.Stub(&dtrace, func(name string, args ...interface{}) {
+	trace.Stub(&driverTrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
 	})
-	trace.Stub(&ctrace, func(name string, args ...interface{}) {
+	trace.Stub(&tableTrace, func(name string, args ...interface{}) {
 		log.Printf("[table] %s: %+v", name, trace.ClearContext(args))
-	})
-	traceutil.Stub(&strace, func(name string, args ...interface{}) {
-		log.Printf("[session] %s: %+v", name, traceutil.ClearContext(args))
 	})
 
 	db, err := ydb.New(
@@ -44,7 +41,7 @@ func openDB(ctx context.Context) (cluster.DB, error) {
 			true,
 		),
 		ydb.WithDriverConfig(&config.Config{
-			Trace:                dtrace,
+			Trace:                driverTrace,
 			RequestTimeout:       time.Second * 2,
 			StreamTimeout:        time.Second * 2,
 			OperationTimeout:     time.Second * 2,
