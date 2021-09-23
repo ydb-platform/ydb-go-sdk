@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -45,8 +47,8 @@ type sqlConn struct {
 
 	idle bool
 
-	tx  *table.Transaction
-	txc *table.TransactionControl
+	tx  table2.Transaction
+	txc *table2.TransactionControl
 }
 
 func (c *sqlConn) takeSession(ctx context.Context) bool {
@@ -90,36 +92,36 @@ func (c *sqlConn) PrepareContext(ctx context.Context, query string) (driver.Stmt
 // This caused by ydb logic that prevents start actual transaction with OnlineReadOnly mode and ReadCommitted
 // and ReadUncommitted isolation levels should use tx_control in every query request.
 // It returns error on unsupported options.
-func txIsolationOrControl(opts driver.TxOptions) (isolation table.TxOption, control []table.TxControlOption, err error) {
+func txIsolationOrControl(opts driver.TxOptions) (isolation table2.TxOption, control []table2.TxControlOption, err error) {
 	level := sql.IsolationLevel(opts.Isolation)
 	switch level {
 	case sql.LevelDefault,
 		sql.LevelSerializable,
 		sql.LevelLinearizable:
 
-		isolation = table.WithSerializableReadWrite()
+		isolation = table2.WithSerializableReadWrite()
 		return
 
 	case sql.LevelReadUncommitted:
 		if opts.ReadOnly {
-			control = []table.TxControlOption{
-				table.BeginTx(
-					table.WithOnlineReadOnly(
-						table.WithInconsistentReads(),
+			control = []table2.TxControlOption{
+				table2.BeginTx(
+					table2.WithOnlineReadOnly(
+						table2.WithInconsistentReads(),
 					),
 				),
-				table.CommitTx(),
+				table2.CommitTx(),
 			}
 			return
 		}
 
 	case sql.LevelReadCommitted:
 		if opts.ReadOnly {
-			control = []table.TxControlOption{
-				table.BeginTx(
-					table.WithOnlineReadOnly(),
+			control = []table2.TxControlOption{
+				table2.BeginTx(
+					table2.WithOnlineReadOnly(),
 				),
-				table.CommitTx(),
+				table2.CommitTx(),
 			}
 			return
 		}
@@ -142,13 +144,13 @@ func (c *sqlConn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver
 		return nil, err
 	}
 	if isolation != nil {
-		c.tx, err = c.session.BeginTransaction(ctx, table.TxSettings(isolation))
+		c.tx, err = c.session.BeginTransaction(ctx, table2.TxSettings(isolation))
 		if err != nil {
 			return nil, mapBadSessionError(err)
 		}
-		c.txc = table.TxControl(table.WithTx(c.tx))
+		c.txc = table2.TxControl(table2.WithTx(c.tx))
 	} else {
-		c.txc = table.TxControl(control...)
+		c.txc = table2.TxControl(control...)
 	}
 	return c, nil
 }
@@ -248,14 +250,14 @@ func (c *sqlConn) Begin() (driver.Tx, error) {
 	return nil, ErrDeprecated
 }
 
-func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryParameters) (res resultset.Result, err error) {
+func (c *sqlConn) exec(ctx context.Context, req processor, params *table2.QueryParameters) (res resultset.Result, err error) {
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
 	err, _ = c.pool().Retry(
 		ctx,
 		retry.ContextRetryNoIdempotent(ctx),
-		func(ctx context.Context, session *table.Session) (err error) {
+		func(ctx context.Context, session table2.Session) (err error) {
 			res, err = req.process(ctx, c, params)
 			return err
 		},
@@ -263,7 +265,7 @@ func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryPa
 	return res, err
 }
 
-func (c *sqlConn) txControl() *table.TransactionControl {
+func (c *sqlConn) txControl() *table2.TransactionControl {
 	if c.txc == nil {
 		return c.connector.defaultTxControl
 	}
@@ -283,14 +285,14 @@ func (c *sqlConn) pool() *table.SessionPool {
 }
 
 type processor interface {
-	process(context.Context, *sqlConn, *table.QueryParameters) (resultset.Result, error)
+	process(context.Context, *sqlConn, *table2.QueryParameters) (resultset.Result, error)
 }
 
 type reqStmt struct {
-	stmt *table.Statement
+	stmt table2.Statement
 }
 
-func (o *reqStmt) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (resultset.Result, error) {
+func (o *reqStmt) process(ctx context.Context, c *sqlConn, params *table2.QueryParameters) (resultset.Result, error) {
 	_, res, err := o.stmt.Execute(ctx, c.txControl(), params, c.dataOpts()...)
 	return res, err
 }
@@ -299,7 +301,7 @@ type reqQuery struct {
 	text string
 }
 
-func (o *reqQuery) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (resultset.Result, error) {
+func (o *reqQuery) process(ctx context.Context, c *sqlConn, params *table2.QueryParameters) (resultset.Result, error) {
 	_, res, err := c.session.Execute(ctx, c.txControl(), o.text, params, c.dataOpts()...)
 	return res, err
 }
@@ -308,7 +310,7 @@ type reqScanQuery struct {
 	text string
 }
 
-func (o *reqScanQuery) process(ctx context.Context, c *sqlConn, params *table.QueryParameters) (resultset.Result, error) {
+func (o *reqScanQuery) process(ctx context.Context, c *sqlConn, params *table2.QueryParameters) (resultset.Result, error) {
 	return c.session.StreamExecuteScanQuery(ctx, o.text, params, c.scanOpts()...)
 }
 
@@ -393,7 +395,7 @@ func nameIsolationLevel(x sql.IsolationLevel) string {
 
 type stmt struct {
 	conn *sqlConn
-	stmt *table.Statement
+	stmt table2.Statement
 }
 
 func (s *stmt) NumInput() int {
@@ -507,18 +509,18 @@ func checkNamedValue(v *driver.NamedValue) (err error) {
 	return nil
 }
 
-func params(args []driver.NamedValue) *table.QueryParameters {
+func params(args []driver.NamedValue) *table2.QueryParameters {
 	if len(args) == 0 {
 		return nil
 	}
-	opts := make([]table.ParameterOption, len(args))
+	opts := make([]table2.ParameterOption, len(args))
 	for i, arg := range args {
-		opts[i] = table.ValueParam(
+		opts[i] = table2.ValueParam(
 			arg.Name,
 			arg.Value.(types.Value),
 		)
 	}
-	return table.NewQueryParameters(opts...)
+	return table2.NewQueryParameters(opts...)
 }
 
 type rows struct {

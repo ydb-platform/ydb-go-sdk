@@ -9,7 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -108,7 +108,7 @@ func (s *lazyScheme) CleanupDatabase(ctx context.Context, prefix string, names .
 				}
 
 			case scheme.EntryTable:
-				err, _ = s.db.Table().Retry(ctx, false, func(ctx context.Context, session *table.Session) (err error) {
+				err, _ = s.db.Table().Retry(ctx, false, func(ctx context.Context, session table.Session) (err error) {
 					return session.DropTable(ctx, pt)
 				})
 				if err != nil {

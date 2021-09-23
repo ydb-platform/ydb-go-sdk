@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
+
 	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
@@ -159,8 +161,8 @@ func TestIsolationMapping(t *testing.T) {
 func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
 		dtrace trace.Driver
-		ctrace table.Trace
-		strace table.SessionPoolTrace
+		ctrace sessiontrace.Trace
+		strace sessiontrace.SessionPoolTrace
 	)
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, traceutil.ClearContext(args))

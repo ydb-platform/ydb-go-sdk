@@ -1,11 +1,12 @@
 package table
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"google.golang.org/protobuf/proto"
 
@@ -39,11 +40,11 @@ type Session struct {
 	onClose      []func()
 }
 
-func CreateSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session, err error) {
+func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session, err error) {
 	createSessionDone := traceOnCreateSession(trace, ctx)
 	start := time.Now()
 	defer func() {
-		createSessionDone(ctx, s.id, s.Address(), time.Since(start), err)
+		createSessionDone(ctx, s.ID(), s.Address(), time.Since(start), err)
 	}()
 	var (
 		response *Ydb_Table.CreateSessionResponse
@@ -78,7 +79,7 @@ func CreateSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session,
 	return
 }
 
-func (s *Session) GetID() string {
+func (s *Session) ID() string {
 	return s.id
 }
 
@@ -320,14 +321,8 @@ func (s *Session) CopyTable(ctx context.Context, dst, src string, opts ...option
 	return err
 }
 
-// DataQueryExplanation is a result of ExplainDataQuery call.
-type DataQueryExplanation struct {
-	AST  string
-	Plan string
-}
-
 // Explain explains data query represented by text.
-func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExplanation, err error) {
+func (s *Session) Explain(ctx context.Context, query string) (exp table.DataQueryExplanation, err error) {
 	var (
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
@@ -346,7 +341,7 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 	if err != nil {
 		return
 	}
-	return DataQueryExplanation{
+	return table.DataQueryExplanation{
 		AST:  result.QueryAst,
 		Plan: result.QueryPlan,
 	}, nil
@@ -356,32 +351,32 @@ func (s *Session) Explain(ctx context.Context, query string) (exp DataQueryExpla
 // concurrent use by multiple goroutines.
 type Statement struct {
 	session *Session
-	query   *DataQuery
+	query   *dataQuery
 	params  map[string]*Ydb.Type
 }
 
 // Execute executes prepared data query.
 func (s *Statement) Execute(
-	ctx context.Context, tx *TransactionControl,
-	params *QueryParameters,
+	ctx context.Context, tx *table.TransactionControl,
+	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr *Transaction, r resultset.Result, err error,
+	txr table.Transaction, r resultset.Result, err error,
 ) {
-	executeDataQueryDone := traceOnExecuteDataQuery(s.session.trace, ctx, s.session.id, tx.id(), s.query, params)
+	executeDataQueryDone := traceOnExecuteDataQuery(s.session.trace, ctx, s.session.id, transactionControlID(tx.Desc()), s.query, params)
 	defer func() {
-		executeDataQueryDone(ctx, s.session.id, GetTransactionID(txr), s.query, params, true, r, err)
+		executeDataQueryDone(ctx, s.session.id, getTransactionID(txr), s.query, params, true, r, err)
 	}()
 	return s.execute(ctx, tx, params, opts...)
 }
 
 // execute executes prepared query without any tracing.
 func (s *Statement) execute(
-	ctx context.Context, tx *TransactionControl,
-	params *QueryParameters,
+	ctx context.Context, tx *table.TransactionControl,
+	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr *Transaction, r resultset.Result, err error,
+	txr table.Transaction, r resultset.Result, err error,
 ) {
 	_, res, err := s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
 	if err != nil {
@@ -399,10 +394,10 @@ func (s *Statement) Text() string {
 }
 
 // Prepare prepares data query within session s.
-func (s *Session) Prepare(ctx context.Context, query string) (stmt *Statement, err error) {
+func (s *Session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
 	var (
 		cached   bool
-		q        *DataQuery
+		q        *dataQuery
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 	)
@@ -426,7 +421,7 @@ func (s *Session) Prepare(ctx context.Context, query string) (stmt *Statement, e
 		return
 	}
 
-	q = new(DataQuery)
+	q = new(dataQuery)
 	q.initPrepared(result.QueryId)
 	stmt = &Statement{
 		session: s,
@@ -440,19 +435,19 @@ func (s *Session) Prepare(ctx context.Context, query string) (stmt *Statement, e
 // Execute executes given data query represented by text.
 func (s *Session) Execute(
 	ctx context.Context,
-	tx *TransactionControl,
+	tx *table.TransactionControl,
 	query string,
-	params *QueryParameters,
+	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr *Transaction, r resultset.Result, err error,
+	txr table.Transaction, r resultset.Result, err error,
 ) {
-	q := new(DataQuery)
+	q := new(dataQuery)
 	q.initFromText(query)
 
-	executeDataQueryDone := traceOnExecuteDataQuery(s.trace, ctx, s.id, tx.id(), q, params)
+	executeDataQueryDone := traceOnExecuteDataQuery(s.trace, ctx, s.id, transactionControlID(tx.Desc()), q, params)
 	defer func() {
-		executeDataQueryDone(ctx, s.id, GetTransactionID(txr), q, params, true, r, err)
+		executeDataQueryDone(ctx, s.id, getTransactionID(txr), q, params, true, r, err)
 	}()
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
@@ -463,9 +458,9 @@ func (s *Session) Execute(
 		queryID := result.QueryMeta.Id
 		// Supplement q with ID for tracing.
 		q.initPreparedText(query, queryID)
-		// Create new DataQuery instead of q above to not store the whole query
+		// Create new dataQuery instead of q above to not store the whole query
 		// string within statement.
-		subq := new(DataQuery)
+		subq := new(dataQuery)
 		subq.initPrepared(queryID)
 	}
 
@@ -479,7 +474,7 @@ func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
 
 // executeQueryResult returns Transaction and Result built from received
 // result.
-func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (*Transaction, resultset.Result, error) {
+func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.Transaction, resultset.Result, error) {
 	t := &Transaction{
 		id: res.GetTxMeta().GetId(),
 		s:  s,
@@ -493,8 +488,8 @@ func (s *Session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (*Transa
 
 // executeDataQuery executes data query.
 func (s *Session) executeDataQuery(
-	ctx context.Context, tx *TransactionControl,
-	query *DataQuery, params *QueryParameters,
+	ctx context.Context, tx *table.TransactionControl,
+	query *dataQuery, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	request *Ydb_Table.ExecuteDataQueryRequest,
@@ -507,8 +502,8 @@ func (s *Session) executeDataQuery(
 	result = &Ydb_Table.ExecuteQueryResult{}
 	request = &Ydb_Table.ExecuteDataQueryRequest{
 		SessionId:  s.id,
-		TxControl:  &tx.desc,
-		Parameters: params.params(),
+		TxControl:  tx.Desc(),
+		Parameters: params.Params(),
 		Query:      &query.query,
 	}
 	for _, opt := range opts {
@@ -707,13 +702,13 @@ func (s *Session) StreamReadTable(ctx context.Context, path string, opts ...opti
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamExecuteScanQuery() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextSet() calls.
-func (s *Session) StreamExecuteScanQuery(ctx context.Context, query string, params *QueryParameters, opts ...options.ExecuteScanQueryOption) (_ resultset.Result, err error) {
-	q := new(DataQuery)
+func (s *Session) StreamExecuteScanQuery(ctx context.Context, query string, params *table.QueryParameters, opts ...options.ExecuteScanQueryOption) (_ resultset.Result, err error) {
+	q := new(dataQuery)
 	q.initFromText(query)
 	var (
 		request = Ydb_Table.ExecuteScanQueryRequest{
 			Query:      &q.query,
-			Parameters: params.params(),
+			Parameters: params.Params(),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		response Ydb_Table.ExecuteScanQueryPartialResponse
@@ -781,10 +776,10 @@ func (s *Session) BulkUpsert(ctx context.Context, table string, rows types.Value
 
 // BeginTransaction begins new transaction within given session with given
 // settings.
-func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings) (x *Transaction, err error) {
+func (s *Session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
 	beginTransactionDone := traceOnBeginTransaction(s.trace, ctx, s.id)
 	defer func() {
-		beginTransactionDone(ctx, s.id, GetTransactionID(x), err)
+		beginTransactionDone(ctx, s.id, getTransactionID(x), err)
 	}()
 	var (
 		result   Ydb_Table.BeginTransactionResult
@@ -795,7 +790,7 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 	}
 	response, err = s.tableService.BeginTransaction(ctx, &Ydb_Table.BeginTransactionRequest{
 		SessionId:  s.id,
-		TxSettings: &tx.settings,
+		TxSettings: tx.Settings(),
 	})
 	if err != nil {
 		return nil, err
@@ -816,13 +811,17 @@ func (s *Session) BeginTransaction(ctx context.Context, tx *TransactionSettings)
 type Transaction struct {
 	id string
 	s  *Session
-	c  *TransactionControl
+	c  *table.TransactionControl
+}
+
+func (tx *Transaction) ID() string {
+	return tx.id
 }
 
 // Execute executes query represented by text within transaction tx.
 func (tx *Transaction) Execute(
 	ctx context.Context,
-	query string, params *QueryParameters,
+	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r resultset.Result, err error) {
 	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
@@ -832,7 +831,7 @@ func (tx *Transaction) Execute(
 // ExecuteStatement executes prepared statement stmt within transaction tx.
 func (tx *Transaction) ExecuteStatement(
 	ctx context.Context,
-	stmt *Statement, params *QueryParameters,
+	stmt table.Statement, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r resultset.Result, err error) {
 	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
@@ -886,20 +885,27 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	return err
 }
 
-func (tx *Transaction) txc() *TransactionControl {
+func (tx *Transaction) txc() *table.TransactionControl {
 	if tx.c == nil {
-		tx.c = TxControl(WithTx(tx))
+		tx.c = table.TxControl(table.WithTx(tx))
 	}
 	return tx.c
 }
 
-type DataQuery struct {
+func getTransactionID(txr table.Transaction) string {
+	if txr != nil {
+		return txr.ID()
+	}
+	return ""
+}
+
+type dataQuery struct {
 	query    Ydb_Table.Query
 	queryID  Ydb_Table.Query_Id
 	queryYQL Ydb_Table.Query_YqlText
 }
 
-func (q *DataQuery) String() string {
+func (q *dataQuery) String() string {
 	var emptyID Ydb_Table.Query_Id
 	if q.queryID == emptyID {
 		return q.queryYQL.YqlText
@@ -907,27 +913,27 @@ func (q *DataQuery) String() string {
 	return q.queryID.Id
 }
 
-func (q *DataQuery) ID() string {
+func (q *dataQuery) ID() string {
 	return q.queryID.Id
 }
 
-func (q *DataQuery) YQL() string {
+func (q *dataQuery) YQL() string {
 	return q.queryYQL.YqlText
 }
 
-func (q *DataQuery) initFromText(s string) {
+func (q *dataQuery) initFromText(s string) {
 	q.queryID = Ydb_Table.Query_Id{} // Reset id field.
 	q.queryYQL.YqlText = s
 	q.query.Query = &q.queryYQL
 }
 
-func (q *DataQuery) initPrepared(id string) {
+func (q *dataQuery) initPrepared(id string) {
 	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
 	q.queryID.Id = id
 	q.query.Query = &q.queryID
 }
 
-func (q *DataQuery) initPreparedText(s, id string) {
+func (q *dataQuery) initPreparedText(s, id string) {
 	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
 	q.queryYQL.YqlText = s
 
@@ -937,179 +943,9 @@ func (q *DataQuery) initPreparedText(s, id string) {
 	q.query.Query = &q.queryID // Prefer preared query.
 }
 
-type QueryParameters struct {
-	m queryParams
-}
-
-func (q *QueryParameters) params() queryParams {
-	if q == nil {
-		return nil
-	}
-	return q.m
-}
-
-func (q *QueryParameters) Each(it func(name string, value types.Value)) {
-	if q == nil {
-		return
-	}
-	for key, value := range q.m {
-		it(key, internal.ValueFromYDB(
-			value.Type,
-			value.Value,
-		))
-	}
-}
-
-func (q *QueryParameters) String() string {
-	var buf bytes.Buffer
-	buf.WriteByte('(')
-	q.Each(func(name string, value types.Value) {
-		buf.WriteString("((")
-		buf.WriteString(name)
-		buf.WriteByte(')')
-		buf.WriteByte('(')
-		internal.WriteValueStringTo(&buf, value)
-		buf.WriteString("))")
-	})
-	buf.WriteByte(')')
-	return buf.String()
-}
-
-type queryParams map[string]*Ydb.TypedValue
-
-type ParameterOption func(queryParams)
-
-func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
-	q := &QueryParameters{
-		m: make(queryParams, len(opts)),
-	}
-	q.Add(opts...)
-	return q
-}
-
-func (q *QueryParameters) Add(opts ...ParameterOption) {
-	for _, opt := range opts {
-		opt(q.m)
-	}
-}
-
-func ValueParam(name string, v types.Value) ParameterOption {
-	return func(q queryParams) {
-		q[name] = internal.ValueToYDB(v)
-	}
-}
-
-func GetTransactionID(txr *Transaction) string {
-	if txr != nil {
-		return txr.id
-	}
-	return ""
-}
-
-// Transaction control options
-type (
-	txDesc   Ydb_Table.TransactionSettings
-	TxOption func(*txDesc)
-)
-
-type TransactionSettings struct {
-	settings Ydb_Table.TransactionSettings
-}
-
-func TxSettings(opts ...TxOption) *TransactionSettings {
-	s := new(TransactionSettings)
-	for _, opt := range opts {
-		opt((*txDesc)(&s.settings))
-	}
-	return s
-}
-
-func BeginTx(opts ...TxOption) TxControlOption {
-	return func(d *txControlDesc) {
-		s := TxSettings(opts...)
-		d.TxSelector = &Ydb_Table.TransactionControl_BeginTx{
-			BeginTx: &s.settings,
-		}
-	}
-}
-
-func WithTx(t *Transaction) TxControlOption {
-	return func(d *txControlDesc) {
-		d.TxSelector = &Ydb_Table.TransactionControl_TxId{
-			TxId: t.id,
-		}
-	}
-}
-
-func CommitTx() TxControlOption {
-	return func(d *txControlDesc) {
-		d.CommitTx = true
-	}
-}
-
-var (
-	serializableReadWrite = &Ydb_Table.TransactionSettings_SerializableReadWrite{
-		SerializableReadWrite: &Ydb_Table.SerializableModeSettings{},
-	}
-	staleReadOnly = &Ydb_Table.TransactionSettings_StaleReadOnly{
-		StaleReadOnly: &Ydb_Table.StaleModeSettings{},
-	}
-)
-
-func WithSerializableReadWrite() TxOption {
-	return func(d *txDesc) {
-		d.TxMode = serializableReadWrite
-	}
-}
-
-func WithStaleReadOnly() TxOption {
-	return func(d *txDesc) {
-		d.TxMode = staleReadOnly
-	}
-}
-
-func WithOnlineReadOnly(opts ...TxOnlineReadOnlyOption) TxOption {
-	return func(d *txDesc) {
-		var ro txOnlineReadOnly
-		for _, opt := range opts {
-			opt(&ro)
-		}
-		d.TxMode = &Ydb_Table.TransactionSettings_OnlineReadOnly{
-			OnlineReadOnly: (*Ydb_Table.OnlineModeSettings)(&ro),
-		}
-	}
-}
-
-type txOnlineReadOnly Ydb_Table.OnlineModeSettings
-
-type TxOnlineReadOnlyOption func(*txOnlineReadOnly)
-
-func WithInconsistentReads() TxOnlineReadOnlyOption {
-	return func(d *txOnlineReadOnly) {
-		d.AllowInconsistentReads = true
-	}
-}
-
-type (
-	txControlDesc   Ydb_Table.TransactionControl
-	TxControlOption func(*txControlDesc)
-)
-
-type TransactionControl struct {
-	desc Ydb_Table.TransactionControl
-}
-
-func (t *TransactionControl) id() string {
-	if tx, ok := t.desc.TxSelector.(*Ydb_Table.TransactionControl_TxId); ok {
+func transactionControlID(desc *Ydb_Table.TransactionControl) string {
+	if tx, ok := desc.TxSelector.(*Ydb_Table.TransactionControl_TxId); ok {
 		return tx.TxId
 	}
 	return ""
-}
-
-func TxControl(opts ...TxControlOption) *TransactionControl {
-	c := new(TransactionControl)
-	for _, opt := range opts {
-		opt((*txControlDesc)(&c.desc))
-	}
-	return c
 }

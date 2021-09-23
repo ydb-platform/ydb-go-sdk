@@ -3,7 +3,7 @@ package ydbsql
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	table2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 )
 
 type ctxScanQueryKey struct{}
@@ -21,14 +21,14 @@ func ContextScanQueryMode(ctx context.Context) bool {
 type ctxConfigKey struct{}
 
 // WithTableConfig returns a copy of parent context with table config.
-func WithTableConfig(ctx context.Context, config table.Config) context.Context {
+func WithTableConfig(ctx context.Context, config table2.Config) context.Context {
 	return context.WithValue(ctx, ctxConfigKey{}, &config)
 }
 
 // ContextTableConfig returns table config from context.
-func ContextTableConfig(ctx context.Context) table.Config {
-	if cfg, ok := ctx.Value(ctxConfigKey{}).(*table.Config); ok {
+func ContextTableConfig(ctx context.Context) table2.Config {
+	if cfg, ok := ctx.Value(ctxConfigKey{}).(*table2.Config); ok {
 		return *cfg
 	}
-	return table.DefaultConfig()
+	return table2.DefaultConfig()
 }

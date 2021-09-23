@@ -8,13 +8,9 @@ import (
 	"path"
 	"text/template"
 
-	table2 "github.com/ydb-platform/ydb-go-sdk/v3/table"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -74,12 +70,12 @@ SELECT
 FROM AS_TABLE($episodesData);
 `))
 
-func readTable(ctx context.Context, c table2.Client, path string) error {
+func readTable(ctx context.Context, c table.Client, path string) error {
 	var res resultset.Result
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			res, err = s.StreamReadTable(ctx, path,
 				options.ReadOrdered(),
 				options.ReadColumn("series_id"),
@@ -140,12 +136,12 @@ func readTable(ctx context.Context, c table2.Client, path string) error {
 	return nil
 }
 
-func describeTableOptions(ctx context.Context, c table2.Client) error {
+func describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
 			return
 		},
@@ -185,7 +181,7 @@ func describeTableOptions(ctx context.Context, c table2.Client) error {
 	return nil
 }
 
-func selectSimple(ctx context.Context, c table2.Client, prefix string) error {
+func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -214,7 +210,7 @@ func selectSimple(ctx context.Context, c table2.Client, prefix string) error {
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$seriesID", types.Uint64Value(1)),
@@ -260,7 +256,7 @@ func selectSimple(ctx context.Context, c table2.Client, prefix string) error {
 	return nil
 }
 
-func scanQuerySelect(ctx context.Context, c table2.Client, prefix string) error {
+func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -280,7 +276,7 @@ func scanQuerySelect(ctx context.Context, c table2.Client, prefix string) error 
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			res, err = s.StreamExecuteScanQuery(ctx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$series",
@@ -324,7 +320,7 @@ func scanQuerySelect(ctx context.Context, c table2.Client, prefix string) error 
 	return nil
 }
 
-func fillTablesWithData(ctx context.Context, c table2.Client, prefix string) error {
+func fillTablesWithData(ctx context.Context, c table.Client, prefix string) error {
 	// Prepare write transaction.
 	writeTx := table.TxControl(
 		table.BeginTx(
@@ -335,7 +331,7 @@ func fillTablesWithData(ctx context.Context, c table2.Client, prefix string) err
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			stmt, err := s.Prepare(ctx, render(fill, templateConfig{
 				TablePathPrefix: prefix,
 			}))
@@ -360,11 +356,11 @@ func fillTablesWithData(ctx context.Context, c table2.Client, prefix string) err
 	return err
 }
 
-func createTables(ctx context.Context, c table2.Client, prefix string) error {
+func createTables(ctx context.Context, c table.Client, prefix string) error {
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeUTF8)),
@@ -387,7 +383,7 @@ func createTables(ctx context.Context, c table2.Client, prefix string) error {
 	err, issues = c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "seasons"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
@@ -410,7 +406,7 @@ func createTables(ctx context.Context, c table2.Client, prefix string) error {
 	err, issues = c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "episodes"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
@@ -431,11 +427,11 @@ func createTables(ctx context.Context, c table2.Client, prefix string) error {
 	return err
 }
 
-func describeTable(ctx context.Context, c table2.Client, path string) (err error) {
+func describeTable(ctx context.Context, c table.Client, path string) (err error) {
 	err, issues := c.Retry(
 		ctx,
 		false,
-		func(ctx context.Context, s *table.Session) (err error) {
+		func(ctx context.Context, s table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
 			if err != nil {
 				return
