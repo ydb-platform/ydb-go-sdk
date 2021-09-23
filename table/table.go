@@ -32,6 +32,8 @@ type Session interface {
 	BulkUpsert(ctx context.Context, table string, rows types.Value) (err error)
 	BeginTransaction(ctx context.Context, tx *TransactionSettings) (x Transaction, err error)
 	Close(ctx context.Context) (err error)
+	OnClose(f func())
+	KeepAlive(ctx context.Context) (options.SessionInfo, error)
 }
 
 type TransactionSettings struct {

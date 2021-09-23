@@ -16,17 +16,17 @@ import (
 // SessionProvider is the interface that holds session lifecycle logic.
 type SessionProvider interface {
 	// Get returns alive idle session or creates new one.
-	Get(context.Context) (*Session, error)
+	Get(context.Context) (table.Session, error)
 
 	// Put takes no longer needed session for reuse or deletion depending
 	// on implementation.
 	// Put must be fast, if necessary must be async
-	Put(context.Context, *Session) (err error)
+	Put(context.Context, table.Session) (err error)
 
 	// CloseSession provides the most effective way of session closing
 	// instead of plain session.Close.
 	// CloseSession must be fast. If necessary, can be async.
-	CloseSession(ctx context.Context, s *Session) error
+	CloseSession(ctx context.Context, s table.Session) error
 
 	// Retry provide the best effort fo retrying operation
 	// Retry implements internal busy loop until one of the following conditions is met:
@@ -40,8 +40,8 @@ type SessionProvider interface {
 }
 
 type SessionProviderFunc struct {
-	OnGet   func(context.Context) (*Session, error)
-	OnPut   func(context.Context, *Session) error
+	OnGet   func(context.Context) (table.Session, error)
+	OnPut   func(context.Context, table.Session) error
 	OnRetry func(context.Context, table.RetryOperation) (error, []error)
 	OnClose func(context.Context) error
 }
@@ -53,14 +53,14 @@ func (f SessionProviderFunc) Close(ctx context.Context) error {
 	return f.OnClose(ctx)
 }
 
-func (f SessionProviderFunc) Get(ctx context.Context) (*Session, error) {
+func (f SessionProviderFunc) Get(ctx context.Context) (table.Session, error) {
 	if f.OnGet == nil {
 		return nil, errNoSession
 	}
 	return f.OnGet(ctx)
 }
 
-func (f SessionProviderFunc) Put(ctx context.Context, s *Session) error {
+func (f SessionProviderFunc) Put(ctx context.Context, s table.Session) error {
 	if f.OnPut == nil {
 		return testutil.ErrNotImplemented
 	}
@@ -74,13 +74,13 @@ func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op table.RetryOp
 	return f.OnRetry(ctx, op)
 }
 
-func (f SessionProviderFunc) CloseSession(ctx context.Context, s *Session) error {
+func (f SessionProviderFunc) CloseSession(ctx context.Context, s table.Session) error {
 	return s.Close(ctx)
 }
 
 // SingleSession returns SessionProvider that uses only given session during
 // retries.
-func SingleSession(s *Session, b retry.Backoff) SessionProvider {
+func SingleSession(s table.Session, b retry.Backoff) SessionProvider {
 	return &singleSession{s: s, b: b}
 }
 
@@ -91,7 +91,7 @@ var (
 )
 
 type singleSession struct {
-	s     *Session
+	s     table.Session
 	b     retry.Backoff
 	empty bool
 }
@@ -104,7 +104,7 @@ func (s *singleSession) Retry(ctx context.Context, _ bool, op table.RetryOperati
 	return retryBackoff(ctx, s, s.b, s.b, false, op)
 }
 
-func (s *singleSession) Get(context.Context) (*Session, error) {
+func (s *singleSession) Get(context.Context) (table.Session, error) {
 	if s.empty {
 		return nil, errNoSession
 	}
@@ -112,7 +112,7 @@ func (s *singleSession) Get(context.Context) (*Session, error) {
 	return s.s, nil
 }
 
-func (s *singleSession) Put(_ context.Context, x *Session) error {
+func (s *singleSession) Put(_ context.Context, x table.Session) error {
 	if x != s.s {
 		return errUnexpectedSession
 	}
@@ -123,7 +123,7 @@ func (s *singleSession) Put(_ context.Context, x *Session) error {
 	return nil
 }
 
-func (s *singleSession) CloseSession(ctx context.Context, x *Session) error {
+func (s *singleSession) CloseSession(ctx context.Context, x table.Session) error {
 	if x != s.s {
 		return errUnexpectedSession
 	}
@@ -143,7 +143,7 @@ func retryBackoff(
 	op table.RetryOperation,
 ) (err error, issues []error) {
 	var (
-		s *Session
+		s table.Session
 		i int
 
 		code   = int32(0)

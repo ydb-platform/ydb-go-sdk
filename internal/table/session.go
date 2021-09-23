@@ -40,7 +40,7 @@ type Session struct {
 	onClose      []func()
 }
 
-func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s *Session, err error) {
+func newSession(ctx context.Context, cl cluster.DB, trace Trace) (s table.Session, err error) {
 	createSessionDone := traceOnCreateSession(trace, ctx)
 	start := time.Now()
 	defer func() {

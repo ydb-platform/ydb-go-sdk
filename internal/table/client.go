@@ -31,7 +31,7 @@ type SessionPoolBuilder struct {
 	*client
 }
 
-func (c *SessionPoolBuilder) CreateSession(ctx context.Context) (s *Session, err error) {
+func (c *SessionPoolBuilder) CreateSession(ctx context.Context) (s table.Session, err error) {
 	return newSession(ctx, c.cluster, c.trace)
 }
 

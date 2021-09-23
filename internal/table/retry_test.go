@@ -3,6 +3,8 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"io"
 	"math/rand"
 	"testing"
@@ -21,10 +23,10 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
 		errors.NewTransportError(
-			errors.TransportErrorResourceExhausted,
+			errors.WithTEReason(errors.WithTEReason(errors.TransportErrorResourceExhausted)),
 		),
 		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
-			errors.TransportErrorResourceExhausted,
+			errors.WithTEReason(errors.WithTEReason(errors.TransportErrorResourceExhausted)),
 		)),
 		errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded)),
 		fmt.Errorf("wrap op error: %w", errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded))),
@@ -62,13 +64,17 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	}
 }
 
+func wrapNewSession(t *testing.T, ctx context.Context, cl cluster.DB, trace Trace) table.Session {
+	s, err := newSession(ctx, cl, "1")
+}
+
 func TestRetryerImmediateRetry(t *testing.T) {
-	for testErr, session := range map[error]*Session{
+	for testErr, session := range map[error]table.Session{
 		errors.NewTransportError(
-			errors.TransportErrorResourceExhausted,
+			errors.WithTEReason(errors.TransportErrorResourceExhausted),
 		): newSession(nil, "1"),
 		errors.NewTransportError(
-			errors.TransportErrorAborted,
+			errors.WithTEReason(errors.TransportErrorAborted),
 		): newSession(nil, "2"),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusUnavailable),
@@ -214,10 +220,10 @@ func TestRetryerImmediateReturn(t *testing.T) {
 			errors.WithOEReason(errors.StatusGenericError),
 		)),
 		errors.NewTransportError(
-			errors.TransportErrorPermissionDenied,
+			errors.WithTEReason(errors.TransportErrorPermissionDenied),
 		),
 		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
-			errors.TransportErrorPermissionDenied,
+			errors.WithTEReason(errors.TransportErrorPermissionDenied),
 		)),
 		errors.New("whoa"),
 	} {
@@ -274,55 +280,55 @@ func TestRetryContextDeadline(t *testing.T) {
 		context.DeadlineExceeded,
 		fmt.Errorf("test error"),
 		errors.NewTransportError(
-			errors.TransportErrorUnknownCode,
+			errors.WithTEReason(errors.TransportErrorUnknownCode),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorCanceled,
+			errors.WithTEReason(errors.TransportErrorCanceled),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorUnknown,
+			errors.WithTEReason(errors.TransportErrorUnknown),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorInvalidArgument,
+			errors.WithTEReason(errors.TransportErrorInvalidArgument),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorDeadlineExceeded,
+			errors.WithTEReason(errors.TransportErrorDeadlineExceeded),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorNotFound,
+			errors.WithTEReason(errors.TransportErrorNotFound),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorAlreadyExists,
+			errors.WithTEReason(errors.TransportErrorAlreadyExists),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorPermissionDenied,
+			errors.WithTEReason(errors.TransportErrorPermissionDenied),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorResourceExhausted,
+			errors.WithTEReason(errors.TransportErrorResourceExhausted),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorFailedPrecondition,
+			errors.WithTEReason(errors.TransportErrorFailedPrecondition),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorAborted,
+			errors.WithTEReason(errors.TransportErrorAborted),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorOutOfRange,
+			errors.WithTEReason(errors.TransportErrorOutOfRange),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorUnimplemented,
+			errors.WithTEReason(errors.TransportErrorUnimplemented),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorInternal,
+			errors.WithTEReason(errors.TransportErrorInternal),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorUnavailable,
+			errors.WithTEReason(errors.TransportErrorUnavailable),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorDataLoss,
+			errors.WithTEReason(errors.TransportErrorDataLoss),
 		),
 		errors.NewTransportError(
-			errors.TransportErrorUnauthenticated,
+			errors.WithTEReason(errors.TransportErrorUnauthenticated),
 		),
 		errors.NewOpError(errors.WithOEReason(errors.StatusUnknownStatus)),
 		errors.NewOpError(errors.WithOEReason(errors.StatusBadRequest)),

@@ -47,7 +47,7 @@ var (
 // SessionBuilder is the interface that holds logic of creating or deleting
 // sessions.
 type SessionBuilder interface {
-	CreateSession(context.Context) (*Session, error)
+	CreateSession(context.Context) (table.Session, error)
 }
 
 // SessionPool is a set of Session instances that may be reused.
@@ -109,11 +109,11 @@ type SessionPool struct {
 
 	mu               sync.Mutex
 	initOnce         sync.Once
-	index            map[*Session]sessionInfo
+	index            map[table.Session]sessionInfo
 	createInProgress int        // KIKIMR-9163: in-create-process counter
 	limit            int        // Upper bound for pool size.
-	idle             *list.List // list<*Session>
-	waitq            *list.List // list<*chan *Session>
+	idle             *list.List // list<table.Session>
+	waitq            *list.List // list<*chan table.Session>
 
 	keeperWake chan struct{} // Set by keeper.
 	keeperStop chan struct{}
@@ -136,7 +136,7 @@ func (p *SessionPool) isClosed() bool {
 
 func (p *SessionPool) init() {
 	p.initOnce.Do(func() {
-		p.index = make(map[*Session]sessionInfo)
+		p.index = make(map[table.Session]sessionInfo)
 
 		p.idle = list.New()
 		p.waitq = list.New()
@@ -191,12 +191,12 @@ func isCreateSessionErrorRetriable(err error) bool {
 }
 
 type createSessionResult struct {
-	s   *Session
+	s   table.Session
 	err error
 }
 
 // p.mu must NOT be held.
-func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
+func (p *SessionPool) createSession(ctx context.Context) (table.Session, error) {
 	// pre-check the pool size
 	p.mu.Lock()
 	enoughSpace := p.createInProgress+len(p.index) < p.limit
@@ -283,7 +283,7 @@ func (p *SessionPool) createSession(ctx context.Context) (*Session, error) {
 // Get returns first idle session from the SessionPool and removes it from
 // there. If no items stored in SessionPool it creates new one by calling
 // Builder.CreateSession() method and returns it.
-func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
+func (p *SessionPool) Get(ctx context.Context) (s table.Session, err error) {
 	p.init()
 
 	var (
@@ -292,13 +292,13 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 	)
 	getDone := sessionPoolTraceOnGet(p.Trace, ctx)
 	defer func() {
-		getDone(ctx, s.id, time.Since(start), i, err)
+		getDone(ctx, s.ID(), time.Since(start), i, err)
 	}()
 
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
 		var (
-			ch *chan *Session
+			ch *chan table.Session
 			el *list.Element // Element in the wait queue.
 		)
 
@@ -357,7 +357,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 				// for the next waiter – session could be lost for a long time.
 				p.putWaitCh(ch)
 			}
-			waitDone(ctx, s.id, err)
+			waitDone(ctx, s.ID(), err)
 
 		case <-ctx.Done():
 			p.mu.Lock()
@@ -367,7 +367,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 			p.waitq.Remove(el)
 			p.mu.Unlock()
 			err = ctx.Err()
-			waitDone(ctx, s.id, err)
+			waitDone(ctx, s.ID(), err)
 			return nil, err
 		}
 	}
@@ -387,12 +387,12 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 // Note that Put() must be called only once after being created or received by
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
-func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
+func (p *SessionPool) Put(ctx context.Context, s table.Session) (err error) {
 	p.init()
 
-	putDone := sessionPoolTraceOnPut(p.Trace, ctx, s.id)
+	putDone := sessionPoolTraceOnPut(p.Trace, ctx, s.ID())
 	defer func() {
-		putDone(ctx, s.id, err)
+		putDone(ctx, s.ID(), err)
 	}()
 
 	p.mu.Lock()
@@ -430,10 +430,10 @@ func (p *SessionPool) Put(ctx context.Context, s *Session) (err error) {
 // Close().
 //
 // It is assumed that Take() callers never call Get() method.
-func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err error) {
+func (p *SessionPool) Take(ctx context.Context, s table.Session) (took bool, err error) {
 	p.init()
 
-	takeWait := sessionPoolTraceOnTake(p.Trace, ctx, s.id)
+	takeWait := sessionPoolTraceOnTake(p.Trace, ctx, s.ID())
 	var takeDone func(_ context.Context, _ string, took bool, _ error)
 
 	if p.isClosed() {
@@ -444,7 +444,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
-		takeDone = takeWait(ctx, s.id)
+		takeDone = takeWait(ctx, s.ID())
 
 		// Keepalive processing takes place right now.
 		// Try to await touched session before creation of new one.
@@ -458,7 +458,7 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 		p.mu.Lock()
 	}
 	defer func() {
-		takeDone(ctx, s.id, took, err)
+		takeDone(ctx, s.ID(), took, err)
 	}()
 	p.mu.Unlock()
 
@@ -471,12 +471,12 @@ func (p *SessionPool) Take(ctx context.Context, s *Session) (took bool, err erro
 
 // Create creates new session and returns it.
 // The intended way of Create() usage relates to Take() method.
-func (p *SessionPool) Create(ctx context.Context) (s *Session, err error) {
+func (p *SessionPool) Create(ctx context.Context) (s table.Session, err error) {
 	p.init()
 
 	createDone := sessionPoolTraceOnCreate(p.Trace, ctx)
 	defer func() {
-		createDone(ctx, s.id, err)
+		createDone(ctx, s.ID(), err)
 	}()
 
 	const maxAttempts = 10
@@ -545,15 +545,15 @@ func (p *SessionPool) Close(ctx context.Context) (err error) {
 	p.limit = 0
 	p.idle = list.New()
 	p.waitq = list.New()
-	p.index = make(map[*Session]sessionInfo)
+	p.index = make(map[table.Session]sessionInfo)
 	p.mu.Unlock()
 
 	for el := waitq.Front(); el != nil; el = el.Next() {
-		ch := el.Value.(*chan *Session)
+		ch := el.Value.(*chan table.Session)
 		close(*ch)
 	}
 	for e := idle.Front(); e != nil; e = e.Next() {
-		s := e.Value.(*Session)
+		s := e.Value.(table.Session)
 		_ = p.CloseSession(ctx, s)
 	}
 
@@ -595,9 +595,9 @@ func (p *SessionPool) Stats() SessionPoolStats {
 func (p *SessionPool) keeper() {
 	defer close(p.keeperDone)
 	var (
-		toTouch    []*Session // Cached for reuse.
-		toDelete   []*Session // Cached for reuse.
-		toTryAgain []*Session // Cached for reuse.
+		toTouch    []table.Session // Cached for reuse.
+		toDelete   []table.Session // Cached for reuse.
+		toTryAgain []table.Session // Cached for reuse.
 
 		wake  = make(chan struct{})
 		timer = timeutil.NewTimer(p.IdleThreshold)
@@ -743,15 +743,15 @@ func (p *SessionPool) keeper() {
 // Note that returning a pointer reduces allocations on sync.Pool usage –
 // sync.Pool.Get() returns empty interface, which leads to allocation for
 // non-pointer values.
-func (p *SessionPool) getWaitCh() *chan *Session {
+func (p *SessionPool) getWaitCh() *chan table.Session {
 	if p.testHookGetWaitCh != nil {
 		p.testHookGetWaitCh()
 	}
-	s, ok := p.waitChPool.Get().(*chan *Session)
+	s, ok := p.waitChPool.Get().(*chan table.Session)
 	if !ok {
 		// NOTE: MUST NOT be buffered.
 		// In other case we could cork an already no-owned channel.
-		ch := make(chan *Session)
+		ch := make(chan table.Session)
 		s = &ch
 	}
 	return s
@@ -761,17 +761,17 @@ func (p *SessionPool) getWaitCh() *chan *Session {
 // use.
 // Note that ch MUST NOT be owned by any goroutine at the call moment and ch
 // MUST NOT contain any value.
-func (p *SessionPool) putWaitCh(ch *chan *Session) {
+func (p *SessionPool) putWaitCh(ch *chan table.Session) {
 	p.waitChPool.Put(ch)
 }
 
 // p.mu must be held.
-func (p *SessionPool) peekFirstIdle() (s *Session, touched time.Time) {
+func (p *SessionPool) peekFirstIdle() (s table.Session, touched time.Time) {
 	el := p.idle.Front()
 	if el == nil {
 		return
 	}
-	s = el.Value.(*Session)
+	s = el.Value.(table.Session)
 	info, has := p.index[s]
 	if !has || el != info.idle {
 		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
@@ -783,7 +783,7 @@ func (p *SessionPool) peekFirstIdle() (s *Session, touched time.Time) {
 // to prevent session from dying in the keeper after it was returned
 // to be used only in outgoing functions that make Session busy.
 // p.mu must be held.
-func (p *SessionPool) removeFirstIdle() *Session {
+func (p *SessionPool) removeFirstIdle() table.Session {
 	s, _ := p.peekFirstIdle()
 	if s != nil {
 		info := p.removeIdle(s)
@@ -797,7 +797,7 @@ func (p *SessionPool) removeFirstIdle() *Session {
 // Unlike other info modifiers, this one doesn't care if it didn't find the session, it skips
 // the action. You can still check it later if needed, if the return code is -1
 // p.mu must be held.
-func (p *SessionPool) incrementKeepAlive(s *Session) int {
+func (p *SessionPool) incrementKeepAlive(s table.Session) int {
 	info, has := p.index[s]
 	if !has {
 		return -1
@@ -817,7 +817,7 @@ func (p *SessionPool) touchCond() <-chan struct{} {
 }
 
 // p.mu must be held.
-func (p *SessionPool) notify(s *Session) (notified bool) {
+func (p *SessionPool) notify(s table.Session) (notified bool) {
 	for el := p.waitq.Front(); el != nil; el = p.waitq.Front() {
 		// Some goroutine is waiting for a session.
 		//
@@ -832,7 +832,7 @@ func (p *SessionPool) notify(s *Session) (notified bool) {
 		// missed something and may want to retry (especially for case (3)).
 		//
 		// After that we taking a next waiter and repeat the same.
-		ch := p.waitq.Remove(el).(*chan *Session)
+		ch := p.waitq.Remove(el).(*chan table.Session)
 		select {
 		case *ch <- s:
 			// Case (1).
@@ -848,27 +848,27 @@ func (p *SessionPool) notify(s *Session) (notified bool) {
 // CloseSession provides the most effective way of session closing
 // instead of plain session.Close.
 // CloseSession must be fast. If necessary, can be async.
-func (p *SessionPool) CloseSession(ctx context.Context, s *Session) error {
+func (p *SessionPool) CloseSession(ctx context.Context, s table.Session) error {
 	ctx, cancel := context.WithTimeout(
 		internal.ContextWithoutDeadline(ctx),
 		p.DeleteTimeout,
 	)
-	closeSessionDone := sessionPoolTraceOnCloseSession(p.Trace, ctx, s.id)
+	closeSessionDone := sessionPoolTraceOnCloseSession(p.Trace, ctx, s.ID())
 	go func() {
 		defer cancel()
-		closeSessionDone(ctx, s.id, s.Close(ctx))
+		closeSessionDone(ctx, s.ID(), s.Close(ctx))
 	}()
 	return nil
 }
 
-func (p *SessionPool) keepAliveSession(ctx context.Context, s *Session) (options.SessionInfo, error) {
+func (p *SessionPool) keepAliveSession(ctx context.Context, s table.Session) (options.SessionInfo, error) {
 	ctx, cancel := context.WithTimeout(ctx, p.KeepAliveTimeout)
 	defer cancel()
 	return s.KeepAlive(ctx)
 }
 
 // p.mu must be held.
-func (p *SessionPool) removeIdle(s *Session) sessionInfo {
+func (p *SessionPool) removeIdle(s table.Session) sessionInfo {
 	info, has := p.index[s]
 	if !has || info.idle == nil {
 		panicLocked(&p.mu, "ydb: table: inconsistent session pool index")
@@ -884,7 +884,7 @@ func (p *SessionPool) removeIdle(s *Session) sessionInfo {
 // to die in keeper when it will be returned
 // to be used only in outgoing functions that make Session busy.
 // p.mu must be held.
-func (p *SessionPool) takeIdle(s *Session) (has, took bool) {
+func (p *SessionPool) takeIdle(s table.Session) (has, took bool) {
 	var info sessionInfo
 	info, has = p.index[s]
 	if !has {
@@ -904,15 +904,15 @@ func (p *SessionPool) takeIdle(s *Session) (has, took bool) {
 }
 
 // p.mu must be held.
-func (p *SessionPool) pushIdle(s *Session, now time.Time) {
+func (p *SessionPool) pushIdle(s table.Session, now time.Time) {
 	p.handlePushIdle(s, now, p.idle.PushBack(s))
 }
 
 // p.mu must be held.
-func (p *SessionPool) pushIdleInOrder(s *Session, now time.Time) (el *list.Element) {
+func (p *SessionPool) pushIdleInOrder(s table.Session, now time.Time) (el *list.Element) {
 	var prev *list.Element
 	for prev = p.idle.Back(); prev != nil; prev = prev.Prev() {
-		s := prev.Value.(*Session)
+		s := prev.Value.(table.Session)
 		t := p.index[s].touched
 		if !now.Before(t) { // now >= t
 			break
@@ -928,7 +928,7 @@ func (p *SessionPool) pushIdleInOrder(s *Session, now time.Time) (el *list.Eleme
 }
 
 // p.mu must be held.
-func (p *SessionPool) pushIdleInOrderAfter(s *Session, now time.Time, mark *list.Element) *list.Element {
+func (p *SessionPool) pushIdleInOrderAfter(s table.Session, now time.Time, mark *list.Element) *list.Element {
 	if mark != nil {
 		n := p.idle.Len()
 		el := p.idle.InsertAfter(s, mark)
@@ -942,7 +942,7 @@ func (p *SessionPool) pushIdleInOrderAfter(s *Session, now time.Time, mark *list
 }
 
 // p.mu must be held.
-func (p *SessionPool) handlePushIdle(s *Session, now time.Time, el *list.Element) {
+func (p *SessionPool) handlePushIdle(s table.Session, now time.Time, el *list.Element) {
 	info, has := p.index[s]
 	if !has {
 		panicLocked(&p.mu, "ydb: table: trying to store session created outside of the pool")
