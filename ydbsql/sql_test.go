@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/sessiontrace"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 
 	table "github.com/ydb-platform/ydb-go-sdk/v3/table"
 
@@ -161,28 +161,23 @@ func TestIsolationMapping(t *testing.T) {
 func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
 		dtrace trace.Driver
-		ctrace sessiontrace.Trace
-		strace sessiontrace.SessionPoolTrace
+		ttrace trace.Table
 	)
 	trace.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
 	})
-	trace.Stub(&ctrace, func(name string, args ...interface{}) {
-		log.Printf("[client] %s: %+v", name, trace.ClearContext(args))
-	})
-	trace.Stub(&strace, func(name string, args ...interface{}) {
-		log.Printf("[session] %s: %+v", name, trace.ClearContext(args))
+	trace.Stub(&ttrace, func(name string, args ...interface{}) {
+		log.Printf("[table] %s: %+v", name, trace.ClearContext(args))
 	})
 
+	connectParams := ydb.MustConnectionString(os.Getenv("YDB"))
 	db := sql.OpenDB(Connector(
-		WithEndpoint("ydb-ru.yandex.net:2135"),
-		WithDatabase("/ru/home/kamardin/mydb"),
+		WithConnectParams(connectParams),
 		WithCredentials(credentials.AuthTokenCredentials{
-			AuthToken: os.Getenv("YDB_TOKEN"),
+			AuthToken: os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
 		}),
 		WithTraceDriver(dtrace),
-		WithClientTrace(ctrace),
-		WithSessionPoolTrace(strace),
+		WithTraceTable(ttrace),
 	))
 
 	return db, db.PingContext(ctx)

@@ -2,8 +2,9 @@ package table
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -15,7 +16,7 @@ func NewClientAsPool(db cluster.DB, config Config) ClientAsPool {
 	}
 	c.pool = &pool{
 		Trace:                  config.Trace,
-		Builder:                &SessionPoolBuilder{client: c},
+		Builder:                c,
 		SizeLimit:              config.SizeLimit,
 		KeepAliveMinSize:       config.KeepAliveMinSize,
 		IdleKeepAliveThreshold: config.IdleKeepAliveThreshold,
@@ -25,15 +26,6 @@ func NewClientAsPool(db cluster.DB, config Config) ClientAsPool {
 		DeleteTimeout:          config.DeleteTimeout,
 	}
 	return c
-}
-
-// SessionPoolBuilder only for session pool
-type SessionPoolBuilder struct {
-	*client
-}
-
-func (c *SessionPoolBuilder) CreateSession(ctx context.Context) (s table.Session, err error) {
-	return newSession(ctx, c.cluster, c.trace)
 }
 
 // client contains logic of creation of ydb table sessions.

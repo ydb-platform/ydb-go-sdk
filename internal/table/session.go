@@ -2,12 +2,13 @@ package table
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
@@ -46,7 +47,7 @@ func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Sessi
 	createSessionDone := trace.TableOnCreateSession(t, ctx)
 	start := time.Now()
 	defer func() {
-		createSessionDone(ctx, s.ID(), s.Address(), time.Since(start), err)
+		createSessionDone(ctx, sessionID(s), sessionAddress(s), time.Since(start), err)
 	}()
 	var (
 		response *Ydb_Table.CreateSessionResponse
@@ -373,7 +374,7 @@ func (s *Statement) Execute(
 ) {
 	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.session.trace, ctx, s.session.id, transactionControlID(tx.Desc()), s.query, params)
 	defer func() {
-		executeDataQueryDone(ctx, s.session.id, getTransactionID(txr), s.query, params, true, r, err)
+		executeDataQueryDone(ctx, s.session.id, transactionID(txr), s.query, params, true, r, err)
 	}()
 	return s.execute(ctx, tx, params, opts...)
 }
@@ -455,7 +456,7 @@ func (s *session) Execute(
 
 	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.trace, ctx, s.id, transactionControlID(tx.Desc()), q, params)
 	defer func() {
-		executeDataQueryDone(ctx, s.id, getTransactionID(txr), q, params, true, r, err)
+		executeDataQueryDone(ctx, s.id, transactionID(txr), q, params, true, r, err)
 	}()
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
@@ -787,7 +788,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
 	beginTransactionDone := trace.TableOnBeginTransaction(s.trace, ctx, s.id)
 	defer func() {
-		beginTransactionDone(ctx, s.id, getTransactionID(x), err)
+		beginTransactionDone(ctx, s.id, transactionID(x), err)
 	}()
 	var (
 		result   Ydb_Table.BeginTransactionResult
@@ -900,13 +901,6 @@ func (tx *Transaction) txc() *table.TransactionControl {
 	return tx.c
 }
 
-func getTransactionID(txr table.Transaction) string {
-	if txr != nil {
-		return txr.ID()
-	}
-	return ""
-}
-
 type dataQuery struct {
 	query    Ydb_Table.Query
 	queryID  Ydb_Table.Query_Id
@@ -951,9 +945,30 @@ func (q *dataQuery) initPreparedText(s, id string) {
 	q.query.Query = &q.queryID // Prefer preared query.
 }
 
+func transactionID(txr table.Transaction) string {
+	if txr != nil {
+		return txr.ID()
+	}
+	return ""
+}
+
 func transactionControlID(desc *Ydb_Table.TransactionControl) string {
 	if tx, ok := desc.TxSelector.(*Ydb_Table.TransactionControl_TxId); ok {
 		return tx.TxId
 	}
 	return ""
+}
+
+func sessionID(s table.Session) string {
+	if s == nil {
+		return ""
+	}
+	return s.ID()
+}
+
+func sessionAddress(s table.Session) string {
+	if s == nil {
+		return ""
+	}
+	return s.Address()
 }

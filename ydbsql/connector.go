@@ -5,9 +5,10 @@ import (
 	"crypto/tls"
 	"database/sql/driver"
 	"fmt"
+	"sync"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
@@ -86,7 +87,7 @@ func WithTraceDriver(t trace.Driver) ConnectorOption {
 	}
 }
 
-func WithTrace(t trace.Table) ConnectorOption {
+func WithTraceTable(t trace.Table) ConnectorOption {
 	return func(c *connector) {
 		c.trace = t
 	}
