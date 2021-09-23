@@ -302,6 +302,9 @@ func main() {
 	for i, item := range items {
 		t := p.Traces[i]
 		for _, field := range item.StructType.Fields.List {
+			if _, ok := field.Type.(*ast.FuncType); !ok {
+				continue
+			}
 			name := field.Names[0].Name
 			fn, ok := field.Type.(*ast.FuncType)
 			if !ok {
