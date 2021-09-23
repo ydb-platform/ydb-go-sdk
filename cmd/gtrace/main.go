@@ -489,6 +489,7 @@ func (f GenFlag) Has(x GenFlag) bool {
 const (
 	GenZero GenFlag = 1 << iota >> 1
 	GenShortcut
+	GenShortcutPublic
 	GenContext
 
 	GenAll = ^GenFlag(0)
@@ -527,6 +528,8 @@ func (g *GenConfig) ParseParameter(text string) (err error) {
 	switch param {
 	case "shortcut":
 		g.Flag |= GenShortcut
+	case "Shortcut", "SHORTCUT":
+		g.Flag |= GenShortcutPublic
 	case "context":
 		g.Flag |= GenContext
 	default:

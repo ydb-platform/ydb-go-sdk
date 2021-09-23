@@ -91,13 +91,13 @@ func (w *Writer) Write(p Package) error {
 		}
 		for _, trace := range p.Traces {
 			for _, hook := range trace.Hooks {
-				if !hook.Flag.Has(GenShortcut) {
+				if !hook.Flag.Has(GenShortcut) && !hook.Flag.Has(GenShortcutPublic) {
 					continue
 				}
 				if w.Stub {
-					w.stubHookShortcut(trace, hook)
+					w.stubHookShortcut(trace, hook, hook.Flag.Has(GenShortcutPublic))
 				} else {
-					w.hookShortcut(trace, hook)
+					w.hookShortcut(trace, hook, hook.Flag.Has(GenShortcutPublic))
 				}
 			}
 		}
@@ -209,7 +209,7 @@ func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 func (w *Writer) funcImports(dst []dep, flag GenFlag, fn *Func) []dep {
 	for _, p := range fn.Params {
 		dst = w.typeImports(dst, p.Type)
-		if !flag.Has(GenShortcut) {
+		if !flag.Has(GenShortcut) && !flag.Has(GenShortcutPublic) {
 			continue
 		}
 		if _, s := unwrapStruct(p.Type); s != nil {
@@ -597,9 +597,13 @@ func (w *Writer) stubShortcutFunc(id string, f *Func) (name string) {
 	return name
 }
 
-func (w *Writer) stubHookShortcut(trace *Trace, hook Hook) {
+func (w *Writer) stubHookShortcut(trace *Trace, hook Hook, export bool) {
 	name := tempName(trace.Name, hook.Name)
-	name = unexported(name)
+	if export {
+		name = exported(name)
+	} else {
+		name = unexported(name)
+	}
 	w.mustDeclare(name)
 
 	id := uniqueTraceHookID(trace, hook)
@@ -877,9 +881,13 @@ func (w *Writer) constructStruct(n *types.Named, s *types.Struct, vars []string)
 	return p, vars
 }
 
-func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
+func (w *Writer) hookShortcut(trace *Trace, hook Hook, export bool) {
 	name := tempName(trace.Name, hook.Name)
-	name = unexported(name)
+	if export {
+		name = exported(name)
+	} else {
+		name = unexported(name)
+	}
 	w.mustDeclare(name)
 
 	w.newScope(func() {

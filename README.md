@@ -213,6 +213,41 @@ func (c *Client) ping(ctx context.Context) error {
 }
 ```
 
+**gtrace** can export **shortcuts** by using comment like `//gtrace:set Shortcut` or `//gtrace:set SHORTCUT`.
+This may need if traces placed in external package (for example `trace`):
+
+```go
+package trace
+
+//go:generate gtrace
+
+//gtrace:gen
+//gtrace:set Shortcut
+type Client struct {
+	OnPing func(ClientPingStart) func(ClientPingDone)
+}
+```
+
+Code snippet bellow exclude `Trace` prefix from struct names because `trace` is a package name. 
+This allows transform code from `ClientTrace` to `trace.Client`. 
+After `go generate` we able to call exported _hooks_ like this:
+
+```go
+package lib
+
+import (
+	"context"
+	"trace"
+)
+
+func (c *Client) ClientTracePing(ctx context.Context) error {
+	done := trace.ClientOnPing(c.Trace, 1, 2, 3)
+	err := doPing(ctx, c.conn)
+	done(1, 2, 3, err)
+	return err
+}
+```
+
 ### Build Tags
 
 **gtrace** can generate zero-cost tracing helpers when tracing of your app is optional. That is, your client code will remain the same -- composing traces with needed callbacks, calling non-exported versions of _hooks_ (or _shortcuts_) etc. But after compilation calling the tracing helpers would take no CPU time.
