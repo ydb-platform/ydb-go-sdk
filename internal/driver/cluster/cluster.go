@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"sort"
@@ -50,8 +49,6 @@ type cluster struct {
 	wait  chan struct{}
 
 	closed bool
-
-	testHookTrackerQueue func([]*list.Element)
 }
 
 func (c *cluster) Force() {

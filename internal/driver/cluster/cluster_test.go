@@ -80,15 +80,21 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	}()
 
 	cs, balancer := simpleBalancer()
+	c := &cluster{
+		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
+			return ln.Dial(ctx)
+		},
+		balancer: balancer,
+	}
 
 	pingConnects := func(size int) {
 		for i := 0; i < size*10; i++ {
 			sub, cancel := context.WithTimeout(ctx, time.Millisecond)
 			defer cancel()
-			con, err := c.Get(sub)
+			conn, err := c.Get(sub)
 			// enforce close bad connects to track them
-			if err == nil && con != nil && con.addr.addr == "bad" {
-				_ = con.Conn().Close()
+			if err == nil && conn != nil && conn.Addr().Host == "bad" {
+				_ = conn.Close()
 			}
 		}
 	}
@@ -99,26 +105,23 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		if len(*cs) != inBalance {
 			t.Fatalf("inBalance expected number of endpoints %d got %d", inBalance, len(*cs))
 		}
-		if c.trackerQueue.Len() != onTracking {
-			t.Fatalf("onTracking expected number of endpoints %d got %d", onTracking, c.trackerQueue.Len())
-		}
 	}
 
 	endpoints := []public.Endpoint{
-		{Host: "foo"},
-		{Host: "foo", Port: 123},
+		{Addr: public.Addr{Host: "foo"}},
+		{Addr: public.Addr{Host: "foo", Port: 123}},
 	}
 	badEndpoints := []public.Endpoint{
-		{Host: "bad"},
-		{Host: "bad", Port: 123},
+		{Addr: public.Addr{Host: "bad"}},
+		{Addr: public.Addr{Host: "bad", Port: 123}},
 	}
 	nextEndpoints := []public.Endpoint{
-		{Host: "foo"},
-		{Host: "bar"},
-		{Host: "bar", Port: 123},
+		{Addr: public.Addr{Host: "foo"}},
+		{Addr: public.Addr{Host: "bar"}},
+		{Addr: public.Addr{Host: "bar", Port: 123}},
 	}
 	nextBadEndpoints := []public.Endpoint{
-		{Host: "bad", Port: 23},
+		{Addr: public.Addr{Host: "bad", Port: 23}},
 	}
 	t.Run("initial fill", func(t *testing.T) {
 		ne := append(endpoints, badEndpoints...)
@@ -184,20 +187,13 @@ func TestClusterRemoveTracking(t *testing.T) {
 	}
 
 	c := &cluster{
-		dial: func(ctx context.Context, s string, p int) (conn.Conn, error) {
-			cc, err := ln.Dial(ctx)
-			return &conn.conn{
-				addr: public.Addr{s, p},
-				raw:  cc,
-			}, err
+		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
+			return ln.Dial(ctx)
 		},
 		balancer: balancer,
-		testHookTrackerQueue: func(q []*list.Element) {
-			tracking <- len(q)
-		},
 	}
 
-	endpoint := public.Endpoint{Host: "foo"}
+	endpoint := public.Endpoint{Addr: public.Addr{Host: "foo"}}
 	c.Insert(ctx, endpoint)
 
 	// Await for connection to be established.
@@ -243,16 +239,13 @@ func TestClusterRemoveOffline(t *testing.T) {
 	defer close(tracking)
 
 	c := &cluster{
-		dial: func(ctx context.Context, s string, p int) (conn.Conn, error) {
+		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
 			return nil, fmt.Errorf("refused")
 		},
 		balancer: balancer,
-		testHookTrackerQueue: func(q []*list.Element) {
-			tracking <- len(q)
-		},
 	}
 
-	endpoint := public.Endpoint{Host: "foo"}
+	endpoint := public.Endpoint{Addr: public.Addr{Host: "foo"}}
 	c.Insert(ctx, endpoint)
 	<-timer.Reset
 
