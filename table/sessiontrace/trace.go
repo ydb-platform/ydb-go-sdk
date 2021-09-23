@@ -6,4 +6,6 @@ type Trace struct {
 	table.Trace
 }
 
-type SessionPoolTrace table.SessionPoolTrace
+type SessionPoolTrace struct {
+	table.SessionPoolTrace
+}
