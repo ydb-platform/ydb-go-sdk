@@ -59,7 +59,7 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 
-	t := trace.ContextDriverTrace(ctx).Compose(d.Config.Trace)
+	t := trace.ContextDriver(ctx).Compose(d.Config.Trace)
 	var getConnDone func(trace.GetConnDoneInfo)
 	if t.OnGetConn != nil {
 		getConnDone = t.OnGetConn(trace.GetConnStartInfo{

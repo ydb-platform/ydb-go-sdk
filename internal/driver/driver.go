@@ -68,8 +68,8 @@ func (d *driver) Meta(ctx context.Context) (context.Context, error) {
 	return d.meta.Meta(ctx)
 }
 
-func (d *driver) Trace(ctx context.Context) trace.DriverTrace {
-	return trace.ContextDriverTrace(ctx).Compose(d.Config.Trace)
+func (d *driver) Trace(ctx context.Context) trace.Driver {
+	return trace.ContextDriver(ctx).Compose(d.Config.Trace)
 }
 
 func (d *driver) Pessimize(addr cluster.Addr) error {

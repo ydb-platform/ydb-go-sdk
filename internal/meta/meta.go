@@ -27,7 +27,7 @@ type Meta interface {
 func New(
 	database string,
 	credentials credentials.Credentials,
-	trace trace.DriverTrace,
+	trace trace.Driver,
 	requestsType string,
 ) Meta {
 	return &meta{
@@ -39,7 +39,7 @@ func New(
 }
 
 type meta struct {
-	trace        trace.DriverTrace
+	trace        trace.Driver
 	credentials  credentials.Credentials
 	database     string
 	requestsType string
@@ -57,7 +57,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	}
 	if m.credentials != nil {
 		var token string
-		t := trace.ContextDriverTrace(ctx).Compose(m.trace)
+		t := trace.ContextDriver(ctx).Compose(m.trace)
 		if t.OnGetCredentials != nil {
 			getCredentialsDone := t.OnGetCredentials(trace.GetCredentialsStartInfo{
 				Context: ctx,

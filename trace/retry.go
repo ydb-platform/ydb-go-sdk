@@ -24,7 +24,7 @@ type (
 )
 
 func OnRetry(ctx context.Context) func(ctx context.Context, latency time.Duration, issues []error) {
-	onStart := ContextRetryTrace(ctx).OnRetry
+	onStart := ContextRetry(ctx).OnRetry
 	var onDone func(RetryLoopDoneInfo)
 	if onStart != nil {
 		onDone = onStart(RetryLoopStartInfo{Context: ctx})

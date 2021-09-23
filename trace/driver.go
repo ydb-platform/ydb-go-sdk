@@ -12,21 +12,14 @@ import (
 
 type (
 	//gtrace:gen
-	//gtrace:set shortcut
-	DriverTrace struct {
-		OnDial func(DialStartInfo) func(DialDoneInfo)
-
-		OnGetConn func(GetConnStartInfo) func(GetConnDoneInfo)
-
-		OnPessimization func(PessimizationStartInfo) func(PessimizationDoneInfo)
-
+	Driver struct {
+		OnDial           func(DialStartInfo) func(DialDoneInfo)
+		OnGetConn        func(GetConnStartInfo) func(GetConnDoneInfo)
+		OnPessimization  func(PessimizationStartInfo) func(PessimizationDoneInfo)
 		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
-
-		OnDiscovery func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
-
-		OnOperation func(OperationStartInfo) func(OperationDoneInfo)
-
-		OnStream func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
+		OnDiscovery      func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
+		OnOperation      func(OperationStartInfo) func(OperationDoneInfo)
+		OnStream         func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
 	}
 )
 

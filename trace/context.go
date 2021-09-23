@@ -2,38 +2,38 @@ package trace
 
 import "context"
 
-type driverTraceContextKey struct{}
+type driverContextKey struct{}
 
-// WithDriverTrace returns context which has associated DriverTrace with it.
-func WithDriverTrace(ctx context.Context, t DriverTrace) context.Context {
+// WithDriver returns context which has associated Driver with it.
+func WithDriver(ctx context.Context, t Driver) context.Context {
 	return context.WithValue(ctx,
-		driverTraceContextKey{},
-		ContextDriverTrace(ctx).Compose(t),
+		driverContextKey{},
+		ContextDriver(ctx).Compose(t),
 	)
 }
 
-// ContextDriverTrace returns DriverTrace associated with ctx.
-// If there is no DriverTrace associated with ctx then zero value
-// of DriverTrace is returned.
-func ContextDriverTrace(ctx context.Context) DriverTrace {
-	t, _ := ctx.Value(driverTraceContextKey{}).(DriverTrace)
+// ContextDriver returns Driver associated with ctx.
+// If there is no Driver associated with ctx then zero value
+// of Driver is returned.
+func ContextDriver(ctx context.Context) Driver {
+	t, _ := ctx.Value(driverContextKey{}).(Driver)
 	return t
 }
 
-type retryTraceContextKey struct{}
+type retryContextKey struct{}
 
-// WithRetryTrace returns context which has associated RetryTrace with it.
-func WithRetryTrace(ctx context.Context, t RetryTrace) context.Context {
+// WithRetry returns context which has associated RetryTrace with it.
+func WithRetry(ctx context.Context, t RetryTrace) context.Context {
 	return context.WithValue(ctx,
-		retryTraceContextKey{},
-		ContextRetryTrace(ctx).Compose(t),
+		retryContextKey{},
+		ContextRetry(ctx).Compose(t),
 	)
 }
 
-// ContextRetryTrace returns RetryTrace associated with ctx.
+// ContextRetry returns RetryTrace associated with ctx.
 // If there is no RetryTrace associated with ctx then zero value
 // of RetryTrace is returned.
-func ContextRetryTrace(ctx context.Context) RetryTrace {
-	t, _ := ctx.Value(retryTraceContextKey{}).(RetryTrace)
+func ContextRetry(ctx context.Context) RetryTrace {
+	t, _ := ctx.Value(retryContextKey{}).(RetryTrace)
 	return t
 }

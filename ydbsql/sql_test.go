@@ -158,7 +158,7 @@ func TestIsolationMapping(t *testing.T) {
 
 func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
-		dtrace trace.DriverTrace
+		dtrace trace.Driver
 		ctrace table.Trace
 		strace table.SessionPoolTrace
 	)
@@ -178,7 +178,7 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 		WithCredentials(credentials.AuthTokenCredentials{
 			AuthToken: os.Getenv("YDB_TOKEN"),
 		}),
-		WithDriverTrace(dtrace),
+		WithTraceDriver(dtrace),
 		WithClientTrace(ctrace),
 		WithSessionPoolTrace(strace),
 		WithSessionPoolIdleThreshold(time.Second),

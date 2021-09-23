@@ -16,7 +16,7 @@ type Option func(ctx context.Context, client *db) error
 
 type options struct {
 	connectTimeout                       *time.Duration
-	driverTrace                          *trace.DriverTrace
+	traceDriver                          *trace.Driver
 	driverConfig                         *config.Config
 	credentials                          icredentials.Credentials
 	discoveryInterval                    *time.Duration
@@ -130,24 +130,24 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithDriverTrace returns context which has associated DriverTrace with it.
-func WithDriverTrace(trace trace.DriverTrace) Option {
+// WithTraceDriver returns context which has associated Driver with it.
+func WithTraceDriver(trace trace.Driver) Option {
 	return func(ctx context.Context, c *db) error {
-		c.options.driverTrace = &trace
+		c.options.traceDriver = &trace
 		return nil
 	}
 }
 
-// WithTableClientTrace returns context which has associated DriverTrace with it.
-func WithTableClientTrace(trace sessiontrace.Trace) Option {
+// WithTraceTableClient returns context which has associated Driver with it.
+func WithTraceTableClient(trace sessiontrace.Trace) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.tableClientTrace = &trace
 		return nil
 	}
 }
 
-// WithTableSessionPoolTrace returns context which has associated DriverTrace with it.
-func WithTableSessionPoolTrace(trace sessiontrace.SessionPoolTrace) Option {
+// WithTraceTableSessionPool returns context which has associated Driver with it.
+func WithTraceTableSessionPool(trace sessiontrace.SessionPoolTrace) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.tableSessionPoolTrace = &trace
 		return nil

@@ -2,16 +2,9 @@
 
 package trace
 
-import (
-	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
-)
-
-// Compose returns a new DriverTrace which has functional fields composed
+// Compose returns a new Driver which has functional fields composed
 // both from t and x.
-func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
+func (t Driver) Compose(x Driver) (ret Driver) {
 	switch {
 	case t.OnDial == nil:
 		ret.OnDial = x.OnDial
@@ -193,7 +186,7 @@ func (t DriverTrace) Compose(x DriverTrace) (ret DriverTrace) {
 	}
 	return ret
 }
-func (t DriverTrace) onDial(d DialStartInfo) func(DialDoneInfo) {
+func (t Driver) onDial(d DialStartInfo) func(DialDoneInfo) {
 	fn := t.OnDial
 	if fn == nil {
 		return func(DialDoneInfo) {
@@ -208,7 +201,7 @@ func (t DriverTrace) onDial(d DialStartInfo) func(DialDoneInfo) {
 	}
 	return res
 }
-func (t DriverTrace) onGetConn(g GetConnStartInfo) func(GetConnDoneInfo) {
+func (t Driver) onGetConn(g GetConnStartInfo) func(GetConnDoneInfo) {
 	fn := t.OnGetConn
 	if fn == nil {
 		return func(GetConnDoneInfo) {
@@ -223,7 +216,7 @@ func (t DriverTrace) onGetConn(g GetConnStartInfo) func(GetConnDoneInfo) {
 	}
 	return res
 }
-func (t DriverTrace) onPessimization(p PessimizationStartInfo) func(PessimizationDoneInfo) {
+func (t Driver) onPessimization(p PessimizationStartInfo) func(PessimizationDoneInfo) {
 	fn := t.OnPessimization
 	if fn == nil {
 		return func(PessimizationDoneInfo) {
@@ -238,7 +231,7 @@ func (t DriverTrace) onPessimization(p PessimizationStartInfo) func(Pessimizatio
 	}
 	return res
 }
-func (t DriverTrace) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
+func (t Driver) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
 	if fn == nil {
 		return func(GetCredentialsDoneInfo) {
@@ -253,7 +246,7 @@ func (t DriverTrace) onGetCredentials(g GetCredentialsStartInfo) func(GetCredent
 	}
 	return res
 }
-func (t DriverTrace) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
+func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	fn := t.OnDiscovery
 	if fn == nil {
 		return func(DiscoveryDoneInfo) {
@@ -268,7 +261,7 @@ func (t DriverTrace) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	}
 	return res
 }
-func (t DriverTrace) onOperation(o OperationStartInfo) func(OperationDoneInfo) {
+func (t Driver) onOperation(o OperationStartInfo) func(OperationDoneInfo) {
 	fn := t.OnOperation
 	if fn == nil {
 		return func(OperationDoneInfo) {
@@ -283,7 +276,7 @@ func (t DriverTrace) onOperation(o OperationStartInfo) func(OperationDoneInfo) {
 	}
 	return res
 }
-func (t DriverTrace) onStream(s StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo) {
+func (t Driver) onStream(s StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo) {
 	fn := t.OnStream
 	if fn == nil {
 		return func(StreamRecvDoneInfo) func(StreamDoneInfo) {
@@ -308,93 +301,5 @@ func (t DriverTrace) onStream(s StreamStartInfo) func(StreamRecvDoneInfo) func(S
 			}
 		}
 		return res
-	}
-}
-func driverTraceOnDial(t DriverTrace, c context.Context, address string) func(_ context.Context, address string, _ error) {
-	var p DialStartInfo
-	p.Context = c
-	p.Address = address
-	res := t.onDial(p)
-	return func(c context.Context, address string, e error) {
-		var p DialDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnGetConn(t DriverTrace, c context.Context) func(_ context.Context, address string, _ error) {
-	var p GetConnStartInfo
-	p.Context = c
-	res := t.onGetConn(p)
-	return func(c context.Context, address string, e error) {
-		var p GetConnDoneInfo
-		p.Address = address
-		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnPessimization(t DriverTrace, c context.Context, address string, cause error) func(error) {
-	var p PessimizationStartInfo
-	p.Context = c
-	p.Address = address
-	p.Cause = cause
-	res := t.onPessimization(p)
-	return func(e error) {
-		var p PessimizationDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnGetCredentials(t DriverTrace, c context.Context) func(_ context.Context, token bool, _ error) {
-	var p GetCredentialsStartInfo
-	p.Context = c
-	res := t.onGetCredentials(p)
-	return func(c context.Context, token bool, e error) {
-		var p GetCredentialsDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnDiscovery(t DriverTrace, c context.Context) func(_ context.Context, endpoints []cluster.Endpoint, _ error) {
-	var p DiscoveryStartInfo
-	p.Context = c
-	res := t.onDiscovery(p)
-	return func(c context.Context, endpoints []cluster.Endpoint, e error) {
-		var p DiscoveryDoneInfo
-		p.Context = c
-		p.Endpoints = endpoints
-		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnOperation(t DriverTrace, c context.Context, address string, m Method, p operation.Params) func(opID string, issues errors.IssueIterator, _ error) {
-	var p1 OperationStartInfo
-	p1.Context = c
-	p1.Address = address
-	p1.Method = m
-	p1.Params = p
-	res := t.onOperation(p1)
-	return func(opID string, issues errors.IssueIterator, e error) {
-		var p OperationDoneInfo
-		p.OpID = opID
-		p.Issues = issues
-		p.Error = e
-		res(p)
-	}
-}
-func driverTraceOnStream(t DriverTrace, c context.Context, address string, m Method) func(error) func(error) {
-	var p StreamStartInfo
-	p.Context = c
-	p.Address = address
-	p.Method = m
-	res := t.onStream(p)
-	return func(e error) func(error) {
-		var p StreamRecvDoneInfo
-		p.Error = e
-		res := res(p)
-		return func(e error) {
-			var p StreamDoneInfo
-			p.Error = e
-			res(p)
-		}
 	}
 }

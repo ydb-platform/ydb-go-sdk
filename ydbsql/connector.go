@@ -85,7 +85,7 @@ func WithDatabase(db string) ConnectorOption {
 	}
 }
 
-func WithDriverTrace(t trace.DriverTrace) ConnectorOption {
+func WithTraceDriver(t trace.Driver) ConnectorOption {
 	return func(c *connector) {
 		c.dialer.DriverConfig.Trace = t
 	}

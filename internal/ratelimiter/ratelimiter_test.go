@@ -26,7 +26,7 @@ const (
 
 func openDB(ctx context.Context) (cluster.DB, error) {
 	var (
-		dtrace trace.DriverTrace
+		dtrace trace.Driver
 		ctrace sessiontrace.Trace
 		strace sessiontrace.SessionPoolTrace
 	)

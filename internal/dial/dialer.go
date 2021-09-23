@@ -103,7 +103,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 
 func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (_ *grpc.ClientConn, err error) {
 	s := cluster.String(host, port)
-	t := trace.ContextDriverTrace(ctx).Compose(d.config.Trace)
+	t := trace.ContextDriver(ctx).Compose(d.config.Trace)
 	var dialDone func(trace.DialDoneInfo)
 	if t.OnDial != nil {
 		dialDone = t.OnDial(trace.DialStartInfo{

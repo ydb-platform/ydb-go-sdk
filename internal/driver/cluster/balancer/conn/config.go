@@ -13,7 +13,7 @@ type Config interface {
 	OperationTimeout() time.Duration
 	OperationCancelAfter() time.Duration
 	Meta(ctx context.Context) (context.Context, error)
-	Trace(ctx context.Context) trace.DriverTrace
+	Trace(ctx context.Context) trace.Driver
 	Pessimize(addr cluster.Addr) error
 	StreamTimeout() time.Duration
 	GrpcConnectionPolicy() *GrpcConnectionPolicy

@@ -41,7 +41,7 @@ func TestClusterTracking(t *testing.T) {
 	endpoint := db.StartEndpoint()
 	defer endpoint.Close()
 
-	var dtrace trace.DriverTrace
+	var dtrace trace.Driver
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf(
 			"[driver] %s: %+v",

@@ -18,7 +18,7 @@ type Config struct {
 	Credentials credentials.Credentials
 
 	// Trace contains driver tracing options.
-	Trace trace.DriverTrace
+	Trace trace.Driver
 
 	// RequestTimeout is the maximum amount of time a Call() will wait for an
 	// operation to complete.
