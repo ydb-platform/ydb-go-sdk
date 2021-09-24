@@ -3,9 +3,10 @@ package types
 import (
 	"bytes"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
 // Type describes YDB data types.
@@ -69,6 +70,29 @@ func Void() Type {
 
 func Optional(T Type) Type {
 	return value.OptionalType{T: T}
+}
+
+// Decimal supported in scanner API
+type Decimal struct {
+	Bytes     [16]byte
+	Precision uint32
+	Scale     uint32
+}
+
+var DefaultDecimal = DecimalTypeFrom(22, 9)
+
+func DecimalTypeFrom(precision, scale uint32) Type {
+	return value.DecimalType{
+		Precision: precision,
+		Scale:     scale,
+	}
+}
+
+func DecimalType(d *Decimal) Type {
+	return value.DecimalType{
+		Precision: d.Precision,
+		Scale:     d.Scale,
+	}
 }
 
 // TODO(kamardin): rename types to consistent format like values: BoolType,
@@ -240,10 +264,4 @@ type RawValue interface {
 // Scanner scanning non-primitive yql types
 type Scanner interface {
 	UnmarshalYDB(res RawValue) error
-}
-
-type Decimal struct {
-	Bytes     [16]byte
-	Precision uint32
-	Scale     uint32
 }
