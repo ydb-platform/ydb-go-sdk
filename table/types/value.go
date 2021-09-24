@@ -1,10 +1,13 @@
 package types
 
 import (
+	"math/big"
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"time"
 )
 
 type Value interface {
@@ -63,10 +66,33 @@ func NullValue(t Type) Value      { return value.NullValue(t) }
 func ZeroValue(t Type) Value      { return value.ZeroValue(t) }
 func OptionalValue(v Value) Value { return value.OptionalValue(v) }
 
+// Decimal supported in scanner API
+type Decimal struct {
+	Bytes     [16]byte
+	Precision uint32
+	Scale     uint32
+}
+
+func (d *Decimal) String() string {
+	v := decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
+	return decimal.Format(v, d.Precision, d.Scale)
+}
+
+func (d *Decimal) BigInt() *big.Int {
+	return decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
+}
+
 // DecimalValue creates decimal value of given types t and value v.
-// Note that v interpreted as big-endian int128.
-func DecimalValue(t Type, v [16]byte) Value {
-	return value.DecimalValue(t, v)
+// Note that Decimal.Bytes interpreted as big-endian int128.
+func DecimalValue(v *Decimal) Value {
+	t := DecimalTypeFromDecimal(v)
+	return value.DecimalValue(t, v.Bytes)
+}
+
+func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
+	b := decimal.BigIntToByte(v, precision, scale)
+	t := DecimalType(precision, scale)
+	return value.DecimalValue(t, b)
 }
 
 func TupleValue(vs ...Value) Value {

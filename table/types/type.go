@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math/big"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -75,36 +72,20 @@ func Optional(T Type) Type {
 	return value.OptionalType{T: T}
 }
 
-// Decimal supported in scanner API
-type Decimal struct {
-	Bytes     [16]byte
-	Precision uint32
-	Scale     uint32
-}
+var DefaultDecimal = DecimalType(22, 9)
 
-var DefaultDecimal = DecimalTypeFrom(22, 9)
-
-func DecimalTypeFrom(precision, scale uint32) Type {
+func DecimalType(precision, scale uint32) Type {
 	return value.DecimalType{
 		Precision: precision,
 		Scale:     scale,
 	}
 }
 
-func DecimalType(d *Decimal) Type {
+func DecimalTypeFromDecimal(d *Decimal) Type {
 	return value.DecimalType{
 		Precision: d.Precision,
 		Scale:     d.Scale,
 	}
-}
-
-func (d *Decimal) String() string {
-	v := decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
-	return decimal.Format(v, d.Precision, d.Scale)
-}
-
-func (d *Decimal) BigInt() *big.Int {
-	return decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
 }
 
 // TODO(kamardin): rename types to consistent format like values: BoolType,
