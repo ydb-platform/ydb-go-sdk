@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 )
 
 func ContextParams(ctx context.Context) (p Params) {

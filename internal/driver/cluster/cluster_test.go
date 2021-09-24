@@ -3,6 +3,11 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"net"
+	"sync"
+	"testing"
+	"time"
+
 	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
@@ -11,16 +16,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
-	"net"
-	"sync"
-	"testing"
-	"time"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil/timetest"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil/timetest"
 )
 
 func TestClusterFastRedial(t *testing.T) {

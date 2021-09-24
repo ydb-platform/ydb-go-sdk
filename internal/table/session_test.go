@@ -3,13 +3,14 @@ package table
 import (
 	"context"
 	"errors"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"reflect"
-	"testing"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
@@ -75,7 +76,7 @@ func TestSessionKeepAlive(t *testing.T) {
 			t.Fatal(err)
 		}
 		if info.Status() != options.SessionBusy.String() {
-			t.Fatalf("Result %v differ from, expectd %v", info.Status, options.SessionBusy.String())
+			t.Fatalf("Result %v differ from, expectd %v", info.Status(), options.SessionBusy.String())
 		}
 	}
 }

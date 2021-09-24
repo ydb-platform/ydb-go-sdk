@@ -3,13 +3,13 @@ package repeater
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil/timetest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil/timetest"
 )
 
 func TestRepeater(t *testing.T) {

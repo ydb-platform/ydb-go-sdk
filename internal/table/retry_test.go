@@ -3,12 +3,13 @@ package table
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"io"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -34,7 +35,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
 			pool := SingleSession(
-				simpleSession(),
+				simpleSession(t),
 				testutil.BackoffFunc(func(n int) <-chan time.Time {
 					ch := make(chan time.Time)
 					backoff <- ch
@@ -99,7 +100,7 @@ func TestRetryerImmediateRetry(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
 			pool := SingleSession(
-				simpleSession(),
+				simpleSession(t),
 				testutil.BackoffFunc(func(n int) <-chan time.Time {
 					t.Fatalf("this code will not be called")
 					return nil
@@ -122,7 +123,7 @@ func TestRetryerImmediateRetry(t *testing.T) {
 func TestRetryerBadSession(t *testing.T) {
 	pool := SessionProviderFunc{
 		OnGet: func(ctx context.Context) (table.Session, error) {
-			return simpleSession(), nil
+			return simpleSession(t), nil
 		},
 		OnPut:   nil,
 		OnRetry: nil,
@@ -237,7 +238,7 @@ func TestRetryerImmediateReturn(t *testing.T) {
 				}
 			}()
 			pool := SingleSession(
-				simpleSession(),
+				simpleSession(t),
 				testutil.BackoffFunc(func(n int) <-chan time.Time {
 					panic("this code will not be called")
 				}),

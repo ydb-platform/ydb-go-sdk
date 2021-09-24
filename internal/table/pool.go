@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
@@ -14,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 

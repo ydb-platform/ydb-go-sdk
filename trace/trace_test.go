@@ -11,7 +11,7 @@ func TestTable(t *testing.T) {
 }
 
 func TestTablePoolTrace(t *testing.T) {
-	testSingleTrace(t, TablePool{}, "SessionPoolTrace")
+	testSingleTrace(t, TablePool{}, "TablePoolTrace")
 }
 
 func TestTraceDriver(t *testing.T) {

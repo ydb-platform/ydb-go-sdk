@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 )
 
 func TestOperationParams(t *testing.T) {
