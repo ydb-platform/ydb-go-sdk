@@ -84,12 +84,12 @@ func WithCertificatesFromFile(caFile string) ConnectorOption {
 	return WithCertificates(certPool)
 }
 
-func WithCertificatesFromPem(pem string) ConnectorOption {
+func WithCertificatesFromPem(pem []byte) ConnectorOption {
 	certPool, err := x509.SystemCertPool()
 	if err != nil {
 		panic(err)
 	}
-	if ok := certPool.AppendCertsFromPEM([]byte(pem)); !ok {
+	if ok := certPool.AppendCertsFromPEM(pem); !ok {
 		panic(err)
 	}
 	return WithCertificates(certPool)
