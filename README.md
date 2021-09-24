@@ -53,77 +53,89 @@ go get -u github.com/ydb-platform/ydb-go-sdk/v3
 The straightforward example of querying data may look similar to this:
 
 ```go
-// Determine timeout for connect or do nothing
-connectCtx, cancel := context.WithTimeout(ctx, time.Second)
-defer cancel()
+   // Determine timeout for connect or do nothing
+   ctx := context.Background()
 
-// connect package helps to connect to database, returns connection object which
-// provide necessary clients such as table.Client, scheme.Client, etc.
- db, err := ydb.New(
-     connectCtx,
-     params.ConnectParams,
-     environ.WithEnvironCredentials(ctx),
- )
-if err != nil {
-    return fmt.Errorf("connect error: %w", err)
-}
-defer db.Close()
+   connectParams, err := ydb.ConnectionString(os.Getenv("YDB"))
+   if err != nil {
+   _, _ = fmt.Fprintf(os.Stderr, "cannot create connect params from connection string env['YDB'] = '%s': %v\n", os.Getenv("YDB"), err)
+   os.Exit(1)
+   }
+   
+   connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+   defer cancel()
 
-// Create session for execute queries
-session, err := db.Table().CreateSession(ctx)
-if err != nil {
-    // handle error
-}
-defer session.Close(ctx)
+   // connect package helps to connect to database, returns connection object which
+   // provide necessary clients such as table.Client, scheme.Client, etc.
+   db, err := ydb.New(
+      connectCtx,
+      connectParams,
+      ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
+      ydb.WithSessionPoolIdleThreshold(time.Second * 5),
+      ydb.WithSessionPoolKeepAliveMinSize(-1),
+      ydb.WithDiscoveryInterval(5 * time.Second),
+      ydb.WithAccessTokenCredentials(os.GetEnv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+   )
+   if err != nil {
+      // handle error
+   }
+   defer func() { _ = db.Close() }()
+   
+   // Create session for execute queries
+   session, err := db.Table().CreateSession(ctx)
+   if err != nil {
+       // handle error
+   }
+   defer session.Close(ctx)
 
-// Prepare transaction control for upcoming query execution.
-// NOTE: result of TxControl() may be reused.
-txc := table.TxControl(
-    table.BeginTx(table.WithSerializableReadWrite()),
-    table.CommitTx(),
-)
+   // Prepare transaction control for upcoming query execution.
+   // NOTE: result of TxControl() may be reused.
+   txc := table.TxControl(
+       table.BeginTx(table.WithSerializableReadWrite()),
+       table.CommitTx(),
+   )
 
-// Execute text query without preparation and with given "autocommit"
-// transaction control. That is, transaction will be committed without
-// additional calls. Notice the "_" unused variable – it stands for created
-// transaction during execution, but as said above, transaction is committed
-// for us and `ydb-go-sdk` do not want to do anything with it.
-_, res, err := session.Execute(ctx, txc,
-    `--!syntax_v1
-        DECLARE $mystr AS Utf8?;
-        SELECT 42 as id, $mystr as mystr
-    `,
-    table.NewQueryParameters(
-        table.ValueParam("$mystr", types.OptionalValue(types.UTF8Value("test"))),
-    ),
-)
-if err != nil {
-    return err // handle error
-}
-// Scan for received values within the result set(s).
-// res.Err() reports the reason of last unsuccessful one.
-var (
-    id    int32
-    myStr *string //optional value
-)
-for res.NextResultSet("id", "mystr") {
-    for res.NextRow() {
-        // Suppose our "users" table has two rows: id and age.
-        // Thus, current row will contain two appropriate items with
-        // exactly the same order.
-        err := res.Scan(&id, &myStr)
-
-        // Error handling.
-        if err != nil {
-            return err
-        }
-        // do something with data
-        fmt.Printf("got id %v, got mystr: %v\n", id, *myStr)
-    }
-}
-if res.Err() != nil {
-    return res.Err() // handle error
-}
+   // Execute text query without preparation and with given "autocommit"
+   // transaction control. That is, transaction will be committed without
+   // additional calls. Notice the "_" unused variable – it stands for created
+   // transaction during execution, but as said above, transaction is committed
+   // for us and `ydb-go-sdk` do not want to do anything with it.
+   _, res, err := session.Execute(ctx, txc,
+       `--!syntax_v1
+           DECLARE $mystr AS Utf8?;
+           SELECT 42 as id, $mystr as mystr
+       `,
+       table.NewQueryParameters(
+           table.ValueParam("$mystr", types.OptionalValue(types.UTF8Value("test"))),
+       ),
+   )
+   if err != nil {
+       return err // handle error
+   }
+   // Scan for received values within the result set(s).
+   // res.Err() reports the reason of last unsuccessful one.
+   var (
+       id    int32
+       myStr *string //optional value
+   )
+   for res.NextResultSet("id", "mystr") {
+       for res.NextRow() {
+           // Suppose our "users" table has two rows: id and age.
+           // Thus, current row will contain two appropriate items with
+           // exactly the same order.
+           err := res.Scan(&id, &myStr)
+   
+           // Error handling.
+           if err != nil {
+               return err
+           }
+           // do something with data
+           fmt.Printf("got id %v, got mystr: %v\n", id, *myStr)
+       }
+   }
+   if res.Err() != nil {
+       return res.Err() // handle error
+   }
 ```
 
 This example can be tested as https://github.com/ydb-platform/ydb-go-examples/tree/master/from_readme
