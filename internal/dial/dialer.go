@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pem"
 	"net"
 	"strconv"
 	"time"
@@ -41,12 +40,6 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 		grpcKeepalive = config.MinKeepaliveInterval
 	}
 	tlsConfig := d.TLSConfig
-	if tlsConfig != nil {
-		tlsConfig.RootCAs, err = pem.WithYdbCA(tlsConfig.RootCAs)
-		if err != nil {
-			return nil, err
-		}
-	}
 	return (&dialer{
 		netDial:   d.NetDial,
 		tlsConfig: tlsConfig,

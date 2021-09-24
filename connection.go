@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 
 	"google.golang.org/grpc"
 
@@ -98,8 +99,7 @@ func (db *db) RateLimiter() ratelimiter.Client {
 // New connects to name and return name runtime holder
 func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connection, err error) {
 	db := &db{
-		name:  params.Database(),
-		table: &lazyTable{},
+		name: params.Database(),
 	}
 	for _, opt := range opts {
 		err = opt(ctx, db)
@@ -109,14 +109,21 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 	}
 	var tlsConfig *tls.Config
 	if params.UseTLS() {
-		tlsConfig = new(tls.Config)
+		tlsConfig = &tls.Config{}
+		if db.options.certPool != nil {
+			tlsConfig.RootCAs = db.options.certPool
+		} else {
+			tlsConfig.RootCAs, err = x509.SystemCertPool()
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	if db.options.connectTimeout != nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *db.options.connectTimeout)
 		defer cancel()
 	}
-
 	db.cluster, err = (&dial.Dialer{
 		DriverConfig: config.New(
 			func(c *config.Config) {

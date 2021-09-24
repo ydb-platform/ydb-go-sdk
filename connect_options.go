@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"crypto/x509"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -13,6 +14,7 @@ import (
 type Option func(ctx context.Context, client *db) error
 
 type options struct {
+	certPool                             *x509.CertPool
 	connectTimeout                       *time.Duration
 	traceDriver                          *trace.Driver
 	traceTable                           *trace.Table
@@ -146,6 +148,13 @@ func WithTraceTable(trace trace.Table) Option {
 func WithConnectTimeout(connectTimeout time.Duration) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.connectTimeout = &connectTimeout
+		return nil
+	}
+}
+
+func WithCertificates(certPool *x509.CertPool) Option {
+	return func(ctx context.Context, c *db) error {
+		c.options.certPool = certPool
 		return nil
 	}
 }
