@@ -59,6 +59,19 @@ func WithConnectParams(params ydb.ConnectParams) ConnectorOption {
 	}
 }
 
+func WithCertificates(certPool *x509.CertPool) ConnectorOption {
+	return func(c *connector) {
+		if c.dialer.TLSConfig == nil {
+			var err error
+			c.dialer.TLSConfig, err = dial.Tls()
+			if err != nil {
+				panic(err)
+			}
+		}
+		c.dialer.TLSConfig.RootCAs = certPool
+	}
+}
+
 func WithCertificatesFromFile(caFile string) ConnectorOption {
 	certPool, err := x509.SystemCertPool()
 	if err != nil {
@@ -68,15 +81,18 @@ func WithCertificatesFromFile(caFile string) ConnectorOption {
 	if err != nil {
 		panic(err)
 	}
-	return func(c *connector) {
-		if c.dialer.TLSConfig == nil {
-			c.dialer.TLSConfig, err = dial.Tls()
-			if err != nil {
-				panic(err)
-			}
-		}
-		c.dialer.TLSConfig.RootCAs = certPool
+	return WithCertificates(certPool)
+}
+
+func WithCertificatesFromPem(pem string) ConnectorOption {
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		panic(err)
 	}
+	if ok := certPool.AppendCertsFromPEM([]byte(pem)); !ok {
+		panic(err)
+	}
+	return WithCertificates(certPool)
 }
 
 func WithConnectionString(connection string) ConnectorOption {
