@@ -3,14 +3,10 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
-	"os"
-
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
@@ -111,20 +107,9 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 	}
 	var tlsConfig *tls.Config
 	if params.UseTLS() {
-		tlsConfig = &tls.Config{}
+		tlsConfig, err = dial.Tls()
 		if db.options.certPool != nil {
 			tlsConfig.RootCAs = db.options.certPool
-		} else {
-			tlsConfig.RootCAs, err = x509.SystemCertPool()
-			if err != nil {
-				return nil, err
-			}
-		}
-		// append user defined certs
-		if caFile, ok := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); ok {
-			if err := credentials.AppendCertsFromFile(tlsConfig.RootCAs, caFile); err != nil {
-				return nil, err
-			}
 		}
 	}
 	if db.options.connectTimeout != nil {

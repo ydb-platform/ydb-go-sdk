@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	icredentials "github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -19,7 +19,7 @@ type options struct {
 	traceDriver                          *trace.Driver
 	traceTable                           *trace.Table
 	driverConfig                         *config.Config
-	credentials                          icredentials.Credentials
+	credentials                          credentials.Credentials
 	discoveryInterval                    *time.Duration
 	tableSessionPoolSizeLimit            *int
 	tableSessionPoolKeepAliveMinSize     *int
@@ -31,25 +31,25 @@ type options struct {
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
-		credentials.NewAuthTokenCredentials(accessToken, "connect.WithAccessTokenCredentials(accessToken)"), // hide access token for logs
+		internal.NewAuthTokenCredentials(accessToken, "connect.WithAccessTokenCredentials(accessToken)"), // hide access token for logs
 	)
 }
 
 func NewAuthTokenCredentials(accessToken string) credentials.Credentials {
-	return credentials.NewAuthTokenCredentials(accessToken, "connect.NewAuthTokenCredentials(accessToken)") // hide access token for logs
+	return internal.NewAuthTokenCredentials(accessToken, "connect.NewAuthTokenCredentials(accessToken)") // hide access token for logs
 }
 
 func WithAnonymousCredentials() Option {
 	return WithCredentials(
-		credentials.NewAnonymousCredentials("connect.WithAnonymousCredentials()"),
+		internal.NewAnonymousCredentials("connect.WithAnonymousCredentials()"),
 	)
 }
 
 func NewAnonymousCredentials() credentials.Credentials {
-	return credentials.NewAnonymousCredentials("connect.NewAnonymousCredentials()")
+	return internal.NewAnonymousCredentials("connect.NewAnonymousCredentials()")
 }
 
-func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (icredentials.Credentials, error)) Option {
+func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (credentials.Credentials, error)) Option {
 	return func(ctx context.Context, c *db) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
@@ -60,8 +60,8 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (icre
 	}
 }
 
-func WithCredentials(c icredentials.Credentials) Option {
-	return WithCreateCredentialsFunc(func(context.Context) (icredentials.Credentials, error) {
+func WithCredentials(c credentials.Credentials) Option {
+	return WithCreateCredentialsFunc(func(context.Context) (credentials.Credentials, error) {
 		return c, nil
 	})
 }
@@ -157,4 +157,16 @@ func WithCertificates(certPool *x509.CertPool) Option {
 		c.options.certPool = certPool
 		return nil
 	}
+}
+
+func WithCertificatesFromFile(caFile string) Option {
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		panic(err)
+	}
+	err = credentials.AppendCertsFromFile(certPool, caFile)
+	if err != nil {
+		panic(err)
+	}
+	return WithCertificates(certPool)
 }

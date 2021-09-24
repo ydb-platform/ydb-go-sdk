@@ -34,6 +34,7 @@ func main() {
 	ctx := context.Background()
 
 	opts := []ydbsql.ConnectorOption{
+		ydbsql.WithCertificatesFromFile("~/.ydb/CA.pem"),
 		ydbsql.WithConnectParams(connectParams),
 		ydbsql.WithDefaultExecDataQueryOption(
 			options.WithQueryCachePolicy(

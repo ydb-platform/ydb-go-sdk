@@ -24,6 +24,7 @@ func main() {
 	defer cancel()
 
 	options := []ydb.Option{
+		ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
 		ydb.WithSessionPoolIdleThreshold(time.Second * 5),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5 * time.Second),

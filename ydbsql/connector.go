@@ -2,12 +2,12 @@ package ydbsql
 
 import (
 	"context"
-	"crypto/tls"
+	"crypto/x509"
 	"database/sql/driver"
 	"fmt"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -46,10 +46,36 @@ func WithConnectParams(params ydb.ConnectParams) ConnectorOption {
 		}
 		c.dialer.DriverConfig.Database = params.Database()
 		if params.UseTLS() {
-			c.dialer.TLSConfig = &tls.Config{}
+			if c.dialer.TLSConfig == nil {
+				var err error
+				c.dialer.TLSConfig, err = dial.Tls()
+				if err != nil {
+					panic(err)
+				}
+			}
 		} else {
 			c.dialer.TLSConfig = nil
 		}
+	}
+}
+
+func WithCertificatesFromFile(caFile string) ConnectorOption {
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		panic(err)
+	}
+	err = credentials.AppendCertsFromFile(certPool, caFile)
+	if err != nil {
+		panic(err)
+	}
+	return func(c *connector) {
+		if c.dialer.TLSConfig == nil {
+			c.dialer.TLSConfig, err = dial.Tls()
+			if err != nil {
+				panic(err)
+			}
+		}
+		c.dialer.TLSConfig.RootCAs = certPool
 	}
 }
 
