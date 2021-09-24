@@ -132,19 +132,19 @@ YDB sessions may become staled and appropriate error will be returned. To
 reduce boilerplate overhead for such cases `ydb-go-sdk` provides generic retry logic:
 
 ```go
-	var res *table.Result
-    // Retry() provide the best effort fo retrying operation
-    // Retry implements internal busy loop until one of the following conditions occurs:
-    // - deadline was cancelled or deadlined
-    // - retry operation returned nil as error
-	// Note that in case of prepared statements call to Prepare() must be made
-	// inside the function body.
-	err, issues := c.Retry(ctx, false,
-		func(ctx context.Context, s table.Session) (err error) {
-			res, err = s.Execute(...)
-			return
-		},
-	)
+ var res *table.Result
+ // Retry() provide the best effort fo retrying operation
+ // Retry implements internal busy loop until one of the following conditions occurs:
+ // - deadline was cancelled or deadlined
+ // - retry operation returned nil as error
+ // Note that in case of prepared statements call to Prepare() must be made
+ // inside the function body.
+ err, issues := c.Retry(ctx, false,
+     func(ctx context.Context, s table.Session) (err error) {
+         res, err = s.Execute(...)
+         return
+     },
+ )
 ```
 
 That is, instead of manual creation of `table.Session`, we give a
