@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math/big"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -93,6 +96,15 @@ func DecimalType(d *Decimal) Type {
 		Precision: d.Precision,
 		Scale:     d.Scale,
 	}
+}
+
+func (d *Decimal) String() string {
+	v := decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
+	return decimal.Format(v, d.Precision, d.Scale)
+}
+
+func (d *Decimal) BigInt() *big.Int {
+	return decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
 }
 
 // TODO(kamardin): rename types to consistent format like values: BoolType,

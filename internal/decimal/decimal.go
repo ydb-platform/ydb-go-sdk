@@ -5,6 +5,7 @@ import (
 	"math/bits"
 )
 
+// TODO(berezhnov): delete unused functions
 const wordSize = bits.UintSize / 8
 
 var (
