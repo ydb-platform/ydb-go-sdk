@@ -1,7 +1,7 @@
 package balancer
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"testing"
 	"time"
@@ -33,16 +33,16 @@ func TestAbsDuration(t *testing.T) {
 
 func TestChooseByState(t *testing.T) {
 	c := connRuntimeCriterion{}
-	c1, c2 := &cluster.connListElement{
-		index: 1,
-	}, &cluster.connListElement{
-		index: 2,
+	c1, c2 := &list.Element{
+		Index: 1,
+	}, &list.Element{
+		Index: 2,
 	}
 	for _, test := range [...]struct {
 		name   string
 		s1     state.State
 		s2     state.State
-		choice *cluster.connListElement
+		choice *list.Element
 	}{
 		{
 			s1:     state.Unknown,

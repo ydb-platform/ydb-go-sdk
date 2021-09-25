@@ -1,6 +1,7 @@
 package balancer
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
@@ -232,7 +233,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(cluster.Addr{}, nil, 0)
+				c := conn.New(context.Background(), cluster.Addr{}, nil, nil)
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
@@ -285,7 +286,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(cluster.Addr{}, nil, 0)
+				c := conn.New(context.Background(), cluster.Addr{}, nil, nil)
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c

@@ -1,7 +1,10 @@
 package cluster
 
 import (
+	"context"
+	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"strconv"
 	"testing"
 
@@ -24,14 +27,14 @@ func isOddConn(c conn.Conn, info info.Info) bool {
 func TestMultiBalancer(t *testing.T) {
 	cs1, b1 := simpleBalancer()
 	cs2, b2 := simpleBalancer()
-	forEachList := func(it func(*connList)) {
+	forEachList := func(it func(*list.List)) {
 		it(cs1)
 		it(cs2)
 	}
 	forEachConn := func(it func(conn.Conn, info.Info)) {
-		forEachList(func(cs *connList) {
+		forEachList(func(cs *list.List) {
 			for _, e := range *cs {
-				it(e.conn, e.info)
+				it(e.Conn, e.Info)
 			}
 		})
 	}
@@ -45,16 +48,12 @@ func TestMultiBalancer(t *testing.T) {
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := &conn.conn{
-			addr: conn.connAddr{
-				addr: strconv.Itoa(i),
-			},
-		}
+		c := conn.New(context.Background(), public.Addr{Host: strconv.Itoa(i)}, nil, nil)
 		e := m.Insert(c, info.Info{})
 		es[i] = e
 		el[c] = e
 	}
-	forEachList(func(cs *connList) {
+	forEachList(func(cs *list.List) {
 		if act, exp := len(*cs), n/2; act != exp {
 			t.Errorf(
 				"unexepcted number of conns: %d; want %d",
@@ -64,11 +63,11 @@ func TestMultiBalancer(t *testing.T) {
 	})
 	for i := 0; i < n; i++ {
 		m.Update(es[i], info.Info{
-			loadFactor: 1,
+			LoadFactor: 1,
 		})
 	}
 	forEachConn(func(conn conn.Conn, info info.Info) {
-		if act, exp := info.loadFactor, float32(1); act != exp {
+		if act, exp := info.LoadFactor, float32(1); act != exp {
 			t.Errorf(
 				"unexpected load factor: %f; want %f",
 				act, exp,

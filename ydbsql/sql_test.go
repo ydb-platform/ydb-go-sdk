@@ -200,6 +200,9 @@ func TestQuery(t *testing.T) {
 									},
 								}, err
 							},
+							testutil.TableStreamExecuteScanQuery: func(_ interface{}) (result proto.Message, err error) {
+								return &Ydb_Table.ExecuteSchemeQueryResponse{}, err
+							},
 							testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.PrepareQueryResult{}, nil
 							},

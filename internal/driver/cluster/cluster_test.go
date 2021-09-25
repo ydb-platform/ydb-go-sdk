@@ -289,25 +289,16 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 
 	dialTicket := make(chan uint64, 1)
 	c := &cluster{
-		dial: func(ctx context.Context, s string, p int) (conn.Conn, error) {
+		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
 			var id uint64
 			select {
 			case id = <-dialTicket:
 			default:
 				return nil, fmt.Errorf("refused")
 			}
-			cc, err := ln.Dial(ctx)
-			ret := conn2.NewConn(cc, public.Addr{s, p})
-			// Used to distinguish connections.
-			ret.Runtime().SetOpStarted(id)
-			return ret, err
+			return ln.Dial(ctx)
 		},
 		balancer: balancer,
-		testHookTrackerQueue: func(q []*list.Element) {
-			ch := make(chan int)
-			tracking <- ch
-			ch <- len(q)
-		},
 	}
 	defer func() {
 		err := c.Close()
@@ -317,7 +308,11 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 	}()
 
 	t.Run("test actual block of tracker", func(t *testing.T) {
-		endpoint := public.Endpoint{Host: "foo"}
+		endpoint := public.Endpoint{
+			Addr: public.Addr{
+				Host: "foo",
+			},
+		}
 		c.Insert(ctx, endpoint)
 
 		// Wait for connection become tracked.
@@ -346,7 +341,7 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 		assertTracking(0)
 
 		var ss []stats.Stats
-		c.Stats(func(_ endpoint.Endpoint, s stats.Stats) {
+		c.Stats(func(_ public.Endpoint, s stats.Stats) {
 			ss = append(ss, s)
 		})
 		if len(ss) != 1 {
@@ -369,19 +364,13 @@ func TestClusterAwait(t *testing.T) {
 
 	var connToReturn conn.Conn
 	c := &cluster{
-		dial: func(ctx context.Context, _ string, _ int) (_ conn.Conn, err error) {
-			cc, err := ln.Dial(ctx)
-			if err != nil {
-				return nil, err
-			}
-			return &conn.conn{
-				raw: cc,
-			}, nil
+		dial: func(ctx context.Context, _ string, _ int) (_ *grpc.ClientConn, err error) {
+			return ln.Dial(ctx)
 		},
 		balancer: stubBalancer{
 			OnInsert: func(c conn.Conn, _ info.Info) balancer.Element {
 				connToReturn = c
-				return c.addr
+				return c.Addr()
 			},
 			OnNext: func() conn.Conn {
 				return connToReturn
