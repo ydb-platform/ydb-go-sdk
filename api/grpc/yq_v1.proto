@@ -31,8 +31,11 @@ service YandexQueryService {
 
     // Job
     // Job - appears immediately after starting the request and contains the request metadata
-    // Get information about the job
+    // Get a list of jobs
     rpc ListJobs(YandexQuery.ListJobsRequest) returns (YandexQuery.ListJobsResponse);
+
+    // Get information about the job
+    rpc DescribeJob(YandexQuery.DescribeJobRequest) returns (YandexQuery.DescribeJobResponse);
 
     // Connection
     // Connection - entity that describes connection points. This can be imagined as an analogue of a network address.

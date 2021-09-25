@@ -293,6 +293,19 @@ message TtlSettings {
     // There is no guarantee that expired row will be deleted immediately upon
     // expiration. There may be a delay between the time a row expires and the
     // time that server deletes the row from the table.
+
+    // Ttl periodically runs background removal operations (BRO) on table's partitions.
+    // By default, there is:
+    // - no more than one BRO on the table;
+    // - BRO is started no more than once an hour on the same partition.
+    // Use options below to change that behavior.
+
+    // Number of maximum parallel BROs on the table
+    uint32 concurrency_level = 3;
+
+    // How often to run BRO on the same partition.
+    // BRO will not be started more often, but may be started less often.
+    uint32 run_interval_seconds = 4;
 }
 
 message StorageSettings {

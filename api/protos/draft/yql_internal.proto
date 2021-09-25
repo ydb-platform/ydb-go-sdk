@@ -27,6 +27,13 @@ message SignedIdentity {
     string signature = 2;
 }
 
+message TopicConsumer {
+    string database_id = 1;
+    string database = 2;
+    string topic_path = 3;
+    string consumer_name = 4;
+}
+
 message GetTaskResult {
     bool has_task = 1;
     // come back later in 10 sec ?
@@ -36,7 +43,8 @@ message GetTaskResult {
     uint64 generation = 5;
 
     bool streaming = 6;
-    string dq_graph = 7;
+    repeated bytes dq_graph = 7;
+    int32 dq_graph_index = 20;
     // text, connection and binding are empty if dq_graph is not empty
     string text = 8;
     repeated YandexQuery.Connection connection = 9;
@@ -50,6 +58,8 @@ message GetTaskResult {
     YandexQuery.ExecuteMode execute_mode = 16;
     YandexQuery.StateLoadMode state_load_mode = 17;
     YandexQuery.QueryMeta.ComputeStatus status = 18;
+    map<string, string> sensor_labels = 19;
+    repeated YandexQuery.ResultSetMeta result_set_meta = 21;
 }
 
 message GetTaskResponse {
@@ -68,15 +78,16 @@ message PingTaskRequest {
     string statistics = 8;
     repeated YandexQuery.ResultSetMeta result_set_meta = 9;
     string executer_info = 10;
-    string dq_graph = 11;
+    repeated bytes dq_graph = 11;
+    int32 dq_graph_index = 20;
     string ast = 12;
     string plan = 13;
     bool resign_query = 14;
+    repeated TopicConsumer created_topic_consumers = 17;
     Ydb.Operations.OperationParams operation_params = 15;
     string scope = 100; //TODO remove
     google.protobuf.Timestamp started_at = 101;
     google.protobuf.Timestamp finished_at = 102;
-
 }
 
 message PingTaskResult {
