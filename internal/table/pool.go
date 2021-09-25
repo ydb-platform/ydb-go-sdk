@@ -57,7 +57,7 @@ type Pool interface {
 	Take(ctx context.Context, s table.Session) (took bool, err error)
 	Put(ctx context.Context, s table.Session) (err error)
 	Create(ctx context.Context) (s table.Session, err error)
-	Retry(ctx context.Context, idempotent bool, op table.RetryOperation) (error, []error)
+	Retry(ctx context.Context, isIdempotentOperation bool, op table.RetryOperation) (error, []error)
 	Close(ctx context.Context) error
 }
 

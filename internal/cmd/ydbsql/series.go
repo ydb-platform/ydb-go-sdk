@@ -125,9 +125,8 @@ func readTable(ctx context.Context, db *sql.DB, path string) error {
 
 func describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
-	err, issues := c.Retry(
+	err, issues := c.RetryIdempotent(
 		ctx,
-		false,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
 			return
@@ -310,9 +309,8 @@ func fillTablesWithData(ctx context.Context, db *sql.DB, prefix string) error {
 }
 
 func createTables(ctx context.Context, c table.Client, prefix string) error {
-	err, issues := c.Retry(
+	err, issues := c.RetryNonIdempotent(
 		ctx,
-		false,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
@@ -333,9 +331,8 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 		return err
 	}
 
-	err, issues = c.Retry(
+	err, issues = c.RetryNonIdempotent(
 		ctx,
-		false,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "seasons"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
@@ -356,9 +353,8 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 		return err
 	}
 
-	err, issues = c.Retry(
+	err, issues = c.RetryNonIdempotent(
 		ctx,
-		false,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "episodes"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
@@ -381,9 +377,8 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 }
 
 func describeTable(ctx context.Context, c table.Client, path string) (err error) {
-	err, issues := c.Retry(
+	err, issues := c.RetryIdempotent(
 		ctx,
-		false,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
 			if err != nil {

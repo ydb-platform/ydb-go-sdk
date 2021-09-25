@@ -37,7 +37,7 @@ type retryOperation func(context.Context) (err error)
 // - deadline was cancelled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func Retry(ctx context.Context, retryNoIdempotent bool, op retryOperation) (err error, issues []error) {
+func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (err error, issues []error) {
 	var (
 		i        int
 		attempts int
@@ -66,10 +66,10 @@ func Retry(ctx context.Context, retryNoIdempotent bool, op retryOperation) (err 
 			if m.StatusCode() != code {
 				i = 0
 			}
-			if m.MustRetry(retryNoIdempotent) {
+			if m.MustRetry(isIdempotentOperation) {
 				issues = append(issues, fmt.Errorf("retry.Retry: retriable error: %w", err))
 			}
-			if !m.MustRetry(retryNoIdempotent) {
+			if !m.MustRetry(isIdempotentOperation) {
 				issues = append(issues, fmt.Errorf("retry.Retry: non-retriable error: %w", err))
 				return
 			}

@@ -53,8 +53,16 @@ func (c *client) CreateSession(ctx context.Context) (s table.Session, err error)
 	return newSession(ctx, c.cluster, c.trace)
 }
 
-func (c *client) Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error) {
-	return c.pool.Retry(ctx, retryNoIdempotent, op)
+func (c *client) RetryIdempotent(ctx context.Context, op table.RetryOperation) (err error, issues []error) {
+	return c.pool.Retry(ctx, true, op)
+}
+
+func (c *client) RetryNonIdempotent(ctx context.Context, op table.RetryOperation) (err error, issues []error) {
+	return c.pool.Retry(ctx, false, op)
+}
+
+func (c *client) Retry(ctx context.Context, isIdempotentOperation bool, op table.RetryOperation) (err error, issues []error) {
+	return c.pool.Retry(ctx, isIdempotentOperation, op)
 }
 
 // Close closes session client instance.

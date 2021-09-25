@@ -255,7 +255,7 @@ func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryPa
 	}
 	err, _ = c.pool().Retry(
 		ctx,
-		retry.ContextRetryNoIdempotent(ctx),
+		retry.ContextIdempotentOperation(ctx),
 		func(ctx context.Context, session table.Session) (err error) {
 			res, err = req.process(ctx, c, params)
 			return err
@@ -346,7 +346,7 @@ type TxDoer struct {
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 	err, _ = retry.Retry(
 		ctx,
-		retry.ContextRetryNoIdempotent(ctx),
+		retry.ContextIdempotentOperation(ctx),
 		func(ctx context.Context) (err error) {
 			return d.do(ctx, f)
 		},
