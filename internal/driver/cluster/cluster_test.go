@@ -290,12 +290,6 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 	dialTicket := make(chan uint64, 1)
 	c := &cluster{
 		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
-			var id uint64
-			select {
-			case id = <-dialTicket:
-			default:
-				return nil, fmt.Errorf("refused")
-			}
 			return ln.Dial(ctx)
 		},
 		balancer: balancer,
