@@ -2,12 +2,13 @@ package ratelimiter
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_RateLimiter_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 )
 
 type Client interface {

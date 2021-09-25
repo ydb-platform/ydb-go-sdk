@@ -2,15 +2,15 @@ package ydb
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
-	resource "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 )
 
 type lazyRatelimiter struct {
 	db     DB
-	client ratelimiter.Client
+	client internal.Client
 	m      sync.Mutex
 }
 
@@ -26,12 +26,12 @@ func (r *lazyRatelimiter) Close(ctx context.Context) error {
 	return r.client.Close(ctx)
 }
 
-func (r *lazyRatelimiter) CreateResource(ctx context.Context, coordinationNodePath string, resource resource.Resource) (err error) {
+func (r *lazyRatelimiter) CreateResource(ctx context.Context, coordinationNodePath string, resource ratelimiter.Resource) (err error) {
 	r.init()
 	return r.client.CreateResource(ctx, coordinationNodePath, resource)
 }
 
-func (r *lazyRatelimiter) AlterResource(ctx context.Context, coordinationNodePath string, resource resource.Resource) (err error) {
+func (r *lazyRatelimiter) AlterResource(ctx context.Context, coordinationNodePath string, resource ratelimiter.Resource) (err error) {
 	r.init()
 	return r.client.AlterResource(ctx, coordinationNodePath, resource)
 }
@@ -46,7 +46,7 @@ func (r *lazyRatelimiter) ListResource(ctx context.Context, coordinationNodePath
 	return r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
 }
 
-func (r *lazyRatelimiter) DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (_ *resource.Resource, err error) {
+func (r *lazyRatelimiter) DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (_ *ratelimiter.Resource, err error) {
 	r.init()
 	return r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
 }
@@ -58,7 +58,7 @@ func (r *lazyRatelimiter) AcquireResource(ctx context.Context, coordinationNodeP
 
 func (r *lazyRatelimiter) init() {
 	r.m.Lock()
-	r.client = ratelimiter.New(r.db)
+	r.client = internal.New(r.db)
 	r.m.Unlock()
 }
 

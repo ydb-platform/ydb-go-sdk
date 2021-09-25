@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
@@ -34,6 +35,7 @@ func main() {
 	ctx := context.Background()
 
 	opts := []ydbsql.ConnectorOption{
+		ydbsql.WithDialTimeout(3 * time.Second),
 		ydbsql.WithCertificatesFromFile("~/.ydb/CA.pem"),
 		ydbsql.WithConnectParams(connectParams),
 		ydbsql.WithDefaultExecDataQueryOption(

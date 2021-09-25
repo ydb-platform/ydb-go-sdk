@@ -40,7 +40,7 @@ func TestConnectorDialOnPing(t *testing.T) {
 				dialCh <- struct{}{}
 				return client, nil
 			},
-			DriverConfig: &config.Config{
+			Config: &config.Config{
 				Credentials:          credentials.NewAnonymousCredentials("test"),
 				GrpcConnectionPolicy: &config.DefaultGrpcConnectionPolicy,
 				DiscoveryInterval:    time.Second,
@@ -93,7 +93,7 @@ func TestConnectorRedialOnError(t *testing.T) {
 					return nil, errors.New("any error")
 				}
 			},
-			DriverConfig: &config.Config{
+			Config: &config.Config{
 				Credentials:          credentials.NewAnonymousCredentials("test"),
 				GrpcConnectionPolicy: &config.DefaultGrpcConnectionPolicy,
 				DiscoveryInterval:    time.Second,

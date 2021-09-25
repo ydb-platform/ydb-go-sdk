@@ -20,10 +20,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	options := []ydb.Option{
+		ydb.WithDialTimeout(3 * time.Second),
 		ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
 		ydb.WithSessionPoolIdleThreshold(time.Second * 5),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
@@ -37,7 +35,7 @@ func main() {
 	}
 
 	db, err := ydb.New(
-		connectCtx,
+		ctx,
 		connectParams,
 		options...,
 	)

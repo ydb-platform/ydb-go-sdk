@@ -3,8 +3,6 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
-	"google.golang.org/grpc"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
@@ -14,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"google.golang.org/grpc"
 )
 
 type DB interface {
@@ -118,14 +117,10 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 		defer cancel()
 	}
 	db.cluster, err = (&dial.Dialer{
-		DriverConfig: config.New(
-			func(c *config.Config) {
-				c.Database = params.Database()
-			},
-			func(c *config.Config) {
-				c.Credentials = db.options.credentials
-			},
-		),
+		Config: config.New(func(c *config.Config) {
+			c.Database = params.Database()
+			c.Credentials = db.options.credentials
+		}),
 		TLSConfig: tlsConfig,
 	}).Dial(ctx, params.Endpoint())
 	if err != nil {

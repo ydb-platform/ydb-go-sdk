@@ -14,6 +14,7 @@ import (
 type Option func(ctx context.Context, client *db) error
 
 type options struct {
+	dialTimeout                          time.Duration
 	certPool                             *x509.CertPool
 	connectTimeout                       *time.Duration
 	traceDriver                          *trace.Driver
@@ -76,6 +77,13 @@ func WithDriverConfig(config *config.Config) Option {
 func WithGrpcConnectionPolicy(policy *config.GrpcConnectionPolicy) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.driverConfig.GrpcConnectionPolicy = policy
+		return nil
+	}
+}
+
+func WithDialTimeout(timeout time.Duration) Option {
+	return func(ctx context.Context, c *db) error {
+		c.options.dialTimeout = timeout
 		return nil
 	}
 }

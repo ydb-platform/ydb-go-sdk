@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
@@ -26,8 +27,8 @@ type ConnectorOption func(*connector)
 func WithDialer(d dial.Dialer) ConnectorOption {
 	return func(c *connector) {
 		c.dialer = d
-		if c.dialer.DriverConfig == nil {
-			c.dialer.DriverConfig = new(config.Config)
+		if c.dialer.Config == nil {
+			c.dialer.Config = config.New()
 		}
 	}
 }
@@ -41,10 +42,10 @@ func withClient(pool internal.ClientAsPool) ConnectorOption {
 func WithConnectParams(params ydb.ConnectParams) ConnectorOption {
 	return func(c *connector) {
 		c.endpoint = params.Endpoint()
-		if c.dialer.DriverConfig == nil {
-			c.dialer.DriverConfig = &config.Config{}
+		if c.dialer.Config == nil {
+			c.dialer.Config = &config.Config{}
 		}
-		c.dialer.DriverConfig.Database = params.Database()
+		c.dialer.Config.Database = params.Database()
 		if params.UseTLS() {
 			if c.dialer.TLSConfig == nil {
 				var err error
@@ -69,6 +70,12 @@ func WithCertificates(certPool *x509.CertPool) ConnectorOption {
 			}
 		}
 		c.dialer.TLSConfig.RootCAs = certPool
+	}
+}
+
+func WithDialTimeout(timeout time.Duration) ConnectorOption {
+	return func(c *connector) {
+		c.dialer.Timeout = timeout
 	}
 }
 
@@ -107,25 +114,25 @@ func WithEndpoint(addr string) ConnectorOption {
 
 func WithDriverConfig(config config.Config) ConnectorOption {
 	return func(c *connector) {
-		*(c.dialer.DriverConfig) = config
+		*(c.dialer.Config) = config
 	}
 }
 
 func WithCredentials(creds credentials.Credentials) ConnectorOption {
 	return func(c *connector) {
-		c.dialer.DriverConfig.Credentials = creds
+		c.dialer.Config.Credentials = creds
 	}
 }
 
 func WithDatabase(db string) ConnectorOption {
 	return func(c *connector) {
-		c.dialer.DriverConfig.Database = db
+		c.dialer.Config.Database = db
 	}
 }
 
 func WithTraceDriver(t trace.Driver) ConnectorOption {
 	return func(c *connector) {
-		c.dialer.DriverConfig.Trace = t
+		c.dialer.Config.Trace = t
 	}
 }
 
@@ -156,7 +163,7 @@ func WithDefaultExecScanQueryOption(opts ...options.ExecuteScanQueryOption) Conn
 func Connector(opts ...ConnectorOption) driver.Connector {
 	c := &connector{
 		dialer: dial.Dialer{
-			DriverConfig: config.New(),
+			Config: config.New(),
 		},
 		defaultTxControl: table.TxControl(
 			table.BeginTx(
@@ -213,13 +220,13 @@ func (c *connector) dial(ctx context.Context) (internal.ClientAsPool, error) {
 		if c == nil {
 			panic("nil connector")
 		}
-		if c.dialer.DriverConfig == nil {
+		if c.dialer.Config == nil {
 			panic("nil driver config")
 		}
-		if c.dialer.DriverConfig.Credentials == nil {
+		if c.dialer.Config.Credentials == nil {
 			panic("nil credentials")
 		}
-		if stringer, ok := c.dialer.DriverConfig.Credentials.(fmt.Stringer); ok {
+		if stringer, ok := c.dialer.Config.Credentials.(fmt.Stringer); ok {
 			return nil, fmt.Errorf("dial error: %w (credentials: %s)", err, stringer.String())
 		}
 		return nil, fmt.Errorf("dial error: %w", err)

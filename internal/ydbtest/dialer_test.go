@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
@@ -52,11 +52,11 @@ func TestClusterTracking(t *testing.T) {
 	)
 
 	dialer := &dial.Dialer{
-		DriverConfig: &config.Config{
-			Database:          "xxx",
-			DiscoveryInterval: time.Hour,
-			Trace:             dtrace,
-		},
+		Config: config.New(func(c *config.Config) {
+			c.Database = "xxx"
+			c.DiscoveryInterval = time.Hour
+			c.Trace = dtrace
+		}),
 		NetDial: func(ctx context.Context, addr string) (net.Conn, error) {
 			var wrap func(net.Conn) net.Conn
 			if addr == balancer.Addr().String() {
@@ -94,7 +94,7 @@ func TestClusterTracking(t *testing.T) {
 	// trying to connect to them (and is not able until we put ticket into the
 	// dialTicket channel).
 
-	tc := table.NewClient(d)
+	tc := table.NewClientAsPool(d, table.DefaultConfig())
 	mustCreateSession := func() {
 		sub, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()

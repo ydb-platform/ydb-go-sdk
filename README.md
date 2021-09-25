@@ -62,14 +62,12 @@ The straightforward example of querying data may look similar to this:
    os.Exit(1)
    }
    
-   connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-   defer cancel()
-
    // connect package helps to connect to database, returns connection object which
    // provide necessary clients such as table.Client, scheme.Client, etc.
    db, err := ydb.New(
-      connectCtx,
+      ctx,
       connectParams,
+      ydb.WithDialTimeout(3 * time.Second),
       ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
       ydb.WithSessionPoolIdleThreshold(time.Second * 5),
       ydb.WithSessionPoolKeepAliveMinSize(-1),

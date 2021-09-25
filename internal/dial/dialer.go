@@ -20,8 +20,8 @@ import (
 // Dialer contains options of dialing and initialization of particular ydb
 // driver.
 type Dialer struct {
-	// DriverConfig is a driver configuration.
-	DriverConfig *config.Config
+	// Config is a driver configuration.
+	Config *config.Config
 
 	// TLSConfig specifies the TLS configuration to use for tls client.
 	// If TLSConfig is zero then connections are insecure.
@@ -29,13 +29,19 @@ type Dialer struct {
 
 	// NetDial is an optional function that may replace default network dialing
 	// function such as net.Dial("tcp").
-	// Deprecated: Use it for test purposes and special cases only. In most cases should be left empty.
+	// Deprecated: Use it for test purposes and special cases only. In most cases
+	// should be left empty.
 	NetDial func(context.Context, string) (net.Conn, error)
+
+	// Timeout is the maximum amount of time a dial will wait for a connect to
+	// complete.
+	// If Timeout is zero then no timeout is used.
+	Timeout time.Duration
 }
 
 // Dial dials given addr and initializes driver instance on success.
 func (d *Dialer) Dial(ctx context.Context, addr string) (_ cluster.Cluster, err error) {
-	grpcKeepalive := d.DriverConfig.GrpcConnectionPolicy.Timeout
+	grpcKeepalive := d.Config.GrpcConnectionPolicy.Timeout
 	if grpcKeepalive <= 0 {
 		grpcKeepalive = config.MinKeepaliveInterval
 	}
@@ -43,13 +49,14 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 	return (&dialer{
 		netDial:   d.NetDial,
 		tlsConfig: tlsConfig,
+		timeout:   d.Timeout,
 		keepalive: grpcKeepalive,
-		config:    *d.DriverConfig,
+		config:    *d.Config,
 		meta: meta.New(
-			d.DriverConfig.Database,
-			d.DriverConfig.Credentials,
-			d.DriverConfig.Trace,
-			d.DriverConfig.RequestsType,
+			d.Config.Database,
+			d.Config.Credentials,
+			d.Config.Trace,
+			d.Config.RequestsType,
 		),
 	}).dial(ctx, addr)
 }
@@ -58,6 +65,7 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 type dialer struct {
 	netDial   func(context.Context, string) (net.Conn, error)
 	tlsConfig *tls.Config
+	timeout   time.Duration
 	keepalive time.Duration
 	config    config.Config
 	meta      meta.Meta
@@ -96,27 +104,17 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 
 func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (_ *grpc.ClientConn, err error) {
 	s := cluster.String(host, port)
-	t := trace.ContextDriver(ctx).Compose(d.config.Trace)
-	var dialDone func(trace.DialDoneInfo)
-	if t.OnDial != nil {
-		dialDone = t.OnDial(trace.DialStartInfo{
-			Context: ctx,
-			Address: s,
-		})
+	if d.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, d.timeout)
+		defer cancel()
 	}
 
+	dialDone := trace.DriverOnDial(d.config.Trace, ctx, s)
 	cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
+	dialDone(err)
 
-	if dialDone != nil {
-		dialDone(trace.DialDoneInfo{
-			Error: err,
-		})
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return cc, nil
+	return cc, err
 }
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
