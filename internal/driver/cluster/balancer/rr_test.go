@@ -2,7 +2,10 @@ package balancer
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"testing"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 
@@ -222,6 +225,42 @@ var (
 	}
 )
 
+type cfg struct {
+	*config.Config
+}
+
+func (c cfg) RequestTimeout() time.Duration {
+	return c.Config.RequestTimeout
+}
+
+func (c cfg) OperationTimeout() time.Duration {
+	return c.Config.OperationTimeout
+}
+
+func (c cfg) OperationCancelAfter() time.Duration {
+	return c.Config.OperationCancelAfter
+}
+
+func (c cfg) Meta(ctx context.Context) (context.Context, error) {
+	return ctx, nil
+}
+
+func (c cfg) Trace(ctx context.Context) trace.Driver {
+	return c.Config.Trace
+}
+
+func (c cfg) Pessimize(addr cluster.Addr) error {
+	return nil
+}
+
+func (c cfg) StreamTimeout() time.Duration {
+	return c.Config.StreamTimeout
+}
+
+func (c cfg) GrpcConnectionPolicy() *conn.GrpcConnectionPolicy {
+	return (*conn.GrpcConnectionPolicy)(c.Config.GrpcConnectionPolicy)
+}
+
 func TestRoundRobinBalancer(t *testing.T) {
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
@@ -233,7 +272,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), cluster.Addr{}, nil, nil)
+				c := conn.New(context.Background(), cluster.Addr{}, nil, &cfg{config.New()})
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
@@ -286,7 +325,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), cluster.Addr{}, nil, nil)
+				c := conn.New(context.Background(), cluster.Addr{}, nil, &cfg{config.New()})
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
