@@ -2,8 +2,6 @@ package gotest
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
-	ratelimiter2 "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"log"
 	"os"
 	"testing"
@@ -14,6 +12,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
+	public "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -72,7 +72,7 @@ func TestRateLimiter(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	client := ratelimiter.New(db)
+	client := internal.New(db)
 	coordinationClient := coordination.New(db)
 
 	err = coordinationClient.DropNode(ctx, testCoordinationNodePath)
@@ -94,9 +94,9 @@ func TestRateLimiter(t *testing.T) {
 		}
 	}()
 
-	err = client.CreateResource(ctx, testCoordinationNodePath, ratelimiter2.Resource{
+	err = client.CreateResource(ctx, testCoordinationNodePath, public.Resource{
 		ResourcePath: testResource,
-		HierarchicalDrr: ratelimiter2.HierarchicalDrrSettings{
+		HierarchicalDrr: public.HierarchicalDrrSettings{
 			MaxUnitsPerSecond:       1,
 			MaxBurstSizeCoefficient: 2,
 		},
@@ -123,9 +123,9 @@ func TestRateLimiter(t *testing.T) {
 		t.Fatal("Resource invalid")
 	}
 
-	err = client.AlterResource(ctx, testCoordinationNodePath, ratelimiter2.Resource{
+	err = client.AlterResource(ctx, testCoordinationNodePath, public.Resource{
 		ResourcePath: testResource,
-		HierarchicalDrr: ratelimiter2.HierarchicalDrrSettings{
+		HierarchicalDrr: public.HierarchicalDrrSettings{
 			MaxUnitsPerSecond:       3,
 			MaxBurstSizeCoefficient: 4,
 		},
