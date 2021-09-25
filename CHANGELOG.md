@@ -1,3 +1,6 @@
+## 2.9.3
+* Forced grpc keep-alive PermitWithoutStream parameter to true
+
 ## 2.9.2
 * Added errors without panic
 
