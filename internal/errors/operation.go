@@ -19,18 +19,24 @@ type operation interface {
 	GetIssues() []*Ydb_Issue.IssueMessage
 }
 
+// WithOEIssues is an option for construct operation error with issues list
+// WithOEIssues must use as `NewOpError(WithOEIssues(issues))`
 func WithOEIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
 	return func(oe *OpError) {
 		oe.issues = issues
 	}
 }
 
+// WithOEReason is an option for construct operation error with reason code
+// WithOEReason must use as `NewOpError(WithOEReason(reason))`
 func WithOEReason(reason StatusCode) oeOpt {
 	return func(oe *OpError) {
 		oe.Reason = reason
 	}
 }
 
+// WithOEOperation is an option for construct operation error from operation
+// WithOEOperation must use as `NewOpError(WithOEOperation(operation))`
 func WithOEOperation(operation operation) oeOpt {
 	return func(oe *OpError) {
 		oe.Reason = statusCode(operation.GetStatus())
