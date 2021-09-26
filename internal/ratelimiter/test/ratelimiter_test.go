@@ -112,14 +112,14 @@ func TestRateLimiter(t *testing.T) {
 		}
 	}()
 
-	descibed, err := client.DescribeResource(ctx, testCoordinationNodePath, testResource)
+	described, err := client.DescribeResource(ctx, testCoordinationNodePath, testResource)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if descibed == nil ||
-		descibed.ResourcePath != testResource ||
-		descibed.HierarchicalDrr.MaxUnitsPerSecond != 1.0 ||
-		descibed.HierarchicalDrr.MaxBurstSizeCoefficient != 2.0 {
+	if described == nil ||
+		described.ResourcePath != testResource ||
+		described.HierarchicalDrr.MaxUnitsPerSecond != 1.0 ||
+		described.HierarchicalDrr.MaxBurstSizeCoefficient != 2.0 {
 		t.Fatal("Resource invalid")
 	}
 
@@ -134,14 +134,14 @@ func TestRateLimiter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	descibed, err = client.DescribeResource(ctx, testCoordinationNodePath, testResource)
+	described, err = client.DescribeResource(ctx, testCoordinationNodePath, testResource)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if descibed == nil ||
-		descibed.ResourcePath != testResource ||
-		descibed.HierarchicalDrr.MaxUnitsPerSecond != 3.0 ||
-		descibed.HierarchicalDrr.MaxBurstSizeCoefficient != 4.0 {
+	if described == nil ||
+		described.ResourcePath != testResource ||
+		described.HierarchicalDrr.MaxUnitsPerSecond != 3.0 ||
+		described.HierarchicalDrr.MaxBurstSizeCoefficient != 4.0 {
 		t.Fatal("Resource invalid")
 	}
 
