@@ -83,7 +83,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		_ = srv.Serve(ln)
 	}()
 
-	cs, balancer := simpleBalancer()
+	_, balancer := simpleBalancer()
 	c := &cluster{
 		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
 			return ln.Dial(ctx)
@@ -92,23 +92,26 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		index:    make(map[public.Addr]entry.Entry),
 	}
 
-	pingConnects := func(size int) {
-		for i := 0; i < size*10; i++ {
-			sub, cancel := context.WithTimeout(ctx, time.Millisecond)
-			defer cancel()
-			conn, err := c.Get(sub)
-			// enforce close bad connects to track them
-			if err == nil && conn != nil && conn.Addr().Host == "bad" {
-				_ = conn.Close()
+	assert := func(t *testing.T, exp []public.Endpoint) {
+		if len(c.index) != len(exp) {
+			t.Fatalf("unexpected number of endpoints %d: got %d", len(exp), len(c.index))
+		}
+		for _, e := range exp {
+			if _, ok := c.index[e.Addr]; !ok {
+				t.Fatalf("not found endpoint '%v' in index", e.String())
 			}
 		}
-	}
-	assert := func(t *testing.T, total, inBalance int) {
-		if len(c.index) != total {
-			t.Fatalf("total expected number of endpoints %d got %d", total, len(c.index))
-		}
-		if len(*cs) != inBalance {
-			t.Fatalf("inBalance expected number of endpoints %d got %d", inBalance, len(*cs))
+		for addr := range c.index {
+			if func() bool {
+				for _, e := range exp {
+					if e.Addr == addr {
+						return false
+					}
+				}
+				return true
+			}() {
+				t.Fatalf("unexpected endpoint '%v' in index", addr.String())
+			}
 		}
 	}
 
@@ -117,8 +120,8 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		{Addr: public.Addr{Host: "foo", Port: 123}},
 	}
 	badEndpoints := []public.Endpoint{
-		{Addr: public.Addr{Host: "bad"}},
-		{Addr: public.Addr{Host: "bad", Port: 123}},
+		{Addr: public.Addr{Host: "baz"}},
+		{Addr: public.Addr{Host: "baz", Port: 123}},
 	}
 	nextEndpoints := []public.Endpoint{
 		{Addr: public.Addr{Host: "foo"}},
@@ -133,32 +136,28 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		// merge new endpoints into balancer
 		mergeEndpointIntoCluster(ctx, c, []public.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
 		// try endpoints, filter out bad ones to tracking
-		pingConnects(len(ne))
-		assert(t, len(ne), len(endpoints))
+		assert(t, ne)
 	})
 	t.Run("update with another endpoints", func(t *testing.T) {
 		ne := append(nextEndpoints, nextBadEndpoints...)
 		// merge new endpoints into balancer
 		mergeEndpointIntoCluster(ctx, c, append(endpoints, badEndpoints...), ne, WithConnConfig(stub.Config(config.New())))
 		// try endpoints, filter out bad ones to tracking
-		pingConnects(len(ne))
-		assert(t, len(ne), len(nextEndpoints))
+		assert(t, ne)
 	})
 	t.Run("left only bad", func(t *testing.T) {
 		ne := nextBadEndpoints
 		// merge new endpoints into balancer
 		mergeEndpointIntoCluster(ctx, c, append(nextEndpoints, nextBadEndpoints...), ne)
 		// try endpoints, filter out bad ones to tracking
-		pingConnects(len(ne))
-		assert(t, len(ne), 0)
+		assert(t, ne)
 	})
 	t.Run("left only good", func(t *testing.T) {
 		ne := nextEndpoints
 		// merge new endpoints into balancer
 		mergeEndpointIntoCluster(ctx, c, nextBadEndpoints, ne, WithConnConfig(stub.Config(config.New())))
 		// try endpoints, filter out bad ones to tracking
-		pingConnects(len(ne))
-		assert(t, len(ne), len(nextEndpoints))
+		assert(t, ne)
 	})
 }
 
