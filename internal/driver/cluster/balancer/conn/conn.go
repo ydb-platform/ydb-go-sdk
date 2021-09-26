@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -109,18 +110,24 @@ func (c *conn) waitClose() {
 	}
 }
 
-func (c *conn) Close() error {
-	if !c.timer.Stop() {
-		panic("cant stop timer")
-	}
+func (c *conn) Close() (err error) {
 	c.Lock()
 	defer c.Unlock()
-	close(c.done)
-	c.done = nil
-	if c.grpcConn != nil {
-		return c.grpcConn.Close()
+	if c.done == nil {
+		return nil
 	}
-	return nil
+	if !c.timer.Stop() {
+		panic(fmt.Errorf("cant stop timer for conn to '%v'", c.addr.String()))
+	}
+	if c.done != nil {
+		close(c.done)
+		c.done = nil
+	}
+	if c.grpcConn != nil {
+		err = c.grpcConn.Close()
+		c.grpcConn = nil
+	}
+	return err
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
@@ -135,7 +142,6 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 			Error: c.config.Pessimize(c.addr),
 		},
 	)
-
 }
 
 func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {

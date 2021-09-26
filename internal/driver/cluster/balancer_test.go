@@ -3,8 +3,10 @@ package cluster
 import (
 	"context"
 	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
 	"strconv"
 	"testing"
 
@@ -13,7 +15,7 @@ import (
 )
 
 func isEvenConn(c conn.Conn, _ info.Info) bool {
-	n, err := strconv.Atoi(c.Addr().String())
+	n, err := strconv.Atoi(c.Addr().Host)
 	if err != nil {
 		panic(err)
 	}
@@ -48,7 +50,7 @@ func TestMultiBalancer(t *testing.T) {
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(context.Background(), public.Addr{Host: strconv.Itoa(i)}, nil, nil)
+		c := conn.New(context.Background(), public.Addr{Host: strconv.Itoa(i)}, nil, stub.Config(config.New()))
 		e := m.Insert(c, info.Info{})
 		es[i] = e
 		el[c] = e

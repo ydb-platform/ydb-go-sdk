@@ -9,12 +9,15 @@ import (
 	"time"
 
 	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil/timetest"
@@ -39,6 +42,7 @@ func TestClusterFastRedial(t *testing.T) {
 			return ln.Dial(ctx)
 		},
 		balancer: balancer,
+		index:    make(map[public.Addr]entry.Entry),
 	}
 
 	pingConnects := func(size int) chan struct{} {
@@ -60,7 +64,7 @@ func TestClusterFastRedial(t *testing.T) {
 		{Addr: public.Addr{Host: "foo"}},
 		{Addr: public.Addr{Host: "bad"}},
 	}
-	mergeEndpointIntoCluster(ctx, c, []public.Endpoint{}, ne)
+	mergeEndpointIntoCluster(ctx, c, []public.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
 	select {
 	case <-pingConnects(len(ne)):
 
@@ -85,6 +89,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			return ln.Dial(ctx)
 		},
 		balancer: balancer,
+		index:    make(map[public.Addr]entry.Entry),
 	}
 
 	pingConnects := func(size int) {
@@ -98,7 +103,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			}
 		}
 	}
-	assert := func(t *testing.T, total, inBalance, onTracking int) {
+	assert := func(t *testing.T, total, inBalance int) {
 		if len(c.index) != total {
 			t.Fatalf("total expected number of endpoints %d got %d", total, len(c.index))
 		}
@@ -126,18 +131,18 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	t.Run("initial fill", func(t *testing.T) {
 		ne := append(endpoints, badEndpoints...)
 		// merge new endpoints into balancer
-		mergeEndpointIntoCluster(ctx, c, []public.Endpoint{}, ne)
+		mergeEndpointIntoCluster(ctx, c, []public.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
 		// try endpoints, filter out bad ones to tracking
 		pingConnects(len(ne))
-		assert(t, len(ne), len(endpoints), len(badEndpoints))
+		assert(t, len(ne), len(endpoints))
 	})
 	t.Run("update with another endpoints", func(t *testing.T) {
 		ne := append(nextEndpoints, nextBadEndpoints...)
 		// merge new endpoints into balancer
-		mergeEndpointIntoCluster(ctx, c, append(endpoints, badEndpoints...), ne)
+		mergeEndpointIntoCluster(ctx, c, append(endpoints, badEndpoints...), ne, WithConnConfig(stub.Config(config.New())))
 		// try endpoints, filter out bad ones to tracking
 		pingConnects(len(ne))
-		assert(t, len(ne), len(nextEndpoints), len(nextBadEndpoints))
+		assert(t, len(ne), len(nextEndpoints))
 	})
 	t.Run("left only bad", func(t *testing.T) {
 		ne := nextBadEndpoints
@@ -145,15 +150,15 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		mergeEndpointIntoCluster(ctx, c, append(nextEndpoints, nextBadEndpoints...), ne)
 		// try endpoints, filter out bad ones to tracking
 		pingConnects(len(ne))
-		assert(t, len(ne), 0, len(nextBadEndpoints))
+		assert(t, len(ne), 0)
 	})
 	t.Run("left only good", func(t *testing.T) {
 		ne := nextEndpoints
 		// merge new endpoints into balancer
-		mergeEndpointIntoCluster(ctx, c, nextBadEndpoints, ne)
+		mergeEndpointIntoCluster(ctx, c, nextBadEndpoints, ne, WithConnConfig(stub.Config(config.New())))
 		// try endpoints, filter out bad ones to tracking
 		pingConnects(len(ne))
-		assert(t, len(ne), len(nextEndpoints), 0)
+		assert(t, len(ne), len(nextEndpoints))
 	})
 }
 
@@ -191,10 +196,11 @@ func TestClusterRemoveTracking(t *testing.T) {
 			return ln.Dial(ctx)
 		},
 		balancer: balancer,
+		index:    make(map[public.Addr]entry.Entry),
 	}
 
 	endpoint := public.Endpoint{Addr: public.Addr{Host: "foo"}}
-	c.Insert(ctx, endpoint)
+	c.Insert(ctx, endpoint, WithConnConfig(stub.Config(config.New())))
 
 	// Await for connection to be established.
 	// Note that this is server side half.
@@ -220,7 +226,7 @@ func TestClusterRemoveTracking(t *testing.T) {
 	assertTracking(1)
 	<-timer.Reset
 
-	c.Remove(ctx, endpoint)
+	c.Remove(ctx, endpoint, WithConnConfig(stub.Config(config.New())))
 
 	assertTracking(0)
 }
@@ -246,10 +252,10 @@ func TestClusterRemoveOffline(t *testing.T) {
 	}
 
 	endpoint := public.Endpoint{Addr: public.Addr{Host: "foo"}}
-	c.Insert(ctx, endpoint)
+	c.Insert(ctx, endpoint, WithConnConfig(stub.Config(config.New())))
 	<-timer.Reset
 
-	c.Remove(ctx, endpoint)
+	c.Remove(ctx, endpoint, WithConnConfig(stub.Config(config.New())))
 
 	timer.C <- timeutil.Now()
 	if n := <-tracking; n != 0 {
@@ -293,6 +299,7 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 			return ln.Dial(ctx)
 		},
 		balancer: balancer,
+		index:    make(map[public.Addr]entry.Entry),
 	}
 	defer func() {
 		err := c.Close()
@@ -307,7 +314,7 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 				Host: "foo",
 			},
 		}
-		c.Insert(ctx, endpoint)
+		c.Insert(ctx, endpoint, WithConnConfig(stub.Config(config.New())))
 
 		// Wait for connection become tracked.
 		<-timer.Reset
@@ -321,12 +328,12 @@ func TestClusterRemoveAndInsert(t *testing.T) {
 
 		// While our tracker is in progress (stuck on writing to the tracking
 		// channel actually) remove endpoint.
-		c.Remove(ctx, endpoint)
+		c.Remove(ctx, endpoint, WithConnConfig(stub.Config(config.New())))
 
 		// Now insert back the same endpoint with alive connection (and let dialer
 		// to dial successfully).
 		dialTicket <- 100
-		c.Insert(ctx, endpoint)
+		c.Insert(ctx, endpoint, WithConnConfig(stub.Config(config.New())))
 
 		// Release the tracker iteration.
 		dialTicket <- 200
@@ -370,6 +377,7 @@ func TestClusterAwait(t *testing.T) {
 				return connToReturn
 			},
 		},
+		index: make(map[public.Addr]entry.Entry),
 	}
 	get := func() (<-chan error, context.CancelFunc) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -391,7 +399,7 @@ func TestClusterAwait(t *testing.T) {
 		assertRecvError(t, timeout, got, ErrClusterEmpty)
 	}
 	{
-		c.Insert(context.Background(), public.Endpoint{})
+		c.Insert(context.Background(), public.Endpoint{}, WithConnConfig(stub.Config(config.New())))
 		got, cancel := get()
 		defer cancel()
 		assertRecvError(t, timeout, got, nil)
@@ -553,13 +561,19 @@ func assertRecvError(t *testing.T, d time.Duration, e <-chan error, exp error) {
 	}
 }
 
-func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []public.Endpoint) {
+func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []public.Endpoint, opts ...option) {
 	SortEndpoints(curr)
 	SortEndpoints(next)
 	DiffEndpoints(curr, next,
-		func(i, j int) { c.Update(ctx, next[j]) },
-		func(i, j int) { c.Insert(ctx, next[j]) },
-		func(i, j int) { c.Remove(ctx, curr[i]) },
+		func(i, j int) {
+			c.Update(ctx, next[j], opts...)
+		},
+		func(i, j int) {
+			c.Insert(ctx, next[j], opts...)
+		},
+		func(i, j int) {
+			c.Remove(ctx, curr[i], opts...)
+		},
 	)
 }
 
