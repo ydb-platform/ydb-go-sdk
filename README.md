@@ -1,5 +1,12 @@
 # ydb
 
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/ydb-platform/ydb-go-sdk/v3)](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3)
+[![GoDoc](https://godoc.org/github.com/ydb-platform/ydb-go-sdk/v3?status.svg)](https://godoc.org/github.com/ydb-platform/ydb-go-sdk/v3)
+![tests](https://github.com/ydb-platform/ydb-go-sdk/workflows/tests/badge.svg?branch=master)
+![lint](https://github.com/ydb-platform/ydb-go-sdk/workflows/lint/badge.svg?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ydb-platform/ydb-go-sdk)](https://goreportcard.com/report/github.com/ydb-platform/ydb-go-sdk)
+[![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/branch/master/graph/badge.svg)](https://codecov.io/gh/ydb-platform/ydb-go-sdk/v3)
+
 > YDB API client written in Go.
 
 [godoc](https://godoc.org/github.com/ydb-platform/ydb-go-sdk/v3/)
