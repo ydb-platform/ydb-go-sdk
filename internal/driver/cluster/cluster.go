@@ -279,15 +279,15 @@ func (c *cluster) Pessimize(addr public.Addr) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
-		return ErrClusterClosed
+		return fmt.Errorf("cluster: pessimize failed: %w", ErrClusterClosed)
 	}
 
 	entry, has := c.index[addr]
 	if !has {
-		return ErrUnknownEndpoint
+		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
 	if entry.Handle == nil {
-		return balancer.ErrNilBalancerElement
+		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrNilBalancerElement)
 	}
 	if !c.balancer.Contains(entry.Handle) {
 		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrUnknownBalancerElement)
