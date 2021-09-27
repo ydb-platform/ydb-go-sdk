@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"math/rand"
@@ -126,8 +127,11 @@ func NewMultiBalancer(opts ...balancerOption) *multiBalancer {
 }
 
 func (m *multiBalancer) Contains(x Element) bool {
-	for _, b := range m.balancer {
-		if b.Contains(x) {
+	for i, x := range x.(multiHandle).elements {
+		if assert.IsNil(x) {
+			continue
+		}
+		if m.balancer[i].Contains(x) {
 			return true
 		}
 	}
@@ -181,13 +185,14 @@ func (m *multiBalancer) Pessimize(x Element) error {
 	all := 0
 	errs := make([]string, 0)
 	for i, x := range x.(multiHandle).elements {
-		if x != nil {
-			all++
-			if e := m.balancer[i].Pessimize(x); e == nil {
-				good++
-			} else if !errors.Is(e, ErrUnknownBalancerElement) { // collect error only if not an ErrUnknownBalancerElement
-				errs = append(errs, e.Error())
-			}
+		if assert.IsNil(x) {
+			continue
+		}
+		all++
+		if e := m.balancer[i].Pessimize(x); e == nil {
+			good++
+		} else if !errors.Is(e, ErrUnknownBalancerElement) { // collect error only if not an ErrUnknownBalancerElement
+			errs = append(errs, e.Error())
 		}
 	}
 	if good > 0 || all == 0 {
