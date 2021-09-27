@@ -131,16 +131,13 @@ func (c *conn) Close() (err error) {
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
-	c.config.Trace(ctx).OnPessimization(
-		trace.PessimizationStartInfo{
-			Context: ctx,
-			Address: c.Addr().String(),
-			Cause:   err,
-		},
+	trace.DriverOnPessimization(
+		c.config.Trace(ctx),
+		ctx,
+		c.Addr().String(),
+		err,
 	)(
-		trace.PessimizationDoneInfo{
-			Error: c.config.Pessimize(c.addr),
-		},
+		c.config.Pessimize(c.addr),
 	)
 }
 
