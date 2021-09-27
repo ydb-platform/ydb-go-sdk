@@ -51,33 +51,28 @@ func TestSessionKeepAlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	e = errors.New("any error")
+	_, err = s.KeepAlive(ctx)
+	if err == nil {
+		t.Fatal(err)
+	}
 
-	{
-		e = errors.New("any error")
-		_, err := s.KeepAlive(ctx)
-		if err == nil {
-			t.Fatal(err)
-		}
+	status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY, nil
+	info, err := s.KeepAlive(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
-	{
-		status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY, nil
-		info, err := s.KeepAlive(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if info.Status() != options.SessionReady.String() {
-			t.Fatalf("Result %v differ from, expectd %v", info.Status(), options.SessionReady.String())
-		}
+	if info.Status() != options.SessionReady.String() {
+		t.Fatalf("Result %v differ from, expectd %v", info.Status(), options.SessionReady.String())
 	}
-	{
-		status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY, nil
-		info, err := s.KeepAlive(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if info.Status() != options.SessionBusy.String() {
-			t.Fatalf("Result %v differ from, expectd %v", info.Status(), options.SessionBusy.String())
-		}
+
+	status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY, nil
+	info, err = s.KeepAlive(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Status() != options.SessionBusy.String() {
+		t.Fatalf("Result %v differ from, expectd %v", info.Status(), options.SessionBusy.String())
 	}
 }
 
@@ -205,7 +200,6 @@ func TestSessionDescribeTable(t *testing.T) {
 }
 
 func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
-	cluster := testutil.NewDB()
 	fromTo := [...]struct {
 		srcMode operation.Mode
 		dstMode operation.Mode
@@ -225,13 +219,13 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 	}
 	for _, test := range []struct {
 		method testutil.MethodCode
-		do     func(t *testing.T, ctx context.Context, c table.Client)
+		do     func(t *testing.T, ctx context.Context, c *client)
 	}{
 		{
 			method: testutil.TableExecuteDataQuery,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
 				assert.NoError(t, err)
@@ -239,9 +233,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableExplainDataQuery,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.Explain(ctx, "")
 				assert.NoError(t, err)
@@ -249,9 +243,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TablePrepareDataQuery,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.Prepare(ctx, "")
 				assert.NoError(t, err)
@@ -259,25 +253,25 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableCreateSession,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				_, err := c.CreateSession(ctx)
 				assert.NoError(t, err)
 			},
 		},
 		{
 			method: testutil.TableDeleteSession,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				assert.NoError(t, s.Close(ctx))
 			},
 		},
 		{
 			method: testutil.TableBeginTransaction,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.BeginTransaction(ctx, table.TxSettings())
 				assert.NoError(t, err)
@@ -285,10 +279,10 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableCommitTransaction,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				tx := &Transaction{
 					s: &session{
-						tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
+						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
 				}
 				_, err := tx.CommitTx(ctx)
@@ -297,10 +291,10 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableRollbackTransaction,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				tx := &Transaction{
 					s: &session{
-						tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
+						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 					},
 				}
 				err := tx.Rollback(ctx)
@@ -309,9 +303,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 		{
 			method: testutil.TableKeepAlive,
-			do: func(t *testing.T, ctx context.Context, c table.Client) {
+			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
 				_, err := s.KeepAlive(ctx)
 				assert.NoError(t, err)

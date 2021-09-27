@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
@@ -242,7 +244,7 @@ func (p *pool) createSession(ctx context.Context) (table.Session, error) {
 
 		r.s, r.err = p.Builder.CreateSession(ctx)
 		// if session not nil - error must be nil and vice versa
-		if r.s == nil && r.err == nil {
+		if assert.IsNil(r.s) && r.err == nil {
 			panic("ydb: abnormal result of pool.Builder.CreateSession()")
 		}
 
@@ -280,14 +282,14 @@ func (p *pool) createSession(ctx context.Context) (table.Session, error) {
 
 	select {
 	case r := <-resCh:
-		if r.s == nil && r.err == nil {
+		if assert.IsNil(r.s) && r.err == nil {
 			panic("ydb: abnormal result of pool.createSession()")
 		}
 		return r.s, r.err
 	case <-ctx.Done():
 		// read result from resCh for prevention of forgetting session
 		go func() {
-			if r, ok := <-resCh; ok && r.s != nil {
+			if r, ok := <-resCh; ok && !assert.IsNil(r.s) {
 				_ = r.s.Close(deadline.ContextWithoutDeadline(ctx))
 			}
 		}()
@@ -316,7 +318,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 	}()
 
 	const maxAttempts = 100
-	for ; s == nil && err == nil && i < maxAttempts; i++ {
+	for ; assert.IsNil(s) && err == nil && i < maxAttempts; i++ {
 		var (
 			ch *chan table.Session
 			el *list.Element // Element in the wait queue.
@@ -329,18 +331,18 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 		s = p.removeFirstIdle()
 		p.mu.Unlock()
 
-		if s == nil {
-			// Try create new session without awaiting for reused one.
+		if assert.IsNil(s) {
+			// Try creating new session without awaiting reused one.
 			s, err = p.createSession(ctx)
 			// got session or err is not recoverable
-			if s != nil || err != nil && !isCreateSessionErrorRetriable(err) {
+			if !assert.IsNil(s) || err != nil && !isCreateSessionErrorRetriable(err) {
 				return s, err
 			}
 			err = nil
 		}
 
 		// get here after check isCreateSessionErrorRetriable
-		if s == nil {
+		if assert.IsNil(s) {
 			// Try to wait for a touched session - pool is full.
 			//
 			// This should be done only if number of currently waiting goroutines
@@ -349,7 +351,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 			// session to.
 			p.mu.Lock()
 			s = p.removeFirstIdle()
-			if s != nil {
+			if !assert.IsNil(s) {
 				p.mu.Unlock()
 				return s, nil
 			}
@@ -369,7 +371,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 			// session into channel after it was enqueued but before it being
 			// read here. In that case we will receive nil here and will retry.
 			//
-			// The same path will work when some session become deleted - the
+			// The same way will work when some session become deleted - the
 			// nil value will be sent into the channel.
 			if ok {
 				// Put only filled and not closed channel back to the pool.
@@ -377,7 +379,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 				// for the next waiter – session could be lost for a long time.
 				p.putWaitCh(ch)
 			}
-			if err == nil {
+			if !assert.IsNil(s) {
 				waitDone(ctx, s.ID(), err)
 			} else {
 				waitDone(ctx, "", err)
@@ -399,7 +401,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 			return nil, err
 		}
 	}
-	if s == nil && err == nil {
+	if assert.IsNil(s) && err == nil {
 		err = ErrNoProgress
 	}
 
@@ -524,7 +526,7 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 		s, _ = p.peekFirstIdle()
 		p.mu.Unlock()
 
-		if s == nil {
+		if assert.IsNil(s) {
 			return p.createSession(ctx)
 		}
 
@@ -664,7 +666,7 @@ func (p *pool) keeper() {
 				p.touching = true
 				for p.idle.Len() > 0 {
 					s, touched := p.peekFirstIdle()
-					if s == nil || now.Sub(touched) < p.IdleThreshold {
+					if assert.IsNil(s) || now.Sub(touched) < p.IdleThreshold {
 						break
 					}
 					_ = p.removeIdle(s)
@@ -736,7 +738,7 @@ func (p *pool) keeper() {
 			)
 			p.mu.Lock()
 
-			if s, touched := p.peekFirstIdle(); s == nil {
+			if s, touched := p.peekFirstIdle(); assert.IsNil(s) {
 				// No sessions to check. Let the Put() caller to wake up
 				// keeper when session arrive.
 				sleep = true
@@ -819,7 +821,7 @@ func (p *pool) peekFirstIdle() (s table.Session, touched time.Time) {
 // p.mu must be held.
 func (p *pool) removeFirstIdle() table.Session {
 	s, _ := p.peekFirstIdle()
-	if s != nil {
+	if !assert.IsNil(s) {
 		info := p.removeIdle(s)
 		info.keepAliveCount = 0
 		p.index[s] = info

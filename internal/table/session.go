@@ -144,7 +144,7 @@ func (s *session) Address() string {
 func (s *session) KeepAlive(ctx context.Context) (info options.SessionInfo, err error) {
 	keepAliveDone := trace.TableOnKeepAlive(s.trace, ctx, s.id)
 	defer func() {
-		keepAliveDone(ctx, s.id, info, err)
+		keepAliveDone(ctx, s.id, &info, err)
 	}()
 	var result Ydb_Table.KeepAliveResult
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
