@@ -105,6 +105,7 @@ func (c *conn) waitClose() {
 				_ = c.grpcConn.Close()
 				c.grpcConn = nil
 			}
+			c.timer.Reset(time.Duration(math.MaxInt64))
 			c.Unlock()
 		}
 	}
