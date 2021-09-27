@@ -58,19 +58,10 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if m.credentials != nil {
 		var token string
 		t := trace.ContextDriver(ctx).Compose(m.trace)
-		if t.OnGetCredentials != nil {
-			getCredentialsDone := t.OnGetCredentials(trace.GetCredentialsStartInfo{
-				Context: ctx,
-			})
-			if getCredentialsDone != nil {
-				defer func() {
-					getCredentialsDone(trace.GetCredentialsDoneInfo{
-						TokenOk: token != "",
-						Error:   err,
-					})
-				}()
-			}
-		}
+		getCredentialsDone := trace.DriverOnGetCredentials(t, ctx)
+		defer func() {
+			getCredentialsDone(token != "", err)
+		}()
 		token, err = m.credentials.Token(ctx)
 		if err != nil {
 			if stringer, ok := m.credentials.(fmt.Stringer); ok {

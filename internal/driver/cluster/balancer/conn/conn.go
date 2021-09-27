@@ -3,6 +3,8 @@ package conn
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"math"
 	"sync"
 	"time"
@@ -12,10 +14,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -170,32 +170,12 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	start := timeutil.Now()
 	c.runtime.OperationStart(start)
 	t := c.config.Trace(ctx)
-	if t.OnOperation != nil {
-		operationDone := t.OnOperation(
-			trace.OperationStartInfo{
-				Context: ctx,
-				Address: c.Addr().String(),
-				Method:  trace.Method(method),
-				Params:  params,
-			},
-		)
-		if operationDone != nil {
-			defer func() {
-				operationDone(
-					trace.OperationDoneInfo{
-						OpID:   opId,
-						Issues: issues,
-						Error:  err,
-					},
-				)
-				err := errors.ErrIf(errors.IsTimeoutError(err), err)
-				c.runtime.OperationDone(
-					start, timeutil.Now(),
-					err,
-				)
-			}()
-		}
-	}
+	operationDone := trace.DriverOnOperation(t, ctx, c.Addr().String(), trace.Method(method), params)
+	defer func() {
+		operationDone(opId, issues, err)
+		err := errors.ErrIf(errors.IsTimeoutError(err), err)
+		c.runtime.OperationDone(start, timeutil.Now(), err)
+	}()
 
 	ctx, err = c.config.Meta(ctx)
 	if err != nil {
@@ -251,14 +231,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 
 	c.runtime.StreamStart(timeutil.Now())
 	t := c.config.Trace(ctx)
-	var streamRecv func(trace.StreamRecvDoneInfo) func(trace.StreamDoneInfo)
-	if t.OnStream != nil {
-		streamRecv = t.OnStream(trace.StreamStartInfo{
-			Context: ctx,
-			Address: c.Addr().String(),
-			Method:  trace.Method(method),
-		})
-	}
+	streamRecv := trace.DriverOnStream(t, ctx, c.Addr().String(), trace.Method(method))
 	defer func() {
 		if err != nil {
 			c.runtime.StreamDone(timeutil.Now(), err)

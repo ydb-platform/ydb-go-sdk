@@ -21,8 +21,8 @@ type grpcClientStream struct {
 	method trace.Method
 	s      grpc.ClientStream
 	cancel context.CancelFunc
-	recv   func(trace.StreamRecvDoneInfo) func(trace.StreamDoneInfo)
-	done   func(trace.StreamDoneInfo)
+	recv   func(error) func(error)
+	done   func(error)
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
@@ -40,9 +40,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	}
 	s.c.runtime.StreamDone(timeutil.Now(), errors.HideEOF(err))
 	if s.done != nil {
-		s.done(trace.StreamDoneInfo{
-			Error: errors.HideEOF(err),
-		})
+		s.done(errors.HideEOF(err))
 	}
 	if s.cancel != nil {
 		s.cancel()
@@ -81,11 +79,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		}
 	}
 
-	if s.recv != nil {
-		s.done = s.recv(trace.StreamRecvDoneInfo{
-			Error: errors.HideEOF(err),
-		})
-	}
+	s.done = s.recv(errors.HideEOF(err))
 
 	return err
 }

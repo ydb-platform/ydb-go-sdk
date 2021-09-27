@@ -60,19 +60,9 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	rawCtx := ctx
 
 	t := trace.ContextDriver(ctx).Compose(d.Config.Trace)
-	var getConnDone func(trace.GetConnDoneInfo)
-	if t.OnGetConn != nil {
-		getConnDone = t.OnGetConn(trace.GetConnStartInfo{
-			Context: ctx,
-		})
-	}
+	getConnDone := trace.DriverOnGetConn(t, ctx)
 	c, err = d.clusterGet(ctx)
-	if getConnDone != nil {
-		getConnDone(trace.GetConnDoneInfo{
-			Address: c.Addr().String(),
-			Error:   err,
-		})
-	}
+	getConnDone(c.Addr().String(), err)
 
 	if err != nil {
 		return nil, err
