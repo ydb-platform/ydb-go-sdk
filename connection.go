@@ -129,6 +129,9 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 		Config: config.New(func(c *config.Config) {
 			c.Database = params.Database()
 			c.Credentials = db.options.credentials
+			if db.options.traceDriver != nil {
+				c.Trace = *db.options.traceDriver
+			}
 		}),
 		TLSConfig: db.options.tlsConfig,
 		Timeout:   db.options.dialTimeout,
