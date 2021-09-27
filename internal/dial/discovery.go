@@ -2,9 +2,12 @@ package dial
 
 import (
 	"context"
+	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -38,7 +41,6 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn grpc.Clie
 			func(ctx context.Context) {
 				onDone := trace.DriverOnDiscovery(d.config.Trace, ctx)
 				next, err := discoveryClient.Discover(ctx)
-				onDone(next, err)
 				if err != nil {
 					return
 				}
@@ -78,6 +80,14 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn grpc.Clie
 				wg.Add(actual - max) // adjust
 				wg.Wait()
 				curr = next
+				endpoints := make(map[public.Addr]state.State, len(next))
+				m := sync.Mutex{}
+				c.Stats(func(endpoint public.Endpoint, stats stats.Stats) {
+					m.Lock()
+					endpoints[endpoint.Addr] = stats.State
+					m.Unlock()
+				})
+				onDone(endpoints, err)
 			},
 		),
 	)

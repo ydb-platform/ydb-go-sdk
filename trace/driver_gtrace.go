@@ -4,7 +4,6 @@ package trace
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
@@ -355,11 +354,11 @@ func DriverOnGetCredentials(t Driver, c context.Context) func(tokenOk bool, _ er
 		res(p)
 	}
 }
-func DriverOnDiscovery(t Driver, c context.Context) func(endpoints []cluster.Endpoint, _ error) {
+func DriverOnDiscovery(t Driver, c context.Context) func(endpoints map[cluster.Addr]state.State, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
 	res := t.onDiscovery(p)
-	return func(endpoints []cluster.Endpoint, e error) {
+	return func(endpoints map[cluster.Addr]state.State, e error) {
 		var p DiscoveryDoneInfo
 		p.Endpoints = endpoints
 		p.Error = e
