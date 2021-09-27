@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"sort"
 	"strings"
 	"sync"
@@ -52,6 +52,16 @@ type cluster struct {
 	closed bool
 }
 
+func (c *cluster) ConnStats(addr endpoint.Addr) (ok bool, _ stats.Stats) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, ok := c.index[addr]
+	if !ok {
+		return false, stats.Stats{}
+	}
+	return true, entry.Conn.Runtime().Stats()
+}
+
 func (c *cluster) Force() {
 	c.explorer.Force()
 }
@@ -65,6 +75,7 @@ type Cluster interface {
 	Update(ctx context.Context, e endpoint.Endpoint, opts ...option)
 	Get(ctx context.Context) (conn conn.Conn, err error)
 	Pessimize(a endpoint.Addr) error
+	ConnStats(addr endpoint.Addr) (ok bool, stats stats.Stats)
 	Stats(it func(endpoint.Endpoint, stats.Stats))
 	Close() error
 	Remove(ctx context.Context, e endpoint.Endpoint, wg ...option)
@@ -315,21 +326,19 @@ func (c *cluster) Stats(it func(endpoint.Endpoint, stats.Stats)) {
 	if c.closed {
 		return
 	}
-	call := func(conn conn.Conn, info info.Info) {
-		e := endpoint.Endpoint{
-			Addr: endpoint.Addr{
-				Host: conn.Addr().Host,
-				Port: conn.Addr().Port,
-			},
-			LoadFactor: info.LoadFactor,
-			Local:      info.Local,
-		}
-		s := conn.Runtime().Stats()
-		it(e, s)
-	}
 	for _, entry := range c.index {
 		if entry.Conn != nil {
-			call(entry.Conn, entry.Info)
+			it(
+				endpoint.Endpoint{
+					Addr: endpoint.Addr{
+						Host: entry.Conn.Addr().Host,
+						Port: entry.Conn.Addr().Port,
+					},
+					LoadFactor: entry.Info.LoadFactor,
+					Local:      entry.Info.Local,
+				},
+				entry.Conn.Runtime().Stats(),
+			)
 		}
 	}
 }

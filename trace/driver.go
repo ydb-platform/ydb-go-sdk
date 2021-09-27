@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
@@ -16,13 +15,14 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Driver struct {
-		OnDial           func(DialStartInfo) func(DialDoneInfo)
-		OnGetConn        func(GetConnStartInfo) func(GetConnDoneInfo)
-		OnPessimization  func(PessimizationStartInfo) func(PessimizationDoneInfo)
-		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
-		OnDiscovery      func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
-		OnOperation      func(OperationStartInfo) func(OperationDoneInfo)
-		OnStream         func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
+		OnDial            func(DialStartInfo) func(DialDoneInfo)
+		OnGetConn         func(GetConnStartInfo) func(GetConnDoneInfo)
+		OnPessimization   func(PessimizationStartInfo) func(PessimizationDoneInfo)
+		OnGetCredentials  func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
+		OnConnStateChange func(ConnStateChangeInfo)
+		OnDiscovery       func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
+		OnOperation       func(OperationStartInfo) func(OperationDoneInfo)
+		OnStream          func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
 	}
 )
 
@@ -50,6 +50,14 @@ func (m Method) Split() (service, method string) {
 	return strings.TrimPrefix(string(m[:i]), "/"), string(m[i+1:])
 }
 
+type Endpoint interface {
+	String() string
+}
+
+type State interface {
+	String() string
+}
+
 type (
 	DialStartInfo struct {
 		Context context.Context
@@ -64,6 +72,11 @@ type (
 	GetConnDoneInfo struct {
 		Address string
 		Error   error
+	}
+	ConnStateChangeInfo struct {
+		Endpoint Endpoint
+		Before   State
+		After    State
 	}
 	PessimizationStartInfo struct {
 		Context context.Context
@@ -86,7 +99,7 @@ type (
 		Context context.Context
 	}
 	DiscoveryDoneInfo struct {
-		Endpoints map[endpoint.Endpoint]state.State
+		Endpoints map[Endpoint]State
 		Error     error
 	}
 	OperationStartInfo struct {

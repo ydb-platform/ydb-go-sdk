@@ -109,6 +109,19 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnConnStateChange == nil:
+		ret.OnConnStateChange = x.OnConnStateChange
+	case x.OnConnStateChange == nil:
+		ret.OnConnStateChange = t.OnConnStateChange
+	default:
+		h1 := t.OnConnStateChange
+		h2 := x.OnConnStateChange
+		ret.OnConnStateChange = func(c ConnStateChangeInfo) {
+			h1(c)
+			h2(c)
+		}
+	}
+	switch {
 	case t.OnDiscovery == nil:
 		ret.OnDiscovery = x.OnDiscovery
 	case x.OnDiscovery == nil:
@@ -253,6 +266,13 @@ func (t Driver) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsD
 	}
 	return res
 }
+func (t Driver) onConnStateChange(c1 ConnStateChangeInfo) {
+	fn := t.OnConnStateChange
+	if fn == nil {
+		return
+	}
+	fn(c1)
+}
 func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	fn := t.OnDiscovery
 	if fn == nil {
@@ -357,11 +377,18 @@ func DriverOnGetCredentials(t Driver, c context.Context) func(tokenOk bool, _ er
 		res(p)
 	}
 }
-func DriverOnDiscovery(t Driver, c context.Context) func(endpoints map[endpoint.Endpoint]state.State, _ error) {
+func DriverOnConnStateChange(t Driver, e Endpoint, before State, after State) {
+	var p ConnStateChangeInfo
+	p.Endpoint = e
+	p.Before = before
+	p.After = after
+	t.onConnStateChange(p)
+}
+func DriverOnDiscovery(t Driver, c context.Context) func(endpoints map[Endpoint]State, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
 	res := t.onDiscovery(p)
-	return func(endpoints map[endpoint.Endpoint]state.State, e error) {
+	return func(endpoints map[Endpoint]State, e error) {
 		var p DiscoveryDoneInfo
 		p.Endpoints = endpoints
 		p.Error = e

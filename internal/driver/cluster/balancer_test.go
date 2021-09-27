@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
-	public "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"strconv"
 	"testing"
 
@@ -50,7 +50,7 @@ func TestMultiBalancer(t *testing.T) {
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(context.Background(), public.Addr{Host: strconv.Itoa(i)}, nil, stub.Config(config.New()))
+		c := conn.New(context.Background(), endpoint.Addr{Host: strconv.Itoa(i)}, nil, stub.Config(config.New()))
 		e := m.Insert(c, info.Info{})
 		es[i] = e
 		el[c] = e

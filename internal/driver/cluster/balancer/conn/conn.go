@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"math"
 	"sync"
@@ -68,7 +68,9 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 		c.grpcConn = raw
 	}
 	if c.runtime.GetState() != state.Banned {
+		before := c.runtime.GetState()
 		c.runtime.SetState(state.Online)
+		c.stateChanged(before, c.runtime.GetState())
 	}
 	if c.config.GrpcConnectionPolicy().TTL > 0 {
 		c.timer.Reset(c.config.GrpcConnectionPolicy().TTL)
@@ -90,6 +92,10 @@ func (c *conn) IsReady() bool {
 	return c != nil && c.grpcConn != nil && c.grpcConn.GetState() == connectivity.Ready
 }
 
+func (c *conn) stateChanged(before, after state.State) {
+	trace.DriverOnConnStateChange(c.config.Trace(context.Background()), c.addr, before, after)
+}
+
 func (c *conn) waitClose() {
 	if c.config.GrpcConnectionPolicy().TTL <= 0 {
 		return
@@ -102,8 +108,10 @@ func (c *conn) waitClose() {
 		case <-c.timer.C():
 			c.Lock()
 			if c.grpcConn != nil {
+				before := c.runtime.GetState()
 				_ = c.grpcConn.Close()
 				c.grpcConn = nil
+				c.stateChanged(before, c.runtime.GetState())
 			}
 			c.timer.Reset(time.Duration(math.MaxInt64))
 			c.Unlock()

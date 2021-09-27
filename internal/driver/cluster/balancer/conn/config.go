@@ -2,7 +2,7 @@ package conn
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"google.golang.org/grpc/keepalive"
 	"time"
