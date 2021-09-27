@@ -21,7 +21,7 @@ func NoError(t *testing.T, err error) {
 }
 
 func NotNil(t *testing.T, value interface{}) {
-	if value == nil {
+	if value == nil || IsNil(value) {
 		t.Fatal("value is nil")
 	}
 }

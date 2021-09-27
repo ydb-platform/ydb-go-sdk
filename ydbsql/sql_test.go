@@ -171,20 +171,24 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 	})
 
 	connectParams := ydb.MustConnectionString(os.Getenv("YDB"))
-	db := sql.OpenDB(Connector(
+	con, err := Connector(
 		WithConnectParams(connectParams),
 		WithCredentials(credentials.AuthTokenCredentials{
 			AuthToken: os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
 		}),
 		WithTraceDriver(dtrace),
 		WithTraceTable(ttrace),
-	))
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	db := sql.OpenDB(con)
 
 	return db, db.PingContext(ctx)
 }
 
 func TestQuery(t *testing.T) {
-	c := Connector(
+	c, err := Connector(
 		withClient(
 			internal.NewClientAsPool(
 				testutil.NewDB(
@@ -231,7 +235,9 @@ func TestQuery(t *testing.T) {
 		),
 		WithDefaultExecDataQueryOption(),
 	)
-
+	if err != nil {
+		log.Fatal(err)
+	}
 	for _, test := range [...]struct {
 		subName       string
 		scanQueryMode bool

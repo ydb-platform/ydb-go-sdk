@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 
@@ -250,7 +252,7 @@ func (c *connector) init(ctx context.Context) (err error) {
 	// database/sql.DB.SetMaxIdleConns() call. Unfortunately, we can not
 	// receive that limit here and we do not want to force user to
 	// configure it twice (and pass it as an option to connector).
-	if c.tbl == nil {
+	if assert.IsNil(c.tbl) {
 		c.tbl, err = c.dial(ctx)
 	}
 	//c.tbl.Builder = c.client
