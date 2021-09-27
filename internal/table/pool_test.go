@@ -214,7 +214,6 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestSessionPoolClose(t *testing.T) {
@@ -313,6 +312,11 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			var (
+				get  = make(chan struct{}, 1)
+				wait = make(chan struct{})
+				got  = make(chan struct{}, 1)
+			)
 			p := &pool{
 				SizeLimit: 1,
 				Builder: &StubBuilder{
@@ -323,21 +327,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						}})),
 				},
-			}
-			defer func() {
-				_ = p.Close(context.Background())
-			}()
-			s := mustGetSession(t, p)
-			var (
-				get  = make(chan struct{})
-				wait = make(chan struct{})
-				got  = make(chan struct{})
-			)
-			go func() {
-				defer func() {
-					close(got)
-				}()
-				_, _ = p.Get(trace.WithTable(context.Background(), trace.Table{
+				Trace: trace.Table{
 					TablePool: trace.TablePool{
 						OnGet: func(trace.SessionPoolGetStartInfo) func(trace.SessionPoolGetDoneInfo) {
 							get <- struct{}{}
@@ -348,7 +338,17 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 							return nil
 						},
 					},
-				}))
+				},
+			}
+			defer func() {
+				_ = p.Close(context.Background())
+			}()
+			s := mustGetSession(t, p)
+			go func() {
+				defer func() {
+					close(got)
+				}()
+				_, _ = p.Get(context.Background())
 			}()
 
 			regWait := whenWantWaitCh(p)
@@ -1221,21 +1221,13 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 func mustCreateSession(t *testing.T, p *pool) table.Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	s, err := p.Create(
-		trace.WithTable(
-			context.Background(),
-			trace.Table{
-				TablePool: trace.TablePool{
-					OnCreate: func(info trace.SessionPoolCreateStartInfo) func(trace.SessionPoolCreateDoneInfo) {
-						wg.Add(1)
-						return func(info trace.SessionPoolCreateDoneInfo) {
-							wg.Done()
-						}
-					},
-				},
-			},
-		),
-	)
+	p.Trace.OnCreate = func(info trace.SessionPoolCreateStartInfo) func(trace.SessionPoolCreateDoneInfo) {
+		wg.Add(1)
+		return func(info trace.SessionPoolCreateDoneInfo) {
+			wg.Done()
+		}
+	}
+	s, err := p.Create(context.Background())
 	if err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
@@ -1245,21 +1237,7 @@ func mustCreateSession(t *testing.T, p *pool) table.Session {
 func mustGetSession(t *testing.T, p *pool) table.Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	s, err := p.Get(
-		trace.WithTable(
-			context.Background(),
-			trace.Table{
-				TablePool: trace.TablePool{
-					OnGet: func(info trace.SessionPoolGetStartInfo) func(trace.SessionPoolGetDoneInfo) {
-						wg.Add(1)
-						return func(info trace.SessionPoolGetDoneInfo) {
-							wg.Done()
-						}
-					},
-				},
-			},
-		),
-	)
+	s, err := p.Get(context.Background())
 	if err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
@@ -1323,22 +1301,14 @@ func mustTakeSession(t *testing.T, p *pool, s table.Session) {
 
 func mustClose(t *testing.T, p *pool) {
 	wg := sync.WaitGroup{}
+	p.Trace.OnCloseSession = func(info trace.SessionPoolCloseSessionStartInfo) func(doneInfo trace.SessionPoolCloseSessionDoneInfo) {
+		wg.Add(1)
+		return func(info trace.SessionPoolCloseSessionDoneInfo) {
+			wg.Done()
+		}
+	}
 	defer wg.Wait()
-	if err := p.Close(
-		trace.WithTable(
-			context.Background(),
-			trace.Table{
-				TablePool: trace.TablePool{
-					OnCloseSession: func(info trace.SessionPoolCloseSessionStartInfo) func(doneInfo trace.SessionPoolCloseSessionDoneInfo) {
-						wg.Add(1)
-						return func(info trace.SessionPoolCloseSessionDoneInfo) {
-							wg.Done()
-						}
-					},
-				},
-			},
-		),
-	); err != nil {
+	if err := p.Close(context.Background()); err != nil {
 		t.Fatalf("%s: %v", caller(), err)
 	}
 }
@@ -1386,7 +1356,7 @@ func (s *StubBuilder) CreateSession(ctx context.Context) (session table.Session,
 		return f(ctx)
 	}
 
-	return newSession(ctx, s.Cluster, trace.Table{})
+	return newSession(ctx, s.Cluster, trace.ContextTable(ctx))
 }
 
 func (p *pool) debug() {

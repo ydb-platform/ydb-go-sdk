@@ -1,9 +1,10 @@
 package options
 
 import (
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
@@ -33,11 +34,11 @@ type SessionInfo struct {
 	status SessionStatus
 }
 
-func (s SessionInfo) Status() string {
+func (s *SessionInfo) Status() string {
 	return s.status.String()
 }
 
-func (s SessionInfo) SetStatus(status SessionStatus) {
+func (s *SessionInfo) SetStatus(status SessionStatus) {
 	s.status = status
 }
 
