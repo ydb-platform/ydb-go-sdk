@@ -178,7 +178,7 @@ func (m *multiBalancer) Remove(x Element) {
 }
 
 func (m *multiBalancer) Pessimize(x Element) error {
-	if x == nil {
+	if assert.IsNil(x) {
 		return ErrNilBalancerElement
 	}
 	good := 0
@@ -224,7 +224,7 @@ func (s *singleConnBalancer) Remove(x Element) {
 func (s *singleConnBalancer) Update(Element, info.Info)  {}
 func (s *singleConnBalancer) Pessimize(el Element) error { return nil }
 func (s *singleConnBalancer) Contains(x Element) bool {
-	if x == nil {
+	if assert.IsNil(x) {
 		return false
 	}
 	return s.conn != x.(conn.Conn)
