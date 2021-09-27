@@ -69,6 +69,7 @@ type (
 	}
 	PessimizationDoneInfo struct {
 		Error error
+		State string
 	}
 	GetCredentialsStartInfo struct {
 		Context context.Context

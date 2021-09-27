@@ -331,15 +331,16 @@ func DriverOnGetConn(t Driver, c context.Context) func(address string, _ error) 
 		res(p)
 	}
 }
-func DriverOnPessimization(t Driver, c context.Context, address string, cause error) func(error) {
+func DriverOnPessimization(t Driver, c context.Context, address string, cause error) func(_ error, state string) {
 	var p PessimizationStartInfo
 	p.Context = c
 	p.Address = address
 	p.Cause = cause
 	res := t.onPessimization(p)
-	return func(e error) {
+	return func(e error, state string) {
 		var p PessimizationDoneInfo
 		p.Error = e
+		p.State = state
 		res(p)
 	}
 }
