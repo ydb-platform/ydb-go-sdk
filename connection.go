@@ -125,17 +125,13 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 			db.options.tlsConfig.RootCAs = certPool
 		}
 	}
-	if db.options.connectTimeout != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *db.options.connectTimeout)
-		defer cancel()
-	}
 	db.cluster, err = (&dial.Dialer{
 		Config: config.New(func(c *config.Config) {
 			c.Database = params.Database()
 			c.Credentials = db.options.credentials
 		}),
 		TLSConfig: db.options.tlsConfig,
+		Timeout:   db.options.dialTimeout,
 	}).Dial(ctx, params.Endpoint())
 	if err != nil {
 		return nil, err

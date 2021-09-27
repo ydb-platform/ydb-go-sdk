@@ -17,7 +17,6 @@ type Option func(ctx context.Context, client *db) error
 type options struct {
 	dialTimeout                          time.Duration
 	tlsConfig                            *tls.Config
-	connectTimeout                       *time.Duration
 	traceDriver                          *trace.Driver
 	traceTable                           *trace.Table
 	driverConfig                         *config.Config
@@ -150,13 +149,6 @@ func WithTraceDriver(trace trace.Driver) Option {
 func WithTraceTable(trace trace.Table) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.traceTable = &trace
-		return nil
-	}
-}
-
-func WithConnectTimeout(connectTimeout time.Duration) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options.connectTimeout = &connectTimeout
 		return nil
 	}
 }
