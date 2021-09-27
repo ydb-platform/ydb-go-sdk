@@ -32,3 +32,17 @@ func ContextTableConfig(ctx context.Context) table.Config {
 	}
 	return table.DefaultConfig()
 }
+
+type ctxRetryNoIdempotentKey struct{}
+
+// WithRetryNoIdempotent returns a copy of parent context with allow operationCompleted
+// operations with no idempotent errors
+func WithRetryNoIdempotent(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxRetryNoIdempotentKey{}, true)
+}
+
+// ContextRetryNoIdempotent returns the flag for operationCompleted with no idempotent errors
+func ContextRetryNoIdempotent(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxRetryNoIdempotentKey{}).(bool)
+	return ok && v
+}

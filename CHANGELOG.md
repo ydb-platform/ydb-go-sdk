@@ -1,3 +1,7 @@
+## 2.9.4
+* Forced cancelled transport error as retriable (only idempotent operations)
+* Renamed some internal retry mode types
+
 ## 2.9.3
 * Forced grpc keep-alive PermitWithoutStream parameter to true
 

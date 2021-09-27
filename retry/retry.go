@@ -87,28 +87,27 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 func Check(err error) (m retryMode) {
 	var te *errors.TransportError
 	var oe *errors.OpError
-
 	switch {
 	case errors.As(err, &te):
 		return retryMode{
-			statusCode:    int32(te.Reason),
-			retry:         te.Reason.RetryType(),
-			backoff:       te.Reason.BackoffType(),
-			deleteSession: te.Reason.MustDeleteSession(),
+			statusCode:         int32(te.Reason),
+			operationCompleted: te.Reason.OperationCompleted(),
+			backoff:            te.Reason.BackoffType(),
+			deleteSession:      te.Reason.MustDeleteSession(),
 		}
 	case errors.As(err, &oe):
 		return retryMode{
-			statusCode:    int32(oe.Reason),
-			retry:         oe.Reason.RetryType(),
-			backoff:       oe.Reason.BackoffType(),
-			deleteSession: oe.Reason.MustDeleteSession(),
+			statusCode:         int32(oe.Reason),
+			operationCompleted: oe.Reason.OperationCompleted(),
+			backoff:            oe.Reason.BackoffType(),
+			deleteSession:      oe.Reason.MustDeleteSession(),
 		}
 	default:
 		return retryMode{
-			statusCode:    -1,
-			retry:         errors.RetryTypeNoRetry,
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
+			statusCode:         -1,
+			operationCompleted: errors.OperationCompletedTrue,
+			backoff:            errors.BackoffTypeNoBackoff,
+			deleteSession:      false,
 		}
 	}
 }
@@ -181,25 +180,25 @@ func max(a, b uint) uint {
 	return b
 }
 
-// retryMode reports whether operation is able to be retried and with which
-// properties.
+// retryMode reports whether operation is able retried and with which properties.
 type retryMode struct {
-	statusCode    int32
-	retry         errors.RetryType
-	backoff       errors.BackoffType
-	deleteSession bool
+	statusCode         int32
+	operationCompleted errors.OperationCompleted
+	backoff            errors.BackoffType
+	deleteSession      bool
 }
 
-func (m retryMode) MustRetry(retryNoIdempotent bool) bool {
-	switch m.retry {
-	case errors.RetryTypeNoRetry:
+func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
+	switch m.operationCompleted {
+	case errors.OperationCompletedTrue:
 		return false
-	case errors.RetryTypeNoIdempotent:
-		return retryNoIdempotent
+	case errors.OperationCompletedUndefined:
+		return isOperationIdempotent
 	default:
 		return true
 	}
 }
+
 func (m retryMode) StatusCode() int32               { return m.statusCode }
 func (m retryMode) MustBackoff() bool               { return m.backoff&errors.BackoffTypeBackoffAny != 0 }
 func (m retryMode) BackoffType() errors.BackoffType { return m.backoff }

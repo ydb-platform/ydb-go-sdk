@@ -93,7 +93,7 @@ func IsOpError(err error, code StatusCode) bool {
 	return op.Reason == code
 }
 
-func (e StatusCode) RetryType() RetryType {
+func (e StatusCode) OperationCompleted() OperationCompleted {
 	switch e {
 	case
 		StatusAborted,
@@ -102,13 +102,12 @@ func (e StatusCode) RetryType() RetryType {
 		StatusBadSession,
 		StatusSessionBusy,
 		StatusNotFound:
-		return RetryTypeAny
+		return OperationCompletedFalse
 	case
-		StatusCancelled,
 		StatusUndetermined:
-		return RetryTypeIdempotent
+		return OperationCompletedUndefined
 	default:
-		return RetryTypeNoRetry
+		return OperationCompletedTrue
 	}
 }
 
@@ -120,7 +119,6 @@ func (e StatusCode) BackoffType() BackoffType {
 	case
 		StatusAborted,
 		StatusUnavailable,
-		StatusBadSession,
 		StatusCancelled,
 		StatusSessionBusy,
 		StatusUndetermined:

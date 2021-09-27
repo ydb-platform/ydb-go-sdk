@@ -3,6 +3,7 @@ package retry
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc"
 	"math/rand"
 	"testing"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
-func TestLogBackoff(t *testing.T) {
+func TestlogBackoff(t *testing.T) {
 	type exp struct {
 		eq  time.Duration
 		gte time.Duration
@@ -111,328 +112,461 @@ func TestLogBackoff(t *testing.T) {
 }
 
 func TestRetryModes(t *testing.T) {
+	type CanRetry struct {
+		idempotentOperation    bool // after an error we must retry idempotent operation or no
+		nonIdempotentOperation bool // after an error we must retry non-idempotent operation or no
+	}
 	type Case struct {
 		err           error              // given error
-		retryType     errors.RetryType   // types of retry: no retry, retry always idempotent, retry conditionally with user allow retry for unidempotent operations
-		backoff       errors.BackoffType // types of Backoff: no Backoff (=== no retry), fast Backoff, slow Backoff
+		backoff       errors.BackoffType // type of backoff: no backoff (=== no operationCompleted), fast backoff, slow backoff
 		deleteSession bool               // close session and delete from pool
+		canRetry      CanRetry
 	}
 	errs := []Case{
 		{
-			err:           fmt.Errorf("unknown error"), // retryer given unknown error - we will not retry and will close session
-			retryType:     errors.RetryTypeNoRetry,
+			err:           fmt.Errorf("unknown error"), // retryer given unknown error - we will not operationCompleted and will close session
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
-			err:           context.DeadlineExceeded, // golang deadline deadline exceeded
-			retryType:     errors.RetryTypeNoRetry,
+			err:           context.DeadlineExceeded, // golang context deadline exceeded
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
-			err:           context.Canceled, // golang deadline cancelled
-			retryType:     errors.RetryTypeNoRetry,
+			err:           context.Canceled, // golang context cancelled
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err:           errors.MapGRPCError(grpc.ErrClientConnClosing),
+			backoff:       errors.BackoffTypeFastBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorUnknownCode,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorCanceled,
 			},
-			retryType:     errors.RetryTypeNoRetry,
-			backoff:       errors.BackoffTypeNoBackoff,
+			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorUnknown,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorInvalidArgument,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorDeadlineExceeded,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorNotFound,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorAlreadyExists,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorPermissionDenied,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorResourceExhausted,
 			},
-			retryType:     errors.RetryTypeAny,
 			backoff:       errors.BackoffTypeSlowBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorFailedPrecondition,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorAborted,
 			},
-			retryType:     errors.RetryTypeAny,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorOutOfRange,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorUnimplemented,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorInternal,
 			},
-			retryType:     errors.RetryTypeIdempotent,
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorUnavailable,
 			},
-			retryType:     errors.RetryTypeIdempotent,
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorDataLoss,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.TransportError{
 				Reason: errors.TransportErrorUnauthenticated,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusUnknownStatus,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusBadRequest,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusUnauthorized,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusInternalError,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusAborted,
 			},
-			retryType:     errors.RetryTypeAny,
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusUnavailable,
 			},
-			retryType:     errors.RetryTypeAny,
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusOverloaded,
 			},
-			retryType:     errors.RetryTypeAny,
 			backoff:       errors.BackoffTypeSlowBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusSchemeError,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusGenericError,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusTimeout,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusBadSession,
 			},
-			retryType:     errors.RetryTypeAny,
-			backoff:       errors.BackoffTypeFastBackoff,
+			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusPreconditionFailed,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusAlreadyExists,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusNotFound,
 			},
-			retryType:     errors.RetryTypeAny,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusSessionExpired,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusCancelled,
 			},
-			retryType:     errors.RetryTypeIdempotent,
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusUndetermined,
 			},
-			retryType:     errors.RetryTypeIdempotent,
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusUnsupported,
 			},
-			retryType:     errors.RetryTypeNoRetry,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
 		},
 		{
 			err: &errors.OpError{
 				Reason: errors.StatusSessionBusy,
 			},
-			retryType:     errors.RetryTypeAny,
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
 		},
 	}
 	for _, test := range errs {
 		t.Run(test.err.Error(), func(t *testing.T) {
 			m := Check(test.err)
-			if m.retry != test.retryType {
-				t.Errorf("unexpected RetryType status: %v, want: %v", m.retry, test.retryType)
+			if m.MustRetry(true) != test.canRetry.idempotentOperation {
+				t.Errorf("unexpected must retry idempotent operation status: %v, want: %v", m.MustRetry(true), test.canRetry.idempotentOperation)
+			}
+			if m.MustRetry(false) != test.canRetry.nonIdempotentOperation {
+				t.Errorf("unexpected must retry non-idempotent operation status: %v, want: %v", m.MustRetry(false), test.canRetry.nonIdempotentOperation)
 			}
 			if m.backoff != test.backoff {
-				t.Errorf("unexpected Backoff status: %v, want: %v", m.backoff, test.backoff)
+				t.Errorf("unexpected backoff status: %v, want: %v", m.backoff, test.backoff)
 			}
 			if m.deleteSession != test.deleteSession {
 				t.Errorf("unexpected delete session status: %v, want: %v", m.deleteSession, test.deleteSession)

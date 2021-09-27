@@ -193,6 +193,49 @@ func (t TransportErrorCode) String() string {
 	return transportErrorString(t)
 }
 
+func (t TransportErrorCode) OperationCompleted() OperationCompleted {
+	switch t {
+	case
+		TransportErrorAborted,
+		TransportErrorResourceExhausted:
+		return OperationCompletedFalse
+	case
+		TransportErrorInternal,
+		TransportErrorCanceled,
+		TransportErrorUnavailable:
+		return OperationCompletedUndefined
+	default:
+		return OperationCompletedTrue
+	}
+}
+
+func (t TransportErrorCode) BackoffType() BackoffType {
+	switch t {
+	case
+		TransportErrorInternal,
+		TransportErrorCanceled,
+		TransportErrorUnavailable:
+		return BackoffTypeFastBackoff
+	case
+		TransportErrorResourceExhausted:
+		return BackoffTypeSlowBackoff
+	default:
+		return BackoffTypeNoBackoff
+	}
+}
+
+func (t TransportErrorCode) MustDeleteSession() bool {
+	switch t {
+	case
+		TransportErrorCanceled,
+		TransportErrorResourceExhausted,
+		TransportErrorOutOfRange:
+		return false
+	default:
+		return true
+	}
+}
+
 const (
 	TransportErrorUnknownCode TransportErrorCode = iota
 	TransportErrorCanceled
@@ -293,45 +336,4 @@ func MustPessimizeEndpoint(err error) bool {
 		return false
 	}
 	return t.Reason != TransportErrorCanceled
-}
-
-func (t TransportErrorCode) RetryType() RetryType {
-	switch t {
-	case
-		TransportErrorResourceExhausted,
-		TransportErrorAborted:
-		return RetryTypeAny
-	case
-		TransportErrorInternal,
-		TransportErrorUnavailable:
-		return RetryTypeIdempotent
-	default:
-		return RetryTypeNoRetry
-	}
-}
-
-func (t TransportErrorCode) BackoffType() BackoffType {
-	switch t {
-	case
-		TransportErrorInternal,
-		TransportErrorUnavailable:
-		return BackoffTypeFastBackoff
-	case
-		TransportErrorResourceExhausted:
-		return BackoffTypeSlowBackoff
-	default:
-		return BackoffTypeNoBackoff
-	}
-}
-
-func (t TransportErrorCode) MustDeleteSession() bool {
-	switch t {
-	case
-		TransportErrorCanceled,
-		TransportErrorResourceExhausted,
-		TransportErrorOutOfRange:
-		return false
-	default:
-		return true
-	}
 }
