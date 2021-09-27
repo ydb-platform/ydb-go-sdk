@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"time"
 
@@ -15,7 +16,7 @@ type Option func(ctx context.Context, client *db) error
 
 type options struct {
 	dialTimeout                          time.Duration
-	certPool                             *x509.CertPool
+	tlsConfig                            *tls.Config
 	connectTimeout                       *time.Duration
 	traceDriver                          *trace.Driver
 	traceTable                           *trace.Table
@@ -160,21 +161,37 @@ func WithConnectTimeout(connectTimeout time.Duration) Option {
 	}
 }
 
+func WithTlsConfig(tlsConfig *tls.Config) Option {
+	return func(ctx context.Context, c *db) error {
+		c.options.tlsConfig = tlsConfig
+		return nil
+	}
+}
+
 func WithCertificates(certPool *x509.CertPool) Option {
 	return func(ctx context.Context, c *db) error {
-		c.options.certPool = certPool
+		if c.options.tlsConfig == nil {
+			c.options.tlsConfig = &tls.Config{}
+		}
+		c.options.tlsConfig.RootCAs = certPool
 		return nil
 	}
 }
 
 func WithCertificatesFromFile(caFile string) Option {
-	certPool, err := x509.SystemCertPool()
-	if err != nil {
-		panic(err)
+	return func(ctx context.Context, c *db) error {
+		certPool, err := x509.SystemCertPool()
+		if err != nil {
+			return err
+		}
+		err = credentials.AppendCertsFromFile(certPool, caFile)
+		if err != nil {
+			return err
+		}
+		if c.options.tlsConfig == nil {
+			c.options.tlsConfig = &tls.Config{}
+		}
+		c.options.tlsConfig.RootCAs = certPool
+		return nil
 	}
-	err = credentials.AppendCertsFromFile(certPool, caFile)
-	if err != nil {
-		panic(err)
-	}
-	return WithCertificates(certPool)
 }

@@ -51,15 +51,25 @@ func main() {
 		opts = append(opts, ydbsql.WithCredentials(ydb.NewAnonymousCredentials()))
 	}
 
-	db := sql.OpenDB(ydbsql.Connector(opts...))
-	defer func() { _ = db.Close() }()
-
-	err := db.PingContext(ctx)
+	connector, err := ydbsql.Connector(opts...)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "ping failed: %v\n", err)
 		os.Exit(1)
 	}
+
+	db := sql.OpenDB(connector)
+	defer func() { _ = db.Close() }()
+
+	if err = db.PingContext(ctx); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "ping failed: %v\n", err)
+		os.Exit(1)
+	}
+
 	cl, err := getClient(ctx, db)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "ping failed: %v\n", err)
+		os.Exit(1)
+	}
 
 	err = cleanupDatabase(ctx, cl, connectParams.Database(), "series", "episodes", "seasons")
 	if err != nil {

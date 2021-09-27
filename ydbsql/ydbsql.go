@@ -23,7 +23,7 @@ func (d *legacyDriver) OpenConnector(name string) (driver.Connector, error) {
 	if err := validateURL(u); err != nil {
 		return nil, err
 	}
-	return Connector(urlConnectorOptions(u)...), nil
+	return Connector(urlConnectorOptions(u)...)
 }
 
 func (d *legacyDriver) Open(name string) (driver.Conn, error) {

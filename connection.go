@@ -3,8 +3,11 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
@@ -13,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"google.golang.org/grpc"
+	"os"
 )
 
 type DB interface {
@@ -104,11 +108,21 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 			return nil, err
 		}
 	}
-	var tlsConfig *tls.Config
 	if params.UseTLS() {
-		tlsConfig, err = dial.Tls()
-		if db.options.certPool != nil {
-			tlsConfig.RootCAs = db.options.certPool
+		if db.options.tlsConfig == nil {
+			db.options.tlsConfig = &tls.Config{}
+		}
+		if caFile, hasUserCA := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); hasUserCA || db.options.tlsConfig.RootCAs == nil {
+			certPool, err := x509.SystemCertPool()
+			if err != nil {
+				return nil, err
+			}
+			if hasUserCA {
+				if err := credentials.AppendCertsFromFile(certPool, caFile); err != nil {
+					return nil, fmt.Errorf("cannot load certificates from file '%s' by Env['YDB_SSL_ROOT_CERTIFICATES_FILE']: %v", caFile, err)
+				}
+			}
+			db.options.tlsConfig.RootCAs = certPool
 		}
 	}
 	if db.options.connectTimeout != nil {
@@ -121,7 +135,7 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 			c.Database = params.Database()
 			c.Credentials = db.options.credentials
 		}),
-		TLSConfig: tlsConfig,
+		TLSConfig: db.options.tlsConfig,
 	}).Dial(ctx, params.Endpoint())
 	if err != nil {
 		return nil, err

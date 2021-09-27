@@ -20,24 +20,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	options := []ydb.Option{
-		ydb.WithDialTimeout(3 * time.Second),
+	opts := []ydb.Option{
 		ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
+		ydb.WithDialTimeout(3 * time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second * 5),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5 * time.Second),
 	}
 	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		options = append(options, ydb.WithAccessTokenCredentials(token))
+		opts = append(opts, ydb.WithAccessTokenCredentials(token))
 	}
 	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
-		options = append(options, ydb.WithAnonymousCredentials())
+		opts = append(opts, ydb.WithAnonymousCredentials())
 	}
 
 	db, err := ydb.New(
 		ctx,
 		connectParams,
-		options...,
+		opts...,
 	)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)
