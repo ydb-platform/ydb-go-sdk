@@ -159,11 +159,16 @@ func TestTxDoerStmt(t *testing.T) {
 		},
 		Logf: t.Logf,
 	}
-	cluster := b.Build()
+	cl := b.Build()
 
-	db := sql.OpenDB(Connector(
-		withClient(table.NewClientAsPool(cluster, table.DefaultConfig())),
-	))
+	con, err := Connector(
+		withClient(table.NewClientAsPool(cl, table.DefaultConfig())),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db := sql.OpenDB(con)
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)
 	}
