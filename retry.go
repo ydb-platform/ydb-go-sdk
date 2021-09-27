@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -20,7 +21,7 @@ var (
 	// use as constant instead and configure max retries as parameter of Retryer
 	DefaultMaxRetries   = 10
 	DefaultRetryChecker = RetryChecker{}
-	// DefaultBackoff is a logarithmic backoff retry strategy.
+	// DefaultBackoff is a logarithmic backoff operationCompleted strategy.
 	// Deprecated: use DefaultFastBackoff or DefaultSlowBackoff instead
 	DefaultBackoff = LogBackoff{
 		SlotDuration: time.Second,
@@ -37,9 +38,9 @@ var (
 )
 
 // RetryChecker contains options of checking errors returned by YDB for ability
-// to retry provoked operation.
+// to operationCompleted provoked operation.
 type RetryChecker struct {
-	// RetryNotFound reports whether Repeater must retry ErrNotFound errors.
+	// RetryNotFound reports whether Repeater must operationCompleted ErrNotFound errors.
 	// Deprecated: has no effect now
 	RetryNotFound bool
 }
@@ -47,9 +48,9 @@ type RetryChecker struct {
 // RetryMode reports whether operation is able to be retried and with which
 // properties.
 type RetryMode struct {
-	retry         RetryType
-	backoff       BackoffType
-	deleteSession bool
+	operationCompleted OperationCompleted
+	backoff            BackoffType
+	deleteSession      bool
 }
 
 // Deprecated: has no effect now
@@ -75,20 +76,46 @@ const (
 	backoffTypeBackoffAny = BackoffTypeFastBackoff | BackoffTypeSlowBackoff
 )
 
-// RetryType reports which operations need to retry
-type RetryType uint8
+func (b BackoffType) String() string {
+	switch b {
+	case BackoffTypeNoBackoff:
+		return "immediately"
+	case BackoffTypeFastBackoff:
+		return "fast backoff"
+	case BackoffTypeSlowBackoff:
+		return "slow backoff"
+	case backoffTypeBackoffAny:
+		return "any backoff"
+	default:
+		return fmt.Sprintf("unknown backoff type %d", b)
+	}
+}
 
-// Binary flags that used as RetryType
+// OperationCompleted reports which operations need to operationCompleted
+type OperationCompleted uint8
+
+// Binary flags that used as OperationCompleted
 const (
-	RetryTypeNoRetry RetryType = 1 << iota >> 1
-	RetryTypeIdempotent
-	RetryTypeNoIdempotent
-
-	RetryTypeAny = RetryTypeNoIdempotent | RetryTypeIdempotent
+	OperationCompletedTrue      OperationCompleted = 1 << iota >> 1
+	OperationCompletedUndefined                    // may be true or may be false
+	OperationCompletedFalse
 )
 
+func (t OperationCompleted) String() string {
+	switch t {
+	case OperationCompletedTrue:
+		return "operation was completed"
+	case OperationCompletedFalse:
+		return "operation was not completed"
+	case OperationCompletedUndefined:
+		return "operation completed status undefined"
+	default:
+		return fmt.Sprintf("unknown operation completed code: %d", t)
+	}
+}
+
 // Deprecated: will be dropped at next major release
-func (m RetryMode) Retriable() bool { return m.retry&RetryTypeAny != 0 }
+func (m RetryMode) Retriable() bool { return m.operationCompleted&OperationCompletedUndefined != 0 }
 
 // Deprecated: will be dropped at next major release
 func (m RetryMode) MustCheckSession() bool { return m.deleteSession }
@@ -96,12 +123,12 @@ func (m RetryMode) MustCheckSession() bool { return m.deleteSession }
 // Deprecated: will be dropped at next major release
 func (m RetryMode) MustDropCache() bool { return m.deleteSession }
 
-func (m RetryMode) MustRetry(retryNoIdempotent bool) bool {
-	switch m.retry {
-	case RetryTypeNoRetry:
+func (m RetryMode) MustRetry(isOperationIdempotent bool) bool {
+	switch m.operationCompleted {
+	case OperationCompletedTrue:
 		return false
-	case RetryTypeNoIdempotent:
-		return retryNoIdempotent
+	case OperationCompletedUndefined:
+		return isOperationIdempotent
 	default:
 		return true
 	}
@@ -112,7 +139,7 @@ func (m RetryMode) BackoffType() BackoffType { return m.backoff }
 
 func (m RetryMode) MustDeleteSession() bool { return m.deleteSession }
 
-// Check returns retry mode for err.
+// Check returns operationCompleted mode for err.
 func (r *RetryChecker) Check(err error) (m RetryMode) {
 	var te *TransportError
 	var oe *OpError
@@ -120,32 +147,32 @@ func (r *RetryChecker) Check(err error) (m RetryMode) {
 	switch {
 	case errors.As(err, &te):
 		return RetryMode{
-			retry:         te.Reason.retryType(),
-			backoff:       te.Reason.backoffType(),
-			deleteSession: te.Reason.mustDeleteSession(),
+			operationCompleted: te.Reason.operationCompleted(),
+			backoff:            te.Reason.backoffType(),
+			deleteSession:      te.Reason.mustDeleteSession(),
 		}
 	case errors.As(err, &oe):
 		return RetryMode{
-			retry:         oe.Reason.retryType(),
-			backoff:       oe.Reason.backoffType(),
-			deleteSession: oe.Reason.mustDeleteSession(),
+			operationCompleted: oe.Reason.operationCompleted(),
+			backoff:            oe.Reason.backoffType(),
+			deleteSession:      oe.Reason.mustDeleteSession(),
 		}
 	default:
 		return RetryMode{
-			retry:         RetryTypeNoRetry,
-			backoff:       BackoffTypeNoBackoff,
-			deleteSession: false,
+			operationCompleted: OperationCompletedTrue,
+			backoff:            BackoffTypeNoBackoff,
+			deleteSession:      false,
 		}
 	}
 }
 
-// Backoff is the interface that contains logic of delaying operation retry.
+// Backoff is the interface that contains logic of delaying operation operationCompleted.
 type Backoff interface {
-	// Wait maps index of the retry to a channel which fulfillment means that
+	// Wait maps index of the operationCompleted to a channel which fulfillment means that
 	// delay is over.
 	//
-	// Note that retry index begins from 0 and 0-th index means that it is the
-	// first retry attempt after an initial error.
+	// Note that operationCompleted index begins from 0 and 0-th index means that it is the
+	// first operationCompleted attempt after an initial error.
 	Wait(n int) <-chan time.Time
 }
 

@@ -259,17 +259,17 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 		_ = conn.conn.Close()
 	}()
 
-	subctx := ctx
+	subCtx := ctx
 	if d.timeout > 0 {
 		var cancel context.CancelFunc
-		subctx, cancel = context.WithTimeout(ctx, d.timeout)
+		subCtx, cancel = context.WithTimeout(ctx, d.timeout)
 		defer cancel()
 	}
 
 	return (&discoveryClient{
 		conn: conn,
 		meta: d.meta,
-	}).Discover(subctx, d.config.Database, d.useTLS())
+	}).Discover(subCtx, d.config.Database, d.useTLS())
 }
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
