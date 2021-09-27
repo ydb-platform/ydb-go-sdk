@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"container/heap"
+	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
@@ -80,7 +81,7 @@ func (r *roundRobin) Pessimize(x Element) error {
 		return ErrUnknownTypeOfBalancerElement
 	}
 	if !r.conns.Contains(el) {
-		return ErrUnknownBalancerElement
+		return fmt.Errorf("rr: pessimize failed: %w", ErrUnknownBalancerElement)
 	}
 	el.Conn.Runtime().SetState(state.Banned)
 	r.belt = r.distribute()

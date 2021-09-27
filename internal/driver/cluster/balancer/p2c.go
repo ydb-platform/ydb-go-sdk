@@ -1,6 +1,7 @@
 package balancer
 
 import (
+	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
@@ -165,7 +166,7 @@ func (p *p2c) Pessimize(x Element) error {
 		return ErrUnknownTypeOfBalancerElement
 	}
 	if !p.conns.Contains(el) {
-		return ErrUnknownBalancerElement
+		return fmt.Errorf("p2c: pessimize failed: %w", ErrUnknownBalancerElement)
 	}
 	el.Conn.Runtime().SetState(state.Banned)
 	return nil

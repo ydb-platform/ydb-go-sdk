@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -289,7 +290,7 @@ func (c *cluster) Pessimize(addr public.Addr) (err error) {
 		return balancer.ErrNilBalancerElement
 	}
 	if !c.balancer.Contains(entry.Handle) {
-		return balancer.ErrUnknownBalancerElement
+		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrUnknownBalancerElement)
 	}
 	err = c.balancer.Pessimize(entry.Handle)
 	if err == nil && c.explorer != nil {
