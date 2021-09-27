@@ -131,7 +131,9 @@ func (c *conn) Close() (err error) {
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
-	trace.DriverOnPessimization(c.config.Trace(ctx), ctx, c.Addr().String(), err)(c.config.Pessimize(c.addr), state.Banned.String())
+	onDone := trace.DriverOnPessimization(c.config.Trace(ctx), ctx, c.Addr().String(), c.runtime.Stats().State.String(), err)
+	err = c.config.Pessimize(c.addr)
+	onDone(err, c.runtime.Stats().State.String())
 }
 
 func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {

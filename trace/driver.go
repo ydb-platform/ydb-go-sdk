@@ -65,6 +65,7 @@ type (
 	PessimizationStartInfo struct {
 		Context context.Context
 		Address string
+		State   string
 		Cause   error
 	}
 	PessimizationDoneInfo struct {
