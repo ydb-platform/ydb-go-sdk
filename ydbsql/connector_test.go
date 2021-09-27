@@ -33,7 +33,7 @@ func TestConnectorDialOnPing(t *testing.T) {
 	}()
 
 	dialCh := make(chan struct{})
-	c := Connector(
+	c, err := Connector(
 		WithEndpoint("127.0.0.1:9999"),
 		WithDialer(dial.Dialer{
 			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
@@ -48,6 +48,10 @@ func TestConnectorDialOnPing(t *testing.T) {
 		}),
 		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorDialOnPing")),
 	)
+
+	if err != nil {
+		t.Fatalf("unexpected connector error: %v", err)
+	}
 
 	db := sql.OpenDB(c)
 	select {
@@ -80,7 +84,7 @@ func TestConnectorRedialOnError(t *testing.T) {
 	success := make(chan bool, 1)
 
 	dialFlag := false
-	c := Connector(
+	c, err := Connector(
 		WithEndpoint("127.0.0.1:9999"),
 		WithDialer(dial.Dialer{
 			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
@@ -107,6 +111,10 @@ func TestConnectorRedialOnError(t *testing.T) {
 			table.CommitTx()),
 		),
 	)
+	if err != nil {
+		t.Fatalf("unexpected connector error: %v", err)
+	}
+
 	db := sql.OpenDB(c)
 	for i := 0; i < 3; i++ {
 		success <- i%2 == 0
@@ -165,7 +173,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 				_ = server.Close()
 			}()
 
-			c := Connector(
+			c, err := Connector(
 				withClient(
 					internal.NewClientAsPool(
 						testutil.NewDB(
@@ -187,6 +195,10 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 				),
 				WithDefaultExecDataQueryOption(options.WithQueryCachePolicy(test.queryCachePolicyOption...)),
 			)
+			if err != nil {
+				t.Fatalf("unexpected connector error: %v", err)
+			}
+
 			db := sql.OpenDB(c)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
