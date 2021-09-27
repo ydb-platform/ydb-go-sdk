@@ -156,12 +156,12 @@ func (r Retryer) backoff(ctx context.Context, m ydb.RetryMode, i int) error {
 // Do calls op.Do until it return nil or not retriable error.
 func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 	var (
-		s                  *Session
-		m                  ydb.RetryMode
-		i                  int
-		start              = time.Now()
-		retryNoIdempotent  = ydb.ContextRetryNoIdempotent(ctx)
-		retryTraceLoopDone = retryTraceOnLoop(ctx, r.Trace, ctx)
+		s                     *Session
+		m                     ydb.RetryMode
+		i                     int
+		start                 = time.Now()
+		isOperationIdempotent = ydb.IsOperationIdempotent(ctx)
+		retryTraceLoopDone    = retryTraceOnLoop(ctx, r.Trace, ctx)
 	)
 	defer func() {
 		retryTraceLoopDone(ctx, time.Since(start), i)
@@ -202,7 +202,7 @@ func (r Retryer) Do(ctx context.Context, op Operation) (err error) {
 				_ = r.SessionProvider.CloseSession(ctx, s)
 				s = nil
 			}
-			if !m.MustRetry(retryNoIdempotent) {
+			if !m.MustRetry(isOperationIdempotent) {
 				return err
 			}
 			if e := r.backoff(ctx, m, i); e != nil {
