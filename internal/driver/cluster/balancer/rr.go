@@ -3,6 +3,7 @@ package balancer
 import (
 	"container/heap"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
@@ -73,7 +74,7 @@ func (r *roundRobin) Remove(x Element) {
 }
 
 func (r *roundRobin) Pessimize(x Element) error {
-	if x == nil {
+	if assert.IsNil(x) {
 		return ErrNilBalancerElement
 	}
 	el, ok := x.(*list.Element)
@@ -89,7 +90,7 @@ func (r *roundRobin) Pessimize(x Element) error {
 }
 
 func (r *roundRobin) Contains(x Element) bool {
-	if x == nil {
+	if assert.IsNil(x) {
 		return false
 	}
 	el, ok := x.(*list.Element)

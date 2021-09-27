@@ -11,6 +11,10 @@ type Element struct {
 	Info  info.Info
 }
 
+func (e *Element) isNil() bool {
+	return e == nil
+}
+
 type List []*Element
 
 func (cs *List) Insert(conn conn.Conn, info info.Info) *Element {
