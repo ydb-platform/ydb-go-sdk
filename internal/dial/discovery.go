@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"google.golang.org/grpc"
 	"sync"
 	"time"
@@ -35,7 +36,9 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn grpc.Clie
 		repeater.NewRepeater(
 			d.config.DiscoveryInterval,
 			func(ctx context.Context) {
+				onDone := trace.DriverOnDiscovery(d.config.Trace, ctx)
 				next, err := discoveryClient.Discover(ctx)
+				onDone(next, err)
 				if err != nil {
 					return
 				}

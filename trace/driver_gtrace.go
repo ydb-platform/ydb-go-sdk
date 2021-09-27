@@ -355,13 +355,12 @@ func DriverOnGetCredentials(t Driver, c context.Context) func(tokenOk bool, _ er
 		res(p)
 	}
 }
-func DriverOnDiscovery(t Driver, c context.Context) func(_ context.Context, endpoints []cluster.Endpoint, _ error) {
+func DriverOnDiscovery(t Driver, c context.Context) func(endpoints []cluster.Endpoint, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
 	res := t.onDiscovery(p)
-	return func(c context.Context, endpoints []cluster.Endpoint, e error) {
+	return func(endpoints []cluster.Endpoint, e error) {
 		var p DiscoveryDoneInfo
-		p.Context = c
 		p.Endpoints = endpoints
 		p.Error = e
 		res(p)

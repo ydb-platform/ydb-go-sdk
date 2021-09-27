@@ -82,7 +82,6 @@ type (
 		Context context.Context
 	}
 	DiscoveryDoneInfo struct {
-		Context   context.Context
 		Endpoints []cluster.Endpoint
 		Error     error
 	}
