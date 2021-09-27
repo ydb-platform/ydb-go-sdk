@@ -159,16 +159,16 @@ func TestTxDoerStmt(t *testing.T) {
 		},
 		Logf: t.Logf,
 	}
-	cl := b.Build()
+	cluster := b.Build()
 
-	con, err := Connector(
-		withClient(table.NewClientAsPool(cl, table.DefaultConfig())),
+	connector, err := Connector(
+		withClient(table.NewClientAsPool(cluster, table.DefaultConfig())),
 	)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	db := sql.OpenDB(con)
+	db := sql.OpenDB(connector)
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)
 	}
@@ -180,8 +180,14 @@ func TestTxDoerStmt(t *testing.T) {
 	defer cancel()
 
 	stmt, err := db.PrepareContext(ctx, "QUERY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	_, err = db.PrepareContext(ctx, "QUERY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	// Try to prepare statement on second session, which must fail due to our
 	// stub logic above.
@@ -189,6 +195,9 @@ func TestTxDoerStmt(t *testing.T) {
 		_, err = tx.Stmt(stmt).Exec()
 		return
 	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	// Try to repeat the same thing – we should not receive any error here –
 	// previous session must be marked busy and not used for some time.
