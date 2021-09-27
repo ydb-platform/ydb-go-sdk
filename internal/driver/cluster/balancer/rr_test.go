@@ -4,11 +4,11 @@ import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 )
@@ -16,17 +16,17 @@ import (
 var (
 	testData = [...]struct {
 		name   string
-		add    []cluster.Endpoint
-		del    []cluster.Endpoint
+		add    []endpoint.Endpoint
+		del    []endpoint.Endpoint
 		banned map[string]struct{}
 		repeat int
 		exp    map[string]int
 		err    bool
 	}{
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}},
-				{Addr: cluster.Addr{Host: "bar"}},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}},
+				{Addr: endpoint.Addr{Host: "bar"}},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -35,10 +35,10 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0.2},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 1},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 1},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0.2},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 1},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 1},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -48,10 +48,10 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 1},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0.1},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0.9},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 1},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0.1},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0.9},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -61,28 +61,13 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0.25},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 1},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 1},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0.25},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 1},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 1},
 			},
-			del: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}},
-			},
-			repeat: 1000,
-			exp: map[string]int{
-				"bar": 500,
-				"baz": 500,
-			},
-		},
-		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 1},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0.25},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0.25},
-			},
-			del: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}},
+			del: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -91,13 +76,28 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 1},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0.75},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0.25},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 1},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0.25},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0.25},
 			},
-			del: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "bar"}},
+			del: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}},
+			},
+			repeat: 1000,
+			exp: map[string]int{
+				"bar": 500,
+				"baz": 500,
+			},
+		},
+		{
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 1},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0.75},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0.25},
+			},
+			del: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "bar"}},
 			},
 			repeat: 1200,
 			exp: map[string]int{
@@ -106,13 +106,13 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
 			},
-			del: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "baz"}},
+			del: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "baz"}},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -121,24 +121,24 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
 			},
-			del: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}},
-				{Addr: cluster.Addr{Host: "bar"}},
-				{Addr: cluster.Addr{Host: "baz"}},
+			del: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}},
+				{Addr: endpoint.Addr{Host: "bar"}},
+				{Addr: endpoint.Addr{Host: "baz"}},
 			},
 			repeat: 1,
 			err:    true,
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -151,10 +151,10 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -167,10 +167,10 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 0},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -186,10 +186,10 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 10},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 20},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 30},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 10},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 20},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 30},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -205,10 +205,10 @@ var (
 			},
 		},
 		{
-			add: []cluster.Endpoint{
-				{Addr: cluster.Addr{Host: "foo"}, LoadFactor: 10},
-				{Addr: cluster.Addr{Host: "bar"}, LoadFactor: 20},
-				{Addr: cluster.Addr{Host: "baz"}, LoadFactor: 30},
+			add: []endpoint.Endpoint{
+				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 10},
+				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 20},
+				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 30},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -235,7 +235,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), cluster.Addr{}, nil, stub.Config(config.New()))
+				c := conn.New(context.Background(), endpoint.Addr{}, nil, stub.Config(config.New()))
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
@@ -288,7 +288,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), cluster.Addr{}, nil, stub.Config(config.New()))
+				c := conn.New(context.Background(), endpoint.Addr{}, nil, stub.Config(config.New()))
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c

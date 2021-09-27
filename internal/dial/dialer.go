@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"net"
 	"strconv"
@@ -103,7 +104,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 }
 
 func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (_ *grpc.ClientConn, err error) {
-	s := cluster.String(host, port)
+	s := endpoint.String(host, port)
 	if d.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, d.timeout)
@@ -165,7 +166,7 @@ func (d *dialer) mustSplitHostPort(addr string) (host string, port int) {
 	return host, port
 }
 
-func (d *dialer) endpointByAddr(addr string) (e cluster.Endpoint) {
+func (d *dialer) endpointByAddr(addr string) (e endpoint.Endpoint) {
 	e.Host, e.Port = d.mustSplitHostPort(addr)
 	return
 }

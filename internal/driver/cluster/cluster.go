@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
@@ -45,7 +45,7 @@ type cluster struct {
 
 	mu    sync.RWMutex
 	once  sync.Once
-	index map[public.Addr]entry.Entry
+	index map[endpoint.Addr]entry.Entry
 	ready int
 	wait  chan struct{}
 
@@ -61,13 +61,13 @@ func (c *cluster) SetExplorer(repeater repeater.Repeater) {
 }
 
 type Cluster interface {
-	Insert(ctx context.Context, e public.Endpoint, opts ...option)
-	Update(ctx context.Context, e public.Endpoint, opts ...option)
+	Insert(ctx context.Context, e endpoint.Endpoint, opts ...option)
+	Update(ctx context.Context, e endpoint.Endpoint, opts ...option)
 	Get(ctx context.Context) (conn conn.Conn, err error)
-	Pessimize(a public.Addr) error
-	Stats(it func(public.Endpoint, stats.Stats))
+	Pessimize(a endpoint.Addr) error
+	Stats(it func(endpoint.Endpoint, stats.Stats))
 	Close() error
-	Remove(ctx context.Context, e public.Endpoint, wg ...option)
+	Remove(ctx context.Context, e endpoint.Endpoint, wg ...option)
 	SetExplorer(repeater repeater.Repeater)
 	Force()
 }
@@ -77,7 +77,7 @@ func New(
 	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
-		index:    make(map[public.Addr]entry.Entry),
+		index:    make(map[endpoint.Addr]entry.Entry),
 		dial:     dial,
 		balancer: balancer,
 	}
@@ -162,7 +162,7 @@ func WithConnConfig(connConfig conn.Config) option {
 }
 
 // Insert inserts new connection into the cluster.
-func (c *cluster) Insert(ctx context.Context, e public.Endpoint, opts ...option) {
+func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...option) {
 	opt := options{}
 	for _, o := range opts {
 		o(&opt)
@@ -171,7 +171,7 @@ func (c *cluster) Insert(ctx context.Context, e public.Endpoint, opts ...option)
 		defer opt.wg.Done()
 	}
 
-	addr := public.Addr{e.Host, e.Port}
+	addr := endpoint.Addr{e.Host, e.Port}
 	info := info.Info{
 		LoadFactor: e.LoadFactor,
 		Local:      e.Local,
@@ -204,7 +204,7 @@ func (c *cluster) Insert(ctx context.Context, e public.Endpoint, opts ...option)
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
-func (c *cluster) Update(_ context.Context, ep public.Endpoint, opts ...option) {
+func (c *cluster) Update(_ context.Context, ep endpoint.Endpoint, opts ...option) {
 	opt := options{}
 	for _, o := range opts {
 		o(&opt)
@@ -213,7 +213,7 @@ func (c *cluster) Update(_ context.Context, ep public.Endpoint, opts ...option) 
 		defer opt.wg.Done()
 	}
 
-	addr := public.Addr{ep.Host, ep.Port}
+	addr := endpoint.Addr{ep.Host, ep.Port}
 	info := info.Info{
 		LoadFactor: ep.LoadFactor,
 		Local:      ep.Local,
@@ -242,7 +242,7 @@ func (c *cluster) Update(_ context.Context, ep public.Endpoint, opts ...option) 
 }
 
 // Remove removes and closes previously inserted connection.
-func (c *cluster) Remove(_ context.Context, e public.Endpoint, opts ...option) {
+func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option) {
 	opt := options{}
 	for _, o := range opts {
 		o(&opt)
@@ -251,7 +251,7 @@ func (c *cluster) Remove(_ context.Context, e public.Endpoint, opts ...option) {
 		defer opt.wg.Done()
 	}
 
-	addr := public.Addr{e.Host, e.Port}
+	addr := endpoint.Addr{e.Host, e.Port}
 
 	c.mu.Lock()
 	if c.closed {
@@ -275,7 +275,7 @@ func (c *cluster) Remove(_ context.Context, e public.Endpoint, opts ...option) {
 	}
 }
 
-func (c *cluster) Pessimize(addr public.Addr) (err error) {
+func (c *cluster) Pessimize(addr endpoint.Addr) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
@@ -309,15 +309,15 @@ func (c *cluster) Pessimize(addr public.Addr) (err error) {
 	return err
 }
 
-func (c *cluster) Stats(it func(public.Endpoint, stats.Stats)) {
+func (c *cluster) Stats(it func(endpoint.Endpoint, stats.Stats)) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.closed {
 		return
 	}
 	call := func(conn conn.Conn, info info.Info) {
-		e := public.Endpoint{
-			Addr: public.Addr{
+		e := endpoint.Endpoint{
+			Addr: endpoint.Addr{
 				Host: conn.Addr().Host,
 				Port: conn.Addr().Port,
 			},
@@ -359,7 +359,7 @@ func (c *cluster) await() func() <-chan struct{} {
 	}
 }
 
-func compareEndpoints(a, b public.Endpoint) int {
+func compareEndpoints(a, b endpoint.Endpoint) int {
 	if c := strings.Compare(a.Host, b.Host); c != 0 {
 		return c
 	}
@@ -369,13 +369,13 @@ func compareEndpoints(a, b public.Endpoint) int {
 	return 0
 }
 
-func SortEndpoints(es []public.Endpoint) {
+func SortEndpoints(es []endpoint.Endpoint) {
 	sort.Slice(es, func(i, j int) bool {
 		return compareEndpoints(es[i], es[j]) < 0
 	})
 }
 
-func DiffEndpoints(curr, next []public.Endpoint, eq, add, del func(i, j int)) {
+func DiffEndpoints(curr, next []endpoint.Endpoint, eq, add, del func(i, j int)) {
 	diffslice(
 		len(curr),
 		len(next),

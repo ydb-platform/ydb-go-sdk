@@ -6,6 +6,7 @@ package ydbtest
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"net"
 	"strconv"
 	"sync"
@@ -13,7 +14,6 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -75,7 +75,7 @@ type YDB struct {
 	descs []grpc.ServiceDesc
 
 	mu        sync.Mutex
-	endpoints map[cluster.Endpoint]*Endpoint
+	endpoints map[endpoint.Endpoint]*Endpoint
 }
 
 func (s *YDB) init() {
@@ -105,14 +105,14 @@ func (s *YDB) init() {
 			})
 		}
 
-		s.endpoints = make(map[cluster.Endpoint]*Endpoint)
+		s.endpoints = make(map[endpoint.Endpoint]*Endpoint)
 	})
 }
 
 type Endpoint struct {
 	db     *YDB
 	ln     *Listener
-	id     cluster.Endpoint
+	id     endpoint.Endpoint
 	server *grpc.Server
 }
 
@@ -129,8 +129,8 @@ func (s *YDB) StartEndpoint() *Endpoint {
 		s.T.Fatal(err)
 	}
 
-	e := cluster.Endpoint{
-		Addr: cluster.Addr{
+	e := endpoint.Endpoint{
+		Addr: endpoint.Addr{
 			Host: host,
 			Port: port,
 		},
@@ -242,7 +242,7 @@ func (s *YDB) StartBalancer() *Balancer {
 }
 
 func (s *YDB) DialContext(ctx context.Context, addr string) (_ net.Conn, err error) {
-	var e cluster.Endpoint
+	var e endpoint.Endpoint
 	e.Host, e.Port, err = SplitHostPort(addr)
 	if err != nil {
 		return

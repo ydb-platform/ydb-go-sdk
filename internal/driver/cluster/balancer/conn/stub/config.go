@@ -3,9 +3,9 @@ package stub
 import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -38,7 +38,7 @@ func (c configStub) Trace(ctx context.Context) trace.Driver {
 	return c.Config.Trace
 }
 
-func (c configStub) Pessimize(addr cluster.Addr) error {
+func (c configStub) Pessimize(addr endpoint.Addr) error {
 	return nil
 }
 

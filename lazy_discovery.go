@@ -2,8 +2,8 @@ package ydb
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"sync"
 )
 
@@ -13,7 +13,7 @@ type lazyDiscovery struct {
 	m      sync.Mutex
 }
 
-func (t *lazyDiscovery) Discover(ctx context.Context) ([]cluster.Endpoint, error) {
+func (t *lazyDiscovery) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 	t.init()
 	return t.client.Discover(ctx)
 }

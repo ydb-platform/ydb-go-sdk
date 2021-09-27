@@ -4,9 +4,12 @@ package trace
 
 import (
 	"context"
+	"strings"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
-	"strings"
 )
 
 type (
@@ -65,12 +68,12 @@ type (
 	PessimizationStartInfo struct {
 		Context context.Context
 		Address string
-		State   string
+		State   state.State
 		Cause   error
 	}
 	PessimizationDoneInfo struct {
+		State state.State
 		Error error
-		State string
 	}
 	GetCredentialsStartInfo struct {
 		Context context.Context
@@ -83,8 +86,7 @@ type (
 		Context context.Context
 	}
 	DiscoveryDoneInfo struct {
-		// map addr -> state
-		Endpoints map[string]string
+		Endpoints map[endpoint.Endpoint]state.State
 		Error     error
 	}
 	OperationStartInfo struct {

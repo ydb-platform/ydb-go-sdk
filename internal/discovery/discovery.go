@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"strings"
@@ -21,7 +21,7 @@ func (w WhoAmI) String() string {
 }
 
 type Client interface {
-	Discover(ctx context.Context) ([]cluster.Endpoint, error)
+	Discover(ctx context.Context) ([]endpoint.Endpoint, error)
 	WhoAmI(ctx context.Context) (*WhoAmI, error)
 	Close(ctx context.Context) error
 }
@@ -40,7 +40,7 @@ type client struct {
 	ssl      bool
 }
 
-func (d *client) Discover(ctx context.Context) ([]cluster.Endpoint, error) {
+func (d *client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: d.database,
 	}
@@ -53,11 +53,11 @@ func (d *client) Discover(ctx context.Context) ([]cluster.Endpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	endpoints := make([]cluster.Endpoint, 0, len(listEndpointsResult.Endpoints))
+	endpoints := make([]endpoint.Endpoint, 0, len(listEndpointsResult.Endpoints))
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
-			endpoints = append(endpoints, cluster.Endpoint{
-				Addr: cluster.Addr{
+			endpoints = append(endpoints, endpoint.Endpoint{
+				Addr: endpoint.Addr{
 					Host: e.Address,
 					Port: int(e.Port),
 				},

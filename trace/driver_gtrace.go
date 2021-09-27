@@ -4,6 +4,7 @@ package trace
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
@@ -331,17 +332,17 @@ func DriverOnGetConn(t Driver, c context.Context) func(address string, _ error) 
 		res(p)
 	}
 }
-func DriverOnPessimization(t Driver, c context.Context, address string, state string, cause error) func(_ error, state string) {
+func DriverOnPessimization(t Driver, c context.Context, address string, s state.State, cause error) func(state.State, error) {
 	var p PessimizationStartInfo
 	p.Context = c
 	p.Address = address
-	p.State = state
+	p.State = s
 	p.Cause = cause
 	res := t.onPessimization(p)
-	return func(e error, state string) {
+	return func(s state.State, e error) {
 		var p PessimizationDoneInfo
+		p.State = s
 		p.Error = e
-		p.State = state
 		res(p)
 	}
 }
@@ -356,11 +357,11 @@ func DriverOnGetCredentials(t Driver, c context.Context) func(tokenOk bool, _ er
 		res(p)
 	}
 }
-func DriverOnDiscovery(t Driver, c context.Context) func(endpoints map[string]string, _ error) {
+func DriverOnDiscovery(t Driver, c context.Context) func(endpoints map[endpoint.Endpoint]state.State, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
 	res := t.onDiscovery(p)
-	return func(endpoints map[string]string, e error) {
+	return func(endpoints map[endpoint.Endpoint]state.State, e error) {
 		var p DiscoveryDoneInfo
 		p.Endpoints = endpoints
 		p.Error = e

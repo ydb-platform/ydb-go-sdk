@@ -2,7 +2,7 @@ package conn
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"google.golang.org/grpc/keepalive"
 	"time"
@@ -14,7 +14,7 @@ type Config interface {
 	OperationCancelAfter() time.Duration
 	Meta(ctx context.Context) (context.Context, error)
 	Trace(ctx context.Context) trace.Driver
-	Pessimize(addr cluster.Addr) error
+	Pessimize(addr endpoint.Addr) error
 	StreamTimeout() time.Duration
 	GrpcConnectionPolicy() *GrpcConnectionPolicy
 }

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"math"
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -26,7 +26,7 @@ import (
 type Conn interface {
 	grpc.ClientConnInterface
 
-	Addr() cluster.Addr
+	Addr() endpoint.Addr
 	Runtime() runtime.Runtime
 	Close() error
 }
@@ -39,7 +39,7 @@ type conn struct {
 	sync.Mutex
 
 	dial    func(context.Context, string, int) (*grpc.ClientConn, error)
-	addr    cluster.Addr
+	addr    endpoint.Addr
 	runtime runtime.Runtime
 	done    chan struct{}
 
@@ -49,7 +49,7 @@ type conn struct {
 	grpcConn *grpc.ClientConn
 }
 
-func (c *conn) Addr() cluster.Addr {
+func (c *conn) Addr() endpoint.Addr {
 	return c.addr
 }
 
@@ -261,7 +261,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}, nil
 }
 
-func New(ctx context.Context, addr cluster.Addr, dial func(context.Context, string, int) (*grpc.ClientConn, error), cfg Config) Conn {
+func New(ctx context.Context, addr endpoint.Addr, dial func(context.Context, string, int) (*grpc.ClientConn, error), cfg Config) Conn {
 	c := &conn{
 		addr:    addr,
 		dial:    dial,

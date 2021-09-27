@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"reflect"
 	"strings"
 
@@ -158,7 +159,7 @@ type Cluster struct {
 	onClose     func() error
 }
 
-func (c *Cluster) Stats() map[cluster.Endpoint]stats.Stats {
+func (c *Cluster) Stats() map[endpoint.Endpoint]stats.Stats {
 	return nil
 }
 
@@ -266,7 +267,7 @@ func NewDB(opts ...NewClusterOption) cluster.Cluster {
 type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onAddr      func() cluster.Addr
+	onAddr      func() endpoint.Addr
 }
 
 func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -283,9 +284,9 @@ func (c *clientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, metho
 	return c.onNewStream(ctx, desc, method, opts...)
 }
 
-func (c *clientConn) Addr() cluster.Addr {
+func (c *clientConn) Addr() endpoint.Addr {
 	if c.onAddr == nil {
-		return cluster.Addr{}
+		return endpoint.Addr{}
 	}
 	return c.onAddr()
 }

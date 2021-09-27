@@ -2,13 +2,14 @@ package cluster
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/endpoint"
 	"google.golang.org/grpc"
 )
 
 type ClientConnInterface interface {
 	grpc.ClientConnInterface
 
-	Addr() Addr
+	Addr() endpoint.Addr
 }
 
 type DB interface {
@@ -34,5 +35,5 @@ type Cluster interface {
 	DB
 
 	// Stats provide getting connections stats
-	Stats() map[Endpoint]stats.Stats
+	Stats() map[endpoint.Endpoint]stats.Stats
 }
