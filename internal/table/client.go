@@ -65,6 +65,11 @@ func (c *client) Retry(ctx context.Context, isIdempotentOperation bool, op table
 	return c.pool.Retry(ctx, isIdempotentOperation, op)
 }
 
+// check nil value
+func (c *client) isNil() bool {
+	return c == nil
+}
+
 // Close closes session client instance.
 func (c *client) Close(ctx context.Context) (err error) {
 	return c.pool.Close(ctx)

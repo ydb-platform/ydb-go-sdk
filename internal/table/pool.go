@@ -308,7 +308,11 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 	)
 	getDone := trace.TablePoolOnGet(p.Trace.TablePool, ctx)
 	defer func() {
-		getDone(ctx, sessionID(s), time.Since(start), i, err)
+		if err == nil {
+			getDone(ctx, s.ID(), time.Since(start), i, err)
+		} else {
+			getDone(ctx, "", time.Since(start), i, err)
+		}
 	}()
 
 	const maxAttempts = 100
@@ -373,7 +377,11 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 				// for the next waiter – session could be lost for a long time.
 				p.putWaitCh(ch)
 			}
-			waitDone(ctx, sessionID(s), err)
+			if err == nil {
+				waitDone(ctx, s.ID(), err)
+			} else {
+				waitDone(ctx, "", err)
+			}
 
 		case <-ctx.Done():
 			p.mu.Lock()
@@ -383,7 +391,11 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 			p.waitq.Remove(el)
 			p.mu.Unlock()
 			err = ctx.Err()
-			waitDone(ctx, sessionID(s), err)
+			if err == nil {
+				waitDone(ctx, s.ID(), err)
+			} else {
+				waitDone(ctx, "", err)
+			}
 			return nil, err
 		}
 	}
@@ -494,7 +506,11 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 
 	createDone := trace.TablePoolOnCreate(p.Trace.TablePool, ctx)
 	defer func() {
-		createDone(ctx, sessionID(s), err)
+		if err == nil {
+			createDone(ctx, s.ID(), err)
+		} else {
+			createDone(ctx, "", err)
+		}
 	}()
 
 	const maxAttempts = 10
