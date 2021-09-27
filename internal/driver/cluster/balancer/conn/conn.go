@@ -66,11 +66,11 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 			return nil, err
 		}
 		c.grpcConn = raw
-	}
-	if c.runtime.GetState() != state.Banned {
-		before := c.runtime.GetState()
-		c.runtime.SetState(state.Online)
-		c.stateChanged(before, c.runtime.GetState())
+		if c.runtime.GetState() != state.Banned {
+			before := c.runtime.GetState()
+			c.runtime.SetState(state.Online)
+			c.stateChanged(before, c.runtime.GetState())
+		}
 	}
 	if c.config.GrpcConnectionPolicy().TTL > 0 {
 		c.timer.Reset(c.config.GrpcConnectionPolicy().TTL)
