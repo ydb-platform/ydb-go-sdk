@@ -4,8 +4,6 @@ package trace
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"strings"
@@ -83,7 +81,8 @@ type (
 		Context context.Context
 	}
 	DiscoveryDoneInfo struct {
-		Endpoints map[cluster.Addr]state.State
+		// map addr -> state
+		Endpoints map[string]string
 		Error     error
 	}
 	OperationStartInfo struct {

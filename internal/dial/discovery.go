@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -80,11 +79,11 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn grpc.Clie
 				wg.Add(actual - max) // adjust
 				wg.Wait()
 				curr = next
-				endpoints := make(map[public.Addr]state.State, len(next))
+				endpoints := make(map[string]string, len(next))
 				m := sync.Mutex{}
 				c.Stats(func(endpoint public.Endpoint, stats stats.Stats) {
 					m.Lock()
-					endpoints[endpoint.Addr] = stats.State
+					endpoints[endpoint.Addr.String()] = stats.State.String()
 					m.Unlock()
 				})
 				onDone(endpoints, err)
