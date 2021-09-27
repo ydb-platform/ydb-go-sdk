@@ -139,7 +139,7 @@ func retryBackoff(
 	p SessionProvider,
 	fastBackoff retry.Backoff,
 	slowBackoff retry.Backoff,
-	retryNoIdempotent bool,
+	isOperationIdempotent bool,
 	op table.RetryOperation,
 ) (err error, issues []error) {
 	var (
@@ -193,10 +193,10 @@ func retryBackoff(
 				_ = p.CloseSession(ctx, s)
 				s = nil
 			}
-			if m.MustRetry(retryNoIdempotent) {
+			if m.MustRetry(isOperationIdempotent) {
 				issues = append(issues, fmt.Errorf("retryBackoff: retriable error: %w", err))
 			}
-			if !m.MustRetry(retryNoIdempotent) {
+			if !m.MustRetry(isOperationIdempotent) {
 				issues = append(issues, fmt.Errorf("retryBackoff: non-retriable error: %w", err))
 				return
 			}

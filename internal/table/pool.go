@@ -596,8 +596,8 @@ func (p *pool) Close(ctx context.Context) (err error) {
 // - deadline was cancelled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func (p *pool) Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error) {
-	return retryBackoff(ctx, p, retry.FastBackoff, retry.SlowBackoff, retryNoIdempotent, op)
+func (p *pool) Retry(ctx context.Context, isOperationIdempotent bool, op table.RetryOperation) (err error, issues []error) {
+	return retryBackoff(ctx, p, retry.FastBackoff, retry.SlowBackoff, isOperationIdempotent, op)
 }
 
 func (p *pool) Stats() poolStats {
