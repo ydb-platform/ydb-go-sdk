@@ -9,6 +9,10 @@ const (
 	Online
 )
 
+func (s State) Code() int {
+	return int(s)
+}
+
 func (s State) String() string {
 	switch s {
 	case Online:

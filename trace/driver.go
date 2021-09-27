@@ -56,6 +56,7 @@ type Endpoint interface {
 
 type State interface {
 	String() string
+	Code() int
 }
 
 type (
