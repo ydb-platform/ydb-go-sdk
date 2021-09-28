@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"google.golang.org/grpc"
 )
 
@@ -60,10 +59,7 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	// Remember raw deadline to pass it for the tracing functions.
 	rawCtx := ctx
 
-	t := trace.ContextDriver(ctx).Compose(d.Config.Trace)
-	getConnDone := trace.DriverOnGetConn(t, ctx)
 	c, err = d.clusterGet(ctx)
-	getConnDone(c.Addr().String(), err)
 
 	if err != nil {
 		return nil, err

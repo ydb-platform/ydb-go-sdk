@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"log"
 	"os"
 	"path"
-	"sync"
 	"time"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+}
 
 func main() {
 	ctx := context.Background()
@@ -83,38 +87,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	wg := sync.WaitGroup{}
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			err = selectSimple(ctx, db.Table(), connectParams.Database())
-			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
-			}
-
-			err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
-			if err != nil {
-				if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
-					_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
-				}
-			}
-
-			err = readTable(ctx, db.Table(), path.Join(
-				connectParams.Database(), "series",
-			))
-			if err != nil {
-				fmt.Printf("read table error: %v\n", err)
-			}
-		}()
+	err = selectSimple(ctx, db.Table(), connectParams.Database())
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
 	}
-	wg.Wait()
 
+	err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
+	if err != nil {
+		if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
+			_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
+		}
+	}
+
+	err = readTable(ctx, db.Table(), path.Join(
+		connectParams.Database(), "series",
+	))
+	if err != nil {
+		log.Printf("read table error: %v\n", err)
+	}
+
+	log.Printf("> cluster stats:\n")
 	for e, s := range db.Stats() {
-		fmt.Printf("endpoint '%v' stats: %v\n", e, s)
+		log.Printf("  > '%v': %v\n", e, s)
 	}
 
 	whoAmI, err := db.Discovery().WhoAmI(ctx)
-	fmt.Printf("whoAmI: %v ,%v\n", whoAmI, err)
+	log.Printf("whoAmI: %v, %v\n", whoAmI, err)
 }

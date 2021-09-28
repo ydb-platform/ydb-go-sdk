@@ -5,24 +5,33 @@ package trace
 import (
 	"context"
 	"strings"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"time"
 )
 
 type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Driver struct {
-		OnDial            func(DialStartInfo) func(DialDoneInfo)
-		OnGetConn         func(GetConnStartInfo) func(GetConnDoneInfo)
-		OnPessimization   func(PessimizationStartInfo) func(PessimizationDoneInfo)
-		OnGetCredentials  func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
-		OnConnStateChange func(ConnStateChangeInfo)
-		OnDiscovery       func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
-		OnOperation       func(OperationStartInfo) func(OperationDoneInfo)
-		OnStream          func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
+		// Conn events
+		OnConnDial       func(ConnDialStartInfo) func(ConnDialDoneInfo)
+		OnConnDisconnect func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
+
+		// Cluster events
+		OnClusterGet       func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
+		OnClusterPessimize func(ClusterPessimizeStartInfo) func(ClusterPessimizeDoneInfo)
+		OnClusterInsert    func(ClusterInsertStartInfo) func(ClusterInsertDoneInfo)
+		OnClusterUpdate    func(ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo)
+		OnClusterRemove    func(ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo)
+
+		// Credentials events
+		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
+
+		// Discovery events
+		OnDiscovery func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
+
+		// RPC events
+		OnOperation func(OperationStartInfo) func(OperationDoneInfo)
+		OnStream    func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
 	}
 )
 
@@ -41,6 +50,18 @@ func (m Method) Service() (s string) {
 	return
 }
 
+type Issue interface {
+	GetMessage() string
+	GetIssueCode() uint32
+	GetSeverity() uint32
+}
+
+type OperationParams interface {
+	GetTimeout() time.Duration
+	GetCancelAfter() time.Duration
+	GetMode() string
+}
+
 // Split returns service name and method.
 func (m Method) Split() (service, method string) {
 	i := strings.LastIndex(string(m), "/")
@@ -51,42 +72,67 @@ func (m Method) Split() (service, method string) {
 }
 
 type Endpoint interface {
-	String() string
+	Address() string
 }
 
-type State interface {
+type ConnState interface {
 	String() string
 	Code() int
 }
 
 type (
-	DialStartInfo struct {
-		Context context.Context
-		Address string
-	}
-	DialDoneInfo struct {
-		Error error
-	}
-	GetConnStartInfo struct {
-		Context context.Context
-	}
-	GetConnDoneInfo struct {
-		Address string
-		Error   error
-	}
-	ConnStateChangeInfo struct {
+	ClusterInsertStartInfo struct {
 		Endpoint Endpoint
-		Before   State
-		After    State
 	}
-	PessimizationStartInfo struct {
+	ClusterInsertDoneInfo struct {
+		ClusterSize int
+		State       ConnState
+	}
+	ClusterUpdateStartInfo struct {
+		Endpoint Endpoint
+	}
+	ClusterUpdateDoneInfo struct {
+		State ConnState
+	}
+	ClusterRemoveStartInfo struct {
+		Endpoint Endpoint
+	}
+	ClusterRemoveDoneInfo struct {
+		ClusterSize int
+		State       ConnState
+	}
+	ConnDisconnectStartInfo struct {
+		Endpoint Endpoint
+		State    ConnState
+	}
+	ConnDisconnectDoneInfo struct {
+		Error error
+		State ConnState
+	}
+	ConnDialStartInfo struct {
+		Context  context.Context
+		Endpoint Endpoint
+		State    ConnState
+	}
+	ConnDialDoneInfo struct {
+		Error error
+		State ConnState
+	}
+	ClusterGetStartInfo struct {
 		Context context.Context
-		Address string
-		State   state.State
-		Cause   error
 	}
-	PessimizationDoneInfo struct {
-		State state.State
+	ClusterGetDoneInfo struct {
+		Endpoint Endpoint
+		Error    error
+	}
+	ClusterPessimizeStartInfo struct {
+		Context  context.Context
+		Endpoint Endpoint
+		State    ConnState
+		Cause    error
+	}
+	ClusterPessimizeDoneInfo struct {
+		State ConnState
 		Error error
 	}
 	GetCredentialsStartInfo struct {
@@ -100,24 +146,24 @@ type (
 		Context context.Context
 	}
 	DiscoveryDoneInfo struct {
-		Endpoints map[Endpoint]State
+		Endpoints map[Endpoint]ConnState
 		Error     error
 	}
 	OperationStartInfo struct {
-		Context context.Context
-		Address string
-		Method  Method
-		Params  operation.Params
+		Context  context.Context
+		Endpoint Endpoint
+		Method   Method
+		Params   OperationParams
 	}
 	OperationDoneInfo struct {
 		OpID   string
-		Issues errors.IssueIterator
+		Issues []Issue
 		Error  error
 	}
 	StreamStartInfo struct {
-		Context context.Context
-		Address string
-		Method  Method
+		Context  context.Context
+		Endpoint Endpoint
+		Method   Method
 	}
 	StreamRecvDoneInfo struct {
 		Error error

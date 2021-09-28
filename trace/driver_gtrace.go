@@ -4,82 +4,175 @@ package trace
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
 // Compose returns a new Driver which has functional fields composed
 // both from t and x.
 func (t Driver) Compose(x Driver) (ret Driver) {
 	switch {
-	case t.OnDial == nil:
-		ret.OnDial = x.OnDial
-	case x.OnDial == nil:
-		ret.OnDial = t.OnDial
+	case t.OnConnDial == nil:
+		ret.OnConnDial = x.OnConnDial
+	case x.OnConnDial == nil:
+		ret.OnConnDial = t.OnConnDial
 	default:
-		h1 := t.OnDial
-		h2 := x.OnDial
-		ret.OnDial = func(d DialStartInfo) func(DialDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
+		h1 := t.OnConnDial
+		h2 := x.OnConnDial
+		ret.OnConnDial = func(c ConnDialStartInfo) func(ConnDialDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(d DialDoneInfo) {
-					r1(d)
-					r2(d)
+				return func(c ConnDialDoneInfo) {
+					r1(c)
+					r2(c)
 				}
 			}
 		}
 	}
 	switch {
-	case t.OnGetConn == nil:
-		ret.OnGetConn = x.OnGetConn
-	case x.OnGetConn == nil:
-		ret.OnGetConn = t.OnGetConn
+	case t.OnConnDisconnect == nil:
+		ret.OnConnDisconnect = x.OnConnDisconnect
+	case x.OnConnDisconnect == nil:
+		ret.OnConnDisconnect = t.OnConnDisconnect
 	default:
-		h1 := t.OnGetConn
-		h2 := x.OnGetConn
-		ret.OnGetConn = func(g GetConnStartInfo) func(GetConnDoneInfo) {
-			r1 := h1(g)
-			r2 := h2(g)
+		h1 := t.OnConnDisconnect
+		h2 := x.OnConnDisconnect
+		ret.OnConnDisconnect = func(c ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(g GetConnDoneInfo) {
-					r1(g)
-					r2(g)
+				return func(c ConnDisconnectDoneInfo) {
+					r1(c)
+					r2(c)
 				}
 			}
 		}
 	}
 	switch {
-	case t.OnPessimization == nil:
-		ret.OnPessimization = x.OnPessimization
-	case x.OnPessimization == nil:
-		ret.OnPessimization = t.OnPessimization
+	case t.OnClusterGet == nil:
+		ret.OnClusterGet = x.OnClusterGet
+	case x.OnClusterGet == nil:
+		ret.OnClusterGet = t.OnClusterGet
 	default:
-		h1 := t.OnPessimization
-		h2 := x.OnPessimization
-		ret.OnPessimization = func(p PessimizationStartInfo) func(PessimizationDoneInfo) {
-			r1 := h1(p)
-			r2 := h2(p)
+		h1 := t.OnClusterGet
+		h2 := x.OnClusterGet
+		ret.OnClusterGet = func(c ClusterGetStartInfo) func(ClusterGetDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(p PessimizationDoneInfo) {
-					r1(p)
-					r2(p)
+				return func(c ClusterGetDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnClusterPessimize == nil:
+		ret.OnClusterPessimize = x.OnClusterPessimize
+	case x.OnClusterPessimize == nil:
+		ret.OnClusterPessimize = t.OnClusterPessimize
+	default:
+		h1 := t.OnClusterPessimize
+		h2 := x.OnClusterPessimize
+		ret.OnClusterPessimize = func(c ClusterPessimizeStartInfo) func(ClusterPessimizeDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ClusterPessimizeDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnClusterInsert == nil:
+		ret.OnClusterInsert = x.OnClusterInsert
+	case x.OnClusterInsert == nil:
+		ret.OnClusterInsert = t.OnClusterInsert
+	default:
+		h1 := t.OnClusterInsert
+		h2 := x.OnClusterInsert
+		ret.OnClusterInsert = func(c ClusterInsertStartInfo) func(ClusterInsertDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ClusterInsertDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnClusterUpdate == nil:
+		ret.OnClusterUpdate = x.OnClusterUpdate
+	case x.OnClusterUpdate == nil:
+		ret.OnClusterUpdate = t.OnClusterUpdate
+	default:
+		h1 := t.OnClusterUpdate
+		h2 := x.OnClusterUpdate
+		ret.OnClusterUpdate = func(c ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ClusterUpdateDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnClusterRemove == nil:
+		ret.OnClusterRemove = x.OnClusterRemove
+	case x.OnClusterRemove == nil:
+		ret.OnClusterRemove = t.OnClusterRemove
+	default:
+		h1 := t.OnClusterRemove
+		h2 := x.OnClusterRemove
+		ret.OnClusterRemove = func(c ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ClusterRemoveDoneInfo) {
+					r1(c)
+					r2(c)
 				}
 			}
 		}
@@ -106,19 +199,6 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 					r2(g)
 				}
 			}
-		}
-	}
-	switch {
-	case t.OnConnStateChange == nil:
-		ret.OnConnStateChange = x.OnConnStateChange
-	case x.OnConnStateChange == nil:
-		ret.OnConnStateChange = t.OnConnStateChange
-	default:
-		h1 := t.OnConnStateChange
-		h2 := x.OnConnStateChange
-		ret.OnConnStateChange = func(c ConnStateChangeInfo) {
-			h1(c)
-			h2(c)
 		}
 	}
 	switch {
@@ -206,46 +286,106 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	}
 	return ret
 }
-func (t Driver) onDial(d DialStartInfo) func(DialDoneInfo) {
-	fn := t.OnDial
+func (t Driver) onConnDial(c1 ConnDialStartInfo) func(ConnDialDoneInfo) {
+	fn := t.OnConnDial
 	if fn == nil {
-		return func(DialDoneInfo) {
+		return func(ConnDialDoneInfo) {
 			return
 		}
 	}
-	res := fn(d)
+	res := fn(c1)
 	if res == nil {
-		return func(DialDoneInfo) {
+		return func(ConnDialDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onGetConn(g GetConnStartInfo) func(GetConnDoneInfo) {
-	fn := t.OnGetConn
+func (t Driver) onConnDisconnect(c1 ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo) {
+	fn := t.OnConnDisconnect
 	if fn == nil {
-		return func(GetConnDoneInfo) {
+		return func(ConnDisconnectDoneInfo) {
 			return
 		}
 	}
-	res := fn(g)
+	res := fn(c1)
 	if res == nil {
-		return func(GetConnDoneInfo) {
+		return func(ConnDisconnectDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onPessimization(p PessimizationStartInfo) func(PessimizationDoneInfo) {
-	fn := t.OnPessimization
+func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
+	fn := t.OnClusterGet
 	if fn == nil {
-		return func(PessimizationDoneInfo) {
+		return func(ClusterGetDoneInfo) {
 			return
 		}
 	}
-	res := fn(p)
+	res := fn(c1)
 	if res == nil {
-		return func(PessimizationDoneInfo) {
+		return func(ClusterGetDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onClusterPessimize(c1 ClusterPessimizeStartInfo) func(ClusterPessimizeDoneInfo) {
+	fn := t.OnClusterPessimize
+	if fn == nil {
+		return func(ClusterPessimizeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ClusterPessimizeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onClusterInsert(c1 ClusterInsertStartInfo) func(ClusterInsertDoneInfo) {
+	fn := t.OnClusterInsert
+	if fn == nil {
+		return func(ClusterInsertDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ClusterInsertDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onClusterUpdate(c1 ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo) {
+	fn := t.OnClusterUpdate
+	if fn == nil {
+		return func(ClusterUpdateDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ClusterUpdateDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onClusterRemove(c1 ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo) {
+	fn := t.OnClusterRemove
+	if fn == nil {
+		return func(ClusterRemoveDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ClusterRemoveDoneInfo) {
 			return
 		}
 	}
@@ -265,13 +405,6 @@ func (t Driver) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsD
 		}
 	}
 	return res
-}
-func (t Driver) onConnStateChange(c1 ConnStateChangeInfo) {
-	fn := t.OnConnStateChange
-	if fn == nil {
-		return
-	}
-	fn(c1)
 }
 func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	fn := t.OnDiscovery
@@ -330,39 +463,85 @@ func (t Driver) onStream(s StreamStartInfo) func(StreamRecvDoneInfo) func(Stream
 		return res
 	}
 }
-func DriverOnDial(t Driver, c context.Context, address string) func(error) {
-	var p DialStartInfo
+func DriverOnConnDial(t Driver, c context.Context, e Endpoint, state ConnState) func(_ error, state ConnState) {
+	var p ConnDialStartInfo
 	p.Context = c
-	p.Address = address
-	res := t.onDial(p)
-	return func(e error) {
-		var p DialDoneInfo
+	p.Endpoint = e
+	p.State = state
+	res := t.onConnDial(p)
+	return func(e error, state ConnState) {
+		var p ConnDialDoneInfo
 		p.Error = e
+		p.State = state
 		res(p)
 	}
 }
-func DriverOnGetConn(t Driver, c context.Context) func(address string, _ error) {
-	var p GetConnStartInfo
-	p.Context = c
-	res := t.onGetConn(p)
-	return func(address string, e error) {
-		var p GetConnDoneInfo
-		p.Address = address
+func DriverOnConnDisconnect(t Driver, e Endpoint, state ConnState) func(_ error, state ConnState) {
+	var p ConnDisconnectStartInfo
+	p.Endpoint = e
+	p.State = state
+	res := t.onConnDisconnect(p)
+	return func(e error, state ConnState) {
+		var p ConnDisconnectDoneInfo
 		p.Error = e
+		p.State = state
 		res(p)
 	}
 }
-func DriverOnPessimization(t Driver, c context.Context, address string, s state.State, cause error) func(state.State, error) {
-	var p PessimizationStartInfo
+func DriverOnClusterGet(t Driver, c context.Context) func(Endpoint, error) {
+	var p ClusterGetStartInfo
 	p.Context = c
-	p.Address = address
-	p.State = s
+	res := t.onClusterGet(p)
+	return func(e Endpoint, e1 error) {
+		var p ClusterGetDoneInfo
+		p.Endpoint = e
+		p.Error = e1
+		res(p)
+	}
+}
+func DriverOnClusterPessimize(t Driver, c context.Context, e Endpoint, state ConnState, cause error) func(state ConnState, _ error) {
+	var p ClusterPessimizeStartInfo
+	p.Context = c
+	p.Endpoint = e
+	p.State = state
 	p.Cause = cause
-	res := t.onPessimization(p)
-	return func(s state.State, e error) {
-		var p PessimizationDoneInfo
-		p.State = s
+	res := t.onClusterPessimize(p)
+	return func(state ConnState, e error) {
+		var p ClusterPessimizeDoneInfo
+		p.State = state
 		p.Error = e
+		res(p)
+	}
+}
+func DriverOnClusterInsert(t Driver, e Endpoint) func(clusterSize int, state ConnState) {
+	var p ClusterInsertStartInfo
+	p.Endpoint = e
+	res := t.onClusterInsert(p)
+	return func(clusterSize int, state ConnState) {
+		var p ClusterInsertDoneInfo
+		p.ClusterSize = clusterSize
+		p.State = state
+		res(p)
+	}
+}
+func DriverOnClusterUpdate(t Driver, e Endpoint) func(state ConnState) {
+	var p ClusterUpdateStartInfo
+	p.Endpoint = e
+	res := t.onClusterUpdate(p)
+	return func(state ConnState) {
+		var p ClusterUpdateDoneInfo
+		p.State = state
+		res(p)
+	}
+}
+func DriverOnClusterRemove(t Driver, e Endpoint) func(clusterSize int, state ConnState) {
+	var p ClusterRemoveStartInfo
+	p.Endpoint = e
+	res := t.onClusterRemove(p)
+	return func(clusterSize int, state ConnState) {
+		var p ClusterRemoveDoneInfo
+		p.ClusterSize = clusterSize
+		p.State = state
 		res(p)
 	}
 }
@@ -377,32 +556,25 @@ func DriverOnGetCredentials(t Driver, c context.Context) func(tokenOk bool, _ er
 		res(p)
 	}
 }
-func DriverOnConnStateChange(t Driver, e Endpoint, before State, after State) {
-	var p ConnStateChangeInfo
-	p.Endpoint = e
-	p.Before = before
-	p.After = after
-	t.onConnStateChange(p)
-}
-func DriverOnDiscovery(t Driver, c context.Context) func(endpoints map[Endpoint]State, _ error) {
+func DriverOnDiscovery(t Driver, c context.Context) func(endpoints map[Endpoint]ConnState, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
 	res := t.onDiscovery(p)
-	return func(endpoints map[Endpoint]State, e error) {
+	return func(endpoints map[Endpoint]ConnState, e error) {
 		var p DiscoveryDoneInfo
 		p.Endpoints = endpoints
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnOperation(t Driver, c context.Context, address string, m Method, p operation.Params) func(opID string, issues errors.IssueIterator, _ error) {
-	var p1 OperationStartInfo
-	p1.Context = c
-	p1.Address = address
-	p1.Method = m
-	p1.Params = p
-	res := t.onOperation(p1)
-	return func(opID string, issues errors.IssueIterator, e error) {
+func DriverOnOperation(t Driver, c context.Context, e Endpoint, m Method, params OperationParams) func(opID string, issues []Issue, _ error) {
+	var p OperationStartInfo
+	p.Context = c
+	p.Endpoint = e
+	p.Method = m
+	p.Params = params
+	res := t.onOperation(p)
+	return func(opID string, issues []Issue, e error) {
 		var p OperationDoneInfo
 		p.OpID = opID
 		p.Issues = issues
@@ -410,10 +582,10 @@ func DriverOnOperation(t Driver, c context.Context, address string, m Method, p 
 		res(p)
 	}
 }
-func DriverOnStream(t Driver, c context.Context, address string, m Method) func(error) func(error) {
+func DriverOnStream(t Driver, c context.Context, e Endpoint, m Method) func(error) func(error) {
 	var p StreamStartInfo
 	p.Context = c
-	p.Address = address
+	p.Endpoint = e
 	p.Method = m
 	res := t.onStream(p)
 	return func(e error) func(error) {

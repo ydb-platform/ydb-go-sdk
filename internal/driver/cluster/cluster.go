@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sort"
 	"strings"
 	"sync"
@@ -39,6 +41,7 @@ var (
 )
 
 type cluster struct {
+	trace    trace.Driver
 	dial     func(context.Context, string, int) (*grpc.ClientConn, error)
 	balancer balancer.Balancer
 	explorer repeater.Repeater
@@ -84,6 +87,7 @@ type Cluster interface {
 }
 
 func New(
+	trace trace.Driver,
 	dial func(context.Context, string, int) (*grpc.ClientConn, error),
 	balancer balancer.Balancer,
 ) Cluster {
@@ -107,7 +111,7 @@ func (c *cluster) Close() (err error) {
 		c.mu.Unlock()
 		return
 	}
-	if c.explorer != nil {
+	if !assert.IsNil(c.explorer) {
 		c.explorer.Stop()
 	}
 	c.closed = true
@@ -127,7 +131,7 @@ func (c *cluster) Close() (err error) {
 	}
 	for _, entry := range index {
 		conn := entry.Conn
-		if conn == nil {
+		if assert.IsNil(conn) {
 			continue
 		}
 		_ = conn.Close()
@@ -143,13 +147,17 @@ func (c *cluster) Close() (err error) {
 func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	if c.closed {
 		return nil, ErrClusterClosed
 	}
+	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	conn = c.balancer.Next()
-	if conn == nil {
+	if assert.IsNil(conn) {
+		onDone(nil, ErrClusterEmpty)
 		return nil, ErrClusterEmpty
 	}
+	onDone(conn.Addr(), nil)
 	return conn, nil
 }
 
@@ -178,16 +186,15 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	for _, o := range opts {
 		o(&opt)
 	}
-	if opt.wg != nil {
+	if !assert.IsNil(opt.wg) {
 		defer opt.wg.Done()
 	}
 
-	addr := endpoint.Addr{e.Host, e.Port}
 	info := info.Info{
 		LoadFactor: e.LoadFactor,
 		Local:      e.Local,
 	}
-	conn := conn.New(ctx, addr, c.dial, opt.connConfig)
+	conn := conn.New(ctx, e.Addr, c.dial, opt.connConfig)
 	var wait chan struct{}
 	defer func() {
 		if wait != nil {
@@ -201,33 +208,39 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	if c.closed {
 		return
 	}
-	_, has := c.index[addr]
+
+	_, has := c.index[e.Addr]
 	if has {
 		panic("ydb: can't insert already existing endpoint")
 	}
+
+	onDone := trace.DriverOnClusterInsert(c.trace, e.Addr)
+
 	entry := entry.Entry{Info: info}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
 	c.ready++
 	wait = c.wait
 	c.wait = nil
-	c.index[addr] = entry
+	c.index[e.Addr] = entry
+
+	onDone(len(c.index), conn.Runtime().GetState())
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
-func (c *cluster) Update(_ context.Context, ep endpoint.Endpoint, opts ...option) {
+func (c *cluster) Update(_ context.Context, e endpoint.Endpoint, opts ...option) {
+	onDone := trace.DriverOnClusterUpdate(c.trace, e.Addr)
 	opt := options{}
 	for _, o := range opts {
 		o(&opt)
 	}
-	if opt.wg != nil {
+	if !assert.IsNil(opt.wg) {
 		defer opt.wg.Done()
 	}
 
-	addr := endpoint.Addr{ep.Host, ep.Port}
 	info := info.Info{
-		LoadFactor: ep.LoadFactor,
-		Local:      ep.Local,
+		LoadFactor: e.LoadFactor,
+		Local:      e.Local,
 	}
 
 	c.mu.Lock()
@@ -236,17 +249,22 @@ func (c *cluster) Update(_ context.Context, ep endpoint.Endpoint, opts ...option
 		return
 	}
 
-	entry, has := c.index[addr]
+	entry, has := c.index[e.Addr]
 	if !has {
 		panic("ydb: can't update not-existing endpoint")
 	}
+	if assert.IsNil(entry.Conn) {
+		panic("ydb: cluster entry with nil conn")
+	}
+
+	defer func() {
+		onDone(entry.Conn.Runtime().GetState())
+	}()
 
 	entry.Info = info
-	if entry.Conn != nil {
-		entry.Conn.Runtime().SetState(state.Online)
-	}
-	c.index[addr] = entry
-	if entry.Handle != nil {
+	entry.Conn.Runtime().SetState(state.Online)
+	c.index[e.Addr] = entry
+	if !assert.IsNil(entry.Handle) {
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, info)
 	}
@@ -258,11 +276,9 @@ func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option)
 	for _, o := range opts {
 		o(&opt)
 	}
-	if opt.wg != nil {
+	if !assert.IsNil(opt.wg) {
 		defer opt.wg.Done()
 	}
-
-	addr := endpoint.Addr{e.Host, e.Port}
 
 	c.mu.Lock()
 	if c.closed {
@@ -270,20 +286,25 @@ func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option)
 		return
 	}
 
-	entry, has := c.index[addr]
+	entry, has := c.index[e.Addr]
 	if !has {
 		c.mu.Unlock()
 		panic("ydb: can't remove not-existing endpoint")
 	}
+
+	onDone := trace.DriverOnClusterRemove(c.trace, e.Addr)
+
 	entry.RemoveFrom(c.balancer)
 	c.ready--
-	delete(c.index, addr)
+	delete(c.index, e.Addr)
+	l := len(c.index)
 	c.mu.Unlock()
 
-	if entry.Conn != nil {
+	if !assert.IsNil(entry.Conn) {
 		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
 		_ = entry.Conn.Close()
 	}
+	onDone(l, entry.Conn.Runtime().GetState())
 }
 
 func (c *cluster) Pessimize(addr endpoint.Addr) (err error) {
@@ -297,18 +318,18 @@ func (c *cluster) Pessimize(addr endpoint.Addr) (err error) {
 	if !has {
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
-	if entry.Handle == nil {
+	if assert.IsNil(entry.Handle) {
 		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrNilBalancerElement)
 	}
 	if !c.balancer.Contains(entry.Handle) {
 		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrUnknownBalancerElement)
 	}
 	err = c.balancer.Pessimize(entry.Handle)
-	if err == nil && c.explorer != nil {
+	if err == nil && !assert.IsNil(c.explorer) {
 		// count ratio (banned/all)
 		online := 0
 		for _, e := range c.index {
-			if e.Conn != nil && e.Conn.Runtime().GetState() == state.Online {
+			if !assert.IsNil(e.Conn) && e.Conn.Runtime().GetState() == state.Online {
 				online++
 			}
 		}
@@ -327,7 +348,7 @@ func (c *cluster) Stats(it func(endpoint.Endpoint, stats.Stats)) {
 		return
 	}
 	for _, entry := range c.index {
-		if entry.Conn != nil {
+		if !assert.IsNil(entry.Conn) {
 			it(
 				endpoint.Endpoint{
 					Addr: endpoint.Addr{

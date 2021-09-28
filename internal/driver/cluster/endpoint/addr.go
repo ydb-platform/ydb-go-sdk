@@ -10,6 +10,10 @@ type Addr struct {
 	Port int
 }
 
+func (c Addr) Address() string {
+	return c.String()
+}
+
 func (c Addr) String() string {
 	return net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
 }

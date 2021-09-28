@@ -20,6 +20,7 @@ func (m Mode) String() string {
 		return "unknown"
 	}
 }
+
 func (m Mode) toYDB() Ydb_Operations.OperationParams_OperationMode {
 	switch m {
 	case ModeSync:

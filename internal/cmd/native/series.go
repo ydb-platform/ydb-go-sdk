@@ -86,26 +86,26 @@ func readTable(ctx context.Context, c table.Client, path string) error {
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> readTable issues:\n")
+		log.Printf("> readTable issues:\n")
 		for _, e := range issues {
 			log.Printf("\t> %v\n", e)
 		}
 		return err
 	}
-	log.Printf("\n> read_table:")
 	var (
 		id    *uint64
 		title *string
 		date  *uint64
 	)
 
+	log.Printf("> read_table:\n")
 	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 		for res.NextRow() {
 			err = res.Scan(&id, &title, &date)
 			if err != nil {
 				return err
 			}
-			log.Printf("#  %d %s %d", *id, *title, *date)
+			log.Printf("  > %d %s %d", *id, *title, *date)
 		}
 	}
 	if err := res.Err(); err != nil {
@@ -146,34 +146,34 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> describeTableOptions issues:\n")
+		log.Printf("> describeTableOptions issues:\n")
 		for _, e := range issues {
-			log.Printf("\t> %v\n", e)
+			log.Printf("  > %v\n", e)
 		}
 		return err
 	}
-	log.Println("\n> describe_table_options:")
+	log.Println("> describe_table_options:")
 
 	for i, p := range desc.TableProfilePresets {
-		log.Printf("TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)
+		log.Printf("  > TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)
 	}
 	for i, p := range desc.StoragePolicyPresets {
-		log.Printf("StoragePolicyPresets: %d/%d: %+v", i+1, len(desc.StoragePolicyPresets), p)
+		log.Printf("  > StoragePolicyPresets: %d/%d: %+v", i+1, len(desc.StoragePolicyPresets), p)
 	}
 	for i, p := range desc.CompactionPolicyPresets {
-		log.Printf("CompactionPolicyPresets: %d/%d: %+v", i+1, len(desc.CompactionPolicyPresets), p)
+		log.Printf("  > CompactionPolicyPresets: %d/%d: %+v", i+1, len(desc.CompactionPolicyPresets), p)
 	}
 	for i, p := range desc.PartitioningPolicyPresets {
-		log.Printf("PartitioningPolicyPresets: %d/%d: %+v", i+1, len(desc.PartitioningPolicyPresets), p)
+		log.Printf("  > PartitioningPolicyPresets: %d/%d: %+v", i+1, len(desc.PartitioningPolicyPresets), p)
 	}
 	for i, p := range desc.ExecutionPolicyPresets {
-		log.Printf("ExecutionPolicyPresets: %d/%d: %+v", i+1, len(desc.ExecutionPolicyPresets), p)
+		log.Printf("  > ExecutionPolicyPresets: %d/%d: %+v", i+1, len(desc.ExecutionPolicyPresets), p)
 	}
 	for i, p := range desc.ReplicationPolicyPresets {
-		log.Printf("ReplicationPolicyPresets: %d/%d: %+v", i+1, len(desc.ReplicationPolicyPresets), p)
+		log.Printf("  > ReplicationPolicyPresets: %d/%d: %+v", i+1, len(desc.ReplicationPolicyPresets), p)
 	}
 	for i, p := range desc.CachingPolicyPresets {
-		log.Printf("CachingPolicyPresets: %d/%d: %+v", i+1, len(desc.CachingPolicyPresets), p)
+		log.Printf("  > CachingPolicyPresets: %d/%d: %+v", i+1, len(desc.CachingPolicyPresets), p)
 	}
 
 	return nil
@@ -222,7 +222,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> selectSimple issues:\n")
+		log.Printf("> selectSimple issues:\n")
 		for _, e := range issues {
 			log.Printf("\t> %v\n", e)
 		}
@@ -235,6 +235,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 		date  *[]byte
 	)
 
+	log.Printf("> select_simple_transaction:\n")
 	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 		for res.NextRow() {
 			err = res.Scan(&id, &title, &date)
@@ -242,7 +243,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 				return err
 			}
 			log.Printf(
-				"\n> select_simple_transaction: %d %s %s",
+				"  > %d %s %s\n",
 				*id, *title, *date,
 			)
 		}
@@ -288,7 +289,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> scanQuerySelect issues:\n")
+		log.Printf("> scanQuerySelect issues:\n")
 		for _, e := range issues {
 			log.Printf("\t> %v\n", e)
 		}
@@ -300,14 +301,14 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 		title    string
 		date     string // due to cast in select query
 	)
-	log.Print("\n> scan_query_select:")
+	log.Printf("> scan_query_select:\n")
 	for res.NextResultSet(ctx) {
 		for res.NextRow() {
 			err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
 			if err != nil {
 				return err
 			}
-			log.Printf("#  Season, SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
+			log.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
 		}
 	}
 	if err = res.Err(); err != nil {
@@ -343,7 +344,7 @@ func fillTablesWithData(ctx context.Context, c table.Client, prefix string) erro
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> fillTablesWithData issues:\n")
+		log.Printf("> fillTablesWithData issues:\n")
 		for _, e := range issues {
 			log.Printf("\t> %v\n", e)
 		}
@@ -367,7 +368,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> createTables issues:\n")
+		log.Printf("> createTables issues:\n")
 		for _, e := range issues {
 			log.Printf("\t> %v\n", e)
 		}
@@ -389,7 +390,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> createTables issues:\n")
+		log.Printf("> createTables issues:\n")
 		for _, e := range issues {
 			log.Printf("\t> %v\n", e)
 		}
@@ -411,7 +412,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> createTables issues:\n")
+		log.Printf("> createTables issues:\n")
 		for _, e := range issues {
 			log.Printf("\t> %v\n", e)
 		}
@@ -427,18 +428,18 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 			if err != nil {
 				return
 			}
-			log.Printf("\n> describe table: %s", path)
+			log.Printf("> describe table: %s\n", path)
 			for _, c := range desc.Columns {
-				log.Printf("column, name: %s, %s", c.Type, c.Name)
+				log.Printf("  > column, name: %s, %s\n", c.Type, c.Name)
 			}
 			return
 		},
 	)
 	if err != nil {
 		log.SetOutput(os.Stderr)
-		log.Printf("\n> describeTable issues:\n")
+		log.Printf("> describeTable issues:\n")
 		for _, e := range issues {
-			log.Printf("\t> %v\n", e)
+			log.Printf("  > %v\n", e)
 		}
 	}
 	return err

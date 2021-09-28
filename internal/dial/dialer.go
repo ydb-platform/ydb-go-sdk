@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -74,7 +73,7 @@ type dialer struct {
 
 func (d *dialer) dial(ctx context.Context, addr string) (_ cluster.Cluster, err error) {
 	endpoint := d.endpointByAddr(addr)
-	c := d.newCluster()
+	c := d.newCluster(d.config.Trace)
 	defer func() {
 		if err != nil {
 			_ = c.Close()
@@ -111,11 +110,7 @@ func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (_ *gr
 		defer cancel()
 	}
 
-	dialDone := trace.DriverOnDial(d.config.Trace, ctx, s)
-	cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
-	dialDone(err)
-
-	return cc, err
+	return grpc.DialContext(ctx, s, d.grpcDialOptions()...)
 }
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {

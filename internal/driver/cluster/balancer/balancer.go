@@ -104,6 +104,10 @@ type multiHandle struct {
 	elements []Element
 }
 
+func (h *multiHandle) isNil() bool {
+	return h == nil
+}
+
 type multiBalancer struct {
 	balancer []Balancer
 	filter   []func(conn.Conn, info.Info) bool

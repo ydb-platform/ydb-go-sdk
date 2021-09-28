@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
@@ -29,6 +28,10 @@ type Conn interface {
 	Addr() endpoint.Addr
 	Runtime() runtime.Runtime
 	Close() error
+}
+
+func (c *conn) isNil() bool {
+	return c == nil
 }
 
 func (c *conn) Address() string {
@@ -61,15 +64,17 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 	c.Lock()
 	defer c.Unlock()
 	if c.grpcConn == nil || isBroken(c.grpcConn) {
+		onDone := trace.DriverOnConnDial(c.config.Trace(ctx), ctx, c.addr, c.runtime.GetState())
 		raw, err := c.dial(ctx, c.addr.Host, c.addr.Port)
+		defer func() {
+			onDone(err, c.runtime.GetState())
+		}()
 		if err != nil {
 			return nil, err
 		}
 		c.grpcConn = raw
 		if c.runtime.GetState() != state.Banned {
-			before := c.runtime.GetState()
 			c.runtime.SetState(state.Online)
-			c.stateChanged(before, c.runtime.GetState())
 		}
 	}
 	if c.config.GrpcConnectionPolicy().TTL > 0 {
@@ -92,10 +97,6 @@ func (c *conn) IsReady() bool {
 	return c != nil && c.grpcConn != nil && c.grpcConn.GetState() == connectivity.Ready
 }
 
-func (c *conn) stateChanged(before, after state.State) {
-	trace.DriverOnConnStateChange(c.config.Trace(context.Background()), c.addr, before, after)
-}
-
 func (c *conn) waitClose() {
 	if c.config.GrpcConnectionPolicy().TTL <= 0 {
 		return
@@ -108,15 +109,22 @@ func (c *conn) waitClose() {
 		case <-c.timer.C():
 			c.Lock()
 			if c.grpcConn != nil {
-				before := c.runtime.GetState()
-				_ = c.grpcConn.Close()
-				c.grpcConn = nil
-				c.stateChanged(before, c.runtime.GetState())
+				_ = c.close()
 			}
 			c.timer.Reset(time.Duration(math.MaxInt64))
 			c.Unlock()
 		}
 	}
+}
+
+// c mutex must be locked
+func (c *conn) close() (err error) {
+	onDone := trace.DriverOnConnDisconnect(c.config.Trace(context.Background()), c.addr, c.runtime.GetState())
+	err = c.grpcConn.Close()
+	c.runtime.SetState(state.Offline)
+	onDone(err, c.runtime.GetState())
+	c.grpcConn = nil
+	return err
 }
 
 func (c *conn) Close() (err error) {
@@ -133,14 +141,13 @@ func (c *conn) Close() (err error) {
 		c.done = nil
 	}
 	if c.grpcConn != nil {
-		err = c.grpcConn.Close()
-		c.grpcConn = nil
+		_ = c.close()
 	}
 	return err
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
-	onDone := trace.DriverOnPessimization(c.config.Trace(ctx), ctx, c.Addr().String(), c.runtime.Stats().State, err)
+	onDone := trace.DriverOnClusterPessimize(c.config.Trace(ctx), ctx, c.Addr(), c.runtime.Stats().State, err)
 	err = c.config.Pessimize(c.addr)
 	onDone(c.runtime.Stats().State, err)
 }
@@ -149,7 +156,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	var (
 		cancel context.CancelFunc
 		opId   string
-		issues []*Ydb_Issue.IssueMessage
+		issues []trace.Issue
 	)
 	if t := c.config.RequestTimeout(); t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
@@ -174,7 +181,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	start := timeutil.Now()
 	c.runtime.OperationStart(start)
 	t := c.config.Trace(ctx)
-	operationDone := trace.DriverOnOperation(t, ctx, c.Addr().String(), trace.Method(method), params)
+	operationDone := trace.DriverOnOperation(t, ctx, c.Addr(), trace.Method(method), params)
 	defer func() {
 		operationDone(opId, issues, err)
 		err := errors.ErrIf(errors.IsTimeoutError(err), err)
@@ -206,7 +213,9 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	}
 	if opResponse, ok := res.(response.OpResponse); ok {
 		opId = opResponse.GetOperation().GetId()
-		issues = opResponse.GetOperation().GetIssues()
+		for _, issue := range opResponse.GetOperation().GetIssues() {
+			issues = append(issues, issue)
+		}
 		switch {
 		case !opResponse.GetOperation().GetReady():
 			err = errors.ErrOperationNotReady
@@ -235,7 +244,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 
 	c.runtime.StreamStart(timeutil.Now())
 	t := c.config.Trace(ctx)
-	streamRecv := trace.DriverOnStream(t, ctx, c.Addr().String(), trace.Method(method))
+	streamRecv := trace.DriverOnStream(t, ctx, c.Addr(), trace.Method(method))
 	defer func() {
 		if err != nil {
 			c.runtime.StreamDone(timeutil.Now(), err)

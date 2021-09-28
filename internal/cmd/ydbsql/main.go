@@ -4,18 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path"
-	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ydbsql"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+}
 
 func getClient(ctx context.Context, db *sql.DB) (table.Client, error) {
 	drv, ok := db.Driver().(*ydbsql.Driver)
@@ -113,29 +116,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			err = selectSimple(ctx, db, connectParams.Database())
-			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
-			}
-
-			err = scanQuerySelect(ctx, db, connectParams.Database())
-			if err != nil {
-				if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
-					_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
-				}
-			}
-
-			err = readTable(ctx, db, connectParams.Database())
-			if err != nil {
-				fmt.Printf("read table error: %v\n", err)
-			}
-		}()
+	err = selectSimple(ctx, db, connectParams.Database())
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
 	}
-	wg.Wait()
+
+	err = scanQuerySelect(ctx, db, connectParams.Database())
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
+	}
+
+	err = readTable(ctx, db, connectParams.Database())
+	if err != nil {
+		fmt.Printf("read table error: %v\n", err)
+	}
 }

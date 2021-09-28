@@ -11,6 +11,22 @@ type Params struct {
 	Mode        Mode
 }
 
+type ModeInterface interface {
+	String() string
+}
+
+func (p Params) GetTimeout() time.Duration {
+	return p.Timeout
+}
+
+func (p Params) GetCancelAfter() time.Duration {
+	return p.CancelAfter
+}
+
+func (p Params) GetMode() string {
+	return p.Mode.String()
+}
+
 func (p Params) Empty() bool {
 	return p.Timeout == 0 && p.CancelAfter == 0 && p.Mode == 0
 }
