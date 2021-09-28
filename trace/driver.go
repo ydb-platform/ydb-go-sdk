@@ -17,11 +17,11 @@ type (
 		OnConnDisconnect func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
 
 		// Cluster events
-		OnClusterGet       func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
-		OnClusterPessimize func(ClusterPessimizeStartInfo) func(ClusterPessimizeDoneInfo)
-		OnClusterInsert    func(ClusterInsertStartInfo) func(ClusterInsertDoneInfo)
-		OnClusterUpdate    func(ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo)
-		OnClusterRemove    func(ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo)
+		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
+		OnClusterInsert func(ClusterInsertStartInfo) func(ClusterInsertDoneInfo)
+		OnClusterUpdate func(ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo)
+		OnClusterRemove func(ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo)
+		OnPessimizeNode func(PessimizeNodeStartInfo) func(PessimizeNodeDoneInfo)
 
 		// Credentials events
 		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
@@ -125,13 +125,13 @@ type (
 		Endpoint Endpoint
 		Error    error
 	}
-	ClusterPessimizeStartInfo struct {
+	PessimizeNodeStartInfo struct {
 		Context  context.Context
 		Endpoint Endpoint
 		State    ConnState
 		Cause    error
 	}
-	ClusterPessimizeDoneInfo struct {
+	PessimizeNodeDoneInfo struct {
 		State ConnState
 		Error error
 	}
