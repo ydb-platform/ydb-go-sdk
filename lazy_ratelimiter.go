@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"sync"
 
@@ -58,7 +59,9 @@ func (r *lazyRatelimiter) AcquireResource(ctx context.Context, coordinationNodeP
 
 func (r *lazyRatelimiter) init() {
 	r.m.Lock()
-	r.client = internal.New(r.db)
+	if assert.IsNil(r.client) {
+		r.client = internal.New(r.db)
+	}
 	r.m.Unlock()
 }
 

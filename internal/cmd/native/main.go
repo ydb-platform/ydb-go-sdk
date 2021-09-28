@@ -26,7 +26,7 @@ func main() {
 
 	opts := []ydb.Option{
 		ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
-		ydb.WithDialTimeout(3 * time.Second),
+		ydb.WithDialTimeout(5 * time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second * 5),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5 * time.Second),

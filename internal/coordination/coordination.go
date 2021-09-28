@@ -30,6 +30,10 @@ func New(db cluster.DB) Client {
 	}
 }
 
+func (c *client) isNil() bool {
+	return c == nil
+}
+
 func (c *client) CreateNode(ctx context.Context, path string, config coordination.Config) (err error) {
 	_, err = c.service.CreateNode(ctx, &Ydb_Coordination.CreateNodeRequest{
 		Path: path,

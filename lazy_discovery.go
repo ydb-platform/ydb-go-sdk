@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"sync"
@@ -43,6 +44,8 @@ func newDiscovery(db DB) *lazyDiscovery {
 
 func (t *lazyDiscovery) init() {
 	t.m.Lock()
-	t.client = discovery.New(t.db, t.db.Name(), t.db.Secure())
+	if assert.IsNil(t.client) {
+		t.client = discovery.New(t.db, t.db.Name(), t.db.Secure())
+	}
 	t.m.Unlock()
 }

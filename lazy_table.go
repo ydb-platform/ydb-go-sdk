@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"sync"
 
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
@@ -47,7 +48,9 @@ func newTable(db DB, config internal.Config) *lazyTable {
 
 func (t *lazyTable) init() {
 	t.m.Lock()
-	t.client = internal.NewClientAsPool(t.db, t.config)
+	if assert.IsNil(t.client) {
+		t.client = internal.NewClientAsPool(t.db, t.config)
+	}
 	t.m.Unlock()
 }
 

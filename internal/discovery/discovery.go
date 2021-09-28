@@ -40,6 +40,10 @@ type client struct {
 	ssl      bool
 }
 
+func (d *client) isNil() bool {
+	return d == nil
+}
+
 func (d *client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: d.database,

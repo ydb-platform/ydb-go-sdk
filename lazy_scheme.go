@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"path"
 	"strings"
 	"sync"
@@ -38,7 +39,9 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 
 func (s *lazyScheme) init() {
 	s.m.Lock()
-	s.client = scheme.New(s.db)
+	if assert.IsNil(s.client) {
+		s.client = scheme.New(s.db)
+	}
 	s.m.Unlock()
 }
 

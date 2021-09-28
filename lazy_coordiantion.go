@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"sync"
@@ -48,7 +49,9 @@ func (c *lazyCoordination) Close(ctx context.Context) error {
 
 func (c *lazyCoordination) init() {
 	c.m.Lock()
-	c.client = internal.New(c.db)
+	if assert.IsNil(c.client) {
+		c.client = internal.New(c.db)
+	}
 	c.m.Unlock()
 }
 

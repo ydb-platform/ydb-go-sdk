@@ -81,6 +81,10 @@ type client struct {
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
+func (c *client) isNil() bool {
+	return c == nil
+}
+
 func (c *client) Close(_ context.Context) error {
 	return nil
 }
