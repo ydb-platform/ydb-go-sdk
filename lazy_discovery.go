@@ -5,47 +5,50 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 )
 
 type lazyDiscovery struct {
 	db     DB
+	trace  trace.Driver
 	client discovery.Client
 	m      sync.Mutex
 }
 
-func (t *lazyDiscovery) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
-	t.init()
-	return t.client.Discover(ctx)
+func (d *lazyDiscovery) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
+	d.init()
+	return d.client.Discover(ctx)
 }
 
-func (t *lazyDiscovery) WhoAmI(ctx context.Context) (*discovery.WhoAmI, error) {
-	t.init()
-	return t.client.WhoAmI(ctx)
+func (d *lazyDiscovery) WhoAmI(ctx context.Context) (*discovery.WhoAmI, error) {
+	d.init()
+	return d.client.WhoAmI(ctx)
 }
 
-func (t *lazyDiscovery) Close(ctx context.Context) error {
-	t.m.Lock()
-	defer t.m.Unlock()
-	if t.client == nil {
+func (d *lazyDiscovery) Close(ctx context.Context) error {
+	d.m.Lock()
+	defer d.m.Unlock()
+	if d.client == nil {
 		return nil
 	}
 	defer func() {
-		t.client = nil
+		d.client = nil
 	}()
-	return t.client.Close(ctx)
+	return d.client.Close(ctx)
 }
 
-func newDiscovery(db DB) *lazyDiscovery {
+func newDiscovery(db DB, trace trace.Driver) *lazyDiscovery {
 	return &lazyDiscovery{
-		db: db,
+		db:    db,
+		trace: trace,
 	}
 }
 
-func (t *lazyDiscovery) init() {
-	t.m.Lock()
-	if assert.IsNil(t.client) {
-		t.client = discovery.New(t.db, t.db.Name(), t.db.Secure())
+func (d *lazyDiscovery) init() {
+	d.m.Lock()
+	if assert.IsNil(d.client) {
+		d.client = discovery.New(d.db, d.db.Name(), d.db.Secure(), d.trace)
 	}
-	t.m.Unlock()
+	d.m.Unlock()
 }

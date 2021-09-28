@@ -5,6 +5,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"os"
+
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
@@ -12,19 +16,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"google.golang.org/grpc"
-	"os"
 )
 
 type DB interface {
 	cluster.DB
 
 	// Stats return cluster stats
-	Stats() map[cluster2.Endpoint]stats.Stats
+	Stats() map[endpoint.Endpoint]stats.Stats
 
 	// Close clears resources and close all connections to YDB
 	Close() error
@@ -71,7 +73,7 @@ func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method strin
 	return db.cluster.NewStream(ctx, desc, method, opts...)
 }
 
-func (db *db) Stats() map[cluster2.Endpoint]stats.Stats {
+func (db *db) Stats() map[endpoint.Endpoint]stats.Stats {
 	return db.cluster.Stats()
 }
 
@@ -143,6 +145,6 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 	db.scheme = newScheme(db)
 	db.coordination = newCoordination(db.cluster)
 	db.ratelimiter = newRatelimiter(db.cluster)
-	db.discovery = newDiscovery(db.cluster)
+	db.discovery = newDiscovery(db.cluster, db.options.driverConfig.Trace)
 	return db, nil
 }
