@@ -13,6 +13,7 @@ type (
 	//gtrace:set Shortcut
 	Driver struct {
 		// Conn events
+		OnConnNew        func(Endpoint Endpoint)
 		OnConnDial       func(ConnDialStartInfo) func(ConnDialDoneInfo)
 		OnConnDisconnect func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
 

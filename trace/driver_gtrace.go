@@ -10,6 +10,19 @@ import (
 // both from t and x.
 func (t Driver) Compose(x Driver) (ret Driver) {
 	switch {
+	case t.OnConnNew == nil:
+		ret.OnConnNew = x.OnConnNew
+	case x.OnConnNew == nil:
+		ret.OnConnNew = t.OnConnNew
+	default:
+		h1 := t.OnConnNew
+		h2 := x.OnConnNew
+		ret.OnConnNew = func(endpoint Endpoint) {
+			h1(endpoint)
+			h2(endpoint)
+		}
+	}
+	switch {
 	case t.OnConnDial == nil:
 		ret.OnConnDial = x.OnConnDial
 	case x.OnConnDial == nil:
@@ -286,6 +299,13 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	}
 	return ret
 }
+func (t Driver) onConnNew(endpoint Endpoint) {
+	fn := t.OnConnNew
+	if fn == nil {
+		return
+	}
+	fn(endpoint)
+}
 func (t Driver) onConnDial(c1 ConnDialStartInfo) func(ConnDialDoneInfo) {
 	fn := t.OnConnDial
 	if fn == nil {
@@ -462,6 +482,9 @@ func (t Driver) onStream(s StreamStartInfo) func(StreamRecvDoneInfo) func(Stream
 		}
 		return res
 	}
+}
+func DriverOnConnNew(t Driver, endpoint Endpoint) {
+	t.onConnNew(endpoint)
 }
 func DriverOnConnDial(t Driver, c context.Context, e Endpoint, state ConnState) func(_ error, state ConnState) {
 	var p ConnDialStartInfo

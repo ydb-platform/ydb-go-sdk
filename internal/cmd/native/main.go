@@ -27,6 +27,7 @@ func main() {
 
 	opts := []ydb.Option{
 		ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
+		ydb.WithCredentials(ydb.NewAuthTokenCredentials("put your token")),
 		ydb.WithDialTimeout(5 * time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second * 5),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
