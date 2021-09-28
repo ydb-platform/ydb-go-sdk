@@ -310,7 +310,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 	)
 	getDone := trace.TablePoolOnGet(p.Trace.TablePool, ctx)
 	defer func() {
-		if err == nil {
+		if !assert.IsNil(s) {
 			getDone(ctx, s.ID(), time.Since(start), i, err)
 		} else {
 			getDone(ctx, "", time.Since(start), i, err)
@@ -393,7 +393,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 			p.waitq.Remove(el)
 			p.mu.Unlock()
 			err = ctx.Err()
-			if err == nil {
+			if !assert.IsNil(s) {
 				waitDone(ctx, s.ID(), err)
 			} else {
 				waitDone(ctx, "", err)
@@ -508,7 +508,7 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 
 	createDone := trace.TablePoolOnCreate(p.Trace.TablePool, ctx)
 	defer func() {
-		if err == nil {
+		if !assert.IsNil(s) {
 			createDone(ctx, s.ID(), err)
 		} else {
 			createDone(ctx, "", err)

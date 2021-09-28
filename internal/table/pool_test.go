@@ -164,18 +164,17 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				got  = make(chan error)
 			)
 			go func() {
-				_, err := p.Get(trace.WithTable(context.Background(), trace.Table{
-					TablePool: trace.TablePool{
-						OnGet: func(trace.SessionPoolGetStartInfo) func(trace.SessionPoolGetDoneInfo) {
-							get <- struct{}{}
-							return nil
-						},
-						OnWait: func(trace.SessionPoolWaitStartInfo) func(trace.SessionPoolWaitDoneInfo) {
-							wait <- struct{}{}
-							return nil
-						},
+				p.Trace.TablePool = p.Trace.TablePool.Compose(trace.TablePool{
+					OnGet: func(trace.SessionPoolGetStartInfo) func(trace.SessionPoolGetDoneInfo) {
+						get <- struct{}{}
+						return nil
 					},
-				}))
+					OnWait: func(trace.SessionPoolWaitStartInfo) func(trace.SessionPoolWaitDoneInfo) {
+						wait <- struct{}{}
+						return nil
+					},
+				})
+				_, err := p.Get(context.Background())
 				got <- err
 			}()
 
@@ -253,38 +252,31 @@ func TestSessionPoolClose(t *testing.T) {
 	mustClose(t, p)
 
 	if !closed1 {
-		t.Fatalf("session was not closed")
+		t.Fatalf("session1 was not closed")
 	}
 	if !closed2 {
-		t.Fatalf("session was not closed")
+		t.Fatalf("session2 was not closed")
 	}
 	if closed3 {
 		t.Fatalf("unexpected session close")
 	}
 
 	wg := sync.WaitGroup{}
-	if err := p.Put(
-		trace.WithTable(
-			context.Background(),
-			trace.Table{
-				TablePool: trace.TablePool{
-					OnPut: func(info trace.SessionPoolPutStartInfo) func(trace.SessionPoolPutDoneInfo) {
-						wg.Add(1)
-						return func(info trace.SessionPoolPutDoneInfo) {
-							wg.Done()
-						}
-					},
-					OnCloseSession: func(info trace.SessionPoolCloseSessionStartInfo) func(doneInfo trace.SessionPoolCloseSessionDoneInfo) {
-						wg.Add(1)
-						return func(info trace.SessionPoolCloseSessionDoneInfo) {
-							wg.Done()
-						}
-					},
-				},
-			},
-		),
-		s3,
-	); err != ErrSessionPoolClosed {
+	p.Trace.TablePool = p.Trace.TablePool.Compose(trace.TablePool{
+		OnPut: func(info trace.SessionPoolPutStartInfo) func(trace.SessionPoolPutDoneInfo) {
+			wg.Add(1)
+			return func(info trace.SessionPoolPutDoneInfo) {
+				wg.Done()
+			}
+		},
+		OnCloseSession: func(info trace.SessionPoolCloseSessionStartInfo) func(doneInfo trace.SessionPoolCloseSessionDoneInfo) {
+			wg.Add(1)
+			return func(info trace.SessionPoolCloseSessionDoneInfo) {
+				wg.Done()
+			}
+		},
+	})
+	if err := p.Put(context.Background(), s3); err != ErrSessionPoolClosed {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
 			err, ErrSessionPoolClosed,
@@ -530,19 +522,17 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				got  = make(chan sessionAndError)
 			)
 			go func() {
-				ctx := trace.WithTable(context.Background(), trace.Table{
-					TablePool: trace.TablePool{
-						OnGet: func(trace.SessionPoolGetStartInfo) func(trace.SessionPoolGetDoneInfo) {
-							get <- struct{}{}
-							return nil
-						},
-						OnWait: func(trace.SessionPoolWaitStartInfo) func(trace.SessionPoolWaitDoneInfo) {
-							wait <- struct{}{}
-							return nil
-						},
+				p.Trace.TablePool = p.Trace.TablePool.Compose(trace.TablePool{
+					OnGet: func(trace.SessionPoolGetStartInfo) func(trace.SessionPoolGetDoneInfo) {
+						get <- struct{}{}
+						return nil
+					},
+					OnWait: func(trace.SessionPoolWaitStartInfo) func(trace.SessionPoolWaitDoneInfo) {
+						wait <- struct{}{}
+						return nil
 					},
 				})
-				s, err := p.Get(ctx)
+				s, err := p.Get(context.Background())
 				got <- sessionAndError{s, err}
 			}()
 
@@ -1041,8 +1031,12 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 }
 
 func TestSessionPoolKeepAliveMinSize(t *testing.T) {
-	keepAliveCnt := 0
-	allKeepAlive := make(chan int)
+	timer := timetest.StubSingleTimer(t)
+	defer timer.Cleanup()
+
+	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
+	defer cleanupNow()
+	idleThreshold := 5 * time.Second
 	p := &pool{
 		Builder: &StubBuilder{
 			T:     t,
@@ -1054,10 +1048,6 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
-							keepAliveCnt++
-							if keepAliveCnt%3 == 0 {
-								allKeepAlive <- keepAliveCnt
-							}
 							return &Ydb_Table.KeepAliveResult{}, nil
 						},
 						testutil.TableDeleteSession: okHandler,
@@ -1068,25 +1058,35 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 		SizeLimit:              3,
 		KeepAliveMinSize:       1,
 		IdleKeepAliveThreshold: 2,
-		IdleThreshold:          2 * time.Second,
+		IdleThreshold:          idleThreshold,
 	}
 	defer func() {
 		_ = p.Close(context.Background())
 	}()
 	sessionBuilder := func(t *testing.T, pool *pool) (table.Session, chan bool) {
 		s := mustCreateSession(t, pool)
-		mustPutSession(t, p, s)
 		closed := make(chan bool)
 		s.OnClose(func() {
 			close(closed)
 		})
 		return s, closed
 	}
-	_, c1 := sessionBuilder(t, p)
-	_, c2 := sessionBuilder(t, p)
+	s1, c1 := sessionBuilder(t, p)
+	<-timer.Created
+	s2, c2 := sessionBuilder(t, p)
 	s3, c3 := sessionBuilder(t, p)
-	<-allKeepAlive
-	<-allKeepAlive
+	mustPutSession(t, p, s1)
+	mustPutSession(t, p, s2)
+	mustPutSession(t, p, s3)
+	shiftTime(idleThreshold)
+	timer.C <- timeutil.Now()
+	<-timer.Reset
+	shiftTime(idleThreshold)
+	timer.C <- timeutil.Now()
+	<-timer.Reset
+	shiftTime(idleThreshold)
+	timer.C <- timeutil.Now()
+	<-timer.Reset
 	<-c1
 	<-c2
 
@@ -1094,15 +1094,12 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 		t.Fatalf("lower bound for sessions in the pool is not equal KeepAliveMinSize")
 	}
 
-	s4, c4 := sessionBuilder(t, p)
-	<-c3
-
 	s := mustGetSession(t, p)
-	if s != s4 {
+	if s != s3 {
 		t.Fatalf("session is not reused")
 	}
 	_ = s.Close(context.Background())
-	<-c4
+	<-c3
 }
 
 func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
@@ -1178,9 +1175,9 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 		_ = p.Close(context.Background())
 	}()
 	s := mustCreateSession(t, p)
-	mustPutSession(t, p, s)
 	<-timer.Created
 	s2 := mustCreateSession(t, p)
+	mustPutSession(t, p, s)
 	mustPutSession(t, p, s2)
 	//retry
 	shiftTime(p.IdleThreshold)
@@ -1323,7 +1320,48 @@ var okHandler = func(request interface{}) (proto.Message, error) {
 }
 
 func simpleSession(t *testing.T) table.Session {
-	return _newSession(t, testutil.NewDB())
+	c := testutil.NewDB(
+		testutil.WithInvokeHandlers(
+			testutil.InvokeHandlers{
+				testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.ExecuteQueryResult{
+						TxMeta: &Ydb_Table.TransactionMeta{
+							Id: "",
+						},
+					}, nil
+				},
+				testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.BeginTransactionResult{
+						TxMeta: &Ydb_Table.TransactionMeta{
+							Id: "",
+						},
+					}, nil
+				},
+				testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.ExecuteQueryResult{}, nil
+				},
+				testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.PrepareQueryResult{}, nil
+				},
+				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CreateSessionResult{}, nil
+				},
+				testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.DeleteSessionResponse{}, nil
+				},
+				testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.CommitTransactionResponse{}, nil
+				},
+				testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.RollbackTransactionResponse{}, nil
+				},
+				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+					return &Ydb_Table.KeepAliveResult{}, nil
+				},
+			},
+		),
+	)
+	return _newSession(t, c)
 }
 
 type StubBuilder struct {
