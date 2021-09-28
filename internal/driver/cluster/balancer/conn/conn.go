@@ -295,6 +295,6 @@ func New(ctx context.Context, addr endpoint.Addr, dial func(context.Context, str
 		runtime: runtime.New(cfg.Trace(ctx), addr),
 	}
 	go c.waitClose()
-	trace.DriverOnConnNew(cfg.Trace(ctx), addr)
+	trace.DriverOnConnNew(cfg.Trace(ctx), addr, c.runtime.GetState())
 	return c
 }
