@@ -78,42 +78,45 @@ func TestRetryerImmediateRetry(t *testing.T) {
 	for testErr, session := range map[error]table.Session{
 		errors.NewTransportError(
 			errors.WithTEReason(errors.TransportErrorResourceExhausted),
-		): _newSession(t, nil),
+		): _newSession(t, simpleCluster),
 		errors.NewTransportError(
 			errors.WithTEReason(errors.TransportErrorAborted),
-		): _newSession(t, nil),
+		): _newSession(t, simpleCluster),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusUnavailable),
-		): _newSession(t, nil),
+		): _newSession(t, simpleCluster),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusOverloaded),
-		): _newSession(t, nil),
+		): _newSession(t, simpleCluster),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusAborted),
-		): _newSession(t, nil),
+		): _newSession(t, simpleCluster),
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusNotFound),
-		): _newSession(t, nil),
+		): _newSession(t, simpleCluster),
 		fmt.Errorf("wrap op error: %w", errors.NewOpError(
 			errors.WithOEReason(errors.StatusAborted),
-		)): _newSession(t, nil),
+		)): _newSession(t, simpleCluster),
 	} {
 		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
-			pool := SingleSession(
+			p := SingleSession(
 				simpleSession(t),
 				testutil.BackoffFunc(func(n int) <-chan time.Time {
-					t.Fatalf("this code will not be called")
-					return nil
+					ch := make(chan time.Time, 1)
+					ch <- time.Now()
+					return ch
 				}),
 			)
-			err, _ := pool.Retry(
-				context.Background(),
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			err, issues := p.Retry(
+				ctx,
 				false,
 				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
 			)
-			if !errors.Is(err, testErr) {
+			if !errors.Is(issues[0], testErr) {
 				t.Fatalf("unexpected error: %v; want: %v", err, testErr)
 			}
 		})
@@ -130,8 +133,10 @@ func TestRetryerBadSession(t *testing.T) {
 	}
 
 	var sessions []table.Session
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
 	err, _ := pool.Retry(
-		context.Background(),
+		ctx,
 		false,
 		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
@@ -179,8 +184,9 @@ func TestRetryerBadSessionReuse(t *testing.T) {
 		pool SessionProvider
 	)
 	backoff := testutil.BackoffFunc(func(n int) <-chan time.Time {
-		t.Fatalf("this code will not be called")
-		return nil
+		ch := make(chan time.Time, 1)
+		ch <- time.Now()
+		return ch
 	})
 	pool = SessionProviderFunc{
 		OnGet: func(_ context.Context) (table.Session, error) {

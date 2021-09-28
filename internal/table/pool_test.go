@@ -1319,49 +1319,50 @@ var okHandler = func(request interface{}) (proto.Message, error) {
 	return nil, nil
 }
 
-func simpleSession(t *testing.T) table.Session {
-	c := testutil.NewDB(
-		testutil.WithInvokeHandlers(
-			testutil.InvokeHandlers{
-				testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.ExecuteQueryResult{
-						TxMeta: &Ydb_Table.TransactionMeta{
-							Id: "",
-						},
-					}, nil
-				},
-				testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.BeginTransactionResult{
-						TxMeta: &Ydb_Table.TransactionMeta{
-							Id: "",
-						},
-					}, nil
-				},
-				testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.ExecuteQueryResult{}, nil
-				},
-				testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.PrepareQueryResult{}, nil
-				},
-				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.CreateSessionResult{}, nil
-				},
-				testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.DeleteSessionResponse{}, nil
-				},
-				testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.CommitTransactionResponse{}, nil
-				},
-				testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.RollbackTransactionResponse{}, nil
-				},
-				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
-					return &Ydb_Table.KeepAliveResult{}, nil
-				},
+var simpleCluster = testutil.NewDB(
+	testutil.WithInvokeHandlers(
+		testutil.InvokeHandlers{
+			testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.ExecuteQueryResult{
+					TxMeta: &Ydb_Table.TransactionMeta{
+						Id: "",
+					},
+				}, nil
 			},
-		),
-	)
-	return _newSession(t, c)
+			testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.BeginTransactionResult{
+					TxMeta: &Ydb_Table.TransactionMeta{
+						Id: "",
+					},
+				}, nil
+			},
+			testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.ExecuteQueryResult{}, nil
+			},
+			testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.PrepareQueryResult{}, nil
+			},
+			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.CreateSessionResult{}, nil
+			},
+			testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.DeleteSessionResponse{}, nil
+			},
+			testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.CommitTransactionResponse{}, nil
+			},
+			testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.RollbackTransactionResponse{}, nil
+			},
+			testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+				return &Ydb_Table.KeepAliveResult{}, nil
+			},
+		},
+	),
+)
+
+func simpleSession(t *testing.T) table.Session {
+	return _newSession(t, simpleCluster)
 }
 
 type StubBuilder struct {
