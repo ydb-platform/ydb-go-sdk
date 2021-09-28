@@ -184,11 +184,6 @@ func TestTxDoerStmt(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, err = db.PrepareContext(ctx, "QUERY")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
 	// Try to prepare statement on second session, which must fail due to our
 	// stub logic above.
 	err = DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
