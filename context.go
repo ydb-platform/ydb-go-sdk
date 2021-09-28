@@ -15,11 +15,11 @@ import (
 )
 
 type (
-	ctxOpTimeoutKey         struct{}
-	ctxOpCancelAfterKey     struct{}
-	ctxOpModeKey            struct{}
-	ctxRetryNoIdempotentKey struct{}
-	ctxEndpointInfoKey      struct{}
+	ctxOpTimeoutKey             struct{}
+	ctxOpCancelAfterKey         struct{}
+	ctxOpModeKey                struct{}
+	ctxIsOperationIdempotentKey struct{}
+	ctxEndpointInfoKey          struct{}
 
 	ctxEndpointInfo struct {
 		conn   *conn
@@ -139,15 +139,19 @@ func ContextOperationMode(ctx context.Context) (m OperationMode, ok bool) {
 	return
 }
 
-// WithRetryNoIdempotent returns a copy of parent context with allow retry
-// operations with no idempotent errors
-func WithRetryNoIdempotent(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxRetryNoIdempotentKey{}, true)
+// WithIdempotentOperation returns a copy of parent context with idempotent operation flag
+func WithIdempotentOperation(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxIsOperationIdempotentKey{}, true)
 }
 
-// ContextRetryNoIdempotent returns the flag for retry with no idempotent errors
-func ContextRetryNoIdempotent(ctx context.Context) bool {
-	v, ok := ctx.Value(ctxRetryNoIdempotentKey{}).(bool)
+// WithNonIdempotentOperation returns a copy of parent context with non-idempotent operation flag
+func WithNonIdempotentOperation(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxIsOperationIdempotentKey{}, false)
+}
+
+// IsOperationIdempotent returns the flag for operationCompleted with no idempotent errors
+func IsOperationIdempotent(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxIsOperationIdempotentKey{}).(bool)
 	return ok && v
 }
 

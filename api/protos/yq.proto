@@ -31,16 +31,16 @@ message Acl {
 
 message Limits {
     // Used only for streaming queries
-    int64 vcpu_rate_limit = 1 [(Ydb.value) = ">= 0"];
-    int64 flow_rate_limit = 2 [(Ydb.value) = ">= 0"];
-    int64 vcpu_time_limit = 3 [(Ydb.value) = ">= 0"];
+    int64 vcpu_rate_limit = 1 [(Ydb.value) = ">= 0"]; // 0.01 vcpu per second
+    int64 flow_rate_limit = 2 [(Ydb.value) = ">= 0"]; // Bytes per second
+    int64 vcpu_time_limit = 3 [(Ydb.value) = ">= 0"]; // Milliseconds per second
 
     // Used only for analytics queries
-    int64 max_result_size = 4 [(Ydb.value) = ">= 0"];
-    int64 max_result_rows = 5 [(Ydb.value) = ">= 0"];
+    int64 max_result_size = 4 [(Ydb.value) = ">= 0"]; // Bytes
+    int64 max_result_rows = 5 [(Ydb.value) = ">= 0"]; // Count
 
     // Common limits
-    int64 memory_limit = 6 [(Ydb.value) = ">= 0"];
+    int64 memory_limit = 6 [(Ydb.value) = ">= 0"]; // Bytes
     google.protobuf.Duration result_ttl = 7;
 }
 
@@ -292,6 +292,7 @@ message Job {
     QueryStatistics statistics = 6;
     repeated ResultSetMeta result_set_meta = 7;
     QueryAst ast = 8;
+    string query_name = 9;
 }
 
 // Information about recent query runs
@@ -315,6 +316,20 @@ message ListJobsResponse {
 message ListJobsResult {
     repeated Job job = 1;
     string next_page_token = 2 [(Ydb.length).le = 1024];
+}
+
+// Getting information about the job
+message DescribeJobRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string job_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+}
+
+message DescribeJobResponse {
+    Ydb.Operations.Operation operation = 1; // DescribeJobResult
+}
+
+message DescribeJobResult {
+    Job job = 1;
 }
 
 // === Connection API ===
@@ -492,7 +507,7 @@ message GetResultDataRequest {
     string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
     int32 result_set_index = 3 [(Ydb.value) = ">= 0"];
     int64 offset = 4 [(Ydb.value) = ">= 0"];
-    int64 limit = 5 [(Ydb.value) = "[1; 100]"];
+    int64 limit = 5 [(Ydb.value) = "[1; 1000]"];
 }
 
 message GetResultDataResponse {

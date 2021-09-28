@@ -27,6 +27,7 @@ message SelfCheckRequest {
     bool return_verbose_status = 2;
     StatusFlag.Status minimum_status = 3;
     uint32 maximum_level = 4;
+    uint32 timeout = 5;
 }
 
 message SelfCheckResponse {

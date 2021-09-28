@@ -119,7 +119,7 @@ func (e StatusCode) String() string {
 	return Ydb.StatusIds_StatusCode_name[int32(e)]
 }
 
-func (e StatusCode) retryType() RetryType {
+func (e StatusCode) operationCompleted() OperationCompleted {
 	switch e {
 	case
 		StatusAborted,
@@ -128,13 +128,12 @@ func (e StatusCode) retryType() RetryType {
 		StatusBadSession,
 		StatusSessionBusy,
 		StatusNotFound:
-		return RetryTypeAny
+		return OperationCompletedFalse
 	case
-		StatusCancelled,
 		StatusUndetermined:
-		return RetryTypeIdempotent
+		return OperationCompletedUndefined
 	default:
-		return RetryTypeNoRetry
+		return OperationCompletedTrue
 	}
 }
 
@@ -146,7 +145,6 @@ func (e StatusCode) backoffType() BackoffType {
 	case
 		StatusAborted,
 		StatusUnavailable,
-		StatusBadSession,
 		StatusCancelled,
 		StatusSessionBusy,
 		StatusUndetermined:
@@ -240,18 +238,19 @@ func (t TransportErrorCode) String() string {
 	return transportErrorString(t)
 }
 
-func (t TransportErrorCode) retryType() RetryType {
+func (t TransportErrorCode) operationCompleted() OperationCompleted {
 	switch t {
 	case
-		TransportErrorResourceExhausted,
-		TransportErrorAborted:
-		return RetryTypeAny
+		TransportErrorAborted,
+		TransportErrorResourceExhausted:
+		return OperationCompletedFalse
 	case
 		TransportErrorInternal,
+		TransportErrorCanceled,
 		TransportErrorUnavailable:
-		return RetryTypeIdempotent
+		return OperationCompletedUndefined
 	default:
-		return RetryTypeNoRetry
+		return OperationCompletedTrue
 	}
 }
 
@@ -259,6 +258,7 @@ func (t TransportErrorCode) backoffType() BackoffType {
 	switch t {
 	case
 		TransportErrorInternal,
+		TransportErrorCanceled,
 		TransportErrorUnavailable:
 		return BackoffTypeFastBackoff
 	case

@@ -238,7 +238,7 @@ func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParam
 		return nil, driver.ErrBadConn
 	}
 	rc := c.retryConfig()
-	retryNoIdempotent := ydb.ContextRetryNoIdempotent(ctx)
+	retryNoIdempotent := ydb.IsOperationIdempotent(ctx)
 	maxRetries := rc.MaxRetries
 	if c.tx != nil {
 		// NOTE: when under transaction, no retries must be done.
@@ -354,7 +354,7 @@ type TxDoer struct {
 //   }))
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 	rc := d.RetryConfig
-	retryNoIdempotent := ydb.ContextRetryNoIdempotent(ctx)
+	retryNoIdempotent := ydb.IsOperationIdempotent(ctx)
 	if rc == nil {
 		rc = &d.DB.Driver().(*Driver).c.retryConfig
 	}

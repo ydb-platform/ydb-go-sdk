@@ -1,3 +1,13 @@
+## 2.9.5
+* Renamed context idempotent operation flag
+
+## 2.9.4
+* Forced cancelled transport error as retriable (only idempotent operations)
+* Renamed some internal retry mode types
+
+## 2.9.3
+* Forced grpc keep-alive PermitWithoutStream parameter to true
+
 ## 2.9.2
 * Added errors without panic
 
