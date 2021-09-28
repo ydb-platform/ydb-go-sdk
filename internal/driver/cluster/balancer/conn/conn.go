@@ -152,7 +152,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	if c.runtime.Stats().State == state.Banned {
 		return
 	}
-	onDone := trace.DriverOnClusterPessimize(c.config.Trace(ctx), ctx, c.Addr(), c.runtime.Stats().State, err)
+	onDone := trace.DriverOnPessimizeNode(c.config.Trace(ctx), ctx, c.Addr(), c.runtime.Stats().State, err)
 	err = c.config.Pessimize(c.addr)
 	c.runtime.SetState(state.Banned)
 	onDone(state.Banned, err)

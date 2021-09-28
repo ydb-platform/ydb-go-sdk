@@ -82,30 +82,6 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
-	case t.OnClusterPessimize == nil:
-		ret.OnClusterPessimize = x.OnClusterPessimize
-	case x.OnClusterPessimize == nil:
-		ret.OnClusterPessimize = t.OnClusterPessimize
-	default:
-		h1 := t.OnClusterPessimize
-		h2 := x.OnClusterPessimize
-		ret.OnClusterPessimize = func(c ClusterPessimizeStartInfo) func(ClusterPessimizeDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(c ClusterPessimizeDoneInfo) {
-					r1(c)
-					r2(c)
-				}
-			}
-		}
-	}
-	switch {
 	case t.OnClusterInsert == nil:
 		ret.OnClusterInsert = x.OnClusterInsert
 	case x.OnClusterInsert == nil:
@@ -173,6 +149,30 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 				return func(c ClusterRemoveDoneInfo) {
 					r1(c)
 					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPessimizeNode == nil:
+		ret.OnPessimizeNode = x.OnPessimizeNode
+	case x.OnPessimizeNode == nil:
+		ret.OnPessimizeNode = t.OnPessimizeNode
+	default:
+		h1 := t.OnPessimizeNode
+		h2 := x.OnPessimizeNode
+		ret.OnPessimizeNode = func(p PessimizeNodeStartInfo) func(PessimizeNodeDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PessimizeNodeDoneInfo) {
+					r1(p)
+					r2(p)
 				}
 			}
 		}
@@ -331,21 +331,6 @@ func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
 	}
 	return res
 }
-func (t Driver) onClusterPessimize(c1 ClusterPessimizeStartInfo) func(ClusterPessimizeDoneInfo) {
-	fn := t.OnClusterPessimize
-	if fn == nil {
-		return func(ClusterPessimizeDoneInfo) {
-			return
-		}
-	}
-	res := fn(c1)
-	if res == nil {
-		return func(ClusterPessimizeDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t Driver) onClusterInsert(c1 ClusterInsertStartInfo) func(ClusterInsertDoneInfo) {
 	fn := t.OnClusterInsert
 	if fn == nil {
@@ -386,6 +371,21 @@ func (t Driver) onClusterRemove(c1 ClusterRemoveStartInfo) func(ClusterRemoveDon
 	res := fn(c1)
 	if res == nil {
 		return func(ClusterRemoveDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onPessimizeNode(p PessimizeNodeStartInfo) func(PessimizeNodeDoneInfo) {
+	fn := t.OnPessimizeNode
+	if fn == nil {
+		return func(PessimizeNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(p)
+	if res == nil {
+		return func(PessimizeNodeDoneInfo) {
 			return
 		}
 	}
@@ -499,20 +499,6 @@ func DriverOnClusterGet(t Driver, c context.Context) func(Endpoint, error) {
 		res(p)
 	}
 }
-func DriverOnClusterPessimize(t Driver, c context.Context, e Endpoint, state ConnState, cause error) func(state ConnState, _ error) {
-	var p ClusterPessimizeStartInfo
-	p.Context = c
-	p.Endpoint = e
-	p.State = state
-	p.Cause = cause
-	res := t.onClusterPessimize(p)
-	return func(state ConnState, e error) {
-		var p ClusterPessimizeDoneInfo
-		p.State = state
-		p.Error = e
-		res(p)
-	}
-}
 func DriverOnClusterInsert(t Driver, e Endpoint) func(clusterSize int, state ConnState) {
 	var p ClusterInsertStartInfo
 	p.Endpoint = e
@@ -542,6 +528,20 @@ func DriverOnClusterRemove(t Driver, e Endpoint) func(clusterSize int, state Con
 		var p ClusterRemoveDoneInfo
 		p.ClusterSize = clusterSize
 		p.State = state
+		res(p)
+	}
+}
+func DriverOnPessimizeNode(t Driver, c context.Context, e Endpoint, state ConnState, cause error) func(state ConnState, _ error) {
+	var p PessimizeNodeStartInfo
+	p.Context = c
+	p.Endpoint = e
+	p.State = state
+	p.Cause = cause
+	res := t.onPessimizeNode(p)
+	return func(state ConnState, e error) {
+		var p PessimizeNodeDoneInfo
+		p.State = state
+		p.Error = e
 		res(p)
 	}
 }
