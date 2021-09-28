@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"golang.org/x/net/trace"
 	"log"
 	"os"
 	"path"
@@ -16,8 +17,35 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 }
 
+type printTrace struct {
+}
+
+func (p printTrace) LazyLog(x fmt.Stringer, _ bool) {
+	log.Println(x)
+}
+
+func (p printTrace) LazyPrintf(format string, a ...interface{}) {
+	log.Printf(format, a)
+}
+
+func (p printTrace) SetError() {
+	log.SetOutput(os.Stderr)
+}
+
+func (p printTrace) SetRecycler(f func(interface{})) {
+}
+
+func (p printTrace) SetTraceInfo(traceID, spanID uint64) {
+}
+
+func (p printTrace) SetMaxEvents(m int) {
+}
+
+func (p printTrace) Finish() {
+}
+
 func main() {
-	ctx := context.Background()
+	ctx := trace.NewContext(context.Background(), &printTrace{})
 
 	connectParams, err := ydb.ConnectionString(os.Getenv("YDB"))
 	if err != nil {
@@ -89,30 +117,33 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = selectSimple(ctx, db.Table(), connectParams.Database())
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
-	}
-
-	err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
-	if err != nil {
-		if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
-			_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
+	for {
+		err = selectSimple(ctx, db.Table(), connectParams.Database())
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
 		}
-	}
 
-	err = readTable(ctx, db.Table(), path.Join(
-		connectParams.Database(), "series",
-	))
-	if err != nil {
-		log.Printf("read table error: %v\n", err)
-	}
+		err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
+		if err != nil {
+			if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
+				_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
+			}
+		}
 
-	log.Printf("> cluster stats:\n")
-	for e, s := range db.Stats() {
-		log.Printf("  > '%v': %v\n", e, s)
-	}
+		err = readTable(ctx, db.Table(), path.Join(
+			connectParams.Database(), "series",
+		))
+		if err != nil {
+			log.Printf("read table error: %v\n", err)
+		}
 
-	whoAmI, err := db.Discovery().WhoAmI(ctx)
-	log.Printf("whoAmI: %v, %v\n", whoAmI, err)
+		log.Printf("> cluster stats:\n")
+		for e, s := range db.Stats() {
+			log.Printf("  > '%v': %v\n", e, s)
+		}
+
+		whoAmI, err := db.Discovery().WhoAmI(ctx)
+		log.Printf("whoAmI: %v, %v\n", whoAmI, err)
+
+	}
 }

@@ -71,7 +71,9 @@ func (r *repeater) Force() {
 func (r *repeater) worker(onDone func()) {
 	defer func() {
 		close(r.done)
-		onDone()
+		if onDone != nil {
+			onDone()
+		}
 	}()
 	for {
 		r.task(r.ctx)
