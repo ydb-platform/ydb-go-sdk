@@ -10,10 +10,6 @@ func TestTable(t *testing.T) {
 	testSingleTrace(t, Table{}, "Table")
 }
 
-func TestTablePoolTrace(t *testing.T) {
-	testSingleTrace(t, TablePool{}, "TablePoolTrace")
-}
-
 func TestTraceDriver(t *testing.T) {
 	testSingleTrace(t, Driver{}, "Driver")
 }
