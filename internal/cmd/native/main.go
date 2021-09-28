@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"golang.org/x/net/trace"
 	"log"
 	"os"
 	"path"
@@ -17,35 +16,8 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 }
 
-type printTrace struct {
-}
-
-func (p printTrace) LazyLog(x fmt.Stringer, _ bool) {
-	log.Println(x)
-}
-
-func (p printTrace) LazyPrintf(format string, a ...interface{}) {
-	log.Printf(format, a)
-}
-
-func (p printTrace) SetError() {
-	log.SetOutput(os.Stderr)
-}
-
-func (p printTrace) SetRecycler(f func(interface{})) {
-}
-
-func (p printTrace) SetTraceInfo(traceID, spanID uint64) {
-}
-
-func (p printTrace) SetMaxEvents(m int) {
-}
-
-func (p printTrace) Finish() {
-}
-
 func main() {
-	ctx := trace.NewContext(context.Background(), &printTrace{})
+	ctx := context.Background()
 
 	connectParams, err := ydb.ConnectionString(os.Getenv("YDB"))
 	if err != nil {
