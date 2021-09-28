@@ -5,7 +5,6 @@ package trace
 import (
 	"context"
 	"strings"
-	"time"
 )
 
 type (
@@ -18,6 +17,8 @@ type (
 		OnConnDial        func(ConnDialStartInfo) func(ConnDialDoneInfo)
 		OnConnDisconnect  func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
 		OnConnStateChange func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
+		OnConnInvoke      func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
+		OnConnNewStream   func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
 
 		// Cluster events
 		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
@@ -31,10 +32,6 @@ type (
 
 		// Discovery events
 		OnDiscovery func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
-
-		// RPC events
-		OnOperation func(OperationStartInfo) func(OperationDoneInfo)
-		OnStream    func(StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo)
 	}
 )
 
@@ -57,12 +54,6 @@ type Issue interface {
 	GetMessage() string
 	GetIssueCode() uint32
 	GetSeverity() uint32
-}
-
-type OperationParams interface {
-	GetTimeout() time.Duration
-	GetCancelAfter() time.Duration
-	GetMode() string
 }
 
 // Split returns service name and method.
@@ -134,6 +125,27 @@ type (
 		Error error
 		State ConnState
 	}
+	ConnInvokeStartInfo struct {
+		Context  context.Context
+		Endpoint Endpoint
+		Method   Method
+	}
+	ConnInvokeDoneInfo struct {
+		Error  error
+		Issues []Issue
+		OpId   string
+	}
+	ConnNewStreamStartInfo struct {
+		Context  context.Context
+		Endpoint Endpoint
+		Method   Method
+	}
+	ConnNewStreamRecvInfo struct {
+		Error error
+	}
+	ConnNewStreamDoneInfo struct {
+		Error error
+	}
 	ClusterGetStartInfo struct {
 		Context context.Context
 	}
@@ -164,27 +176,5 @@ type (
 	DiscoveryDoneInfo struct {
 		Endpoints []Endpoint
 		Error     error
-	}
-	OperationStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		Method   Method
-		Params   OperationParams
-	}
-	OperationDoneInfo struct {
-		OpID   string
-		Issues []Issue
-		Error  error
-	}
-	StreamStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		Method   Method
-	}
-	StreamRecvDoneInfo struct {
-		Error error
-	}
-	StreamDoneInfo struct {
-		Error error
 	}
 )

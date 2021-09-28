@@ -161,6 +161,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 
 func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {
 	var (
+		rawCtx = ctx
 		cancel context.CancelFunc
 		opId   string
 		issues []trace.Issue
@@ -187,10 +188,9 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 
 	start := timeutil.Now()
 	c.runtime.OperationStart(start)
-	t := c.config.Trace(ctx)
-	operationDone := trace.DriverOnOperation(t, ctx, c.Addr(), trace.Method(method), params)
+	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.Addr(), trace.Method(method))
 	defer func() {
-		operationDone(opId, issues, err)
+		onDone(err, issues, opId)
 		err := errors.ErrIf(errors.IsTimeoutError(err), err)
 		c.runtime.OperationDone(start, timeutil.Now(), err)
 	}()
@@ -250,8 +250,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	c.runtime.StreamStart(timeutil.Now())
-	t := c.config.Trace(ctx)
-	streamRecv := trace.DriverOnStream(t, ctx, c.Addr(), trace.Method(method))
+	streamRecv := trace.DriverOnConnNewStream(c.config.Trace(ctx), rawCtx, c.Addr(), trace.Method(method))
 	defer func() {
 		if err != nil {
 			c.runtime.StreamDone(timeutil.Now(), err)

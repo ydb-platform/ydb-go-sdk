@@ -108,6 +108,65 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnConnInvoke == nil:
+		ret.OnConnInvoke = x.OnConnInvoke
+	case x.OnConnInvoke == nil:
+		ret.OnConnInvoke = t.OnConnInvoke
+	default:
+		h1 := t.OnConnInvoke
+		h2 := x.OnConnInvoke
+		ret.OnConnInvoke = func(c ConnInvokeStartInfo) func(ConnInvokeDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnInvokeDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnConnNewStream == nil:
+		ret.OnConnNewStream = x.OnConnNewStream
+	case x.OnConnNewStream == nil:
+		ret.OnConnNewStream = t.OnConnNewStream
+	default:
+		h1 := t.OnConnNewStream
+		h2 := x.OnConnNewStream
+		ret.OnConnNewStream = func(c ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
+					r11 := r1(c)
+					r21 := r2(c)
+					switch {
+					case r11 == nil:
+						return r21
+					case r21 == nil:
+						return r11
+					default:
+						return func(c ConnNewStreamDoneInfo) {
+							r11(c)
+							r21(c)
+						}
+					}
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnClusterGet == nil:
 		ret.OnClusterGet = x.OnClusterGet
 	case x.OnClusterGet == nil:
@@ -275,65 +334,6 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 		}
 	}
-	switch {
-	case t.OnOperation == nil:
-		ret.OnOperation = x.OnOperation
-	case x.OnOperation == nil:
-		ret.OnOperation = t.OnOperation
-	default:
-		h1 := t.OnOperation
-		h2 := x.OnOperation
-		ret.OnOperation = func(o OperationStartInfo) func(OperationDoneInfo) {
-			r1 := h1(o)
-			r2 := h2(o)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(o OperationDoneInfo) {
-					r1(o)
-					r2(o)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnStream == nil:
-		ret.OnStream = x.OnStream
-	case x.OnStream == nil:
-		ret.OnStream = t.OnStream
-	default:
-		h1 := t.OnStream
-		h2 := x.OnStream
-		ret.OnStream = func(s StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s StreamRecvDoneInfo) func(StreamDoneInfo) {
-					r11 := r1(s)
-					r21 := r2(s)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(s StreamDoneInfo) {
-							r11(s)
-							r21(s)
-						}
-					}
-				}
-			}
-		}
-	}
 	return ret
 }
 func (t Driver) onConnNew(c1 ConnNewInfo) {
@@ -394,6 +394,48 @@ func (t Driver) onConnStateChange(c1 ConnStateChangeStartInfo) func(ConnStateCha
 		}
 	}
 	return res
+}
+func (t Driver) onConnInvoke(c1 ConnInvokeStartInfo) func(ConnInvokeDoneInfo) {
+	fn := t.OnConnInvoke
+	if fn == nil {
+		return func(ConnInvokeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnInvokeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onConnNewStream(c1 ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
+	fn := t.OnConnNewStream
+	if fn == nil {
+		return func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
+			return func(ConnNewStreamDoneInfo) {
+				return
+			}
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
+			return func(ConnNewStreamDoneInfo) {
+				return
+			}
+		}
+	}
+	return func(c ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
+		res := res(c)
+		if res == nil {
+			return func(ConnNewStreamDoneInfo) {
+				return
+			}
+		}
+		return res
+	}
 }
 func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
 	fn := t.OnClusterGet
@@ -500,48 +542,6 @@ func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	}
 	return res
 }
-func (t Driver) onOperation(o OperationStartInfo) func(OperationDoneInfo) {
-	fn := t.OnOperation
-	if fn == nil {
-		return func(OperationDoneInfo) {
-			return
-		}
-	}
-	res := fn(o)
-	if res == nil {
-		return func(OperationDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t Driver) onStream(s StreamStartInfo) func(StreamRecvDoneInfo) func(StreamDoneInfo) {
-	fn := t.OnStream
-	if fn == nil {
-		return func(StreamRecvDoneInfo) func(StreamDoneInfo) {
-			return func(StreamDoneInfo) {
-				return
-			}
-		}
-	}
-	res := fn(s)
-	if res == nil {
-		return func(StreamRecvDoneInfo) func(StreamDoneInfo) {
-			return func(StreamDoneInfo) {
-				return
-			}
-		}
-	}
-	return func(s StreamRecvDoneInfo) func(StreamDoneInfo) {
-		res := res(s)
-		if res == nil {
-			return func(StreamDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
-}
 func DriverOnConnNew(t Driver, e Endpoint, state ConnState) {
 	var p ConnNewInfo
 	p.Endpoint = e
@@ -588,6 +588,37 @@ func DriverOnConnStateChange(t Driver, e Endpoint, state ConnState) func(state C
 		var p ConnStateChangeDoneInfo
 		p.State = state
 		res(p)
+	}
+}
+func DriverOnConnInvoke(t Driver, c context.Context, e Endpoint, m Method) func(_ error, issues []Issue, opId string) {
+	var p ConnInvokeStartInfo
+	p.Context = c
+	p.Endpoint = e
+	p.Method = m
+	res := t.onConnInvoke(p)
+	return func(e error, issues []Issue, opId string) {
+		var p ConnInvokeDoneInfo
+		p.Error = e
+		p.Issues = issues
+		p.OpId = opId
+		res(p)
+	}
+}
+func DriverOnConnNewStream(t Driver, c context.Context, e Endpoint, m Method) func(error) func(error) {
+	var p ConnNewStreamStartInfo
+	p.Context = c
+	p.Endpoint = e
+	p.Method = m
+	res := t.onConnNewStream(p)
+	return func(e error) func(error) {
+		var p ConnNewStreamRecvInfo
+		p.Error = e
+		res := res(p)
+		return func(e error) {
+			var p ConnNewStreamDoneInfo
+			p.Error = e
+			res(p)
+		}
 	}
 }
 func DriverOnClusterGet(t Driver, c context.Context) func(Endpoint, error) {
@@ -665,37 +696,5 @@ func DriverOnDiscovery(t Driver, c context.Context) func(endpoints []Endpoint, _
 		p.Endpoints = endpoints
 		p.Error = e
 		res(p)
-	}
-}
-func DriverOnOperation(t Driver, c context.Context, e Endpoint, m Method, params OperationParams) func(opID string, issues []Issue, _ error) {
-	var p OperationStartInfo
-	p.Context = c
-	p.Endpoint = e
-	p.Method = m
-	p.Params = params
-	res := t.onOperation(p)
-	return func(opID string, issues []Issue, e error) {
-		var p OperationDoneInfo
-		p.OpID = opID
-		p.Issues = issues
-		p.Error = e
-		res(p)
-	}
-}
-func DriverOnStream(t Driver, c context.Context, e Endpoint, m Method) func(error) func(error) {
-	var p StreamStartInfo
-	p.Context = c
-	p.Endpoint = e
-	p.Method = m
-	res := t.onStream(p)
-	return func(e error) func(error) {
-		var p StreamRecvDoneInfo
-		p.Error = e
-		res := res(p)
-		return func(e error) {
-			var p StreamDoneInfo
-			p.Error = e
-			res(p)
-		}
 	}
 }
