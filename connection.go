@@ -102,6 +102,11 @@ func (db *db) RateLimiter() ratelimiter.Client {
 func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connection, err error) {
 	db := &db{
 		name: params.Database(),
+		options: options{
+			driverConfig: config.New(
+				config.WithDatabase(params.Database()),
+			),
+		},
 	}
 	for _, opt := range opts {
 		err = opt(ctx, db)
@@ -127,13 +132,7 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 		}
 	}
 	db.cluster, err = (&dial.Dialer{
-		Config: config.New(func(c *config.Config) {
-			c.Database = params.Database()
-			c.Credentials = db.options.credentials
-			if db.options.traceDriver != nil {
-				c.Trace = *db.options.traceDriver
-			}
-		}),
+		Config:    db.options.driverConfig,
 		TLSConfig: db.options.tlsConfig,
 		Timeout:   db.options.dialTimeout,
 	}).Dial(ctx, params.Endpoint())

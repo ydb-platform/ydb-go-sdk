@@ -17,10 +17,8 @@ type Option func(ctx context.Context, client *db) error
 type options struct {
 	dialTimeout                          time.Duration
 	tlsConfig                            *tls.Config
-	traceDriver                          *trace.Driver
 	traceTable                           *trace.Table
 	driverConfig                         *config.Config
-	credentials                          credentials.Credentials
 	discoveryInterval                    *time.Duration
 	tableSessionPoolSizeLimit            *int
 	tableSessionPoolKeepAliveMinSize     *int
@@ -56,7 +54,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 		if err != nil {
 			return err
 		}
-		c.options.credentials = credentials
+		c.options.driverConfig.Credentials = credentials
 		return nil
 	}
 }
@@ -74,9 +72,9 @@ func WithDriverConfig(config *config.Config) Option {
 	}
 }
 
-func WithGrpcConnectionPolicy(policy *config.GrpcConnectionPolicy) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options.driverConfig.GrpcConnectionPolicy = policy
+func WithGrpcConnectionTTL(ttl time.Duration) Option {
+	return func(ctx context.Context, client *db) error {
+		client.options.driverConfig.GrpcConnectionPolicy.TTL = ttl
 		return nil
 	}
 }
@@ -140,7 +138,7 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 // WithTraceDriver returns deadline which has associated Driver with it.
 func WithTraceDriver(trace trace.Driver) Option {
 	return func(ctx context.Context, c *db) error {
-		c.options.traceDriver = &trace
+		c.options.driverConfig.Trace = trace
 		return nil
 	}
 }

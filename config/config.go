@@ -68,6 +68,12 @@ type Config struct {
 
 type option func(c *Config)
 
+func WithDatabase(database string) option {
+	return func(c *Config) {
+		c.Database = database
+	}
+}
+
 func New(opts ...option) *Config {
 	c := defaults()
 	for _, o := range opts {
