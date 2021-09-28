@@ -225,7 +225,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	c.wait = nil
 	c.index[e.Addr] = entry
 
-	onDone(len(c.index), conn.Runtime().GetState())
+	onDone(conn.Runtime().GetState())
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
@@ -298,14 +298,13 @@ func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option)
 	entry.RemoveFrom(c.balancer)
 	c.ready--
 	delete(c.index, e.Addr)
-	l := len(c.index)
 	c.mu.Unlock()
 
 	if !assert.IsNil(entry.Conn) {
 		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
 		_ = entry.Conn.Close()
 	}
-	onDone(l, entry.Conn.Runtime().GetState())
+	onDone(entry.Conn.Runtime().GetState())
 }
 
 func (c *cluster) Pessimize(addr endpoint.Addr) (err error) {

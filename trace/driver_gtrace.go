@@ -601,13 +601,12 @@ func DriverOnClusterGet(t Driver, c context.Context) func(Endpoint, error) {
 		res(p)
 	}
 }
-func DriverOnClusterInsert(t Driver, e Endpoint) func(clusterSize int, state ConnState) {
+func DriverOnClusterInsert(t Driver, e Endpoint) func(state ConnState) {
 	var p ClusterInsertStartInfo
 	p.Endpoint = e
 	res := t.onClusterInsert(p)
-	return func(clusterSize int, state ConnState) {
+	return func(state ConnState) {
 		var p ClusterInsertDoneInfo
-		p.ClusterSize = clusterSize
 		p.State = state
 		res(p)
 	}
@@ -622,13 +621,12 @@ func DriverOnClusterUpdate(t Driver, e Endpoint) func(state ConnState) {
 		res(p)
 	}
 }
-func DriverOnClusterRemove(t Driver, e Endpoint) func(clusterSize int, state ConnState) {
+func DriverOnClusterRemove(t Driver, e Endpoint) func(state ConnState) {
 	var p ClusterRemoveStartInfo
 	p.Endpoint = e
 	res := t.onClusterRemove(p)
-	return func(clusterSize int, state ConnState) {
+	return func(state ConnState) {
 		var p ClusterRemoveDoneInfo
-		p.ClusterSize = clusterSize
 		p.State = state
 		res(p)
 	}

@@ -88,8 +88,7 @@ type (
 		Endpoint Endpoint
 	}
 	ClusterInsertDoneInfo struct {
-		ClusterSize int
-		State       ConnState
+		State ConnState
 	}
 	ClusterUpdateStartInfo struct {
 		Endpoint Endpoint
@@ -101,8 +100,7 @@ type (
 		Endpoint Endpoint
 	}
 	ClusterRemoveDoneInfo struct {
-		ClusterSize int
-		State       ConnState
+		State ConnState
 	}
 	ConnDisconnectStartInfo struct {
 		Endpoint Endpoint
