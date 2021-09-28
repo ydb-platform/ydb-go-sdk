@@ -7,18 +7,13 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
