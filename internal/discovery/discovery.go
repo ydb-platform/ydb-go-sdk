@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"strings"
@@ -26,8 +27,9 @@ type Client interface {
 	Close(ctx context.Context) error
 }
 
-func New(conn grpc.ClientConnInterface, database string, ssl bool) Client {
+func New(conn grpc.ClientConnInterface, database string, ssl bool, trace trace.Driver) Client {
 	return &client{
+		trace:    trace,
 		service:  Ydb_Discovery_V1.NewDiscoveryServiceClient(conn),
 		database: database,
 		ssl:      ssl,
@@ -35,6 +37,7 @@ func New(conn grpc.ClientConnInterface, database string, ssl bool) Client {
 }
 
 type client struct {
+	trace    trace.Driver
 	service  Ydb_Discovery_V1.DiscoveryServiceClient
 	database string
 	ssl      bool
@@ -44,7 +47,15 @@ func (d *client) isNil() bool {
 	return d == nil
 }
 
-func (d *client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
+func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
+	onDone := trace.DriverOnDiscovery(d.trace, ctx)
+	defer func() {
+		nodes := make([]trace.Endpoint, 0)
+		for _, e := range endpoints {
+			nodes = append(nodes, e)
+		}
+		onDone(nodes, err)
+	}()
 	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: d.database,
 	}
@@ -57,18 +68,21 @@ func (d *client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	endpoints := make([]endpoint.Endpoint, 0, len(listEndpointsResult.Endpoints))
+	nodes := make([]trace.Endpoint, len(listEndpointsResult.Endpoints))
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
-			endpoints = append(endpoints, endpoint.Endpoint{
+			node := endpoint.Endpoint{
 				Addr: endpoint.Addr{
 					Host: e.Address,
 					Port: int(e.Port),
 				},
 				Local: e.Location == listEndpointsResult.SelfLocation,
-			})
+			}
+			endpoints = append(endpoints, node)
+			nodes = append(nodes, node)
 		}
 	}
+
 	return endpoints, nil
 }
 

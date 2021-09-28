@@ -7,13 +7,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 	"time"
 )
 
 func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn, connConfig conn.Config) error {
-	discoveryClient := discovery.New(conn, d.config.Database, d.useTLS())
+	discoveryClient := discovery.New(conn, d.config.Database, d.useTLS(), d.config.Trace)
 
 	curr, err := discoveryClient.Discover(ctx)
 	if err != nil {
@@ -36,15 +35,7 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 		repeater.NewRepeater(
 			d.config.DiscoveryInterval,
 			func(ctx context.Context) {
-				onDone := trace.DriverOnDiscovery(d.config.Trace, ctx)
 				next, err := discoveryClient.Discover(ctx)
-				endpoints := make(map[trace.Endpoint]trace.ConnState, len(next))
-				for _, e := range next {
-					if ok, stats := c.ConnStats(e.Addr); ok {
-						endpoints[e] = stats.State
-					}
-				}
-				onDone(endpoints, err)
 				if err != nil {
 					return
 				}

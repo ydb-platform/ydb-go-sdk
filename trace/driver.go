@@ -164,7 +164,7 @@ type (
 		Context context.Context
 	}
 	DiscoveryDoneInfo struct {
-		Endpoints map[Endpoint]ConnState
+		Endpoints []Endpoint
 		Error     error
 	}
 	OperationStartInfo struct {

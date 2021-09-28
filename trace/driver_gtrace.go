@@ -658,11 +658,11 @@ func DriverOnGetCredentials(t Driver, c context.Context) func(tokenOk bool, _ er
 		res(p)
 	}
 }
-func DriverOnDiscovery(t Driver, c context.Context) func(endpoints map[Endpoint]ConnState, _ error) {
+func DriverOnDiscovery(t Driver, c context.Context) func(endpoints []Endpoint, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
 	res := t.onDiscovery(p)
-	return func(endpoints map[Endpoint]ConnState, e error) {
+	return func(endpoints []Endpoint, e error) {
 		var p DiscoveryDoneInfo
 		p.Endpoints = endpoints
 		p.Error = e
