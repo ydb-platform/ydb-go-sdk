@@ -147,15 +147,15 @@ func (c *conn) Close() (err error) {
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
+	c.Lock()
+	defer c.Unlock()
 	if c.runtime.Stats().State == state.Banned {
 		return
 	}
-	c.Lock()
 	onDone := trace.DriverOnClusterPessimize(c.config.Trace(ctx), ctx, c.Addr(), c.runtime.Stats().State, err)
 	err = c.config.Pessimize(c.addr)
 	c.runtime.SetState(state.Banned)
 	onDone(state.Banned, err)
-	c.Unlock()
 }
 
 func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {
