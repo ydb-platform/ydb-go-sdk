@@ -92,6 +92,7 @@ func New(
 	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
+		trace:    trace,
 		index:    make(map[endpoint.Addr]entry.Entry),
 		dial:     dial,
 		balancer: balancer,
