@@ -32,7 +32,7 @@ type repeater struct {
 }
 
 // NewRepeater creates and begins to execute task periodically.
-func NewRepeater(interval time.Duration, task func(ctx context.Context)) Repeater {
+func NewRepeater(interval time.Duration, task func(ctx context.Context), onDone func()) Repeater {
 	if interval <= 0 {
 		return nil
 	}
@@ -48,7 +48,7 @@ func NewRepeater(interval time.Duration, task func(ctx context.Context)) Repeate
 		cancel:   cancel,
 		force:    make(chan struct{}),
 	}
-	go r.worker()
+	go r.worker(onDone)
 	return r
 }
 
@@ -68,8 +68,11 @@ func (r *repeater) Force() {
 	}
 }
 
-func (r *repeater) worker() {
-	defer close(r.done)
+func (r *repeater) worker(onDone func()) {
+	defer func() {
+		close(r.done)
+		onDone()
+	}()
 	for {
 		r.task(r.ctx)
 		select {

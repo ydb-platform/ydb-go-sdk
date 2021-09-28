@@ -8,16 +8,20 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"google.golang.org/grpc"
 	"sync"
 	"time"
 )
 
-func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn grpc.ClientConnInterface, connConfig conn.Config) error {
+func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn, connConfig conn.Config) error {
+	onDone := func() {
+		_ = conn.Close()
+		trace.DriverOnConnDrop(d.config.Trace, conn.Addr(), conn.Runtime().GetState())
+	}
 	discoveryClient := discovery.New(conn, d.config.Database, d.useTLS())
 
 	curr, err := discoveryClient.Discover(ctx)
 	if err != nil {
+		onDone()
 		return err
 	}
 	// Endpoints must be sorted to merge
@@ -85,6 +89,7 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn grpc.Clie
 				wg.Wait()
 				curr = next
 			},
+			onDone,
 		),
 	)
 	return nil

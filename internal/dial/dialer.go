@@ -89,15 +89,15 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 		c.Close,
 	)
 
-	conn := conn.New(ctx, endpoint.Addr, d.dialHostPort, driver)
 	if d.config.DiscoveryInterval > 0 {
-		if err := d.discover(ctx, c, conn, driver); err != nil {
+		if err := d.discover(
+			ctx,
+			c,
+			conn.New(ctx, endpoint.Addr, d.dialHostPort, driver),
+			driver,
+		); err != nil {
 			return nil, err
 		}
-	} else {
-		defer func() {
-			_ = conn.Close()
-		}()
 	}
 	return driver, nil
 }
