@@ -250,6 +250,185 @@ func (t Table) Compose(x Table) (ret Table) {
 			}
 		}
 	}
+	switch {
+	case t.OnPoolCreate == nil:
+		ret.OnPoolCreate = x.OnPoolCreate
+	case x.OnPoolCreate == nil:
+		ret.OnPoolCreate = t.OnPoolCreate
+	default:
+		h1 := t.OnPoolCreate
+		h2 := x.OnPoolCreate
+		ret.OnPoolCreate = func(p PoolCreateStartInfo) func(PoolCreateDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolCreateDoneInfo) {
+					r1(p)
+					r2(p)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPoolGet == nil:
+		ret.OnPoolGet = x.OnPoolGet
+	case x.OnPoolGet == nil:
+		ret.OnPoolGet = t.OnPoolGet
+	default:
+		h1 := t.OnPoolGet
+		h2 := x.OnPoolGet
+		ret.OnPoolGet = func(p PoolGetStartInfo) func(PoolGetDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolGetDoneInfo) {
+					r1(p)
+					r2(p)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPoolWait == nil:
+		ret.OnPoolWait = x.OnPoolWait
+	case x.OnPoolWait == nil:
+		ret.OnPoolWait = t.OnPoolWait
+	default:
+		h1 := t.OnPoolWait
+		h2 := x.OnPoolWait
+		ret.OnPoolWait = func(p PoolWaitStartInfo) func(PoolWaitDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolWaitDoneInfo) {
+					r1(p)
+					r2(p)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPoolTake == nil:
+		ret.OnPoolTake = x.OnPoolTake
+	case x.OnPoolTake == nil:
+		ret.OnPoolTake = t.OnPoolTake
+	default:
+		h1 := t.OnPoolTake
+		h2 := x.OnPoolTake
+		ret.OnPoolTake = func(p PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
+					r11 := r1(p)
+					r21 := r2(p)
+					switch {
+					case r11 == nil:
+						return r21
+					case r21 == nil:
+						return r11
+					default:
+						return func(p PoolTakeDoneInfo) {
+							r11(p)
+							r21(p)
+						}
+					}
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPoolPut == nil:
+		ret.OnPoolPut = x.OnPoolPut
+	case x.OnPoolPut == nil:
+		ret.OnPoolPut = t.OnPoolPut
+	default:
+		h1 := t.OnPoolPut
+		h2 := x.OnPoolPut
+		ret.OnPoolPut = func(p PoolPutStartInfo) func(PoolPutDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolPutDoneInfo) {
+					r1(p)
+					r2(p)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPoolCloseSession == nil:
+		ret.OnPoolCloseSession = x.OnPoolCloseSession
+	case x.OnPoolCloseSession == nil:
+		ret.OnPoolCloseSession = t.OnPoolCloseSession
+	default:
+		h1 := t.OnPoolCloseSession
+		h2 := x.OnPoolCloseSession
+		ret.OnPoolCloseSession = func(p PoolCloseSessionStartInfo) func(PoolCloseSessionDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolCloseSessionDoneInfo) {
+					r1(p)
+					r2(p)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPoolClose == nil:
+		ret.OnPoolClose = x.OnPoolClose
+	case x.OnPoolClose == nil:
+		ret.OnPoolClose = t.OnPoolClose
+	default:
+		h1 := t.OnPoolClose
+		h2 := x.OnPoolClose
+		ret.OnPoolClose = func(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolCloseDoneInfo) {
+					r1(p)
+					r2(p)
+				}
+			}
+		}
+	}
 	return ret
 }
 func (t Table) onCreateSession(c1 CreateSessionStartInfo) func(CreateSessionDoneInfo) {
@@ -402,303 +581,118 @@ func (t Table) onRollbackTransaction(r RollbackTransactionStartInfo) func(Rollba
 	}
 	return res
 }
-
-// Compose returns a new TablePool which has functional fields composed
-// both from t and x.
-func (t TablePool) Compose(x TablePool) (ret TablePool) {
-	switch {
-	case t.OnCreate == nil:
-		ret.OnCreate = x.OnCreate
-	case x.OnCreate == nil:
-		ret.OnCreate = t.OnCreate
-	default:
-		h1 := t.OnCreate
-		h2 := x.OnCreate
-		ret.OnCreate = func(s SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolCreateDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnGet == nil:
-		ret.OnGet = x.OnGet
-	case x.OnGet == nil:
-		ret.OnGet = t.OnGet
-	default:
-		h1 := t.OnGet
-		h2 := x.OnGet
-		ret.OnGet = func(s SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolGetDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnWait == nil:
-		ret.OnWait = x.OnWait
-	case x.OnWait == nil:
-		ret.OnWait = t.OnWait
-	default:
-		h1 := t.OnWait
-		h2 := x.OnWait
-		ret.OnWait = func(s SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolWaitDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnTake == nil:
-		ret.OnTake = x.OnTake
-	case x.OnTake == nil:
-		ret.OnTake = t.OnTake
-	default:
-		h1 := t.OnTake
-		h2 := x.OnTake
-		ret.OnTake = func(s SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
-					r11 := r1(s)
-					r21 := r2(s)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(s SessionPoolTakeDoneInfo) {
-							r11(s)
-							r21(s)
-						}
-					}
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnPut == nil:
-		ret.OnPut = x.OnPut
-	case x.OnPut == nil:
-		ret.OnPut = t.OnPut
-	default:
-		h1 := t.OnPut
-		h2 := x.OnPut
-		ret.OnPut = func(s SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolPutDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnCloseSession == nil:
-		ret.OnCloseSession = x.OnCloseSession
-	case x.OnCloseSession == nil:
-		ret.OnCloseSession = t.OnCloseSession
-	default:
-		h1 := t.OnCloseSession
-		h2 := x.OnCloseSession
-		ret.OnCloseSession = func(s SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolCloseSessionDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnClose == nil:
-		ret.OnClose = x.OnClose
-	case x.OnClose == nil:
-		ret.OnClose = t.OnClose
-	default:
-		h1 := t.OnClose
-		h2 := x.OnClose
-		ret.OnClose = func(s SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s SessionPoolCloseDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	return ret
-}
-func (t TablePool) onCreate(s SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo) {
-	fn := t.OnCreate
+func (t Table) onPoolCreate(p PoolCreateStartInfo) func(PoolCreateDoneInfo) {
+	fn := t.OnPoolCreate
 	if fn == nil {
-		return func(SessionPoolCreateDoneInfo) {
+		return func(PoolCreateDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(p)
 	if res == nil {
-		return func(SessionPoolCreateDoneInfo) {
+		return func(PoolCreateDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t TablePool) onGet(s SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo) {
-	fn := t.OnGet
+func (t Table) onPoolGet(p PoolGetStartInfo) func(PoolGetDoneInfo) {
+	fn := t.OnPoolGet
 	if fn == nil {
-		return func(SessionPoolGetDoneInfo) {
+		return func(PoolGetDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(p)
 	if res == nil {
-		return func(SessionPoolGetDoneInfo) {
+		return func(PoolGetDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t TablePool) onWait(s SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo) {
-	fn := t.OnWait
+func (t Table) onPoolWait(p PoolWaitStartInfo) func(PoolWaitDoneInfo) {
+	fn := t.OnPoolWait
 	if fn == nil {
-		return func(SessionPoolWaitDoneInfo) {
+		return func(PoolWaitDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(p)
 	if res == nil {
-		return func(SessionPoolWaitDoneInfo) {
+		return func(PoolWaitDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t TablePool) onTake(s SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
-	fn := t.OnTake
+func (t Table) onPoolTake(p PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
+	fn := t.OnPoolTake
 	if fn == nil {
-		return func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
-			return func(SessionPoolTakeDoneInfo) {
+		return func(PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
+			return func(PoolTakeDoneInfo) {
 				return
 			}
 		}
 	}
-	res := fn(s)
+	res := fn(p)
 	if res == nil {
-		return func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
-			return func(SessionPoolTakeDoneInfo) {
+		return func(PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
+			return func(PoolTakeDoneInfo) {
 				return
 			}
 		}
 	}
-	return func(s SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo) {
-		res := res(s)
+	return func(p PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
+		res := res(p)
 		if res == nil {
-			return func(SessionPoolTakeDoneInfo) {
+			return func(PoolTakeDoneInfo) {
 				return
 			}
 		}
 		return res
 	}
 }
-func (t TablePool) onPut(s SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo) {
-	fn := t.OnPut
+func (t Table) onPoolPut(p PoolPutStartInfo) func(PoolPutDoneInfo) {
+	fn := t.OnPoolPut
 	if fn == nil {
-		return func(SessionPoolPutDoneInfo) {
+		return func(PoolPutDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(p)
 	if res == nil {
-		return func(SessionPoolPutDoneInfo) {
+		return func(PoolPutDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t TablePool) onCloseSession(s SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo) {
-	fn := t.OnCloseSession
+func (t Table) onPoolCloseSession(p PoolCloseSessionStartInfo) func(PoolCloseSessionDoneInfo) {
+	fn := t.OnPoolCloseSession
 	if fn == nil {
-		return func(SessionPoolCloseSessionDoneInfo) {
+		return func(PoolCloseSessionDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(p)
 	if res == nil {
-		return func(SessionPoolCloseSessionDoneInfo) {
+		return func(PoolCloseSessionDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t TablePool) onClose(s SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo) {
-	fn := t.OnClose
+func (t Table) onPoolClose(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
+	fn := t.OnPoolClose
 	if fn == nil {
-		return func(SessionPoolCloseDoneInfo) {
+		return func(PoolCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(p)
 	if res == nil {
-		return func(SessionPoolCloseDoneInfo) {
+		return func(PoolCloseDoneInfo) {
 			return
 		}
 	}
@@ -860,24 +854,24 @@ func TableOnRollbackTransaction(t Table, c context.Context, sessionID string, tx
 		res(p)
 	}
 }
-func TablePoolOnCreate(t TablePool, c context.Context) func(_ context.Context, sessionID string, _ error) {
-	var p SessionPoolCreateStartInfo
+func TableOnPoolCreate(t Table, c context.Context) func(_ context.Context, sessionID string, _ error) {
+	var p PoolCreateStartInfo
 	p.Context = c
-	res := t.onCreate(p)
+	res := t.onPoolCreate(p)
 	return func(c context.Context, sessionID string, e error) {
-		var p SessionPoolCreateDoneInfo
+		var p PoolCreateDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
 		res(p)
 	}
 }
-func TablePoolOnGet(t TablePool, c context.Context) func(_ context.Context, sessionID string, latency time.Duration, retryAttempts int, _ error) {
-	var p SessionPoolGetStartInfo
+func TableOnPoolGet(t Table, c context.Context) func(_ context.Context, sessionID string, latency time.Duration, retryAttempts int, _ error) {
+	var p PoolGetStartInfo
 	p.Context = c
-	res := t.onGet(p)
+	res := t.onPoolGet(p)
 	return func(c context.Context, sessionID string, latency time.Duration, retryAttempts int, e error) {
-		var p SessionPoolGetDoneInfo
+		var p PoolGetDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Latency = latency
@@ -886,30 +880,30 @@ func TablePoolOnGet(t TablePool, c context.Context) func(_ context.Context, sess
 		res(p)
 	}
 }
-func TablePoolOnWait(t TablePool, c context.Context) func(_ context.Context, sessionID string, _ error) {
-	var p SessionPoolWaitStartInfo
+func TableOnPoolWait(t Table, c context.Context) func(_ context.Context, sessionID string, _ error) {
+	var p PoolWaitStartInfo
 	p.Context = c
-	res := t.onWait(p)
+	res := t.onPoolWait(p)
 	return func(c context.Context, sessionID string, e error) {
-		var p SessionPoolWaitDoneInfo
+		var p PoolWaitDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
 		res(p)
 	}
 }
-func TablePoolOnTake(t TablePool, c context.Context, sessionID string) func(_ context.Context, sessionID string) func(_ context.Context, sessionID string, took bool, _ error) {
-	var p SessionPoolTakeStartInfo
+func TableOnPoolTake(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string) func(_ context.Context, sessionID string, took bool, _ error) {
+	var p PoolTakeStartInfo
 	p.Context = c
 	p.SessionID = sessionID
-	res := t.onTake(p)
+	res := t.onPoolTake(p)
 	return func(c context.Context, sessionID string) func(context.Context, string, bool, error) {
-		var p SessionPoolTakeWaitInfo
+		var p PoolTakeWaitInfo
 		p.Context = c
 		p.SessionID = sessionID
 		res := res(p)
 		return func(c context.Context, sessionID string, took bool, e error) {
-			var p SessionPoolTakeDoneInfo
+			var p PoolTakeDoneInfo
 			p.Context = c
 			p.SessionID = sessionID
 			p.Took = took
@@ -918,38 +912,38 @@ func TablePoolOnTake(t TablePool, c context.Context, sessionID string) func(_ co
 		}
 	}
 }
-func TablePoolOnPut(t TablePool, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ error) {
-	var p SessionPoolPutStartInfo
+func TableOnPoolPut(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ error) {
+	var p PoolPutStartInfo
 	p.Context = c
 	p.SessionID = sessionID
-	res := t.onPut(p)
+	res := t.onPoolPut(p)
 	return func(c context.Context, sessionID string, e error) {
-		var p SessionPoolPutDoneInfo
+		var p PoolPutDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
 		res(p)
 	}
 }
-func TablePoolOnCloseSession(t TablePool, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ error) {
-	var p SessionPoolCloseSessionStartInfo
+func TableOnPoolCloseSession(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ error) {
+	var p PoolCloseSessionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
-	res := t.onCloseSession(p)
+	res := t.onPoolCloseSession(p)
 	return func(c context.Context, sessionID string, e error) {
-		var p SessionPoolCloseSessionDoneInfo
+		var p PoolCloseSessionDoneInfo
 		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
 		res(p)
 	}
 }
-func TablePoolOnClose(t TablePool, c context.Context) func(context.Context, error) {
-	var p SessionPoolCloseStartInfo
+func TableOnPoolClose(t Table, c context.Context) func(context.Context, error) {
+	var p PoolCloseStartInfo
 	p.Context = c
-	res := t.onClose(p)
+	res := t.onPoolClose(p)
 	return func(c context.Context, e error) {
-		var p SessionPoolCloseDoneInfo
+		var p PoolCloseDoneInfo
 		p.Context = c
 		p.Error = e
 		res(p)

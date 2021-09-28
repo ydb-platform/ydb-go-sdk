@@ -1218,9 +1218,9 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 func mustCreateSession(t *testing.T, p *pool) table.Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	p.Trace.OnCreate = func(info trace.SessionPoolCreateStartInfo) func(trace.SessionPoolCreateDoneInfo) {
+	p.Trace.OnCreate = func(info trace.PoolCreateStartInfo) func(trace.PoolCreateDoneInfo) {
 		wg.Add(1)
-		return func(info trace.SessionPoolCreateDoneInfo) {
+		return func(info trace.PoolCreateDoneInfo) {
 			wg.Done()
 		}
 	}

@@ -303,7 +303,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 		i     = 0
 		start = time.Now()
 	)
-	getDone := trace.TablePoolOnGet(p.Trace.TablePool, ctx)
+	getDone := trace.TableOnPoolGet(p.Trace, ctx)
 	defer func() {
 		if !assert.IsNil(s) {
 			getDone(ctx, s.ID(), time.Since(start), i, err)
@@ -358,7 +358,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 		if ch == nil {
 			continue
 		}
-		waitDone := trace.TablePoolOnWait(p.Trace.TablePool, ctx)
+		waitDone := trace.TableOnPoolWait(p.Trace, ctx)
 		var ok bool
 		select {
 		case s, ok = <-*ch:
@@ -415,7 +415,7 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 func (p *pool) Put(ctx context.Context, s table.Session) (err error) {
 	p.init()
 
-	putDone := trace.TablePoolOnPut(p.Trace.TablePool, ctx, s.ID())
+	putDone := trace.TableOnPoolPut(p.Trace, ctx, s.ID())
 	defer func() {
 		putDone(ctx, s.ID(), err)
 	}()
@@ -458,7 +458,7 @@ func (p *pool) Put(ctx context.Context, s table.Session) (err error) {
 func (p *pool) Take(ctx context.Context, s table.Session) (took bool, err error) {
 	p.init()
 
-	takeWait := trace.TablePoolOnTake(p.Trace.TablePool, ctx, s.ID())
+	takeWait := trace.TableOnPoolTake(p.Trace, ctx, s.ID())
 	var takeDone func(_ context.Context, _ string, took bool, _ error)
 
 	if p.isClosed() {
@@ -501,7 +501,7 @@ func (p *pool) Take(ctx context.Context, s table.Session) (took bool, err error)
 func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 	p.init()
 
-	createDone := trace.TablePoolOnCreate(p.Trace.TablePool, ctx)
+	createDone := trace.TableOnPoolCreate(p.Trace, ctx)
 	defer func() {
 		if !assert.IsNil(s) {
 			createDone(ctx, s.ID(), err)
@@ -549,7 +549,7 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 func (p *pool) Close(ctx context.Context) (err error) {
 	p.init()
 
-	closeDone := trace.TablePoolOnClose(p.Trace.TablePool, ctx)
+	closeDone := trace.TableOnPoolClose(p.Trace, ctx)
 	defer func() {
 		closeDone(ctx, err)
 	}()
@@ -884,7 +884,7 @@ func (p *pool) CloseSession(ctx context.Context, s table.Session) error {
 		deadline.ContextWithoutDeadline(ctx),
 		p.DeleteTimeout,
 	)
-	closeSessionDone := trace.TablePoolOnCloseSession(p.Trace.TablePool, ctx, s.ID())
+	closeSessionDone := trace.TableOnPoolCloseSession(p.Trace, ctx, s.ID())
 	go func() {
 		defer cancel()
 		closeSessionDone(ctx, s.ID(), s.Close(ctx))

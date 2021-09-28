@@ -12,8 +12,6 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Table struct {
-		TablePool
-
 		OnCreateSession          func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
 		OnKeepAlive              func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
 		OnDeleteSession          func(DeleteSessionStartInfo) func(DeleteSessionDoneInfo)
@@ -24,18 +22,14 @@ type (
 		OnBeginTransaction       func(BeginTransactionStartInfo) func(BeginTransactionDoneInfo)
 		OnCommitTransaction      func(CommitTransactionStartInfo) func(CommitTransactionDoneInfo)
 		OnRollbackTransaction    func(RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo)
-	}
 
-	//gtrace:gen
-	//gtrace:set Shortcut
-	TablePool struct {
-		OnCreate       func(SessionPoolCreateStartInfo) func(SessionPoolCreateDoneInfo)
-		OnGet          func(SessionPoolGetStartInfo) func(SessionPoolGetDoneInfo)
-		OnWait         func(SessionPoolWaitStartInfo) func(SessionPoolWaitDoneInfo)
-		OnTake         func(SessionPoolTakeStartInfo) func(SessionPoolTakeWaitInfo) func(SessionPoolTakeDoneInfo)
-		OnPut          func(SessionPoolPutStartInfo) func(SessionPoolPutDoneInfo)
-		OnCloseSession func(SessionPoolCloseSessionStartInfo) func(SessionPoolCloseSessionDoneInfo)
-		OnClose        func(SessionPoolCloseStartInfo) func(SessionPoolCloseDoneInfo)
+		OnPoolCreate       func(PoolCreateStartInfo) func(PoolCreateDoneInfo)
+		OnPoolGet          func(PoolGetStartInfo) func(PoolGetDoneInfo)
+		OnPoolWait         func(PoolWaitStartInfo) func(PoolWaitDoneInfo)
+		OnPoolTake         func(PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo)
+		OnPoolPut          func(PoolPutStartInfo) func(PoolPutDoneInfo)
+		OnPoolCloseSession func(PoolCloseSessionStartInfo) func(PoolCloseSessionDoneInfo)
+		OnPoolClose        func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
 	}
 )
 
@@ -168,68 +162,68 @@ type (
 )
 
 type (
-	SessionPoolCreateStartInfo struct {
+	PoolCreateStartInfo struct {
 		Context context.Context
 	}
-	SessionPoolCreateDoneInfo struct {
+	PoolCreateDoneInfo struct {
 		Context   context.Context
 		SessionID string
 		Error     error
 	}
-	SessionPoolGetStartInfo struct {
+	PoolGetStartInfo struct {
 		Context context.Context
 	}
-	SessionPoolGetDoneInfo struct {
+	PoolGetDoneInfo struct {
 		Context       context.Context
 		SessionID     string
 		Latency       time.Duration
 		RetryAttempts int
 		Error         error
 	}
-	SessionPoolWaitStartInfo struct {
+	PoolWaitStartInfo struct {
 		Context context.Context
 	}
-	SessionPoolWaitDoneInfo struct {
+	PoolWaitDoneInfo struct {
 		Context   context.Context
 		SessionID string
 		Error     error
 	}
-	SessionPoolTakeStartInfo struct {
+	PoolTakeStartInfo struct {
 		Context   context.Context
 		SessionID string
 	}
-	SessionPoolTakeWaitInfo struct {
+	PoolTakeWaitInfo struct {
 		Context   context.Context
 		SessionID string
 	}
-	SessionPoolTakeDoneInfo struct {
+	PoolTakeDoneInfo struct {
 		Context   context.Context
 		SessionID string
 		Took      bool
 		Error     error
 	}
-	SessionPoolPutStartInfo struct {
+	PoolPutStartInfo struct {
 		Context   context.Context
 		SessionID string
 	}
-	SessionPoolPutDoneInfo struct {
-		Context   context.Context
-		SessionID string
-		Error     error
-	}
-	SessionPoolCloseSessionStartInfo struct {
-		Context   context.Context
-		SessionID string
-	}
-	SessionPoolCloseSessionDoneInfo struct {
+	PoolPutDoneInfo struct {
 		Context   context.Context
 		SessionID string
 		Error     error
 	}
-	SessionPoolCloseStartInfo struct {
+	PoolCloseSessionStartInfo struct {
+		Context   context.Context
+		SessionID string
+	}
+	PoolCloseSessionDoneInfo struct {
+		Context   context.Context
+		SessionID string
+		Error     error
+	}
+	PoolCloseStartInfo struct {
 		Context context.Context
 	}
-	SessionPoolCloseDoneInfo struct {
+	PoolCloseDoneInfo struct {
 		Context context.Context
 		Error   error
 	}
