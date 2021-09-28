@@ -13,15 +13,11 @@ import (
 )
 
 func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn, connConfig conn.Config) error {
-	onDone := func() {
-		_ = conn.Close()
-		trace.DriverOnConnDrop(d.config.Trace, conn.Addr(), conn.Runtime().GetState())
-	}
 	discoveryClient := discovery.New(conn, d.config.Database, d.useTLS())
 
 	curr, err := discoveryClient.Discover(ctx)
 	if err != nil {
-		onDone()
+		_ = conn.Close()
 		return err
 	}
 	// Endpoints must be sorted to merge
@@ -89,7 +85,9 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 				wg.Wait()
 				curr = next
 			},
-			onDone,
+			func() {
+				_ = conn.Close()
+			},
 		),
 	)
 	return nil

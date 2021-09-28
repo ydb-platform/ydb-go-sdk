@@ -306,8 +306,6 @@ func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option)
 		_ = entry.Conn.Close()
 	}
 	onDone(l, entry.Conn.Runtime().GetState())
-
-	trace.DriverOnConnDrop(c.trace, e.Addr, entry.Conn.Runtime().GetState())
 }
 
 func (c *cluster) Pessimize(addr endpoint.Addr) (err error) {

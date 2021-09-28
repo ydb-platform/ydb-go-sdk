@@ -23,14 +23,14 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
-	case t.OnConnDrop == nil:
-		ret.OnConnDrop = x.OnConnDrop
-	case x.OnConnDrop == nil:
-		ret.OnConnDrop = t.OnConnDrop
+	case t.OnConnClose == nil:
+		ret.OnConnClose = x.OnConnClose
+	case x.OnConnClose == nil:
+		ret.OnConnClose = t.OnConnClose
 	default:
-		h1 := t.OnConnDrop
-		h2 := x.OnConnDrop
-		ret.OnConnDrop = func(c ConnDropInfo) {
+		h1 := t.OnConnClose
+		h2 := x.OnConnClose
+		ret.OnConnClose = func(c ConnCloseInfo) {
 			h1(c)
 			h2(c)
 		}
@@ -343,8 +343,8 @@ func (t Driver) onConnNew(c1 ConnNewInfo) {
 	}
 	fn(c1)
 }
-func (t Driver) onConnDrop(c1 ConnDropInfo) {
-	fn := t.OnConnDrop
+func (t Driver) onConnClose(c1 ConnCloseInfo) {
+	fn := t.OnConnClose
 	if fn == nil {
 		return
 	}
@@ -548,11 +548,11 @@ func DriverOnConnNew(t Driver, e Endpoint, state ConnState) {
 	p.State = state
 	t.onConnNew(p)
 }
-func DriverOnConnDrop(t Driver, e Endpoint, state ConnState) {
-	var p ConnDropInfo
+func DriverOnConnClose(t Driver, e Endpoint, state ConnState) {
+	var p ConnCloseInfo
 	p.Endpoint = e
 	p.State = state
-	t.onConnDrop(p)
+	t.onConnClose(p)
 }
 func DriverOnConnDial(t Driver, c context.Context, e Endpoint, state ConnState) func(_ error, state ConnState) {
 	var p ConnDialStartInfo

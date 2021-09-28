@@ -143,6 +143,7 @@ func (c *conn) Close() (err error) {
 	if c.grpcConn != nil {
 		_ = c.close()
 	}
+	trace.DriverOnConnClose(c.config.Trace(context.Background()), c.addr, c.runtime.GetState())
 	return err
 }
 
