@@ -84,14 +84,14 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
-	case t.OnConnStateChenge == nil:
-		ret.OnConnStateChenge = x.OnConnStateChenge
-	case x.OnConnStateChenge == nil:
-		ret.OnConnStateChenge = t.OnConnStateChenge
+	case t.OnConnStateChange == nil:
+		ret.OnConnStateChange = x.OnConnStateChange
+	case x.OnConnStateChange == nil:
+		ret.OnConnStateChange = t.OnConnStateChange
 	default:
-		h1 := t.OnConnStateChenge
-		h2 := x.OnConnStateChenge
-		ret.OnConnStateChenge = func(c ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
+		h1 := t.OnConnStateChange
+		h2 := x.OnConnStateChange
+		ret.OnConnStateChange = func(c ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
 			r1 := h1(c)
 			r2 := h2(c)
 			switch {
@@ -380,8 +380,8 @@ func (t Driver) onConnDisconnect(c1 ConnDisconnectStartInfo) func(ConnDisconnect
 	}
 	return res
 }
-func (t Driver) onConnStateChenge(c1 ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
-	fn := t.OnConnStateChenge
+func (t Driver) onConnStateChange(c1 ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
+	fn := t.OnConnStateChange
 	if fn == nil {
 		return func(ConnStateChangeDoneInfo) {
 			return
@@ -579,11 +579,11 @@ func DriverOnConnDisconnect(t Driver, e Endpoint, state ConnState) func(_ error,
 		res(p)
 	}
 }
-func DriverOnConnStateChenge(t Driver, e Endpoint, state ConnState) func(state ConnState) {
+func DriverOnConnStateChange(t Driver, e Endpoint, state ConnState) func(state ConnState) {
 	var p ConnStateChangeStartInfo
 	p.Endpoint = e
 	p.State = state
-	res := t.onConnStateChenge(p)
+	res := t.onConnStateChange(p)
 	return func(state ConnState) {
 		var p ConnStateChangeDoneInfo
 		p.State = state

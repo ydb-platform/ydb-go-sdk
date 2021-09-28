@@ -17,7 +17,7 @@ type (
 		OnConnClose       func(ConnCloseInfo)
 		OnConnDial        func(ConnDialStartInfo) func(ConnDialDoneInfo)
 		OnConnDisconnect  func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
-		OnConnStateChenge func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
+		OnConnStateChange func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
 
 		// Cluster events
 		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)

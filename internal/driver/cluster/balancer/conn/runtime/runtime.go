@@ -80,7 +80,7 @@ func (r *runtime) Stats() stats.Stats {
 func (r *runtime) SetState(s state.State) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	trace.DriverOnConnStateChenge(r.trace, r.addr, r.state)(s)
+	trace.DriverOnConnStateChange(r.trace, r.addr, r.state)(s)
 	r.state = s
 	if s == state.Offline {
 		r.offlineCount++
