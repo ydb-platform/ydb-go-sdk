@@ -14,6 +14,7 @@ type (
 	Driver struct {
 		// Conn events
 		OnConnNew         func(ConnNewInfo)
+		OnConnDrop        func(ConnDropInfo)
 		OnConnDial        func(ConnDialStartInfo) func(ConnDialDoneInfo)
 		OnConnDisconnect  func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
 		OnConnStateChenge func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
@@ -119,6 +120,10 @@ type (
 		State ConnState
 	}
 	ConnNewInfo struct {
+		Endpoint Endpoint
+		State    ConnState
+	}
+	ConnDropInfo struct {
 		Endpoint Endpoint
 		State    ConnState
 	}

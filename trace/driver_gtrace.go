@@ -23,6 +23,19 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnConnDrop == nil:
+		ret.OnConnDrop = x.OnConnDrop
+	case x.OnConnDrop == nil:
+		ret.OnConnDrop = t.OnConnDrop
+	default:
+		h1 := t.OnConnDrop
+		h2 := x.OnConnDrop
+		ret.OnConnDrop = func(c ConnDropInfo) {
+			h1(c)
+			h2(c)
+		}
+	}
+	switch {
 	case t.OnConnDial == nil:
 		ret.OnConnDial = x.OnConnDial
 	case x.OnConnDial == nil:
@@ -330,6 +343,13 @@ func (t Driver) onConnNew(c1 ConnNewInfo) {
 	}
 	fn(c1)
 }
+func (t Driver) onConnDrop(c1 ConnDropInfo) {
+	fn := t.OnConnDrop
+	if fn == nil {
+		return
+	}
+	fn(c1)
+}
 func (t Driver) onConnDial(c1 ConnDialStartInfo) func(ConnDialDoneInfo) {
 	fn := t.OnConnDial
 	if fn == nil {
@@ -527,6 +547,12 @@ func DriverOnConnNew(t Driver, e Endpoint, state ConnState) {
 	p.Endpoint = e
 	p.State = state
 	t.onConnNew(p)
+}
+func DriverOnConnDrop(t Driver, e Endpoint, state ConnState) {
+	var p ConnDropInfo
+	p.Endpoint = e
+	p.State = state
+	t.onConnDrop(p)
 }
 func DriverOnConnDial(t Driver, c context.Context, e Endpoint, state ConnState) func(_ error, state ConnState) {
 	var p ConnDialStartInfo
