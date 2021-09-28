@@ -71,6 +71,30 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnConnStateChenge == nil:
+		ret.OnConnStateChenge = x.OnConnStateChenge
+	case x.OnConnStateChenge == nil:
+		ret.OnConnStateChenge = t.OnConnStateChenge
+	default:
+		h1 := t.OnConnStateChenge
+		h2 := x.OnConnStateChenge
+		ret.OnConnStateChenge = func(c ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnStateChangeDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnClusterGet == nil:
 		ret.OnClusterGet = x.OnClusterGet
 	case x.OnClusterGet == nil:
@@ -336,6 +360,21 @@ func (t Driver) onConnDisconnect(c1 ConnDisconnectStartInfo) func(ConnDisconnect
 	}
 	return res
 }
+func (t Driver) onConnStateChenge(c1 ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
+	fn := t.OnConnStateChenge
+	if fn == nil {
+		return func(ConnStateChangeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnStateChangeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
 	fn := t.OnClusterGet
 	if fn == nil {
@@ -507,6 +546,17 @@ func DriverOnConnDisconnect(t Driver, e Endpoint, state ConnState) func(_ error,
 	return func(e error, state ConnState) {
 		var p ConnDisconnectDoneInfo
 		p.Error = e
+		p.State = state
+		res(p)
+	}
+}
+func DriverOnConnStateChenge(t Driver, e Endpoint, state ConnState) func(state ConnState) {
+	var p ConnStateChangeStartInfo
+	p.Endpoint = e
+	p.State = state
+	res := t.onConnStateChenge(p)
+	return func(state ConnState) {
+		var p ConnStateChangeDoneInfo
 		p.State = state
 		res(p)
 	}

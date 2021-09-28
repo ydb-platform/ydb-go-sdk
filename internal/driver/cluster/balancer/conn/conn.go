@@ -292,7 +292,7 @@ func New(ctx context.Context, addr endpoint.Addr, dial func(context.Context, str
 		config:  cfg,
 		timer:   timeutil.NewTimer(time.Duration(math.MaxInt64)),
 		done:    make(chan struct{}),
-		runtime: runtime.New(),
+		runtime: runtime.New(cfg.Trace(ctx), addr),
 	}
 	go c.waitClose()
 	trace.DriverOnConnNew(cfg.Trace(ctx), addr)

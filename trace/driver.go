@@ -13,9 +13,10 @@ type (
 	//gtrace:set Shortcut
 	Driver struct {
 		// Conn events
-		OnConnNew        func(Endpoint Endpoint)
-		OnConnDial       func(ConnDialStartInfo) func(ConnDialDoneInfo)
-		OnConnDisconnect func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
+		OnConnNew         func(Endpoint Endpoint)
+		OnConnDial        func(ConnDialStartInfo) func(ConnDialDoneInfo)
+		OnConnDisconnect  func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
+		OnConnStateChenge func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
 
 		// Cluster events
 		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
@@ -108,6 +109,13 @@ type (
 	}
 	ConnDisconnectDoneInfo struct {
 		Error error
+		State ConnState
+	}
+	ConnStateChangeStartInfo struct {
+		Endpoint Endpoint
+		State    ConnState
+	}
+	ConnStateChangeDoneInfo struct {
 		State ConnState
 	}
 	ConnDialStartInfo struct {
