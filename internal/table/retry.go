@@ -2,13 +2,12 @@ package table
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -143,9 +142,8 @@ func retryBackoff(
 	op table.RetryOperation,
 ) (err error, issues []error) {
 	var (
-		s table.Session
-		i int
-
+		s      table.Session
+		i      int
 		code   = int32(0)
 		start  = time.Now()
 		onDone = trace.RetryOnRetry(trace.ContextRetry(ctx), ctx)
@@ -159,25 +157,16 @@ func retryBackoff(
 	for ; ; i++ {
 		select {
 		case <-ctx.Done():
-			issues = append(issues, fmt.Errorf("retryBackoff: deadline is done: %w", ctx.Err()))
+			issues = errors.Prepend(issues, fmt.Errorf("retryBackoff: deadline is done: %w", ctx.Err()), errors.DefaultMaxIssuesLen)
 			return ctx.Err(), issues
 
 		default:
 			if s == nil {
-				var e error
-				s, e = p.Get(ctx)
-				if s == nil && e == nil {
+				s, err = p.Get(ctx)
+				if s == nil && err == nil {
 					panic("only one of pair <session, error> must be not nil")
 				}
-				if e != nil {
-					issues = append(issues, fmt.Errorf("retryBackoff: get session error: %w", err))
-					if err == nil {
-						// It is initial attempt to get a session.
-						// Otherwise s could be nil only when status bad session
-						// received – that is, we must return bad session error to
-						// make it possible to lay on for the client.
-						err = e
-					}
+				if err != nil {
 					return
 				}
 			}
@@ -194,14 +183,13 @@ func retryBackoff(
 				s = nil
 			}
 			if m.MustRetry(isOperationIdempotent) {
-				issues = append(issues, fmt.Errorf("retryBackoff: retriable error: %w", err))
-			}
-			if !m.MustRetry(isOperationIdempotent) {
-				issues = append(issues, fmt.Errorf("retryBackoff: non-retriable error: %w", err))
+				issues = errors.Prepend(issues, fmt.Errorf("retryBackoff: retriable error: %w", err), errors.DefaultMaxIssuesLen)
+			} else {
+				issues = errors.Prepend(issues, fmt.Errorf("retryBackoff: non-retriable error: %w", err), errors.DefaultMaxIssuesLen)
 				return
 			}
-			if e := retry.Wait(ctx, fastBackoff, slowBackoff, m, i); e != nil {
-				issues = append(issues, fmt.Errorf("retryBackoff: wait failed: %w", e))
+			if err = retry.Wait(ctx, fastBackoff, slowBackoff, m, i); err != nil {
+				issues = errors.Prepend(issues, fmt.Errorf("retryBackoff: wait failed: %w", err), errors.DefaultMaxIssuesLen)
 				return
 			}
 			code = m.StatusCode()

@@ -48,4 +48,3 @@ func ydbConvI16ToU32(x int16) uint32 {
 	}
 	return uint32(x)
 }
-

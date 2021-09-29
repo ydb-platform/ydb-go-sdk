@@ -48,20 +48,6 @@ func TestTransportErrorWrapsContextError(t *testing.T) {
 	}
 }
 
-func TestIsOpError(t *testing.T) {
-	code := StatusBadRequest
-	for _, err := range []error{
-		&OpError{Reason: code},
-		fmt.Errorf("wrapped: %w", &OpError{Reason: code}),
-	} {
-		t.Run("", func(t *testing.T) {
-			if !IsOpError(err, code) {
-				t.Errorf("expected %v to be OpError with code=%v", err, code)
-			}
-		})
-	}
-}
-
 func TestIsNotOpError(t *testing.T) {
 	code := StatusBadRequest
 	for _, err := range []error{

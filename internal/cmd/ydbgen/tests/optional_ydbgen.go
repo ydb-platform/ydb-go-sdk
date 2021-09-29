@@ -120,4 +120,3 @@ func ydbConvI64ToI16(x int64) int16 {
 	}
 	return int16(x)
 }
-

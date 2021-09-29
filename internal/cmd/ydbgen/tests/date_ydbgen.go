@@ -28,7 +28,7 @@ func (t *Times) QueryParameters() *table.QueryParameters {
 	var v0 types.Value
 	{
 		var v1 types.Value
-		var x0 =t.Date
+		var x0 = t.Date
 		ok0 := !t.Date.IsZero()
 		if ok0 {
 			v1 = types.OptionalValue(types.DateValueFromTime(x0))
@@ -48,7 +48,7 @@ func (t *Times) StructValue() types.Value {
 		var v1 types.Value
 		{
 			var v2 types.Value
-			var x0 =t.Date
+			var x0 = t.Date
 			ok0 := !t.Date.IsZero()
 			if ok0 {
 				v2 = types.OptionalValue(types.DateValueFromTime(x0))
@@ -78,4 +78,3 @@ func (t *Times) StructType() types.Type {
 	}
 	return t0
 }
-

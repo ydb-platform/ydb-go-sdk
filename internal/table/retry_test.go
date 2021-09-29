@@ -14,9 +14,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -34,7 +31,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
-			pool := SingleSession(
+			p := SingleSession(
 				simpleSession(t),
 				testutil.BackoffFunc(func(n int) <-chan time.Time {
 					ch := make(chan time.Time)
@@ -44,23 +41,27 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			)
 
 			ctx, cancel := context.WithCancel(context.Background())
-			result := make(chan error)
+			type result struct {
+				err    error
+				issues []error
+			}
+			results := make(chan result)
 			go func() {
-				err, _ := pool.Retry(ctx, false, func(ctx context.Context, _ table.Session) error {
+				err, issues := p.Retry(ctx, false, func(ctx context.Context, _ table.Session) error {
 					return testErr
 				})
-				result <- err
+				results <- result{err, issues}
 			}()
 
 			select {
 			case <-backoff:
-			case err := <-result:
-				t.Fatalf("unexpected result: %v", err)
+			case res := <-results:
+				t.Fatalf("unexpected result: %v", res)
 			}
 
 			cancel()
-			if err := <-result; !errors.Is(err, testErr) {
-				t.Errorf("unexpected error: %v", err)
+			if res := <-results; !errors.Contains(res.issues, testErr) {
+				t.Errorf("unexpected result: %v", res)
 			}
 		})
 	}
@@ -116,7 +117,7 @@ func TestRetryerImmediateRetry(t *testing.T) {
 					return testErr
 				},
 			)
-			if !errors.Is(issues[0], testErr) {
+			if !errors.Contains(issues, testErr) {
 				t.Fatalf("unexpected error: %v; want: %v", err, testErr)
 			}
 		})
@@ -124,26 +125,34 @@ func TestRetryerImmediateRetry(t *testing.T) {
 }
 
 func TestRetryerBadSession(t *testing.T) {
-	pool := SessionProviderFunc{
+	p := SessionProviderFunc{
 		OnGet: func(ctx context.Context) (table.Session, error) {
 			return simpleSession(t), nil
 		},
-		OnPut:   nil,
-		OnRetry: nil,
 	}
 
-	var sessions []table.Session
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	err, _ := pool.Retry(
+	var (
+		maxRetryes = 100
+		i          int
+		sessions   []table.Session
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	err, issues := p.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
+			i++
+			if i > maxRetryes {
+				cancel()
+			}
 			return errors.NewOpError(errors.WithOEReason(errors.StatusBadSession))
 		},
 	)
-	if !errors.IsOpError(err, errors.StatusBadSession) {
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !errors.ContainsOpError(issues, errors.StatusBadSession) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	seen := make(map[table.Session]bool, len(sessions))
@@ -155,68 +164,6 @@ func TestRetryerBadSession(t *testing.T) {
 		}
 		if !s.IsClosed() {
 			t.Errorf("bad session was not closed")
-		}
-	}
-}
-
-func TestRetryerBadSessionReuse(t *testing.T) {
-	client := &client{
-		cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-				return &Ydb_Table.CreateSessionResult{}, nil
-			}})),
-	}
-	var (
-		sessions = make([]table.Session, 10)
-		bad      = make(map[table.Session]bool)
-		reused   = make(map[table.Session]bool)
-	)
-	for i := range sessions {
-		s, err := client.CreateSession(context.Background())
-		if err != nil {
-			t.Fatal(err)
-		}
-		sessions[i] = s
-		bad[s] = i < len(sessions)-1 // All bad but last.
-	}
-	var (
-		i    int
-		pool SessionProvider
-	)
-	backoff := testutil.BackoffFunc(func(n int) <-chan time.Time {
-		ch := make(chan time.Time, 1)
-		ch <- time.Now()
-		return ch
-	})
-	pool = SessionProviderFunc{
-		OnGet: func(_ context.Context) (table.Session, error) {
-			defer func() { i++ }()
-			return sessions[i], nil
-		},
-		OnPut: func(_ context.Context, s table.Session) error {
-			reused[s] = true
-			return nil
-		},
-		OnRetry: func(ctx context.Context, operation table.RetryOperation) (error, []error) {
-			return retryBackoff(ctx, pool, backoff, backoff, false, operation)
-		},
-	}
-	_, _ = pool.Retry(
-		context.Background(),
-		false,
-		func(ctx context.Context, s table.Session) error {
-			if bad[s] {
-				return errors.NewOpError(errors.WithOEReason(errors.StatusBadSession))
-			}
-			return nil
-		},
-	)
-	for _, s := range sessions {
-		if bad[s] && reused[s] {
-			t.Errorf("reused bad session")
-		}
-		if !bad[s] && !reused[s] {
-			t.Errorf("missed good session")
 		}
 	}
 }

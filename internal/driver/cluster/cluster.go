@@ -123,8 +123,6 @@ func (c *cluster) Close() (err error) {
 	index := c.index
 	c.index = nil
 
-	//c.trackerCancel()
-	//
 	c.mu.Unlock()
 
 	if wait != nil {
@@ -137,8 +135,6 @@ func (c *cluster) Close() (err error) {
 		}
 		_ = conn.Close()
 	}
-
-	//<-c.trackerDone
 
 	return
 }

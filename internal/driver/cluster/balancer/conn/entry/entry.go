@@ -10,7 +10,6 @@ import (
 type Entry struct {
 	Conn   conn.Conn
 	Handle balancer.Element
-	//TrackerQueueEl *list.Element
 
 	Info info.Info
 }

@@ -54,7 +54,7 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 		attempts++
 		select {
 		case <-ctx.Done():
-			issues = append(issues, fmt.Errorf("retry.Retry: deadline is done: %w", ctx.Err()))
+			issues = errors.Prepend(issues, fmt.Errorf("retry.Retry: deadline is done: %w", ctx.Err()), errors.DefaultMaxIssuesLen)
 			return ctx.Err(), issues
 
 		default:
@@ -67,14 +67,13 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 				i = 0
 			}
 			if m.MustRetry(isIdempotentOperation) {
-				issues = append(issues, fmt.Errorf("retry.Retry: retriable error: %w", err))
-			}
-			if !m.MustRetry(isIdempotentOperation) {
-				issues = append(issues, fmt.Errorf("retry.Retry: non-retriable error: %w", err))
+				issues = errors.Prepend(issues, fmt.Errorf("retry.Retry: retriable error: %w", err), errors.DefaultMaxIssuesLen)
+			} else {
+				issues = errors.Prepend(issues, fmt.Errorf("retry.Retry: non-retriable error: %w", err), errors.DefaultMaxIssuesLen)
 				return
 			}
 			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
-				issues = append(issues, fmt.Errorf("retry.Retry: wait failed: %w", err))
+				issues = errors.Prepend(issues, fmt.Errorf("retry.Retry: wait failed: %w", err), errors.DefaultMaxIssuesLen)
 				return
 			}
 			code = m.StatusCode()
