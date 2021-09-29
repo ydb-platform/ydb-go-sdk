@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -49,7 +47,7 @@ func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Sessi
 	createSessionDone := trace.TableOnCreateSession(t, ctx)
 	start := time.Now()
 	defer func() {
-		if !assert.IsNil(s) {
+		if s != nil {
 			createSessionDone(ctx, s.ID(), s.Address(), time.Since(start), err)
 		} else {
 			createSessionDone(ctx, "", "", time.Since(start), err)
@@ -86,10 +84,6 @@ func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Sessi
 		trace:        t,
 	}
 	return
-}
-
-func (s *session) IsNil() bool {
-	return s == nil
 }
 
 func (s *session) ID() string {
@@ -384,7 +378,7 @@ func (s *Statement) Execute(
 ) {
 	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.session.trace, ctx, s.session.id, transactionControlID(tx.Desc()), s.query, params)
 	defer func() {
-		if !assert.IsNil(txr) {
+		if txr != nil {
 			executeDataQueryDone(ctx, s.session.id, txr.ID(), s.query, params, true, r, err)
 		} else {
 			executeDataQueryDone(ctx, s.session.id, "", s.query, params, true, r, err)
@@ -470,7 +464,7 @@ func (s *session) Execute(
 
 	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.trace, ctx, s.id, transactionControlID(tx.Desc()), q, params)
 	defer func() {
-		if !assert.IsNil(txr) {
+		if txr != nil {
 			executeDataQueryDone(ctx, s.id, txr.ID(), q, params, true, r, err)
 		} else {
 			executeDataQueryDone(ctx, s.id, "", q, params, true, r, err)
@@ -806,7 +800,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
 	beginTransactionDone := trace.TableOnBeginTransaction(s.trace, ctx, s.id)
 	defer func() {
-		if !assert.IsNil(s) {
+		if s != nil {
 			beginTransactionDone(ctx, s.id, x.ID(), err)
 		} else {
 			beginTransactionDone(ctx, s.id, "", err)

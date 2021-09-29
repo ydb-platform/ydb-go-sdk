@@ -2,6 +2,7 @@ package scheme
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
@@ -83,10 +84,6 @@ type client struct {
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
-func (c *client) IsNil() bool {
-	return c == nil
-}
-
 func (c *client) Close(_ context.Context) error {
 	return nil
 }
@@ -120,14 +117,16 @@ func (c *client) ListDirectory(ctx context.Context, path string) (d Directory, e
 	response, err = c.service.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
 	})
+	fmt.Printf("%T %+v\n", err, err)
 	if err != nil {
 		return d, err
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	fmt.Printf("%T %+v\n", err, err)
 	if err != nil {
 		return d, err
 	}
-	d.Entry.from(result.Self)
+	d.from(result.Self)
 	d.Children = make([]Entry, len(result.Children))
 	putEntry(d.Children, result.Children)
 	return d, nil

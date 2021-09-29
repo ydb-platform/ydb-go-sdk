@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 )
@@ -105,10 +104,6 @@ type multiHandle struct {
 	elements []Element
 }
 
-func (h *multiHandle) IsNil() bool {
-	return h == nil
-}
-
 type multiBalancer struct {
 	balancer []Balancer
 	filter   []func(conn.Conn, info.Info) bool
@@ -133,7 +128,7 @@ func NewMultiBalancer(opts ...balancerOption) *multiBalancer {
 
 func (m *multiBalancer) Contains(x Element) bool {
 	for i, x := range x.(multiHandle).elements {
-		if assert.IsNil(x) {
+		if x == nil {
 			continue
 		}
 		if m.balancer[i].Contains(x) {
@@ -183,14 +178,14 @@ func (m *multiBalancer) Remove(x Element) {
 }
 
 func (m *multiBalancer) Pessimize(x Element) error {
-	if assert.IsNil(x) {
+	if x == nil {
 		return ErrNilBalancerElement
 	}
 	good := 0
 	all := 0
 	errs := make([]string, 0)
 	for i, x := range x.(multiHandle).elements {
-		if assert.IsNil(x) {
+		if x == nil {
 			continue
 		}
 		all++
@@ -229,7 +224,7 @@ func (s *singleConnBalancer) Remove(x Element) {
 func (s *singleConnBalancer) Update(Element, info.Info)  {}
 func (s *singleConnBalancer) Pessimize(el Element) error { return nil }
 func (s *singleConnBalancer) Contains(x Element) bool {
-	if assert.IsNil(x) {
+	if x == nil {
 		return false
 	}
 	return s.conn != x.(conn.Conn)

@@ -1,4 +1,4 @@
-package assert
+package cmp
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ func NoError(t *testing.T, err error) {
 }
 
 func NotNil(t *testing.T, value interface{}) {
-	if value == nil || IsNil(value) {
+	if value == nil {
 		t.Fatal("value is nil")
 	}
 }

@@ -26,10 +26,6 @@ func (s *grpcClientStream) Header() (metadata.MD, error) {
 	return s.s.Header()
 }
 
-func (s *grpcClientStream) IsNil() bool {
-	return s == nil
-}
-
 func (s *grpcClientStream) Trailer() metadata.MD {
 	return s.s.Trailer()
 }

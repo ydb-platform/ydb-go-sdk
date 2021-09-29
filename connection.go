@@ -65,8 +65,9 @@ func (db *db) Secure() bool {
 	return db.cluster.Secure()
 }
 
-func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-	return db.cluster.Invoke(ctx, method, args, reply, opts...)
+func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) (err error) {
+	err = db.cluster.Invoke(ctx, method, args, reply, opts...)
+	return err
 }
 
 func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {

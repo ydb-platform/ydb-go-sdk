@@ -32,10 +32,6 @@ type Conn interface {
 	Close() error
 }
 
-func (c *conn) IsNil() bool {
-	return c == nil
-}
-
 func (c *conn) Address() string {
 	return c.Addr().String()
 }
@@ -229,14 +225,16 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		}
 		switch {
 		case !opResponse.GetOperation().GetReady():
-			err = errors.ErrOperationNotReady
+			return errors.ErrOperationNotReady
 
 		case opResponse.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-			err = errors.NewOpError(errors.WithOEOperation(opResponse.GetOperation()))
+			e := errors.NewOpError(errors.WithOEOperation(opResponse.GetOperation()))
+			fmt.Printf("%T %+v\n", e, e)
+			return e
 		}
 	}
 
-	return
+	return nil
 }
 
 func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {

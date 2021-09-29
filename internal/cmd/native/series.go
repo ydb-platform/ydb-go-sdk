@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"path"
 	"text/template"
@@ -84,6 +85,7 @@ func readTable(ctx context.Context, c table.Client, path string) error {
 		},
 	)
 	if err != nil {
+		fmt.Printf("%T %+v", err, err)
 		return err
 	}
 	var (
@@ -210,6 +212,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 		},
 	)
 	if err != nil {
+		fmt.Printf("%T %+v", err, err)
 		return err
 	}
 
@@ -269,6 +272,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 		},
 	)
 	if err != nil {
+		fmt.Printf("%T %+v", err, err)
 		return err
 	}
 	var (

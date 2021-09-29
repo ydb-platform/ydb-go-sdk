@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -12,19 +13,23 @@ import (
 	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 )
 
-func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
+func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) error {
 	c, err := d.getConn(ctx)
 	if err != nil {
-		return
+		return err
 	}
 
-	return c.Invoke(
+	e := c.Invoke(
 		ctx,
 		method,
 		request,
 		response,
 		opts...,
 	)
+
+	fmt.Printf("%T %+v", e, e)
+
+	return e
 }
 
 func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
@@ -69,5 +74,6 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	if apply, ok := cluster.ContextClientConnApplier(rawCtx); ok {
 		apply(c)
 	}
+
 	return c, err
 }

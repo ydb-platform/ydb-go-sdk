@@ -11,7 +11,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
@@ -112,7 +111,7 @@ func (c *cluster) Close() (err error) {
 		c.mu.Unlock()
 		return
 	}
-	if !assert.IsNil(c.explorer) {
+	if c.explorer != nil {
 		c.explorer.Stop()
 	}
 	c.closed = true
@@ -130,7 +129,7 @@ func (c *cluster) Close() (err error) {
 	}
 	for _, entry := range index {
 		conn := entry.Conn
-		if assert.IsNil(conn) {
+		if conn == nil {
 			continue
 		}
 		_ = conn.Close()
@@ -150,7 +149,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	}
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	conn = c.balancer.Next()
-	if assert.IsNil(conn) {
+	if conn == nil {
 		onDone(nil, ErrClusterEmpty)
 		return nil, ErrClusterEmpty
 	}
@@ -183,7 +182,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	for _, o := range opts {
 		o(&opt)
 	}
-	if !assert.IsNil(opt.wg) {
+	if opt.wg != nil {
 		defer opt.wg.Done()
 	}
 
@@ -231,7 +230,7 @@ func (c *cluster) Update(_ context.Context, e endpoint.Endpoint, opts ...option)
 	for _, o := range opts {
 		o(&opt)
 	}
-	if !assert.IsNil(opt.wg) {
+	if opt.wg != nil {
 		defer opt.wg.Done()
 	}
 
@@ -250,7 +249,7 @@ func (c *cluster) Update(_ context.Context, e endpoint.Endpoint, opts ...option)
 	if !has {
 		panic("ydb: can't update not-existing endpoint")
 	}
-	if assert.IsNil(entry.Conn) {
+	if entry.Conn == nil {
 		panic("ydb: cluster entry with nil conn")
 	}
 
@@ -261,7 +260,7 @@ func (c *cluster) Update(_ context.Context, e endpoint.Endpoint, opts ...option)
 	entry.Info = info
 	entry.Conn.Runtime().SetState(state.Online)
 	c.index[e.Addr] = entry
-	if !assert.IsNil(entry.Handle) {
+	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, info)
 	}
@@ -273,7 +272,7 @@ func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option)
 	for _, o := range opts {
 		o(&opt)
 	}
-	if !assert.IsNil(opt.wg) {
+	if opt.wg != nil {
 		defer opt.wg.Done()
 	}
 
@@ -296,7 +295,7 @@ func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option)
 	delete(c.index, e.Addr)
 	c.mu.Unlock()
 
-	if !assert.IsNil(entry.Conn) {
+	if entry.Conn != nil {
 		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
 		_ = entry.Conn.Close()
 	}
@@ -314,18 +313,18 @@ func (c *cluster) Pessimize(addr endpoint.Addr) (err error) {
 	if !has {
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
-	if assert.IsNil(entry.Handle) {
+	if entry.Handle == nil {
 		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrNilBalancerElement)
 	}
 	if !c.balancer.Contains(entry.Handle) {
 		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrUnknownBalancerElement)
 	}
 	err = c.balancer.Pessimize(entry.Handle)
-	if err == nil && !assert.IsNil(c.explorer) {
+	if err == nil && c.explorer != nil {
 		// count ratio (banned/all)
 		online := 0
 		for _, e := range c.index {
-			if !assert.IsNil(e.Conn) && e.Conn.Runtime().GetState() == state.Online {
+			if e.Conn != nil && e.Conn.Runtime().GetState() == state.Online {
 				online++
 			}
 		}
@@ -344,7 +343,7 @@ func (c *cluster) Stats(it func(endpoint.Endpoint, stats.Stats)) {
 		return
 	}
 	for _, entry := range c.index {
-		if !assert.IsNil(entry.Conn) {
+		if entry.Conn != nil {
 			it(
 				endpoint.Endpoint{
 					Addr: endpoint.Addr{

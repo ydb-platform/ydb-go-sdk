@@ -47,7 +47,7 @@ func WithOEOperation(operation operation) oeOpt {
 
 type oeOpt func(ops *OpError)
 
-func NewOpError(opts ...oeOpt) *OpError {
+func NewOpError(opts ...oeOpt) error {
 	oe := &OpError{
 		Reason: StatusUnknownStatus,
 	}
