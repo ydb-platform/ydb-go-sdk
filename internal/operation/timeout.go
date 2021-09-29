@@ -1,8 +1,9 @@
 package operation
 
 import (
-	"google.golang.org/protobuf/types/known/durationpb"
 	"time"
+
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func timeoutParam(d time.Duration) *durationpb.Duration {

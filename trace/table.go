@@ -7,8 +7,8 @@ import (
 
 //go:generate gtrace
 
-// Table contains options for tracing table client activity.
 type (
+	// Table contains options for tracing table client activity.
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Table struct {

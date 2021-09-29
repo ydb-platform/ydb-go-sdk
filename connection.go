@@ -121,12 +121,12 @@ func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connectio
 			db.options.tlsConfig = &tls.Config{}
 		}
 		if caFile, hasUserCA := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); hasUserCA || db.options.tlsConfig.RootCAs == nil {
-			certPool, err := x509.SystemCertPool()
-			if err != nil {
-				return nil, err
+			certPool, e := x509.SystemCertPool()
+			if e != nil {
+				return nil, e
 			}
 			if hasUserCA {
-				if err := credentials.AppendCertsFromFile(certPool, caFile); err != nil {
+				if err = credentials.AppendCertsFromFile(certPool, caFile); err != nil {
 					return nil, fmt.Errorf("cannot load certificates from file '%s' by Env['YDB_SSL_ROOT_CERTIFICATES_FILE']: %v", caFile, err)
 				}
 			}

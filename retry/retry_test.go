@@ -3,15 +3,16 @@ package retry
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc"
 	"math/rand"
 	"testing"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
-func TestlogBackoff(t *testing.T) {
+func TestLogBackoff(t *testing.T) {
 	type exp struct {
 		eq  time.Duration
 		gte time.Duration
@@ -142,7 +143,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err:           context.Canceled, // golang context cancelled
+			err:           context.Canceled, // golang context canceled
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{

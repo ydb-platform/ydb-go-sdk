@@ -2,8 +2,9 @@ package meta
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 

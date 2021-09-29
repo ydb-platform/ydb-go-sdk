@@ -3,10 +3,11 @@ package ydb
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
@@ -102,10 +103,10 @@ func (s *lazyScheme) CleanupDatabase(ctx context.Context, prefix string, names .
 			pt := path.Join(p, child.Name)
 			switch child.Type {
 			case scheme.EntryDirectory:
-				if err := list(i+1, pt); err != nil {
+				if err = list(i+1, pt); err != nil {
 					return err
 				}
-				if err := s.RemoveDirectory(ctx, pt); err != nil {
+				if err = s.RemoveDirectory(ctx, pt); err != nil {
 					return err
 				}
 

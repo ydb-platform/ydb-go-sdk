@@ -2,13 +2,15 @@ package driver
 
 import (
 	"context"
-	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"sync"
+
+	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"google.golang.org/grpc"
 )
 
 func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {

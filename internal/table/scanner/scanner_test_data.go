@@ -2,9 +2,10 @@ package scanner
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"strconv"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 

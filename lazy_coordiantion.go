@@ -2,11 +2,12 @@ package ydb
 
 import (
 	"context"
+	"sync"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
-	"sync"
 )
 
 type lazyCoordination struct {

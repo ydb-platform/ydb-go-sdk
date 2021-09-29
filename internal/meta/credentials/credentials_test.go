@@ -2,8 +2,9 @@ package credentials
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 )
 
 func TestCredentialsString(t *testing.T) {

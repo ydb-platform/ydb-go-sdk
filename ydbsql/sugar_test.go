@@ -1,9 +1,10 @@
 package ydbsql
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"strings"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestDeclaration(t *testing.T) {

@@ -3,8 +3,9 @@ package ydb
 import (
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 )
 
 func TestParseConnectionString(t *testing.T) {

@@ -34,7 +34,7 @@ type retryOperation func(context.Context) (err error)
 
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
-// - deadline was cancelled or deadlined
+// - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (err error, issues []error) {
@@ -79,7 +79,6 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 			code = m.StatusCode()
 		}
 	}
-	return
 }
 
 // Check returns retry mode for err.

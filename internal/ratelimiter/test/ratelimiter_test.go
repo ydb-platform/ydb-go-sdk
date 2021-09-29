@@ -76,6 +76,9 @@ func TestRateLimiter(t *testing.T) {
 	coordinationClient := coordination.New(db)
 
 	err = coordinationClient.DropNode(ctx, testCoordinationNodePath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = coordinationClient.CreateNode(ctx, testCoordinationNodePath, cfg.Config{
 		Path:                     "",
 		SelfCheckPeriodMillis:    1000,

@@ -11,9 +11,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
@@ -45,7 +46,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 	return testutil.NewDB(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 					sid := fmt.Sprintf("ydb://test-session/%d", atomic.AddInt32(&sessionID, 1))
 					b.log("[%q] create session", sid)
 
@@ -138,7 +139,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 						TxMeta: &Ydb_Table.TransactionMeta{
 							Id: tid,
 						},
-					}, err
+					}, nil
 				},
 			},
 		),
@@ -159,17 +160,17 @@ func TestTxDoerStmt(t *testing.T) {
 		},
 		Logf: t.Logf,
 	}
-	cluster := b.Build()
+	cl := b.Build()
 
-	connector, err := Connector(
-		withClient(table.NewClientAsPool(cluster, table.DefaultConfig())),
+	con, err := Connector(
+		withClient(table.NewClientAsPool(cl, table.DefaultConfig())),
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	db := sql.OpenDB(connector)
-	if err := db.Ping(); err != nil {
+	db := sql.OpenDB(con)
+	if err = db.Ping(); err != nil {
 		t.Fatal(err)
 	}
 

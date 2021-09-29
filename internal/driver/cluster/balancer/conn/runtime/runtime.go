@@ -1,9 +1,10 @@
 package runtime
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/series"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"

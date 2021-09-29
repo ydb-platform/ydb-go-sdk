@@ -3,9 +3,10 @@ package errors
 import (
 	"bytes"
 	"errors"
-	"google.golang.org/grpc/status"
 	"strconv"
 	"strings"
+
+	"google.golang.org/grpc/status"
 
 	grpc "google.golang.org/grpc/codes"
 

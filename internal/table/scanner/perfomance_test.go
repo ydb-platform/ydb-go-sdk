@@ -106,7 +106,7 @@ func BenchmarkTestTempValue(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for i := 0; i < testSize; i++ {
 			col := slice[i]
-			col.name = "test"
+			col.name = "test1"
 			col.typeID = 1
 		}
 	}
@@ -120,7 +120,7 @@ func BenchmarkTestDoubleIndex(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for i := 0; i < testSize; i++ {
-			slice[i].name = "test"
+			slice[i].name = "test2"
 			slice[i].typeID = 1
 		}
 	}

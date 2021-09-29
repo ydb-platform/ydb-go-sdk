@@ -1,15 +1,15 @@
 package options
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"testing"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (

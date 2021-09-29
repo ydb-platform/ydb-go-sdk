@@ -3,11 +3,12 @@ package assert
 import (
 	"bytes"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"math/big"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
 // Compare compares its operands.

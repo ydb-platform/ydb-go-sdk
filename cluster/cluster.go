@@ -1,9 +1,10 @@
 package cluster
 
 import (
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
-	"google.golang.org/grpc"
 )
 
 type ClientConnInterface interface {

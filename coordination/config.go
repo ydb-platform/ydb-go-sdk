@@ -8,18 +8,25 @@ const (
 	ConsistencyModeUnset ConsistencyMode = iota
 	ConsistencyModeStrict
 	ConsistencyModeRelaxed
+
+	consistencyAggregated = "Aggregated"
+	consistencyDetailed   = "Detailed"
+	consistencyRelaxed    = "Relaxed"
+	consistencyStrict     = "Strict"
+	consistencyUnknown    = "Unknown"
+	consistencyUnset      = "Unset"
 )
 
 func (t ConsistencyMode) String() string {
 	switch t {
 	default:
-		return "Unknown"
+		return consistencyUnknown
 	case ConsistencyModeUnset:
-		return "Unset"
+		return consistencyUnset
 	case ConsistencyModeStrict:
-		return "Strict"
+		return consistencyStrict
 	case ConsistencyModeRelaxed:
-		return "Relaxed"
+		return consistencyRelaxed
 	}
 }
 
@@ -34,13 +41,13 @@ const (
 func (t RateLimiterCountersMode) String() string {
 	switch t {
 	default:
-		return "Unknown"
+		return consistencyUnknown
 	case RateLimiterCountersModeUnset:
-		return "Unset"
+		return consistencyUnset
 	case RateLimiterCountersModeAggregated:
-		return "Aggregated"
+		return consistencyAggregated
 	case RateLimiterCountersModeDetailed:
-		return "Detailed"
+		return consistencyDetailed
 	}
 }
 

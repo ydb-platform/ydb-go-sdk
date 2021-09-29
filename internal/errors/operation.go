@@ -3,6 +3,7 @@ package errors
 import (
 	"bytes"
 	"errors"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )

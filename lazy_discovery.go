@@ -2,11 +2,12 @@ package ydb
 
 import (
 	"context"
+	"sync"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"sync"
 )
 
 type lazyDiscovery struct {

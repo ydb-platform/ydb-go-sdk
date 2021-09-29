@@ -2,13 +2,14 @@ package scanner
 
 import (
 	"bytes"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 

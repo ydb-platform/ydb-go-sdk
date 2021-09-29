@@ -3,9 +3,10 @@ package resultset
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"reflect"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -23,7 +24,11 @@ func TestResultAny(t *testing.T) {
 	}{
 		{
 			columns: []options.Column{
-				{"column0", types.Optional(types.TypeUint32), "family0"},
+				{
+					Name:   "column0",
+					Type:   types.Optional(types.TypeUint32),
+					Family: "family0",
+				},
 			},
 			values: []types.Value{
 				types.OptionalValue(types.Uint32Value(43)),
@@ -75,8 +80,16 @@ func TestResultOUint32(t *testing.T) {
 	}{
 		{
 			columns: []options.Column{
-				{"column0", types.Optional(types.TypeUint32), "family0"},
-				{"column1", types.TypeUint32, "family0"},
+				{
+					Name:   "column0",
+					Type:   types.Optional(types.TypeUint32),
+					Family: "family0",
+				},
+				{
+					Name:   "column1",
+					Type:   types.TypeUint32,
+					Family: "family0",
+				},
 			},
 			values: []types.Value{
 				types.OptionalValue(types.Uint32Value(43)),

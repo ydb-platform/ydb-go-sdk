@@ -16,10 +16,6 @@ func camelToSnake(s string) string {
 		b.Write(buf[:n])
 	}
 
-	type char struct {
-		value rune
-		upper bool
-	}
 	var (
 		prev   [2]rune
 		lodash bool

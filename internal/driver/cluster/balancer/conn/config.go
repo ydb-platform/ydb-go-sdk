@@ -2,10 +2,12 @@ package conn
 
 import (
 	"context"
+	"time"
+
+	"google.golang.org/grpc/keepalive"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"google.golang.org/grpc/keepalive"
-	"time"
 )
 
 type Config interface {

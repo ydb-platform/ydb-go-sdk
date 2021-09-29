@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"container/list"
-	"fmt"
 	"go/types"
 	"log"
 	"sort"
@@ -250,23 +249,6 @@ func (g *Generator) generateStructScan(bw *bufio.Writer, s *Struct) {
 	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
 	line(bw, `Scan(`, res, ` resultset.Result) (`, err, ` error) {`)
 	g.writeStructFieldsScan(bw, 1, res, rcvr, s)
-	line(bw, tab(1), `return `, res, `.Err()`)
-	line(bw, `}`)
-	line(bw)
-}
-
-func (g *Generator) generateStructContainerScan(bw *bufio.Writer, s *Struct) {
-	g.enterScope()
-	defer g.leaveScope()
-
-	var (
-		rcvr = g.declareShort(structReceiver(s))
-		res  = g.declareShort("res")
-		err  = g.declareShort("err")
-	)
-	code(bw, `func (`, rcvr, ` *`, s.Name+`) `)
-	line(bw, `ScanContainer(`, res, ` resultset.Result) (`, err, ` error) {`)
-	g.writeStructContainerScan(bw, 1, res, rcvr, s)
 	line(bw, tab(1), `return `, res, `.Err()`)
 	line(bw, `}`)
 	line(bw)
@@ -634,7 +616,7 @@ func (g *Generator) assignBasicType(bw *bufio.Writer, depth int, t *Basic) strin
 	return tp
 }
 
-func (g *Generator) writeStructFieldsScan(bw *bufio.Writer, depth int, res, rcvr string, s *Struct) {
+func (g *Generator) writeStructFieldsScan(bw *bufio.Writer, depth int, _, rcvr string, s *Struct) {
 	code(bw, tab(depth), `_ = res.ScanWithDefaults(`)
 	for i, f := range s.Fields {
 		code(bw, `&`, rcvr, `.`, f.Name)
@@ -643,10 +625,6 @@ func (g *Generator) writeStructFieldsScan(bw *bufio.Writer, depth int, res, rcvr
 		}
 	}
 	line(bw, `)`)
-}
-
-func fieldSetterFunc(s *Struct, column string) string {
-	return fmt.Sprintf("ydbgenSet%s%s", s.Name, column)
 }
 
 func (g *Generator) writeStructContainerScan(bw *bufio.Writer, depth int, res, rcvr string, s *Struct) {
@@ -918,7 +896,7 @@ func abs(bw *bufio.Writer, depth int, in, out string) {
 	line(bw, tab(depth), `}`)
 }
 
-func format(bw *bufio.Writer, info types.BasicInfo, depth int, in string) {
+func format(bw *bufio.Writer, info types.BasicInfo, _ int, in string) {
 	var (
 		t string
 		w string
@@ -946,21 +924,22 @@ func code(bw *bufio.Writer, args ...string) {
 }
 
 func ydbTypeSuffix(t value.PrimitiveType) string {
+	valueFrom := "ValueFromTime"
 	switch t {
 	case value.TypeDate:
-		return "ValueFromTime"
+		return valueFrom
 	case value.TypeDatetime:
-		return "ValueFromTime"
+		return valueFrom
 	case value.TypeTimestamp:
-		return "ValueFromTime"
+		return valueFrom
 	case value.TypeTzDate:
-		return "ValueFromTime"
+		return valueFrom
 	case value.TypeTzDatetime:
-		return "ValueFromTime"
+		return valueFrom
 	case value.TypeTzTimestamp:
-		return "ValueFromTime"
+		return valueFrom
 	case value.TypeInterval:
-		return "ValueFromDuration"
+		return valueFrom
 	}
 	return "Value"
 }

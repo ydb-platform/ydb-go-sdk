@@ -17,6 +17,8 @@ const (
 	SessionStatusUnknown SessionStatus = iota
 	SessionReady
 	SessionBusy
+
+	statusUnknown = "unknown"
 )
 
 func (s SessionStatus) String() string {
@@ -26,7 +28,7 @@ func (s SessionStatus) String() string {
 	case SessionBusy:
 		return "busy"
 	default:
-		return "unknown"
+		return statusUnknown
 	}
 }
 
@@ -167,7 +169,7 @@ func (c ColumnFamilyCompression) String() string {
 	case ColumnFamilyCompressionLZ4:
 		return "lz4"
 	default:
-		return "unknown"
+		return statusUnknown
 	}
 }
 

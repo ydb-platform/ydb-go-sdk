@@ -34,7 +34,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
 						testutil.TableDeleteSession: okHandler,
@@ -81,10 +81,10 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableKeepAlive: func(_ interface{}) (result proto.Message, err error) {
 							keepalive <- struct{}{}
 							return nil, nil
 						},
@@ -146,7 +146,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 					T:     t,
 					Limit: 1,
 					Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						}})),
 				},
@@ -222,7 +222,7 @@ func TestSessionPoolClose(t *testing.T) {
 			T:     t,
 			Limit: 3,
 			Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
 				}})),
 		},
@@ -314,7 +314,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 					T:     t,
 					Limit: 2,
 					Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						}})),
 				},
@@ -453,7 +453,7 @@ func TestSessionPoolPutInFull(t *testing.T) {
 			T:     t,
 			Limit: 1,
 			Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
 				}})),
 		},
@@ -494,7 +494,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 					T:     t,
 					Limit: 1,
 					Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						}})),
 				},
@@ -529,8 +529,8 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 						return nil
 					},
 				})
-				s, err := p.Get(context.Background())
-				got <- sessionAndError{s, err}
+				se, err := p.Get(context.Background())
+				got <- sessionAndError{se, err}
 			}()
 
 			regWait := whenWantWaitCh(p)
@@ -592,10 +592,10 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableKeepAlive: func(_ interface{}) (result proto.Message, err error) {
 							keepalive <- struct{}{}
 							// Here we are emulating blocked connection initialization.
 							<-release
@@ -694,11 +694,11 @@ func TestSessionPoolGetPut(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							created++
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
-						testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableDeleteSession: func(_ interface{}) (result proto.Message, err error) {
 							deleted++
 							return nil, nil
 						},
@@ -738,7 +738,7 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 			T:     t,
 			Limit: 1,
 			Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
 				}})),
 		},
@@ -776,12 +776,12 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableKeepAlive: func(_ interface{}) (result proto.Message, err error) {
 							atomic.AddUint32(&keepAliveCount, 1)
 							return &Ydb_Table.KeepAliveResult{}, nil
 						},
 						testutil.TableDeleteSession: okHandler,
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
 					},
@@ -851,10 +851,10 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableKeepAlive: func(_ interface{}) (result proto.Message, err error) {
 							done := make(chan struct{})
 							keepalive <- done
 							<-done
@@ -916,7 +916,7 @@ func TestSessionPoolDoublePut(t *testing.T) {
 			T:     t,
 			Limit: 1,
 			Cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-				testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+				testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 					return &Ydb_Table.CreateSessionResult{}, nil
 				}})),
 		},
@@ -965,7 +965,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
 						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
@@ -1041,10 +1041,10 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableKeepAlive: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.KeepAliveResult{}, nil
 						},
 						testutil.TableDeleteSession: okHandler,
@@ -1107,10 +1107,10 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableKeepAlive: func(_ interface{}) (result proto.Message, err error) {
 							return nil, &errors.OpError{
 								Reason: errors.StatusBadSession,
 							}
@@ -1149,10 +1149,10 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 			Cluster: testutil.NewDB(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
-						testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 							return &Ydb_Table.CreateSessionResult{}, nil
 						},
-						testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+						testutil.TableKeepAlive: func(_ interface{}) (result proto.Message, err error) {
 							if retry {
 								retry = false
 								return nil, context.DeadlineExceeded
@@ -1308,46 +1308,46 @@ func caller() string {
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
 }
 
-var okHandler = func(request interface{}) (proto.Message, error) {
+var okHandler = func(_ interface{}) (proto.Message, error) {
 	return nil, nil
 }
 
 var simpleCluster = testutil.NewDB(
 	testutil.WithInvokeHandlers(
 		testutil.InvokeHandlers{
-			testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+			testutil.TableExecuteDataQuery: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.ExecuteQueryResult{
 					TxMeta: &Ydb_Table.TransactionMeta{
 						Id: "",
 					},
 				}, nil
 			},
-			testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
+			testutil.TableBeginTransaction: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.BeginTransactionResult{
 					TxMeta: &Ydb_Table.TransactionMeta{
 						Id: "",
 					},
 				}, nil
 			},
-			testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+			testutil.TableExplainDataQuery: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.ExecuteQueryResult{}, nil
 			},
-			testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+			testutil.TablePrepareDataQuery: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.PrepareQueryResult{}, nil
 			},
-			testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+			testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.CreateSessionResult{}, nil
 			},
-			testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+			testutil.TableDeleteSession: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.DeleteSessionResponse{}, nil
 			},
-			testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+			testutil.TableCommitTransaction: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.CommitTransactionResponse{}, nil
 			},
-			testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+			testutil.TableRollbackTransaction: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.RollbackTransactionResponse{}, nil
 			},
-			testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+			testutil.TableKeepAlive: func(_ interface{}) (result proto.Message, err error) {
 				return &Ydb_Table.KeepAliveResult{}, nil
 			},
 		},

@@ -27,6 +27,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ydbtypes"
 )
 
+const (
+	convMode       = "conv"
+	seekModeColumn = "column"
+	genType        = "types"
+)
+
 func generate(pairs []pair, cfg cfg) error {
 	astFiles := make([]*ast.File, 0, len(pairs))
 	fset := token.NewFileSet()
@@ -432,7 +438,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := os.Mkdir(path.Join(tmp, "src"), 0700); err != nil {
+			if err = os.Mkdir(path.Join(tmp, "src"), 0700); err != nil {
 				log.Fatal(err)
 			}
 			base, dir := splitPair(strings.TrimSpace(p), ':')
@@ -487,9 +493,9 @@ func main() {
 		}
 	}
 	if *exclude != "" {
-		re, err := regexp.Compile(*exclude)
-		if err != nil {
-			log.Fatalf("compile ignore regexp error: %v", err)
+		re, e := regexp.Compile(*exclude)
+		if e != nil {
+			log.Fatalf("compile ignore regexp error: %v", e)
 		}
 		excludeFile = re.MatchString
 	}
@@ -517,9 +523,9 @@ func main() {
 		if !processFile(fpath) {
 			continue
 		}
-		file, err := os.Open(fpath)
-		if err != nil {
-			log.Fatal(err)
+		file, e := os.Open(fpath)
+		if e != nil {
+			log.Fatal(e)
 		}
 		files = append(files, file)
 		pairs = append(pairs, pair{
@@ -551,7 +557,7 @@ func ParseSeekMode(s string) (SeekMode, error) {
 	switch s {
 	case "position":
 		return SeekPosition, nil
-	case "column":
+	case seekModeColumn:
 		return SeekColumn, nil
 	default:
 		return 0, fmt.Errorf("unknown seek mode: %q", s)
@@ -653,7 +659,7 @@ func ParseWrapMode(s string) (WrapMode, error) {
 	case "none":
 		return WrapNothing, nil
 	default:
-		return 0, fmt.Errorf("unknown types mode: %q", s)
+		return WrapModeUnknown, fmt.Errorf("unknown types mode: %q", s)
 	}
 }
 
@@ -697,7 +703,7 @@ func (g *GenItem) parseGenFlags(text string) error {
 			g.Flags |= GenQueryParams
 		case "value":
 			g.Flags |= GenValue
-		case "types":
+		case genType:
 			g.Flags |= GenType
 		default:
 			return fmt.Errorf("unknown generation flag: %q", param)
@@ -714,7 +720,7 @@ func (g *GenItem) parseGenMode(text string) (err error) {
 			g.Mode.Wrap, err = ParseWrapMode(val)
 		case "seek":
 			g.Mode.Seek, err = ParseSeekMode(val)
-		case "conv":
+		case convMode:
 			g.Mode.Conv, err = ParseConvMode(val)
 		default:
 			return fmt.Errorf("unknown option: %q", key)
@@ -726,8 +732,7 @@ func (g *GenItem) parseGenMode(text string) (err error) {
 type GenFlag uint
 
 const (
-	GenNothing GenFlag = 1 << iota >> 1
-	GenScan
+	GenScan GenFlag = 1 << iota
 	GenQueryParams
 	GenValue
 	GenType
@@ -866,15 +871,6 @@ func ParseConvMode(s string) (ConvMode, error) {
 	default:
 		return 0, fmt.Errorf("unknown conv mode: %q", s)
 	}
-}
-
-func isAssignable(t1, t2 types.Type) bool {
-	s1, _ := t1.(*types.Slice)
-	s2, _ := t2.(*types.Slice)
-	if s1 != nil && s2 != nil {
-		return isAssignable(s1.Elem(), s2.Elem())
-	}
-	return types.AssignableTo(t1, t2)
 }
 
 func exactlyOne(bs ...bool) bool {
@@ -1019,7 +1015,7 @@ func (f *Field) ParseTags(tags string) (err error) {
 		switch key {
 		case "-":
 			f.Ignore = true
-		case "column":
+		case seekModeColumn:
 			columnGiven = true
 			f.Column = value
 		case "pos":
@@ -1028,9 +1024,9 @@ func (f *Field) ParseTags(tags string) (err error) {
 			if err != nil {
 				return
 			}
-		case "types":
+		case genType:
 			typs = value
-		case "conv":
+		case convMode:
 			conv, err = ParseConvMode(value)
 			if err != nil {
 				return
@@ -1191,28 +1187,6 @@ func singleParam(f *types.Func) (*types.Basic, error) {
 		"unexpected parameter %q of method %q types: "+
 			"%s; only basic types are supported",
 		f.Name(), arg.Name(), arg.Type(),
-	)
-}
-
-func singleResult(f *types.Func) (*types.Basic, error) {
-	var (
-		s = f.Type().(*types.Signature)
-		r = s.Results()
-	)
-	if n := r.Len(); n != 1 {
-		return nil, fmt.Errorf(
-			"unexpected method %q signature: have %d results; want 1",
-			f.Name(), n,
-		)
-	}
-	res := r.At(0)
-	if b, ok := res.Type().(*types.Basic); ok {
-		return b, nil
-	}
-	return nil, fmt.Errorf(
-		"unexpected types of method %q result: "+
-			"%s; only basic types are supported",
-		f.Name(), res.Type(),
 	)
 }
 

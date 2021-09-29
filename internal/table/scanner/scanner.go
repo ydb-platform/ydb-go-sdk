@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"math"
 	"reflect"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 

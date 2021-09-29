@@ -2,8 +2,9 @@ package ydb
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"sync"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"

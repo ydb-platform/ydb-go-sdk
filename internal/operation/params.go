@@ -1,8 +1,9 @@
 package operation
 
 import (
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 )
 
 type Params struct {

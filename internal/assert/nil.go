@@ -5,8 +5,8 @@ type nillable interface {
 }
 
 func IsNil(v interface{}) bool {
-	if nillable, ok := v.(nillable); ok {
-		return nillable.isNil()
+	if n, ok := v.(nillable); ok {
+		return n.isNil()
 	}
 	return v == nil
 }

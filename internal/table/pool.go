@@ -227,7 +227,7 @@ func (p *pool) createSession(ctx context.Context) (table.Session, error) {
 	go func() {
 		var r createSessionResult
 
-		ctx, cancel := context.WithTimeout(
+		c, cancel := context.WithTimeout(
 			deadline.ContextWithoutDeadline(ctx),
 			p.CreateSessionTimeout,
 		)
@@ -237,7 +237,7 @@ func (p *pool) createSession(ctx context.Context) (table.Session, error) {
 			close(resCh)
 		}()
 
-		r.s, r.err = p.Builder.CreateSession(ctx)
+		r.s, r.err = p.Builder.CreateSession(c)
 		// if session not nil - error must be nil and vice versa
 		if assert.IsNil(r.s) && r.err == nil {
 			panic("ydb: abnormal result of pool.Builder.CreateSession()")
@@ -290,7 +290,6 @@ func (p *pool) createSession(ctx context.Context) (table.Session, error) {
 		}()
 		return nil, ctx.Err()
 	}
-	return nil, nil
 }
 
 // Get returns first idle session from the pool and removes it from
@@ -593,7 +592,7 @@ func (p *pool) Close(ctx context.Context) (err error) {
 
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
-// - deadline was cancelled or deadlined
+// - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (p *pool) Retry(ctx context.Context, isOperationIdempotent bool, op table.RetryOperation) (err error, issues []error) {

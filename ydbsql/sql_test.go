@@ -214,7 +214,7 @@ func TestQuery(t *testing.T) {
 					),
 					testutil.WithNewStreamHandlers(
 						testutil.NewStreamHandlers{
-							testutil.TableStreamExecuteScanQuery: func(_ *grpc.StreamDesc) (c grpc.ClientStream, err error) {
+							testutil.TableStreamExecuteScanQuery: func(_ *grpc.StreamDesc) (grpc.ClientStream, error) {
 								return &testutil.ClientStream{
 									OnRecvMsg: func(m interface{}) error {
 										return io.EOF
@@ -225,7 +225,7 @@ func TestQuery(t *testing.T) {
 									OnCloseSend: func() error {
 										return nil
 									},
-								}, err
+								}, nil
 							},
 						},
 					),
@@ -453,7 +453,7 @@ func TestDriver(t *testing.T) {
 			seriesInfo  string
 			releaseDate time.Time
 		)
-		err := rows.Scan(
+		err = rows.Scan(
 			&seriesID,
 			&title,
 			&seriesInfo,
@@ -462,7 +462,7 @@ func TestDriver(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		log.Printf("test: #%d %q %q %s", seriesID, title, seriesInfo, time.Time(releaseDate))
+		log.Printf("test: #%d %q %q %s", seriesID, title, seriesInfo, releaseDate)
 	}
 	log.Println("rows err", rows.Err())
 

@@ -1,10 +1,11 @@
 package config
 
 import (
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"time"
 )
 
 // Config contains driver configuration options.
@@ -49,7 +50,7 @@ type Config struct {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval time.Duration
 
-	// GrpcConnectionPolicy define lifecycle behaviour of grpc connection
+	// GrpcConnectionPolicy define lifecycle behavior of grpc connection
 	// By default GrpcConnectionPolicy is sets to DefaultGrpcConnectionPolicy
 	GrpcConnectionPolicy *GrpcConnectionPolicy
 

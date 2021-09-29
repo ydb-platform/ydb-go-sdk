@@ -3,13 +3,15 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
-	"strings"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type WhoAmI struct {
@@ -68,7 +70,7 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	if err != nil {
 		return nil, err
 	}
-	nodes := make([]trace.Endpoint, len(listEndpointsResult.Endpoints))
+	endpoints = make([]endpoint.Endpoint, len(listEndpointsResult.Endpoints))
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
 			node := endpoint.Endpoint{
@@ -79,7 +81,6 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 				Local: e.Location == listEndpointsResult.SelfLocation,
 			}
 			endpoints = append(endpoints, node)
-			nodes = append(nodes, node)
 		}
 	}
 

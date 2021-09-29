@@ -1,9 +1,11 @@
 package config
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"google.golang.org/grpc/keepalive"
 	"time"
+
+	"google.golang.org/grpc/keepalive"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 )
 
 type GrpcConnectionPolicy conn.GrpcConnectionPolicy

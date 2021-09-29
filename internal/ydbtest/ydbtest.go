@@ -6,7 +6,6 @@ package ydbtest
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"net"
 	"strconv"
 	"sync"
@@ -14,14 +13,15 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Handler func(ctx context.Context, req RequestParser) (res interface{}, err error)

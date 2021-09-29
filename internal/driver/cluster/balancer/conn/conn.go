@@ -3,12 +3,14 @@ package conn
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
@@ -92,9 +94,12 @@ func isBroken(raw *grpc.ClientConn) bool {
 }
 
 func (c *conn) IsReady() bool {
+	if c == nil {
+		return false
+	}
 	c.Lock()
 	defer c.Unlock()
-	return c != nil && c.grpcConn != nil && c.grpcConn.GetState() == connectivity.Ready
+	return c.grpcConn != nil && c.grpcConn.GetState() == connectivity.Ready
 }
 
 func (c *conn) waitClose() {
@@ -191,7 +196,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.Addr(), trace.Method(method))
 	defer func() {
 		onDone(err, issues, opId)
-		err := errors.ErrIf(errors.IsTimeoutError(err), err)
+		err = errors.ErrIf(errors.IsTimeoutError(err), err)
 		c.runtime.OperationDone(start, timeutil.Now(), err)
 	}()
 

@@ -3,11 +3,12 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"net"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"

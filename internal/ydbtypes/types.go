@@ -6,9 +6,10 @@ package ydbtypes
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"go/types"
 	"strings"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
 func PrimitiveTypeFromString(s string) (t value.PrimitiveType, err error) {

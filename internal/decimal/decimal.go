@@ -22,6 +22,10 @@ var (
 	negnan = big.NewInt(0).Neg(nan)
 )
 
+const (
+	errorTag = "<error>"
+)
+
 // IsInf reports whether x is an infinity.
 func IsInf(x *big.Int) bool { return x.CmpAbs(inf) == 0 }
 
@@ -210,7 +214,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	)
 	for ; v.Cmp(zero) > 0; v.Div(v, ten) {
 		if precision == 0 {
-			return "<error>"
+			return errorTag
 		}
 		precision--
 
@@ -232,7 +236,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	if scale > 0 {
 		for ; scale > 0; scale-- {
 			if precision == 0 {
-				return "<error>"
+				return errorTag
 			}
 			precision--
 			pos--

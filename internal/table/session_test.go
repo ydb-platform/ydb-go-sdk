@@ -89,10 +89,10 @@ func TestSessionDescribeTable(t *testing.T) {
 		Cluster: testutil.NewDB(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 						return &Ydb_Table.CreateSessionResult{}, nil
 					},
-					testutil.TableDescribeTable: func(request interface{}) (proto.Message, error) {
+					testutil.TableDescribeTable: func(_ interface{}) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)
 						return r, e
@@ -321,14 +321,14 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 							cluster: testutil.NewDB(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
-										testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
+										testutil.TableExecuteDataQuery: func(_ interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.ExecuteQueryResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
 													Id: "",
 												},
 											}, nil
 										},
-										testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
+										testutil.TableBeginTransaction: func(_ interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.BeginTransactionResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
 													Id: "",

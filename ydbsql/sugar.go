@@ -2,9 +2,10 @@ package ydbsql
 
 import (
 	"bytes"
+	"io"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"io"
 )
 
 type Declaration struct {

@@ -230,9 +230,8 @@ type connector struct {
 
 	trace trace.Table
 
-	mu    sync.Mutex
-	ready chan struct{}
-	tbl   internal.ClientAsPool // Used as a template for created connections.
+	mu  sync.Mutex
+	tbl internal.ClientAsPool // Used as a template for created connections.
 
 	defaultTxControl *table.TransactionControl
 

@@ -29,7 +29,7 @@ type SessionProvider interface {
 
 	// Retry provide the best effort fo retrying operation
 	// Retry implements internal busy loop until one of the following conditions is met:
-	// - deadline was cancelled or deadlined
+	// - deadline was canceled or deadlined
 	// - retry operation returned nil as error
 	// If deadline without deadline used session pool RetryTimeout
 	Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error)
@@ -195,5 +195,4 @@ func retryBackoff(
 			code = m.StatusCode()
 		}
 	}
-	return
 }

@@ -3,15 +3,16 @@ package balancer
 import (
 	"container/heap"
 	"fmt"
+	"math"
+	"math/rand"
+	"sync"
+	"sync/atomic"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
-	"math"
-	"math/rand"
-	"sync"
-	"sync/atomic"
 )
 
 // roundRobin is an implementation of weighted round-robin balancing algorithm.
