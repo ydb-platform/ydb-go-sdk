@@ -179,9 +179,11 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 						testutil.NewDB(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
+									// nolint:unparam
 									testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 										return &Ydb_Table.CreateSessionResult{}, nil
 									},
+									// nolint:unparam
 									testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
 										r := request.(*Ydb_Table.ExecuteDataQueryRequest)
 										keepInCache := r.QueryCachePolicy.KeepInCache

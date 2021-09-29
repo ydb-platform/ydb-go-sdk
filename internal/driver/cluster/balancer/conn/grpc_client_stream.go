@@ -3,11 +3,12 @@ package conn
 import (
 	"context"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )

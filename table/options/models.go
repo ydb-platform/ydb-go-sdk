@@ -72,6 +72,7 @@ type IndexDescription struct {
 	Status       Ydb_Table.TableIndexDescription_Status
 }
 
+// nolint:unused
 func (i IndexDescription) toYDB() *Ydb_Table.TableIndexDescription {
 	return &Ydb_Table.TableIndexDescription{
 		Name:         i.Name,

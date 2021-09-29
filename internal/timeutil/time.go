@@ -19,7 +19,7 @@ var (
 	unix = time.Unix(0, 0)
 )
 
-// Up to ±292 years.
+// UnmarshalInterval up to ±292 years.
 func UnmarshalInterval(n int64) time.Duration {
 	return time.Duration(n)
 }

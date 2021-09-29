@@ -140,6 +140,7 @@ func (d *dialer) useTLS() bool {
 	return d.tlsConfig != nil
 }
 
+// nolint:unused
 func (d *dialer) splitHostPort(addr string) (host string, port int, err error) {
 	var prt string
 	host, prt, err = net.SplitHostPort(addr)
@@ -169,6 +170,7 @@ func (d *dialer) endpointByAddr(addr string) (e endpoint.Endpoint) {
 
 // withContextDialer is an adapter to allow the use of normal go-world net dial
 // function as WithDialer option argument for grpc Dial().
+// nolint:unused, deadcode
 func withContextDialer(f func(context.Context, string) (net.Conn, error)) func(string, time.Duration) (net.Conn, error) {
 	if f == nil {
 		return nil

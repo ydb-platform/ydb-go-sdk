@@ -75,6 +75,7 @@ func (e *OpError) Error() string {
 	return buf.String()
 }
 
+// nolint:unused, deadcode
 func iterateIssues(issues []*Ydb_Issue.IssueMessage, it func(Issue)) {
 	for _, x := range issues {
 		it(Issue{

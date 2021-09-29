@@ -46,6 +46,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 	return testutil.NewDB(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
+				// nolint:unparam
 				testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
 					sid := fmt.Sprintf("ydb://test-session/%d", atomic.AddInt32(&sessionID, 1))
 					b.log("[%q] create session", sid)
@@ -58,6 +59,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 						SessionId: sid,
 					}, nil
 				},
+				// nolint:unparam
 				testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 					sid := request.(*Ydb_Table.KeepAliveRequest).SessionId
 					b.log("[%q] keepalive session", sid)
@@ -74,6 +76,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 						SessionStatus: Ydb_Table.KeepAliveResult_SESSION_STATUS_READY,
 					}, nil
 				},
+				// nolint:unparam
 				testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
 					sid := request.(*Ydb_Table.DeleteSessionRequest).SessionId
 					b.log("[%q] delete session", sid)
@@ -84,6 +87,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 
 					return nil, nil
 				},
+				// nolint:unparam
 				testutil.TableBeginTransaction: func(request interface{}) (result proto.Message, err error) {
 					sid := request.(*Ydb_Table.BeginTransactionRequest).SessionId
 					tid := fmt.Sprintf("test-tx/%d", atomic.AddInt32(&txID, 1))
@@ -96,6 +100,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 						},
 					}, nil
 				},
+				// nolint:unparam
 				testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
 					r := request.(*Ydb_Table.CommitTransactionRequest)
 					sid := r.SessionId
@@ -105,6 +110,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 
 					return &Ydb_Table.CommitTransactionResult{}, nil
 				},
+				// nolint:unparam
 				testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
 					r := request.(*Ydb_Table.RollbackTransactionRequest)
 					sid := r.SessionId
@@ -114,6 +120,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 
 					return result, err
 				},
+				// nolint:unparam
 				testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 					r := request.(*Ydb_Table.PrepareDataQueryRequest)
 					sid := r.SessionId
@@ -130,6 +137,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 					}
 					return &Ydb_Table.PrepareQueryResult{}, err
 				},
+				// nolint:unparam
 				testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
 					r := request.(*Ydb_Table.ExecuteDataQueryRequest)
 					sid := r.SessionId

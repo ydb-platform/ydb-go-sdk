@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
 
+// Issue struct
 type Issue struct {
 	Message  string
 	Code     uint32

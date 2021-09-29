@@ -152,6 +152,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
+			// nolint:staticcheck
 			err:           errors.MapGRPCError(grpc.ErrClientConnClosing),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,

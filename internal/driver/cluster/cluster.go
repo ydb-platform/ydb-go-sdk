@@ -361,6 +361,7 @@ func (c *cluster) Stats(it func(endpoint.Endpoint, stats.Stats)) {
 }
 
 // c.mu read lock must be held.
+// nolint:unused
 func (c *cluster) await() func() <-chan struct{} {
 	prev := c.wait
 	return func() <-chan struct{} {

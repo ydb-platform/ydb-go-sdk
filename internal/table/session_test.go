@@ -37,9 +37,11 @@ func TestSessionKeepAlive(t *testing.T) {
 		Cluster: testutil.NewDB(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
+					// nolint:unparam
 					testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
 						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
 					},
+					// nolint:unparam
 					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 						return &Ydb_Table.CreateSessionResult{}, nil
 					},
@@ -321,6 +323,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 							cluster: testutil.NewDB(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
+										// nolint:unparam
 										testutil.TableExecuteDataQuery: func(_ interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.ExecuteQueryResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
@@ -328,6 +331,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 												},
 											}, nil
 										},
+										// nolint:unparam
 										testutil.TableBeginTransaction: func(_ interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.BeginTransactionResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
@@ -335,24 +339,31 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 												},
 											}, nil
 										},
+										// nolint:unparam
 										testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.ExecuteQueryResult{}, nil
 										},
+										// nolint:unparam
 										testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.PrepareQueryResult{}, nil
 										},
+										// nolint:unparam
 										testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.CreateSessionResult{}, nil
 										},
+										// nolint:unparam
 										testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.DeleteSessionResponse{}, nil
 										},
+										// nolint:unparam
 										testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.CommitTransactionResponse{}, nil
 										},
+										// nolint:unparam
 										testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.RollbackTransactionResponse{}, nil
 										},
+										// nolint:unparam
 										testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.KeepAliveResult{}, nil
 										},

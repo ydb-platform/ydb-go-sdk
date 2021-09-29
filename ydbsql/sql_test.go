@@ -194,9 +194,11 @@ func TestQuery(t *testing.T) {
 				testutil.NewDB(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
+							// nolint:unparam
 							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.CreateSessionResult{}, err
 							},
+							// nolint:unparam
 							testutil.TableExecuteDataQuery: func(_ interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.ExecuteQueryResult{
 									TxMeta: &Ydb_Table.TransactionMeta{
@@ -204,9 +206,11 @@ func TestQuery(t *testing.T) {
 									},
 								}, err
 							},
+							// nolint:unparam
 							testutil.TableStreamExecuteScanQuery: func(_ interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.ExecuteSchemeQueryResponse{}, err
 							},
+							// nolint:unparam
 							testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 								return &Ydb_Table.PrepareQueryResult{}, nil
 							},
@@ -214,6 +218,7 @@ func TestQuery(t *testing.T) {
 					),
 					testutil.WithNewStreamHandlers(
 						testutil.NewStreamHandlers{
+							// nolint:unparam
 							testutil.TableStreamExecuteScanQuery: func(_ *grpc.StreamDesc) (grpc.ClientStream, error) {
 								return &testutil.ClientStream{
 									OnRecvMsg: func(m interface{}) error {
