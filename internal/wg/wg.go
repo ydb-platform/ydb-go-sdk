@@ -21,7 +21,7 @@ type wg struct {
 var _ WG = &sync.WaitGroup{}
 var _ WG = &wg{}
 
-func (w *wg) isNil() bool {
+func (w *wg) IsNil() bool {
 	return w == nil
 }
 

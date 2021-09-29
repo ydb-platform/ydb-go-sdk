@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"google.golang.org/grpc/status"
-
 	grpc "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"

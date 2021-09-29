@@ -88,7 +88,7 @@ func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Sessi
 	return
 }
 
-func (s *session) isNil() bool {
+func (s *session) IsNil() bool {
 	return s == nil
 }
 
@@ -849,7 +849,7 @@ func (tx *Transaction) ID() string {
 	return tx.id
 }
 
-func (tx *Transaction) isNil() bool {
+func (tx *Transaction) IsNil() bool {
 	return tx == nil
 }
 

@@ -83,7 +83,7 @@ type client struct {
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
-func (c *client) isNil() bool {
+func (c *client) IsNil() bool {
 	return c == nil
 }
 

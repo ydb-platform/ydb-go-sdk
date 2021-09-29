@@ -11,7 +11,7 @@ type Element struct {
 	Info  info.Info
 }
 
-func (e *Element) isNil() bool {
+func (e *Element) IsNil() bool {
 	return e == nil
 }
 

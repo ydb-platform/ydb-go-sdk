@@ -66,7 +66,7 @@ func (c *client) Retry(ctx context.Context, isIdempotentOperation bool, op table
 }
 
 // check nil value
-func (c *client) isNil() bool {
+func (c *client) IsNil() bool {
 	return c == nil
 }
 

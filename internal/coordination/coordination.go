@@ -31,7 +31,7 @@ func New(db cluster.DB) Client {
 	}
 }
 
-func (c *client) isNil() bool {
+func (c *client) IsNil() bool {
 	return c == nil
 }
 

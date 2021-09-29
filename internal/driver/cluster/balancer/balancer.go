@@ -105,7 +105,7 @@ type multiHandle struct {
 	elements []Element
 }
 
-func (h *multiHandle) isNil() bool {
+func (h *multiHandle) IsNil() bool {
 	return h == nil
 }
 

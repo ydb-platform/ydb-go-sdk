@@ -524,15 +524,14 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 			return p.createSession(ctx)
 		}
 
-		took, err := p.Take(ctx, s)
-		if err == nil && !took || errors.Is(err, ErrSessionUnknown) {
+		took, e := p.Take(ctx, s)
+		if e == nil && !took || errors.Is(e, ErrSessionUnknown) {
 			// session was marked for deletion or deleted by keeper() - race happen - retry
 			s = nil
-			err = nil
 			continue
 		}
-		if err != nil {
-			return nil, err
+		if e != nil {
+			return nil, e
 		}
 
 		return s, nil
@@ -998,7 +997,6 @@ func (p *pool) wakeUpKeeper() {
 
 type sessionInfo struct {
 	idle           *list.Element
-	ready          *list.Element
 	touched        time.Time
 	keepAliveCount int
 }

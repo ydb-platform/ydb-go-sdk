@@ -45,7 +45,7 @@ type client struct {
 	ssl      bool
 }
 
-func (d *client) isNil() bool {
+func (d *client) IsNil() bool {
 	return d == nil
 }
 
@@ -70,7 +70,7 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	if err != nil {
 		return nil, err
 	}
-	endpoints = make([]endpoint.Endpoint, len(listEndpointsResult.Endpoints))
+	endpoints = make([]endpoint.Endpoint, 0, len(listEndpointsResult.Endpoints))
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
 			node := endpoint.Endpoint{

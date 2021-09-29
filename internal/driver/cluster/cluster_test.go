@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
@@ -21,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 )
 
 func TestClusterFastRedial(t *testing.T) {
@@ -301,17 +299,6 @@ func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
 			Timeout: time.Second,
 		}),
 	)
-}
-
-func assertRecvError(t *testing.T, d time.Duration, e <-chan error, exp error) {
-	select {
-	case act := <-e:
-		if act != exp {
-			t.Errorf("%s: unexpected error: %v; want %v", testutil.FileLine(2), act, exp)
-		}
-	case <-time.After(d):
-		t.Errorf("%s: nothing received after %s", testutil.FileLine(2), d)
-	}
 }
 
 func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []endpoint.Endpoint, opts ...option) {

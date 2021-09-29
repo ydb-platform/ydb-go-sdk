@@ -32,7 +32,7 @@ type Conn interface {
 	Close() error
 }
 
-func (c *conn) isNil() bool {
+func (c *conn) IsNil() bool {
 	return c == nil
 }
 

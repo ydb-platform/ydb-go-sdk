@@ -4,11 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-
 	"google.golang.org/grpc/metadata"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 )
 
 func TestMetaRequiredHeaders(t *testing.T) {
