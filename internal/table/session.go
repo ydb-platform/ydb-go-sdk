@@ -774,7 +774,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 				e := client.RecvMsg(&response)
 				if e != nil {
 					if e != io.EOF {
-						r.SetChErr = &err
+						r.SetChErr = &e
 					}
 					return
 				}
