@@ -46,12 +46,12 @@ type cluster struct {
 	balancer balancer.Balancer
 	explorer repeater.Repeater
 
-	mu    sync.RWMutex
-	once  sync.Once
 	index map[endpoint.Addr]entry.Entry
 	ready int
 	wait  chan struct{}
 
+	mu     sync.RWMutex
+	once   sync.Once
 	closed bool
 }
 

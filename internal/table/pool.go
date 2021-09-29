@@ -120,8 +120,6 @@ type pool struct {
 	// DefaultSessionPoolDeleteTimeout is used.
 	DeleteTimeout time.Duration
 
-	mu               sync.Mutex
-	initOnce         sync.Once
 	index            map[table.Session]sessionInfo
 	createInProgress int        // KIKIMR-9163: in-create-process counter
 	limit            int        // Upper bound for pool size.
@@ -132,10 +130,13 @@ type pool struct {
 	keeperStop chan struct{}
 	keeperDone chan struct{}
 
-	touching     bool
 	touchingDone chan struct{}
 
-	closed bool
+	mu       sync.Mutex
+	initOnce sync.Once
+
+	touching bool
+	closed   bool
 
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.

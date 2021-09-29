@@ -112,6 +112,7 @@ linters:
     - gosimple
     - govet
     - ineffassign
+    - maligned
     - misspell
     - staticcheck
     - structcheck

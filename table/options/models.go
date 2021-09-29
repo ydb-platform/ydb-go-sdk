@@ -423,12 +423,14 @@ type TTLSettings struct {
 }
 
 type TimeToLiveSettings struct {
-	ColumnName         string
+	ColumnName string
+
+	// Specifies mode
+	Mode               TimeToLiveMode
 	ExpireAfterSeconds uint32
 
 	ColumnUnit *TimeToLiveUnit // valid with Mode = TimeToLiveModeValueSinceUnixEpoch
-	// Specifies mode
-	Mode TimeToLiveMode
+
 }
 
 type TimeToLiveMode byte

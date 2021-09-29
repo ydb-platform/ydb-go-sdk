@@ -401,7 +401,6 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	)
 
 	var err error
-	// nolint:SA2002
 	for i := 0; i < 2; i++ {
 		go func() {
 			defer func() {
