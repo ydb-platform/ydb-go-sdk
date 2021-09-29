@@ -133,7 +133,7 @@ func TestSeriesAddConcurrent(t *testing.T) {
 	m := sync.Mutex{}
 	wg := sync.WaitGroup{}
 	wg.Add(cuncurrency)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
 	defer cancel()
 	for i := 0; i < cuncurrency; i++ {
 		go func() {
