@@ -771,9 +771,9 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 			case <-ctx.Done():
 				return
 			default:
-				err = client.RecvMsg(&response)
-				if err != nil {
-					if err != io.EOF {
+				e := client.RecvMsg(&response)
+				if e != nil {
+					if e != io.EOF {
 						r.SetChErr = &err
 					}
 					return

@@ -143,7 +143,6 @@ func (c *conn) Close() (err error) {
 	}
 	if c.done != nil {
 		close(c.done)
-		c.done = nil
 	}
 	if c.grpcConn != nil {
 		_ = c.close()
