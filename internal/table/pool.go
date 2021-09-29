@@ -54,7 +54,7 @@ type Pool interface {
 	Take(ctx context.Context, s table.Session) (took bool, err error)
 	Put(ctx context.Context, s table.Session) (err error)
 	Create(ctx context.Context) (s table.Session, err error)
-	Retry(ctx context.Context, isIdempotentOperation bool, op table.RetryOperation) (error, []error)
+	Retry(ctx context.Context, isIdempotentOperation bool, op table.RetryOperation) error
 	Close(ctx context.Context) error
 }
 
@@ -595,7 +595,7 @@ func (p *pool) Close(ctx context.Context) (err error) {
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func (p *pool) Retry(ctx context.Context, isOperationIdempotent bool, op table.RetryOperation) (err error, issues []error) {
+func (p *pool) Retry(ctx context.Context, isOperationIdempotent bool, op table.RetryOperation) (err error) {
 	return retryBackoff(ctx, p, retry.FastBackoff, retry.SlowBackoff, isOperationIdempotent, op)
 }
 

@@ -2,7 +2,6 @@ package retry
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -37,7 +36,7 @@ type retryOperation func(context.Context) (err error)
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (err error, issues []error) {
+func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (err error) {
 	var (
 		i        int
 		attempts int
@@ -47,15 +46,14 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 		onDone = trace.RetryOnRetry(trace.ContextRetry(ctx), ctx)
 	)
 	defer func() {
-		onDone(ctx, time.Since(start), issues)
+		onDone(ctx, time.Since(start), err)
 	}()
 	for {
 		i++
 		attempts++
 		select {
 		case <-ctx.Done():
-			issues = errors.Prepend(issues, fmt.Errorf("retry.Retry: deadline is done: %w", ctx.Err()), errors.DefaultMaxIssuesLen)
-			return ctx.Err(), issues
+			return ctx.Err()
 
 		default:
 			err = op(ctx)
@@ -66,14 +64,10 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 			if m.StatusCode() != code {
 				i = 0
 			}
-			if m.MustRetry(isIdempotentOperation) {
-				issues = errors.Prepend(issues, fmt.Errorf("retry.Retry: retriable error: %w", err), errors.DefaultMaxIssuesLen)
-			} else {
-				issues = errors.Prepend(issues, fmt.Errorf("retry.Retry: non-retriable error: %w", err), errors.DefaultMaxIssuesLen)
+			if !m.MustRetry(isIdempotentOperation) {
 				return
 			}
 			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
-				issues = errors.Prepend(issues, fmt.Errorf("retry.Retry: wait failed: %w", err), errors.DefaultMaxIssuesLen)
 				return
 			}
 			code = m.StatusCode()

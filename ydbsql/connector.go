@@ -63,7 +63,7 @@ func WithConnectParams(params ydb.ConnectParams) ConnectorOption {
 	}
 }
 
-func WithTlsConfig(tlsConfig *tls.Config) ConnectorOption {
+func WithTLSConfig(tlsConfig *tls.Config) ConnectorOption {
 	return func(c *connector) error {
 		c.dialer.TLSConfig = tlsConfig
 		return nil

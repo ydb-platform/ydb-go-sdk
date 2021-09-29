@@ -29,12 +29,12 @@ func (t *lazyTable) Close(ctx context.Context) error {
 	return t.client.Close(ctx)
 }
 
-func (t *lazyTable) RetryIdempotent(ctx context.Context, op table.RetryOperation) (err error, issues []error) {
+func (t *lazyTable) RetryIdempotent(ctx context.Context, op table.RetryOperation) (err error) {
 	t.init()
 	return t.client.RetryIdempotent(ctx, op)
 }
 
-func (t *lazyTable) RetryNonIdempotent(ctx context.Context, op table.RetryOperation) (err error, issues []error) {
+func (t *lazyTable) RetryNonIdempotent(ctx context.Context, op table.RetryOperation) (err error) {
 	t.init()
 	return t.client.RetryNonIdempotent(ctx, op)
 

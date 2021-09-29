@@ -253,7 +253,7 @@ func (c *sqlConn) exec(ctx context.Context, req processor, params *table.QueryPa
 	if !c.takeSession(ctx) {
 		return nil, driver.ErrBadConn
 	}
-	err, _ = c.pool().Retry(
+	err = c.pool().Retry(
 		ctx,
 		retry.IsOperationIdempotent(ctx),
 		func(ctx context.Context, session table.Session) (err error) {
@@ -344,7 +344,7 @@ type TxDoer struct {
 //       return rows.err()
 //   }))
 func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
-	err, _ = retry.Retry(
+	err = retry.Retry(
 		ctx,
 		retry.IsOperationIdempotent(ctx),
 		func(ctx context.Context) (err error) {

@@ -14,11 +14,11 @@ type V interface {
 	toString(*bytes.Buffer)
 }
 
-func ValueToYDB(v V) *Ydb.TypedValue {
+func ToYDB(v V) *Ydb.TypedValue {
 	return v.ToYDB()
 }
 
-func ValueFromYDB(t *Ydb.Type, v *Ydb.Value) V {
+func FromYDB(t *Ydb.Type, v *Ydb.Value) V {
 	return Value{
 		t: TypeFromYDB(t),
 		v: v,

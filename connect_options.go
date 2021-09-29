@@ -151,7 +151,7 @@ func WithTraceTable(trace trace.Table) Option {
 	}
 }
 
-func WithTlsConfig(tlsConfig *tls.Config) Option {
+func WithTLSConfig(tlsConfig *tls.Config) Option {
 	return func(ctx context.Context, c *db) error {
 		c.options.tlsConfig = tlsConfig
 		return nil

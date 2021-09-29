@@ -4,7 +4,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 )
 
-type FeatureFlag = feature.FeatureFlag
+type FeatureFlag = feature.Flag
 
 const (
 	FeatureEnabled  = feature.FeatureEnabled

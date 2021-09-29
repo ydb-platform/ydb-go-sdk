@@ -14,7 +14,7 @@ func TestMetaRequiredHeaders(t *testing.T) {
 	m := &meta{
 		database:     "database",
 		requestsType: "requestType",
-		credentials: credentials.CredentialsFunc(func(context.Context) (string, error) {
+		credentials: credentials.Func(func(context.Context) (string, error) {
 			return "token", nil
 		}),
 	}

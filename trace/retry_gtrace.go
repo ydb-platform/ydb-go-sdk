@@ -51,15 +51,15 @@ func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
 	}
 	return res
 }
-func RetryOnRetry(t Retry, c context.Context) func(_ context.Context, latency time.Duration, issues []error) {
+func RetryOnRetry(t Retry, c context.Context) func(_ context.Context, latency time.Duration, err error) {
 	var p RetryLoopStartInfo
 	p.Context = c
 	res := t.onRetry(p)
-	return func(c context.Context, latency time.Duration, issues []error) {
+	return func(c context.Context, latency time.Duration, err error) {
 		var p RetryLoopDoneInfo
 		p.Context = c
 		p.Latency = latency
-		p.Issues = issues
+		p.Err = err
 		res(p)
 	}
 }

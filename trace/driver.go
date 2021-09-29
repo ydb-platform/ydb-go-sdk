@@ -134,7 +134,7 @@ type (
 	ConnInvokeDoneInfo struct {
 		Error  error
 		Issues []Issue
-		OpId   string
+		OpID   string
 	}
 	ConnNewStreamStartInfo struct {
 		Context  context.Context

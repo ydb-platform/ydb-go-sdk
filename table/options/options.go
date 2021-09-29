@@ -285,7 +285,7 @@ func WithPartitioningPolicyExplicitPartitions(splitPoints ...types.Value) Partit
 	return func(p *partitioningPolicy) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
 		for i := range values {
-			values[i] = value.ValueToYDB(splitPoints[i])
+			values[i] = value.ToYDB(splitPoints[i])
 		}
 		p.Partitions = &Ydb_Table.PartitioningPolicy_ExplicitPartitions{
 			ExplicitPartitions: &Ydb_Table.ExplicitPartitions{
@@ -575,7 +575,7 @@ func ReadGreater(x types.Value) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_Greater{
-			Greater: value.ValueToYDB(x),
+			Greater: value.ToYDB(x),
 		}
 	}
 }
@@ -584,7 +584,7 @@ func ReadGreaterOrEqual(x types.Value) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
-			GreaterOrEqual: value.ValueToYDB(x),
+			GreaterOrEqual: value.ToYDB(x),
 		}
 	}
 }
@@ -593,7 +593,7 @@ func ReadLess(x types.Value) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
-			Less: value.ValueToYDB(x),
+			Less: value.ToYDB(x),
 		}
 	}
 }
@@ -602,7 +602,7 @@ func ReadLessOrEqual(x types.Value) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.initKeyRange()
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_LessOrEqual{
-			LessOrEqual: value.ValueToYDB(x),
+			LessOrEqual: value.ToYDB(x),
 		}
 	}
 }

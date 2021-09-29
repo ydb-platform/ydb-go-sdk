@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"path"
 	"text/template"
 
@@ -116,16 +115,12 @@ func readTable(ctx context.Context, db *sql.DB, path string) error {
 		}
 		log.Printf("  > %d %s %d", *id, *title, date.Time.Unix())
 	}
-
-	if err = res.Err(); err != nil {
-		return err
-	}
-	return nil
+	return res.Err()
 }
 
 func describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
-	err, issues := c.RetryIdempotent(
+	err := c.RetryIdempotent(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
@@ -133,11 +128,6 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 		},
 	)
 	if err != nil {
-		log.SetOutput(os.Stderr)
-		log.Printf("> describeTableOptions issues:\n")
-		for _, e := range issues {
-			log.Printf("  > %v\n", e)
-		}
 		return err
 	}
 	log.Printf("> describe_table_options:\n")
@@ -282,10 +272,7 @@ func scanQuerySelect(ctx context.Context, db *sql.DB, prefix string) error {
 		}
 		log.Printf("  > Decimal: { bytes: %d, scale: %d, precision: %d }\n", decimal.Bytes, decimal.Scale, decimal.Precision)
 	}
-	if err = res.Err(); err != nil {
-		return err
-	}
-	return nil
+	return res.Err()
 }
 
 func fillTablesWithData(ctx context.Context, db *sql.DB, prefix string) error {
@@ -310,7 +297,7 @@ func fillTablesWithData(ctx context.Context, db *sql.DB, prefix string) error {
 }
 
 func createTables(ctx context.Context, c table.Client, prefix string) error {
-	err, issues := c.RetryNonIdempotent(
+	err := c.RetryNonIdempotent(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
@@ -324,15 +311,10 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 		},
 	)
 	if err != nil {
-		log.SetOutput(os.Stderr)
-		log.Printf("> createTables issues:\n")
-		for _, e := range issues {
-			log.Printf("\t> %v\n", e)
-		}
 		return err
 	}
 
-	err, issues = c.RetryNonIdempotent(
+	err = c.RetryNonIdempotent(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "seasons"),
@@ -346,15 +328,10 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 		},
 	)
 	if err != nil {
-		log.SetOutput(os.Stderr)
-		log.Printf("> createTables issues:\n")
-		for _, e := range issues {
-			log.Printf("\t> %v\n", e)
-		}
 		return err
 	}
 
-	err, issues = c.RetryNonIdempotent(
+	err = c.RetryNonIdempotent(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, "episodes"),
@@ -367,18 +344,11 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 			)
 		},
 	)
-	if err != nil {
-		log.SetOutput(os.Stderr)
-		log.Printf("> createTables issues:\n")
-		for _, e := range issues {
-			log.Printf("\t> %v\n", e)
-		}
-	}
 	return err
 }
 
 func describeTable(ctx context.Context, c table.Client, path string) (err error) {
-	err, issues := c.RetryIdempotent(
+	err = c.RetryIdempotent(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
@@ -392,13 +362,6 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 			return
 		},
 	)
-	if err != nil {
-		log.SetOutput(os.Stderr)
-		log.Printf("> describeTable issues:\n")
-		for _, e := range issues {
-			log.Printf("  > %v\n", e)
-		}
-	}
 	return err
 }
 

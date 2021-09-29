@@ -164,7 +164,7 @@ func WithValues(vs ...types.Value) ResultSetOption {
 					Items: make([]*Ydb.Value, n),
 				}
 			}
-			tv := value.ValueToYDB(v)
+			tv := value.ToYDB(v)
 			act := value.TypeFromYDB(tv.Type)
 			exp := value.TypeFromYDB(r.Columns[j].Type)
 			if !value.TypesEqual(act, exp) {

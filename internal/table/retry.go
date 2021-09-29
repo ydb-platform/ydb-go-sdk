@@ -2,7 +2,6 @@ package table
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -32,7 +31,7 @@ type SessionProvider interface {
 	// - deadline was canceled or deadlined
 	// - retry operation returned nil as error
 	// If deadline without deadline used session pool RetryTimeout
-	Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error, issues []error)
+	Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error)
 
 	// Close provide cleanup sessions
 	Close(ctx context.Context) error
@@ -41,7 +40,7 @@ type SessionProvider interface {
 type SessionProviderFunc struct {
 	OnGet   func(context.Context) (table.Session, error)
 	OnPut   func(context.Context, table.Session) error
-	OnRetry func(context.Context, table.RetryOperation) (error, []error)
+	OnRetry func(context.Context, table.RetryOperation) error
 	OnClose func(context.Context) error
 }
 
@@ -66,7 +65,7 @@ func (f SessionProviderFunc) Put(ctx context.Context, s table.Session) error {
 	return f.OnPut(ctx, s)
 }
 
-func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op table.RetryOperation) (err error, issues []error) {
+func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op table.RetryOperation) (err error) {
 	if f.OnRetry == nil {
 		return retryBackoff(ctx, f, nil, nil, false, op)
 	}
@@ -99,7 +98,7 @@ func (s *singleSession) Close(ctx context.Context) error {
 	return s.CloseSession(ctx, s.s)
 }
 
-func (s *singleSession) Retry(ctx context.Context, _ bool, op table.RetryOperation) (err error, issues []error) {
+func (s *singleSession) Retry(ctx context.Context, _ bool, op table.RetryOperation) (err error) {
 	return retryBackoff(ctx, s, s.b, s.b, false, op)
 }
 
@@ -140,7 +139,7 @@ func retryBackoff(
 	slowBackoff retry.Backoff,
 	isOperationIdempotent bool,
 	op table.RetryOperation,
-) (err error, issues []error) {
+) (err error) {
 	var (
 		s      table.Session
 		i      int
@@ -149,7 +148,7 @@ func retryBackoff(
 		onDone = trace.RetryOnRetry(trace.ContextRetry(ctx), ctx)
 	)
 	defer func() {
-		onDone(ctx, time.Since(start), issues)
+		onDone(ctx, time.Since(start), err)
 		if s != nil {
 			_ = p.Put(ctx, s)
 		}
@@ -157,8 +156,7 @@ func retryBackoff(
 	for ; ; i++ {
 		select {
 		case <-ctx.Done():
-			issues = errors.Prepend(issues, fmt.Errorf("retryBackoff: deadline is done: %w", ctx.Err()), errors.DefaultMaxIssuesLen)
-			return ctx.Err(), issues
+			return ctx.Err()
 
 		default:
 			if s == nil {
@@ -182,14 +180,10 @@ func retryBackoff(
 				_ = p.CloseSession(ctx, s)
 				s = nil
 			}
-			if m.MustRetry(isOperationIdempotent) {
-				issues = errors.Prepend(issues, fmt.Errorf("retryBackoff: retriable error: %w", err), errors.DefaultMaxIssuesLen)
-			} else {
-				issues = errors.Prepend(issues, fmt.Errorf("retryBackoff: non-retriable error: %w", err), errors.DefaultMaxIssuesLen)
+			if !m.MustRetry(isOperationIdempotent) {
 				return
 			}
 			if err = retry.Wait(ctx, fastBackoff, slowBackoff, m, i); err != nil {
-				issues = errors.Prepend(issues, fmt.Errorf("retryBackoff: wait failed: %w", err), errors.DefaultMaxIssuesLen)
 				return
 			}
 			code = m.StatusCode()

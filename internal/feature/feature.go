@@ -2,15 +2,15 @@ package feature
 
 import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-type FeatureFlag int
+type Flag int
 
 const (
-	FeatureUnknown FeatureFlag = iota
+	FeatureUnknown Flag = iota
 	FeatureEnabled
 	FeatureDisabled
 )
 
-func (f FeatureFlag) ToYDB() Ydb.FeatureFlag_Status {
+func (f Flag) ToYDB() Ydb.FeatureFlag_Status {
 	switch f {
 	case FeatureEnabled:
 		return Ydb.FeatureFlag_ENABLED
@@ -23,7 +23,7 @@ func (f FeatureFlag) ToYDB() Ydb.FeatureFlag_Status {
 	}
 }
 
-func FeatureFlagFromYDB(f Ydb.FeatureFlag_Status) FeatureFlag {
+func FromYDB(f Ydb.FeatureFlag_Status) Flag {
 	switch f {
 	case Ydb.FeatureFlag_ENABLED:
 		return FeatureEnabled

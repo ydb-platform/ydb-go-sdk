@@ -140,7 +140,7 @@ func generate(pairs []pair, cfg cfg) error {
 								Mode: cfg.genMode,
 							}
 						}
-						if err := item.ParseComment(text); err != nil {
+						if err = item.ParseComment(text); err != nil {
 							log.Fatalf(
 								"malformed comment string: %q: %v",
 								text, err,
@@ -251,7 +251,7 @@ func generate(pairs []pair, cfg cfg) error {
 
 				default:
 					// TODO: shrink GenAll here.
-					typ, err := checkInterface(x, GenAll)
+					typ, err = checkInterface(x, GenAll)
 					if err != nil {
 						pkg.Couple(obj.Name(), func(x interface{}) {
 							t.Struct = x.(*Struct)
@@ -279,7 +279,7 @@ func generate(pairs []pair, cfg cfg) error {
 					Name:  item.Ident.Name,
 					Flags: item.Flags,
 				}
-				if err := inferType(&s.T, item.ArrayType.Elt); err != nil {
+				if err = inferType(&s.T, item.ArrayType.Elt); err != nil {
 					return fmt.Errorf("%s: %w", s.Name, err)
 				}
 				file.Slices = append(file.Slices, s)
@@ -300,13 +300,13 @@ func generate(pairs []pair, cfg cfg) error {
 						Column:   camelToSnake(name),
 						Position: i,
 					}
-					if err := field.ParseTags(decl.Tag(i)); err != nil {
+					if err = field.ParseTags(decl.Tag(i)); err != nil {
 						return fmt.Errorf("%s.%s: %w", s.Name, field.Name, err)
 					}
 					if field.Ignore {
 						continue
 					}
-					if err := inferType(&field.T, f.Type); err != nil {
+					if err = inferType(&field.T, f.Type); err != nil {
 						return fmt.Errorf("%s.%s: %w", s.Name, field.Name, err)
 					}
 					// Do not handle errors here due to the late binding.
@@ -341,7 +341,7 @@ func generate(pairs []pair, cfg cfg) error {
 		}{f: file, w: pairs[i].dst})
 	}
 
-	if err := pkg.Finalize(); err != nil {
+	if err = pkg.Finalize(); err != nil {
 		return err
 	}
 	for _, p := range pkg.Pipelines {
@@ -350,7 +350,7 @@ func generate(pairs []pair, cfg cfg) error {
 				if f.T.Slice != nil || f.T.Struct != nil || f.T.Container {
 					// Slices or structs for fields are always containers
 					// currently.
-					err := dig(&f.T, func(t *T) {
+					err = dig(&f.T, func(t *T) {
 						if t.Basic != nil {
 							return
 						}
@@ -366,7 +366,7 @@ func generate(pairs []pair, cfg cfg) error {
 				if cfg.verbose {
 					log.Printf("%s.%s: %s", s.Name, f.Name, f.T.String())
 				}
-				if err := f.Validate(); err != nil {
+				if err = f.Validate(); err != nil {
 					return fmt.Errorf(
 						"generate struct %q field %q error: %v",
 						s.Name, f.Name, err,
@@ -376,10 +376,8 @@ func generate(pairs []pair, cfg cfg) error {
 		}
 	}
 	g := Generator{}
-	if err := g.Generate(pkg); err != nil {
-		return err
-	}
-	return nil
+	err = g.Generate(pkg)
+	return err
 }
 func main() {
 	log.SetFlags(0)

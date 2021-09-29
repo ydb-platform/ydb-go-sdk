@@ -194,7 +194,7 @@ func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 		return
 	}
 	for key, v := range q.m {
-		it(key, value.ValueFromYDB(
+		it(key, value.FromYDB(
 			v.Type,
 			v.Value,
 		))
@@ -232,6 +232,6 @@ func (q *QueryParameters) Add(opts ...ParameterOption) {
 
 func ValueParam(name string, v types.Value) ParameterOption {
 	return func(q queryParams) {
-		q[name] = value.ValueToYDB(v)
+		q[name] = value.ToYDB(v)
 	}
 }

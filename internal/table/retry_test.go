@@ -41,16 +41,12 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			)
 
 			ctx, cancel := context.WithCancel(context.Background())
-			type result struct {
-				err    error
-				issues []error
-			}
-			results := make(chan result)
+			results := make(chan error)
 			go func() {
-				err, issues := p.Retry(ctx, false, func(ctx context.Context, _ table.Session) error {
+				err := p.Retry(ctx, false, func(ctx context.Context, _ table.Session) error {
 					return testErr
 				})
-				results <- result{err, issues}
+				results <- err
 			}()
 
 			select {
@@ -60,9 +56,6 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			}
 
 			cancel()
-			if res := <-results; !errors.Contains(res.issues, testErr) {
-				t.Errorf("unexpected result: %v", res)
-			}
 		})
 	}
 }
@@ -73,55 +66,6 @@ func _newSession(t *testing.T, cl cluster.DB) table.Session {
 		t.Fatalf("newSession unexpected error: %v", err)
 	}
 	return s
-}
-
-func TestRetryerImmediateRetry(t *testing.T) {
-	for testErr, session := range map[error]table.Session{
-		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorResourceExhausted),
-		): _newSession(t, simpleCluster),
-		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorAborted),
-		): _newSession(t, simpleCluster),
-		errors.NewOpError(
-			errors.WithOEReason(errors.StatusUnavailable),
-		): _newSession(t, simpleCluster),
-		errors.NewOpError(
-			errors.WithOEReason(errors.StatusOverloaded),
-		): _newSession(t, simpleCluster),
-		errors.NewOpError(
-			errors.WithOEReason(errors.StatusAborted),
-		): _newSession(t, simpleCluster),
-		errors.NewOpError(
-			errors.WithOEReason(errors.StatusNotFound),
-		): _newSession(t, simpleCluster),
-		fmt.Errorf("wrap op error: %w", errors.NewOpError(
-			errors.WithOEReason(errors.StatusAborted),
-		)): _newSession(t, simpleCluster),
-	} {
-		t.Run(fmt.Sprintf("err: %v, session: %v", testErr, session != nil), func(t *testing.T) {
-			p := SingleSession(
-				simpleSession(t),
-				testutil.BackoffFunc(func(n int) <-chan time.Time {
-					ch := make(chan time.Time, 1)
-					ch <- time.Now()
-					return ch
-				}),
-			)
-			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-			defer cancel()
-			err, issues := p.Retry(
-				ctx,
-				false,
-				func(ctx context.Context, _ table.Session) error {
-					return testErr
-				},
-			)
-			if !errors.Contains(issues, testErr) {
-				t.Fatalf("unexpected error: %v; want: %v", err, testErr)
-			}
-		})
-	}
 }
 
 func TestRetryerBadSession(t *testing.T) {
@@ -137,7 +81,7 @@ func TestRetryerBadSession(t *testing.T) {
 		sessions   []table.Session
 	)
 	ctx, cancel := context.WithCancel(context.Background())
-	err, issues := p.Retry(
+	err := p.Retry(
 		ctx,
 		false,
 		func(ctx context.Context, s table.Session) error {
@@ -150,9 +94,6 @@ func TestRetryerBadSession(t *testing.T) {
 		},
 	)
 	if !errors.Is(err, context.Canceled) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if !errors.ContainsOpError(issues, errors.StatusBadSession) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	seen := make(map[table.Session]bool, len(sessions))
@@ -196,7 +137,7 @@ func TestRetryerImmediateReturn(t *testing.T) {
 					panic("this code will not be called")
 				}),
 			)
-			err, _ := pool.Retry(
+			err := pool.Retry(
 				context.Background(),
 				false,
 				func(ctx context.Context, _ table.Session) error {
@@ -321,14 +262,14 @@ func TestRetryContextDeadline(t *testing.T) {
 				random := rand.New(rand.NewSource(time.Now().Unix()))
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
-				_, _ = pool.Retry(
+				_ = pool.Retry(
 					trace.WithRetry(
 						ctx,
 						trace.Retry{
 							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 								return func(info trace.RetryLoopDoneInfo) {
 									if info.Latency-timeouts[i] > tolerance {
-										t.Errorf("unexpected latency: %v (issues %d)", info.Latency, info.Issues)
+										t.Errorf("unexpected latency: %v", info.Latency)
 									}
 								}
 							},

@@ -321,15 +321,13 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 				}
 				var dv *string
 				return ydbval, &dv
-			} else {
-				if c.testDefault {
-					var dv [8]byte
-					return ydbval, &dv
-				}
-				var dv *[8]byte
-				return ydbval, &dv
-
 			}
+			if c.testDefault {
+				var dv [8]byte
+				return ydbval, &dv
+			}
+			var dv *[8]byte
+			return ydbval, &dv
 		}
 		v := make([]byte, 8)
 		binary.BigEndian.PutUint64(v, uint64(rv))
@@ -352,15 +350,14 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 				return ydbval, &vp
 			}
 			return ydbval, &src
-		} else {
-			var src [8]byte
-			copy(src[:], v)
-			if c.optional && !c.testDefault {
-				vp := &src
-				return ydbval, &vp
-			}
-			return ydbval, &src
 		}
+		var src [8]byte
+		copy(src[:], v)
+		if c.optional && !c.testDefault {
+			vp := &src
+			return ydbval, &vp
+		}
+		return ydbval, &src
 	case Ydb.Type_UTF8:
 		v := strconv.FormatUint(uint64(rv), 10)
 		ydbval := &Ydb.Value{

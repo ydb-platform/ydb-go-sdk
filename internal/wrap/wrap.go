@@ -15,7 +15,7 @@ type Operation struct {
 	resp   response.Response
 }
 
-func WrapWithResponse(method string, req proto.Message, resp response.Response) Operation {
+func WithResponse(method string, req proto.Message, resp response.Response) Operation {
 	return Operation{
 		method: method,
 		req:    req,
@@ -54,7 +54,7 @@ type StreamOperation struct {
 	processor func(error)
 }
 
-func WrapStreamOperation(
+func NewStreamOperation(
 	method string, req proto.Message,
 	resp StreamOperationResponse,
 	p func(error),

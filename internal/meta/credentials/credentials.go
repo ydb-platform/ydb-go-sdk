@@ -18,18 +18,18 @@ type Credentials interface {
 	Token(context.Context) (string, error)
 }
 
-// CredentialsFunc is an adapter to allow the use of ordinary functions as
+// Func is an adapter to allow the use of ordinary functions as
 // Credentials.
-type CredentialsFunc func(context.Context) (string, error)
+type Func func(context.Context) (string, error)
 
 // Token implements Credentials.
-func (f CredentialsFunc) Token(ctx context.Context) (string, error) {
+func (f Func) Token(ctx context.Context) (string, error) {
 	return f(ctx)
 }
 
 // Token implements Credentials.
-func (f CredentialsFunc) String() string {
-	return "CredentialsFunc"
+func (f Func) String() string {
+	return "Func"
 }
 
 // AuthTokenCredentials implements Credentials interface with static

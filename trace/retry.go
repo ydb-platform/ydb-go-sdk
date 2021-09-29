@@ -19,6 +19,6 @@ type (
 	RetryLoopDoneInfo struct {
 		Context context.Context
 		Latency time.Duration
-		Issues  []error
+		Err     error
 	}
 )

@@ -245,9 +245,8 @@ func compareBool(l, r *Ydb.Value) int {
 	if ll {
 		if rr {
 			return 0
-		} else {
-			return 1
 		}
+		return 1
 	}
 	if rr {
 		return -1

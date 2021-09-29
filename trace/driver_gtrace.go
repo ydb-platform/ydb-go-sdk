@@ -600,7 +600,7 @@ func DriverOnConnInvoke(t Driver, c context.Context, e Endpoint, m Method) func(
 		var p ConnInvokeDoneInfo
 		p.Error = e
 		p.Issues = issues
-		p.OpId = opId
+		p.OpID = opId
 		res(p)
 	}
 }

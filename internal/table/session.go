@@ -228,7 +228,7 @@ func (s *session) DescribeTable(ctx context.Context, path string, opts ...option
 			rs[i].From = last
 		}
 
-		bound := value.ValueFromYDB(b.GetType(), b.GetValue())
+		bound := value.FromYDB(b.GetType(), b.GetValue())
 		rs[i].To = bound
 
 		last = bound
@@ -293,7 +293,7 @@ func (s *session) DescribeTable(ctx context.Context, path string, opts ...option
 		Attributes:           attrs,
 		ReadReplicaSettings:  options.NewReadReplicasSettings(result.GetReadReplicasSettings()),
 		StorageSettings:      options.NewStorageSettings(result.GetStorageSettings()),
-		KeyBloomFilter:       feature.FeatureFlagFromYDB(result.GetKeyBloomFilter()),
+		KeyBloomFilter:       feature.FromYDB(result.GetKeyBloomFilter()),
 		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
 		Indexes:              indexes,
 		TimeToLiveSettings:   options.NewTimeToLiveSettings(result.GetTtlSettings()),
@@ -796,7 +796,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
 	_, err = s.tableService.BulkUpsert(ctx, &Ydb_Table.BulkUpsertRequest{
 		Table: table,
-		Rows:  value.ValueToYDB(rows),
+		Rows:  value.ToYDB(rows),
 	})
 	return err
 }

@@ -156,7 +156,7 @@ reduce boilerplate overhead for such cases `ydb-go-sdk` provides generic retry l
  // - retry operation returned nil as error
  // Note that in case of prepared statements call to Prepare() must be made
  // inside the function body.
- err, issues := c.Retry(ctx, false,
+ err := c.Retry(ctx, false,
      func(ctx context.Context, s table.Session) (err error) {
          res, err = s.Execute(...)
          return

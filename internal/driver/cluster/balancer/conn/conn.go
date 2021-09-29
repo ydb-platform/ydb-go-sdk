@@ -168,7 +168,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	var (
 		rawCtx = ctx
 		cancel context.CancelFunc
-		opId   string
+		opID   string
 		issues []trace.Issue
 	)
 	if t := c.config.RequestTimeout(); t > 0 {
@@ -195,7 +195,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	c.runtime.OperationStart(start)
 	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.Addr(), trace.Method(method))
 	defer func() {
-		onDone(err, issues, opId)
+		onDone(err, issues, opID)
 		err = errors.ErrIf(errors.IsTimeoutError(err), err)
 		c.runtime.OperationDone(start, timeutil.Now(), err)
 	}()
@@ -224,7 +224,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		return
 	}
 	if opResponse, ok := res.(response.OpResponse); ok {
-		opId = opResponse.GetOperation().GetId()
+		opID = opResponse.GetOperation().GetId()
 		for _, issue := range opResponse.GetOperation().GetIssues() {
 			issues = append(issues, issue)
 		}

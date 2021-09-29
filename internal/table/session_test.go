@@ -175,7 +175,7 @@ func TestSessionDescribeTable(t *testing.T) {
 			},
 			PrimaryKey: expect.PrimaryKey,
 			ShardKeyBounds: []*Ydb.TypedValue{
-				value.ValueToYDB(expect.KeyRanges[0].To),
+				value.ToYDB(expect.KeyRanges[0].To),
 			},
 			Indexes:    nil,
 			TableStats: nil,

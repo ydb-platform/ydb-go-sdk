@@ -132,7 +132,7 @@ func NewColumnFamily(c *Ydb_Table.ColumnFamily) ColumnFamily {
 		Name:         c.GetName(),
 		Data:         storagePool(c.GetData()),
 		Compression:  columnFamilyCompression(c.GetCompression()),
-		KeepInMemory: feature.FeatureFlagFromYDB(c.GetKeepInMemory()),
+		KeepInMemory: feature.FromYDB(c.GetKeepInMemory()),
 	}
 }
 
@@ -267,7 +267,7 @@ func NewStorageSettings(ss *Ydb_Table.StorageSettings) StorageSettings {
 		TableCommitLog0:    storagePool(ss.GetTabletCommitLog0()),
 		TableCommitLog1:    storagePool(ss.GetTabletCommitLog1()),
 		External:           storagePool(ss.GetExternal()),
-		StoreExternalBlobs: feature.FeatureFlagFromYDB(ss.GetStoreExternalBlobs()),
+		StoreExternalBlobs: feature.FromYDB(ss.GetStoreExternalBlobs()),
 	}
 }
 
@@ -291,9 +291,9 @@ func (ps PartitioningSettings) toYDB() *Ydb_Table.PartitioningSettings {
 
 func NewPartitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSettings {
 	return PartitioningSettings{
-		PartitioningBySize: feature.FeatureFlagFromYDB(ps.GetPartitioningBySize()),
+		PartitioningBySize: feature.FromYDB(ps.GetPartitioningBySize()),
 		PartitionSizeMb:    ps.GetPartitionSizeMb(),
-		PartitioningByLoad: feature.FeatureFlagFromYDB(ps.GetPartitioningByLoad()),
+		PartitioningByLoad: feature.FromYDB(ps.GetPartitioningByLoad()),
 		MinPartitionsCount: ps.GetMinPartitionsCount(),
 		MaxPartitionsCount: ps.GetMaxPartitionsCount(),
 	}

@@ -328,7 +328,7 @@ func (s *scanner) any() interface{} {
 // Value returns current item under scan as ydb.Value types.
 func (s *scanner) value() types.Value {
 	x := s.stack.current()
-	return value.ValueFromYDB(x.t, x.v)
+	return value.FromYDB(x.t, x.v)
 }
 
 func (s *scanner) isCurrentTypeOptional() bool {
