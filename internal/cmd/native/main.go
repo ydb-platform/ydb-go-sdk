@@ -36,6 +36,7 @@ func main() {
 
 	opts := []ydb.Option{
 		ydb.WithDialTimeout(5 * time.Second),
+		ydb.WithGrpcConnectionTTL(5 * time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second * 5),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5 * time.Second),

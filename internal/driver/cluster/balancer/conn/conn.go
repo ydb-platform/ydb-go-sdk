@@ -71,12 +71,7 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 			return nil, err
 		}
 		c.grpcConn = raw
-		if c.runtime.GetState() != state.Banned {
-			c.runtime.SetState(state.Online)
-		}
-	}
-	if c.config.GrpcConnectionPolicy().TTL > 0 {
-		c.timer.Reset(c.config.GrpcConnectionPolicy().TTL)
+		c.runtime.SetState(state.Online)
 	}
 	return c.grpcConn, nil
 }
@@ -98,11 +93,15 @@ func (c *conn) IsReady() bool {
 	return c.grpcConn != nil && c.grpcConn.GetState() == connectivity.Ready
 }
 
-func (c *conn) waitClose() {
+func (c *conn) resetTimer() {
 	if c.config.GrpcConnectionPolicy().TTL <= 0 {
 		return
 	}
 	c.timer.Reset(c.config.GrpcConnectionPolicy().TTL)
+}
+
+func (c *conn) waitClose() {
+	c.resetTimer()
 	for {
 		select {
 		case <-c.done:
@@ -110,22 +109,23 @@ func (c *conn) waitClose() {
 		case <-c.timer.C():
 			c.Lock()
 			if c.grpcConn != nil {
-				_ = c.close()
+				c.close()
+			} else {
+				c.resetTimer()
 			}
-			c.timer.Reset(time.Duration(math.MaxInt64))
 			c.Unlock()
 		}
 	}
 }
 
 // c mutex must be locked
-func (c *conn) close() (err error) {
+func (c *conn) close() {
 	onDone := trace.DriverOnConnDisconnect(c.config.Trace(context.Background()), c.addr, c.runtime.GetState())
-	err = c.grpcConn.Close()
+	err := c.grpcConn.Close()
 	c.runtime.SetState(state.Offline)
 	onDone(err, c.runtime.GetState())
 	c.grpcConn = nil
-	return err
+	c.timer.Reset(time.Duration(math.MaxInt64))
 }
 
 func (c *conn) Close() (err error) {
@@ -134,14 +134,14 @@ func (c *conn) Close() (err error) {
 	if c.done == nil {
 		return nil
 	}
-	if !c.timer.Stop() {
-		panic(fmt.Errorf("cant stop timer for conn to '%v'", c.addr.String()))
-	}
 	if c.done != nil {
 		close(c.done)
 	}
 	if c.grpcConn != nil {
-		_ = c.close()
+		c.close()
+	}
+	if !c.timer.Stop() {
+		panic(fmt.Errorf("cant stop timer for conn to '%v'", c.addr.String()))
 	}
 	trace.DriverOnConnClose(c.config.Trace(context.Background()), c.addr, c.runtime.GetState())
 	return err
@@ -157,6 +157,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	err = c.config.Pessimize(c.addr)
 	c.runtime.SetState(state.Banned)
 	onDone(state.Banned, err)
+	c.close()
 }
 
 func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {
@@ -210,6 +211,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	}
 
 	err = raw.Invoke(ctx, method, req, res, opts...)
+	c.resetTimer()
 
 	if err != nil {
 		err = errors.MapGRPCError(err)
@@ -277,6 +279,8 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	if err != nil {
 		return nil, errors.MapGRPCError(err)
 	}
+
+	c.resetTimer()
 
 	return &grpcClientStream{
 		ctx:    rawCtx,
