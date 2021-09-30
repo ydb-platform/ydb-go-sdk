@@ -48,9 +48,9 @@ func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Sessi
 	start := time.Now()
 	defer func() {
 		if s != nil {
-			createSessionDone(ctx, s.ID(), s.Address(), time.Since(start), err)
+			createSessionDone(s.ID(), s.Address(), time.Since(start), err)
 		} else {
-			createSessionDone(ctx, "", "", time.Since(start), err)
+			createSessionDone("", "", time.Since(start), err)
 		}
 	}()
 	var (
@@ -118,7 +118,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 		for _, cb := range s.onClose {
 			cb()
 		}
-		deleteSessionDone(ctx, s.id, time.Since(start), err)
+		deleteSessionDone(s.id, time.Since(start), err)
 	}()
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
@@ -140,7 +140,7 @@ func (s *session) Address() string {
 func (s *session) KeepAlive(ctx context.Context) (info options.SessionInfo, err error) {
 	keepAliveDone := trace.TableOnKeepAlive(s.trace, ctx, s.id)
 	defer func() {
-		keepAliveDone(ctx, s.id, &info, err)
+		keepAliveDone(s.id, &info, err)
 	}()
 	var result Ydb_Table.KeepAliveResult
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
@@ -379,9 +379,9 @@ func (s *Statement) Execute(
 	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.session.trace, ctx, s.session.id, transactionControlID(tx.Desc()), s.query, params)
 	defer func() {
 		if txr != nil {
-			executeDataQueryDone(ctx, s.session.id, txr.ID(), s.query, params, true, r, err)
+			executeDataQueryDone(s.session.id, txr.ID(), s.query, params, true, r, err)
 		} else {
-			executeDataQueryDone(ctx, s.session.id, "", s.query, params, true, r, err)
+			executeDataQueryDone(s.session.id, "", s.query, params, true, r, err)
 		}
 	}()
 	return s.execute(ctx, tx, params, opts...)
@@ -420,7 +420,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	)
 	prepareDataQueryDone := trace.TableOnPrepareDataQuery(s.trace, ctx, s.id, query)
 	defer func() {
-		prepareDataQueryDone(ctx, s.id, query, q, cached, err)
+		prepareDataQueryDone(s.id, query, q, cached, err)
 	}()
 
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
@@ -465,9 +465,9 @@ func (s *session) Execute(
 	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.trace, ctx, s.id, transactionControlID(tx.Desc()), q, params)
 	defer func() {
 		if txr != nil {
-			executeDataQueryDone(ctx, s.id, txr.ID(), q, params, true, r, err)
+			executeDataQueryDone(s.id, txr.ID(), q, params, true, r, err)
 		} else {
-			executeDataQueryDone(ctx, s.id, "", q, params, true, r, err)
+			executeDataQueryDone(s.id, "", q, params, true, r, err)
 		}
 	}()
 
@@ -681,7 +681,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 	streamReadTableDone := trace.TableOnStreamReadTable(s.trace, ctx, s.id)
 	if err != nil {
 		cancel()
-		streamReadTableDone(ctx, s.id, nil, err)
+		streamReadTableDone(s.id, nil, err)
 		return nil, err
 	}
 
@@ -693,7 +693,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		defer func() {
 			close(r.SetCh)
 			cancel()
-			streamReadTableDone(ctx, s.id, r, err)
+			streamReadTableDone(s.id, r, err)
 		}()
 		for {
 			select {
@@ -746,7 +746,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 	streamExecuteScanQueryDone := trace.TableOnStreamExecuteScanQuery(s.trace, ctx, s.id, q, params)
 	if err != nil {
 		cancel()
-		streamExecuteScanQueryDone(ctx, s.id, q, params, nil, err)
+		streamExecuteScanQueryDone(s.id, q, params, nil, err)
 		return nil, err
 	}
 
@@ -758,7 +758,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		defer func() {
 			close(r.SetCh)
 			cancel()
-			streamExecuteScanQueryDone(ctx, s.id, q, params, r, err)
+			streamExecuteScanQueryDone(s.id, q, params, r, err)
 		}()
 		for {
 			select {
@@ -801,9 +801,9 @@ func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSet
 	beginTransactionDone := trace.TableOnBeginTransaction(s.trace, ctx, s.id)
 	defer func() {
 		if s != nil {
-			beginTransactionDone(ctx, s.id, x.ID(), err)
+			beginTransactionDone(s.id, x.ID(), err)
 		} else {
-			beginTransactionDone(ctx, s.id, "", err)
+			beginTransactionDone(s.id, "", err)
 		}
 	}()
 	var (
@@ -871,7 +871,7 @@ func (tx *Transaction) ExecuteStatement(
 func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r resultset.Result, err error) {
 	commitTransactionDone := trace.TableOnCommitTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
 	defer func() {
-		commitTransactionDone(ctx, tx.s.id, tx.id, err)
+		commitTransactionDone(tx.s.id, tx.id, err)
 	}()
 	var (
 		request = &Ydb_Table.CommitTransactionRequest{
@@ -902,7 +902,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	rollbackTransactionDone := trace.TableOnRollbackTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
 	defer func() {
-		rollbackTransactionDone(ctx, tx.s.id, tx.id, err)
+		rollbackTransactionDone(tx.s.id, tx.id, err)
 	}()
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)

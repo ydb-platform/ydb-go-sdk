@@ -590,17 +590,17 @@ func DriverOnConnStateChange(t Driver, e Endpoint, state ConnState) func(state C
 		res(p)
 	}
 }
-func DriverOnConnInvoke(t Driver, c context.Context, e Endpoint, m Method) func(_ error, issues []Issue, opId string) {
+func DriverOnConnInvoke(t Driver, c context.Context, e Endpoint, m Method) func(_ error, issues []Issue, opID string) {
 	var p ConnInvokeStartInfo
 	p.Context = c
 	p.Endpoint = e
 	p.Method = m
 	res := t.onConnInvoke(p)
-	return func(e error, issues []Issue, opId string) {
+	return func(e error, issues []Issue, opID string) {
 		var p ConnInvokeDoneInfo
 		p.Error = e
 		p.Issues = issues
-		p.OpID = opId
+		p.OpID = opID
 		res(p)
 	}
 }
