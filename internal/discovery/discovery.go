@@ -45,10 +45,6 @@ type client struct {
 	ssl      bool
 }
 
-func (d *client) IsNil() bool {
-	return d == nil
-}
-
 func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	onDone := trace.DriverOnDiscovery(d.trace, ctx)
 	defer func() {

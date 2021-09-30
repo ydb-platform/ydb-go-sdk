@@ -9,22 +9,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	cluster2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 )
 
 func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
-	c, err := d.getConn(ctx)
+	var c conn.Conn
+	c, err = d.getConn(ctx)
 	if err != nil {
-		return
+		return err
 	}
 
-	return c.Invoke(
-		ctx,
-		method,
-		request,
-		response,
-		opts...,
-	)
+	return c.Invoke(ctx, method, request, response, opts...)
 }
 
 func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
@@ -41,10 +36,10 @@ func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method st
 	)
 }
 
-func (d *driver) Stats() map[cluster2.Endpoint]stats.Stats {
-	endpoints := make(map[cluster2.Endpoint]stats.Stats)
+func (d *driver) Stats() map[endpoint.Endpoint]stats.Stats {
+	endpoints := make(map[endpoint.Endpoint]stats.Stats)
 	m := sync.Mutex{}
-	d.clusterStats(func(endpoint cluster2.Endpoint, s stats.Stats) {
+	d.clusterStats(func(endpoint endpoint.Endpoint, s stats.Stats) {
 		m.Lock()
 		endpoints[endpoint] = s
 		m.Unlock()
@@ -69,5 +64,6 @@ func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	if apply, ok := cluster.ContextClientConnApplier(rawCtx); ok {
 		apply(c)
 	}
+
 	return c, err
 }

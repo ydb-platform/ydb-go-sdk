@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -147,5 +147,5 @@ func VariantValue(v Value, i uint32, variantT Type) Value {
 // shorter tuple (list) are all equal to corresponding elements of the other tuple (list), than the shorter tuple (list)
 // is considered less than the longer one.
 func Compare(l, r Value) (int, error) {
-	return assert.Compare(l, r)
+	return cmp.Compare(l, r)
 }

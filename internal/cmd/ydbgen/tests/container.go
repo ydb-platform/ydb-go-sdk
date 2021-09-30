@@ -4,7 +4,7 @@ package tests
 type Container struct {
 	Struct  Foo
 	Structs []Foo
-	Bytes   []byte   `ydb:"types:list<uint32>,conv:assert"`
+	Bytes   []byte   `ydb:"types:list<uint32>,conv:cmp"`
 	Strings []string `ydb:"types:list<string>"`
 	String  []byte
 }

@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
@@ -160,7 +159,7 @@ func (p *p2c) Remove(x Element) {
 }
 
 func (p *p2c) Pessimize(x Element) error {
-	if assert.IsNil(x) {
+	if x == nil {
 		return ErrNilBalancerElement
 	}
 	el, ok := x.(*list.Element)
@@ -175,7 +174,7 @@ func (p *p2c) Pessimize(x Element) error {
 }
 
 func (p *p2c) Contains(x Element) bool {
-	if assert.IsNil(x) {
+	if x == nil {
 		return false
 	}
 	el, ok := x.(*list.Element)

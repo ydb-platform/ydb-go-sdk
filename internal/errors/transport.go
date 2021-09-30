@@ -73,7 +73,7 @@ func WithTEOperation(operation operation) teOpt {
 	}
 }
 
-func NewTransportError(opts ...teOpt) *TransportError {
+func NewTransportError(opts ...teOpt) error {
 	te := &TransportError{
 		Reason: TransportErrorUnknownCode,
 	}

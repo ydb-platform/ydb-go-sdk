@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
@@ -187,7 +187,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 									testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
 										r := request.(*Ydb_Table.ExecuteDataQueryRequest)
 										keepInCache := r.QueryCachePolicy.KeepInCache
-										assert.Equal(t, len(test.queryCachePolicyOption) > 0, keepInCache)
+										cmp.Equal(t, len(test.queryCachePolicyOption) > 0, keepInCache)
 										return &Ydb_Table.ExecuteQueryResult{}, nil
 									},
 								},
@@ -205,8 +205,8 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			rows, err := db.QueryContext(ctx, "SELECT 1")
-			assert.NoError(t, err)
-			assert.NotNil(t, rows)
+			cmp.NoError(t, err)
+			cmp.NotNil(t, rows)
 		})
 	}
 }

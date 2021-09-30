@@ -2,7 +2,6 @@ package scheme
 
 import (
 	"context"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"google.golang.org/protobuf/proto"
@@ -83,10 +82,6 @@ type client struct {
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
-func (c *client) IsNil() bool {
-	return c == nil
-}
-
 func (c *client) Close(_ context.Context) error {
 	return nil
 }
@@ -112,8 +107,10 @@ func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	return err
 }
 
-func (c *client) ListDirectory(ctx context.Context, path string) (d Directory, err error) {
+func (c *client) ListDirectory(ctx context.Context, path string) (Directory, error) {
 	var (
+		d        Directory
+		err      error
 		response *Ydb_Scheme.ListDirectoryResponse
 		result   Ydb_Scheme.ListDirectoryResult
 	)
@@ -127,7 +124,7 @@ func (c *client) ListDirectory(ctx context.Context, path string) (d Directory, e
 	if err != nil {
 		return d, err
 	}
-	d.Entry.from(result.Self)
+	d.from(result.Self)
 	d.Children = make([]Entry, len(result.Children))
 	putEntry(d.Children, result.Children)
 	return d, nil

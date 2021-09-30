@@ -7,13 +7,12 @@ import (
 )
 
 func IsTimeoutError(err error) bool {
-	var te *TransportError
-
 	switch {
 	case
 		IsOpError(err, StatusTimeout),
 		IsOpError(err, StatusCancelled),
-		errors.As(err, &te),
+		IsTransportError(err, TransportErrorCanceled),
+		IsTransportError(err, TransportErrorDeadlineExceeded),
 		errors.Is(err, context.DeadlineExceeded),
 		errors.Is(err, context.Canceled):
 		return true

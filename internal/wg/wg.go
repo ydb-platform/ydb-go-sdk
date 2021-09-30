@@ -21,10 +21,6 @@ type wg struct {
 var _ WG = &sync.WaitGroup{}
 var _ WG = &wg{}
 
-func (w *wg) IsNil() bool {
-	return w == nil
-}
-
 func (w *wg) Done() {
 	w.once.Do(w.first)
 	w.wg.Done()

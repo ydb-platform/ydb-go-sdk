@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 )
 
 func TestParseConnectionString(t *testing.T) {
@@ -50,17 +50,17 @@ func TestParseConnectionString(t *testing.T) {
 			if !errors.Is(err, test.error) {
 				t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
 			}
-			assert.Equal(t, test.schema, schema)
-			assert.Equal(t, test.endpoint, endpoint)
-			assert.Equal(t, test.database, database)
+			cmp.Equal(t, test.schema, schema)
+			cmp.Equal(t, test.endpoint, endpoint)
+			cmp.Equal(t, test.database, database)
 		})
 	}
 }
 
 func assertConnectParams(t *testing.T, params ConnectParams) {
-	assert.NotNil(t, params)
-	assert.Equal(t, "endpoint", params.Endpoint())
-	assert.Equal(t, "name", params.Database())
+	cmp.NotNil(t, params)
+	cmp.Equal(t, "endpoint", params.Endpoint())
+	cmp.Equal(t, "name", params.Database())
 	if !params.UseTLS() {
 		t.Fatal("UseTLS is not true")
 	}

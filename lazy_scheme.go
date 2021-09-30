@@ -7,8 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -40,7 +38,7 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 
 func (s *lazyScheme) init() {
 	s.m.Lock()
-	if assert.IsNil(s.client) {
+	if s.client == nil {
 		s.client = scheme.New(s.db)
 	}
 	s.m.Unlock()

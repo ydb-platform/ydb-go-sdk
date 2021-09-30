@@ -9,7 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -523,10 +523,10 @@ func TestScanSqlTypes(t *testing.T) {
 			}
 			if test.setColumnIndexes != nil {
 				for i, v := range test.setColumnIndexes {
-					assert.Equal(t, expected[0][v], test.values[i])
+					cmp.Equal(t, expected[0][v], test.values[i])
 				}
 			} else {
-				assert.Equal(t, expected[0], test.values)
+				cmp.Equal(t, expected[0], test.values)
 			}
 			expected = expected[1:]
 		}

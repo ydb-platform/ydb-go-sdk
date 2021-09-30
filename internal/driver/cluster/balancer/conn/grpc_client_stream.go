@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -24,10 +23,6 @@ type grpcClientStream struct {
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
 	return s.s.Header()
-}
-
-func (s *grpcClientStream) IsNil() bool {
-	return s == nil
 }
 
 func (s *grpcClientStream) Trailer() metadata.MD {

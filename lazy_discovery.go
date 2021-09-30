@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -48,7 +47,7 @@ func newDiscovery(db DB, trace trace.Driver) *lazyDiscovery {
 
 func (d *lazyDiscovery) init() {
 	d.m.Lock()
-	if assert.IsNil(d.client) {
+	if d.client == nil {
 		d.client = discovery.New(d.db, d.db.Name(), d.db.Secure(), d.trace)
 	}
 	d.m.Unlock()

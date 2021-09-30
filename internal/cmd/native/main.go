@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc"
 	"log"
 	"os"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -14,6 +16,13 @@ import (
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+}
+
+type quet struct {
+}
+
+func (q quet) Write(p []byte) (n int, err error) {
+	return len(p), nil
 }
 
 func main() {
@@ -26,8 +35,6 @@ func main() {
 	}
 
 	opts := []ydb.Option{
-		ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
-		ydb.WithCredentials(ydb.NewAuthTokenCredentials("put your token")),
 		ydb.WithDialTimeout(5 * time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second * 5),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
@@ -89,33 +96,74 @@ func main() {
 		os.Exit(1)
 	}
 
-	for {
-		err = selectSimple(ctx, db.Table(), connectParams.Database())
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "select simple error: %v\n", err)
-		}
+	log.SetOutput(&quet{})
 
-		err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
-		if err != nil {
-			if !errors.IsTransportError(err, errors.TransportErrorUnimplemented) {
-				_, _ = fmt.Fprintf(os.Stderr, "scan query select error: %v\n", err)
+	concurrency := 200
+	wg := sync.WaitGroup{}
+	fmt.Printf("grpc version: %v\n", grpc.Version)
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				fmt.Print(".")
+
+				err = selectSimple(ctx, db.Table(), connectParams.Database())
+				if err != nil {
+					if errors.Is(err, grpc.ErrClientConnClosing) {
+						panic(err)
+					}
+					if errors.Is(err, context.Canceled) {
+						fmt.Println("exit")
+						return
+					}
+				}
+
+				err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
+				if err != nil {
+					if errors.Is(err, grpc.ErrClientConnClosing) {
+						panic(err)
+					}
+					if errors.Is(err, context.Canceled) {
+						fmt.Println("exit")
+						return
+					}
+				}
+
+				err = readTable(ctx, db.Table(), path.Join(
+					connectParams.Database(), "series",
+				))
+				if err != nil {
+					if errors.Is(err, grpc.ErrClientConnClosing) {
+						panic(err)
+					}
+					if errors.Is(err, context.Canceled) {
+						fmt.Println("exit")
+						return
+					}
+				}
+
+				log.Printf("> cluster stats:\n")
+				for e, s := range db.Stats() {
+					log.Printf("  > '%v': %v\n", e, s)
+				}
+
+				whoAmI, err := db.Discovery().WhoAmI(ctx)
+				log.Printf("whoAmI: %v, %v\n", whoAmI, err)
+				if err != nil {
+					if errors.Is(err, grpc.ErrClientConnClosing) {
+						panic(err)
+					}
+					if errors.Is(err, context.Canceled) {
+						fmt.Println("exit")
+						return
+					}
+				} else {
+					log.Printf("whoAmI: %v, %v\n", whoAmI, err)
+				}
 			}
-		}
-
-		err = readTable(ctx, db.Table(), path.Join(
-			connectParams.Database(), "series",
-		))
-		if err != nil {
-			log.Printf("read table error: %v\n", err)
-		}
-
-		log.Printf("> cluster stats:\n")
-		for e, s := range db.Stats() {
-			log.Printf("  > '%v': %v\n", e, s)
-		}
-
-		whoAmI, err := db.Discovery().WhoAmI(ctx)
-		log.Printf("whoAmI: %v, %v\n", whoAmI, err)
-
+		}()
 	}
+
+	wg.Wait()
 }

@@ -864,7 +864,7 @@ func ParseConvMode(s string) (ConvMode, error) {
 		return ConvDefault, nil
 	case "unsafe":
 		return ConvUnsafe, nil
-	case "assert":
+	case "cmp":
 		return ConvAssert, nil
 	default:
 		return 0, fmt.Errorf("unknown conv mode: %q", s)

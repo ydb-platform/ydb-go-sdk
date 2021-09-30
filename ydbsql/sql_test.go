@@ -12,7 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 
 	table "github.com/ydb-platform/ydb-go-sdk/v3/table"
 
@@ -144,7 +144,7 @@ func TestIsolationMapping(t *testing.T) {
 				sExp = table.TxSettings(test.txExp)
 			}
 
-			assert.Equal(t, sAct, sExp)
+			cmp.Equal(t, sAct, sExp)
 
 			var cAct, cExp *table.TransactionControl
 			if txcAct != nil {
@@ -153,7 +153,7 @@ func TestIsolationMapping(t *testing.T) {
 			if test.txcExp != nil {
 				cExp = table.TxControl(test.txcExp...)
 			}
-			assert.Equal(t, cAct, cExp)
+			cmp.Equal(t, cAct, cExp)
 		})
 	}
 }
@@ -264,22 +264,22 @@ func TestQuery(t *testing.T) {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := db.QueryContext(ctx, "SELECT 1")
-			assert.NoError(t, err)
-			assert.NotNil(t, rows)
+			cmp.NoError(t, err)
+			cmp.NotNil(t, rows)
 		})
 		t.Run("QueryContext/STMT/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			stmt, err := db.PrepareContext(ctx, "SELECT 1")
-			assert.NoError(t, err)
+			cmp.NoError(t, err)
 			defer func() { _ = stmt.Close() }()
 			if test.scanQueryMode {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := stmt.QueryContext(ctx)
-			assert.NoError(t, err)
-			assert.NotNil(t, rows)
+			cmp.NoError(t, err)
+			cmp.NotNil(t, rows)
 		})
 		t.Run("ExecContext/Conn/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
@@ -289,22 +289,22 @@ func TestQuery(t *testing.T) {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := db.ExecContext(ctx, "SELECT 1")
-			assert.NoError(t, err)
-			assert.NotNil(t, rows)
+			cmp.NoError(t, err)
+			cmp.NotNil(t, rows)
 		})
 		t.Run("ExecContext/STMT/"+test.subName, func(t *testing.T) {
 			db := sql.OpenDB(c)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 			defer cancel()
 			stmt, err := db.PrepareContext(ctx, "SELECT 1")
-			assert.NoError(t, err)
+			cmp.NoError(t, err)
 			defer func() { _ = stmt.Close() }()
 			if test.scanQueryMode {
 				ctx = WithScanQuery(ctx)
 			}
 			rows, err := stmt.ExecContext(ctx)
-			assert.NoError(t, err)
-			assert.NotNil(t, rows)
+			cmp.NoError(t, err)
+			cmp.NotNil(t, rows)
 		})
 	}
 }

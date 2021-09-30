@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/assert"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -78,7 +78,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
-			assert.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{value.ToYDB(types.Int64Value(1))})
+			cmp.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{value.ToYDB(types.Int64Value(1))})
 		}
 	}
 	{
