@@ -567,14 +567,13 @@ func DriverOnConnDial(t Driver, c context.Context, e Endpoint, state ConnState) 
 		res(p)
 	}
 }
-func DriverOnConnDisconnect(t Driver, e Endpoint, state ConnState) func(_ error, state ConnState) {
+func DriverOnConnDisconnect(t Driver, e Endpoint, state ConnState) func(state ConnState) {
 	var p ConnDisconnectStartInfo
 	p.Endpoint = e
 	p.State = state
 	res := t.onConnDisconnect(p)
-	return func(e error, state ConnState) {
+	return func(state ConnState) {
 		var p ConnDisconnectDoneInfo
-		p.Error = e
 		p.State = state
 		res(p)
 	}

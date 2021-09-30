@@ -17,7 +17,7 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 
 	curr, err := discoveryClient.Discover(ctx)
 	if err != nil {
-		_ = conn.Close()
+		conn.Close()
 		return err
 	}
 	// Endpoints must be sorted to merge
@@ -77,9 +77,7 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 				wg.Wait()
 				curr = next
 			},
-			func() {
-				_ = conn.Close()
-			},
+			conn.Close,
 		),
 	)
 	return nil

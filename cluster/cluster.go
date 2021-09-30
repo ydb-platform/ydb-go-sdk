@@ -10,7 +10,7 @@ import (
 type ClientConnInterface interface {
 	grpc.ClientConnInterface
 
-	Addr() endpoint.Addr
+	Endpoint() endpoint.Endpoint
 }
 
 type DB interface {

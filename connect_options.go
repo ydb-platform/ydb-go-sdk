@@ -72,6 +72,13 @@ func WithDriverConfig(config *config.Config) Option {
 	}
 }
 
+func WithBalancingConfig(config config.BalancerConfig) Option {
+	return func(ctx context.Context, client *db) error {
+		client.options.driverConfig.BalancingConfig = config
+		return nil
+	}
+}
+
 func WithGrpcConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, client *db) error {
 		client.options.driverConfig.GrpcConnectionPolicy.TTL = ttl

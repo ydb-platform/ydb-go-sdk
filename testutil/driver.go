@@ -268,7 +268,7 @@ func NewDB(opts ...NewClusterOption) cluster.Cluster {
 type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onAddr      func() endpoint.Addr
+	onEndpoint  func() endpoint.Endpoint
 }
 
 func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -285,11 +285,11 @@ func (c *clientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, metho
 	return c.onNewStream(ctx, desc, method, opts...)
 }
 
-func (c *clientConn) Addr() endpoint.Addr {
-	if c.onAddr == nil {
-		return endpoint.Addr{}
+func (c *clientConn) Endpoint() endpoint.Endpoint {
+	if c.onEndpoint == nil {
+		return endpoint.Endpoint{}
 	}
-	return c.onAddr()
+	return c.onEndpoint()
 }
 
 type ClientStream struct {

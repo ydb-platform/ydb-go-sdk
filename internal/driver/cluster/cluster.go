@@ -132,7 +132,7 @@ func (c *cluster) Close() (err error) {
 		if conn == nil {
 			continue
 		}
-		_ = conn.Close()
+		conn.Close()
 	}
 
 	return
@@ -153,7 +153,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 		onDone(nil, ErrClusterEmpty)
 		return nil, ErrClusterEmpty
 	}
-	onDone(conn.Addr(), nil)
+	onDone(conn.Endpoint(), nil)
 	return conn, nil
 }
 
@@ -190,7 +190,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		LoadFactor: e.LoadFactor,
 		Local:      e.Local,
 	}
-	conn := conn.New(ctx, e.Addr, c.dial, opt.connConfig)
+	conn := conn.New(ctx, e, c.dial, opt.connConfig)
 	var wait chan struct{}
 	defer func() {
 		if wait != nil {
@@ -210,7 +210,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		panic("ydb: can't insert already existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterInsert(c.trace, e.Addr)
+	onDone := trace.DriverOnClusterInsert(c.trace, e)
 
 	entry := entry.Entry{Info: info}
 	entry.Conn = conn
@@ -225,7 +225,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 // Update updates existing connection's runtime stats such that load factor and others.
 func (c *cluster) Update(_ context.Context, e endpoint.Endpoint, opts ...option) {
-	onDone := trace.DriverOnClusterUpdate(c.trace, e.Addr)
+	onDone := trace.DriverOnClusterUpdate(c.trace, e)
 	opt := options{}
 	for _, o := range opts {
 		o(&opt)
@@ -288,7 +288,7 @@ func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option)
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterRemove(c.trace, e.Addr)
+	onDone := trace.DriverOnClusterRemove(c.trace, e)
 
 	entry.RemoveFrom(c.balancer)
 	c.ready--
@@ -297,7 +297,7 @@ func (c *cluster) Remove(_ context.Context, e endpoint.Endpoint, opts ...option)
 
 	if entry.Conn != nil {
 		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
-		_ = entry.Conn.Close()
+		entry.Conn.Close()
 	}
 	onDone(entry.Conn.Runtime().GetState())
 }
@@ -347,8 +347,8 @@ func (c *cluster) Stats(it func(endpoint.Endpoint, stats.Stats)) {
 			it(
 				endpoint.Endpoint{
 					Addr: endpoint.Addr{
-						Host: entry.Conn.Addr().Host,
-						Port: entry.Conn.Addr().Port,
+						Host: entry.Conn.Endpoint().Host,
+						Port: entry.Conn.Endpoint().Port,
 					},
 					LoadFactor: entry.Info.LoadFactor,
 					Local:      entry.Info.Local,

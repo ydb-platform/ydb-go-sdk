@@ -131,7 +131,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 func (s *session) Address() string {
 	if s != nil && s.conn != nil {
-		return s.conn.Addr().String()
+		return s.conn.Endpoint().Address()
 	}
 	return ""
 }

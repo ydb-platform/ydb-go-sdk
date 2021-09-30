@@ -94,7 +94,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 		if err := d.discover(
 			ctx,
 			c,
-			conn.New(ctx, endpoint.Addr, d.dialHostPort, driver),
+			conn.New(ctx, endpoint, d.dialHostPort, driver),
 			driver,
 		); err != nil {
 			return nil, err

@@ -34,7 +34,10 @@ func BenchmarkTestScan(b *testing.B) {
 }
 
 func TestOverallApproaches(t *testing.T) {
-	for k, f := range map[string]func(b *testing.B){"BenchmarkTestScanWithColumns": BenchmarkTestScanWithColumns, "BenchmarkTestScan": BenchmarkTestScan} {
+	for k, f := range map[string]func(b *testing.B){
+		"BenchmarkTestScanWithColumns": BenchmarkTestScanWithColumns,
+		"BenchmarkTestScan":            BenchmarkTestScan,
+	} {
 		r := testing.Benchmark(f)
 		t.Log(k, r.String(), r.MemString())
 	}

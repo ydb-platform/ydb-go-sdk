@@ -47,11 +47,8 @@ func TestClusterFastRedial(t *testing.T) {
 			for i := 0; i < size*10; i++ {
 				conn, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && conn != nil && conn.Addr().Host == "bad" {
-					err = conn.Close()
-					if err == nil {
-						break
-					}
+				if err == nil && conn != nil && conn.Endpoint().Host == "bad" {
+					conn.Close()
 				}
 			}
 			close(done)

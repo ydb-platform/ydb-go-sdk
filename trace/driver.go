@@ -68,6 +68,7 @@ func (m Method) Split() (service, method string) {
 
 type Endpoint interface {
 	Address() string
+	LocalDC() bool
 }
 
 type ConnState interface {
@@ -99,7 +100,6 @@ type (
 		State    ConnState
 	}
 	ConnDisconnectDoneInfo struct {
-		Error error
 		State ConnState
 	}
 	ConnStateChangeStartInfo struct {

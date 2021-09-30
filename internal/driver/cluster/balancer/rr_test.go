@@ -236,7 +236,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), endpoint.Addr{}, nil, stub.Config(config.New()))
+				c := conn.New(context.Background(), endpoint.Endpoint{}, nil, stub.Config(config.New()))
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
@@ -289,7 +289,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), endpoint.Addr{}, nil, stub.Config(config.New()))
+				c := conn.New(context.Background(), endpoint.Endpoint{}, nil, stub.Config(config.New()))
 				c.Runtime().SetState(state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c

@@ -10,3 +10,7 @@ type Endpoint struct {
 func (e Endpoint) Address() string {
 	return e.Addr.String()
 }
+
+func (e Endpoint) LocalDC() bool {
+	return e.Local
+}
