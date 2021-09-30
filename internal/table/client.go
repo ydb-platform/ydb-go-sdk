@@ -13,6 +13,7 @@ import (
 func NewClientAsPool(db cluster.DB, config Config) ClientAsPool {
 	c := &client{
 		cluster: db,
+		trace:   config.Trace,
 	}
 	c.pool = &pool{
 		Trace:                  config.Trace,
