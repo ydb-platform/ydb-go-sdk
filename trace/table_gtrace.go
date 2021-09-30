@@ -275,6 +275,30 @@ func (t Table) Compose(x Table) (ret Table) {
 		}
 	}
 	switch {
+	case t.OnPoolClose == nil:
+		ret.OnPoolClose = x.OnPoolClose
+	case x.OnPoolClose == nil:
+		ret.OnPoolClose = t.OnPoolClose
+	default:
+		h1 := t.OnPoolClose
+		h2 := x.OnPoolClose
+		ret.OnPoolClose = func(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolCloseDoneInfo) {
+					r1(p)
+					r2(p)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnPoolGet == nil:
 		ret.OnPoolGet = x.OnPoolGet
 	case x.OnPoolGet == nil:
@@ -399,30 +423,6 @@ func (t Table) Compose(x Table) (ret Table) {
 				return r1
 			default:
 				return func(p PoolCloseSessionDoneInfo) {
-					r1(p)
-					r2(p)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnPoolClose == nil:
-		ret.OnPoolClose = x.OnPoolClose
-	case x.OnPoolClose == nil:
-		ret.OnPoolClose = t.OnPoolClose
-	default:
-		h1 := t.OnPoolClose
-		h2 := x.OnPoolClose
-		ret.OnPoolClose = func(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
-			r1 := h1(p)
-			r2 := h2(p)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(p PoolCloseDoneInfo) {
 					r1(p)
 					r2(p)
 				}
@@ -596,6 +596,21 @@ func (t Table) onPoolCreate(p PoolCreateStartInfo) func(PoolCreateDoneInfo) {
 	}
 	return res
 }
+func (t Table) onPoolClose(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
+	fn := t.OnPoolClose
+	if fn == nil {
+		return func(PoolCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(p)
+	if res == nil {
+		return func(PoolCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Table) onPoolGet(p PoolGetStartInfo) func(PoolGetDoneInfo) {
 	fn := t.OnPoolGet
 	if fn == nil {
@@ -683,28 +698,12 @@ func (t Table) onPoolCloseSession(p PoolCloseSessionStartInfo) func(PoolCloseSes
 	}
 	return res
 }
-func (t Table) onPoolClose(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
-	fn := t.OnPoolClose
-	if fn == nil {
-		return func(PoolCloseDoneInfo) {
-			return
-		}
-	}
-	res := fn(p)
-	if res == nil {
-		return func(PoolCloseDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func TableOnCreateSession(t Table, c context.Context) func(_ context.Context, sessionID string, endpoint string, latency time.Duration, _ error) {
+func TableOnCreateSession(t Table, c context.Context) func(sessionID string, endpoint string, latency time.Duration, _ error) {
 	var p CreateSessionStartInfo
 	p.Context = c
 	res := t.onCreateSession(p)
-	return func(c context.Context, sessionID string, endpoint string, latency time.Duration, e error) {
+	return func(sessionID string, endpoint string, latency time.Duration, e error) {
 		var p CreateSessionDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.Endpoint = endpoint
 		p.Latency = latency
@@ -712,43 +711,40 @@ func TableOnCreateSession(t Table, c context.Context) func(_ context.Context, se
 		res(p)
 	}
 }
-func TableOnKeepAlive(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ SessionInfo, _ error) {
+func TableOnKeepAlive(t Table, c context.Context, sessionID string) func(sessionID string, sessionInfo sessionInfo, _ error) {
 	var p KeepAliveStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onKeepAlive(p)
-	return func(c context.Context, sessionID string, s SessionInfo, e error) {
+	return func(sessionID string, sessionInfo sessionInfo, e error) {
 		var p KeepAliveDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
-		p.SessionInfo = s
+		p.SessionInfo = sessionInfo
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnDeleteSession(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string, latency time.Duration, _ error) {
+func TableOnDeleteSession(t Table, c context.Context, sessionID string) func(sessionID string, latency time.Duration, _ error) {
 	var p DeleteSessionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onDeleteSession(p)
-	return func(c context.Context, sessionID string, latency time.Duration, e error) {
+	return func(sessionID string, latency time.Duration, e error) {
 		var p DeleteSessionDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.Latency = latency
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnPrepareDataQuery(t Table, c context.Context, sessionID string, query string) func(_ context.Context, sessionID string, query string, result DataQuery, cached bool, _ error) {
+func TableOnPrepareDataQuery(t Table, c context.Context, sessionID string, query string) func(sessionID string, query string, result dataQuery, cached bool, _ error) {
 	var p PrepareDataQueryStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.Query = query
 	res := t.onPrepareDataQuery(p)
-	return func(c context.Context, sessionID string, query string, result DataQuery, cached bool, e error) {
+	return func(sessionID string, query string, result dataQuery, cached bool, e error) {
 		var p PrepareDataQueryDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.Query = query
 		p.Result = result
@@ -757,7 +753,7 @@ func TableOnPrepareDataQuery(t Table, c context.Context, sessionID string, query
 		res(p)
 	}
 }
-func TableOnExecuteDataQuery(t Table, c context.Context, sessionID string, txID string, query DataQuery, parameters QueryParameters) func(_ context.Context, sessionID string, txID string, query DataQuery, parameters QueryParameters, prepared bool, _ Result, _ error) {
+func TableOnExecuteDataQuery(t Table, c context.Context, sessionID string, txID string, query dataQuery, parameters queryParameters) func(sessionID string, txID string, query dataQuery, parameters queryParameters, prepared bool, result result, _ error) {
 	var p ExecuteDataQueryStartInfo
 	p.Context = c
 	p.SessionID = sessionID
@@ -765,114 +761,116 @@ func TableOnExecuteDataQuery(t Table, c context.Context, sessionID string, txID 
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onExecuteDataQuery(p)
-	return func(c context.Context, sessionID string, txID string, query DataQuery, parameters QueryParameters, prepared bool, r Result, e error) {
+	return func(sessionID string, txID string, query dataQuery, parameters queryParameters, prepared bool, result result, e error) {
 		var p ExecuteDataQueryDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.TxID = txID
 		p.Query = query
 		p.Parameters = parameters
 		p.Prepared = prepared
-		p.Result = r
+		p.Result = result
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnStreamReadTable(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ Result, _ error) {
+func TableOnStreamReadTable(t Table, c context.Context, sessionID string) func(sessionID string, result streamResult, _ error) {
 	var p StreamReadTableStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onStreamReadTable(p)
-	return func(c context.Context, sessionID string, r Result, e error) {
+	return func(sessionID string, result streamResult, e error) {
 		var p StreamReadTableDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
-		p.Result = r
+		p.Result = result
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnStreamExecuteScanQuery(t Table, c context.Context, sessionID string, query DataQuery, parameters QueryParameters) func(_ context.Context, sessionID string, query DataQuery, parameters QueryParameters, _ Result, _ error) {
+func TableOnStreamExecuteScanQuery(t Table, c context.Context, sessionID string, query dataQuery, parameters queryParameters) func(sessionID string, query dataQuery, parameters queryParameters, result streamResult, _ error) {
 	var p StreamExecuteScanQueryStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onStreamExecuteScanQuery(p)
-	return func(c context.Context, sessionID string, query DataQuery, parameters QueryParameters, r Result, e error) {
+	return func(sessionID string, query dataQuery, parameters queryParameters, result streamResult, e error) {
 		var p StreamExecuteScanQueryDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.Query = query
 		p.Parameters = parameters
-		p.Result = r
+		p.Result = result
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnBeginTransaction(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string, txID string, _ error) {
+func TableOnBeginTransaction(t Table, c context.Context, sessionID string) func(sessionID string, txID string, _ error) {
 	var p BeginTransactionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onBeginTransaction(p)
-	return func(c context.Context, sessionID string, txID string, e error) {
+	return func(sessionID string, txID string, e error) {
 		var p BeginTransactionDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.TxID = txID
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnCommitTransaction(t Table, c context.Context, sessionID string, txID string) func(_ context.Context, sessionID string, txID string, _ error) {
+func TableOnCommitTransaction(t Table, c context.Context, sessionID string, txID string) func(sessionID string, txID string, _ error) {
 	var p CommitTransactionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.TxID = txID
 	res := t.onCommitTransaction(p)
-	return func(c context.Context, sessionID string, txID string, e error) {
+	return func(sessionID string, txID string, e error) {
 		var p CommitTransactionDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.TxID = txID
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnRollbackTransaction(t Table, c context.Context, sessionID string, txID string) func(_ context.Context, sessionID string, txID string, _ error) {
+func TableOnRollbackTransaction(t Table, c context.Context, sessionID string, txID string) func(sessionID string, txID string, _ error) {
 	var p RollbackTransactionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	p.TxID = txID
 	res := t.onRollbackTransaction(p)
-	return func(c context.Context, sessionID string, txID string, e error) {
+	return func(sessionID string, txID string, e error) {
 		var p RollbackTransactionDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.TxID = txID
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnPoolCreate(t Table, c context.Context) func(_ context.Context, sessionID string, _ error) {
+func TableOnPoolCreate(t Table, c context.Context) func(sessionID string, _ error) {
 	var p PoolCreateStartInfo
 	p.Context = c
 	res := t.onPoolCreate(p)
-	return func(c context.Context, sessionID string, e error) {
+	return func(sessionID string, e error) {
 		var p PoolCreateDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnPoolGet(t Table, c context.Context) func(_ context.Context, sessionID string, latency time.Duration, retryAttempts int, _ error) {
+func TableOnPoolClose(t Table, c context.Context) func(error) {
+	var p PoolCloseStartInfo
+	p.Context = c
+	res := t.onPoolClose(p)
+	return func(e error) {
+		var p PoolCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func TableOnPoolGet(t Table, c context.Context) func(sessionID string, latency time.Duration, retryAttempts int, _ error) {
 	var p PoolGetStartInfo
 	p.Context = c
 	res := t.onPoolGet(p)
-	return func(c context.Context, sessionID string, latency time.Duration, retryAttempts int, e error) {
+	return func(sessionID string, latency time.Duration, retryAttempts int, e error) {
 		var p PoolGetDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.Latency = latency
 		p.RetryAttempts = retryAttempts
@@ -880,31 +878,28 @@ func TableOnPoolGet(t Table, c context.Context) func(_ context.Context, sessionI
 		res(p)
 	}
 }
-func TableOnPoolWait(t Table, c context.Context) func(_ context.Context, sessionID string, _ error) {
+func TableOnPoolWait(t Table, c context.Context) func(sessionID string, _ error) {
 	var p PoolWaitStartInfo
 	p.Context = c
 	res := t.onPoolWait(p)
-	return func(c context.Context, sessionID string, e error) {
+	return func(sessionID string, e error) {
 		var p PoolWaitDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnPoolTake(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string) func(_ context.Context, sessionID string, took bool, _ error) {
+func TableOnPoolTake(t Table, c context.Context, sessionID string) func(sessionID string) func(sessionID string, took bool, _ error) {
 	var p PoolTakeStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onPoolTake(p)
-	return func(c context.Context, sessionID string) func(context.Context, string, bool, error) {
+	return func(sessionID string) func(string, bool, error) {
 		var p PoolTakeWaitInfo
-		p.Context = c
 		p.SessionID = sessionID
 		res := res(p)
-		return func(c context.Context, sessionID string, took bool, e error) {
+		return func(sessionID string, took bool, e error) {
 			var p PoolTakeDoneInfo
-			p.Context = c
 			p.SessionID = sessionID
 			p.Took = took
 			p.Error = e
@@ -912,39 +907,26 @@ func TableOnPoolTake(t Table, c context.Context, sessionID string) func(_ contex
 		}
 	}
 }
-func TableOnPoolPut(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ error) {
+func TableOnPoolPut(t Table, c context.Context, sessionID string) func(sessionID string, _ error) {
 	var p PoolPutStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onPoolPut(p)
-	return func(c context.Context, sessionID string, e error) {
+	return func(sessionID string, e error) {
 		var p PoolPutDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnPoolCloseSession(t Table, c context.Context, sessionID string) func(_ context.Context, sessionID string, _ error) {
+func TableOnPoolCloseSession(t Table, c context.Context, sessionID string) func(sessionID string, _ error) {
 	var p PoolCloseSessionStartInfo
 	p.Context = c
 	p.SessionID = sessionID
 	res := t.onPoolCloseSession(p)
-	return func(c context.Context, sessionID string, e error) {
+	return func(sessionID string, e error) {
 		var p PoolCloseSessionDoneInfo
-		p.Context = c
 		p.SessionID = sessionID
-		p.Error = e
-		res(p)
-	}
-}
-func TableOnPoolClose(t Table, c context.Context) func(context.Context, error) {
-	var p PoolCloseStartInfo
-	p.Context = c
-	res := t.onPoolClose(p)
-	return func(c context.Context, e error) {
-		var p PoolCloseDoneInfo
-		p.Context = c
 		p.Error = e
 		res(p)
 	}

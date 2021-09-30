@@ -305,9 +305,9 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 	getDone := trace.TableOnPoolGet(p.Trace, ctx)
 	defer func() {
 		if s != nil {
-			getDone(ctx, s.ID(), time.Since(start), i, err)
+			getDone(s.ID(), time.Since(start), i, err)
 		} else {
-			getDone(ctx, "", time.Since(start), i, err)
+			getDone("", time.Since(start), i, err)
 		}
 	}()
 
@@ -374,9 +374,9 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 				p.putWaitCh(ch)
 			}
 			if s != nil {
-				waitDone(ctx, s.ID(), err)
+				waitDone(s.ID(), err)
 			} else {
-				waitDone(ctx, "", err)
+				waitDone("", err)
 			}
 
 		case <-ctx.Done():
@@ -388,9 +388,9 @@ func (p *pool) Get(ctx context.Context) (s table.Session, err error) {
 			p.mu.Unlock()
 			err = ctx.Err()
 			if s != nil {
-				waitDone(ctx, s.ID(), err)
+				waitDone(s.ID(), err)
 			} else {
-				waitDone(ctx, "", err)
+				waitDone("", err)
 			}
 			return nil, err
 		}
@@ -416,7 +416,7 @@ func (p *pool) Put(ctx context.Context, s table.Session) (err error) {
 
 	putDone := trace.TableOnPoolPut(p.Trace, ctx, s.ID())
 	defer func() {
-		putDone(ctx, s.ID(), err)
+		putDone(s.ID(), err)
 	}()
 
 	p.mu.Lock()
@@ -458,7 +458,7 @@ func (p *pool) Take(ctx context.Context, s table.Session) (took bool, err error)
 	p.init()
 
 	takeWait := trace.TableOnPoolTake(p.Trace, ctx, s.ID())
-	var takeDone func(_ context.Context, _ string, took bool, _ error)
+	var takeDone func(_ string, took bool, _ error)
 
 	if p.isClosed() {
 		return false, ErrSessionPoolClosed
@@ -468,7 +468,7 @@ func (p *pool) Take(ctx context.Context, s table.Session) (took bool, err error)
 	for has, took = p.takeIdle(s); has && !took && p.touching; has, took = p.takeIdle(s) {
 		cond := p.touchCond()
 		p.mu.Unlock()
-		takeDone = takeWait(ctx, s.ID())
+		takeDone = takeWait(s.ID())
 
 		// Keepalive processing takes place right now.
 		// Try to await touched session before creation of new one.
@@ -483,7 +483,7 @@ func (p *pool) Take(ctx context.Context, s table.Session) (took bool, err error)
 	}
 	defer func() {
 		if takeDone != nil {
-			takeDone(ctx, s.ID(), took, err)
+			takeDone(s.ID(), took, err)
 		}
 	}()
 	p.mu.Unlock()
@@ -503,9 +503,9 @@ func (p *pool) Create(ctx context.Context) (s table.Session, err error) {
 	createDone := trace.TableOnPoolCreate(p.Trace, ctx)
 	defer func() {
 		if s != nil {
-			createDone(ctx, s.ID(), err)
+			createDone(s.ID(), err)
 		} else {
-			createDone(ctx, "", err)
+			createDone("", err)
 		}
 	}()
 
@@ -549,7 +549,7 @@ func (p *pool) Close(ctx context.Context) (err error) {
 
 	closeDone := trace.TableOnPoolClose(p.Trace, ctx)
 	defer func() {
-		closeDone(ctx, err)
+		closeDone(err)
 	}()
 
 	if p.isClosed() {
@@ -885,7 +885,7 @@ func (p *pool) CloseSession(ctx context.Context, s table.Session) error {
 	closeSessionDone := trace.TableOnPoolCloseSession(p.Trace, ctx, s.ID())
 	go func() {
 		defer cancel()
-		closeSessionDone(ctx, s.ID(), s.Close(ctx))
+		closeSessionDone(s.ID(), s.Close(ctx))
 	}()
 	return nil
 }
