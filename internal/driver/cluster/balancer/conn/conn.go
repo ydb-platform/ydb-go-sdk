@@ -191,7 +191,6 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.Addr(), trace.Method(method))
 	defer func() {
 		onDone(err, issues, opID)
-		err = errors.ErrIf(errors.IsTimeoutError(err), err)
 		c.runtime.OperationDone(start, timeutil.Now(), err)
 	}()
 
@@ -200,7 +199,8 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		return err
 	}
 
-	raw, err := c.Conn(ctx)
+	var raw *grpc.ClientConn
+	raw, err = c.Conn(ctx)
 	if err != nil {
 		err = errors.MapGRPCError(err)
 		if errors.MustPessimizeEndpoint(err) {
@@ -218,23 +218,21 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		}
 		return
 	}
-	if opResponse, ok := res.(response.OpResponse); ok {
-		opID = opResponse.GetOperation().GetId()
-		for _, issue := range opResponse.GetOperation().GetIssues() {
+	if operation, ok := res.(response.Response); ok {
+		opID = operation.GetOperation().GetId()
+		for _, issue := range operation.GetOperation().GetIssues() {
 			issues = append(issues, issue)
 		}
 		switch {
-		case !opResponse.GetOperation().GetReady():
+		case !operation.GetOperation().GetReady():
 			return errors.ErrOperationNotReady
 
-		case opResponse.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-			e := errors.NewOpError(errors.WithOEOperation(opResponse.GetOperation()))
-			fmt.Printf("%T %+v\n", e, e)
-			return e
+		case operation.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
+			return errors.NewOpError(errors.WithOEOperation(operation.GetOperation()))
 		}
 	}
 
-	return nil
+	return
 }
 
 func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
@@ -264,7 +262,8 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		return nil, err
 	}
 
-	raw, err := c.Conn(ctx)
+	var raw *grpc.ClientConn
+	raw, err = c.Conn(ctx)
 	if err != nil {
 		err = errors.MapGRPCError(err)
 		if errors.MustPessimizeEndpoint(err) {
@@ -273,7 +272,8 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		return
 	}
 
-	s, err := raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
+	var s grpc.ClientStream
+	s, err = raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 	if err != nil {
 		return nil, errors.MapGRPCError(err)
 	}

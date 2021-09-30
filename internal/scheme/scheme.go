@@ -2,8 +2,6 @@ package scheme
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"google.golang.org/protobuf/proto"
@@ -109,20 +107,20 @@ func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	return err
 }
 
-func (c *client) ListDirectory(ctx context.Context, path string) (d Directory, err error) {
+func (c *client) ListDirectory(ctx context.Context, path string) (Directory, error) {
 	var (
+		d        Directory
+		err      error
 		response *Ydb_Scheme.ListDirectoryResponse
 		result   Ydb_Scheme.ListDirectoryResult
 	)
 	response, err = c.service.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
 		Path: path,
 	})
-	fmt.Printf("%T %+v\n", err, err)
 	if err != nil {
 		return d, err
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
-	fmt.Printf("%T %+v\n", err, err)
 	if err != nil {
 		return d, err
 	}
