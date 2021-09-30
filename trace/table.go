@@ -12,22 +12,24 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Table struct {
+		// Session events
 		OnCreateSession func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
 		OnKeepAlive     func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
 		OnDeleteSession func(DeleteSessionStartInfo) func(DeleteSessionDoneInfo)
-
-		OnPrepareDataQuery       func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo)
-		OnExecuteDataQuery       func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo)
-		OnStreamReadTable        func(StreamReadTableStartInfo) func(StreamReadTableDoneInfo)
+		// Query events
+		OnPrepareDataQuery func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo)
+		OnExecuteDataQuery func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo)
+		// Stream events
 		OnStreamExecuteScanQuery func(StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo)
-
+		OnStreamReadTable        func(StreamReadTableStartInfo) func(StreamReadTableDoneInfo)
+		// Transaction events
 		OnBeginTransaction    func(BeginTransactionStartInfo) func(BeginTransactionDoneInfo)
 		OnCommitTransaction   func(CommitTransactionStartInfo) func(CommitTransactionDoneInfo)
 		OnRollbackTransaction func(RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo)
-
+		// Pool events
 		OnPoolCreate func(PoolCreateStartInfo) func(PoolCreateDoneInfo)
 		OnPoolClose  func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
-
+		// PoolCycle events
 		OnPoolGet          func(PoolGetStartInfo) func(PoolGetDoneInfo)
 		OnPoolWait         func(PoolWaitStartInfo) func(PoolWaitDoneInfo)
 		OnPoolTake         func(PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo)
