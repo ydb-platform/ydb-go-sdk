@@ -131,30 +131,6 @@ func (t Table) Compose(x Table) (ret Table) {
 		}
 	}
 	switch {
-	case t.OnStreamReadTable == nil:
-		ret.OnStreamReadTable = x.OnStreamReadTable
-	case x.OnStreamReadTable == nil:
-		ret.OnStreamReadTable = t.OnStreamReadTable
-	default:
-		h1 := t.OnStreamReadTable
-		h2 := x.OnStreamReadTable
-		ret.OnStreamReadTable = func(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s StreamReadTableDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
 	case t.OnStreamExecuteScanQuery == nil:
 		ret.OnStreamExecuteScanQuery = x.OnStreamExecuteScanQuery
 	case x.OnStreamExecuteScanQuery == nil:
@@ -172,6 +148,30 @@ func (t Table) Compose(x Table) (ret Table) {
 				return r1
 			default:
 				return func(s StreamExecuteScanQueryDoneInfo) {
+					r1(s)
+					r2(s)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnStreamReadTable == nil:
+		ret.OnStreamReadTable = x.OnStreamReadTable
+	case x.OnStreamReadTable == nil:
+		ret.OnStreamReadTable = t.OnStreamReadTable
+	default:
+		h1 := t.OnStreamReadTable
+		h2 := x.OnStreamReadTable
+		ret.OnStreamReadTable = func(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
+			r1 := h1(s)
+			r2 := h2(s)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(s StreamReadTableDoneInfo) {
 					r1(s)
 					r2(s)
 				}
@@ -246,6 +246,30 @@ func (t Table) Compose(x Table) (ret Table) {
 				return func(r RollbackTransactionDoneInfo) {
 					r1(r)
 					r2(r)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPoolInit == nil:
+		ret.OnPoolInit = x.OnPoolInit
+	case x.OnPoolInit == nil:
+		ret.OnPoolInit = t.OnPoolInit
+	default:
+		h1 := t.OnPoolInit
+		h2 := x.OnPoolInit
+		ret.OnPoolInit = func(p PoolInitStartInfo) func(PoolInitDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolInitDoneInfo) {
+					r1(p)
+					r2(p)
 				}
 			}
 		}
@@ -429,6 +453,30 @@ func (t Table) Compose(x Table) (ret Table) {
 			}
 		}
 	}
+	switch {
+	case t.OnPoolRetry == nil:
+		ret.OnPoolRetry = x.OnPoolRetry
+	case x.OnPoolRetry == nil:
+		ret.OnPoolRetry = t.OnPoolRetry
+	default:
+		h1 := t.OnPoolRetry
+		h2 := x.OnPoolRetry
+		ret.OnPoolRetry = func(p PoolRetryStartInfo) func(PoolRetryDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(p PoolRetryDoneInfo) {
+					r1(p)
+					r2(p)
+				}
+			}
+		}
+	}
 	return ret
 }
 func (t Table) onCreateSession(c1 CreateSessionStartInfo) func(CreateSessionDoneInfo) {
@@ -506,21 +554,6 @@ func (t Table) onExecuteDataQuery(e ExecuteDataQueryStartInfo) func(ExecuteDataQ
 	}
 	return res
 }
-func (t Table) onStreamReadTable(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
-	fn := t.OnStreamReadTable
-	if fn == nil {
-		return func(StreamReadTableDoneInfo) {
-			return
-		}
-	}
-	res := fn(s)
-	if res == nil {
-		return func(StreamReadTableDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t Table) onStreamExecuteScanQuery(s StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo) {
 	fn := t.OnStreamExecuteScanQuery
 	if fn == nil {
@@ -531,6 +564,21 @@ func (t Table) onStreamExecuteScanQuery(s StreamExecuteScanQueryStartInfo) func(
 	res := fn(s)
 	if res == nil {
 		return func(StreamExecuteScanQueryDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Table) onStreamReadTable(s StreamReadTableStartInfo) func(StreamReadTableDoneInfo) {
+	fn := t.OnStreamReadTable
+	if fn == nil {
+		return func(StreamReadTableDoneInfo) {
+			return
+		}
+	}
+	res := fn(s)
+	if res == nil {
+		return func(StreamReadTableDoneInfo) {
 			return
 		}
 	}
@@ -576,6 +624,21 @@ func (t Table) onRollbackTransaction(r RollbackTransactionStartInfo) func(Rollba
 	res := fn(r)
 	if res == nil {
 		return func(RollbackTransactionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Table) onPoolInit(p PoolInitStartInfo) func(PoolInitDoneInfo) {
+	fn := t.OnPoolInit
+	if fn == nil {
+		return func(PoolInitDoneInfo) {
+			return
+		}
+	}
+	res := fn(p)
+	if res == nil {
+		return func(PoolInitDoneInfo) {
 			return
 		}
 	}
@@ -698,6 +761,21 @@ func (t Table) onPoolCloseSession(p PoolCloseSessionStartInfo) func(PoolCloseSes
 	}
 	return res
 }
+func (t Table) onPoolRetry(p PoolRetryStartInfo) func(PoolRetryDoneInfo) {
+	fn := t.OnPoolRetry
+	if fn == nil {
+		return func(PoolRetryDoneInfo) {
+			return
+		}
+	}
+	res := fn(p)
+	if res == nil {
+		return func(PoolRetryDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func TableOnCreateSession(t Table, c context.Context) func(sessionID string, endpoint string, latency time.Duration, _ error) {
 	var p CreateSessionStartInfo
 	p.Context = c
@@ -773,19 +851,6 @@ func TableOnExecuteDataQuery(t Table, c context.Context, sessionID string, txID 
 		res(p)
 	}
 }
-func TableOnStreamReadTable(t Table, c context.Context, sessionID string) func(sessionID string, result streamResult, _ error) {
-	var p StreamReadTableStartInfo
-	p.Context = c
-	p.SessionID = sessionID
-	res := t.onStreamReadTable(p)
-	return func(sessionID string, result streamResult, e error) {
-		var p StreamReadTableDoneInfo
-		p.SessionID = sessionID
-		p.Result = result
-		p.Error = e
-		res(p)
-	}
-}
 func TableOnStreamExecuteScanQuery(t Table, c context.Context, sessionID string, query dataQuery, parameters queryParameters) func(sessionID string, query dataQuery, parameters queryParameters, result streamResult, _ error) {
 	var p StreamExecuteScanQueryStartInfo
 	p.Context = c
@@ -798,6 +863,19 @@ func TableOnStreamExecuteScanQuery(t Table, c context.Context, sessionID string,
 		p.SessionID = sessionID
 		p.Query = query
 		p.Parameters = parameters
+		p.Result = result
+		p.Error = e
+		res(p)
+	}
+}
+func TableOnStreamReadTable(t Table, c context.Context, sessionID string) func(sessionID string, result streamResult, _ error) {
+	var p StreamReadTableStartInfo
+	p.Context = c
+	p.SessionID = sessionID
+	res := t.onStreamReadTable(p)
+	return func(sessionID string, result streamResult, e error) {
+		var p StreamReadTableDoneInfo
+		p.SessionID = sessionID
 		p.Result = result
 		p.Error = e
 		res(p)
@@ -841,6 +919,16 @@ func TableOnRollbackTransaction(t Table, c context.Context, sessionID string, tx
 		p.SessionID = sessionID
 		p.TxID = txID
 		p.Error = e
+		res(p)
+	}
+}
+func TableOnPoolInit(t Table) func(limit int, keepAliveMinSize int) {
+	var p PoolInitStartInfo
+	res := t.onPoolInit(p)
+	return func(limit int, keepAliveMinSize int) {
+		var p PoolInitDoneInfo
+		p.Limit = limit
+		p.KeepAliveMinSize = keepAliveMinSize
 		res(p)
 	}
 }
@@ -927,6 +1015,18 @@ func TableOnPoolCloseSession(t Table, c context.Context, sessionID string) func(
 	return func(sessionID string, e error) {
 		var p PoolCloseSessionDoneInfo
 		p.SessionID = sessionID
+		p.Error = e
+		res(p)
+	}
+}
+func TableOnPoolRetry(t Table, c context.Context, idempotent bool) func(attempts int, _ error) {
+	var p PoolRetryStartInfo
+	p.Context = c
+	p.Idempotent = idempotent
+	res := t.onPoolRetry(p)
+	return func(attempts int, e error) {
+		var p PoolRetryDoneInfo
+		p.Attempts = attempts
 		p.Error = e
 		res(p)
 	}

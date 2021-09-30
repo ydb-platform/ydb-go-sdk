@@ -149,6 +149,7 @@ func (p *pool) isClosed() bool {
 
 func (p *pool) init() {
 	p.initOnce.Do(func() {
+		onDone := trace.TableOnPoolInit(p.Trace)
 		p.index = make(map[table.Session]sessionInfo)
 
 		p.idle = list.New()
@@ -186,6 +187,7 @@ func (p *pool) init() {
 		if p.KeepAliveTimeout <= 0 {
 			p.KeepAliveTimeout = DefaultSessionPoolKeepAliveTimeout
 		}
+		onDone(p.limit, p.KeepAliveMinSize)
 	})
 }
 
@@ -595,7 +597,21 @@ func (p *pool) Close(ctx context.Context) (err error) {
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (p *pool) Retry(ctx context.Context, isOperationIdempotent bool, op table.RetryOperation) (err error) {
-	return retryBackoff(ctx, p, retry.FastBackoff, retry.SlowBackoff, isOperationIdempotent, op)
+	onDone := trace.TableOnPoolRetry(p.Trace, ctx, isOperationIdempotent)
+	var attempts int
+	err = retryBackoff(
+		ctx,
+		p,
+		retry.FastBackoff,
+		retry.SlowBackoff,
+		isOperationIdempotent,
+		func(ctx context.Context, s table.Session) (err error) {
+			attempts++
+			return op(ctx, s)
+		},
+	)
+	onDone(attempts, err)
+	return err
 }
 
 func (p *pool) Stats() poolStats {

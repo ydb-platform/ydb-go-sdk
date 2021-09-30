@@ -27,14 +27,15 @@ type (
 		OnCommitTransaction   func(CommitTransactionStartInfo) func(CommitTransactionDoneInfo)
 		OnRollbackTransaction func(RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo)
 		// Pool events
-		OnPoolCreate func(PoolCreateStartInfo) func(PoolCreateDoneInfo)
-		OnPoolClose  func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
-		// PoolCycle events
+		OnPoolInit         func(PoolInitStartInfo) func(PoolInitDoneInfo)
+		OnPoolCreate       func(PoolCreateStartInfo) func(PoolCreateDoneInfo)
+		OnPoolClose        func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
 		OnPoolGet          func(PoolGetStartInfo) func(PoolGetDoneInfo)
 		OnPoolWait         func(PoolWaitStartInfo) func(PoolWaitDoneInfo)
 		OnPoolTake         func(PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo)
 		OnPoolPut          func(PoolPutStartInfo) func(PoolPutDoneInfo)
 		OnPoolCloseSession func(PoolCloseSessionStartInfo) func(PoolCloseSessionDoneInfo)
+		OnPoolRetry        func(PoolRetryStartInfo) func(PoolRetryDoneInfo)
 	}
 )
 
@@ -167,6 +168,12 @@ type (
 )
 
 type (
+	PoolInitStartInfo struct {
+	}
+	PoolInitDoneInfo struct {
+		Limit            int
+		KeepAliveMinSize int
+	}
 	PoolCreateStartInfo struct {
 		Context context.Context
 	}
@@ -223,5 +230,13 @@ type (
 	}
 	PoolCloseDoneInfo struct {
 		Error error
+	}
+	PoolRetryStartInfo struct {
+		Context    context.Context
+		Idempotent bool
+	}
+	PoolRetryDoneInfo struct {
+		Attempts int
+		Error    error
 	}
 )
