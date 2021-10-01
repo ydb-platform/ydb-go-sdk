@@ -743,10 +743,10 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 	c, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
 
-	streamExecuteScanQueryDone := trace.TableOnStreamExecuteScanQuery(s.trace, ctx, s.id, q, params)
+	onDone := trace.TableOnStreamExecuteScanQuery(s.trace, ctx, s.id, q, params)
 	if err != nil {
 		cancel()
-		streamExecuteScanQueryDone(s.id, q, params, nil, err)
+		onDone(s.id, q, params, nil, err)
 		return nil, err
 	}
 
@@ -758,7 +758,6 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		defer func() {
 			close(r.SetCh)
 			cancel()
-			streamExecuteScanQueryDone(s.id, q, params, r, err)
 		}()
 		for {
 			select {
@@ -768,7 +767,9 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 				if e := c.RecvMsg(&response); e != nil {
 					if e != io.EOF {
 						r.SetChErr = &e
+						e = nil
 					}
+					onDone(s.id, q, params, r, e)
 					return
 				}
 				if result := response.GetResult(); result != nil {
