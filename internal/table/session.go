@@ -766,7 +766,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 				return
 			default:
 				if e := c.RecvMsg(&response); e != nil {
-					if err != io.EOF {
+					if e != io.EOF {
 						r.SetChErr = &e
 					}
 					return
