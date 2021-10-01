@@ -733,7 +733,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		response Ydb_Table.ExecuteScanQueryPartialResponse
-		client   Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
+		c        Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 	)
 	for _, opt := range opts {
 		opt((*options.ExecuteScanQueryDesc)(&request))
@@ -741,7 +741,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	client, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
+	c, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
 
 	streamExecuteScanQueryDone := trace.TableOnStreamExecuteScanQuery(s.trace, ctx, s.id, q, params)
 	if err != nil {
@@ -765,10 +765,9 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 			case <-ctx.Done():
 				return
 			default:
-				err = client.RecvMsg(&response)
-				if err != nil {
+				if e := c.RecvMsg(&response); e != nil {
 					if err != io.EOF {
-						r.SetChErr = &err
+						r.SetChErr = &e
 					}
 					return
 				}
