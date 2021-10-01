@@ -942,16 +942,6 @@ func TestSessionPoolDoublePut(t *testing.T) {
 	_ = p.Put(context.Background(), s)
 }
 
-func TestSessionPoolReuseWaitChannel(t *testing.T) {
-	p := pool{}
-	ch1 := p.getWaitCh()
-	p.putWaitCh(ch1)
-	ch2 := p.getWaitCh()
-	if ch1 != ch2 {
-		t.Errorf("unexpected reused channel")
-	}
-}
-
 func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()

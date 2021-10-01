@@ -792,7 +792,8 @@ func (p *pool) getWaitCh() *chan table.Session {
 	if p.testHookGetWaitCh != nil {
 		p.testHookGetWaitCh()
 	}
-	s, ok := p.waitChPool.Get().(*chan table.Session)
+	ch := p.waitChPool.Get()
+	s, ok := ch.(*chan table.Session)
 	if !ok {
 		// NOTE: MUST NOT be buffered.
 		// In other case we could cork an already no-owned channel.
