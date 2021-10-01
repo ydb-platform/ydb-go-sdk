@@ -39,10 +39,11 @@ func (c *conn) Address() string {
 type conn struct {
 	sync.Mutex
 
-	dial     func(context.Context, string, int) (*grpc.ClientConn, error)
-	endpoint endpoint.Endpoint
-	runtime  runtime.Runtime
-	done     chan struct{}
+	dial      func(context.Context, string, int) (*grpc.ClientConn, error)
+	endpoint  endpoint.Endpoint
+	runtime   runtime.Runtime
+	done      chan struct{}
+	closeOnce sync.Once
 
 	config Config
 
@@ -94,60 +95,52 @@ func (c *conn) IsReady() bool {
 }
 
 func (c *conn) resetTimer() {
-	if c.config.GrpcConnectionPolicy().TTL <= 0 {
-		return
+	if c.config.GrpcConnectionPolicy().TTL > 0 {
+		c.timer.Reset(c.config.GrpcConnectionPolicy().TTL)
+	} else {
+		c.timer.Reset(time.Duration(math.MaxInt64))
 	}
-	c.timer.Reset(c.config.GrpcConnectionPolicy().TTL)
 }
 
 func (c *conn) waitClose() {
+	defer c.close()
 	c.resetTimer()
 	for {
 		select {
 		case <-c.done:
-			c.done = nil
 			return
 		case <-c.timer.C():
-			c.Lock()
-			if c.grpcConn != nil {
-				c.close()
-			} else {
+			if !c.close() {
 				c.resetTimer()
 			}
-			c.Unlock()
 		}
 	}
 }
 
-// c mutex must be locked
-func (c *conn) close() {
+// c mutex must be unlocked
+func (c *conn) close() bool {
+	c.Lock()
+	defer c.Unlock()
 	if c.grpcConn == nil {
-		return
+		return false
 	}
 	onDone := trace.DriverOnConnDisconnect(c.config.Trace(context.Background()), c.endpoint, c.runtime.GetState())
 	c.grpcConn.Close()
 	c.grpcConn = nil
 	c.runtime.SetState(state.Offline)
-	onDone(c.runtime.GetState())
 	c.timer.Reset(time.Duration(math.MaxInt64))
+	onDone(c.runtime.GetState())
+	return true
 }
 
 func (c *conn) Close() {
-	c.Lock()
-	defer c.Unlock()
-	if c.done == nil {
-		return
-	}
-	if c.done != nil {
+	c.closeOnce.Do(func() {
 		close(c.done)
-	}
-	if c.grpcConn != nil {
-		c.close()
-	}
-	if !c.timer.Stop() {
-		panic(fmt.Errorf("cant stop timer for conn to '%v'", c.Address()))
-	}
-	trace.DriverOnConnClose(c.config.Trace(context.Background()), c.endpoint, c.runtime.GetState())
+		if !c.timer.Stop() {
+			panic(fmt.Errorf("cant stop timer for conn to '%v'", c.Address()))
+		}
+		trace.DriverOnConnClose(c.config.Trace(context.Background()), c.endpoint, c.runtime.GetState())
+	})
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
@@ -160,7 +153,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	err = c.config.Pessimize(c.endpoint.Addr)
 	c.runtime.SetState(state.Banned)
 	onDone(state.Banned, err)
-	c.close()
+	go c.close()
 }
 
 func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {
