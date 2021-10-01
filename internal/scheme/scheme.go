@@ -2,9 +2,11 @@ package scheme
 
 import (
 	"context"
+
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 )

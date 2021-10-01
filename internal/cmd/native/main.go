@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc"
 	"log"
 	"os"
 	"path"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -111,6 +112,9 @@ func main() {
 
 				err = selectSimple(ctx, db.Table(), connectParams.Database())
 				if err != nil {
+					// nolint:staticcheck
+					// ignore SA1019
+					// We want to check internal grpc error on chaos monkey testing
 					if errors.Is(err, grpc.ErrClientConnClosing) {
 						panic(err)
 					}
@@ -122,6 +126,9 @@ func main() {
 
 				err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
 				if err != nil {
+					// nolint:staticcheck
+					// ignore SA1019
+					// We want to check internal grpc error on chaos monkey testing
 					if errors.Is(err, grpc.ErrClientConnClosing) {
 						panic(err)
 					}
@@ -135,6 +142,9 @@ func main() {
 					connectParams.Database(), "series",
 				))
 				if err != nil {
+					// nolint:staticcheck
+					// ignore SA1019
+					// We want to check internal grpc error on chaos monkey testing
 					if errors.Is(err, grpc.ErrClientConnClosing) {
 						panic(err)
 					}
@@ -152,6 +162,9 @@ func main() {
 				whoAmI, err := db.Discovery().WhoAmI(ctx)
 				log.Printf("whoAmI: %v, %v\n", whoAmI, err)
 				if err != nil {
+					// nolint:staticcheck
+					// ignore SA1019
+					// We want to check internal grpc error on chaos monkey testing
 					if errors.Is(err, grpc.ErrClientConnClosing) {
 						panic(err)
 					}

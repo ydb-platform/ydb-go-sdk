@@ -3,7 +3,6 @@ package wrap
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
-	"google.golang.org/protobuf/proto"
 )
 
 //type Operation struct {
@@ -45,13 +44,13 @@ type StreamOperationResponse interface {
 	GetIssues() []*Ydb_Issue.IssueMessage
 }
 
-type StreamOperation struct {
-	method    string
-	req       proto.Message
-	resp      StreamOperationResponse
-	processor func(error)
-}
-
+//type StreamOperation struct {
+//	method    string
+//	req       proto.Message
+//	resp      StreamOperationResponse
+//	processor func(error)
+//}
+//
 //func NewStreamOperation(
 //	method string, req proto.Message,
 //	resp StreamOperationResponse,

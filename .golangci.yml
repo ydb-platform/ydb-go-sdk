@@ -73,7 +73,7 @@ linters-settings:
     min-len: 2
     # minimal occurrences count to trigger, 3 by default
     min-occurrences: 2
-  maligned:
+  fieldalignment:
     # print struct with more effective memory layout or not, false by default
     suggest-new: true
   misspell:
@@ -136,7 +136,6 @@ linters:
     - gosimple
     - govet
     - ineffassign
-    - maligned
     - misspell
     - staticcheck
     - structcheck
