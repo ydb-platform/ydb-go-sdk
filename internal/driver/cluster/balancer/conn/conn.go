@@ -105,6 +105,7 @@ func (c *conn) waitClose() {
 	for {
 		select {
 		case <-c.done:
+			c.done = nil
 			return
 		case <-c.timer.C():
 			c.Lock()
@@ -139,7 +140,6 @@ func (c *conn) Close() {
 	}
 	if c.done != nil {
 		close(c.done)
-		c.done = nil
 	}
 	if c.grpcConn != nil {
 		c.close()
