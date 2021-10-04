@@ -31,3 +31,19 @@ func IsStatusAlreadyExistsError(err error) bool {
 	}
 	return o.Reason == errors.StatusAlreadyExists
 }
+
+func IsStatusNotFoundError(err error) bool {
+	var o *errors.OpError
+	if !errors.As(err, &o) {
+		return false
+	}
+	return o.Reason == errors.StatusNotFound
+}
+
+func IsStatusSchemeError(err error) bool {
+	var o *errors.OpError
+	if !errors.As(err, &o) {
+		return false
+	}
+	return o.Reason == errors.StatusSchemeError
+}
