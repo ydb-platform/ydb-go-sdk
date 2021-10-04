@@ -4,12 +4,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
-type StatusCode errors.StatusCode
-
-const (
-	StatusAlreadyExists = StatusCode(errors.StatusAlreadyExists)
-)
-
 func IsTimeoutError(err error) bool {
 	return errors.IsTimeoutError(err)
 }
@@ -30,11 +24,10 @@ func IsOperationError(err error) (ok bool, code int32, name string) {
 	return true, int32(o.Reason), o.Reason.String()
 }
 
-// IsOpError reports whether err is OpError with given code as the Reason.
-func IsOpError(err error, code StatusCode) bool {
-	var op *errors.OpError
-	if !errors.As(err, &op) {
+func IsStatusAlreadyExistsError(err error) bool {
+	var o *errors.OpError
+	if !errors.As(err, &o) {
 		return false
 	}
-	return op.Reason == errors.StatusCode(code)
+	return o.Reason == errors.StatusAlreadyExists
 }
