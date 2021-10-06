@@ -82,7 +82,7 @@ type Result interface {
 	// Output param - Scanner error
 	Scan(values ...interface{}) error
 
-	// Stats returns query execution queryStats.
+	// Stats returns query execution QueryStats.
 	Stats() (s stats.QueryStats)
 
 	// Err return scanner error

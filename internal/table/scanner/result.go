@@ -61,7 +61,7 @@ func (r *Result) CurrentResultSet() ResultSet {
 	return r
 }
 
-// Stats returns query execution queryStats.
+// Stats returns query execution QueryStats.
 func (r *Result) Stats() stats.QueryStats {
 	var s queryStats
 	s.stats = r.QueryStats

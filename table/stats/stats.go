@@ -2,16 +2,22 @@ package stats
 
 import "time"
 
+// QueryPhase holds query execution phase statistics.
 type QueryPhase interface {
+	// NextTableAccess returns next accessed table within query execution phase.
+	// If ok flag is false, then there are no more accessed tables and t is invalid.
 	NextTableAccess() (t *TableAccess, ok bool)
 	Duration() time.Duration
 	CPUTime() time.Duration
 	AffectedShards() uint64
 }
 
+// QueryStats holds query execution statistics.
 type QueryStats interface {
 	ProcessCPUTime() time.Duration
 	Compilation() (c *CompilationStats)
+	// NextPhase returns next execution phase within query.
+	// If ok flag is false, then there are no more phases and p is invalid.
 	NextPhase() (p QueryPhase, ok bool)
 }
 
