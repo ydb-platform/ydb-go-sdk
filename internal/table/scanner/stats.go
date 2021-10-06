@@ -8,21 +8,21 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 )
 
-// QueryStats holds query execution statistics.
-type QueryStats struct {
+// queryStats holds query execution statistics.
+type queryStats struct {
 	stats          *Ydb_TableStats.QueryStats
 	processCPUTime time.Duration
 	pos            int
 }
 
-func (s *QueryStats) ProcessCPUTime() time.Duration {
+func (s *queryStats) ProcessCPUTime() time.Duration {
 	if s == nil {
 		return 0
 	}
 	return s.processCPUTime
 }
 
-func (s *QueryStats) Compilation() (c *stats.CompilationStats) {
+func (s *queryStats) Compilation() (c *stats.CompilationStats) {
 	if s == nil || s.stats == nil || s.stats.Compilation == nil {
 		return nil
 	}
@@ -39,7 +39,7 @@ func (s *QueryStats) Compilation() (c *stats.CompilationStats) {
 
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
-func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
+func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {
 	if s.stats == nil || s.pos >= len(s.stats.QueryPhases) {
 		return
 	}
@@ -48,20 +48,20 @@ func (s *QueryStats) NextPhase() (p QueryPhase, ok bool) {
 		return
 	}
 	s.pos++
-	return QueryPhase{
+	return &queryPhase{
 		tables:         x.TableAccess,
 		pos:            0,
-		Duration:       time.Microsecond * time.Duration(x.DurationUs),
-		CPUTime:        time.Microsecond * time.Duration(x.CpuTimeUs),
-		AffectedShards: x.AffectedShards,
+		duration:       time.Microsecond * time.Duration(x.DurationUs),
+		cpuTime:        time.Microsecond * time.Duration(x.CpuTimeUs),
+		affectedShards: x.AffectedShards,
 	}, true
 }
 
-// QueryPhase holds query execution phase statistics.
-type QueryPhase struct {
-	Duration       time.Duration
-	CPUTime        time.Duration
-	AffectedShards uint64
+// queryPhase holds query execution phase statistics.
+type queryPhase struct {
+	duration       time.Duration
+	cpuTime        time.Duration
+	affectedShards uint64
 	tables         []*Ydb_TableStats.TableAccessStats
 	pos            int
 }
@@ -70,18 +70,30 @@ type QueryPhase struct {
 //
 // If ok flag is false, then there are no more accessed tables and t is
 // invalid.
-func (q *QueryPhase) NextTableAccess() (t stats.TableAccess, ok bool) {
+func (q *queryPhase) NextTableAccess() (t *stats.TableAccess, ok bool) {
 	if q.pos >= len(q.tables) {
 		return
 	}
 	x := q.tables[q.pos]
 	q.pos++
-	return stats.TableAccess{
+	return &stats.TableAccess{
 		Name:    x.Name,
 		Reads:   initOperationStats(x.Reads),
 		Updates: initOperationStats(x.Updates),
 		Deletes: initOperationStats(x.Deletes),
 	}, true
+}
+
+func (q *queryPhase) Duration() time.Duration {
+	return q.duration
+}
+
+func (q *queryPhase) CPUTime() time.Duration {
+	return q.cpuTime
+}
+
+func (q *queryPhase) AffectedShards() uint64 {
+	return q.affectedShards
 }
 
 func initOperationStats(x *Ydb_TableStats.OperationStats) stats.OperationStats {

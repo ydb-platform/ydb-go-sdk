@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
@@ -59,13 +61,13 @@ func (r *Result) CurrentResultSet() ResultSet {
 	return r
 }
 
-// Stats returns query execution QueryStats.
-func (r *Result) Stats() QueryStats {
-	var s QueryStats
+// Stats returns query execution queryStats.
+func (r *Result) Stats() stats.QueryStats {
+	var s queryStats
 	s.stats = r.QueryStats
 	s.processCPUTime = time.Microsecond * time.Duration(r.QueryStats.GetProcessCpuTimeUs())
 	s.pos = 0
-	return s
+	return &s
 }
 
 // Close closes the Result, preventing further iteration.

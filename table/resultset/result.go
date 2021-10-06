@@ -3,6 +3,8 @@ package resultset
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 )
 
@@ -80,8 +82,8 @@ type Result interface {
 	// Output param - Scanner error
 	Scan(values ...interface{}) error
 
-	// Stats returns query execution QueryStats.
-	Stats() (s scanner.QueryStats)
+	// Stats returns query execution queryStats.
+	Stats() (s stats.QueryStats)
 
 	// Err return scanner error
 	// To handle errors, do not need to check after scanning each row

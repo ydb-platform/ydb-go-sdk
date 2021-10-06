@@ -1,8 +1,19 @@
 package stats
 
-import (
-	"time"
-)
+import "time"
+
+type QueryPhase interface {
+	NextTableAccess() (t *TableAccess, ok bool)
+	Duration() time.Duration
+	CPUTime() time.Duration
+	AffectedShards() uint64
+}
+
+type QueryStats interface {
+	ProcessCPUTime() time.Duration
+	Compilation() (c *CompilationStats)
+	NextPhase() (p QueryPhase, ok bool)
+}
 
 // CompilationStats holds query compilation statistics.
 type CompilationStats struct {
