@@ -7,26 +7,9 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
-
-type ResultSet interface {
-	// ColumnCount returns number of columns in the current result set.
-	ColumnCount() int
-
-	// Columns allows to iterate over all columns of the current result set.
-	Columns(it func(options.Column))
-
-	// RowCount returns number of rows in the result set.
-	RowCount() int
-
-	// ItemCount returns number of items in the current row.
-	ItemCount() int
-
-	// Truncated returns true if current result set has been truncated by server
-	Truncated() bool
-}
 
 type Result struct {
 	scanner
@@ -42,6 +25,8 @@ type Result struct {
 	closed  bool
 }
 
+var _ resultset.Result = &Result{}
+
 // NextResultSet selects next result set in the result.
 // columns - names of columns in the resultSet that will be scanned
 // It returns false if there are no more result sets.
@@ -56,7 +41,7 @@ func (r *Result) NextResultSet(ctx context.Context, columns ...string) bool {
 }
 
 // CurrentResultSet get current result set
-func (r *Result) CurrentResultSet() ResultSet {
+func (r *Result) CurrentResultSet() resultset.ResultSet {
 	return r
 }
 
