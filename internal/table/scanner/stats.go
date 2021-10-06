@@ -3,9 +3,9 @@ package scanner
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 // queryStats holds query execution statistics.

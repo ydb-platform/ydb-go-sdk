@@ -3,9 +3,8 @@ package resultset
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 // Result is a result of a query.

@@ -114,7 +114,7 @@ func readTable(ctx context.Context, c table.Client, path string) error {
 		}
 		log.Printf(
 			"# phase #%d: took %s",
-			i, phase.Duration,
+			i, phase.Duration(),
 		)
 		for {
 			tbl, ok := phase.NextTableAccess()
