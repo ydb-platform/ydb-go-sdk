@@ -1,4 +1,4 @@
-package resultset
+package scanner
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -189,8 +188,8 @@ func NewResultSet(opts ...ResultSetOption) *Ydb.ResultSet {
 	return (*Ydb.ResultSet)(&d)
 }
 
-func NewResult(sets ...*Ydb.ResultSet) *scanner.Result {
-	return &scanner.Result{
+func NewResult(sets ...*Ydb.ResultSet) *Result {
+	return &Result{
 		Sets: sets,
 	}
 }
