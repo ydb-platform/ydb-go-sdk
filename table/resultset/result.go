@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 // Result is a result of a query.
@@ -81,7 +82,7 @@ type Result interface {
 	Scan(values ...interface{}) error
 
 	// Stats returns query execution QueryStats.
-	Stats() (s scanner.QueryStats)
+	Stats() (s stats.QueryStats)
 
 	// Err return scanner error
 	// To handle errors, do not need to check after scanning each row

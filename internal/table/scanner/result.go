@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
 type ResultSet interface {
@@ -60,12 +61,12 @@ func (r *Result) CurrentResultSet() ResultSet {
 }
 
 // Stats returns query execution QueryStats.
-func (r *Result) Stats() QueryStats {
-	var s QueryStats
+func (r *Result) Stats() stats.QueryStats {
+	var s queryStats
 	s.stats = r.QueryStats
 	s.processCPUTime = time.Microsecond * time.Duration(r.QueryStats.GetProcessCpuTimeUs())
 	s.pos = 0
-	return s
+	return &s
 }
 
 // Close closes the Result, preventing further iteration.
