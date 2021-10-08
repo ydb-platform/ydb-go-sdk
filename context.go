@@ -20,11 +20,6 @@ type (
 	ctxOpModeKey                struct{}
 	ctxIsOperationIdempotentKey struct{}
 	ctxEndpointInfoKey          struct{}
-
-	ctxEndpointInfo struct {
-		conn   *conn
-		policy ConnUsePolicy
-	}
 )
 
 type valueOnlyContext struct{ context.Context }
@@ -57,13 +52,11 @@ func ContextOperationTimeout(ctx context.Context) (d time.Duration, ok bool) {
 	return
 }
 
-// WithEndpointInfo returns a copy of parent context with endopint info and custom connection use policy
-func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, policy ConnUsePolicy) context.Context {
+// WithEndpointInfoAndPolicy returns a copy of parent context with endopint info and custom connection use policy
+// Deprecated: from now we use auto policy in cluster.Get()
+func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, _ ConnUsePolicy) context.Context {
 	if endpointInfo != nil {
-		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
-			conn:   endpointInfo.Conn(),
-			policy: policy,
-		})
+		return context.WithValue(ctx, ctxEndpointInfoKey{}, endpointInfo)
 	}
 	return ctx
 }
@@ -71,10 +64,7 @@ func WithEndpointInfoAndPolicy(ctx context.Context, endpointInfo EndpointInfo, p
 // WithEndpointInfo returns a copy of parent context with endpoint info and default connection use policy
 func WithEndpointInfo(ctx context.Context, endpointInfo EndpointInfo) context.Context {
 	if endpointInfo != nil {
-		return context.WithValue(ctx, ctxEndpointInfoKey{}, ctxEndpointInfo{
-			conn:   endpointInfo.Conn(),
-			policy: ConnUseSmart,
-		})
+		return context.WithValue(ctx, ctxEndpointInfoKey{}, endpointInfo)
 	}
 	return ctx
 }
@@ -90,12 +80,18 @@ func WithUserAgent(ctx context.Context, userAgent string) context.Context {
 }
 
 // ContextConn returns the connection and connection use policy
+// Deprecated: conn must not used as information about needed destination
 func ContextConn(ctx context.Context) (conn *conn, backoffUseBalancer bool) {
-	connInfo, ok := ctx.Value(ctxEndpointInfoKey{}).(ctxEndpointInfo)
-	if !ok {
-		return nil, true
+	return nil, true
+}
+
+// ContextEndpointInfo returns the endpoint info or nil
+func ContextEndpointInfo(ctx context.Context) (endpointInfo EndpointInfo) {
+	endpointInfo, ok := ctx.Value(ctxEndpointInfoKey{}).(EndpointInfo)
+	if ok {
+		return endpointInfo
 	}
-	return connInfo.conn, connInfo.policy != ConnUseEndpoint
+	return nil
 }
 
 // WithOperationCancelAfter returns a copy of parent context in which YDB operation

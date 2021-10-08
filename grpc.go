@@ -272,7 +272,6 @@ func (t TransportErrorCode) backoffType() BackoffType {
 func (t TransportErrorCode) mustDeleteSession() bool {
 	switch t {
 	case
-		TransportErrorCanceled,
 		TransportErrorResourceExhausted,
 		TransportErrorOutOfRange:
 		return false

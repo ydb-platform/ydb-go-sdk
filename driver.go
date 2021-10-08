@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"errors"
 	"path"
 	"time"
 
@@ -26,6 +27,17 @@ type driver struct {
 
 func (d *driver) Close() error {
 	return d.cluster.Close()
+}
+
+func isTransportError(err error) bool {
+	var te *TransportError
+	return errors.As(err, &te)
+}
+
+func (d *driver) pessimizeConn(ctx context.Context, conn *conn, cause error) {
+	// remove node from discovery cache on any transport error
+	driverTracePessimizationDone := driverTraceOnPessimization(ctx, d.trace, ctx, conn.addr.String(), cause)
+	driverTracePessimizationDone(ctx, conn.addr.String(), d.cluster.Pessimize(conn.addr))
 }
 
 func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err error) {
@@ -54,23 +66,18 @@ func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err err
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	conn, backoffUseBalancer := ContextConn(rawCtx)
-	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
-		driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
-		conn, err = d.cluster.Get(ctx)
-		addr := ""
-		if conn != nil {
-			addr = conn.addr.String()
-		}
-		driverTraceGetConnDone(rawCtx, addr, err)
-		if err != nil {
-			return
-		}
+	driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
+	conn, err := d.cluster.Get(ctx)
+	addr := ""
+	if conn != nil {
+		addr = conn.addr.String()
+	}
+	driverTraceGetConnDone(rawCtx, addr, err)
+	if err != nil {
+		return
 	}
 
-	info = &callInfo{
-		conn: conn,
-	}
+	info = conn
 
 	if conn.conn == nil {
 		return info, ErrNilConnection
@@ -99,56 +106,49 @@ func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err err
 	driverTraceOperationDone(rawCtx, conn.addr.String(), Method(method), params, resp.GetOpID(), resp.GetIssues(), err)
 
 	if err != nil {
-		if te, ok := err.(*TransportError); ok && te.Reason != TransportErrorCanceled {
-			// remove node from discovery cache on any transport error
-			driverTracePessimizationDone := driverTraceOnPessimization(ctx, d.trace, ctx, conn.addr.String(), err)
-			driverTracePessimizationDone(rawCtx, conn.addr.String(), d.cluster.Pessimize(conn.addr))
+		if isTransportError(err) {
+			d.pessimizeConn(rawCtx, conn, err)
 		}
 	}
 
 	return
 }
 
-func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallInfo, err error) {
+func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (_ CallInfo, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 
 	var cancel context.CancelFunc
 	if t := d.streamTimeout; t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
-		defer func() {
-			if err != nil {
-				cancel()
-			}
-		}()
+	} else {
+		// we want to force cancel goroutine with stream
+		ctx, cancel = context.WithCancel(ctx)
 	}
+	defer func() {
+		// if err is nil goroutine not run, and we cancel directly
+		if err != nil {
+			cancel()
+		}
+	}()
 
 	// Get credentials (token actually) for the request.
-	md, err := d.meta.md(ctx)
+	var md metadata.MD
+	md, err = d.meta.md(ctx)
 	if err != nil {
-		return
+		return nil, err
 	}
 	if len(md) > 0 {
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	conn, backoffUseBalancer := ContextConn(rawCtx)
-	if backoffUseBalancer && (conn == nil || conn.runtime.getState() != ConnOnline) {
-		driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
-		conn, err = d.cluster.Get(ctx)
-		addr := ""
-		if conn != nil {
-			addr = conn.addr.String()
-		}
-		driverTraceGetConnDone(rawCtx, addr, err)
-	}
-
-	info = &callInfo{
-		conn: conn,
-	}
+	var conn *conn
+	driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
+	conn, err = d.cluster.Get(ctx)
+	driverTraceGetConnDone(rawCtx, conn.Address(), err)
 
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	method, req, resp, process := internal.UnwrapStreamOperation(op)
@@ -166,17 +166,30 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallI
 		}
 	}()
 
-	s, err := grpc.NewClientStream(ctx, &desc, conn.conn, method,
+	var s grpc.ClientStream
+	s, err = grpc.NewClientStream(ctx, &desc, conn.conn, method,
 		grpc.MaxCallRecvMsgSize(50*1024*1024), // 50MB
 	)
 	if err != nil {
-		return info, mapGRPCError(err)
+		err = mapGRPCError(err)
+		if isTransportError(err) {
+			d.pessimizeConn(rawCtx, conn, err)
+		}
+		return nil, err
 	}
-	if err := s.SendMsg(req); err != nil {
-		return info, mapGRPCError(err)
+	if err = s.SendMsg(req); err != nil {
+		err = mapGRPCError(err)
+		if isTransportError(err) {
+			d.pessimizeConn(rawCtx, conn, err)
+		}
+		return nil, err
 	}
-	if err := s.CloseSend(); err != nil {
-		return info, mapGRPCError(err)
+	if err = s.CloseSend(); err != nil {
+		err = mapGRPCError(err)
+		if isTransportError(err) {
+			d.pessimizeConn(rawCtx, conn, err)
+		}
+		return nil, err
 	}
 
 	go func() {
@@ -184,9 +197,9 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallI
 		defer func() {
 			conn.runtime.streamDone(timeutil.Now(), hideEOF(err))
 			driverTraceStreamDone(rawCtx, conn.addr.String(), Method(method), hideEOF(err))
-			if cancel != nil {
-				cancel()
-			}
+			// cancel directly on exit from goroutine
+			// this need for break grpc client stream
+			cancel()
 		}()
 		for err == nil {
 			conn.runtime.streamRecv(timeutil.Now())
@@ -200,6 +213,9 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallI
 			}
 			if err != nil {
 				err = mapGRPCError(err)
+				if isTransportError(err) {
+					d.pessimizeConn(rawCtx, conn, err)
+				}
 			} else {
 				if s := resp.GetStatus(); s != Ydb.StatusIds_SUCCESS {
 					err = &OpError{
@@ -213,5 +229,5 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallI
 		}
 	}()
 
-	return info, nil
+	return conn, nil
 }

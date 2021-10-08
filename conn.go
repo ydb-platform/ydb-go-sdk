@@ -14,6 +14,17 @@ type conn struct {
 	runtime connRuntime
 }
 
+func (conn *conn) Conn() *conn {
+	return conn
+}
+
+func (conn *conn) Address() string {
+	if conn != nil {
+		return conn.addr.String()
+	}
+	return ""
+}
+
 func newConn(cc *grpc.ClientConn, addr connAddr) *conn {
 	const (
 		statsDuration = time.Minute

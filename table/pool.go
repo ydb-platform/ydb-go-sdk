@@ -193,6 +193,7 @@ func (p *SessionPool) init() {
 func isCreateSessionErrorRetriable(err error) bool {
 	switch {
 	case
+		errors.Is(err, ydb.ErrNilConnection),
 		errors.Is(err, ErrSessionPoolOverflow),
 		ydb.IsOpError(err, ydb.StatusOverloaded),
 		ydb.IsTransportError(err, ydb.TransportErrorResourceExhausted),
@@ -307,6 +308,7 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		i     = 0
 		start = time.Now()
 	)
+
 	getDone := sessionPoolTraceOnGet(ctx, p.Trace, ctx)
 	defer func() {
 		getDone(ctx, s, time.Since(start), i, err)
@@ -322,42 +324,35 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 		if p.isClosed() {
 			return nil, ErrSessionPoolClosed
 		}
+
+		// First, we try to get session from idle
 		p.mu.Lock()
 		s = p.removeFirstIdle()
 		p.mu.Unlock()
 
-		if s == nil {
-			// Try create new session without awaiting for reused one.
-			s, err = p.createSession(ctx)
-			// got session or err is not recoverable
-			if s != nil || err != nil && !isCreateSessionErrorRetriable(err) {
-				return s, err
-			}
-			err = nil
+		if s != nil {
+			return s, nil
 		}
 
-		// get here after check isCreateSessionErrorRetriable
-		if s == nil {
-			// Try to wait for a touched session - pool is full.
-			//
-			// This should be done only if number of currently waiting goroutines
-			// are less than maximum amount of touched session. That is, we want to
-			// be fair here and not to lock more goroutines than we could ship
-			// session to.
-			p.mu.Lock()
-			s = p.removeFirstIdle()
-			if s != nil {
-				p.mu.Unlock()
-				return s, nil
-			}
-			ch = p.getWaitCh()
-			el = p.waitq.PushBack(ch)
-			p.mu.Unlock()
+		// Second, we try to create new session
+		s, err = p.createSession(ctx)
+		// got session or err is not recoverable
+		if s != nil || !isCreateSessionErrorRetriable(err) {
+			return s, err
 		}
+		err = nil
 
-		if ch == nil {
-			continue
-		}
+		// Third, we try to wait for a touched session - pool is full.
+		//
+		// This should be done only if number of currently waiting goroutines
+		// are less than maximum amount of touched session. That is, we want to
+		// be fair here and not to lock more goroutines than we could ship
+		// session to.
+		p.mu.Lock()
+		ch = p.getWaitCh()
+		el = p.waitq.PushBack(ch)
+		p.mu.Unlock()
+
 		waitDone := sessionPoolTraceOnWait(ctx, p.Trace, ctx)
 		var ok bool
 		select {
@@ -374,6 +369,16 @@ func (p *SessionPool) Get(ctx context.Context) (s *Session, err error) {
 				// for the next waiter – session could be lost for a long time.
 				p.putWaitCh(ch)
 			}
+			waitDone(ctx, s, err)
+
+		case <-time.After(p.CreateSessionTimeout):
+			// pass to next iteration
+			p.mu.Lock()
+			// Note that el can be already removed here while we were moving
+			// from reading from ch to this case. This does not make any
+			// difference – channel will be closed by notifying goroutine.
+			p.waitq.Remove(el)
+			p.mu.Unlock()
 			waitDone(ctx, s, err)
 
 		case <-ctx.Done():
@@ -699,9 +704,7 @@ func (p *SessionPool) keeper() {
 				if err != nil {
 					switch {
 					case
-						errors.Is(err, ydb.ErrNilConnection),
 						ydb.IsOpError(err, ydb.StatusBadSession),
-						ydb.IsTransportError(err, ydb.TransportErrorCanceled),
 						ydb.IsTransportError(err, ydb.TransportErrorDeadlineExceeded):
 						toDelete = append(toDelete, s)
 					default:

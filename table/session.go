@@ -117,11 +117,13 @@ func (s *Session) Close(ctx context.Context) (err error) {
 	}
 	s.closed = true
 	clientTraceDeleteSessionDone := clientTraceOnDeleteSession(ctx, s.c.Trace, ctx, s)
+	// call all close listeners before doing request
+	// firstly this need to clear pool from this session
+	for _, cb := range s.onClose {
+		cb()
+	}
 	start := time.Now()
 	defer func() {
-		for _, cb := range s.onClose {
-			cb()
-		}
 		clientTraceDeleteSessionDone(ctx, s, time.Since(start), err)
 	}()
 	req := Ydb_Table.DeleteSessionRequest{
@@ -165,10 +167,9 @@ func (s *Session) KeepAlive(ctx context.Context) (info SessionInfo, err error) {
 		ctx = ydb.WithOperationMode(ctx, ydb.OperationModeSync)
 	}
 	_, err = s.c.Driver.Call(
-		ydb.WithEndpointInfoAndPolicy(
+		ydb.WithEndpointInfo(
 			ctx,
 			s.endpointInfo,
-			ydb.ConnUseEndpoint,
 		),
 		internal.Wrap(
 			"/Ydb.Table.V1.TableService/KeepAlive",

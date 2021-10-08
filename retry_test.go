@@ -151,7 +151,7 @@ func TestRetryModes(t *testing.T) {
 		{
 			err:           mapGRPCError(grpc.ErrClientConnClosing),
 			backoff:       BackoffTypeFastBackoff,
-			deleteSession: false,
+			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
 				nonIdempotentOperation: false,
@@ -173,7 +173,7 @@ func TestRetryModes(t *testing.T) {
 				Reason: TransportErrorCanceled,
 			},
 			backoff:       BackoffTypeFastBackoff,
-			deleteSession: false,
+			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
 				nonIdempotentOperation: false,

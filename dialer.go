@@ -15,8 +15,8 @@ import (
 
 var (
 	// DefaultKeepaliveInterval contains default duration between grpc keepalive
-	DefaultKeepaliveInterval = 5 * time.Minute
-	MinKeepaliveInterval     = 1 * time.Minute
+	DefaultKeepaliveInterval = 10 * time.Second
+	MinKeepaliveInterval     = 10 * time.Second
 	DefaultGRPCMsgSize       = 64 * 1024 * 1024 // 64MB
 )
 
@@ -142,12 +142,9 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		cluster.explorer = NewRepeater(d.config.DiscoveryInterval, 0,
 			func(ctx context.Context) {
 				next, err := d.discover(ctx, addr)
-				if err != nil {
-					return
-				}
 				// if nothing endpoint - re-discover after one second
 				// and use old endpoint list
-				if len(next) == 0 {
+				if err != nil || len(next) == 0 {
 					go func() {
 						time.Sleep(time.Second)
 						cluster.explorer.Force()
@@ -187,7 +184,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 			e   Endpoint
 			err error
 		)
-		e.Addr, e.Port, err = d.splitHostPort(addr)
+		e.Addr, e.Port, err = splitHostPort(addr)
 		if err != nil {
 			return nil, err
 		}
@@ -237,7 +234,7 @@ func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn
 }
 
 func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
-	host, port, err := d.splitHostPort(addr)
+	host, port, err := splitHostPort(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +303,7 @@ func (d *dialer) useTLS() bool {
 	return d.tlsConfig != nil
 }
 
-func (d *dialer) splitHostPort(addr string) (host string, port int, err error) {
+func splitHostPort(addr string) (host string, port int, err error) {
 	var prt string
 	host, prt, err = net.SplitHostPort(addr)
 	if err != nil {

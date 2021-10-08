@@ -148,6 +148,25 @@ func (c *cluster) Close() (err error) {
 	return
 }
 
+func (c *cluster) getNext(
+	ctx context.Context,
+) (
+	conn *conn,
+	closed bool,
+	wait func() <-chan struct{},
+	ready int,
+	size int,
+) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if endpointInfo := ContextEndpointInfo(ctx); endpointInfo != nil {
+		if connEntry, ok := c.index[connAddrFromString(endpointInfo.Address())]; ok && isReady(connEntry.conn) {
+			return connEntry.conn, c.closed, c.await(), c.ready, len(c.index)
+		}
+	}
+	return c.balancer.Next(), c.closed, c.await(), c.ready, len(c.index)
+}
+
 // Get returns next available connection.
 // It returns error on given context cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
@@ -157,13 +176,7 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 	defer cancel()
 
 	for {
-		c.mu.RLock()
-		closed := c.closed
-		wait := c.await()
-		ready := c.ready
-		size := len(c.index)
-		conn = c.balancer.Next()
-		c.mu.RUnlock()
+		conn, closed, wait, ready, size := c.getNext(ctx)
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -231,7 +244,6 @@ func isBroken(conn *conn) bool {
 		return true
 	}
 	state := conn.conn.GetState()
-
 	return state == connectivity.Shutdown || state == connectivity.TransientFailure
 }
 

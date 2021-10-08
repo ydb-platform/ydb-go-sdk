@@ -31,6 +31,12 @@ func errIf(cond bool, err error) error {
 }
 
 func mapGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if te, ok := err.(*TransportError); ok {
+		return te
+	}
 	s, ok := status.FromError(err)
 	if !ok {
 		return err
