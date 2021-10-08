@@ -228,7 +228,6 @@ func (t TransportErrorCode) BackoffType() BackoffType {
 func (t TransportErrorCode) MustDeleteSession() bool {
 	switch t {
 	case
-		TransportErrorCanceled,
 		TransportErrorResourceExhausted,
 		TransportErrorOutOfRange:
 		return false
@@ -312,6 +311,9 @@ func transportErrorString(t TransportErrorCode) string {
 // IsTransportError reports whether err is TransportError with given code as
 // the Reason.
 func IsTransportError(err error, code TransportErrorCode) bool {
+	if err == nil {
+		return false
+	}
 	var t *TransportError
 	if !errors.As(err, &t) {
 		return false
@@ -320,15 +322,20 @@ func IsTransportError(err error, code TransportErrorCode) bool {
 }
 
 func MapGRPCError(err error) error {
-	s, ok := status.FromError(err)
-	if !ok {
-		return err
+	if err == nil {
+		return nil
 	}
-	return &TransportError{
-		Reason:  transportErrorCode(s.Code()),
-		message: s.Message(),
-		err:     err,
+	if te, ok := err.(*TransportError); ok {
+		return te
 	}
+	if s, ok := status.FromError(err); ok {
+		return &TransportError{
+			Reason:  transportErrorCode(s.Code()),
+			message: s.Message(),
+			err:     err,
+		}
+	}
+	return err
 }
 
 func MustPessimizeEndpoint(err error) bool {
@@ -336,5 +343,12 @@ func MustPessimizeEndpoint(err error) bool {
 	if !errors.As(err, &t) {
 		return false
 	}
-	return t.Reason != TransportErrorCanceled
+	switch t.Reason {
+	case
+		TransportErrorResourceExhausted,
+		TransportErrorOutOfRange:
+		return false
+	default:
+		return true
+	}
 }

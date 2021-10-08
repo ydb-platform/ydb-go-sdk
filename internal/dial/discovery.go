@@ -37,12 +37,9 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 			d.config.DiscoveryInterval,
 			func(ctx context.Context) {
 				next, err := discoveryClient.Discover(ctx)
-				if err != nil {
-					return
-				}
 				// if nothing endpoint - re-discover after one second
 				// and use old endpoint list
-				if len(next) == 0 {
+				if err != nil || len(next) == 0 {
 					go func() {
 						time.Sleep(time.Second)
 						c.Force()
