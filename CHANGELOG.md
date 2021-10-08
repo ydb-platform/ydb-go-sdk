@@ -1,3 +1,13 @@
+## 2.9.6
+* Replaced `<session, endpoint>` link type from raw conn to plain endpoint address
+* Moved checking linked endpoint from `driver.{Call,StreamRead}` to `cluster.Get`
+* Added pessimization endpoint code for `driver.StreamRead` if transport error received
+* Setted transport error `Cancelled` as needs to remove session from pool
+* Deprecated connection use policy (used auto policy)
+* Fixed goroutines leak on StreamRead call
+* Fixed force re-discover on receive error after 1 second
+* Added timeout to context in `cluster.Get` if context deadline not defined
+
 ## 2.9.5
 * Renamed context idempotent operation flag
 

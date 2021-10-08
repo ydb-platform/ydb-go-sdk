@@ -207,7 +207,6 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	}
 
 	err = raw.Invoke(ctx, method, req, res, opts...)
-	c.resetTimer()
 
 	if err != nil {
 		err = errors.MapGRPCError(err)
@@ -216,6 +215,9 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		}
 		return
 	}
+
+	c.resetTimer()
+
 	if operation, ok := res.(response.Response); ok {
 		opID = operation.GetOperation().GetId()
 		for _, issue := range operation.GetOperation().GetIssues() {
@@ -273,7 +275,11 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	var s grpc.ClientStream
 	s, err = raw.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 	if err != nil {
-		return nil, errors.MapGRPCError(err)
+		err = errors.MapGRPCError(err)
+		if errors.MustPessimizeEndpoint(err) {
+			c.pessimize(ctx, err)
+		}
+		return nil, err
 	}
 
 	c.resetTimer()

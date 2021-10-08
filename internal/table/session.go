@@ -136,6 +136,9 @@ func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s Session, er
 }
 
 func (s *session) ID() string {
+	if s == nil {
+		return ""
+	}
 	return s.id
 }
 
@@ -153,15 +156,20 @@ func (s *session) Close(ctx context.Context) (err error) {
 		return nil
 	}
 	s.mtx.Lock()
-	defer s.mtx.Unlock()
 	s.flags |= sessionClosed
+	defer s.mtx.Unlock()
+
 	onDone := trace.TableOnSessionDelete(s.trace, ctx, s)
 	defer func() {
-		for _, cb := range s.onClose {
-			cb()
-		}
 		onDone(err)
 	}()
+
+	// call all close listeners before doing request
+	// firstly this need to clear pool from this session
+	for _, cb := range s.onClose {
+		cb()
+	}
+
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
