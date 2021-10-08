@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
 	"io"
 	"log"
 	"os"
@@ -310,7 +311,9 @@ func TestQuery(t *testing.T) {
 }
 
 func TestDatabaseSelect(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	for _, test := range []struct {
 		query  string
@@ -354,7 +357,9 @@ func TestDatabaseSelect(t *testing.T) {
 }
 
 func TestStatement(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -382,7 +387,9 @@ func TestStatement(t *testing.T) {
 }
 
 func TestTx(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -421,7 +428,9 @@ func TestTx(t *testing.T) {
 }
 
 func TestDriver(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

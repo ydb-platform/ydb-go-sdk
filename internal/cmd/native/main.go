@@ -121,7 +121,7 @@ func main() {
 
 	err = Fill(ctx, db.Table(), db.Name())
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "fill tables with data error: %w\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "fill tables with data error: %v\n", err)
 	}
 
 	Quet()

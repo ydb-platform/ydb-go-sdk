@@ -36,21 +36,21 @@ type client struct {
 	pool    Pool
 }
 
-func (c *client) Take(ctx context.Context, s table.Session) (took bool, err error) {
+func (c *client) Take(ctx context.Context, s Session) (took bool, err error) {
 	return c.pool.Take(ctx, s)
 }
 
-func (c *client) Put(ctx context.Context, s table.Session) (err error) {
+func (c *client) Put(ctx context.Context, s Session) (err error) {
 	return c.pool.Put(ctx, s)
 }
 
-func (c *client) Create(ctx context.Context) (s table.Session, err error) {
+func (c *client) Create(ctx context.Context) (s Session, err error) {
 	return c.pool.Create(ctx)
 }
 
 // CreateSession creates new session instance.
 // Unused sessions must be destroyed.
-func (c *client) CreateSession(ctx context.Context) (s table.Session, err error) {
+func (c *client) createSession(ctx context.Context) (s Session, err error) {
 	return newSession(ctx, c.cluster, c.trace)
 }
 

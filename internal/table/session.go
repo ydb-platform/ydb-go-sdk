@@ -6,12 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -19,11 +13,28 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+)
+
+var (
+	ErrNilConnection = errors.New("session with nil connection")
+)
+
+type sessionFlags int
+
+const (
+	sessionClosed = sessionFlags(1 << iota)
+	sessionInPool
+	sessionInFlight
 )
 
 // session represents a single table API session.
@@ -38,20 +49,55 @@ type session struct {
 	conn         cluster.ClientConnInterface
 	tableService Ydb_Table_V1.TableServiceClient
 	trace        trace.Table
-	closeMux     sync.Mutex
-	closed       bool
+	mtx          sync.Mutex
+	flags        sessionFlags
+	status       options.SessionStatus
 	onClose      []func()
 }
 
-func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Session, err error) {
-	createSessionDone := trace.TableOnCreateSession(t, ctx)
+func (s *session) Status() string {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	return s.status.String()
+}
+
+func (s *session) SetStatus(status options.SessionStatus) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	s.status = status
+}
+
+func (s *session) SetInPool(ok bool) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if ok {
+		s.flags |= sessionInPool
+	} else {
+		s.flags &= ^(1 << sessionInPool)
+	}
+}
+
+func (s *session) SetInFlight(ok bool) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if ok {
+		s.flags |= sessionInFlight
+	} else {
+		s.flags &= ^(1 << sessionInFlight)
+	}
+}
+
+func (s *session) IsClosed() bool {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	return s.flags&sessionClosed != 0
+}
+
+func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s Session, err error) {
+	onDone := trace.TableOnSessionNew(t, ctx)
 	start := time.Now()
 	defer func() {
-		if s != nil {
-			createSessionDone(s.ID(), s.Address(), time.Since(start), err)
-		} else {
-			createSessionDone("", "", time.Since(start), err)
-		}
+		onDone(s, time.Since(start), err)
 	}()
 	var (
 		response *Ydb_Table.CreateSessionResponse
@@ -73,6 +119,9 @@ func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s table.Sessi
 	if err != nil {
 		return nil, err
 	}
+	if cc == nil {
+		return nil, ErrNilConnection
+	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return nil, err
@@ -91,34 +140,27 @@ func (s *session) ID() string {
 }
 
 func (s *session) OnClose(cb func()) {
-	s.closeMux.Lock()
-	defer s.closeMux.Unlock()
-	if s.closed {
+	if s.IsClosed() {
 		return
 	}
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 	s.onClose = append(s.onClose, cb)
 }
 
-func (s *session) IsClosed() bool {
-	s.closeMux.Lock()
-	defer s.closeMux.Unlock()
-	return s.closed
-}
-
 func (s *session) Close(ctx context.Context) (err error) {
-	s.closeMux.Lock()
-	defer s.closeMux.Unlock()
-	if s.closed {
+	if s.IsClosed() {
 		return nil
 	}
-	s.closed = true
-	deleteSessionDone := trace.TableOnDeleteSession(s.trace, ctx, s.id)
-	start := time.Now()
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	s.flags |= sessionClosed
+	onDone := trace.TableOnSessionDelete(s.trace, ctx, s)
 	defer func() {
 		for _, cb := range s.onClose {
 			cb()
 		}
-		deleteSessionDone(s.id, time.Since(start), err)
+		onDone(err)
 	}()
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
@@ -137,10 +179,10 @@ func (s *session) Address() string {
 }
 
 // KeepAlive keeps idle session alive.
-func (s *session) KeepAlive(ctx context.Context) (info options.SessionInfo, err error) {
-	keepAliveDone := trace.TableOnKeepAlive(s.trace, ctx, s.id)
+func (s *session) KeepAlive(ctx context.Context) (err error) {
+	onDone := trace.TableOnSessionKeepAlive(s.trace, ctx, s)
 	defer func() {
-		keepAliveDone(s.id, &info, err)
+		onDone(err)
 	}()
 	var result Ydb_Table.KeepAliveResult
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
@@ -164,9 +206,9 @@ func (s *session) KeepAlive(ctx context.Context) (info options.SessionInfo, err 
 	}
 	switch result.SessionStatus {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
-		info.SetStatus(options.SessionReady)
+		s.SetStatus(options.SessionReady)
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
-		info.SetStatus(options.SessionBusy)
+		s.SetStatus(options.SessionBusy)
 	}
 	return
 }
@@ -376,13 +418,9 @@ func (s *Statement) Execute(
 ) (
 	txr table.Transaction, r resultset.Result, err error,
 ) {
-	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.session.trace, ctx, s.session.id, transactionControlID(tx.Desc()), s.query, params)
+	onDone := trace.TableOnSessionQueryExecute(s.session.trace, ctx, s.session, txr, s.query, params)
 	defer func() {
-		if txr != nil {
-			executeDataQueryDone(s.session.id, txr.ID(), s.query, params, true, r, err)
-		} else {
-			executeDataQueryDone(s.session.id, "", s.query, params, true, r, err)
-		}
+		onDone(true, r, err)
 	}()
 	return s.execute(ctx, tx, params, opts...)
 }
@@ -418,9 +456,9 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 	)
-	prepareDataQueryDone := trace.TableOnPrepareDataQuery(s.trace, ctx, s.id, query)
+	onDone := trace.TableOnSessionQueryPrepare(s.trace, ctx, s, query)
 	defer func() {
-		prepareDataQueryDone(s.id, query, q, cached, err)
+		onDone(query, q, cached, err)
 	}()
 
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
@@ -462,13 +500,9 @@ func (s *session) Execute(
 	q := new(dataQuery)
 	q.initFromText(query)
 
-	executeDataQueryDone := trace.TableOnExecuteDataQuery(s.trace, ctx, s.id, transactionControlID(tx.Desc()), q, params)
+	onDone := trace.TableOnSessionQueryExecute(s.trace, ctx, s, txr, q, params)
 	defer func() {
-		if txr != nil {
-			executeDataQueryDone(s.id, txr.ID(), q, params, true, r, err)
-		} else {
-			executeDataQueryDone(s.id, "", q, params, true, r, err)
-		}
+		onDone(true, r, err)
 	}()
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
@@ -678,10 +712,10 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 
 	client, err = s.tableService.StreamReadTable(ctx, &request)
 
-	streamReadTableDone := trace.TableOnStreamReadTable(s.trace, ctx, s.id)
+	onDone := trace.TableOnSessionQueryStreamRead(s.trace, ctx, s)
 	if err != nil {
 		cancel()
-		streamReadTableDone(s.id, nil, err)
+		onDone(nil, err)
 		return nil, err
 	}
 
@@ -693,7 +727,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		defer func() {
 			close(r.SetCh)
 			cancel()
-			streamReadTableDone(s.id, r, err)
+			onDone(r, err)
 		}()
 		for {
 			select {
@@ -743,10 +777,10 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 	c, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
 
-	onDone := trace.TableOnStreamExecuteScanQuery(s.trace, ctx, s.id, q, params)
+	onDone := trace.TableOnSessionQueryStreamExecute(s.trace, ctx, s, q, params)
 	if err != nil {
 		cancel()
-		onDone(s.id, q, params, nil, err)
+		onDone(nil, err)
 		return nil, err
 	}
 
@@ -769,7 +803,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 						r.SetChErr = &e
 						e = nil
 					}
-					onDone(s.id, q, params, r, e)
+					onDone(r, e)
 					return
 				}
 				if result := response.GetResult(); result != nil {
@@ -798,13 +832,9 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 // BeginTransaction begins new transaction within given session with given
 // settings.
 func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
-	beginTransactionDone := trace.TableOnBeginTransaction(s.trace, ctx, s.id)
+	onDone := trace.TableOnSessionTransactionBegin(s.trace, ctx, s)
 	defer func() {
-		if s != nil {
-			beginTransactionDone(s.id, x.ID(), err)
-		} else {
-			beginTransactionDone(s.id, "", err)
-		}
+		onDone(x, err)
 	}()
 	var (
 		result   Ydb_Table.BeginTransactionResult
@@ -869,9 +899,9 @@ func (tx *Transaction) ExecuteStatement(
 
 // CommitTx commits specified active transaction.
 func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r resultset.Result, err error) {
-	commitTransactionDone := trace.TableOnCommitTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
+	onDone := trace.TableOnSessionTransactionCommit(tx.s.trace, ctx, tx.s, tx)
 	defer func() {
-		commitTransactionDone(tx.s.id, tx.id, err)
+		onDone(err)
 	}()
 	var (
 		request = &Ydb_Table.CommitTransactionRequest{
@@ -900,9 +930,9 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *Transaction) Rollback(ctx context.Context) (err error) {
-	rollbackTransactionDone := trace.TableOnRollbackTransaction(tx.s.trace, ctx, tx.s.id, tx.id)
+	onDone := trace.TableOnSessionTransactionRollback(tx.s.trace, ctx, tx.s, tx)
 	defer func() {
-		rollbackTransactionDone(tx.s.id, tx.id, err)
+		onDone(err)
 	}()
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)

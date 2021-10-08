@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
 	"log"
 	"os"
 	"testing"
@@ -59,7 +60,9 @@ func openDB(ctx context.Context) (cluster.DB, error) {
 }
 
 func TestRateLimiter(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()

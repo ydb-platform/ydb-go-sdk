@@ -41,8 +41,8 @@ func (d *ydbWrapper) UnmarshalYDB(res types.RawValue) error {
 
 // sqlConn is a connection to the ydb.
 type sqlConn struct {
-	connector *connector    // Immutable and r/o usage.
-	session   table.Session // Immutable and r/o usage.
+	connector *connector       // Immutable and r/o usage.
+	session   internal.Session // Immutable and r/o usage.
 
 	idle bool
 
@@ -228,8 +228,7 @@ func (c *sqlConn) Ping(ctx context.Context) error {
 	if !c.takeSession(ctx) {
 		return driver.ErrBadConn
 	}
-	_, err := c.session.KeepAlive(ctx)
-	return mapBadSessionError(err)
+	return mapBadSessionError(c.session.KeepAlive(ctx))
 }
 
 func (c *sqlConn) Close() error {

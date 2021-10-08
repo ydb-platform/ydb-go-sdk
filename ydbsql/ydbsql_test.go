@@ -3,6 +3,7 @@ package ydbsql
 import (
 	"database/sql"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
 	"net/url"
 	"os"
 	"testing"
@@ -57,7 +58,9 @@ func TestLegacyDriverValidateDataSourceURI(t *testing.T) {
 }
 
 func TestLegacyDriverOpen(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	db, err := sql.Open("ydb", fmt.Sprintf(
 		"ydb://ydb-ru.yandex.net:2135/ru/home/kamardin/mydb?auth-token=%s",

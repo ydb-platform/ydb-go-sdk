@@ -71,19 +71,16 @@ FROM AS_TABLE($episodesData);
 `))
 
 func cleanupDatabase(ctx context.Context, c table.Client, prefix string, names ...string) (err error) {
-	session, err := c.CreateSession(ctx)
-	defer func() { _ = session.Close(ctx) }()
-	if err != nil {
-		return err
-	}
-	for _, name := range names {
-		fullPath := path.Join(prefix, name)
-		err = session.DropTable(ctx, fullPath)
-		if err != nil {
-			return err
+	return c.RetryIdempotent(ctx, func(ctx context.Context, session table.Session) (err error) {
+		for _, name := range names {
+			fullPath := path.Join(prefix, name)
+			err = session.DropTable(ctx, fullPath)
+			if err != nil {
+				return err
+			}
 		}
-	}
-	return err
+		return err
+	})
 }
 
 func ensurePathExists(ctx context.Context, db *sql.DB) error {

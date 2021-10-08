@@ -61,7 +61,11 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 	s.Unlock()
 }
 
-func TestPoolStats(t *testing.T) {
+func TestPoolHealth(t *testing.T) {
+	if !CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -87,26 +91,19 @@ func TestPoolStats(t *testing.T) {
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithTraceTable(trace.Table{
-			OnCreateSession: func(info trace.CreateSessionStartInfo) func(trace.CreateSessionDoneInfo) {
-				return func(info trace.CreateSessionDoneInfo) {
+			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
+				return func(info trace.SessionNewDoneInfo) {
 					if info.Error == nil {
 						s.addBalance(t, 1)
 					}
 				}
 			},
-			OnKeepAlive: nil,
-			OnDeleteSession: func(info trace.DeleteSessionStartInfo) func(trace.DeleteSessionDoneInfo) {
-				return func(info trace.DeleteSessionDoneInfo) {
+			OnSessionKeepAlive: nil,
+			OnSessionDelete: func(info trace.SessionDeleteStartInfo) func(trace.SessionDeleteDoneInfo) {
+				return func(info trace.SessionDeleteDoneInfo) {
 					s.addBalance(t, -1)
 				}
 			},
-			OnPrepareDataQuery:       nil,
-			OnExecuteDataQuery:       nil,
-			OnStreamExecuteScanQuery: nil,
-			OnStreamReadTable:        nil,
-			OnBeginTransaction:       nil,
-			OnCommitTransaction:      nil,
-			OnRollbackTransaction:    nil,
 			OnPoolInit: func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
 				return func(info trace.PoolInitDoneInfo) {
 					s.Lock()
@@ -115,8 +112,6 @@ func TestPoolStats(t *testing.T) {
 					s.Unlock()
 				}
 			},
-			OnPoolCreate: nil,
-			OnPoolClose:  nil,
 			OnPoolGet: func(info trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
 				return func(info trace.PoolGetDoneInfo) {
 					if info.Error == nil {
@@ -124,15 +119,11 @@ func TestPoolStats(t *testing.T) {
 					}
 				}
 			},
-			OnPoolWait: nil,
-			OnPoolTake: nil,
 			OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
 				return func(info trace.PoolPutDoneInfo) {
 					s.addInFlight(t, -1)
 				}
 			},
-			OnPoolCloseSession: nil,
-			OnPoolRetry:        nil,
 		}),
 	)
 	defer func() { _ = db.Close() }()
