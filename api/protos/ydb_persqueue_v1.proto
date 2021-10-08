@@ -1174,6 +1174,9 @@ message TopicSettings {
 
         // Read rule version. Any non-negative integer.
         int64 version = 6 [(value) = ">= 0"];
+
+        // Client service type.
+        string service_type = 7;
     }
 
     // List of consumer read rules for this topic.

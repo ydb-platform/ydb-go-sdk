@@ -192,6 +192,12 @@ message CreateQueryResult {
     string query_id = 1 [(Ydb.length).le = 1024];
 }
 
+enum AutomaticType {
+    AUTOMATIC_TYPE_UNSPECIFIED = 0;
+    AUTOMATIC = 1;
+    NOT_AUTOMATIC = 2;
+}
+
 // Getting brief information about queries
 message ListQueriesRequest {
     Ydb.Operations.OperationParams operation_params = 1;
@@ -204,6 +210,8 @@ message ListQueriesRequest {
         repeated ExecuteMode mode = 3 [(Ydb.size).le = 20];
         string name = 4 [(Ydb.length).le = 1024]; // queries whose name contains the filter.name substring
         bool created_by_me = 5;
+        Acl.Visibility visibility = 6;
+        AutomaticType automatic = 7;
     }
     Filter filter = 4;
 }
@@ -283,6 +291,12 @@ message ControlQueryResult {
 
 // === Job API ===
 
+message BriefJob {
+    CommonMeta meta = 1;
+    QueryMeta query_meta = 3;
+    string query_name = 9;
+}
+
 message Job {
     CommonMeta meta = 1;
     string text = 2;
@@ -314,7 +328,7 @@ message ListJobsResponse {
 }
 
 message ListJobsResult {
-    repeated Job job = 1;
+    repeated BriefJob job = 1;
     string next_page_token = 2 [(Ydb.length).le = 1024];
 }
 
@@ -396,6 +410,15 @@ message ObjectStorageConnection {
 }
 
 message ConnectionSetting {
+    enum ConnectionType {
+        CONNECTION_TYPE_UNSPECIFIED = 0;
+        YDB_DATABASE = 1;
+        CLICKHOUSE_CLUSTER = 2;
+        DATA_STREAMS = 3;
+        OBJECT_STORAGE = 4;
+        MONITORING = 5;
+    }
+
     oneof connection {
         YdbDatabase ydb_database = 1;
         ClickHouseCluster clickhouse_cluster = 2;
@@ -441,6 +464,7 @@ message ListConnectionsRequest {
     message Filter {
         string name = 1 [(Ydb.length).le = 1024]; // connections whose name contains the filter.name substring
         bool created_by_me = 2;
+        ConnectionSetting.ConnectionType connection_type = 3;
     }
     Filter filter = 4;
 }
@@ -545,23 +569,23 @@ message ObjectStorageBinding {
 }
 
 message BindingSetting {
+    enum BindingType {
+        BINDING_TYPE_UNSPECIFIED = 0;
+        DATA_STREAMS = 1;
+        OBJECT_STORAGE = 2;
+    }
+
     oneof binding {
         DataStreamsBinding data_streams = 1;
         ObjectStorageBinding object_storage = 2;
     }
 }
 
-enum BindingType {
-    BINDING_TYPE_UNSPECIFIED = 0;
-    DATA_STREAMS = 1;
-    OBJECT_STORAGE = 2;
-}
-
 message BriefBinding {
     string name = 1 [(Ydb.length).range = {min: 1, max: 1024}];
     string connection_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
     CommonMeta meta = 3;
-    BindingType type = 4;
+    BindingSetting.BindingType type = 4;
 }
 
 message BindingContent {

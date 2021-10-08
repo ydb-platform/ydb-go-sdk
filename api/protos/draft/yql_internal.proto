@@ -32,6 +32,10 @@ message TopicConsumer {
     string database = 2;
     string topic_path = 3;
     string consumer_name = 4;
+    string cluster_endpoint = 5;
+    bool use_ssl = 6;
+    string token_name = 7;
+    bool add_bearer_to_token = 8;
 }
 
 message GetTaskResult {
@@ -60,6 +64,7 @@ message GetTaskResult {
     YandexQuery.QueryMeta.ComputeStatus status = 18;
     map<string, string> sensor_labels = 19;
     repeated YandexQuery.ResultSetMeta result_set_meta = 21;
+    repeated TopicConsumer created_topic_consumers = 22;
 }
 
 message GetTaskResponse {
