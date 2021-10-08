@@ -155,7 +155,7 @@ func TestRetryModes(t *testing.T) {
 			// nolint:staticcheck
 			err:           errors.MapGRPCError(grpc.ErrClientConnClosing),
 			backoff:       errors.BackoffTypeFastBackoff,
-			deleteSession: false,
+			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
 				nonIdempotentOperation: false,
@@ -177,7 +177,7 @@ func TestRetryModes(t *testing.T) {
 				Reason: errors.TransportErrorCanceled,
 			},
 			backoff:       errors.BackoffTypeFastBackoff,
-			deleteSession: false,
+			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
 				nonIdempotentOperation: false,

@@ -12,8 +12,8 @@ type GrpcConnectionPolicy conn.GrpcConnectionPolicy
 
 var (
 	// DefaultKeepaliveInterval contains default duration between grpc keepalive
-	DefaultKeepaliveInterval = 5 * time.Minute
-	MinKeepaliveInterval     = 1 * time.Minute
+	DefaultKeepaliveInterval = 10 * time.Second
+	MinKeepaliveInterval     = 10 * time.Second
 	DefaultGrpcConnectionTTL = 6 * time.Minute
 	DefaultGRPCMsgSize       = 64 * 1024 * 1024 // 64MB
 )
