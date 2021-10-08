@@ -318,17 +318,15 @@ func (p *pool) createSession(ctx context.Context) (s Session, err error) {
 // there. If no items stored in pool it creates new one by calling
 // Builder.CreateSession() method and returns it.
 func (p *pool) Get(ctx context.Context) (s Session, err error) {
-	onDone := trace.TableOnPoolGet(p.Trace.Compose(trace.ContextTable(ctx)), ctx)
-
 	p.init()
 
 	var (
-		i     = 0
-		start = time.Now()
+		i = 0
 	)
-	getDone := trace.TableOnPoolGet(p.Trace, ctx)
+
+	onDone := trace.TableOnPoolGet(p.Trace.Compose(trace.ContextTable(ctx)), ctx)
 	defer func() {
-		onDone(s, time.Since(start), i, err)
+		onDone(s, i, err)
 	}()
 
 	const maxAttempts = 100
@@ -386,7 +384,7 @@ func (p *pool) Get(ctx context.Context) (s Session, err error) {
 				// for the next waiter – session could be lost for a long time.
 				p.putWaitCh(ch)
 			}
-			onDone(s, err)
+			waitDone(s, err)
 
 		case <-time.After(p.CreateSessionTimeout):
 			// pass to next iteration
@@ -396,11 +394,7 @@ func (p *pool) Get(ctx context.Context) (s Session, err error) {
 			// difference – channel will be closed by notifying goroutine.
 			p.waitq.Remove(el)
 			p.mu.Unlock()
-			if s != nil {
-				waitDone(s.ID(), err)
-			} else {
-				waitDone("", err)
-			}
+			waitDone(s, err)
 
 		case <-ctx.Done():
 			p.mu.Lock()
@@ -413,7 +407,7 @@ func (p *pool) Get(ctx context.Context) (s Session, err error) {
 			if s != nil {
 				_ = p.Put(ctx, s)
 			}
-			onDone(s, err)
+			waitDone(s, err)
 			return nil, err
 		}
 	}

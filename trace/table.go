@@ -175,7 +175,6 @@ type (
 	}
 	PoolGetDoneInfo struct {
 		Session       sessionInfo
-		Latency       time.Duration
 		RetryAttempts int
 		Error         error
 	}

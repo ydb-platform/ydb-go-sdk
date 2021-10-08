@@ -967,14 +967,13 @@ func TableOnPoolPut(t Table, c context.Context, session sessionInfo) func(error)
 		res(p)
 	}
 }
-func TableOnPoolGet(t Table, c context.Context) func(session sessionInfo, latency time.Duration, retryAttempts int, _ error) {
+func TableOnPoolGet(t Table, c context.Context) func(session sessionInfo, retryAttempts int, _ error) {
 	var p PoolGetStartInfo
 	p.Context = c
 	res := t.onPoolGet(p)
-	return func(session sessionInfo, latency time.Duration, retryAttempts int, e error) {
+	return func(session sessionInfo, retryAttempts int, e error) {
 		var p PoolGetDoneInfo
 		p.Session = session
-		p.Latency = latency
 		p.RetryAttempts = retryAttempts
 		p.Error = e
 		res(p)
