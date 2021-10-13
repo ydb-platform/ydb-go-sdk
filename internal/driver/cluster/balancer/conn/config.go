@@ -16,7 +16,7 @@ type Config interface {
 	OperationCancelAfter() time.Duration
 	Meta(ctx context.Context) (context.Context, error)
 	Trace(ctx context.Context) trace.Driver
-	Pessimize(addr endpoint.Addr) error
+	Pessimize(ctx context.Context, addr endpoint.Addr) error
 	StreamTimeout() time.Duration
 	GrpcConnectionPolicy() *GrpcConnectionPolicy
 }

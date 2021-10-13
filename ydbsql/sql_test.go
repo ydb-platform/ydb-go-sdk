@@ -10,22 +10,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
-
-	table "github.com/ydb-platform/ydb-go-sdk/v3/table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Interface checks.
@@ -310,7 +308,9 @@ func TestQuery(t *testing.T) {
 }
 
 func TestDatabaseSelect(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	for _, test := range []struct {
 		query  string
@@ -354,7 +354,9 @@ func TestDatabaseSelect(t *testing.T) {
 }
 
 func TestStatement(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -382,7 +384,9 @@ func TestStatement(t *testing.T) {
 }
 
 func TestTx(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -421,7 +425,9 @@ func TestTx(t *testing.T) {
 }
 
 func TestDriver(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

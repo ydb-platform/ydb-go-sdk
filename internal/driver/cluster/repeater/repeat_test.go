@@ -22,8 +22,11 @@ func TestRepeater(t *testing.T) {
 	})
 	defer cleanup()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	exec := make(chan struct{})
-	r := NewRepeater(42*time.Second,
+	r := NewRepeater(ctx, 42*time.Second,
 		func(_ context.Context) {
 			exec <- struct{}{}
 		}, nil)
@@ -51,7 +54,10 @@ func TestRepeaterCancelation(t *testing.T) {
 	})
 	defer cleanup()
 
-	r := NewRepeater(42*time.Second,
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	r := NewRepeater(ctx, 42*time.Second,
 		func(ctx context.Context) {
 			enter <- struct{}{}
 			<-ctx.Done()

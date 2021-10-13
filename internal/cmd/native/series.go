@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log"
 	"path"
 	"text/template"
@@ -211,7 +210,6 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 		},
 	)
 	if err != nil {
-		fmt.Printf("%T %+v", err, err)
 		return err
 	}
 
@@ -292,7 +290,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 	return res.Err()
 }
 
-func fillTablesWithData(ctx context.Context, c table.Client, prefix string) error {
+func Fill(ctx context.Context, c table.Client, prefix string) error {
 	// Prepare write transaction.
 	writeTx := table.TxControl(
 		table.BeginTx(

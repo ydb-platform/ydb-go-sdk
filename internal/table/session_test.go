@@ -49,32 +49,32 @@ func TestSessionKeepAlive(t *testing.T) {
 			),
 		),
 	}
-	s, err := b.CreateSession(ctx)
+	s, err := b.createSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	e = errors.New("any error")
-	_, err = s.KeepAlive(ctx)
+	err = s.KeepAlive(ctx)
 	if err == nil {
 		t.Fatal(err)
 	}
 
 	status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY, nil
-	info, err := s.KeepAlive(ctx)
+	err = s.KeepAlive(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Status() != options.SessionReady.String() {
-		t.Fatalf("Result %v differ from, expectd %v", info.Status(), options.SessionReady.String())
+	if s.Status() != options.SessionReady.String() {
+		t.Fatalf("Result %v differ from, expectd %v", s.Status(), options.SessionReady.String())
 	}
 
 	status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY, nil
-	info, err = s.KeepAlive(ctx)
+	err = s.KeepAlive(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Status() != options.SessionBusy.String() {
-		t.Fatalf("Result %v differ from, expectd %v", info.Status(), options.SessionBusy.String())
+	if s.Status() != options.SessionBusy.String() {
+		t.Fatalf("Result %v differ from, expectd %v", s.Status(), options.SessionBusy.String())
 	}
 }
 
@@ -103,7 +103,7 @@ func TestSessionDescribeTable(t *testing.T) {
 			),
 		),
 	}
-	s, err := b.CreateSession(ctx)
+	s, err := b.createSession(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		{
 			method: testutil.TableCreateSession,
 			do: func(t *testing.T, ctx context.Context, c *client) {
-				_, err := c.CreateSession(ctx)
+				_, err := c.createSession(ctx)
 				cmp.NoError(t, err)
 			},
 		},
@@ -309,8 +309,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
 				}
-				_, err := s.KeepAlive(ctx)
-				cmp.NoError(t, err)
+				cmp.NoError(t, s.KeepAlive(ctx))
 			},
 		},
 	} {

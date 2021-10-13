@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
 	public "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -22,11 +22,27 @@ const (
 	testResource             = "test_res"
 )
 
-func openDB(ctx context.Context) (cluster.DB, error) {
+func openDB(ctx context.Context, opts ...ydb.Option) (ydb.DB, error) {
 	var (
 		driverTrace trace.Driver
 		tableTrace  trace.Table
 	)
+
+	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
+		opts = append(opts, ydb.WithAccessTokenCredentials(token))
+	}
+	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
+		opts = append(opts, ydb.WithAnonymousCredentials())
+	}
+	opts = append(opts, ydb.WithDriverConfig(&config.Config{
+		Trace:                driverTrace,
+		RequestTimeout:       time.Second * 2,
+		StreamTimeout:        time.Second * 2,
+		OperationTimeout:     time.Second * 2,
+		OperationCancelAfter: time.Second * 2,
+		BalancingConfig:      config.DefaultBalancer,
+	}))
+
 	trace.Stub(&driverTrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
 	})
@@ -36,20 +52,8 @@ func openDB(ctx context.Context) (cluster.DB, error) {
 
 	db, err := ydb.New(
 		ctx,
-		ydb.EndpointDatabase(
-			"localhost:2135",
-			"/local",
-			true,
-		),
-		ydb.WithDriverConfig(&config.Config{
-			Trace:                driverTrace,
-			RequestTimeout:       time.Second * 2,
-			StreamTimeout:        time.Second * 2,
-			OperationTimeout:     time.Second * 2,
-			OperationCancelAfter: time.Second * 2,
-			BalancingConfig:      config.DefaultBalancer,
-		}),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_TOKEN")),
+		ydb.MustConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		opts...,
 	)
 	if err != nil {
 		return nil, err
@@ -59,7 +63,9 @@ func openDB(ctx context.Context) (cluster.DB, error) {
 }
 
 func TestRateLimiter(t *testing.T) {
-	t.Skip("need to be tested with docker")
+	if !test.CheckEndpointDatabaseEnv() {
+		t.Skip("need to be tested with docker")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
@@ -69,7 +75,7 @@ func TestRateLimiter(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = db.Close()
+		_ = db.Close(ctx)
 	}()
 
 	client := internal.New(db)

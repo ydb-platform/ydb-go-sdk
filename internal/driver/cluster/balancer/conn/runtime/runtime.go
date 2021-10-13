@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -20,7 +21,7 @@ const (
 type Runtime interface {
 	Stats() stats.Stats
 	GetState() (s state.State)
-	SetState(s state.State)
+	SetState(ctx context.Context, s state.State)
 	OperationStart(start time.Time)
 	OperationDone(start, end time.Time, err error)
 	StreamStart(now time.Time)
@@ -33,17 +34,16 @@ type Addr interface {
 }
 
 type runtime struct {
-	mu           sync.RWMutex
-	addr         trace.Endpoint
-	trace        trace.Driver
-	state        state.State
-	offlineCount uint64
-	opStarted    uint64
-	opSucceed    uint64
-	opFailed     uint64
-	opTime       *series.Series
-	opRate       *series.Series
-	errRate      *series.Series
+	mu        sync.RWMutex
+	addr      trace.Endpoint
+	trace     trace.Driver
+	state     state.State
+	opStarted uint64
+	opSucceed uint64
+	opFailed  uint64
+	opTime    *series.Series
+	opRate    *series.Series
+	errRate   *series.Series
 }
 
 func New(trace trace.Driver, addr trace.Endpoint) Runtime {
@@ -78,14 +78,12 @@ func (r *runtime) Stats() stats.Stats {
 	return s
 }
 
-func (r *runtime) SetState(s state.State) {
+func (r *runtime) SetState(ctx context.Context, s state.State) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	trace.DriverOnConnStateChange(r.trace, r.addr, r.state)(s)
+	onDone := trace.DriverOnConnStateChange(r.trace, ctx, r.addr, r.state)
 	r.state = s
-	if s == state.Offline {
-		r.offlineCount++
-	}
+	onDone(r.state)
 }
 
 func (r *runtime) GetState() (s state.State) {

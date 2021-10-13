@@ -47,8 +47,8 @@ func (d *driver) Stats() map[endpoint.Endpoint]stats.Stats {
 	return endpoints
 }
 
-func (d *driver) Close() error {
-	return d.clusterClose()
+func (d *driver) Close(ctx context.Context) error {
+	return d.clusterClose(ctx)
 }
 
 func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {

@@ -13,29 +13,33 @@ type (
 	//gtrace:set Shortcut
 	Table struct {
 		// Session events
-		OnCreateSession func(CreateSessionStartInfo) func(CreateSessionDoneInfo)
-		OnKeepAlive     func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
-		OnDeleteSession func(DeleteSessionStartInfo) func(DeleteSessionDoneInfo)
+		OnSessionNew       func(SessionNewStartInfo) func(SessionNewDoneInfo)
+		OnSessionDelete    func(SessionDeleteStartInfo) func(SessionDeleteDoneInfo)
+		OnSessionKeepAlive func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
 		// Query events
-		OnPrepareDataQuery func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo)
-		OnExecuteDataQuery func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo)
+		OnSessionQueryPrepare func(SessionQueryPrepareStartInfo) func(PrepareDataQueryDoneInfo)
+		OnSessionQueryExecute func(ExecuteDataQueryStartInfo) func(SessionQueryPrepareDoneInfo)
 		// Stream events
-		OnStreamExecuteScanQuery func(StreamExecuteScanQueryStartInfo) func(StreamExecuteScanQueryDoneInfo)
-		OnStreamReadTable        func(StreamReadTableStartInfo) func(StreamReadTableDoneInfo)
+		OnSessionQueryStreamExecute func(SessionQueryStreamExecuteStartInfo) func(SessionQueryStreamExecuteDoneInfo)
+		OnSessionQueryStreamRead    func(SessionQueryStreamReadStartInfo) func(SessionQueryStreamReadDoneInfo)
 		// Transaction events
-		OnBeginTransaction    func(BeginTransactionStartInfo) func(BeginTransactionDoneInfo)
-		OnCommitTransaction   func(CommitTransactionStartInfo) func(CommitTransactionDoneInfo)
-		OnRollbackTransaction func(RollbackTransactionStartInfo) func(RollbackTransactionDoneInfo)
+		OnSessionTransactionBegin    func(SessionTransactionBeginStartInfo) func(SessionTransactionBeginDoneInfo)
+		OnSessionTransactionCommit   func(SessionTransactionCommitStartInfo) func(SessionTransactionCommitDoneInfo)
+		OnSessionTransactionRollback func(SessionTransactionRollbackStartInfo) func(SessionTransactionRollbackDoneInfo)
 		// Pool events
-		OnPoolInit         func(PoolInitStartInfo) func(PoolInitDoneInfo)
-		OnPoolCreate       func(PoolCreateStartInfo) func(PoolCreateDoneInfo)
-		OnPoolClose        func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
-		OnPoolGet          func(PoolGetStartInfo) func(PoolGetDoneInfo)
-		OnPoolWait         func(PoolWaitStartInfo) func(PoolWaitDoneInfo)
-		OnPoolTake         func(PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo)
-		OnPoolPut          func(PoolPutStartInfo) func(PoolPutDoneInfo)
-		OnPoolCloseSession func(PoolCloseSessionStartInfo) func(PoolCloseSessionDoneInfo)
-		OnPoolRetry        func(PoolRetryStartInfo) func(PoolRetryDoneInfo)
+		OnPoolInit  func(PoolInitStartInfo) func(PoolInitDoneInfo)
+		OnPoolClose func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
+		OnPoolRetry func(PoolRetryStartInfo) func(PoolRetryDoneInfo)
+		// Pool session lifecycle events
+		OnPoolSessionNew   func(PoolSessionNewStartInfo) func(PoolSessionNewDoneInfo)
+		OnPoolSessionClose func(PoolSessionCloseStartInfo) func(PoolSessionCloseDoneInfo)
+		// Pool common API events
+		OnPoolPut func(PoolPutStartInfo) func(PoolPutDoneInfo)
+		// Pool native API events
+		OnPoolGet  func(PoolGetStartInfo) func(PoolGetDoneInfo)
+		OnPoolWait func(PoolWaitStartInfo) func(PoolWaitDoneInfo)
+		// Pool ydbsql API events
+		OnPoolTake func(PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo)
 	}
 )
 
@@ -49,7 +53,11 @@ type (
 		YQL() string
 	}
 	sessionInfo interface {
+		ID() string
 		Status() string
+	}
+	transactionInfo interface {
+		ID() string
 	}
 	result interface {
 		ResultSetCount() int
@@ -59,134 +67,112 @@ type (
 	streamResult interface {
 		Err() error
 	}
-	CreateSessionStartInfo struct {
+	SessionNewStartInfo struct {
 		Context context.Context
 	}
-	CreateSessionDoneInfo struct {
-		SessionID string
-		Endpoint  string
-		Latency   time.Duration
-		Error     error
+	SessionNewDoneInfo struct {
+		Session sessionInfo
+		Latency time.Duration
+		Error   error
 	}
 	KeepAliveStartInfo struct {
-		Context   context.Context
-		SessionID string
+		Context context.Context
+		Session sessionInfo
 	}
 	KeepAliveDoneInfo struct {
-		SessionID   string
-		SessionInfo sessionInfo
-		Error       error
+		Error error
 	}
-	DeleteSessionStartInfo struct {
-		Context   context.Context
-		SessionID string
+	SessionDeleteStartInfo struct {
+		Context context.Context
+		Session sessionInfo
 	}
-	DeleteSessionDoneInfo struct {
-		SessionID string
-		Latency   time.Duration
-		Error     error
+	SessionDeleteDoneInfo struct {
+		Error error
 	}
-	PrepareDataQueryStartInfo struct {
-		Context   context.Context
-		SessionID string
-		Query     string
+	SessionQueryPrepareStartInfo struct {
+		Context context.Context
+		Session sessionInfo
+		Query   string
 	}
 	PrepareDataQueryDoneInfo struct {
-		SessionID string
-		Query     string
-		Result    dataQuery
-		Cached    bool
-		Error     error
+		Query  string
+		Result dataQuery
+		Cached bool
+		Error  error
 	}
 	ExecuteDataQueryStartInfo struct {
 		Context    context.Context
-		SessionID  string
-		TxID       string
+		Session    sessionInfo
+		Tx         transactionInfo
 		Query      dataQuery
 		Parameters queryParameters
 	}
-	ExecuteDataQueryDoneInfo struct {
-		SessionID  string
-		TxID       string
-		Query      dataQuery
-		Parameters queryParameters
-		Prepared   bool
-		Result     result
-		Error      error
+	SessionQueryPrepareDoneInfo struct {
+		Prepared bool
+		Result   result
+		Error    error
 	}
-	StreamReadTableStartInfo struct {
-		Context   context.Context
-		SessionID string
+	SessionQueryStreamReadStartInfo struct {
+		Context context.Context
+		Session sessionInfo
 	}
-	StreamReadTableDoneInfo struct {
-		SessionID string
-		Result    streamResult
-		Error     error
+	SessionQueryStreamReadDoneInfo struct {
+		Result streamResult
+		Error  error
 	}
-	StreamExecuteScanQueryStartInfo struct {
+	SessionQueryStreamExecuteStartInfo struct {
 		Context    context.Context
-		SessionID  string
+		Session    sessionInfo
 		Query      dataQuery
 		Parameters queryParameters
 	}
-	StreamExecuteScanQueryDoneInfo struct {
-		SessionID  string
-		Query      dataQuery
-		Parameters queryParameters
-		Result     streamResult
-		Error      error
+	SessionQueryStreamExecuteDoneInfo struct {
+		Result streamResult
+		Error  error
 	}
-	BeginTransactionStartInfo struct {
-		Context   context.Context
-		SessionID string
+	SessionTransactionBeginStartInfo struct {
+		Context context.Context
+		Session sessionInfo
 	}
-	BeginTransactionDoneInfo struct {
-		SessionID string
-		TxID      string
-		Error     error
+	SessionTransactionBeginDoneInfo struct {
+		Tx    transactionInfo
+		Error error
 	}
-	CommitTransactionStartInfo struct {
-		Context   context.Context
-		SessionID string
-		TxID      string
+	SessionTransactionCommitStartInfo struct {
+		Context context.Context
+		Session sessionInfo
+		Tx      transactionInfo
 	}
-	CommitTransactionDoneInfo struct {
-		SessionID string
-		TxID      string
-		Error     error
+	SessionTransactionCommitDoneInfo struct {
+		Error error
 	}
-	RollbackTransactionStartInfo struct {
-		Context   context.Context
-		SessionID string
-		TxID      string
+	SessionTransactionRollbackStartInfo struct {
+		Context context.Context
+		Session sessionInfo
+		Tx      transactionInfo
 	}
-	RollbackTransactionDoneInfo struct {
-		SessionID string
-		TxID      string
-		Error     error
+	SessionTransactionRollbackDoneInfo struct {
+		Error error
 	}
-)
-
-type (
 	PoolInitStartInfo struct {
+		Context context.Context
 	}
 	PoolInitDoneInfo struct {
 		Limit            int
 		KeepAliveMinSize int
 	}
-	PoolCreateStartInfo struct {
+	PoolSessionNewStartInfo struct {
 		Context context.Context
 	}
-	PoolCreateDoneInfo struct {
-		SessionID string
-		Error     error
+	PoolSessionNewDoneInfo struct {
+		Session sessionInfo
+		Error   error
 	}
 	PoolGetStartInfo struct {
 		Context context.Context
 	}
 	PoolGetDoneInfo struct {
-		SessionID     string
-		Latency       time.Duration
+		Session       sessionInfo
 		RetryAttempts int
 		Error         error
 	}
@@ -194,36 +180,31 @@ type (
 		Context context.Context
 	}
 	PoolWaitDoneInfo struct {
-		SessionID string
-		Error     error
+		Session sessionInfo
+		Error   error
 	}
 	PoolTakeStartInfo struct {
-		Context   context.Context
-		SessionID string
+		Context context.Context
+		Session sessionInfo
 	}
 	PoolTakeWaitInfo struct {
-		SessionID string
 	}
 	PoolTakeDoneInfo struct {
-		SessionID string
-		Took      bool
-		Error     error
+		Took  bool
+		Error error
 	}
 	PoolPutStartInfo struct {
-		Context   context.Context
-		SessionID string
+		Context context.Context
+		Session sessionInfo
 	}
 	PoolPutDoneInfo struct {
-		SessionID string
-		Error     error
+		Error error
 	}
-	PoolCloseSessionStartInfo struct {
-		Context   context.Context
-		SessionID string
+	PoolSessionCloseStartInfo struct {
+		Context context.Context
+		Session sessionInfo
 	}
-	PoolCloseSessionDoneInfo struct {
-		SessionID string
-		Error     error
+	PoolSessionCloseDoneInfo struct {
 	}
 	PoolCloseStartInfo struct {
 		Context context.Context

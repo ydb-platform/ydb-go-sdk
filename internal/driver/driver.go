@@ -19,9 +19,9 @@ type driver struct {
 	meta meta.Meta
 	tls  bool
 
-	clusterPessimize func(addr endpoint.Addr) error
+	clusterPessimize func(ctx context.Context, addr endpoint.Addr) error
 	clusterStats     func(it func(endpoint.Endpoint, stats.Stats))
-	clusterClose     func() error
+	clusterClose     func(ctx context.Context) error
 	clusterGet       func(ctx context.Context) (conn conn.Conn, err error)
 }
 
@@ -38,9 +38,9 @@ func New(
 	meta meta.Meta,
 	tls bool,
 	get func(ctx context.Context) (conn conn.Conn, err error),
-	pessimize func(addr endpoint.Addr) error,
+	pessimize func(ctx context.Context, addr endpoint.Addr) error,
 	stats func(it func(endpoint.Endpoint, stats.Stats)),
-	close func() error,
+	close func(ctx context.Context) error,
 ) *driver {
 	return &driver{
 		Config:           config,
@@ -73,8 +73,8 @@ func (d *driver) Trace(ctx context.Context) trace.Driver {
 	return trace.ContextDriver(ctx).Compose(d.Config.Trace)
 }
 
-func (d *driver) Pessimize(addr endpoint.Addr) error {
-	return d.clusterPessimize(addr)
+func (d *driver) Pessimize(ctx context.Context, addr endpoint.Addr) error {
+	return d.clusterPessimize(ctx, addr)
 }
 
 func (d *driver) StreamTimeout() time.Duration {

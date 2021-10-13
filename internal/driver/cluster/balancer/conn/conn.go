@@ -29,7 +29,7 @@ type Conn interface {
 
 	Endpoint() endpoint.Endpoint
 	Runtime() runtime.Runtime
-	Close()
+	Close(ctx context.Context) error
 }
 
 func (c *conn) Address() string {
@@ -39,11 +39,11 @@ func (c *conn) Address() string {
 type conn struct {
 	sync.Mutex
 
-	dial      func(context.Context, string, int) (*grpc.ClientConn, error)
-	endpoint  endpoint.Endpoint
-	runtime   runtime.Runtime
-	done      chan struct{}
-	closeOnce sync.Once
+	dial     func(context.Context, string, int) (*grpc.ClientConn, error)
+	endpoint endpoint.Endpoint
+	runtime  runtime.Runtime
+	done     chan struct{}
+	closed   bool
 
 	config Config
 
@@ -60,9 +60,12 @@ func (c *conn) Runtime() runtime.Runtime {
 }
 
 func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
+	if c.isClosed() {
+		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
+	}
 	c.Lock()
 	defer c.Unlock()
-	if c.grpcConn == nil || isBroken(c.grpcConn) {
+	if isBroken(c.grpcConn) {
 		onDone := trace.DriverOnConnDial(c.config.Trace(ctx), ctx, c.endpoint, c.runtime.GetState())
 		raw, err := c.dial(ctx, c.endpoint.Host, c.endpoint.Port)
 		defer func() {
@@ -72,7 +75,7 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 			return nil, err
 		}
 		c.grpcConn = raw
-		c.runtime.SetState(state.Online)
+		c.runtime.SetState(ctx, state.Online)
 	}
 	return c.grpcConn, nil
 }
@@ -102,61 +105,83 @@ func (c *conn) resetTimer() {
 	}
 }
 
-func (c *conn) waitClose() {
-	defer c.close()
+func (c *conn) waitClose(ctx context.Context) {
+	defer func() {
+		c.close(ctx)
+		trace.DriverOnConnClose(c.config.Trace(ctx), ctx, c.endpoint, c.runtime.GetState())()
+	}()
 	c.resetTimer()
 	for {
 		select {
 		case <-c.done:
 			return
 		case <-c.timer.C():
-			if !c.close() {
+			if !c.close(ctx) {
 				c.resetTimer()
 			}
 		}
 	}
+
 }
 
 // c mutex must be unlocked
-func (c *conn) close() bool {
+func (c *conn) close(ctx context.Context) bool {
 	c.Lock()
 	defer c.Unlock()
 	if c.grpcConn == nil {
 		return false
 	}
-	onDone := trace.DriverOnConnDisconnect(c.config.Trace(context.Background()), c.endpoint, c.runtime.GetState())
-	c.grpcConn.Close()
+	onDone := trace.DriverOnConnDisconnect(c.config.Trace(ctx), ctx, c.endpoint, c.runtime.GetState())
+	err := c.grpcConn.Close()
 	c.grpcConn = nil
-	c.runtime.SetState(state.Offline)
+	c.runtime.SetState(ctx, state.Offline)
 	c.timer.Reset(time.Duration(math.MaxInt64))
-	onDone(c.runtime.GetState())
+	onDone(c.runtime.GetState(), err)
 	return true
 }
 
-func (c *conn) Close() {
-	c.closeOnce.Do(func() {
-		close(c.done)
-		if !c.timer.Stop() {
-			panic(fmt.Errorf("cant stop timer for conn to '%v'", c.Address()))
-		}
-		trace.DriverOnConnClose(c.config.Trace(context.Background()), c.endpoint, c.runtime.GetState())
-	})
+func (c *conn) isClosed() bool {
+	c.Lock()
+	defer c.Unlock()
+	return c.closed
+}
+
+func (c *conn) Close(context.Context) error {
+	c.Lock()
+	defer c.Unlock()
+	if c.closed {
+		return nil
+	}
+	close(c.done)
+	c.closed = true
+	if !c.timer.Stop() {
+		return fmt.Errorf("cant stop timer for conn to '%v'", c.Address())
+	}
+	return nil
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
 	c.Lock()
-	defer c.Unlock()
-	if c.runtime.Stats().State == state.Banned {
+	if c.closed {
+		c.Unlock()
 		return
 	}
-	onDone := trace.DriverOnPessimizeNode(c.config.Trace(ctx), ctx, c.endpoint, c.runtime.Stats().State, err)
-	err = c.config.Pessimize(c.endpoint.Addr)
-	c.runtime.SetState(state.Banned)
-	onDone(state.Banned, err)
-	go c.close()
+	if c.runtime.GetState() == state.Banned {
+		c.Unlock()
+		return
+	}
+	onDone := trace.DriverOnPessimizeNode(c.config.Trace(ctx), ctx, c.endpoint, c.runtime.GetState(), err)
+	err = c.config.Pessimize(ctx, c.endpoint.Addr)
+	c.runtime.SetState(ctx, state.Banned)
+	onDone(c.runtime.GetState(), err)
+	c.Unlock()
+	c.close(ctx)
 }
 
 func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {
+	if c.isClosed() {
+		return errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
+	}
 	var (
 		rawCtx = ctx
 		cancel context.CancelFunc
@@ -187,7 +212,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	c.runtime.OperationStart(start)
 	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.endpoint, trace.Method(method))
 	defer func() {
-		onDone(err, issues, opID)
+		onDone(err, issues, opID, c.runtime.GetState())
 		c.runtime.OperationDone(start, timeutil.Now(), err)
 	}()
 
@@ -236,6 +261,10 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 }
 
 func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
+	if c.isClosed() {
+		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
+	}
+
 	// Remember raw deadline to pass it for the tracing functions.
 	rawCtx := ctx
 
@@ -247,7 +276,14 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 				cancel()
 			}
 		}()
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
 	}
+	defer func() {
+		if err != nil {
+			cancel()
+		}
+	}()
 
 	c.runtime.StreamStart(timeutil.Now())
 	streamRecv := trace.DriverOnConnNewStream(c.config.Trace(ctx), rawCtx, c.endpoint, trace.Method(method))
@@ -294,6 +330,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 }
 
 func New(ctx context.Context, endpoint endpoint.Endpoint, dial func(context.Context, string, int) (*grpc.ClientConn, error), cfg Config) Conn {
+	onDone := trace.DriverOnConnNew(cfg.Trace(ctx), ctx, endpoint)
 	c := &conn{
 		endpoint: endpoint,
 		dial:     dial,
@@ -302,7 +339,9 @@ func New(ctx context.Context, endpoint endpoint.Endpoint, dial func(context.Cont
 		done:     make(chan struct{}),
 		runtime:  runtime.New(cfg.Trace(ctx), endpoint),
 	}
-	go c.waitClose()
-	trace.DriverOnConnNew(cfg.Trace(ctx), endpoint, c.runtime.GetState())
+	defer func() {
+		onDone(c.runtime.GetState())
+	}()
+	go c.waitClose(ctx)
 	return c
 }

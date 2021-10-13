@@ -78,8 +78,3 @@ func tableConfig(o options) internal.Config {
 	}
 	return config
 }
-
-func (t *lazyTable) CreateSession(ctx context.Context) (table.Session, error) {
-	t.init()
-	return t.client.CreateSession(ctx)
-}

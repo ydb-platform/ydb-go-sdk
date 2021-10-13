@@ -60,7 +60,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	}
 }
 
-func _newSession(t *testing.T, cl cluster.DB) table.Session {
+func _newSession(t *testing.T, cl cluster.DB) Session {
 	s, err := newSession(context.Background(), cl, trace.Table{})
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
@@ -69,9 +69,14 @@ func _newSession(t *testing.T, cl cluster.DB) table.Session {
 }
 
 func TestRetryerBadSession(t *testing.T) {
+	closed := make(map[table.Session]bool)
 	p := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (table.Session, error) {
-			return simpleSession(t), nil
+		OnGet: func(ctx context.Context) (Session, error) {
+			s := simpleSession(t)
+			s.OnClose(func(context.Context) {
+				closed[s] = true
+			})
+			return s, nil
 		},
 	}
 
@@ -103,7 +108,7 @@ func TestRetryerBadSession(t *testing.T) {
 		} else {
 			seen[s] = true
 		}
-		if !s.IsClosed() {
+		if !closed[s] {
 			t.Errorf("bad session was not closed")
 		}
 	}
@@ -252,7 +257,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	pool := SessionProviderFunc{
-		OnGet: client.CreateSession,
+		OnGet: client.createSession,
 	}
 	for i := range timeouts {
 		for j := range sleeps {

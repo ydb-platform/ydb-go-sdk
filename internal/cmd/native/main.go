@@ -26,6 +26,59 @@ func (q quet) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+func Prepare(ctx context.Context, db ydb.Connection) error {
+	err := db.Scheme().CleanupDatabase(ctx, db.Name(), "series", "episodes", "seasons")
+	if err != nil {
+		return fmt.Errorf("cleaunup database failed: %w", err)
+	}
+
+	err = db.Scheme().EnsurePathExists(ctx, db.Name())
+	if err != nil {
+		return fmt.Errorf("ensure path exists failed: %w", err)
+	}
+
+	err = describeTableOptions(ctx, db.Table())
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "describe table options error: %v", err)
+		os.Exit(1)
+	}
+
+	err = createTables(ctx, db.Table(), db.Name())
+	if err != nil {
+		return fmt.Errorf("create tables error: %w", err)
+	}
+
+	err = describeTable(ctx, db.Table(), path.Join(db.Name(), "series"))
+	if err != nil {
+		return fmt.Errorf("describe table error: %w", err)
+	}
+
+	return nil
+}
+
+func Select(ctx context.Context, db ydb.Connection) error {
+	err := selectSimple(ctx, db.Table(), db.Name())
+	if err != nil {
+		return fmt.Errorf("select simple error: %w", err)
+	}
+
+	err = scanQuerySelect(ctx, db.Table(), db.Name())
+	if err != nil {
+		return fmt.Errorf("scan query error: %w", err)
+	}
+
+	err = readTable(ctx, db.Table(), path.Join(db.Name(), "series"))
+	if err != nil {
+		return fmt.Errorf("read table error: %w", err)
+	}
+
+	return nil
+}
+
+func Quet() {
+	log.SetOutput(&quet{})
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -58,47 +111,20 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)
 		os.Exit(1)
 	}
-	defer func() { _ = db.Close() }()
+	defer func() { _ = db.Close(ctx) }()
 
-	err = db.Scheme().CleanupDatabase(ctx, connectParams.Database(), "series", "episodes", "seasons")
+	err = Prepare(ctx, db)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "cleaunup database failed: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)
 		os.Exit(1)
 	}
 
-	err = db.Scheme().EnsurePathExists(ctx, connectParams.Database())
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ensure path exists failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	err = describeTableOptions(ctx, db.Table())
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "describe table options error: %v\n", err)
-		os.Exit(1)
-	}
-
-	err = createTables(ctx, db.Table(), connectParams.Database())
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "create tables error: %v\n", err)
-		os.Exit(1)
-	}
-
-	err = describeTable(ctx, db.Table(), path.Join(
-		connectParams.Database(), "series",
-	))
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "describe table error: %v\n", err)
-		os.Exit(1)
-	}
-
-	err = fillTablesWithData(ctx, db.Table(), connectParams.Database())
+	err = Fill(ctx, db.Table(), db.Name())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "fill tables with data error: %v\n", err)
-		os.Exit(1)
 	}
 
-	log.SetOutput(&quet{})
+	Quet()
 
 	concurrency := 200
 	wg := sync.WaitGroup{}
@@ -110,7 +136,7 @@ func main() {
 			for {
 				fmt.Print(".")
 
-				err = selectSimple(ctx, db.Table(), connectParams.Database())
+				err := Select(ctx, db)
 				if err != nil {
 					// nolint:staticcheck
 					// ignore SA1019
@@ -122,58 +148,6 @@ func main() {
 						fmt.Println("exit")
 						return
 					}
-				}
-
-				err = scanQuerySelect(ctx, db.Table(), connectParams.Database())
-				if err != nil {
-					// nolint:staticcheck
-					// ignore SA1019
-					// We want to check internal grpc error on chaos monkey testing
-					if errors.Is(err, grpc.ErrClientConnClosing) {
-						panic(err)
-					}
-					if errors.Is(err, context.Canceled) {
-						fmt.Println("exit")
-						return
-					}
-				}
-
-				err = readTable(ctx, db.Table(), path.Join(
-					connectParams.Database(), "series",
-				))
-				if err != nil {
-					// nolint:staticcheck
-					// ignore SA1019
-					// We want to check internal grpc error on chaos monkey testing
-					if errors.Is(err, grpc.ErrClientConnClosing) {
-						panic(err)
-					}
-					if errors.Is(err, context.Canceled) {
-						fmt.Println("exit")
-						return
-					}
-				}
-
-				log.Printf("> cluster stats:\n")
-				for e, s := range db.Stats() {
-					log.Printf("  > '%v': %v\n", e, s)
-				}
-
-				whoAmI, err := db.Discovery().WhoAmI(ctx)
-				log.Printf("whoAmI: %v, %v\n", whoAmI, err)
-				if err != nil {
-					// nolint:staticcheck
-					// ignore SA1019
-					// We want to check internal grpc error on chaos monkey testing
-					if errors.Is(err, grpc.ErrClientConnClosing) {
-						panic(err)
-					}
-					if errors.Is(err, context.Canceled) {
-						fmt.Println("exit")
-						return
-					}
-				} else {
-					log.Printf("whoAmI: %v, %v\n", whoAmI, err)
 				}
 			}
 		}()

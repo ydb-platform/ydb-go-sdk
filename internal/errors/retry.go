@@ -10,19 +10,19 @@ type OperationCompleted uint8
 
 // Binary flags that used as OperationCompleted
 const (
-	OperationCompletedTrue      OperationCompleted = 1 << iota >> 1
-	OperationCompletedUndefined                    // may be true or may be false
+	OperationCompletedTrue      = OperationCompleted(1 << iota >> 1)
+	OperationCompletedUndefined // may be true or may be false
 	OperationCompletedFalse
 )
 
 func (t OperationCompleted) String() string {
 	switch t {
 	case OperationCompletedTrue:
-		return "operation was completed"
+		return "operation was completed, no need retries"
 	case OperationCompletedFalse:
-		return "operation was not completed"
+		return "operation was not completed, need retries"
 	case OperationCompletedUndefined:
-		return "operation completed status undefined"
+		return "operation completed status undefined, no need retries"
 	default:
 		return fmt.Sprintf("unknown operation completed code: %d", t)
 	}

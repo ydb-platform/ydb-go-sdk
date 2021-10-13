@@ -13,9 +13,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-type Session interface {
+type SessionInfo interface {
 	ID() string
 	Address() string
+}
+
+type Session interface {
+	SessionInfo
+
 	CreateTable(ctx context.Context, path string, opts ...options.CreateTableOption) (err error)
 	DescribeTable(ctx context.Context, path string, opts ...options.DescribeTableOption) (desc options.Description, err error)
 	DropTable(ctx context.Context, path string, opts ...options.DropTableOption) (err error)
@@ -30,11 +35,6 @@ type Session interface {
 	StreamExecuteScanQuery(ctx context.Context, query string, params *QueryParameters, opts ...options.ExecuteScanQueryOption) (_ resultset.Result, err error)
 	BulkUpsert(ctx context.Context, table string, rows types.Value) (err error)
 	BeginTransaction(ctx context.Context, tx *TransactionSettings) (x Transaction, err error)
-	Close(ctx context.Context) (err error)
-
-	OnClose(f func())
-	KeepAlive(ctx context.Context) (options.SessionInfo, error)
-	IsClosed() bool
 }
 
 type TransactionSettings struct {

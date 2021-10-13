@@ -12,8 +12,8 @@ type (
 	//gtrace:set Shortcut
 	Driver struct {
 		// Conn events
-		OnConnNew         func(ConnNewInfo)
-		OnConnClose       func(ConnCloseInfo)
+		OnConnNew         func(ConnNewStartInfo) func(ConnNewDoneInfo)
+		OnConnClose       func(ConnCloseStartInfo) func(ConnCloseDoneInfo)
 		OnConnDial        func(ConnDialStartInfo) func(ConnDialDoneInfo)
 		OnConnDisconnect  func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
 		OnConnStateChange func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
@@ -78,44 +78,56 @@ type ConnState interface {
 
 type (
 	ClusterInsertStartInfo struct {
+		Context  context.Context
 		Endpoint Endpoint
 	}
 	ClusterInsertDoneInfo struct {
 		State ConnState
 	}
 	ClusterUpdateStartInfo struct {
+		Context  context.Context
 		Endpoint Endpoint
 	}
 	ClusterUpdateDoneInfo struct {
 		State ConnState
 	}
 	ClusterRemoveStartInfo struct {
+		Context  context.Context
 		Endpoint Endpoint
 	}
 	ClusterRemoveDoneInfo struct {
 		State ConnState
 	}
 	ConnDisconnectStartInfo struct {
+		Context  context.Context
 		Endpoint Endpoint
 		State    ConnState
 	}
 	ConnDisconnectDoneInfo struct {
 		State ConnState
+		Error error
 	}
 	ConnStateChangeStartInfo struct {
+		Context  context.Context
 		Endpoint Endpoint
 		State    ConnState
 	}
 	ConnStateChangeDoneInfo struct {
 		State ConnState
 	}
-	ConnNewInfo struct {
+	ConnNewStartInfo struct {
+		Context  context.Context
+		Endpoint Endpoint
+	}
+	ConnNewDoneInfo struct {
+		State ConnState
+	}
+	ConnCloseStartInfo struct {
+		Context  context.Context
 		Endpoint Endpoint
 		State    ConnState
 	}
-	ConnCloseInfo struct {
-		Endpoint Endpoint
-		State    ConnState
+	ConnCloseDoneInfo struct {
 	}
 	ConnDialStartInfo struct {
 		Context  context.Context
@@ -135,6 +147,7 @@ type (
 		Error  error
 		Issues []Issue
 		OpID   string
+		State  ConnState
 	}
 	ConnNewStreamStartInfo struct {
 		Context  context.Context
@@ -145,6 +158,7 @@ type (
 		Error error
 	}
 	ConnNewStreamDoneInfo struct {
+		State ConnState
 		Error error
 	}
 	ClusterGetStartInfo struct {

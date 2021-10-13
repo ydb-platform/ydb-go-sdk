@@ -17,9 +17,20 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnNew
 		h2 := x.OnConnNew
-		ret.OnConnNew = func(c ConnNewInfo) {
-			h1(c)
-			h2(c)
+		ret.OnConnNew = func(c ConnNewStartInfo) func(ConnNewDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnNewDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
 		}
 	}
 	switch {
@@ -30,9 +41,20 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnClose
 		h2 := x.OnConnClose
-		ret.OnConnClose = func(c ConnCloseInfo) {
-			h1(c)
-			h2(c)
+		ret.OnConnClose = func(c ConnCloseStartInfo) func(ConnCloseDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnCloseDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
 		}
 	}
 	switch {
@@ -336,19 +358,35 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	}
 	return ret
 }
-func (t Driver) onConnNew(c1 ConnNewInfo) {
+func (t Driver) onConnNew(c1 ConnNewStartInfo) func(ConnNewDoneInfo) {
 	fn := t.OnConnNew
 	if fn == nil {
-		return
+		return func(ConnNewDoneInfo) {
+			return
+		}
 	}
-	fn(c1)
+	res := fn(c1)
+	if res == nil {
+		return func(ConnNewDoneInfo) {
+			return
+		}
+	}
+	return res
 }
-func (t Driver) onConnClose(c1 ConnCloseInfo) {
+func (t Driver) onConnClose(c1 ConnCloseStartInfo) func(ConnCloseDoneInfo) {
 	fn := t.OnConnClose
 	if fn == nil {
-		return
+		return func(ConnCloseDoneInfo) {
+			return
+		}
 	}
-	fn(c1)
+	res := fn(c1)
+	if res == nil {
+		return func(ConnCloseDoneInfo) {
+			return
+		}
+	}
+	return res
 }
 func (t Driver) onConnDial(c1 ConnDialStartInfo) func(ConnDialDoneInfo) {
 	fn := t.OnConnDial
@@ -542,17 +580,27 @@ func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	}
 	return res
 }
-func DriverOnConnNew(t Driver, e Endpoint, state ConnState) {
-	var p ConnNewInfo
+func DriverOnConnNew(t Driver, c context.Context, e Endpoint) func(state ConnState) {
+	var p ConnNewStartInfo
+	p.Context = c
 	p.Endpoint = e
-	p.State = state
-	t.onConnNew(p)
+	res := t.onConnNew(p)
+	return func(state ConnState) {
+		var p ConnNewDoneInfo
+		p.State = state
+		res(p)
+	}
 }
-func DriverOnConnClose(t Driver, e Endpoint, state ConnState) {
-	var p ConnCloseInfo
+func DriverOnConnClose(t Driver, c context.Context, e Endpoint, state ConnState) func() {
+	var p ConnCloseStartInfo
+	p.Context = c
 	p.Endpoint = e
 	p.State = state
-	t.onConnClose(p)
+	res := t.onConnClose(p)
+	return func() {
+		var p ConnCloseDoneInfo
+		res(p)
+	}
 }
 func DriverOnConnDial(t Driver, c context.Context, e Endpoint, state ConnState) func(_ error, state ConnState) {
 	var p ConnDialStartInfo
@@ -567,19 +615,22 @@ func DriverOnConnDial(t Driver, c context.Context, e Endpoint, state ConnState) 
 		res(p)
 	}
 }
-func DriverOnConnDisconnect(t Driver, e Endpoint, state ConnState) func(state ConnState) {
+func DriverOnConnDisconnect(t Driver, c context.Context, e Endpoint, state ConnState) func(state ConnState, _ error) {
 	var p ConnDisconnectStartInfo
+	p.Context = c
 	p.Endpoint = e
 	p.State = state
 	res := t.onConnDisconnect(p)
-	return func(state ConnState) {
+	return func(state ConnState, e error) {
 		var p ConnDisconnectDoneInfo
 		p.State = state
+		p.Error = e
 		res(p)
 	}
 }
-func DriverOnConnStateChange(t Driver, e Endpoint, state ConnState) func(state ConnState) {
+func DriverOnConnStateChange(t Driver, c context.Context, e Endpoint, state ConnState) func(state ConnState) {
 	var p ConnStateChangeStartInfo
+	p.Context = c
 	p.Endpoint = e
 	p.State = state
 	res := t.onConnStateChange(p)
@@ -589,32 +640,34 @@ func DriverOnConnStateChange(t Driver, e Endpoint, state ConnState) func(state C
 		res(p)
 	}
 }
-func DriverOnConnInvoke(t Driver, c context.Context, e Endpoint, m Method) func(_ error, issues []Issue, opID string) {
+func DriverOnConnInvoke(t Driver, c context.Context, e Endpoint, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
 	var p ConnInvokeStartInfo
 	p.Context = c
 	p.Endpoint = e
 	p.Method = m
 	res := t.onConnInvoke(p)
-	return func(e error, issues []Issue, opID string) {
+	return func(e error, issues []Issue, opID string, state ConnState) {
 		var p ConnInvokeDoneInfo
 		p.Error = e
 		p.Issues = issues
 		p.OpID = opID
+		p.State = state
 		res(p)
 	}
 }
-func DriverOnConnNewStream(t Driver, c context.Context, e Endpoint, m Method) func(error) func(error) {
+func DriverOnConnNewStream(t Driver, c context.Context, e Endpoint, m Method) func(error) func(state ConnState, _ error) {
 	var p ConnNewStreamStartInfo
 	p.Context = c
 	p.Endpoint = e
 	p.Method = m
 	res := t.onConnNewStream(p)
-	return func(e error) func(error) {
+	return func(e error) func(ConnState, error) {
 		var p ConnNewStreamRecvInfo
 		p.Error = e
 		res := res(p)
-		return func(e error) {
+		return func(state ConnState, e error) {
 			var p ConnNewStreamDoneInfo
+			p.State = state
 			p.Error = e
 			res(p)
 		}
@@ -631,8 +684,9 @@ func DriverOnClusterGet(t Driver, c context.Context) func(Endpoint, error) {
 		res(p)
 	}
 }
-func DriverOnClusterInsert(t Driver, e Endpoint) func(state ConnState) {
+func DriverOnClusterInsert(t Driver, c context.Context, e Endpoint) func(state ConnState) {
 	var p ClusterInsertStartInfo
+	p.Context = c
 	p.Endpoint = e
 	res := t.onClusterInsert(p)
 	return func(state ConnState) {
@@ -641,8 +695,9 @@ func DriverOnClusterInsert(t Driver, e Endpoint) func(state ConnState) {
 		res(p)
 	}
 }
-func DriverOnClusterUpdate(t Driver, e Endpoint) func(state ConnState) {
+func DriverOnClusterUpdate(t Driver, c context.Context, e Endpoint) func(state ConnState) {
 	var p ClusterUpdateStartInfo
+	p.Context = c
 	p.Endpoint = e
 	res := t.onClusterUpdate(p)
 	return func(state ConnState) {
@@ -651,8 +706,9 @@ func DriverOnClusterUpdate(t Driver, e Endpoint) func(state ConnState) {
 		res(p)
 	}
 }
-func DriverOnClusterRemove(t Driver, e Endpoint) func(state ConnState) {
+func DriverOnClusterRemove(t Driver, c context.Context, e Endpoint) func(state ConnState) {
 	var p ClusterRemoveStartInfo
+	p.Context = c
 	p.Endpoint = e
 	res := t.onClusterRemove(p)
 	return func(state ConnState) {

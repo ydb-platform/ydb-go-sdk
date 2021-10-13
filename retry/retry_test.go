@@ -153,6 +153,8 @@ func TestRetryModes(t *testing.T) {
 		},
 		{
 			// nolint:staticcheck
+			// ignore SA1019
+			// We want to check internal grpc error on chaos monkey testing
 			err:           errors.MapGRPCError(grpc.ErrClientConnClosing),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,

@@ -1,6 +1,7 @@
 package balancer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -46,7 +47,7 @@ type Balancer interface {
 	Remove(Element)
 
 	// Pessimize pessimizes some Balancer element.
-	Pessimize(Element) error
+	Pessimize(context.Context, Element) error
 
 	// Contains returns true if Balancer contains requested element.
 	Contains(Element) bool
@@ -177,7 +178,7 @@ func (m *multiBalancer) Remove(x Element) {
 	}
 }
 
-func (m *multiBalancer) Pessimize(x Element) error {
+func (m *multiBalancer) Pessimize(ctx context.Context, x Element) error {
 	if x == nil {
 		return ErrNilBalancerElement
 	}
@@ -189,7 +190,7 @@ func (m *multiBalancer) Pessimize(x Element) error {
 			continue
 		}
 		all++
-		if e := m.balancer[i].Pessimize(x); e == nil {
+		if e := m.balancer[i].Pessimize(ctx, x); e == nil {
 			good++
 		} else if !errors.Is(e, ErrUnknownBalancerElement) { // collect error only if not an ErrUnknownBalancerElement
 			errs = append(errs, e.Error())
@@ -221,8 +222,8 @@ func (s *singleConnBalancer) Remove(x Element) {
 	}
 	s.conn = nil
 }
-func (s *singleConnBalancer) Update(Element, info.Info)  {}
-func (s *singleConnBalancer) Pessimize(el Element) error { return nil }
+func (s *singleConnBalancer) Update(Element, info.Info)                {}
+func (s *singleConnBalancer) Pessimize(context.Context, Element) error { return nil }
 func (s *singleConnBalancer) Contains(x Element) bool {
 	if x == nil {
 		return false

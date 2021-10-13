@@ -81,7 +81,11 @@ func WithBalancingConfig(config config.BalancerConfig) Option {
 
 func WithGrpcConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, client *db) error {
-		client.options.driverConfig.GrpcConnectionPolicy.TTL = ttl
+		if client.options.tableSessionPoolKeepAliveTimeout != nil && *client.options.tableSessionPoolKeepAliveTimeout > ttl {
+			client.options.driverConfig.GrpcConnectionPolicy.TTL = *client.options.tableSessionPoolKeepAliveTimeout + 10*time.Second
+		} else {
+			client.options.driverConfig.GrpcConnectionPolicy.TTL = ttl
+		}
 		return nil
 	}
 }

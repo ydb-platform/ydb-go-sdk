@@ -1,16 +1,15 @@
-package main
+package test
 
 import (
 	"bytes"
 	"context"
-	"database/sql"
-	"fmt"
 	"log"
 	"path"
 	"text/template"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -47,7 +46,7 @@ SELECT
 	series_id,
 	title,
 	series_info,
-	release_date,
+	CAST(release_date AS Uint64) AS release_date,
 	comment
 FROM AS_TABLE($seriesData);
 
@@ -70,49 +69,64 @@ SELECT
 FROM AS_TABLE($episodesData);
 `))
 
-func cleanupDatabase(ctx context.Context, c table.Client, prefix string, names ...string) (err error) {
-	return c.RetryIdempotent(ctx, func(ctx context.Context, session table.Session) (err error) {
-		for _, name := range names {
-			fullPath := path.Join(prefix, name)
-			err = session.DropTable(ctx, fullPath)
-			if err != nil {
-				return err
-			}
-		}
-		return err
-	})
-}
-
-func ensurePathExists(ctx context.Context, db *sql.DB) error {
-	// TODO: fix it
-	return nil
-}
-
-func readTable(ctx context.Context, db *sql.DB, path string) error {
-	query := fmt.Sprintf("PRAGMA TablePathPrefix(\"%s\"); select series_id,title,release_date from series order by series_id", path)
-	/*stmt, err := db.PrepareContext(ctx, query)
-	if err != nil {
-		return err
-	}*/
-	res, err := db.QueryContext(ctx, query)
+func readTable(ctx context.Context, c table.Client, path string) error {
+	var res resultset.Result
+	err := c.RetryIdempotent(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			res, err = s.StreamReadTable(ctx, path,
+				options.ReadOrdered(),
+				options.ReadColumn("series_id"),
+				options.ReadColumn("title"),
+				options.ReadColumn("release_date"),
+			)
+			return
+		},
+	)
 	if err != nil {
 		return err
 	}
 	var (
 		id    *uint64
 		title *string
-		date  sql.NullTime
+		date  *uint64
 	)
 
 	log.Printf("> read_table:\n")
-	for res.Next() {
-		err = res.Scan(&id, &title, &date)
-		if err != nil {
-			return err
+	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
+		for res.NextRow() {
+			err = res.Scan(&id, &title, &date)
+			if err != nil {
+				return err
+			}
+			log.Printf("  > %d %s %d", *id, *title, *date)
 		}
-		log.Printf("  > %d %s %d", *id, *title, date.Time.Unix())
 	}
-	return res.Err()
+	if err := res.Err(); err != nil {
+		return err
+	}
+	stats := res.Stats()
+	for i := 0; ; i++ {
+		phase, ok := stats.NextPhase()
+		if !ok {
+			break
+		}
+		log.Printf(
+			"# phase #%d: took %s",
+			i, phase.Duration(),
+		)
+		for {
+			tbl, ok := phase.NextTableAccess()
+			if !ok {
+				break
+			}
+			log.Printf(
+				"#  accessed %s: read=(%drows, %dbytes)",
+				tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
+			)
+		}
+	}
+	return nil
 }
 
 func describeTableOptions(ctx context.Context, c table.Client) error {
@@ -127,7 +141,7 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("> describe_table_options:\n")
+	log.Println("> describe_table_options:")
 
 	for i, p := range desc.TableProfilePresets {
 		log.Printf("  > TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)
@@ -154,7 +168,7 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	return nil
 }
 
-func selectSimple(ctx context.Context, db *sql.DB, prefix string) error {
+func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -173,16 +187,28 @@ func selectSimple(ctx context.Context, db *sql.DB, prefix string) error {
 			TablePathPrefix: prefix,
 		},
 	)
-
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.PrepareContext(ctx, query)
-	if err != nil {
-		return err
-	}
-	res, err := stmt.QueryContext(ctx, sql.Named("seriesID", uint64(1)))
+	readTx := table.TxControl(
+		table.BeginTx(
+			table.WithOnlineReadOnly(),
+		),
+		table.CommitTx(),
+	)
+	var res resultset.Result
+	err := c.RetryIdempotent(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			_, res, err = s.Execute(ctx, readTx, query,
+				table.NewQueryParameters(
+					table.ValueParam("$seriesID", types.Uint64Value(1)),
+				),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
+				),
+				options.WithCollectStatsModeBasic(),
+			)
+			return
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -192,24 +218,24 @@ func selectSimple(ctx context.Context, db *sql.DB, prefix string) error {
 		title *string
 		date  *[]byte
 	)
+
 	log.Printf("> select_simple_transaction:\n")
-	for res.Next() {
-		err = res.Scan(&id, &title, &date)
-		if err != nil {
-			return err
+	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
+		for res.NextRow() {
+			err = res.Scan(&id, &title, &date)
+			if err != nil {
+				return err
+			}
+			log.Printf(
+				"  > %d %s %s\n",
+				*id, *title, *date,
+			)
 		}
-		log.Printf(
-			"  > %d %s %s\n",
-			*id, *title, *date,
-		)
 	}
-	if err = res.Err(); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return res.Err()
 }
 
-func scanQuerySelect(ctx context.Context, db *sql.DB, prefix string) error {
+func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -218,29 +244,30 @@ func scanQuerySelect(ctx context.Context, db *sql.DB, prefix string) error {
 
 			SELECT series_id, season_id, title, CAST(CAST(first_aired AS Date) AS String) AS first_aired
 			FROM seasons
-			WHERE series_id IN $series;
-
-			SELECT * FROM (
-				  SELECT CAST("nan" AS Decimal(3,2)) as x UNION ALL
-				  SELECT CAST("-inf" AS Decimal(3,2)) as x UNION ALL
-				  SELECT CAST("2.72" AS Decimal(3,2)) as x UNION ALL
-				  SELECT CAST("+inf" AS Decimal(3,2)) as x UNION ALL
-				  SELECT CAST("3.14" AS Decimal(3,2)) as x
-				  ) ORDER BY x;
+			WHERE series_id IN $series
 		`)),
 		templateConfig{
 			TablePathPrefix: prefix,
 		},
 	)
-	stmt, err := db.PrepareContext(ctx, query)
-	if err != nil {
-		return err
-	}
-	res, err := stmt.QueryContext(ctx, sql.Named("series", types.ListValue(
-		types.Uint64Value(1),
-		types.Uint64Value(10),
-	)))
 
+	var res resultset.Result
+	err := c.RetryIdempotent(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			res, err = s.StreamExecuteScanQuery(ctx, query,
+				table.NewQueryParameters(
+					table.ValueParam("$series",
+						types.ListValue(
+							types.Uint64Value(1),
+							types.Uint64Value(10),
+						),
+					),
+				),
+			)
+			return
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -251,46 +278,44 @@ func scanQuerySelect(ctx context.Context, db *sql.DB, prefix string) error {
 		date     string // due to cast in select query
 	)
 	log.Printf("> scan_query_select:\n")
-	for res.Next() {
-		err = res.Scan(&seriesID, &seasonID, &title, &date)
-		if err != nil {
-			return err
+	for res.NextResultSet(ctx) {
+		for res.NextRow() {
+			err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
+			if err != nil {
+				return err
+			}
+			log.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
 		}
-		log.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
-	}
-
-	var decimal types.Decimal
-	res.NextResultSet()
-	log.Print("> all rows in table:\n")
-	for res.Next() {
-		err = res.Scan(&decimal)
-		if err != nil {
-			return err
-		}
-		log.Printf("  > Decimal: { bytes: %d, scale: %d, precision: %d }\n", decimal.Bytes, decimal.Scale, decimal.Precision)
 	}
 	return res.Err()
 }
 
-func fillTablesWithData(ctx context.Context, db *sql.DB, prefix string) error {
-	query := render(fill, templateConfig{
-		TablePathPrefix: prefix,
-	})
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.PrepareContext(ctx, query)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.ExecContext(ctx, sql.Named("seriesData", getSeriesData()),
-		sql.Named("seasonsData", getSeasonsData()),
-		sql.Named("episodesData", getEpisodesData()))
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+func Fill(ctx context.Context, c table.Client, prefix string) error {
+	// Prepare write transaction.
+	writeTx := table.TxControl(
+		table.BeginTx(
+			table.WithSerializableReadWrite(),
+		),
+		table.CommitTx(),
+	)
+	err := c.RetryNonIdempotent(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			stmt, err := s.Prepare(ctx, render(fill, templateConfig{
+				TablePathPrefix: prefix,
+			}))
+			if err != nil {
+				return
+			}
+			_, _, err = stmt.Execute(ctx, writeTx, table.NewQueryParameters(
+				table.ValueParam("$seriesData", getSeriesData()),
+				table.ValueParam("$seasonsData", getSeasonsData()),
+				table.ValueParam("$episodesData", getEpisodesData()),
+			))
+			return
+		},
+	)
+	return err
 }
 
 func createTables(ctx context.Context, c table.Client, prefix string) error {
@@ -301,7 +326,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeUTF8)),
 				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
-				options.WithColumn("release_date", types.Optional(types.TypeDate)),
+				options.WithColumn("release_date", types.Optional(types.TypeUint64)),
 				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
 				options.WithPrimaryKeyColumn("series_id"),
 			)
