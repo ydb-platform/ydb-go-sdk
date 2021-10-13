@@ -34,11 +34,11 @@ func (c configStub) Meta(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func (c configStub) Trace(ctx context.Context) trace.Driver {
+func (c configStub) Trace(context.Context) trace.Driver {
 	return c.Config.Trace
 }
 
-func (c configStub) Pessimize(addr endpoint.Addr) error {
+func (c configStub) Pessimize(context.Context, endpoint.Addr) error {
 	return nil
 }
 

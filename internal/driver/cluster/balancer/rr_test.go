@@ -228,6 +228,8 @@ var (
 func TestRoundRobinBalancer(t *testing.T) {
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			var (
 				mconn = map[conn.Conn]string{} // Conn to addr mapping for easy matching.
 				maddr = map[string]conn.Conn{} // addr to Conn mapping.
@@ -237,7 +239,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 			r := new(roundRobin)
 			for _, e := range test.add {
 				c := conn.New(context.Background(), endpoint.Endpoint{}, nil, stub.Config(config.New()))
-				c.Runtime().SetState(state.Online)
+				c.Runtime().SetState(ctx, state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
 				melem[e.Host] = r.Insert(c, info.Info{
@@ -248,7 +250,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 				r.Remove(melem[e.Host])
 			}
 			for addr := range test.banned {
-				if err := r.Pessimize(melem[addr]); err != nil {
+				if err := r.Pessimize(ctx, melem[addr]); err != nil {
 					t.Errorf("unexpected pessimization error: %w", err)
 				}
 			}
@@ -281,6 +283,8 @@ func TestRoundRobinBalancer(t *testing.T) {
 func TestRandomChoiceBalancer(t *testing.T) {
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			var (
 				mconn = map[conn.Conn]string{} // Conn to addr mapping for easy matching.
 				maddr = map[string]conn.Conn{} // addr to Conn mapping.
@@ -290,7 +294,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			r := new(roundRobin)
 			for _, e := range test.add {
 				c := conn.New(context.Background(), endpoint.Endpoint{}, nil, stub.Config(config.New()))
-				c.Runtime().SetState(state.Online)
+				c.Runtime().SetState(ctx, state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
 				melem[e.Host] = r.Insert(c, info.Info{
@@ -301,7 +305,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 				r.Remove(melem[e.Host])
 			}
 			for addr := range test.banned {
-				if err := r.Pessimize(melem[addr]); err != nil {
+				if err := r.Pessimize(ctx, melem[addr]); err != nil {
 					t.Errorf("unexpected pessimization error: %w", err)
 				}
 			}

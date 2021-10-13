@@ -5,6 +5,7 @@ on:
       - v*
     branches:
       - master
+      - '**'
   pull_request:
   workflow_dispatch:
 jobs:
@@ -27,11 +28,12 @@ jobs:
       - name: Test
         run: go test -race ./... -coverprofile=coverage.txt -covermode=atomic
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.16.x'
+        uses: codecov/codecov-action@v2
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.17.x' && github.ref == 'refs/heads/master'
         with:
           file: ./coverage.txt
           flags: unittests
           env_vars: OS,GO
           name: codecov
           fail_ci_if_error: true
+          verbose: true

@@ -2,12 +2,13 @@ package test
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"os"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
-func OpenDB(t *testing.T, ctx context.Context, opts ...ydb.Option) ydb.Connection {
+func OpenDB(ctx context.Context, t *testing.T, opts ...ydb.Option) ydb.Connection {
 	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
 		opts = append(opts, ydb.WithAccessTokenCredentials(token))
 	}
@@ -17,16 +18,7 @@ func OpenDB(t *testing.T, ctx context.Context, opts ...ydb.Option) ydb.Connectio
 
 	db, err := ydb.New(
 		ctx,
-		ydb.EndpointDatabase(
-			os.Getenv("YDB_ENDPOINT"),
-			os.Getenv("YDB_DATABASE"),
-			func() bool {
-				if v, ok := os.LookupEnv("YDB_SECURE_CONNECTION"); ok && v == "1" {
-					return true
-				}
-				return false
-			}(),
-		),
+		ydb.MustConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		opts...,
 	)
 	if err != nil {

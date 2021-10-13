@@ -29,7 +29,7 @@ type DB interface {
 	Stats() map[endpoint.Endpoint]stats.Stats
 
 	// Close clears resources and close all connections to YDB
-	Close() error
+	Close(ctx context.Context) error
 }
 
 type Connection interface {
@@ -77,11 +77,11 @@ func (db *db) Stats() map[endpoint.Endpoint]stats.Stats {
 	return db.cluster.Stats()
 }
 
-func (db *db) Close() error {
-	_ = db.Table().Close(context.Background())
-	_ = db.Scheme().Close(context.Background())
-	_ = db.Coordination().Close(context.Background())
-	return db.cluster.Close()
+func (db *db) Close(ctx context.Context) error {
+	_ = db.Table().Close(ctx)
+	_ = db.Scheme().Close(ctx)
+	_ = db.Coordination().Close(ctx)
+	return db.cluster.Close(ctx)
 }
 
 func (db *db) Table() table.Client {

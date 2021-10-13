@@ -29,28 +29,28 @@ func (q quet) Write(p []byte) (n int, err error) {
 func Prepare(ctx context.Context, db ydb.Connection) error {
 	err := db.Scheme().CleanupDatabase(ctx, db.Name(), "series", "episodes", "seasons")
 	if err != nil {
-		return fmt.Errorf("cleaunup database failed: %w\n", err)
+		return fmt.Errorf("cleaunup database failed: %w", err)
 	}
 
 	err = db.Scheme().EnsurePathExists(ctx, db.Name())
 	if err != nil {
-		return fmt.Errorf("ensure path exists failed: %w\n", err)
+		return fmt.Errorf("ensure path exists failed: %w", err)
 	}
 
 	err = describeTableOptions(ctx, db.Table())
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "describe table options error: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "describe table options error: %v", err)
 		os.Exit(1)
 	}
 
 	err = createTables(ctx, db.Table(), db.Name())
 	if err != nil {
-		return fmt.Errorf("create tables error: %w\n", err)
+		return fmt.Errorf("create tables error: %w", err)
 	}
 
 	err = describeTable(ctx, db.Table(), path.Join(db.Name(), "series"))
 	if err != nil {
-		return fmt.Errorf("describe table error: %w\n", err)
+		return fmt.Errorf("describe table error: %w", err)
 	}
 
 	return nil
@@ -59,17 +59,17 @@ func Prepare(ctx context.Context, db ydb.Connection) error {
 func Select(ctx context.Context, db ydb.Connection) error {
 	err := selectSimple(ctx, db.Table(), db.Name())
 	if err != nil {
-		return fmt.Errorf("select simple error: %w\n", err)
+		return fmt.Errorf("select simple error: %w", err)
 	}
 
 	err = scanQuerySelect(ctx, db.Table(), db.Name())
 	if err != nil {
-		return fmt.Errorf("scan query error: %w\n", err)
+		return fmt.Errorf("scan query error: %w", err)
 	}
 
 	err = readTable(ctx, db.Table(), path.Join(db.Name(), "series"))
 	if err != nil {
-		return fmt.Errorf("read table error: %w\n", err)
+		return fmt.Errorf("read table error: %w", err)
 	}
 
 	return nil
@@ -111,7 +111,7 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "connect error: %v\n", err)
 		os.Exit(1)
 	}
-	defer func() { _ = db.Close() }()
+	defer func() { _ = db.Close(ctx) }()
 
 	err = Prepare(ctx, db)
 	if err != nil {

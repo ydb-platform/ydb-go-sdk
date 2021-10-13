@@ -154,10 +154,8 @@ type (
 	SessionTransactionRollbackDoneInfo struct {
 		Error error
 	}
-)
-
-type (
 	PoolInitStartInfo struct {
+		Context context.Context
 	}
 	PoolInitDoneInfo struct {
 		Limit            int

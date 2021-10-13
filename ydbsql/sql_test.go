@@ -4,29 +4,26 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
 	"io"
 	"log"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
-
-	table "github.com/ydb-platform/ydb-go-sdk/v3/table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Interface checks.

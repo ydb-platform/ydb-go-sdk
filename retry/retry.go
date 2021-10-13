@@ -97,7 +97,7 @@ func Check(err error) (m retryMode) {
 	default:
 		return retryMode{
 			statusCode:         -1,
-			operationCompleted: errors.OperationCompletedTrue,
+			operationCompleted: errors.OperationCompletedTrue, // it's finish, not need any retry attempts
 			backoff:            errors.BackoffTypeNoBackoff,
 			deleteSession:      false,
 		}

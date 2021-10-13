@@ -55,24 +55,28 @@ func WithTEReason(reason TransportErrorCode) teOpt {
 	}
 }
 
+// WithTEError stores err into transport error
 func WithTEError(err error) teOpt {
 	return func(te *TransportError) {
 		te.err = err
 	}
 }
 
+// WithTEMessage stores message into transport error
 func WithTEMessage(message string) teOpt {
 	return func(te *TransportError) {
 		te.message = message
 	}
 }
 
+// WithTEOperation stores reason code into transport error from operation
 func WithTEOperation(operation operation) teOpt {
 	return func(te *TransportError) {
 		te.Reason = TransportErrorCode(operation.GetStatus())
 	}
 }
 
+// NewTransportError returns a new transport error with given options
 func NewTransportError(opts ...teOpt) error {
 	te := &TransportError{
 		Reason: TransportErrorUnknownCode,
@@ -325,8 +329,9 @@ func MapGRPCError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if te, ok := err.(*TransportError); ok {
-		return te
+	var t *TransportError
+	if errors.As(err, &t) {
+		return t
 	}
 	if s, ok := status.FromError(err); ok {
 		return &TransportError{
@@ -340,15 +345,19 @@ func MapGRPCError(err error) error {
 
 func MustPessimizeEndpoint(err error) bool {
 	var t *TransportError
-	if !errors.As(err, &t) {
+	switch {
+	case err == nil:
 		return false
-	}
-	switch t.Reason {
-	case
-		TransportErrorResourceExhausted,
-		TransportErrorOutOfRange:
-		return false
+	case errors.As(err, &t):
+		switch t.Reason {
+		case
+			TransportErrorResourceExhausted,
+			TransportErrorOutOfRange:
+			return false
+		default:
+			return true
+		}
 	default:
-		return true
+		return false
 	}
 }

@@ -48,7 +48,7 @@ func TestClusterFastRedial(t *testing.T) {
 				conn, err := c.Get(context.Background())
 				// enforce close bad connects to track them
 				if err == nil && conn != nil && conn.Endpoint().Host == "bad" {
-					conn.Close()
+					_ = conn.Close(ctx)
 				}
 			}
 			close(done)
@@ -162,7 +162,7 @@ type stubBalancer struct {
 	OnInsert    func(conn.Conn, info.Info) balancer.Element
 	OnUpdate    func(balancer.Element, info.Info)
 	OnRemove    func(balancer.Element)
-	OnPessimize func(balancer.Element) error
+	OnPessimize func(context.Context, balancer.Element) error
 	OnContains  func(balancer.Element) bool
 }
 
@@ -190,9 +190,9 @@ func simpleBalancer() (*list.List, balancer.Balancer) {
 			e := x.(*list.Element)
 			e.Info = info
 		},
-		OnPessimize: func(x balancer.Element) error {
+		OnPessimize: func(ctx context.Context, x balancer.Element) error {
 			e := x.(*list.Element)
-			e.Conn.Runtime().SetState(state.Banned)
+			e.Conn.Runtime().SetState(ctx, state.Banned)
 			return nil
 		},
 		OnContains: func(x balancer.Element) bool {
@@ -224,9 +224,9 @@ func (s stubBalancer) Remove(el balancer.Element) {
 		f(el)
 	}
 }
-func (s stubBalancer) Pessimize(el balancer.Element) error {
+func (s stubBalancer) Pessimize(ctx context.Context, el balancer.Element) error {
 	if f := s.OnPessimize; f != nil {
-		return f(el)
+		return f(ctx, el)
 	}
 	return nil
 }

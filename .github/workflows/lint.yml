@@ -2,9 +2,10 @@ name: lint
 on:
   push:
     tags:
-      - v*
+      - 'v*'
     branches:
       - master
+      - '**'
   pull_request:
   workflow_dispatch:
 jobs:

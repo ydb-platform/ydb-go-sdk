@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type grpcClientStream struct {
@@ -18,8 +19,8 @@ type grpcClientStream struct {
 	c      *conn
 	s      grpc.ClientStream
 	cancel context.CancelFunc
-	recv   func(error) func(error)
-	done   func(error)
+	recv   func(error) func(trace.ConnState, error)
+	done   func(trace.ConnState, error)
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
@@ -36,12 +37,6 @@ func (s *grpcClientStream) CloseSend() (err error) {
 		err = errors.MapGRPCError(err)
 	}
 	s.c.runtime.StreamDone(timeutil.Now(), errors.HideEOF(err))
-	if s.done != nil {
-		s.done(errors.HideEOF(err))
-	}
-	if s.cancel != nil {
-		s.cancel()
-	}
 	return err
 }
 
@@ -58,6 +53,18 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
+	defer func() {
+		if err != nil {
+			if s.done == nil {
+				s.done = s.recv(errors.HideEOF(err))
+			}
+			s.done(s.c.runtime.GetState(), errors.HideEOF(err))
+			s.cancel()
+		} else {
+			s.done = s.recv(nil)
+		}
+	}()
+
 	s.c.runtime.StreamRecv(timeutil.Now())
 
 	err = s.s.RecvMsg(m)
@@ -75,8 +82,6 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 			err = errors.NewOpError(errors.WithOEOperation(operation))
 		}
 	}
-
-	s.done = s.recv(errors.HideEOF(err))
 
 	return err
 }

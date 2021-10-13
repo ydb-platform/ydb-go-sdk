@@ -17,7 +17,7 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 
 	curr, err := discoveryClient.Discover(ctx)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close(ctx)
 		return err
 	}
 	// Endpoints must be sorted to merge
@@ -34,6 +34,7 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 	}
 	c.SetExplorer(
 		repeater.NewRepeater(
+			ctx,
 			d.config.DiscoveryInterval,
 			func(ctx context.Context) {
 				next, err := discoveryClient.Discover(ctx)
@@ -74,7 +75,9 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 				wg.Wait()
 				curr = next
 			},
-			conn.Close,
+			func() {
+				_ = conn.Close(ctx)
+			},
 		),
 	)
 	return nil

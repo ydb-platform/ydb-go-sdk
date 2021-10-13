@@ -146,9 +146,9 @@ func (p *pool) isClosed() bool {
 	return p.closed
 }
 
-func (p *pool) init() {
+func (p *pool) init(ctx context.Context) {
 	p.initOnce.Do(func() {
-		onDone := trace.TableOnPoolInit(p.Trace)
+		onDone := trace.TableOnPoolInit(p.Trace, ctx)
 		p.index = make(map[Session]sessionInfo)
 
 		p.idle = list.New()
@@ -211,7 +211,7 @@ type Session interface {
 	Close(ctx context.Context) (err error)
 	IsClosed() bool
 	Status() string
-	OnClose(f func())
+	OnClose(f func(ctx context.Context))
 	KeepAlive(ctx context.Context) error
 }
 
@@ -244,7 +244,7 @@ func (p *pool) createSession(ctx context.Context) (s Session, err error) {
 			onDone(r.s, r.err)
 		}()
 
-		ctx, cancel := context.WithTimeout(
+		createSessionCtx, cancel := context.WithTimeout(
 			deadline.ContextWithoutDeadline(ctx),
 			p.CreateSessionTimeout,
 		)
@@ -254,7 +254,7 @@ func (p *pool) createSession(ctx context.Context) (s Session, err error) {
 			close(resCh)
 		}()
 
-		r.s, r.err = p.Builder.createSession(ctx)
+		r.s, r.err = p.Builder.createSession(createSessionCtx)
 		// if session not nil - error must be nil and vice versa
 		if r.s == nil && r.err == nil {
 			panic("ydb: abnormal result of pool.Builder.createSession()")
@@ -268,7 +268,7 @@ func (p *pool) createSession(ctx context.Context) (s Session, err error) {
 			return
 		}
 
-		r.s.OnClose(func() {
+		r.s.OnClose(func(ctx context.Context) {
 			p.mu.Lock()
 			defer p.mu.Unlock()
 			info, has := p.index[r.s]
@@ -318,7 +318,7 @@ func (p *pool) createSession(ctx context.Context) (s Session, err error) {
 // there. If no items stored in pool it creates new one by calling
 // Builder.CreateSession() method and returns it.
 func (p *pool) Get(ctx context.Context) (s Session, err error) {
-	p.init()
+	p.init(ctx)
 
 	var (
 		i = 0
@@ -429,7 +429,7 @@ func (p *pool) Get(ctx context.Context) (s Session, err error) {
 // panic.
 func (p *pool) Put(ctx context.Context, s Session) (err error) {
 	onDone := trace.TableOnPoolPut(p.Trace.Compose(trace.ContextTable(ctx)), ctx, s)
-	p.init()
+	p.init(ctx)
 	defer func() {
 		onDone(err)
 	}()
@@ -450,8 +450,8 @@ func (p *pool) Put(ctx context.Context, s Session) (err error) {
 	p.mu.Unlock()
 
 	if err != nil {
-		ctx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), p.DeleteTimeout)
-		_ = s.Close(ctx)
+		closeCtx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), p.DeleteTimeout)
+		_ = s.Close(closeCtx)
 		cancel()
 	}
 
@@ -472,10 +472,16 @@ func (p *pool) Put(ctx context.Context, s Session) (err error) {
 //
 // It is assumed that Take() callers never call Get() method.
 func (p *pool) Take(ctx context.Context, s Session) (took bool, err error) {
-	p.init()
+	p.init(ctx)
 
 	onWait := trace.TableOnPoolTake(p.Trace.Compose(trace.ContextTable(ctx)), ctx, s)
 	var onDone func(took bool, _ error)
+	defer func() {
+		if onDone == nil {
+			onDone = onWait()
+		}
+		onDone(took, err)
+	}()
 
 	if p.isClosed() {
 		return false, ErrSessionPoolClosed
@@ -499,11 +505,6 @@ func (p *pool) Take(ctx context.Context, s Session) (took bool, err error) {
 
 		p.mu.Lock()
 	}
-	defer func() {
-		if onDone != nil {
-			onDone(took, err)
-		}
-	}()
 	p.mu.Unlock()
 
 	if !has {
@@ -516,7 +517,7 @@ func (p *pool) Take(ctx context.Context, s Session) (took bool, err error) {
 // Create creates new session and returns it.
 // The intended way of Create() usage relates to Take() method.
 func (p *pool) Create(ctx context.Context) (s Session, err error) {
-	p.init()
+	p.init(ctx)
 
 	const maxAttempts = 10
 	for i := 0; i < maxAttempts; i++ {
@@ -554,7 +555,7 @@ func (p *pool) Create(ctx context.Context) (s Session, err error) {
 // It returns first error occurred during stale sessions' deletion.
 // Note that even on error it calls Close() on each session.
 func (p *pool) Close(ctx context.Context) (err error) {
-	p.init()
+	p.init(ctx)
 
 	onDone := trace.TableOnPoolClose(p.Trace.Compose(trace.ContextTable(ctx)), ctx)
 	defer func() {
@@ -593,8 +594,8 @@ func (p *pool) Close(ctx context.Context) (err error) {
 	for e := idle.Front(); e != nil; e = e.Next() {
 		s := e.Value.(Session)
 		func() {
-			ctx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), p.DeleteTimeout)
-			_ = s.Close(ctx)
+			closeCtx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), p.DeleteTimeout)
+			_ = s.Close(closeCtx)
 			cancel()
 		}()
 	}
@@ -705,11 +706,13 @@ func (p *pool) keeper() {
 				p.mu.Unlock()
 				// if keepAlive was called more than the corresponding limit for the session to be alive and more
 				// sessions are open than the lower limit of continuously kept sessions
-				if p.IdleKeepAliveThreshold > 0 && keepAliveCount >= p.IdleKeepAliveThreshold &&
-					p.KeepAliveMinSize < lenIndex-len(toDelete) {
-
-					toDelete = append(toDelete, s)
-					continue
+				if p.IdleKeepAliveThreshold > 0 {
+					if keepAliveCount >= p.IdleKeepAliveThreshold {
+						if p.KeepAliveMinSize < lenIndex-len(toDelete) {
+							toDelete = append(toDelete, s)
+							continue
+						}
+					}
 				}
 
 				err := p.keepAliveSession(context.Background(), s)
@@ -783,7 +786,7 @@ func (p *pool) keeper() {
 					context.Background(),
 					p.DeleteTimeout,
 				)
-				_ = p.CloseSession(ctx, s)
+				_ = s.Close(ctx)
 				cancel()
 			}
 			if touchingDone != nil {
@@ -906,11 +909,8 @@ func (p *pool) notify(s Session) (notified bool) {
 // CloseSession must be fast. If necessary, can be async.
 func (p *pool) CloseSession(ctx context.Context, s Session) error {
 	go func() {
-		ctx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), p.DeleteTimeout)
-		if s == nil {
-			panic("azaza")
-		}
-		_ = s.Close(ctx)
+		closeCtx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), p.DeleteTimeout)
+		_ = s.Close(closeCtx)
 		cancel()
 	}()
 	return nil

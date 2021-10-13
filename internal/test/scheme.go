@@ -2,12 +2,13 @@ package test
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"path"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
-func Prepare(t *testing.T, ctx context.Context, db ydb.Connection) {
+func Prepare(ctx context.Context, t *testing.T, db ydb.Connection) {
 	err := db.Scheme().CleanupDatabase(ctx, db.Name(), "series", "episodes", "seasons")
 	if err != nil {
 		t.Fatalf("cleaunup database failed: %v\n", err)

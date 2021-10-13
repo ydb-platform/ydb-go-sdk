@@ -52,7 +52,7 @@ type session struct {
 	mtx          sync.Mutex
 	flags        sessionFlags
 	status       options.SessionStatus
-	onClose      []func()
+	onClose      []func(ctx context.Context)
 }
 
 func (s *session) Status() string {
@@ -142,7 +142,7 @@ func (s *session) ID() string {
 	return s.id
 }
 
-func (s *session) OnClose(cb func()) {
+func (s *session) OnClose(cb func(ctx context.Context)) {
 	if s.IsClosed() {
 		return
 	}
@@ -167,7 +167,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 	// call all close listeners before doing request
 	// firstly this need to clear pool from this session
 	for _, cb := range s.onClose {
-		cb()
+		cb(ctx)
 	}
 
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
@@ -195,12 +195,6 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	var result Ydb_Table.KeepAliveResult
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
-	if s == nil {
-		panic("nil session")
-	}
-	if s.tableService == nil {
-		panic("nil table service")
 	}
 	resp, err := s.tableService.KeepAlive(ctx, &Ydb_Table.KeepAliveRequest{
 		SessionId: s.id,
@@ -1001,11 +995,4 @@ func (q *dataQuery) initPreparedText(s, id string) {
 	q.queryID.Id = id
 
 	q.query.Query = &q.queryID // Prefer preared query.
-}
-
-func transactionControlID(desc *Ydb_Table.TransactionControl) string {
-	if tx, ok := desc.TxSelector.(*Ydb_Table.TransactionControl_TxId); ok {
-		return tx.TxId
-	}
-	return ""
 }

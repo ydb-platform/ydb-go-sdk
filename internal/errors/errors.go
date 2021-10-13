@@ -38,6 +38,9 @@ func HideEOF(err error) error {
 // As is a proxy to errors.As
 // This need to single import errors
 func As(err error, target interface{}) bool {
+	if err == nil {
+		return false
+	}
 	return errors.As(err, target)
 }
 

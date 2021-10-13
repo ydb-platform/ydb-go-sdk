@@ -30,8 +30,7 @@ type Dialer struct {
 
 	// NetDial is an optional function that may replace default network dialing
 	// function such as net.Dial("tcp").
-	// Deprecated: Use it for test purposes and special cases only. In most cases
-	// should be left empty.
+	// Deprecated: Use it for test purposes and special cases only. In most cases should be left empty.
 	NetDial func(context.Context, string) (net.Conn, error)
 
 	// Timeout is the maximum amount of time a dial will wait for a connect to
@@ -77,7 +76,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ cluster.Cluster, err 
 	c := d.newCluster(d.config.Trace)
 	defer func() {
 		if err != nil {
-			_ = c.Close()
+			_ = c.Close(ctx)
 		}
 	}()
 	driver := driver.New(
@@ -166,18 +165,4 @@ func (d *dialer) mustSplitHostPort(addr string) (host string, port int) {
 func (d *dialer) endpointByAddr(addr string) (e endpoint.Endpoint) {
 	e.Host, e.Port = d.mustSplitHostPort(addr)
 	return
-}
-
-// withContextDialer is an adapter to allow the use of normal go-world net dial
-// function as WithDialer option argument for grpc Dial().
-// nolint:unused, deadcode
-func withContextDialer(f func(context.Context, string) (net.Conn, error)) func(string, time.Duration) (net.Conn, error) {
-	if f == nil {
-		return nil
-	}
-	return func(addr string, timeout time.Duration) (net.Conn, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-		return f(ctx, addr)
-	}
 }

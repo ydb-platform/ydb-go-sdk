@@ -157,7 +157,7 @@ func getField(name string, src, dst interface{}) bool {
 type Cluster struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onClose     func() error
+	onClose     func(ctx context.Context) error
 }
 
 func (c *Cluster) Stats() map[endpoint.Endpoint]stats.Stats {
@@ -200,11 +200,11 @@ func (c *Cluster) Name() string {
 	return "testutil.Cluster"
 }
 
-func (c *Cluster) Close() error {
+func (c *Cluster) Close(ctx context.Context) error {
 	if c.onClose == nil {
 		return fmt.Errorf("Cluster.Close() not implemented")
 	}
-	return c.onClose()
+	return c.onClose(ctx)
 }
 
 type (
@@ -251,7 +251,7 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) NewClusterOption
 	}
 }
 
-func WithClose(onClose func() error) NewClusterOption {
+func WithClose(onClose func(ctx context.Context) error) NewClusterOption {
 	return func(c *Cluster) {
 		c.onClose = onClose
 	}

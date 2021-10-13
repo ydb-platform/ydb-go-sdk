@@ -2,13 +2,13 @@ package test
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"math"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type stats struct {
@@ -83,8 +83,8 @@ func TestPoolHealth(t *testing.T) {
 	defer s.print(t)
 
 	db := OpenDB(
-		t,
 		ctx,
+		t,
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithGrpcConnectionTTL(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
@@ -126,17 +126,19 @@ func TestPoolHealth(t *testing.T) {
 			},
 		}),
 	)
-	defer func() { _ = db.Close() }()
+	defer func() { _ = db.Close(ctx) }()
 
-	Prepare(t, ctx, db)
+	Prepare(ctx, t, db)
 
-	Fill(ctx, db.Table(), db.Name())
+	if err := Fill(ctx, db.Table(), db.Name()); err != nil {
+		t.Fatalf("fill failed: %v\n", err)
+	}
 
 	concurrency := 200
 	wg := sync.WaitGroup{}
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
-		go func() {
+		t.Run("", func(t *testing.T) {
 			defer wg.Done()
 			for {
 				err := Select(ctx, db)
@@ -147,7 +149,7 @@ func TestPoolHealth(t *testing.T) {
 					t.Fatalf("select error: %v\n", err)
 				}
 			}
-		}()
+		})
 	}
 
 	wg.Add(1)

@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"context"
+
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
@@ -27,7 +29,7 @@ type DB interface {
 	Secure() bool
 
 	// Close clears resources and close all connections to YDB
-	Close() error
+	Close(ctx context.Context) error
 }
 
 // Cluster interface provide main usage of YDB driver with

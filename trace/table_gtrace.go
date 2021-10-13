@@ -903,8 +903,9 @@ func TableOnSessionTransactionRollback(t Table, c context.Context, session sessi
 		res(p)
 	}
 }
-func TableOnPoolInit(t Table) func(limit int, keepAliveMinSize int) {
+func TableOnPoolInit(t Table, c context.Context) func(limit int, keepAliveMinSize int) {
 	var p PoolInitStartInfo
+	p.Context = c
 	res := t.onPoolInit(p)
 	return func(limit int, keepAliveMinSize int) {
 		var p PoolInitDoneInfo

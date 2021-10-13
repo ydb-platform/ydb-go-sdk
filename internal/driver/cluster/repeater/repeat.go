@@ -32,11 +32,11 @@ type repeater struct {
 }
 
 // NewRepeater creates and begins to execute task periodically.
-func NewRepeater(interval time.Duration, task func(ctx context.Context), onDone func()) Repeater {
+func NewRepeater(ctx context.Context, interval time.Duration, task func(ctx context.Context), onDone func()) Repeater {
 	if interval <= 0 {
 		return nil
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	r := &repeater{
 		interval: interval,
 		task:     task,
