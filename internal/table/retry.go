@@ -2,7 +2,6 @@ package table
 
 import (
 	"context"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -11,18 +10,18 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// SessionProvider is the interface that holds session lifecycle logic.
+// SessionProvider is the interface that holds build lifecycle logic.
 type SessionProvider interface {
-	// Get returns alive idle session or creates new one.
+	// Get returns alive idle build or creates new one.
 	Get(context.Context) (Session, error)
 
-	// Put takes no longer needed session for reuse or deletion depending
+	// Put takes no longer needed build for reuse or deletion depending
 	// on implementation.
 	// Put must be fast, if necessary must be async
 	Put(context.Context, Session) (err error)
 
-	// CloseSession provides the most effective way of session closing
-	// instead of plain session.Close.
+	// CloseSession provides the most effective way of build closing
+	// instead of plain build.Close.
 	// CloseSession must be fast. If necessary, can be async.
 	CloseSession(ctx context.Context, s Session) error
 
@@ -30,7 +29,7 @@ type SessionProvider interface {
 	// Retry implements internal busy loop until one of the following conditions is met:
 	// - deadline was canceled or deadlined
 	// - retry operation returned nil as error
-	// If deadline without deadline used session pool RetryTimeout
+	// If deadline without deadline used build client RetryTimeout
 	Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error)
 
 	// Close provide cleanup sessions
@@ -76,16 +75,16 @@ func (f SessionProviderFunc) CloseSession(ctx context.Context, s Session) error 
 	return s.Close(ctx)
 }
 
-// SingleSession returns SessionProvider that uses only given session during
+// SingleSession returns SessionProvider that uses only given build during
 // retries.
 func SingleSession(s Session, b retry.Backoff) SessionProvider {
 	return &singleSession{s: s, b: b}
 }
 
 var (
-	errNoSession         = errors.New("no session")
-	errUnexpectedSession = errors.New("unexpected session")
-	errSessionOverflow   = errors.New("session overflow")
+	errNoSession         = errors.New("no build")
+	errUnexpectedSession = errors.New("unexpected build")
+	errSessionOverflow   = errors.New("build overflow")
 )
 
 type singleSession struct {
@@ -141,28 +140,33 @@ func retryBackoff(
 	op table.RetryOperation,
 ) (err error) {
 	var (
-		s      Session
-		i      int
-		code   = int32(0)
-		start  = time.Now()
-		onDone = trace.RetryOnRetry(trace.ContextRetry(ctx), ctx)
+		s              Session
+		i              int
+		attempts       int
+		code           = int32(0)
+		onIntermediate = trace.TableOnPoolRetry(trace.ContextTable(ctx), ctx, isOperationIdempotent)
 	)
 	defer func() {
-		onDone(ctx, time.Since(start), err)
 		if s != nil {
 			_ = p.Put(ctx, s)
 		}
+		onIntermediate(err)(attempts, err)
 	}()
 	for ; ; i++ {
+		attempts++
+		if i > 0 {
+			onIntermediate(err)
+		}
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			err = ctx.Err()
+			return
 
 		default:
 			if s == nil {
 				s, err = p.Get(ctx)
 				if s == nil && err == nil {
-					panic("only one of pair <session, error> must be not nil")
+					panic("only one of pair <build, error> must be not nil")
 				}
 				if err != nil {
 					return

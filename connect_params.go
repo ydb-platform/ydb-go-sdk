@@ -22,27 +22,29 @@ func hasTLS(schema string) bool {
 	return schema == _secureProtocol
 }
 
-func parseConnectionString(connection string) (schema string, endpoint string, database string, _ error) {
+func parseConnectionString(connection string) (schema string, endpoint string, database string, token string, _ error) {
 	uri, err := url.Parse(connection)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	if _, has := validSchemas[uri.Scheme]; !has {
-		return "", "", "", fmt.Errorf("%s: %w", uri.Scheme, errSchemeNotValid)
+		return "", "", "", "", fmt.Errorf("%s: %w", uri.Scheme, errSchemeNotValid)
 	}
-	return uri.Scheme, uri.Host, uri.Query().Get("database"), err
+	return uri.Scheme, uri.Host, uri.Query().Get("database"), uri.Query().Get("token"), err
 }
 
 type ConnectParams interface {
 	Endpoint() string
 	Database() string
 	UseTLS() bool
+	Token() string
 }
 
 type connectParams struct {
 	endpoint string
 	database string
 	useTLS   bool
+	token    string
 }
 
 func (c connectParams) Endpoint() string {
@@ -57,6 +59,10 @@ func (c connectParams) UseTLS() bool {
 	return c.useTLS
 }
 
+func (c connectParams) Token() string {
+	return c.token
+}
+
 func EndpointDatabase(endpoint string, database string, tls bool) ConnectParams {
 	return &connectParams{
 		endpoint: endpoint,
@@ -67,9 +73,9 @@ func EndpointDatabase(endpoint string, database string, tls bool) ConnectParams 
 
 func ConnectionString(uri string) (ConnectParams, error) {
 	if uri == "" {
-		return nil, fmt.Errorf("empty uri")
+		return nil, fmt.Errorf("empty URI")
 	}
-	schema, endpoint, database, err := parseConnectionString(uri)
+	schema, endpoint, database, token, err := parseConnectionString(uri)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +83,7 @@ func ConnectionString(uri string) (ConnectParams, error) {
 		endpoint: endpoint,
 		database: database,
 		useTLS:   hasTLS(schema),
+		token:    token,
 	}, nil
 }
 

@@ -29,9 +29,9 @@ func (c *client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(cluster cluster.DB) Client {
+func New(c cluster.Cluster) Client {
 	return &client{
-		ratelimiterService: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cluster),
+		ratelimiterService: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(c),
 	}
 }
 

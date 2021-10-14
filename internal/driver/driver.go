@@ -6,21 +6,18 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type driver struct {
-	config.Config
+	config config.Config
 
 	meta meta.Meta
 	tls  bool
 
-	clusterPessimize func(ctx context.Context, addr endpoint.Addr) error
-	clusterStats     func(it func(endpoint.Endpoint, stats.Stats))
+	clusterPessimize func(ctx context.Context, address string) error
 	clusterClose     func(ctx context.Context) error
 	clusterGet       func(ctx context.Context) (conn conn.Conn, err error)
 }
@@ -30,7 +27,7 @@ func (d *driver) Secure() bool {
 }
 
 func (d *driver) Name() string {
-	return d.Config.Database
+	return d.config.Database()
 }
 
 func New(
@@ -38,31 +35,29 @@ func New(
 	meta meta.Meta,
 	tls bool,
 	get func(ctx context.Context) (conn conn.Conn, err error),
-	pessimize func(ctx context.Context, addr endpoint.Addr) error,
-	stats func(it func(endpoint.Endpoint, stats.Stats)),
+	pessimize func(ctx context.Context, address string) error,
 	close func(ctx context.Context) error,
 ) *driver {
 	return &driver{
-		Config:           config,
+		config:           config,
 		meta:             meta,
 		tls:              tls,
 		clusterGet:       get,
 		clusterPessimize: pessimize,
-		clusterStats:     stats,
 		clusterClose:     close,
 	}
 }
 
 func (d *driver) RequestTimeout() time.Duration {
-	return d.Config.RequestTimeout
+	return d.config.RequestTimeout()
 }
 
 func (d *driver) OperationTimeout() time.Duration {
-	return d.Config.OperationTimeout
+	return d.config.OperationTimeout()
 }
 
 func (d *driver) OperationCancelAfter() time.Duration {
-	return d.Config.OperationCancelAfter
+	return d.config.OperationCancelAfter()
 }
 
 func (d *driver) Meta(ctx context.Context) (context.Context, error) {
@@ -70,17 +65,17 @@ func (d *driver) Meta(ctx context.Context) (context.Context, error) {
 }
 
 func (d *driver) Trace(ctx context.Context) trace.Driver {
-	return trace.ContextDriver(ctx).Compose(d.Config.Trace)
+	return trace.ContextDriver(ctx).Compose(d.config.Trace())
 }
 
-func (d *driver) Pessimize(ctx context.Context, addr endpoint.Addr) error {
-	return d.clusterPessimize(ctx, addr)
+func (d *driver) Pessimize(ctx context.Context, address string) error {
+	return d.clusterPessimize(ctx, address)
 }
 
 func (d *driver) StreamTimeout() time.Duration {
-	return d.Config.StreamTimeout
+	return d.config.StreamTimeout()
 }
 
-func (d *driver) GrpcConnectionPolicy() *conn.GrpcConnectionPolicy {
-	return (*conn.GrpcConnectionPolicy)(d.Config.GrpcConnectionPolicy)
+func (d *driver) GrpcConnectionPolicy() conn.GrpcConnectionPolicy {
+	return conn.GrpcConnectionPolicy(d.config.GrpcConnectionPolicy())
 }

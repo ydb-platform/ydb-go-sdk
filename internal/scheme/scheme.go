@@ -102,7 +102,7 @@ type Directory struct {
 }
 
 type client struct {
-	db      cluster.DB
+	cluster cluster.Cluster
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
@@ -110,10 +110,10 @@ func (c *client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(db cluster.DB) Scheme {
+func New(c cluster.Cluster) Scheme {
 	return &client{
-		db:      db,
-		service: Ydb_Scheme_V1.NewSchemeServiceClient(db),
+		cluster: c,
+		service: Ydb_Scheme_V1.NewSchemeServiceClient(c),
 	}
 }
 

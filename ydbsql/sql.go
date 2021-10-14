@@ -278,8 +278,8 @@ func (c *sqlConn) scanOpts() []options.ExecuteScanQueryOption {
 	return c.connector.scanOpts
 }
 
-func (c *sqlConn) pool() internal.ClientAsPool {
-	return c.connector.tbl
+func (c *sqlConn) pool() internal.Client {
+	return c.connector.client
 }
 
 type processor interface {

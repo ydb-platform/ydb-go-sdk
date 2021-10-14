@@ -1,3 +1,5 @@
+// +build integration
+
 package test
 
 import (
@@ -15,7 +17,7 @@ func seriesData(id uint64, released time.Time, title, info, comment string) type
 	}
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(id)),
-		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
+		types.StructFieldValue("release_date", types.Uint64Value(uint64(released.Sub(time.Unix(0, 0))/time.Hour/24))),
 		types.StructFieldValue("title", types.UTF8Value(title)),
 		types.StructFieldValue("series_info", types.UTF8Value(info)),
 		types.StructFieldValue("comment", commentv),

@@ -4,18 +4,15 @@ import (
 	"context"
 
 	"google.golang.org/grpc"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 )
 
 type ClientConnInterface interface {
 	grpc.ClientConnInterface
 
-	Endpoint() endpoint.Endpoint
+	Address() string
 }
 
-type DB interface {
+type Cluster interface {
 	// ClientConnInterface interface allows DB use as grpc.ClientConnInterface
 	// with lazy getting raw grpc-connection in Invoke() or NewStream() stages.
 	// Lazy getting grpc-connection must use for embedded client-side balancing
@@ -30,13 +27,4 @@ type DB interface {
 
 	// Close clears resources and close all connections to YDB
 	Close(ctx context.Context) error
-}
-
-// Cluster interface provide main usage of YDB driver with
-// code-generated grpc-clients
-type Cluster interface {
-	DB
-
-	// Stats provide getting connections stats
-	Stats() map[endpoint.Endpoint]stats.Stats
 }

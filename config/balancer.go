@@ -27,10 +27,10 @@ type BalancerConfig struct {
 	// indicators.
 	//
 	// NOTE: currently driver (and even ydb itself) does not track load factor
-	// of each endpoint properly. Enabling this option may lead to the
+	// of each endpoint properly. Enabling this Option may lead to the
 	// situation, when all but one nodes in local datacenter become inactive
 	// and all clients will overload this single instance very quickly. That
-	// is, currently this option may be called as experimental.
+	// is, currently this Option may be called as experimental.
 	// You have been warned.
 	PreferLocal bool
 

@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"io"
 	"log"
-	"os"
 	"testing"
 	"time"
 
@@ -15,15 +14,10 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Interface checks.
@@ -156,40 +150,12 @@ func TestIsolationMapping(t *testing.T) {
 	}
 }
 
-func openDB(ctx context.Context) (*sql.DB, error) {
-	var (
-		dtrace trace.Driver
-		ttrace trace.Table
-	)
-	trace.Stub(&dtrace, func(name string, args ...interface{}) {
-		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
-	})
-	trace.Stub(&ttrace, func(name string, args ...interface{}) {
-		log.Printf("[table] %s: %+v", name, trace.ClearContext(args))
-	})
-
-	connectParams := ydb.MustConnectionString(os.Getenv("YDB"))
-	con, err := Connector(
-		WithConnectParams(connectParams),
-		WithCredentials(credentials.AuthTokenCredentials{
-			AuthToken: os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
-		}),
-		WithTraceDriver(dtrace),
-		WithTraceTable(ttrace),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	db := sql.OpenDB(con)
-
-	return db, db.PingContext(ctx)
-}
-
 func TestQuery(t *testing.T) {
 	c, err := Connector(
 		withClient(
-			internal.NewClientAsPool(
-				testutil.NewDB(
+			internal.New(
+				context.Background(),
+				testutil.NewCluster(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
 							// nolint:unparam
@@ -233,7 +199,6 @@ func TestQuery(t *testing.T) {
 						},
 					),
 				),
-				internal.DefaultConfig(),
 			),
 		),
 		WithDefaultExecDataQueryOption(),
@@ -305,217 +270,4 @@ func TestQuery(t *testing.T) {
 			cmp.NotNil(t, rows)
 		})
 	}
-}
-
-func TestDatabaseSelect(t *testing.T) {
-	if !test.CheckEndpointDatabaseEnv() {
-		t.Skip("need to be tested with docker")
-	}
-
-	for _, test := range []struct {
-		query  string
-		params []interface{}
-	}{
-		{
-			query: "DECLARE $a AS INT64; SELECT $a",
-			params: []interface{}{
-				sql.Named("a", int64(1)),
-			},
-		},
-	} {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		t.Run("exec", func(t *testing.T) {
-			db, err := openDB(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer func() { _ = db.Close() }()
-			res, err := db.ExecContext(ctx, test.query, test.params...)
-			if err != nil {
-				t.Fatal(err)
-			}
-			log.Printf("result=%v", res)
-		})
-		t.Run("query", func(t *testing.T) {
-			db, err := openDB(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer func() { _ = db.Close() }()
-			rows, err := db.QueryContext(ctx, test.query, test.params...)
-			if err != nil {
-				t.Fatal(err)
-			}
-			log.Printf("rows=%v", rows)
-		})
-	}
-}
-
-func TestStatement(t *testing.T) {
-	if !test.CheckEndpointDatabaseEnv() {
-		t.Skip("need to be tested with docker")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	db, err := openDB(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = db.Close() }()
-
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stmt, err := conn.PrepareContext(ctx, "SELECT NULL;")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = stmt.Close() }()
-
-	_, _ = stmt.Exec()
-	_, _ = stmt.Exec()
-
-	_, _ = conn.QueryContext(ctx, "SELECT 42;")
-}
-
-func TestTx(t *testing.T) {
-	if !test.CheckEndpointDatabaseEnv() {
-		t.Skip("need to be tested with docker")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	db, err := openDB(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = db.Close() }()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stmt, err := tx.PrepareContext(ctx, "SELECT NULL;")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = stmt.Close() }()
-
-	_, _ = stmt.Exec()
-	_ = tx.Commit()
-
-	time.Sleep(5 * time.Second)
-
-	{
-		rows, err := db.QueryContext(context.Background(), "SELECT 42")
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = rows.Close()
-
-		time.Sleep(5 * time.Second)
-	}
-	time.Sleep(5 * time.Second)
-}
-
-func TestDriver(t *testing.T) {
-	if !test.CheckEndpointDatabaseEnv() {
-		t.Skip("need to be tested with docker")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	db, err := openDB(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = db.Close() }()
-
-	rows, err := db.QueryContext(ctx, `
-		DECLARE $seriesData AS "List<Struct<
-			series_id: Uint64,
-			title: Utf8,
-			series_info: Utf8,
-			release_date: Date>>";
-
-		SELECT
-			series_id,
-			title,
-			series_info,
-			release_date
-		FROM AS_TABLE($seriesData);
-	`,
-		sql.Named("seriesData", getSeriesData()),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for rows.Next() {
-		var (
-			seriesID    uint64
-			title       string
-			seriesInfo  string
-			releaseDate time.Time
-		)
-		err = rows.Scan(
-			&seriesID,
-			&title,
-			&seriesInfo,
-			&releaseDate,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		log.Printf("test: #%d %q %q %s", seriesID, title, seriesInfo, releaseDate)
-	}
-	log.Println("rows err", rows.Err())
-
-	row := db.QueryRowContext(ctx, `
-		DECLARE $dt AS Datetime;
-		SELECT NULL, $dt;
-	`,
-		sql.Named("dt", types.DateValueFromTime(time.Now())),
-	)
-	var a, b sql.NullTime
-	err = row.Scan(&a, &b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	log.Println("date now:", a.Time, b.Time)
-}
-
-func getSeriesData() types.Value {
-	return types.ListValue(
-		seriesData(1, days("2006-02-03"), "IT Crowd", ""+
-			"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
-			"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry."),
-		seriesData(2, days("2014-04-06"), "Silicon Valley", ""+
-			"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
-			"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley."),
-	)
-}
-
-func seriesData(id uint64, released time.Time, title, info string) types.Value {
-	return types.StructValue(
-		types.StructFieldValue("series_id", types.Uint64Value(id)),
-		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
-		types.StructFieldValue("series_info", types.UTF8Value(info)),
-	)
-}
-
-func days(date string) time.Time {
-	const ISO8601 = "2006-01-02"
-	t, err := time.Parse(ISO8601, date)
-	if err != nil {
-		panic(err)
-	}
-	return t
 }

@@ -60,8 +60,8 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	}
 }
 
-func _newSession(t *testing.T, cl cluster.DB) Session {
-	s, err := newSession(context.Background(), cl, trace.Table{})
+func _newSession(t *testing.T, c cluster.Cluster) Session {
+	s, err := newSession(context.Background(), c, trace.Table{})
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
 	}
@@ -104,12 +104,12 @@ func TestRetryerBadSession(t *testing.T) {
 	seen := make(map[table.Session]bool, len(sessions))
 	for _, s := range sessions {
 		if seen[s] {
-			t.Errorf("session used twice")
+			t.Errorf("build used twice")
 		} else {
 			seen[s] = true
 		}
 		if !closed[s] {
-			t.Errorf("bad session was not closed")
+			t.Errorf("bad build was not closed")
 		}
 	}
 }
@@ -254,7 +254,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		errors.NewOpError(errors.WithOEReason(errors.StatusSessionBusy)),
 	}
 	client := &client{
-		cluster: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
+		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	pool := SessionProviderFunc{
 		OnGet: client.createSession,

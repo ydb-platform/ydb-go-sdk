@@ -25,9 +25,9 @@ type client struct {
 	service Ydb_Coordination_V1.CoordinationServiceClient
 }
 
-func New(db cluster.DB) Client {
+func New(c cluster.Cluster) Client {
 	return &client{
-		service: Ydb_Coordination_V1.NewCoordinationServiceClient(db),
+		service: Ydb_Coordination_V1.NewCoordinationServiceClient(c),
 	}
 }
 

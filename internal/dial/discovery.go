@@ -8,12 +8,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 )
 
 func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn, connConfig conn.Config) error {
-	discoveryClient := discovery.New(conn, d.config.Database, d.useTLS(), d.config.Trace)
+	discoveryClient := discovery.New(conn, d.config.Database(), d.useTLS(), d.config.Trace())
 
 	curr, err := discoveryClient.Discover(ctx)
 	if err != nil {
@@ -22,20 +23,29 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 	}
 	// Endpoints must be sorted to merge
 	cluster.SortEndpoints(curr)
-	wg := wg.New()
-	wg.Add(len(curr))
+	waitGroup := wg.New()
+	waitGroup.Add(len(curr))
 	for _, e := range curr {
-		go c.Insert(ctx, e, cluster.WithWG(wg), cluster.WithConnConfig(connConfig))
+		go c.Insert(
+			ctx,
+			e.Address(),
+			cluster.WithWG(waitGroup),
+			cluster.WithConnConfig(connConfig),
+			cluster.WithInfo(info.Info{
+				LoadFactor: e.LoadFactor,
+				Local:      e.Local,
+			}),
+		)
 	}
-	if d.config.FastDial {
-		wg.WaitFirst()
+	if d.config.FastDial() {
+		waitGroup.WaitFirst()
 	} else {
-		wg.Wait()
+		waitGroup.Wait()
 	}
 	c.SetExplorer(
 		repeater.NewRepeater(
 			ctx,
-			d.config.DiscoveryInterval,
+			d.config.DiscoveryInterval(),
 			func(ctx context.Context) {
 				next, err := discoveryClient.Discover(ctx)
 				// if nothing endpoint - re-discover after one second
@@ -51,28 +61,49 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 				// NOTE: curr endpoints must be sorted here.
 				cluster.SortEndpoints(next)
 
-				wg := new(sync.WaitGroup)
+				waitGroup := new(sync.WaitGroup)
 				max := len(next) + len(curr)
-				wg.Add(max) // set to max possible amount
+				waitGroup.Add(max) // set to max possible amount
 				actual := 0
 				cluster.DiffEndpoints(curr, next,
 					func(i, j int) {
 						actual++
 						// Endpoints are equal, but we still need to update meta
 						// data such that load factor and others.
-						go c.Update(ctx, next[j], cluster.WithWG(wg))
+						go c.Update(
+							ctx,
+							next[j].Address(),
+							cluster.WithWG(waitGroup),
+							cluster.WithInfo(info.Info{
+								LoadFactor: next[j].LoadFactor,
+								Local:      next[j].Local,
+							}),
+						)
 					},
 					func(i, j int) {
 						actual++
-						go c.Insert(ctx, next[j], cluster.WithWG(wg), cluster.WithConnConfig(connConfig))
+						go c.Insert(
+							ctx,
+							next[j].Address(),
+							cluster.WithWG(waitGroup),
+							cluster.WithConnConfig(connConfig),
+							cluster.WithInfo(info.Info{
+								LoadFactor: next[j].LoadFactor,
+								Local:      next[j].Local,
+							}),
+						)
 					},
 					func(i, j int) {
 						actual++
-						go c.Remove(ctx, curr[i], cluster.WithWG(wg))
+						go c.Remove(
+							ctx,
+							next[j].Address(),
+							cluster.WithWG(waitGroup),
+						)
 					},
 				)
-				wg.Add(actual - max) // adjust
-				wg.Wait()
+				waitGroup.Add(actual - max) // adjust
+				waitGroup.Wait()
 				curr = next
 			},
 			func() {

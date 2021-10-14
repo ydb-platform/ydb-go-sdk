@@ -48,9 +48,9 @@ type client struct {
 func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	onDone := trace.DriverOnDiscovery(d.trace, ctx)
 	defer func() {
-		nodes := make([]trace.Endpoint, 0)
+		nodes := make([]string, 0)
 		for _, e := range endpoints {
-			nodes = append(nodes, e)
+			nodes = append(nodes, e.Address())
 		}
 		onDone(nodes, err)
 	}()

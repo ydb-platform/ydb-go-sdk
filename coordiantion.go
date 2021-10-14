@@ -54,9 +54,3 @@ func (c *lazyCoordination) init() {
 	}
 	c.m.Unlock()
 }
-
-func newCoordination(db DB) *lazyCoordination {
-	return &lazyCoordination{
-		db: db,
-	}
-}

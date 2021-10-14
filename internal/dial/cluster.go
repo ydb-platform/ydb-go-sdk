@@ -9,12 +9,12 @@ import (
 func (d *dialer) newCluster(trace trace.Driver) cluster.Cluster {
 	return cluster.New(
 		trace,
-		d.dialHostPort,
+		d.dial,
 		func() balancer.Balancer {
-			if d.config.DiscoveryInterval == 0 {
+			if d.config.DiscoveryInterval() == 0 {
 				return balancer.Single()
 			}
-			return balancer.New(d.config.BalancingConfig)
+			return balancer.New(d.config.BalancingConfig())
 		}(),
 	)
 }

@@ -29,7 +29,7 @@ type (
 		// Pool events
 		OnPoolInit  func(PoolInitStartInfo) func(PoolInitDoneInfo)
 		OnPoolClose func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
-		OnPoolRetry func(PoolRetryStartInfo) func(PoolRetryDoneInfo)
+		OnPoolRetry func(PoolRetryStartInfo) func(info PoolRetryInternalInfo) func(PoolRetryDoneInfo)
 		// Pool session lifecycle events
 		OnPoolSessionNew   func(PoolSessionNewStartInfo) func(PoolSessionNewDoneInfo)
 		OnPoolSessionClose func(PoolSessionCloseStartInfo) func(PoolSessionCloseDoneInfo)
@@ -215,6 +215,9 @@ type (
 	PoolRetryStartInfo struct {
 		Context    context.Context
 		Idempotent bool
+	}
+	PoolRetryInternalInfo struct {
+		Error error
 	}
 	PoolRetryDoneInfo struct {
 		Attempts int

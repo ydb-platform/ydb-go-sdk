@@ -2,14 +2,11 @@ package driver
 
 import (
 	"context"
-	"sync"
 
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 )
 
 func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
@@ -34,17 +31,6 @@ func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method st
 		method,
 		append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...,
 	)
-}
-
-func (d *driver) Stats() map[endpoint.Endpoint]stats.Stats {
-	endpoints := make(map[endpoint.Endpoint]stats.Stats)
-	m := sync.Mutex{}
-	d.clusterStats(func(endpoint endpoint.Endpoint, s stats.Stats) {
-		m.Lock()
-		endpoints[endpoint] = s
-		m.Unlock()
-	})
-	return endpoints
 }
 
 func (d *driver) Close(ctx context.Context) error {

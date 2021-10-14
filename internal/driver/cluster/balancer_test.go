@@ -7,16 +7,14 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
 )
 
 func isEvenConn(c conn.Conn, _ info.Info) bool {
-	n, err := strconv.Atoi(c.Endpoint().Host)
+	n, err := strconv.Atoi(c.Address())
 	if err != nil {
 		panic(err)
 	}
@@ -51,7 +49,7 @@ func TestMultiBalancer(t *testing.T) {
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(context.Background(), endpoint.Endpoint{Addr: endpoint.Addr{Host: strconv.Itoa(i)}}, nil, stub.Config(config.New()))
+		c := conn.New(context.Background(), strconv.Itoa(i), nil, stub.Config(config.New()))
 		e := m.Insert(c, info.Info{})
 		es[i] = e
 		el[c] = e

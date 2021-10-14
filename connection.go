@@ -2,7 +2,6 @@ package ydb
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"os"
@@ -15,22 +14,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-type DB interface {
-	cluster.DB
-
-	// Stats return cluster stats
-	Stats() map[endpoint.Endpoint]stats.Stats
-
-	// Close clears resources and close all connections to YDB
-	Close(ctx context.Context) error
-}
+type DB cluster.Cluster
 
 type Connection interface {
 	DB
@@ -44,17 +33,17 @@ type Connection interface {
 
 type db struct {
 	name         string
-	options      options
+	options      []config.Option
 	cluster      cluster.Cluster
-	table        *lazyTable
-	scheme       *lazyScheme
-	coordination *lazyCoordination
-	ratelimiter  *lazyRatelimiter
-	discovery    *lazyDiscovery
+	table        lazyTable
+	scheme       lazyScheme
+	coordination lazyCoordination
+	ratelimiter  lazyRatelimiter
+	discovery    lazyDiscovery
 }
 
 func (db *db) Discovery() discovery.Client {
-	return db.discovery
+	return &db.discovery
 }
 
 func (db *db) Name() string {
@@ -73,10 +62,6 @@ func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method strin
 	return db.cluster.NewStream(ctx, desc, method, opts...)
 }
 
-func (db *db) Stats() map[endpoint.Endpoint]stats.Stats {
-	return db.cluster.Stats()
-}
-
 func (db *db) Close(ctx context.Context) error {
 	_ = db.Table().Close(ctx)
 	_ = db.Scheme().Close(ctx)
@@ -85,66 +70,58 @@ func (db *db) Close(ctx context.Context) error {
 }
 
 func (db *db) Table() table.Client {
-	return db.table
+	return &db.table
 }
 
 func (db *db) Scheme() scheme.Client {
-	return db.scheme
+	return &db.scheme
 }
 
 func (db *db) Coordination() coordination.Client {
-	return db.coordination
+	return &db.coordination
 }
 
 func (db *db) RateLimiter() ratelimiter.Client {
-	return db.ratelimiter
+	return &db.ratelimiter
 }
 
 // New connects to name and return name runtime holder
-func New(ctx context.Context, params ConnectParams, opts ...Option) (_ Connection, err error) {
-	db := &db{
-		name: params.Database(),
-		options: options{
-			driverConfig: config.New(
-				config.WithDatabase(params.Database()),
-			),
-		},
-	}
+func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
+	db := &db{}
 	for _, opt := range opts {
 		err = opt(ctx, db)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if params.UseTLS() {
-		if db.options.tlsConfig == nil {
-			db.options.tlsConfig = &tls.Config{}
+	c := config.New(db.options...)
+	db.name = c.Database()
+	if tlsConfig := c.TLSConfig(); tlsConfig != nil && tlsConfig.RootCAs == nil {
+		var certPool *x509.CertPool
+		certPool, err = x509.SystemCertPool()
+		if err != nil {
+			return nil, fmt.Errorf("loading system certificates pool failed: %v", err)
 		}
-		if caFile, hasUserCA := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); hasUserCA || db.options.tlsConfig.RootCAs == nil {
-			certPool, e := x509.SystemCertPool()
-			if e != nil {
-				return nil, e
+		if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
+			// ignore any errors on load certificates
+			if err = credentials.AppendCertsFromFile(certPool, caFile); err != nil {
+				return nil, fmt.Errorf("loading certificates from file '%s' by Env['YDB_SSL_ROOT_CERTIFICATES_FILE'] failed: %v", caFile, err)
 			}
-			if hasUserCA {
-				if err = credentials.AppendCertsFromFile(certPool, caFile); err != nil {
-					return nil, fmt.Errorf("cannot load certificates from file '%s' by Env['YDB_SSL_ROOT_CERTIFICATES_FILE']: %v", caFile, err)
-				}
-			}
-			db.options.tlsConfig.RootCAs = certPool
 		}
+		tlsConfig.RootCAs = certPool
 	}
-	db.cluster, err = (&dial.Dialer{
-		Config:    db.options.driverConfig,
-		TLSConfig: db.options.tlsConfig,
-		Timeout:   db.options.dialTimeout,
-	}).Dial(ctx, params.Endpoint())
 	if err != nil {
 		return nil, err
 	}
-	db.table = newTable(db.cluster, tableConfig(db.options))
-	db.scheme = newScheme(db)
-	db.coordination = newCoordination(db.cluster)
-	db.ratelimiter = newRatelimiter(db.cluster)
-	db.discovery = newDiscovery(db.cluster, db.options.driverConfig.Trace)
+	db.cluster, err = dial.Dial(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	db.table.db = db.cluster
+	db.coordination.db = db.cluster
+	db.ratelimiter.db = db.cluster
+	db.discovery.db = db.cluster
+	db.scheme.db = db
+	db.discovery.trace = c.Trace()
 	return db, nil
 }

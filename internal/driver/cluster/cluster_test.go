@@ -26,29 +26,29 @@ func TestClusterFastRedial(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ln := newStubListener()
-	srv := grpc.NewServer()
+	listener := newStubListener()
+	server := grpc.NewServer()
 	go func() {
-		_ = srv.Serve(ln)
+		_ = server.Serve(listener)
 	}()
 
-	cs, balancer := simpleBalancer()
+	l, b := simpleBalancer()
 	c := &cluster{
-		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
-			return ln.Dial(ctx)
+		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
+			return listener.Dial(ctx)
 		},
-		balancer: balancer,
-		index:    make(map[endpoint.Addr]entry.Entry),
+		balancer: b,
+		index:    make(map[string]entry.Entry),
 	}
 
 	pingConnects := func(size int) chan struct{} {
 		done := make(chan struct{})
 		go func() {
 			for i := 0; i < size*10; i++ {
-				conn, err := c.Get(context.Background())
+				c, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && conn != nil && conn.Endpoint().Host == "bad" {
-					_ = conn.Close(ctx)
+				if err == nil && c != nil && c.Address() == "bad:0" {
+					_ = c.Close(ctx)
 				}
 			}
 			close(done)
@@ -65,7 +65,7 @@ func TestClusterFastRedial(t *testing.T) {
 	case <-pingConnects(len(ne)):
 
 	case <-time.After(time.Second * 10):
-		t.Fatalf("Time limit exceeded while %d endpoints in balance. Wait channel used", len(*cs))
+		t.Fatalf("Time limit exceeded while %d endpoints in balance. Wait channel used", len(*l))
 	}
 }
 
@@ -79,13 +79,15 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		_ = srv.Serve(ln)
 	}()
 
-	_, balancer := simpleBalancer()
 	c := &cluster{
-		dial: func(ctx context.Context, s string, p int) (*grpc.ClientConn, error) {
+		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return ln.Dial(ctx)
 		},
-		balancer: balancer,
-		index:    make(map[endpoint.Addr]entry.Entry),
+		balancer: func() balancer.Balancer {
+			_, b := simpleBalancer()
+			return b
+		}(),
+		index: make(map[string]entry.Entry),
 	}
 
 	assert := func(t *testing.T, exp []endpoint.Endpoint) {
@@ -93,20 +95,20 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			t.Fatalf("unexpected number of endpoints %d: got %d", len(exp), len(c.index))
 		}
 		for _, e := range exp {
-			if _, ok := c.index[e.Addr]; !ok {
+			if _, ok := c.index[e.Address()]; !ok {
 				t.Fatalf("not found endpoint '%v' in index", e.String())
 			}
 		}
-		for addr := range c.index {
+		for address := range c.index {
 			if func() bool {
 				for _, e := range exp {
-					if e.Addr == addr {
+					if e.Address() == address {
 						return false
 					}
 				}
 				return true
 			}() {
-				t.Fatalf("unexpected endpoint '%v' in index", addr.String())
+				t.Fatalf("unexpected endpoint '%v' in index", address)
 			}
 		}
 	}
@@ -306,13 +308,13 @@ func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []endp
 	SortEndpoints(next)
 	DiffEndpoints(curr, next,
 		func(i, j int) {
-			c.Update(ctx, next[j], opts...)
+			c.Update(ctx, next[j].Address(), append([]option{WithInfo(info.Info{LoadFactor: next[j].LoadFactor, Local: next[j].Local})}, opts...)...)
 		},
 		func(i, j int) {
-			c.Insert(ctx, next[j], opts...)
+			c.Insert(ctx, next[j].Address(), append([]option{WithInfo(info.Info{LoadFactor: next[j].LoadFactor, Local: next[j].Local})}, opts...)...)
 		},
 		func(i, j int) {
-			c.Remove(ctx, curr[i], opts...)
+			c.Remove(ctx, curr[i].Address(), opts...)
 		},
 	)
 }
