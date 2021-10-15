@@ -39,32 +39,34 @@ message TopicConsumer {
 }
 
 message GetTaskResult {
-    bool has_task = 1;
-    // come back later in 10 sec ?
-    SignedIdentity result_id = 2;
-    SignedIdentity query_id = 3;
-    SignedIdentity job_id = 4;
-    uint64 generation = 5;
+    message Task {
+        // come back later in 10 sec ?
+        SignedIdentity result_id = 1;
+        SignedIdentity query_id = 2;
+        SignedIdentity job_id = 3;
+        uint64 generation = 4;
 
-    bool streaming = 6;
-    repeated bytes dq_graph = 7;
-    int32 dq_graph_index = 20;
-    // text, connection and binding are empty if dq_graph is not empty
-    string text = 8;
-    repeated YandexQuery.Connection connection = 9;
-    repeated YandexQuery.Binding binding = 10;
+        bool streaming = 5;
+        repeated bytes dq_graph = 6;
+        // text, connection and binding are empty if dq_graph is not empty
+        string text = 7;
+        repeated YandexQuery.Connection connection = 8;
+        repeated YandexQuery.Binding binding = 9;
 
-    string user_token = 11; // IAM token for debug
-    repeated SignedIdentity service_accounts = 12;
-    string user_id = 13;
-    YandexQuery.QueryContent.QueryType query_type = 14;
-    string scope = 15;
-    YandexQuery.ExecuteMode execute_mode = 16;
-    YandexQuery.StateLoadMode state_load_mode = 17;
-    YandexQuery.QueryMeta.ComputeStatus status = 18;
-    map<string, string> sensor_labels = 19;
-    repeated YandexQuery.ResultSetMeta result_set_meta = 21;
-    repeated TopicConsumer created_topic_consumers = 22;
+        string user_token = 10; // IAM token for debug
+        repeated SignedIdentity service_accounts = 11;
+        string user_id = 12;
+        YandexQuery.QueryContent.QueryType query_type = 13;
+        string scope = 14;
+        YandexQuery.ExecuteMode execute_mode = 15;
+        YandexQuery.StateLoadMode state_load_mode = 16;
+        YandexQuery.QueryMeta.ComputeStatus status = 17;
+        repeated YandexQuery.ResultSetMeta result_set_meta = 18;
+        repeated TopicConsumer created_topic_consumers = 19;
+        int32 dq_graph_index = 20;
+        map<string, string> sensor_labels = 21;
+    }
+    repeated Task tasks = 1;
 }
 
 message GetTaskResponse {
