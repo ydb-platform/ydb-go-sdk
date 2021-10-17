@@ -306,7 +306,7 @@ func (t Table) Compose(x Table) (ret Table) {
 	default:
 		h1 := t.OnPoolRetry
 		h2 := x.OnPoolRetry
-		ret.OnPoolRetry = func(p PoolRetryStartInfo) func(PoolRetryDoneInfo) {
+		ret.OnPoolRetry = func(p PoolRetryStartInfo) func(PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
 			r1 := h1(p)
 			r2 := h2(p)
 			switch {
@@ -315,9 +315,20 @@ func (t Table) Compose(x Table) (ret Table) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(p PoolRetryDoneInfo) {
-					r1(p)
-					r2(p)
+				return func(info PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
+					r11 := r1(info)
+					r21 := r2(info)
+					switch {
+					case r11 == nil:
+						return r21
+					case r21 == nil:
+						return r11
+					default:
+						return func(p PoolRetryDoneInfo) {
+							r11(p)
+							r21(p)
+						}
+					}
 				}
 			}
 		}
@@ -659,20 +670,32 @@ func (t Table) onPoolClose(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
 	}
 	return res
 }
-func (t Table) onPoolRetry(p PoolRetryStartInfo) func(PoolRetryDoneInfo) {
+func (t Table) onPoolRetry(p PoolRetryStartInfo) func(info PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
 	fn := t.OnPoolRetry
 	if fn == nil {
-		return func(PoolRetryDoneInfo) {
-			return
+		return func(PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
+			return func(PoolRetryDoneInfo) {
+				return
+			}
 		}
 	}
 	res := fn(p)
 	if res == nil {
-		return func(PoolRetryDoneInfo) {
-			return
+		return func(PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
+			return func(PoolRetryDoneInfo) {
+				return
+			}
 		}
 	}
-	return res
+	return func(info PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
+		res := res(info)
+		if res == nil {
+			return func(PoolRetryDoneInfo) {
+				return
+			}
+		}
+		return res
+	}
 }
 func (t Table) onPoolSessionNew(p PoolSessionNewStartInfo) func(PoolSessionNewDoneInfo) {
 	fn := t.OnPoolSessionNew
@@ -924,16 +947,21 @@ func TableOnPoolClose(t Table, c context.Context) func(error) {
 		res(p)
 	}
 }
-func TableOnPoolRetry(t Table, c context.Context, idempotent bool) func(attempts int, _ error) {
+func TableOnPoolRetry(t Table, c context.Context, idempotent bool) func(error) func(attempts int, _ error) {
 	var p PoolRetryStartInfo
 	p.Context = c
 	p.Idempotent = idempotent
 	res := t.onPoolRetry(p)
-	return func(attempts int, e error) {
-		var p PoolRetryDoneInfo
-		p.Attempts = attempts
+	return func(e error) func(int, error) {
+		var p PoolRetryInternalInfo
 		p.Error = e
-		res(p)
+		res := res(p)
+		return func(attempts int, e error) {
+			var p PoolRetryDoneInfo
+			p.Attempts = attempts
+			p.Error = e
+			res(p)
+		}
 	}
 }
 func TableOnPoolSessionNew(t Table, c context.Context) func(session sessionInfo, _ error) {

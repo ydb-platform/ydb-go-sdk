@@ -35,7 +35,7 @@ type Addr interface {
 
 type runtime struct {
 	mu        sync.RWMutex
-	addr      trace.Endpoint
+	address   string
 	trace     trace.Driver
 	state     state.State
 	opStarted uint64
@@ -46,10 +46,10 @@ type runtime struct {
 	errRate   *series.Series
 }
 
-func New(trace trace.Driver, addr trace.Endpoint) Runtime {
+func New(trace trace.Driver, address string) Runtime {
 	return &runtime{
 		trace:   trace,
-		addr:    addr,
+		address: address,
 		state:   state.Offline,
 		opTime:  series.NewSeries(statsDuration, statsBuckets),
 		opRate:  series.NewSeries(statsDuration, statsBuckets),
@@ -81,7 +81,7 @@ func (r *runtime) Stats() stats.Stats {
 func (r *runtime) SetState(ctx context.Context, s state.State) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	onDone := trace.DriverOnConnStateChange(r.trace, ctx, r.addr, r.state)
+	onDone := trace.DriverOnConnStateChange(r.trace, ctx, r.address, r.state)
 	r.state = s
 	onDone(r.state)
 }

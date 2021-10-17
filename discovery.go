@@ -38,13 +38,6 @@ func (d *lazyDiscovery) Close(ctx context.Context) error {
 	return d.client.Close(ctx)
 }
 
-func newDiscovery(db DB, trace trace.Driver) *lazyDiscovery {
-	return &lazyDiscovery{
-		db:    db,
-		trace: trace,
-	}
-}
-
 func (d *lazyDiscovery) init() {
 	d.m.Lock()
 	if d.client == nil {

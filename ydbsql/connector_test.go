@@ -8,19 +8,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -34,19 +32,17 @@ func TestConnectorDialOnPing(t *testing.T) {
 
 	dialCh := make(chan struct{})
 	c, err := Connector(
-		WithEndpoint("127.0.0.1:9999"),
-		WithDialer(dial.Dialer{
-			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
-				dialCh <- struct{}{}
-				return client, nil
-			},
-			Config: &config.Config{
-				Credentials:          credentials.NewAnonymousCredentials("test"),
-				GrpcConnectionPolicy: &config.DefaultGrpcConnectionPolicy,
-				DiscoveryInterval:    time.Second,
-			},
-		}),
-		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorDialOnPing")),
+		With(
+			ydb.With(
+				config.WithEndpoint("127.0.0.1:9999"),
+				config.WithCredentials(credentials.NewAnonymousCredentials("TestConnectorDialOnPing")),
+				config.WithDiscoveryInterval(time.Second),
+				config.WithNetDial(func(_ context.Context, addr string) (net.Conn, error) {
+					dialCh <- struct{}{}
+					return client, nil
+				}),
+			),
+		),
 	)
 
 	if err != nil {
@@ -85,25 +81,23 @@ func TestConnectorRedialOnError(t *testing.T) {
 
 	dialFlag := false
 	c, err := Connector(
-		WithEndpoint("127.0.0.1:9999"),
-		WithDialer(dial.Dialer{
-			NetDial: func(_ context.Context, addr string) (net.Conn, error) {
-				dialFlag = true
-				select {
-				case <-success:
-					// it will still fails on grpc dial
-					return client, nil
-				default:
-					return nil, errors.New("any error")
-				}
-			},
-			Config: &config.Config{
-				Credentials:          credentials.NewAnonymousCredentials("test"),
-				GrpcConnectionPolicy: &config.DefaultGrpcConnectionPolicy,
-				DiscoveryInterval:    time.Second,
-			},
-		}),
-		WithCredentials(credentials.NewAnonymousCredentials("TestConnectorRedialOnError")),
+		With(
+			ydb.With(
+				config.WithEndpoint("127.0.0.1:9999"),
+				config.WithCredentials(credentials.NewAnonymousCredentials("TestConnectorRedialOnError")),
+				config.WithDiscoveryInterval(time.Second),
+				config.WithNetDial(func(_ context.Context, addr string) (net.Conn, error) {
+					dialFlag = true
+					select {
+					case <-success:
+						// it will still fails on grpc dial
+						return client, nil
+					default:
+						return nil, errors.New("any error")
+					}
+				}),
+			),
+		),
 		WithDefaultTxControl(table.TxControl(
 			table.BeginTx(
 				table.WithStaleReadOnly(),
@@ -165,18 +159,11 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			client, server := net.Pipe()
-			defer func() {
-				_ = client.Close()
-			}()
-			defer func() {
-				_ = server.Close()
-			}()
-
 			c, err := Connector(
 				withClient(
-					internal.NewClientAsPool(
-						testutil.NewDB(
+					internal.New(
+						context.Background(),
+						testutil.NewCluster(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
 									// nolint:unparam
@@ -192,10 +179,12 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 									},
 								},
 							),
-						), internal.Config{},
+						),
 					),
 				),
-				WithDefaultExecDataQueryOption(options.WithQueryCachePolicy(test.queryCachePolicyOption...)),
+				WithDefaultExecDataQueryOption(
+					options.WithQueryCachePolicy(test.queryCachePolicyOption...),
+				),
 			)
 			if err != nil {
 				t.Fatalf("unexpected connector error: %v", err)

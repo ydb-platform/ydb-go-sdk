@@ -66,82 +66,86 @@ func (m Method) Split() (service, method string) {
 	return strings.TrimPrefix(string(m[:i]), "/"), string(m[i+1:])
 }
 
-type Endpoint interface {
-	Address() string
-	LocalDC() bool
-}
-
 type ConnState interface {
 	String() string
 	Code() int
 }
 
+type Location int
+
+const (
+	LocationUndefined = Location(iota)
+	LocationLocal
+	LocationRemote
+)
+
 type (
 	ClusterInsertStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
+		Context context.Context
+		Address string
 	}
 	ClusterInsertDoneInfo struct {
-		State ConnState
+		State    ConnState
+		Location Location
 	}
 	ClusterUpdateStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
+		Context context.Context
+		Address string
 	}
 	ClusterUpdateDoneInfo struct {
 		State ConnState
 	}
 	ClusterRemoveStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
+		Context context.Context
+		Address string
 	}
 	ClusterRemoveDoneInfo struct {
 		State ConnState
 	}
 	ConnDisconnectStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		State    ConnState
+		Context context.Context
+		Address string
+		State   ConnState
 	}
 	ConnDisconnectDoneInfo struct {
 		State ConnState
 		Error error
 	}
 	ConnStateChangeStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		State    ConnState
+		Context context.Context
+		Address string
+		State   ConnState
 	}
 	ConnStateChangeDoneInfo struct {
 		State ConnState
 	}
 	ConnNewStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
+		Context context.Context
+		Address string
 	}
 	ConnNewDoneInfo struct {
 		State ConnState
 	}
 	ConnCloseStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		State    ConnState
+		Context context.Context
+		Address string
+		State   ConnState
 	}
 	ConnCloseDoneInfo struct {
 	}
 	ConnDialStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		State    ConnState
+		Context context.Context
+		Address string
+		State   ConnState
 	}
 	ConnDialDoneInfo struct {
 		Error error
 		State ConnState
 	}
 	ConnInvokeStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		Method   Method
+		Context context.Context
+		Address string
+		Method  Method
 	}
 	ConnInvokeDoneInfo struct {
 		Error  error
@@ -150,9 +154,9 @@ type (
 		State  ConnState
 	}
 	ConnNewStreamStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		Method   Method
+		Context context.Context
+		Address string
+		Method  Method
 	}
 	ConnNewStreamRecvInfo struct {
 		Error error
@@ -165,14 +169,14 @@ type (
 		Context context.Context
 	}
 	ClusterGetDoneInfo struct {
-		Endpoint Endpoint
-		Error    error
+		Address string
+		Error   error
 	}
 	PessimizeNodeStartInfo struct {
-		Context  context.Context
-		Endpoint Endpoint
-		State    ConnState
-		Cause    error
+		Context context.Context
+		Address string
+		State   ConnState
+		Cause   error
 	}
 	PessimizeNodeDoneInfo struct {
 		State ConnState
@@ -189,7 +193,7 @@ type (
 		Context context.Context
 	}
 	DiscoveryDoneInfo struct {
-		Endpoints []Endpoint
+		Endpoints []string
 		Error     error
 	}
 )

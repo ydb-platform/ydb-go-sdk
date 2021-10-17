@@ -12,7 +12,7 @@ The recommended usage of this package is as follows:
 			// ydb/table.Client here. This may be useful when tracing setup
 			// must be prepared directly on Client structure.
 			//
-			// There are few other useful options, see ConnectorOption types for
+			// There are few other useful options, see Option types for
 			// more details.
 		))
 	}
@@ -78,7 +78,7 @@ Note that database/sql package reuses sql.Conn instances which are wrappers
 around ydb/table.Session instances in case of ydbsql. It could be reasonable to
 increase the number of reused sessions via database/sql.DB.SetMaxIdleConns()
 and database/sql.DB.SetMaxOpenConns() calls. If doing so, it is also highly
-recommended to setup inner session pool's size limit to the same value by
+recommended to setup inner session client's size limit to the same value by
 passing WithSessionPoolSizeLimit() option to the Connector() function.
 
 It is worth noting that YDB supports server side operation timeout. That is,

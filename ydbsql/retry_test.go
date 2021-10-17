@@ -4,18 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"sync"
 	"sync/atomic"
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -31,7 +33,7 @@ func (b *ClusterBuilder) log(msg string, args ...interface{}) {
 	b.Logf(fmt.Sprint("db stub: ", fmt.Sprintf(msg, args...)))
 }
 
-func (b *ClusterBuilder) Build() cluster.DB {
+func (b *ClusterBuilder) Build() cluster.Cluster {
 	type session struct {
 		sync.Mutex
 		busy bool
@@ -43,7 +45,7 @@ func (b *ClusterBuilder) Build() cluster.DB {
 
 		sessions = map[string]*session{}
 	)
-	return testutil.NewDB(
+	return testutil.NewCluster(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				// nolint:unparam
@@ -168,16 +170,24 @@ func TestTxDoerStmt(t *testing.T) {
 		},
 		Logf: t.Logf,
 	}
-	cl := b.Build()
+	c := b.Build()
 
-	con, err := Connector(
-		withClient(table.NewClientAsPool(cl, table.DefaultConfig())),
+	connector, err := Connector(
+		With(
+			ydb.With(
+				config.WithEndpoint("127.0.0.1:9999"),
+				config.WithNetDial(func(ctx context.Context, s string) (net.Conn, error) {
+					return nil, nil
+				}),
+			),
+		),
+		withClient(table.New(context.Background(), c)),
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	db := sql.OpenDB(con)
+	db := sql.OpenDB(connector)
 	if err = db.Ping(); err != nil {
 		t.Fatal(err)
 	}

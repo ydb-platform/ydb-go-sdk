@@ -9,7 +9,7 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  test:
+  unit:
     strategy:
       matrix:
         go-version: [1.14.x, 1.15.x, 1.16.x, 1.17.x]
@@ -26,4 +26,51 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race ./... -coverprofile=coverage.txt -covermode=atomic
+        run: go test $(go list ./... | egrep -v "\/(test|testutil|trace)^") -coverprofile=coverage.txt -covermode=atomic
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.17.x' && github.ref == 'refs/heads/master'
+        with:
+          file: ./coverage.txt
+          flags: unit
+          env_vars: OS,GO
+          fail_ci_if_error: true
+  integration:
+    strategy:
+      matrix:
+        go-version: [1.17.x]
+        os: [ubuntu-latest]
+    services:
+      ydb:
+        image: cr.yandex/yc/yandex-docker-local-ydb:latest
+        ports:
+          - 2135:2135
+        volumes:
+          - /tmp/ydb_certs:/ydb_certs
+        env:
+          YDB_LOCAL_SURVIVE_RESTART: true
+          YDB_USE_IN_MEMORY_PDISKS: true
+        options: '-h localhost'
+    env:
+      OS: ${{ matrix.os }}
+      GO: ${{ matrix.go-version }}
+      YDB_CONNECTION_STRING: grpcs://localhost:2135/?database=/local
+      YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+      YDB_ANONYMOUS_CREDENTIALS: 1
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Test
+        run: go test -race -tags=integration ./... -coverprofile=coverage.txt -covermode=atomic
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./coverage.txt
+          flags: integration
+          env_vars: OS,GO
+          fail_ci_if_error: true

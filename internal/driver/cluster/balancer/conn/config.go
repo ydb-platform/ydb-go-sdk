@@ -6,7 +6,6 @@ import (
 
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -16,9 +15,9 @@ type Config interface {
 	OperationCancelAfter() time.Duration
 	Meta(ctx context.Context) (context.Context, error)
 	Trace(ctx context.Context) trace.Driver
-	Pessimize(ctx context.Context, addr endpoint.Addr) error
+	Pessimize(ctx context.Context, address string) error
 	StreamTimeout() time.Duration
-	GrpcConnectionPolicy() *GrpcConnectionPolicy
+	GrpcConnectionPolicy() GrpcConnectionPolicy
 }
 
 type GrpcConnectionPolicy struct {

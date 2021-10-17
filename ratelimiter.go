@@ -64,9 +64,3 @@ func (r *lazyRatelimiter) init() {
 	}
 	r.m.Unlock()
 }
-
-func newRatelimiter(db DB) *lazyRatelimiter {
-	return &lazyRatelimiter{
-		db: db,
-	}
-}

@@ -7,19 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
@@ -34,7 +34,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewDB(
+		Cluster: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					// nolint:unparam
@@ -88,7 +88,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewDB(
+		Cluster: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
@@ -318,8 +318,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client := &client{
-							cluster: testutil.NewDB(
+						client := newClient(
+							context.Background(),
+							testutil.NewCluster(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
 										// nolint:unparam
@@ -369,7 +370,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 									},
 								),
 							),
-						}
+							nil,
+							config.New(),
+						)
 						ctx, cancel := context.WithTimeout(
 							context.Background(),
 							time.Second,

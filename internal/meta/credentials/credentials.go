@@ -32,32 +32,32 @@ func (f Func) String() string {
 	return "Func"
 }
 
-// AuthTokenCredentials implements Credentials interface with static
+// AccessTokenCredentials implements Credentials interface with static
 // authorization parameters.
-type AuthTokenCredentials struct {
-	AuthToken string
+type AccessTokenCredentials struct {
+	AccessToken string
 
 	sourceInfo string
 }
 
-func NewAuthTokenCredentials(authToken string, sourceInfo string) *AuthTokenCredentials {
-	return &AuthTokenCredentials{
-		AuthToken:  authToken,
-		sourceInfo: sourceInfo,
+func NewAccessTokenCredentials(AccessToken string, sourceInfo string) *AccessTokenCredentials {
+	return &AccessTokenCredentials{
+		AccessToken: AccessToken,
+		sourceInfo:  sourceInfo,
 	}
 }
 
 // Token implements Credentials.
-func (a AuthTokenCredentials) Token(_ context.Context) (string, error) {
-	return a.AuthToken, nil
+func (a AccessTokenCredentials) Token(_ context.Context) (string, error) {
+	return a.AccessToken, nil
 }
 
 // Token implements Credentials.
-func (a AuthTokenCredentials) String() string {
+func (a AccessTokenCredentials) String() string {
 	if a.sourceInfo == "" {
-		return "AuthTokenCredentials"
+		return "AccessTokenCredentials"
 	}
-	return "AuthTokenCredentials created from " + a.sourceInfo
+	return "AccessTokenCredentials created from " + a.sourceInfo
 }
 
 // anonymousCredentials implements Credentials interface with anonymous access

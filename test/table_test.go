@@ -1,3 +1,5 @@
+// +build integration
+
 package test
 
 import (
@@ -62,10 +64,7 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 }
 
 func TestPoolHealth(t *testing.T) {
-	if !CheckEndpointDatabaseEnv() {
-		t.Skip("need to be tested with docker")
-	}
-
+	t.Skip("run under docker")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -82,9 +81,8 @@ func TestPoolHealth(t *testing.T) {
 
 	defer s.print(t)
 
-	db := OpenDB(
+	db, err := openNative(
 		ctx,
-		t,
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithGrpcConnectionTTL(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
@@ -126,7 +124,12 @@ func TestPoolHealth(t *testing.T) {
 			},
 		}),
 	)
-	defer func() { _ = db.Close(ctx) }()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = db.Close(ctx)
+	}()
 
 	Prepare(ctx, t, db)
 

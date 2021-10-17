@@ -41,11 +41,11 @@ var (
 
 type cluster struct {
 	trace    trace.Driver
-	dial     func(context.Context, string, int) (*grpc.ClientConn, error)
+	dial     func(context.Context, string) (*grpc.ClientConn, error)
 	balancer balancer.Balancer
 	explorer repeater.Repeater
 
-	index map[endpoint.Addr]entry.Entry
+	index map[string]entry.Entry
 	ready int
 	wait  chan struct{}
 
@@ -53,10 +53,10 @@ type cluster struct {
 	closed bool
 }
 
-func (c *cluster) ConnStats(addr endpoint.Addr) (ok bool, _ stats.Stats) {
+func (c *cluster) ConnStats(address string) (ok bool, _ stats.Stats) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	entry, ok := c.index[addr]
+	entry, ok := c.index[address]
 	if !ok {
 		return false, stats.Stats{}
 	}
@@ -72,26 +72,25 @@ func (c *cluster) SetExplorer(repeater repeater.Repeater) {
 }
 
 type Cluster interface {
-	Insert(ctx context.Context, e endpoint.Endpoint, opts ...option)
-	Update(ctx context.Context, e endpoint.Endpoint, opts ...option)
+	Insert(ctx context.Context, address string, opts ...option)
+	Update(ctx context.Context, address string, opts ...option)
 	Get(ctx context.Context) (conn conn.Conn, err error)
-	Pessimize(ctx context.Context, a endpoint.Addr) error
-	ConnStats(addr endpoint.Addr) (ok bool, stats stats.Stats)
-	Stats(it func(endpoint.Endpoint, stats.Stats))
+	Pessimize(ctx context.Context, address string) error
+	ConnStats(address string) (ok bool, stats stats.Stats)
 	Close(ctx context.Context) error
-	Remove(ctx context.Context, e endpoint.Endpoint, wg ...option)
+	Remove(ctx context.Context, address string, wg ...option)
 	SetExplorer(repeater repeater.Repeater)
 	Force()
 }
 
 func New(
 	trace trace.Driver,
-	dial func(context.Context, string, int) (*grpc.ClientConn, error),
+	dial func(context.Context, string) (*grpc.ClientConn, error),
 	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
 		trace:    trace,
-		index:    make(map[endpoint.Addr]entry.Entry),
+		index:    make(map[string]entry.Entry),
 		dial:     dial,
 		balancer: balancer,
 	}
@@ -140,47 +139,50 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	conn = c.balancer.Next()
 	if conn == nil {
-		onDone(nil, ErrClusterEmpty)
+		onDone("", ErrClusterEmpty)
 		return nil, ErrClusterEmpty
 	}
-	onDone(conn.Endpoint(), nil)
+	onDone(conn.Address(), nil)
 	return conn, nil
 }
 
-type options struct {
+type optionsHolder struct {
 	wg         wg.WG
+	info       info.Info
 	connConfig conn.Config
 }
 
-type option func(options *options)
+type option func(options *optionsHolder)
 
 func WithWG(wg wg.WG) option {
-	return func(options *options) {
+	return func(options *optionsHolder) {
 		options.wg = wg
 	}
 }
 
+func WithInfo(info info.Info) option {
+	return func(options *optionsHolder) {
+		options.info = info
+	}
+}
+
 func WithConnConfig(connConfig conn.Config) option {
-	return func(options *options) {
+	return func(options *optionsHolder) {
 		options.connConfig = connConfig
 	}
 }
 
 // Insert inserts new connection into the cluster.
-func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...option) {
-	opt := options{}
+func (c *cluster) Insert(ctx context.Context, address string, opts ...option) {
+	holder := optionsHolder{}
 	for _, o := range opts {
-		o(&opt)
+		o(&holder)
 	}
-	if opt.wg != nil {
-		defer opt.wg.Done()
+	if holder.wg != nil {
+		defer holder.wg.Done()
 	}
 
-	info := info.Info{
-		LoadFactor: e.LoadFactor,
-		Local:      e.Local,
-	}
-	conn := conn.New(ctx, e, c.dial, opt.connConfig)
+	conn := conn.New(ctx, address, c.dial, holder.connConfig)
 	var wait chan struct{}
 	defer func() {
 		if wait != nil {
@@ -195,38 +197,42 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	_, has := c.index[e.Addr]
+	_, has := c.index[address]
 	if has {
 		panic("ydb: can't insert already existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterInsert(c.trace, ctx, e)
+	onDone := trace.DriverOnClusterInsert(c.trace, ctx, address)
 
-	entry := entry.Entry{Info: info}
+	entry := entry.Entry{Info: holder.info}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
 	c.ready++
 	wait = c.wait
 	c.wait = nil
-	c.index[e.Addr] = entry
 
-	onDone(conn.Runtime().GetState())
+	c.index[address] = entry
+
+	onDone(
+		conn.Runtime().GetState(),
+		func() trace.Location {
+			if holder.info.Local {
+				return trace.LocationLocal
+			}
+			return trace.LocationRemote
+		}(),
+	)
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
-func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...option) {
-	onDone := trace.DriverOnClusterUpdate(c.trace, ctx, e)
-	opt := options{}
+func (c *cluster) Update(ctx context.Context, address string, opts ...option) {
+	onDone := trace.DriverOnClusterUpdate(c.trace, ctx, address)
+	holder := optionsHolder{}
 	for _, o := range opts {
-		o(&opt)
+		o(&holder)
 	}
-	if opt.wg != nil {
-		defer opt.wg.Done()
-	}
-
-	info := info.Info{
-		LoadFactor: e.LoadFactor,
-		Local:      e.Local,
+	if holder.wg != nil {
+		defer holder.wg.Done()
 	}
 
 	c.mu.Lock()
@@ -235,7 +241,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	entry, has := c.index[e.Addr]
+	entry, has := c.index[address]
 	if !has {
 		panic("ydb: can't update not-existing endpoint")
 	}
@@ -247,23 +253,23 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		onDone(entry.Conn.Runtime().GetState())
 	}()
 
-	entry.Info = info
+	entry.Info = holder.info
 	entry.Conn.Runtime().SetState(ctx, state.Online)
-	c.index[e.Addr] = entry
+	c.index[address] = entry
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
-		c.balancer.Update(entry.Handle, info)
+		c.balancer.Update(entry.Handle, holder.info)
 	}
 }
 
 // Remove removes and closes previously inserted connection.
-func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...option) {
-	opt := options{}
+func (c *cluster) Remove(ctx context.Context, address string, opts ...option) {
+	holder := optionsHolder{}
 	for _, o := range opts {
-		o(&opt)
+		o(&holder)
 	}
-	if opt.wg != nil {
-		defer opt.wg.Done()
+	if holder.wg != nil {
+		defer holder.wg.Done()
 	}
 
 	c.mu.Lock()
@@ -272,17 +278,17 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	entry, has := c.index[e.Addr]
+	entry, has := c.index[address]
 	if !has {
 		c.mu.Unlock()
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterRemove(c.trace, ctx, e)
+	onDone := trace.DriverOnClusterRemove(c.trace, ctx, address)
 
 	entry.RemoveFrom(c.balancer)
 	c.ready--
-	delete(c.index, e.Addr)
+	delete(c.index, address)
 	c.mu.Unlock()
 
 	if entry.Conn != nil {
@@ -292,14 +298,14 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	onDone(entry.Conn.Runtime().GetState())
 }
 
-func (c *cluster) Pessimize(ctx context.Context, addr endpoint.Addr) (err error) {
+func (c *cluster) Pessimize(ctx context.Context, address string) (err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrClusterClosed)
 	}
 
-	entry, has := c.index[addr]
+	entry, has := c.index[address]
 	if !has {
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
@@ -324,29 +330,6 @@ func (c *cluster) Pessimize(ctx context.Context, addr endpoint.Addr) (err error)
 		}
 	}
 	return err
-}
-
-func (c *cluster) Stats(it func(endpoint.Endpoint, stats.Stats)) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if c.closed {
-		return
-	}
-	for _, entry := range c.index {
-		if entry.Conn != nil {
-			it(
-				endpoint.Endpoint{
-					Addr: endpoint.Addr{
-						Host: entry.Conn.Endpoint().Host,
-						Port: entry.Conn.Endpoint().Port,
-					},
-					LoadFactor: entry.Info.LoadFactor,
-					Local:      entry.Info.Local,
-				},
-				entry.Conn.Runtime().Stats(),
-			)
-		}
-	}
 }
 
 // c.mu read lock must be held.

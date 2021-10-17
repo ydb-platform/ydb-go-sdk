@@ -144,9 +144,3 @@ func (s *lazyScheme) RemoveDirectory(ctx context.Context, path string) (err erro
 	s.init()
 	return s.client.RemoveDirectory(ctx, path)
 }
-
-func newScheme(db dbWithTable) *lazyScheme {
-	return &lazyScheme{
-		db: db,
-	}
-}

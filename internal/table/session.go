@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	ErrNilConnection = errors.New("session with nil connection")
+	ErrNilConnection = errors.New("build with nil connection")
 )
 
 type sessionFlags int
@@ -93,7 +93,7 @@ func (s *session) IsClosed() bool {
 	return s.flags&sessionClosed != 0
 }
 
-func newSession(ctx context.Context, c cluster.DB, t trace.Table) (s Session, err error) {
+func newSession(ctx context.Context, c cluster.Cluster, t trace.Table) (s Session, err error) {
 	onDone := trace.TableOnSessionNew(t, ctx)
 	start := time.Now()
 	defer func() {
@@ -165,7 +165,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 	}()
 
 	// call all close listeners before doing request
-	// firstly this need to clear pool from this session
+	// firstly this need to clear client from this build
 	for _, cb := range s.onClose {
 		cb(ctx)
 	}
@@ -181,12 +181,12 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 func (s *session) Address() string {
 	if s != nil && s.conn != nil {
-		return s.conn.Endpoint().Address()
+		return s.conn.Address()
 	}
 	return ""
 }
 
-// KeepAlive keeps idle session alive.
+// KeepAlive keeps idle build alive.
 func (s *session) KeepAlive(ctx context.Context) (err error) {
 	onDone := trace.TableOnSessionKeepAlive(s.trace, ctx, s)
 	defer func() {
@@ -404,7 +404,7 @@ func (s *session) Explain(ctx context.Context, query string) (exp table.DataQuer
 	}, nil
 }
 
-// Statement is a prepared statement. Like a single session, it is not safe for
+// Statement is a prepared statement. Like a single build, it is not safe for
 // concurrent use by multiple goroutines.
 type Statement struct {
 	session *session
@@ -450,7 +450,7 @@ func (s *Statement) Text() string {
 	return s.query.YQL()
 }
 
-// Prepare prepares data query within session s.
+// Prepare prepares data query within build s.
 func (s *session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
 	var (
 		cached   bool
@@ -831,7 +831,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 	return err
 }
 
-// BeginTransaction begins new transaction within given session with given
+// BeginTransaction begins new transaction within given build with given
 // settings.
 func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
 	onDone := trace.TableOnSessionTransactionBegin(s.trace, ctx, s)
@@ -863,7 +863,7 @@ func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSet
 }
 
 // Transaction is a database transaction.
-// Hence session methods are not goroutine safe, Transaction is not goroutine
+// Hence build methods are not goroutine safe, Transaction is not goroutine
 // safe either.
 type Transaction struct {
 	id string

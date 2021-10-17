@@ -1,9 +1,9 @@
+// +build integration
+
 package test
 
 import (
 	"context"
-	"log"
-	"os"
 	"testing"
 	"time"
 
@@ -12,9 +12,7 @@ import (
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/test"
 	public "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 const (
@@ -22,55 +20,20 @@ const (
 	testResource             = "test_res"
 )
 
-func openDB(ctx context.Context, opts ...ydb.Option) (ydb.DB, error) {
-	var (
-		driverTrace trace.Driver
-		tableTrace  trace.Table
-	)
-
-	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		opts = append(opts, ydb.WithAccessTokenCredentials(token))
-	}
-	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
-		opts = append(opts, ydb.WithAnonymousCredentials())
-	}
-	opts = append(opts, ydb.WithDriverConfig(&config.Config{
-		Trace:                driverTrace,
-		RequestTimeout:       time.Second * 2,
-		StreamTimeout:        time.Second * 2,
-		OperationTimeout:     time.Second * 2,
-		OperationCancelAfter: time.Second * 2,
-		BalancingConfig:      config.DefaultBalancer,
-	}))
-
-	trace.Stub(&driverTrace, func(name string, args ...interface{}) {
-		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
-	})
-	trace.Stub(&tableTrace, func(name string, args ...interface{}) {
-		log.Printf("[table] %s: %+v", name, trace.ClearContext(args))
-	})
-
-	db, err := ydb.New(
-		ctx,
-		ydb.MustConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-		opts...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
 func TestRateLimiter(t *testing.T) {
-	if !test.CheckEndpointDatabaseEnv() {
-		t.Skip("need to be tested with docker")
-	}
-
+	t.Skip("run under docker")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
-	db, err := openDB(ctx)
+	db, err := openNative(
+		ctx,
+		ydb.WithDriverConfigOptions(
+			config.WithRequestTimeout(time.Second*5),
+			config.WithStreamTimeout(time.Second*5),
+			config.WithOperationTimeout(time.Second*5),
+			config.WithOperationCancelAfter(time.Second*5),
+		),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
