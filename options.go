@@ -2,7 +2,6 @@ package ydb
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"io/ioutil"
@@ -16,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Option func(ctx context.Context, client *db) error
+type Option func(ctx context.Context, db *db) error
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
@@ -25,26 +24,22 @@ func WithAccessTokenCredentials(accessToken string) Option {
 }
 
 func WithConnectionString(connection string) Option {
-	return func(ctx context.Context, c *db) error {
+	return func(ctx context.Context, db *db) error {
 		params, err := ConnectionString(connection)
 		if err != nil {
 			return err
 		}
-		return WithConnectParams(params)(ctx, c)
+		return WithConnectParams(params)(ctx, db)
 	}
 }
 
 func WithConnectParams(params ConnectParams) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options = append(c.options, config.WithEndpoint(params.Endpoint()))
-		c.options = append(c.options, config.WithDatabase(params.Database()))
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, config.WithEndpoint(params.Endpoint()))
+		db.options = append(db.options, config.WithDatabase(params.Database()))
+		db.options = append(db.options, config.WithSecure(params.Secure()))
 		if params.Token() != "" {
-			c.options = append(c.options, config.WithCredentials(internal.NewAccessTokenCredentials(params.Token(), "config.WithConnectParams()")))
-		}
-		if params.UseTLS() {
-			c.options = append(c.options, config.WithTLSConfig(&tls.Config{}))
-		} else {
-			c.options = append(c.options, config.WithTLSConfig(nil))
+			db.options = append(db.options, config.WithCredentials(internal.NewAccessTokenCredentials(params.Token(), "config.WithConnectParams()")))
 		}
 		return nil
 	}
@@ -57,12 +52,12 @@ func WithAnonymousCredentials() Option {
 }
 
 func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (credentials.Credentials, error)) Option {
-	return func(ctx context.Context, c *db) error {
+	return func(ctx context.Context, db *db) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
 			return err
 		}
-		c.options = append(c.options, config.WithCredentials(credentials))
+		db.options = append(db.options, config.WithCredentials(credentials))
 		return nil
 	}
 }
@@ -74,65 +69,65 @@ func WithCredentials(c credentials.Credentials) Option {
 }
 
 func WithDriverConfigOptions(options ...config.Option) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options = append(c.options, options...)
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, options...)
 		return nil
 	}
 }
 
 func WithBalancingConfig(balancerConfig config.BalancerConfig) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options = append(c.options, config.WithBalancingConfig(balancerConfig))
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, config.WithBalancingConfig(balancerConfig))
 		return nil
 	}
 }
 
 func WithGrpcConnectionTTL(ttl time.Duration) Option {
-	return func(ctx context.Context, c *db) error {
+	return func(ctx context.Context, db *db) error {
 		// TODO: sync with table session keep-alive timeout
-		c.options = append(c.options, config.WithGrpcConnectionTTL(ttl))
+		db.options = append(db.options, config.WithGrpcConnectionTTL(ttl))
 		return nil
 	}
 }
 
 func WithDialTimeout(timeout time.Duration) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options = append(c.options, config.WithDialTimeout(timeout))
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, config.WithDialTimeout(timeout))
 		return nil
 	}
 }
 
 func With(options ...config.Option) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options = append(c.options, options...)
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, options...)
 		return nil
 	}
 }
 
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options = append(c.options, config.WithDiscoveryInterval(discoveryInterval))
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, config.WithDiscoveryInterval(discoveryInterval))
 		return nil
 	}
 }
 
 // WithTraceDriver returns deadline which has associated Driver with it.
 func WithTraceDriver(trace trace.Driver) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options = append(c.options, config.WithTrace(trace))
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, config.WithTrace(trace))
 		return nil
 	}
 }
 
 func WithCertificate(cert *x509.Certificate) Option {
-	return func(ctx context.Context, c *db) error {
-		c.options = append(c.options, config.WithCertificate(cert))
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, config.WithCertificate(cert))
 		return nil
 	}
 }
 
 func WithCertificatesFromFile(caFile string) Option {
-	return func(ctx context.Context, c *db) error {
+	return func(ctx context.Context, db *db) error {
 		if len(caFile) > 0 || caFile[0] == '~' {
 			usr, err := user.Current()
 			if err != nil {
@@ -144,12 +139,12 @@ func WithCertificatesFromFile(caFile string) Option {
 		if err != nil {
 			return err
 		}
-		return WithCertificatesFromPem(bytes)(ctx, c)
+		return WithCertificatesFromPem(bytes)(ctx, db)
 	}
 }
 
 func WithCertificatesFromPem(bytes []byte) Option {
-	return func(ctx context.Context, c *db) error {
+	return func(ctx context.Context, db *db) error {
 		if ok, err := func(bytes []byte) (ok bool, err error) {
 			var cert *x509.Certificate
 			for len(bytes) > 0 {
@@ -166,7 +161,7 @@ func WithCertificatesFromPem(bytes []byte) Option {
 				if err != nil {
 					continue
 				}
-				_ = WithCertificate(cert)(ctx, c)
+				_ = WithCertificate(cert)(ctx, db)
 				ok = true
 			}
 			return

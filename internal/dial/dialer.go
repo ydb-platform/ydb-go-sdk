@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -55,7 +56,7 @@ func (d *dialer) connect(ctx context.Context, address string) (_ public.Cluster,
 			_ = c.Close(ctx)
 		}
 	}()
-	holder := driver.New(
+	runtimeHolder := driver.New(
 		d.config,
 		d.meta,
 		d.tlsConfig != nil,
@@ -63,20 +64,19 @@ func (d *dialer) connect(ctx context.Context, address string) (_ public.Cluster,
 		c.Pessimize,
 		c.Close,
 	)
-
 	if d.config.DiscoveryInterval() > 0 {
 		if err := d.discover(
 			ctx,
 			c,
-			conn.New(ctx, address, d.dial, holder),
-			holder,
+			conn.New(ctx, address, trace.LocationUnknown, d.dial, runtimeHolder),
+			runtimeHolder,
 		); err != nil {
 			return nil, err
 		}
 	} else {
-		c.Insert(ctx, address, cluster.WithConnConfig(holder))
+		c.Insert(ctx, address, cluster.WithConnConfig(runtimeHolder))
 	}
-	return holder, nil
+	return runtimeHolder, nil
 }
 
 func (d *dialer) dial(ctx context.Context, address string) (_ *grpc.ClientConn, err error) {

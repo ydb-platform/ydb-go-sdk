@@ -5,13 +5,12 @@ import (
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -238,7 +237,18 @@ func TestRoundRobinBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), "", nil, stub.Config(config.New()))
+				c := conn.New(
+					context.Background(),
+					"",
+					trace.LocationUnknown,
+					nil,
+					stub.Config(
+						config.New(
+							config.WithDatabase("test"),
+							config.WithEndpoint("test"),
+						),
+					),
+				)
 				c.Runtime().SetState(ctx, state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c
@@ -293,7 +303,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), "", nil, stub.Config(config.New()))
+				c := conn.New(context.Background(), "", trace.LocationUnknown, nil, stub.Config(config.New()))
 				c.Runtime().SetState(ctx, state.Online)
 				mconn[c] = e.Host
 				maddr[e.Host] = c

@@ -18,7 +18,7 @@ var (
 	errSchemeNotValid = errors.New("scheme not valid")
 )
 
-func hasTLS(schema string) bool {
+func isSecure(schema string) bool {
 	return schema == _secureProtocol
 }
 
@@ -36,14 +36,14 @@ func parseConnectionString(connection string) (schema string, endpoint string, d
 type ConnectParams interface {
 	Endpoint() string
 	Database() string
-	UseTLS() bool
+	Secure() bool
 	Token() string
 }
 
 type connectParams struct {
 	endpoint string
 	database string
-	useTLS   bool
+	secure   bool
 	token    string
 }
 
@@ -55,19 +55,19 @@ func (c connectParams) Database() string {
 	return c.database
 }
 
-func (c connectParams) UseTLS() bool {
-	return c.useTLS
+func (c connectParams) Secure() bool {
+	return c.secure
 }
 
 func (c connectParams) Token() string {
 	return c.token
 }
 
-func EndpointDatabase(endpoint string, database string, tls bool) ConnectParams {
+func EndpointDatabase(endpoint string, database string, secure bool) ConnectParams {
 	return &connectParams{
 		endpoint: endpoint,
 		database: database,
-		useTLS:   tls,
+		secure:   secure,
 	}
 }
 
@@ -82,7 +82,7 @@ func ConnectionString(uri string) (ConnectParams, error) {
 	return &connectParams{
 		endpoint: endpoint,
 		database: database,
-		useTLS:   hasTLS(schema),
+		secure:   isSecure(schema),
 		token:    token,
 	}, nil
 }

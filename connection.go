@@ -2,15 +2,11 @@ package ydb
 
 import (
 	"context"
-	"crypto/x509"
-	"fmt"
-	"os"
 
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
@@ -32,7 +28,7 @@ type Connection interface {
 }
 
 type db struct {
-	name         string
+	config       config.Config
 	options      []config.Option
 	cluster      cluster.Cluster
 	table        lazyTable
@@ -47,7 +43,7 @@ func (db *db) Discovery() discovery.Client {
 }
 
 func (db *db) Name() string {
-	return db.name
+	return db.config.Database()
 }
 
 func (db *db) Secure() bool {
@@ -94,26 +90,11 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 			return nil, err
 		}
 	}
-	c := config.New(db.options...)
-	db.name = c.Database()
-	if tlsConfig := c.TLSConfig(); tlsConfig != nil && tlsConfig.RootCAs == nil {
-		var certPool *x509.CertPool
-		certPool, err = x509.SystemCertPool()
-		if err != nil {
-			return nil, fmt.Errorf("loading system certificates pool failed: %v", err)
-		}
-		if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
-			// ignore any errors on load certificates
-			if err = credentials.AppendCertsFromFile(certPool, caFile); err != nil {
-				return nil, fmt.Errorf("loading certificates from file '%s' by Env['YDB_SSL_ROOT_CERTIFICATES_FILE'] failed: %v", caFile, err)
-			}
-		}
-		tlsConfig.RootCAs = certPool
-	}
+	db.config = config.New(db.options...)
 	if err != nil {
 		return nil, err
 	}
-	db.cluster, err = dial.Dial(ctx, c)
+	db.cluster, err = dial.Dial(ctx, db.config)
 	if err != nil {
 		return nil, err
 	}
@@ -122,6 +103,6 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	db.ratelimiter.db = db.cluster
 	db.discovery.db = db.cluster
 	db.scheme.db = db
-	db.discovery.trace = c.Trace()
+	db.discovery.trace = db.config.Trace()
 	return db, nil
 }
