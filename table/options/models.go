@@ -303,6 +303,18 @@ func (globalIndex) setup(d *indexDesc) {
 	}
 }
 
+type globalAsyncIndex struct{}
+
+func GlobalAsyncIndex() IndexType {
+	return globalAsyncIndex{}
+}
+
+func (globalAsyncIndex) setup(d *indexDesc) {
+	d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
+		GlobalAsyncIndex: new(Ydb_Table.GlobalAsyncIndex),
+	}
+}
+
 type PartitioningMode byte
 
 const (
