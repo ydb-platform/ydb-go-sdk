@@ -1,3 +1,6 @@
+## 2.10.0
+* Added GlobalAsyncIndex implementation of index interface
+
 ## 2.9.6
 * Replaced `<session, endpoint>` link type from raw conn to plain endpoint address
 * Moved checking linked endpoint from `driver.{Call,StreamRead}` to `cluster.Get`
