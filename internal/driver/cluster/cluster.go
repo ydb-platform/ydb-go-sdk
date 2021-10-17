@@ -139,10 +139,10 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	conn = c.balancer.Next()
 	if conn == nil {
-		onDone("", ErrClusterEmpty)
+		onDone("", trace.LocationUnknown, ErrClusterEmpty)
 		return nil, ErrClusterEmpty
 	}
-	onDone(conn.Address(), nil)
+	onDone(conn.Address(), conn.Location(), nil)
 	return conn, nil
 }
 
@@ -182,7 +182,18 @@ func (c *cluster) Insert(ctx context.Context, address string, opts ...option) {
 		defer holder.wg.Done()
 	}
 
-	conn := conn.New(ctx, address, c.dial, holder.connConfig)
+	conn := conn.New(
+		ctx,
+		address,
+		func() trace.Location {
+			if holder.info.Local {
+				return trace.LocationLocal
+			}
+			return trace.LocationRemote
+		}(),
+		c.dial,
+		holder.connConfig,
+	)
 	var wait chan struct{}
 	defer func() {
 		if wait != nil {
@@ -202,7 +213,7 @@ func (c *cluster) Insert(ctx context.Context, address string, opts ...option) {
 		panic("ydb: can't insert already existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterInsert(c.trace, ctx, address)
+	onDone := trace.DriverOnClusterInsert(c.trace, ctx, address, conn.Location())
 
 	entry := entry.Entry{Info: holder.info}
 	entry.Conn = conn
@@ -284,7 +295,7 @@ func (c *cluster) Remove(ctx context.Context, address string, opts ...option) {
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterRemove(c.trace, ctx, address)
+	onDone := trace.DriverOnClusterRemove(c.trace, ctx, address, entry.Conn.Location())
 
 	entry.RemoveFrom(c.balancer)
 	c.ready--

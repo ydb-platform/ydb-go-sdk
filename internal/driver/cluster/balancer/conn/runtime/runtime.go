@@ -21,6 +21,7 @@ const (
 type Runtime interface {
 	Stats() stats.Stats
 	GetState() (s state.State)
+	Location() trace.Location
 	SetState(ctx context.Context, s state.State)
 	OperationStart(start time.Time)
 	OperationDone(start, end time.Time, err error)
@@ -36,6 +37,7 @@ type Addr interface {
 type runtime struct {
 	mu        sync.RWMutex
 	address   string
+	location  trace.Location
 	trace     trace.Driver
 	state     state.State
 	opStarted uint64
@@ -46,14 +48,19 @@ type runtime struct {
 	errRate   *series.Series
 }
 
-func New(trace trace.Driver, address string) Runtime {
+func (r *runtime) Location() trace.Location {
+	return r.location
+}
+
+func New(trace trace.Driver, address string, location trace.Location) Runtime {
 	return &runtime{
-		trace:   trace,
-		address: address,
-		state:   state.Offline,
-		opTime:  series.NewSeries(statsDuration, statsBuckets),
-		opRate:  series.NewSeries(statsDuration, statsBuckets),
-		errRate: series.NewSeries(statsDuration, statsBuckets),
+		trace:    trace,
+		address:  address,
+		location: location,
+		state:    state.Offline,
+		opTime:   series.NewSeries(statsDuration, statsBuckets),
+		opRate:   series.NewSeries(statsDuration, statsBuckets),
+		errRate:  series.NewSeries(statsDuration, statsBuckets),
 	}
 }
 
@@ -81,7 +88,7 @@ func (r *runtime) Stats() stats.Stats {
 func (r *runtime) SetState(ctx context.Context, s state.State) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	onDone := trace.DriverOnConnStateChange(r.trace, ctx, r.address, r.state)
+	onDone := trace.DriverOnConnStateChange(r.trace, ctx, r.address, r.location, r.state)
 	r.state = s
 	onDone(r.state)
 }

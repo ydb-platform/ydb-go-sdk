@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func isEvenConn(c conn.Conn, _ info.Info) bool {
@@ -49,7 +50,7 @@ func TestMultiBalancer(t *testing.T) {
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(context.Background(), strconv.Itoa(i), nil, stub.Config(config.New()))
+		c := conn.New(context.Background(), strconv.Itoa(i), trace.LocationUnknown, nil, stub.Config(config.New()))
 		e := m.Insert(c, info.Info{})
 		es[i] = e
 		el[c] = e

@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
+	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
@@ -19,6 +22,9 @@ type Config interface {
 
 	// Database is a required database name.
 	Database() string
+
+	// Secure() is an flag for secure connection
+	Secure() bool
 
 	// Credentials is an ydb client credentials.
 	// In most cases Credentials are required.
@@ -91,6 +97,7 @@ type Config interface {
 type config struct {
 	endpoint             string
 	database             string
+	secure               bool
 	credentials          credentials.Credentials
 	trace                trace.Driver
 	requestTimeout       time.Duration
@@ -105,6 +112,10 @@ type config struct {
 	dialTimeout          time.Duration
 	tlsConfig            *tls.Config
 	netDial              func(context.Context, string) (net.Conn, error)
+}
+
+func (c *config) Secure() bool {
+	return c.secure
 }
 
 func (c *config) Endpoint() string {
@@ -179,9 +190,9 @@ func WithEndpoint(endpoint string) Option {
 	}
 }
 
-func WithTLSConfig(tlsConfig *tls.Config) Option {
+func WithSecure(secure bool) Option {
 	return func(c *config) {
-		c.tlsConfig = tlsConfig
+		c.secure = secure
 	}
 }
 
@@ -286,13 +297,30 @@ func New(opts ...Option) Config {
 	for _, o := range opts {
 		o(c)
 	}
+	if !c.secure {
+		c.tlsConfig = nil
+	}
 	return c
 }
 
 func defaults() (c *config) {
+	var certPool *x509.CertPool
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		panic(fmt.Errorf("cannot load system certificates pool: %v", err))
+	}
+	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
+		// ignore any errors on load certificates
+		if err = credentials.AppendCertsFromFile(certPool, caFile); err != nil {
+			log.Printf("cannot load certificates from file '%s' by Env['YDB_SSL_ROOT_CERTIFICATES_FILE']: %v", caFile, err)
+		}
+	}
 	return &config{
 		discoveryInterval:    discovery.DefaultDiscoveryInterval,
 		grpcConnectionPolicy: DefaultGrpcConnectionPolicy,
 		balancingConfig:      DefaultBalancer,
+		tlsConfig: &tls.Config{
+			RootCAs: certPool,
+		},
 	}
 }

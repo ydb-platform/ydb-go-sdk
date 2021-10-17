@@ -29,6 +29,7 @@ type Conn interface {
 	Address() string
 	Runtime() runtime.Runtime
 	Close(ctx context.Context) error
+	Location() trace.Location
 }
 
 func (c *conn) Address() string {
@@ -50,6 +51,10 @@ type conn struct {
 	grpcConn *grpc.ClientConn
 }
 
+func (c *conn) Location() trace.Location {
+	return c.runtime.Location()
+}
+
 func (c *conn) Runtime() runtime.Runtime {
 	return c.runtime
 }
@@ -61,7 +66,7 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 	c.Lock()
 	defer c.Unlock()
 	if isBroken(c.grpcConn) {
-		onDone := trace.DriverOnConnDial(c.config.Trace(ctx), ctx, c.address, c.runtime.GetState())
+		onDone := trace.DriverOnConnDial(c.config.Trace(ctx), ctx, c.address, c.runtime.Location(), c.runtime.GetState())
 		raw, err := c.dial(ctx, c.address)
 		defer func() {
 			onDone(err, c.runtime.GetState())
@@ -103,7 +108,7 @@ func (c *conn) resetTimer() {
 func (c *conn) waitClose(ctx context.Context) {
 	defer func() {
 		c.close(ctx)
-		trace.DriverOnConnClose(c.config.Trace(ctx), ctx, c.address, c.runtime.GetState())()
+		trace.DriverOnConnClose(c.config.Trace(ctx), ctx, c.address, c.runtime.Location(), c.runtime.GetState())()
 	}()
 	c.resetTimer()
 	for {
@@ -126,7 +131,7 @@ func (c *conn) close(ctx context.Context) bool {
 	if c.grpcConn == nil {
 		return false
 	}
-	onDone := trace.DriverOnConnDisconnect(c.config.Trace(ctx), ctx, c.address, c.runtime.GetState())
+	onDone := trace.DriverOnConnDisconnect(c.config.Trace(ctx), ctx, c.address, c.runtime.Location(), c.runtime.GetState())
 	err := c.grpcConn.Close()
 	c.grpcConn = nil
 	c.runtime.SetState(ctx, state.Offline)
@@ -165,7 +170,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 		c.Unlock()
 		return
 	}
-	onDone := trace.DriverOnPessimizeNode(c.config.Trace(ctx), ctx, c.address, c.runtime.GetState(), err)
+	onDone := trace.DriverOnPessimizeNode(c.config.Trace(ctx), ctx, c.address, c.runtime.Location(), c.runtime.GetState(), err)
 	err = c.config.Pessimize(ctx, c.address)
 	c.runtime.SetState(ctx, state.Banned)
 	onDone(c.runtime.GetState(), err)
@@ -205,7 +210,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 
 	start := timeutil.Now()
 	c.runtime.OperationStart(start)
-	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.address, trace.Method(method))
+	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.address, c.runtime.Location(), trace.Method(method))
 	defer func() {
 		onDone(err, issues, opID, c.runtime.GetState())
 		c.runtime.OperationDone(start, timeutil.Now(), err)
@@ -281,10 +286,11 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}()
 
 	c.runtime.StreamStart(timeutil.Now())
-	streamRecv := trace.DriverOnConnNewStream(c.config.Trace(ctx), rawCtx, c.address, trace.Method(method))
+	streamRecv := trace.DriverOnConnNewStream(c.config.Trace(ctx), rawCtx, c.address, c.runtime.Location(), trace.Method(method))
 	defer func() {
 		if err != nil {
 			c.runtime.StreamDone(timeutil.Now(), err)
+			streamRecv(err)(c.runtime.GetState(), err)
 		}
 	}()
 
@@ -324,15 +330,15 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}, nil
 }
 
-func New(ctx context.Context, address string, dial func(context.Context, string) (*grpc.ClientConn, error), cfg Config) Conn {
-	onDone := trace.DriverOnConnNew(cfg.Trace(ctx), ctx, address)
+func New(ctx context.Context, address string, location trace.Location, dial func(context.Context, string) (*grpc.ClientConn, error), cfg Config) Conn {
+	onDone := trace.DriverOnConnNew(cfg.Trace(ctx), ctx, address, location)
 	c := &conn{
 		address: address,
 		dial:    dial,
 		config:  cfg,
 		timer:   timeutil.NewTimer(time.Duration(math.MaxInt64)),
 		done:    make(chan struct{}),
-		runtime: runtime.New(cfg.Trace(ctx), address),
+		runtime: runtime.New(cfg.Trace(ctx), address, location),
 	}
 	defer func() {
 		onDone(c.runtime.GetState())
