@@ -25,6 +25,6 @@ type GrpcConnectionPolicy struct {
 
 	// TTL is a duration for automatically close idle connections
 	// Zero TTL will disable automatically closing of idle connections
-	// By default TTL is sets to dial.DefaultGrpcConnectionTTL
+	// By default TTL is sets to config.DefaultGrpcConnectionTTL
 	TTL time.Duration
 }
