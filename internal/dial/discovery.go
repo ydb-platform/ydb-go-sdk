@@ -2,7 +2,6 @@ package dial
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -61,9 +60,6 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 				}
 				// NOTE: curr endpoints must be sorted here.
 				cluster.SortEndpoints(next)
-
-				fmt.Println(curr)
-				fmt.Println(next)
 
 				waitGroup := new(sync.WaitGroup)
 				max := len(next) + len(curr)

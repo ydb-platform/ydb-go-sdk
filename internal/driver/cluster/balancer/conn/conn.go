@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -47,6 +48,7 @@ type conn struct {
 
 	config Config
 
+	counter  int32
 	timer    timeutil.Timer
 	grpcConn *grpc.ClientConn
 }
@@ -59,7 +61,7 @@ func (c *conn) Runtime() runtime.Runtime {
 	return c.runtime
 }
 
-func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
+func (c *conn) Take(ctx context.Context) (*grpc.ClientConn, error) {
 	if c.isClosed() {
 		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
 	}
@@ -77,7 +79,17 @@ func (c *conn) Conn(ctx context.Context) (*grpc.ClientConn, error) {
 		c.grpcConn = raw
 		c.runtime.SetState(ctx, state.Online)
 	}
+	atomic.AddInt32(&c.counter, 1)
 	return c.grpcConn, nil
+}
+
+func (c *conn) Release(ctx context.Context) {
+	if counter := atomic.AddInt32(&c.counter, -1); counter == 0 {
+		c.resetTimer()
+		if c.runtime.GetState() == state.Banned {
+			c.close(ctx)
+		}
+	}
 }
 
 func isBroken(raw *grpc.ClientConn) bool {
@@ -113,6 +125,8 @@ func (c *conn) waitClose(ctx context.Context) {
 	c.resetTimer()
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-c.done:
 			return
 		case <-c.timer.C():
@@ -121,11 +135,13 @@ func (c *conn) waitClose(ctx context.Context) {
 			}
 		}
 	}
-
 }
 
 // c mutex must be unlocked
 func (c *conn) close(ctx context.Context) bool {
+	if atomic.LoadInt32(&c.counter) != 0 {
+		return false
+	}
 	c.Lock()
 	defer c.Unlock()
 	if c.grpcConn == nil {
@@ -175,7 +191,6 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	c.runtime.SetState(ctx, state.Banned)
 	onDone(c.runtime.GetState(), err)
 	c.Unlock()
-	c.close(ctx)
 }
 
 func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {
@@ -222,7 +237,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 	}
 
 	var raw *grpc.ClientConn
-	raw, err = c.Conn(ctx)
+	raw, err = c.Take(ctx)
 	if err != nil {
 		err = errors.MapGRPCError(err)
 		if errors.MustPessimizeEndpoint(err) {
@@ -240,8 +255,6 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		}
 		return
 	}
-
-	c.resetTimer()
 
 	if operation, ok := res.(response.Response); ok {
 		opID = operation.GetOperation().GetId()
@@ -300,7 +313,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	var raw *grpc.ClientConn
-	raw, err = c.Conn(ctx)
+	raw, err = c.Take(ctx)
 	if err != nil {
 		err = errors.MapGRPCError(err)
 		if errors.MustPessimizeEndpoint(err) {
@@ -318,8 +331,6 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		}
 		return nil, err
 	}
-
-	c.resetTimer()
 
 	return &grpcClientStream{
 		ctx:    rawCtx,

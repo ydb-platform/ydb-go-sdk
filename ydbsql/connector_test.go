@@ -23,7 +23,7 @@ import (
 )
 
 func TestConnectorDialOnPing(t *testing.T) {
-	const timeout = time.Second
+	const timeout = 2 * time.Second
 
 	client, server := net.Pipe()
 	defer func() {

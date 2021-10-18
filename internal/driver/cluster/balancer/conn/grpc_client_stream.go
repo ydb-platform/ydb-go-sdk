@@ -63,6 +63,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		} else {
 			s.done = s.recv(nil)
 		}
+		s.c.Release(s.s.Context())
 	}()
 
 	s.c.runtime.StreamRecv(timeutil.Now())
