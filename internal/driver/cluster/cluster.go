@@ -194,12 +194,6 @@ func (c *cluster) Insert(ctx context.Context, address string, opts ...option) {
 		c.dial,
 		holder.connConfig,
 	)
-	var wait chan struct{}
-	defer func() {
-		if wait != nil {
-			close(wait)
-		}
-	}()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -213,6 +207,13 @@ func (c *cluster) Insert(ctx context.Context, address string, opts ...option) {
 		panic("ydb: can't insert already existing endpoint")
 	}
 
+	var wait chan struct{}
+	defer func() {
+		if wait != nil {
+			close(wait)
+		}
+	}()
+
 	onDone := trace.DriverOnClusterInsert(c.trace, ctx, address, conn.Location())
 
 	entry := entry.Entry{Info: holder.info}
@@ -225,7 +226,6 @@ func (c *cluster) Insert(ctx context.Context, address string, opts ...option) {
 	c.index[address] = entry
 
 	onDone(
-		conn.Runtime().GetState(),
 		func() trace.Location {
 			if holder.info.Local {
 				return trace.LocationLocal

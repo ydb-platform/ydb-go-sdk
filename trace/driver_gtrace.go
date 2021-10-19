@@ -10,6 +10,54 @@ import (
 // both from t and x.
 func (t Driver) Compose(x Driver) (ret Driver) {
 	switch {
+	case t.OnConnReceiveBytes == nil:
+		ret.OnConnReceiveBytes = x.OnConnReceiveBytes
+	case x.OnConnReceiveBytes == nil:
+		ret.OnConnReceiveBytes = t.OnConnReceiveBytes
+	default:
+		h1 := t.OnConnReceiveBytes
+		h2 := x.OnConnReceiveBytes
+		ret.OnConnReceiveBytes = func(c ConnReceiveBytesStartInfo) func(ConnReceiveBytesDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnReceiveBytesDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnConnSendBytes == nil:
+		ret.OnConnSendBytes = x.OnConnSendBytes
+	case x.OnConnSendBytes == nil:
+		ret.OnConnSendBytes = t.OnConnSendBytes
+	default:
+		h1 := t.OnConnSendBytes
+		h2 := x.OnConnSendBytes
+		ret.OnConnSendBytes = func(c ConnSendBytesStartInfo) func(ConnSendBytesDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnSendBytesDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnConnNew == nil:
 		ret.OnConnNew = x.OnConnNew
 	case x.OnConnNew == nil:
@@ -406,6 +454,36 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	}
 	return ret
 }
+func (t Driver) onConnReceiveBytes(c1 ConnReceiveBytesStartInfo) func(ConnReceiveBytesDoneInfo) {
+	fn := t.OnConnReceiveBytes
+	if fn == nil {
+		return func(ConnReceiveBytesDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnReceiveBytesDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onConnSendBytes(c1 ConnSendBytesStartInfo) func(ConnSendBytesDoneInfo) {
+	fn := t.OnConnSendBytes
+	if fn == nil {
+		return func(ConnSendBytesDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnSendBytesDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onConnNew(c1 ConnNewStartInfo) func(ConnNewDoneInfo) {
 	fn := t.OnConnNew
 	if fn == nil {
@@ -658,15 +736,38 @@ func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	}
 	return res
 }
-func DriverOnConnNew(t Driver, c context.Context, address string, l Location) func(state ConnState) {
+func DriverOnConnReceiveBytes(t Driver, address string, buffer int) func(received int, _ error) {
+	var p ConnReceiveBytesStartInfo
+	p.Address = address
+	p.Buffer = buffer
+	res := t.onConnReceiveBytes(p)
+	return func(received int, e error) {
+		var p ConnReceiveBytesDoneInfo
+		p.Received = received
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnConnSendBytes(t Driver, address string, bytes int) func(sent int, _ error) {
+	var p ConnSendBytesStartInfo
+	p.Address = address
+	p.Bytes = bytes
+	res := t.onConnSendBytes(p)
+	return func(sent int, e error) {
+		var p ConnSendBytesDoneInfo
+		p.Sent = sent
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnConnNew(t Driver, c context.Context, address string, l Location) func() {
 	var p ConnNewStartInfo
 	p.Context = c
 	p.Address = address
 	p.Location = l
 	res := t.onConnNew(p)
-	return func(state ConnState) {
+	return func() {
 		var p ConnNewDoneInfo
-		p.State = state
 		res(p)
 	}
 }
@@ -791,15 +892,14 @@ func DriverOnClusterGet(t Driver, c context.Context) func(address string, _ Loca
 		res(p)
 	}
 }
-func DriverOnClusterInsert(t Driver, c context.Context, address string, l Location) func(state ConnState, _ Location) {
+func DriverOnClusterInsert(t Driver, c context.Context, address string, l Location) func(Location) {
 	var p ClusterInsertStartInfo
 	p.Context = c
 	p.Address = address
 	p.Location = l
 	res := t.onClusterInsert(p)
-	return func(state ConnState, l Location) {
+	return func(l Location) {
 		var p ClusterInsertDoneInfo
-		p.State = state
 		p.Location = l
 		res(p)
 	}

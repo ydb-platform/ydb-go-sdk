@@ -12,15 +12,17 @@ type (
 	//gtrace:set Shortcut
 	Driver struct {
 		// Conn events
-		OnConnNew         func(ConnNewStartInfo) func(ConnNewDoneInfo)
-		OnConnClose       func(ConnCloseStartInfo) func(ConnCloseDoneInfo)
-		OnConnDial        func(ConnDialStartInfo) func(ConnDialDoneInfo)
-		OnConnDisconnect  func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
-		OnConnStateChange func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
-		OnConnInvoke      func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
-		OnConnNewStream   func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
-		OnConnTake        func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
-		OnConnRelease     func(ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
+		OnConnReceiveBytes func(ConnReceiveBytesStartInfo) func(ConnReceiveBytesDoneInfo)
+		OnConnSendBytes    func(ConnSendBytesStartInfo) func(ConnSendBytesDoneInfo)
+		OnConnNew          func(ConnNewStartInfo) func(ConnNewDoneInfo)
+		OnConnClose        func(ConnCloseStartInfo) func(ConnCloseDoneInfo)
+		OnConnDial         func(ConnDialStartInfo) func(ConnDialDoneInfo)
+		OnConnDisconnect   func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
+		OnConnStateChange  func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
+		OnConnInvoke       func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
+		OnConnNewStream    func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
+		OnConnTake         func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
+		OnConnRelease      func(ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
 
 		// Cluster events
 		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
@@ -69,6 +71,7 @@ func (m Method) Split() (service, method string) {
 }
 
 type ConnState interface {
+	IsValid() bool
 	String() string
 	Code() int
 }
@@ -99,7 +102,6 @@ type (
 		Location Location
 	}
 	ClusterInsertDoneInfo struct {
-		State    ConnState
 		Location Location
 	}
 	ClusterUpdateStartInfo struct {
@@ -136,13 +138,28 @@ type (
 	ConnStateChangeDoneInfo struct {
 		State ConnState
 	}
+	ConnReceiveBytesStartInfo struct {
+		Address string
+		Buffer  int
+	}
+	ConnReceiveBytesDoneInfo struct {
+		Received int
+		Error    error
+	}
+	ConnSendBytesStartInfo struct {
+		Address string
+		Bytes   int
+	}
+	ConnSendBytesDoneInfo struct {
+		Sent  int
+		Error error
+	}
 	ConnNewStartInfo struct {
 		Context  context.Context
 		Address  string
 		Location Location
 	}
 	ConnNewDoneInfo struct {
-		State ConnState
 	}
 	ConnTakeStartInfo struct {
 		Context  context.Context

@@ -3,7 +3,7 @@ package state
 type State int8
 
 const (
-	Offline State = iota - 2
+	Offline = State(iota)
 	Banned
 	Unknown
 	Online
@@ -24,4 +24,8 @@ func (s State) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+func (s State) IsValid() bool {
+	return s != Unknown
 }

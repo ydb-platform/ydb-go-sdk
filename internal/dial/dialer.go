@@ -91,6 +91,23 @@ func (d *dialer) dial(ctx context.Context, address string) (_ *grpc.ClientConn, 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	if d.netDial != nil {
 		opts = append(opts, grpc.WithContextDialer(d.netDial))
+	} else {
+		netDial := func(ctx context.Context, address string) (net.Conn, error) {
+			var dialer net.Dialer
+			if deadline, ok := ctx.Deadline(); ok {
+				dialer.Deadline = deadline
+			}
+			raw, err := dialer.Dial("tcp", address)
+			if err != nil {
+				return nil, err
+			}
+			return &netConn{
+				address: address,
+				raw:     raw,
+				trace:   d.config.Trace(),
+			}, nil
+		}
+		opts = append(opts, grpc.WithContextDialer(netDial))
 	}
 	if d.useTLS() {
 		opts = append(opts, grpc.WithTransportCredentials(

@@ -125,6 +125,12 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	if c.closed {
 		return nil
 	}
+	onDone := trace.DriverOnConnClose(c.config.Trace(ctx), ctx, c.address, c.Location(), c.runtime.GetState())
+	defer func() {
+		c.runtime.SetState(ctx, state.Unknown)
+		onDone()
+	}()
+	c.closed = true
 	return c.close(ctx)
 }
 
@@ -312,7 +318,7 @@ func New(ctx context.Context, address string, location trace.Location, dial func
 		runtime: runtime.New(config.Trace(ctx), address, location),
 	}
 	defer func() {
-		onDone(c.runtime.GetState())
+		onDone()
 	}()
 	return c
 }

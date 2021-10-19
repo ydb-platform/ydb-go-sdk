@@ -57,7 +57,7 @@ func New(trace trace.Driver, address string, location trace.Location) Runtime {
 		trace:    trace,
 		address:  address,
 		location: location,
-		state:    state.Offline,
+		state:    state.Unknown,
 		opTime:   series.NewSeries(statsDuration, statsBuckets),
 		opRate:   series.NewSeries(statsDuration, statsBuckets),
 		errRate:  series.NewSeries(statsDuration, statsBuckets),
