@@ -797,6 +797,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		for {
 			select {
 			case <-ctx.Done():
+				onDone(r, ctx.Err())
 				return
 			default:
 				if e := c.RecvMsg(&response); e != nil {

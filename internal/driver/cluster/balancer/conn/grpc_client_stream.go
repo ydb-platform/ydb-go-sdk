@@ -54,16 +54,15 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	defer func() {
-		if err != nil {
-			if s.done == nil {
-				s.done = s.recv(errors.HideEOF(err))
-			}
-			s.done(s.c.runtime.GetState(), errors.HideEOF(err))
-			s.cancel()
-		} else {
-			s.done = s.recv(nil)
+		if s.done == nil {
+			s.done = s.recv(errors.HideEOF(err))
 		}
-		s.c.release(s.s.Context())
+		if err != nil {
+			s.cancel()
+			s.done(s.c.runtime.GetState(), errors.HideEOF(err))
+			s.c.release(s.s.Context())
+			s.cancel = nil // second call RecvMesg will be raced
+		}
 	}()
 
 	s.c.runtime.StreamRecv(timeutil.Now())
@@ -75,7 +74,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		if errors.MustPessimizeEndpoint(err) {
 			s.c.pessimize(s.ctx, err)
 		}
-		return
+		return err
 	}
 
 	if operation, ok := m.(wrap.StreamOperationResponse); ok {

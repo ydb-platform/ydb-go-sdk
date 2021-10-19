@@ -65,8 +65,8 @@ func (c *conn) Take(ctx context.Context) (raw *grpc.ClientConn, err error) {
 	}
 	c.Lock()
 	defer c.Unlock()
-
 	if isBroken(c.grpcConn) {
+		_ = c.close(ctx)
 		raw, err = c.dial(ctx, c.address)
 		if err != nil {
 			return nil, err
@@ -101,7 +101,6 @@ func (c *conn) IsReady() bool {
 	return c.grpcConn != nil && c.grpcConn.GetState() == connectivity.Ready
 }
 
-// c mutex must be unlocked
 func (c *conn) close(ctx context.Context) (err error) {
 	if c.grpcConn == nil {
 		return nil
@@ -120,13 +119,12 @@ func (c *conn) isClosed() bool {
 	return c.closed
 }
 
-func (c *conn) Close(ctx context.Context) error {
+func (c *conn) Close(ctx context.Context) (err error) {
 	c.Lock()
 	defer c.Unlock()
 	if c.closed {
 		return nil
 	}
-	c.closed = true
 	return c.close(ctx)
 }
 
