@@ -95,13 +95,9 @@ message DatabaseQuotas {
     // A maximum count of shards in all data streams.
     uint64 data_stream_shards_quota = 3;
 
-    // A maximum value of `TtlSettings.concurrency_level` that can be specified.
-    // Default is 1000.
-    uint32 ttl_max_concurrency_level = 4;
-
     // A minimum value of `TtlSettings.run_interval_seconds` that can be specified.
     // Default is 1800 (15 minutes).
-    uint32 ttl_min_run_internal_seconds = 5;
+    uint32 ttl_min_run_internal_seconds = 4;
 }
 
 // Request to create a new database. For successfull creation

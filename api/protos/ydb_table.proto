@@ -300,12 +300,9 @@ message TtlSettings {
     // - BRO is started no more than once an hour on the same partition.
     // Use options below to change that behavior.
 
-    // Number of maximum parallel BROs on the table
-    uint32 concurrency_level = 3;
-
     // How often to run BRO on the same partition.
     // BRO will not be started more often, but may be started less often.
-    uint32 run_interval_seconds = 4;
+    uint32 run_interval_seconds = 3;
 }
 
 message StorageSettings {
