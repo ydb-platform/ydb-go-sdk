@@ -19,6 +19,8 @@ type (
 		OnConnStateChange func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
 		OnConnInvoke      func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
 		OnConnNewStream   func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
+		OnConnTake        func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
+		OnConnRelease     func(ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
 
 		// Cluster events
 		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
@@ -142,6 +144,21 @@ type (
 	ConnNewDoneInfo struct {
 		State ConnState
 	}
+	ConnTakeStartInfo struct {
+		Context  context.Context
+		Address  string
+		Location Location
+	}
+	ConnTakeDoneInfo struct {
+		Error error
+	}
+	ConnReleaseStartInfo struct {
+		Context  context.Context
+		Address  string
+		Location Location
+	}
+	ConnReleaseDoneInfo struct {
+	}
 	ConnCloseStartInfo struct {
 		Context  context.Context
 		Address  string
@@ -154,11 +171,9 @@ type (
 		Context  context.Context
 		Address  string
 		Location Location
-		State    ConnState
 	}
 	ConnDialDoneInfo struct {
 		Error error
-		State ConnState
 	}
 	ConnInvokeStartInfo struct {
 		Context  context.Context

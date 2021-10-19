@@ -2,7 +2,6 @@ package trace
 
 import (
 	"context"
-	"time"
 )
 
 //go:generate gtrace
@@ -54,6 +53,7 @@ type (
 	}
 	sessionInfo interface {
 		ID() string
+		Address() string
 		Status() string
 	}
 	transactionInfo interface {
@@ -72,7 +72,6 @@ type (
 	}
 	SessionNewDoneInfo struct {
 		Session sessionInfo
-		Latency time.Duration
 		Error   error
 	}
 	KeepAliveStartInfo struct {

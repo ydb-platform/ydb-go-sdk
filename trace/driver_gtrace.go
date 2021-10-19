@@ -189,6 +189,54 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnConnTake == nil:
+		ret.OnConnTake = x.OnConnTake
+	case x.OnConnTake == nil:
+		ret.OnConnTake = t.OnConnTake
+	default:
+		h1 := t.OnConnTake
+		h2 := x.OnConnTake
+		ret.OnConnTake = func(c ConnTakeStartInfo) func(ConnTakeDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnTakeDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnConnRelease == nil:
+		ret.OnConnRelease = x.OnConnRelease
+	case x.OnConnRelease == nil:
+		ret.OnConnRelease = t.OnConnRelease
+	default:
+		h1 := t.OnConnRelease
+		h2 := x.OnConnRelease
+		ret.OnConnRelease = func(c ConnReleaseStartInfo) func(ConnReleaseDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnReleaseDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnClusterGet == nil:
 		ret.OnClusterGet = x.OnClusterGet
 	case x.OnClusterGet == nil:
@@ -475,6 +523,36 @@ func (t Driver) onConnNewStream(c1 ConnNewStreamStartInfo) func(ConnNewStreamRec
 		return res
 	}
 }
+func (t Driver) onConnTake(c1 ConnTakeStartInfo) func(ConnTakeDoneInfo) {
+	fn := t.OnConnTake
+	if fn == nil {
+		return func(ConnTakeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnTakeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onConnRelease(c1 ConnReleaseStartInfo) func(ConnReleaseDoneInfo) {
+	fn := t.OnConnRelease
+	if fn == nil {
+		return func(ConnReleaseDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnReleaseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
 	fn := t.OnClusterGet
 	if fn == nil {
@@ -604,17 +682,15 @@ func DriverOnConnClose(t Driver, c context.Context, address string, l Location, 
 		res(p)
 	}
 }
-func DriverOnConnDial(t Driver, c context.Context, address string, l Location, state ConnState) func(_ error, state ConnState) {
+func DriverOnConnDial(t Driver, c context.Context, address string, l Location) func(error) {
 	var p ConnDialStartInfo
 	p.Context = c
 	p.Address = address
 	p.Location = l
-	p.State = state
 	res := t.onConnDial(p)
-	return func(e error, state ConnState) {
+	return func(e error) {
 		var p ConnDialDoneInfo
 		p.Error = e
-		p.State = state
 		res(p)
 	}
 }
@@ -678,6 +754,29 @@ func DriverOnConnNewStream(t Driver, c context.Context, address string, l Locati
 			p.Error = e
 			res(p)
 		}
+	}
+}
+func DriverOnConnTake(t Driver, c context.Context, address string, l Location) func(error) {
+	var p ConnTakeStartInfo
+	p.Context = c
+	p.Address = address
+	p.Location = l
+	res := t.onConnTake(p)
+	return func(e error) {
+		var p ConnTakeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnConnRelease(t Driver, c context.Context, address string, l Location) func() {
+	var p ConnReleaseStartInfo
+	p.Context = c
+	p.Address = address
+	p.Location = l
+	res := t.onConnRelease(p)
+	return func() {
+		var p ConnReleaseDoneInfo
+		res(p)
 	}
 }
 func DriverOnClusterGet(t Driver, c context.Context) func(address string, _ Location, _ error) {

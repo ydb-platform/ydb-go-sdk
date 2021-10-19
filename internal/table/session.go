@@ -95,9 +95,8 @@ func (s *session) IsClosed() bool {
 
 func newSession(ctx context.Context, c cluster.Cluster, t trace.Table) (s Session, err error) {
 	onDone := trace.TableOnSessionNew(t, ctx)
-	start := time.Now()
 	defer func() {
-		onDone(s, time.Since(start), err)
+		onDone(s, err)
 	}()
 	var (
 		response *Ydb_Table.CreateSessionResponse

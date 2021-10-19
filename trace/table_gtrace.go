@@ -4,7 +4,6 @@ package trace
 
 import (
 	"context"
-	"time"
 )
 
 // Compose returns a new Table which has functional fields composed
@@ -799,14 +798,13 @@ func (t Table) onPoolTake(p PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolT
 		return res
 	}
 }
-func TableOnSessionNew(t Table, c context.Context) func(session sessionInfo, latency time.Duration, _ error) {
+func TableOnSessionNew(t Table, c context.Context) func(session sessionInfo, _ error) {
 	var p SessionNewStartInfo
 	p.Context = c
 	res := t.onSessionNew(p)
-	return func(session sessionInfo, latency time.Duration, e error) {
+	return func(session sessionInfo, e error) {
 		var p SessionNewDoneInfo
 		p.Session = session
-		p.Latency = latency
 		p.Error = e
 		res(p)
 	}
