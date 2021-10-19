@@ -34,14 +34,14 @@ func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method st
 }
 
 func (d *driver) Close(ctx context.Context) error {
-	return d.clusterClose(ctx)
+	return d.close(ctx)
 }
 
 func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
 	// Remember raw deadline to pass it for the tracing functions.
 	rawCtx := ctx
 
-	c, err = d.clusterGet(ctx)
+	c, err = d.get(ctx)
 
 	if err != nil {
 		return nil, err

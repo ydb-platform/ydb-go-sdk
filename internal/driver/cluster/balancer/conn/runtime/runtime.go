@@ -5,12 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/series"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 const (
@@ -29,6 +28,8 @@ type Runtime interface {
 	StreamRecv(now time.Time)
 	StreamDone(now time.Time, err error)
 	SetOpStarted(id uint64)
+	Take()
+	Release()
 }
 
 type Addr interface {
@@ -40,12 +41,24 @@ type runtime struct {
 	location  trace.Location
 	trace     trace.Driver
 	state     state.State
+	inflight  uint32
 	opStarted uint64
 	opSucceed uint64
 	opFailed  uint64
 	opTime    *series.Series
 	opRate    *series.Series
 	errRate   *series.Series
+}
+
+func (r *runtime) Take() {
+	r.inflight++
+}
+
+func (r *runtime) Release() {
+	if r.inflight == 0 {
+		panic("infilght must be grate than zero")
+	}
+	r.inflight--
 }
 
 func (r *runtime) Location() trace.Location {
@@ -58,6 +71,7 @@ func New(trace trace.Driver, address string, location trace.Location) Runtime {
 		address:  address,
 		location: location,
 		state:    state.Unknown,
+		inflight: 0,
 		opTime:   series.NewSeries(statsDuration, statsBuckets),
 		opRate:   series.NewSeries(statsDuration, statsBuckets),
 		errRate:  series.NewSeries(statsDuration, statsBuckets),
@@ -71,6 +85,7 @@ func (r *runtime) Stats() stats.Stats {
 	now := timeutil.Now()
 
 	s := stats.Stats{
+		InFlight:     r.inflight,
 		State:        r.state,
 		OpStarted:    r.opStarted,
 		OpSucceed:    r.opSucceed,

@@ -14,7 +14,7 @@ import (
 )
 
 func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn, connConfig conn.Config) error {
-	discoveryClient := discovery.New(conn, d.config.Database(), d.useTLS(), d.config.Trace())
+	discoveryClient := discovery.New(conn, d.config.Database(), d.config.Secure(), d.config.Trace())
 
 	curr, err := discoveryClient.Discover(ctx)
 	if err != nil {

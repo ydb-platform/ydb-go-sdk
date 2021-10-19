@@ -56,27 +56,27 @@ func (d *dialer) connect(ctx context.Context, address string) (_ public.Cluster,
 			_ = c.Close(ctx)
 		}
 	}()
-	runtimeHolder := driver.New(
+	driver := driver.New(
 		d.config,
 		d.meta,
-		d.tlsConfig != nil,
 		c.Get,
 		c.Pessimize,
+		c.Stats,
 		c.Close,
 	)
 	if d.config.DiscoveryInterval() > 0 {
 		if err := d.discover(
 			ctx,
 			c,
-			conn.New(ctx, address, trace.LocationUnknown, d.dial, runtimeHolder),
-			runtimeHolder,
+			conn.New(ctx, address, trace.LocationUnknown, d.dial, driver),
+			driver,
 		); err != nil {
 			return nil, err
 		}
 	} else {
-		c.Insert(ctx, address, cluster.WithConnConfig(runtimeHolder))
+		c.Insert(ctx, address, cluster.WithConnConfig(driver))
 	}
-	return runtimeHolder, nil
+	return driver, nil
 }
 
 func (d *dialer) dial(ctx context.Context, address string) (_ *grpc.ClientConn, err error) {
@@ -109,7 +109,7 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 		}
 		opts = append(opts, grpc.WithContextDialer(netDial))
 	}
-	if d.useTLS() {
+	if d.config.Secure() {
 		opts = append(opts, grpc.WithTransportCredentials(
 			credentials.NewTLS(d.tlsConfig),
 		))
@@ -125,8 +125,4 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	))
 
 	return append(opts, grpc.WithBlock())
-}
-
-func (d *dialer) useTLS() bool {
-	return d.tlsConfig != nil
 }

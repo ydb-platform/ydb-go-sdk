@@ -7,16 +7,15 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -160,8 +159,7 @@ type db struct {
 	onClose     func(ctx context.Context) error
 }
 
-func (c *db) Stats() map[endpoint.Endpoint]stats.Stats {
-	return nil
+func (c *db) Stats(func(address string, stats stats.Stats)) {
 }
 
 func (c *db) Secure() bool {

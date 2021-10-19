@@ -3,10 +3,11 @@ package stats
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
 )
 
 type Stats struct {
+	InFlight     uint32
 	State        state.State
 	OpStarted    uint64
 	OpFailed     uint64

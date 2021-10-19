@@ -3,15 +3,14 @@ package conn
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
@@ -43,7 +42,6 @@ type conn struct {
 
 	config Config
 
-	inflight int32
 	grpcConn *grpc.ClientConn
 }
 
@@ -74,14 +72,18 @@ func (c *conn) Take(ctx context.Context) (raw *grpc.ClientConn, err error) {
 		c.grpcConn = raw
 		c.runtime.SetState(ctx, state.Online)
 	}
-	atomic.AddInt32(&c.inflight, 1)
+	c.runtime.Take()
 	return c.grpcConn, nil
 }
 
 func (c *conn) release(ctx context.Context) {
 	onDone := trace.DriverOnConnRelease(c.config.Trace(ctx), ctx, c.address, c.Location())
-	defer onDone()
-	atomic.AddInt32(&c.inflight, -1)
+	c.Lock()
+	defer func() {
+		c.Unlock()
+		onDone()
+	}()
+	c.runtime.Release()
 }
 
 func isBroken(raw *grpc.ClientConn) bool {

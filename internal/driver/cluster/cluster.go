@@ -11,12 +11,12 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
@@ -53,14 +53,12 @@ type cluster struct {
 	closed bool
 }
 
-func (c *cluster) ConnStats(address string) (ok bool, _ stats.Stats) {
+func (c *cluster) Stats(f func(address string, stats stats.Stats)) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	entry, ok := c.index[address]
-	if !ok {
-		return false, stats.Stats{}
+	for address, entry := range c.index {
+		f(address, entry.Conn.Runtime().Stats())
 	}
-	return true, entry.Conn.Runtime().Stats()
 }
 
 func (c *cluster) Force() {
@@ -76,7 +74,7 @@ type Cluster interface {
 	Update(ctx context.Context, address string, opts ...option)
 	Get(ctx context.Context) (conn conn.Conn, err error)
 	Pessimize(ctx context.Context, address string) error
-	ConnStats(address string) (ok bool, stats stats.Stats)
+	Stats(func(address string, stats stats.Stats))
 	Close(ctx context.Context) error
 	Remove(ctx context.Context, address string, wg ...option)
 	SetExplorer(repeater repeater.Repeater)

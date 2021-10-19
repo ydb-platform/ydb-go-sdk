@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
@@ -15,7 +16,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-type DB cluster.Cluster
+type DB interface {
+	cluster.Cluster
+
+	// Name returns database name
+	Name() string
+
+	// Secure returns true if database connection is secure
+	Secure() bool
+}
 
 type Connection interface {
 	DB
@@ -38,6 +47,10 @@ type db struct {
 	discovery    lazyDiscovery
 }
 
+func (db *db) Stats(iterate func(address string, stats stats.Stats)) {
+	db.cluster.Stats(iterate)
+}
+
 func (db *db) Discovery() discovery.Client {
 	return &db.discovery
 }
@@ -47,7 +60,7 @@ func (db *db) Name() string {
 }
 
 func (db *db) Secure() bool {
-	return db.cluster.Secure()
+	return db.config.Secure()
 }
 
 func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -98,10 +111,10 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	if err != nil {
 		return nil, err
 	}
-	db.table.db = db.cluster
-	db.coordination.db = db.cluster
-	db.ratelimiter.db = db.cluster
-	db.discovery.db = db.cluster
+	db.table.db = db
+	db.coordination.db = db
+	db.ratelimiter.db = db
+	db.discovery.db = db
 	db.scheme.db = db
 	db.discovery.trace = db.config.Trace()
 	return db, nil
