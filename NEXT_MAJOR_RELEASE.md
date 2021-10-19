@@ -16,3 +16,4 @@
 - [ ] Drop `connect.WithSessionPoolBusyCheckInterval()`
 - [ ] Drop marked as deprecated some retry constants
 - [ ] Change `Backoff` interface
+- [ ] Refactoring of ydbsql connector for split driver runtimes on Connect stage

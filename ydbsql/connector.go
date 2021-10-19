@@ -200,7 +200,7 @@ type connector struct {
 
 	clientTrace table.ClientTrace
 
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	ready  chan struct{}
 	client *table.Client
 	pool   table.SessionPool // Used as a template for created connections.
@@ -216,6 +216,7 @@ func (c *connector) init(ctx context.Context) (err error) {
 	// in driver database/sql/sql.go:1228 connect run under mutex, but don't rely on it here
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// in driver database/sql/sql.go:1228 connect run under mutex, but don't rely on it here
 
 	// Setup some more on less generic reasonable pool limit to prevent
 	// session overflow on the YDB servers.
@@ -255,7 +256,9 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	if err := c.init(ctx); err != nil {
 		return nil, err
 	}
+	c.mu.RLock()
 	s, err := c.pool.Create(ctx)
+	c.mu.RUnlock()
 	if err != nil {
 		return nil, err
 	}
