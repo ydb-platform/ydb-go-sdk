@@ -237,7 +237,6 @@ func TestRoundRobinBalancer(t *testing.T) {
 			r := new(roundRobin)
 			for _, e := range test.add {
 				c := conn.New(
-					context.Background(),
 					e,
 					nil,
 					stub.Config(
@@ -247,10 +246,10 @@ func TestRoundRobinBalancer(t *testing.T) {
 						),
 					),
 				)
-				c.Runtime().SetState(ctx, endpoint.Endpoint{}, state.Online)
+				c.SetState(ctx, state.Online)
 				if test.banned != nil {
 					if _, ok := test.banned[e.Addr.Host]; ok {
-						c.Runtime().SetState(ctx, endpoint.Endpoint{}, state.Banned)
+						c.SetState(ctx, state.Banned)
 					}
 				}
 				mconn[c] = e.Host
@@ -302,14 +301,13 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			r := new(roundRobin)
 			for _, e := range test.add {
 				c := conn.New(
-					context.Background(),
 					e,
 					nil,
 					stub.Config(config.New()),
 				)
-				c.Runtime().SetState(ctx, endpoint.Endpoint{}, state.Online)
+				c.SetState(ctx, state.Online)
 				if _, ok := test.banned[e.Addr.Host]; ok {
-					c.Runtime().SetState(ctx, endpoint.Endpoint{}, state.Banned)
+					c.SetState(ctx, state.Banned)
 				}
 				mconn[c] = e.Host
 				maddr[e.Host] = c

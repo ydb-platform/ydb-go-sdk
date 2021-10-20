@@ -5,6 +5,7 @@ import "C"
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -13,11 +14,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -25,7 +24,8 @@ type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-	Runtime() runtime.Runtime
+	GetState() state.State
+	SetState(context.Context, state.State) state.State
 	Close(ctx context.Context) error
 }
 
@@ -37,14 +37,15 @@ type conn struct {
 	sync.Mutex
 
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
-	endpoint endpoint.Endpoint
-	runtime  runtime.Runtime
+	endpoint endpoint.Endpoint // ro access
 	done     chan struct{}
 	closed   bool
 
-	config Config
+	config Config // ro access
 
-	cc *grpc.ClientConn
+	cc    *grpc.ClientConn
+	state state.State
+	locks int32
 }
 
 func (c *conn) Endpoint() endpoint.Endpoint {
@@ -54,11 +55,30 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	return endpoint.Endpoint{}
 }
 
-func (c *conn) Runtime() runtime.Runtime {
-	return c.runtime
+func (c *conn) SetState(ctx context.Context, s state.State) state.State {
+	c.Lock()
+	defer c.Unlock()
+	return c.setState(ctx, s)
+}
+
+func (c *conn) setState(ctx context.Context, s state.State) state.State {
+	onDone := trace.DriverOnConnStateChange(c.config.Trace(ctx), ctx, c.endpoint, c.state)
+	c.state = s
+	onDone(c.state)
+	return c.state
+}
+
+func (c *conn) GetState() (s state.State) {
+	c.Lock()
+	defer c.Unlock()
+	return c.state
 }
 
 func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
+	onDone := trace.DriverOnConnTake(c.config.Trace(ctx), ctx, c.endpoint)
+	defer func() {
+		onDone(int(atomic.LoadInt32(&c.locks)), err)
+	}()
 	if c.isClosed() {
 		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
 	}
@@ -66,22 +86,24 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	defer c.Unlock()
 	//if isBroken(c.grpcConn) {
 	if c.cc == nil {
-		_ = c.close(ctx)
+		//_ = c.close(ctx)
 		cc, err = c.dial(ctx, c.endpoint.Address())
 		if err != nil {
 			return nil, err
 		}
 		c.cc = cc
-		c.runtime.SetState(ctx, c.endpoint, state.Online)
+		c.setState(ctx, state.Online)
 	}
-	c.runtime.Take(ctx, c.endpoint)
+	atomic.AddInt32(&c.locks, 1)
 	return c.cc, nil
 }
 
 func (c *conn) release(ctx context.Context) {
 	c.Lock()
 	defer c.Unlock()
-	c.runtime.Release(ctx, c.endpoint)
+	onDone := trace.DriverOnConnRelease(c.config.Trace(ctx), ctx, c.endpoint)
+	atomic.AddInt32(&c.locks, -1)
+	onDone(int(atomic.LoadInt32(&c.locks)))
 }
 
 //nolint: deadcode
@@ -108,7 +130,7 @@ func (c *conn) close(ctx context.Context) (err error) {
 	}
 	err = c.cc.Close()
 	c.cc = nil
-	c.runtime.SetState(ctx, c.endpoint, state.Offline)
+	c.setState(ctx, state.Offline)
 	return err
 }
 
@@ -124,29 +146,31 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	if c.closed {
 		return nil
 	}
-	defer c.runtime.SetState(ctx, c.endpoint, state.Unknown)
 	c.closed = true
-	return c.close(ctx)
+	err = c.close(ctx)
+	c.setState(ctx, state.Destroyed)
+	return err
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
 	c.Lock()
-	defer c.Unlock()
 	if c.closed {
+		c.Unlock()
 		return
 	}
-	if c.runtime.GetState() == state.Banned {
+	if c.state == state.Banned {
+		c.Unlock()
 		return
 	}
-	onDone := trace.DriverOnPessimizeNode(
+	c.Unlock()
+	trace.DriverOnPessimizeNode(
 		c.config.Trace(ctx),
 		ctx,
 		c.endpoint,
-		c.runtime.GetState(),
+		c.GetState(),
 		err,
-	)
-	onDone(
-		c.runtime.SetState(ctx, c.endpoint, state.Banned),
+	)(
+		c.SetState(ctx, state.Banned),
 		c.config.Pessimize(ctx, c.endpoint),
 	)
 }
@@ -186,12 +210,9 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		return err
 	}
 
-	start := timeutil.Now()
-	c.runtime.OperationStart(start)
 	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.endpoint, trace.Method(method))
 	defer func() {
-		onDone(err, issues, opID, c.runtime.GetState())
-		c.runtime.OperationDone(start, timeutil.Now(), err)
+		onDone(err, issues, opID, c.GetState())
 	}()
 
 	var cc *grpc.ClientConn
@@ -263,12 +284,10 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		return nil, err
 	}
 
-	c.runtime.StreamStart(timeutil.Now())
 	streamRecv := trace.DriverOnConnNewStream(c.config.Trace(ctx), rawCtx, c.endpoint, trace.Method(method))
 	defer func() {
 		if err != nil {
-			c.runtime.StreamDone(timeutil.Now(), err)
-			streamRecv(err)(c.runtime.GetState(), err)
+			streamRecv(err)(c.GetState(), err)
 		}
 	}()
 
@@ -305,13 +324,12 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}, nil
 }
 
-func New(ctx context.Context, endpoint endpoint.Endpoint, dial func(context.Context, string) (*grpc.ClientConn, error), config Config) Conn {
+func New(endpoint endpoint.Endpoint, dial func(context.Context, string) (*grpc.ClientConn, error), config Config) Conn {
 	c := &conn{
 		endpoint: endpoint,
 		dial:     dial,
 		config:   config,
 		done:     make(chan struct{}),
-		runtime:  runtime.New(config.Trace(ctx)),
 	}
 	return c
 }

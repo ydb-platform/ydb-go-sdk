@@ -72,7 +72,7 @@ func (d *dialer) connect(ctx context.Context, endpoint endpoint.Endpoint) (_ pub
 		if err := d.discover(
 			ctx,
 			c,
-			conn.New(ctx, endpoint, d.dial, driver),
+			conn.New(endpoint, d.dial, driver),
 			driver,
 		); err != nil {
 			return nil, err

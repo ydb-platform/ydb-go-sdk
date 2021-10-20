@@ -33,7 +33,7 @@ func TestClusterFastRedial(t *testing.T) {
 	}()
 
 	l, b := simpleBalancer()
-	cluster := &cluster{
+	c := &cluster{
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return listener.Dial(ctx)
 		},
@@ -45,9 +45,9 @@ func TestClusterFastRedial(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			for i := 0; i < size*10; i++ {
-				c, err := cluster.Get(context.Background())
+				c, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && c != nil && c.Endpoint().Address() == "bad:0" {
+				if err == nil && c != nil && c.Endpoint().NodeID() == 1 {
 					_ = c.Close(ctx)
 				}
 			}
@@ -60,11 +60,11 @@ func TestClusterFastRedial(t *testing.T) {
 		{ID: 1, Addr: endpoint.Addr{Host: "foo"}},
 		{ID: 2, Addr: endpoint.Addr{Host: "bad"}},
 	}
-	mergeEndpointIntoCluster(ctx, cluster, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
+	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
 	select {
 	case <-pingConnects(len(ne)):
 
-	case <-time.After(time.Second * 10):
+	case <-time.After(time.Second * 15):
 		t.Fatalf("Time limit exceeded while %d endpoints in balance. Wait channel used", len(*l))
 	}
 }
@@ -194,7 +194,7 @@ func simpleBalancer() (*list.List, balancer.Balancer) {
 		},
 		OnPessimize: func(ctx context.Context, x balancer.Element) error {
 			e := x.(*list.Element)
-			e.Conn.Runtime().SetState(ctx, e.Conn.Endpoint(), state.Banned)
+			e.Conn.SetState(ctx, state.Banned)
 			return nil
 		},
 		OnContains: func(x balancer.Element) bool {

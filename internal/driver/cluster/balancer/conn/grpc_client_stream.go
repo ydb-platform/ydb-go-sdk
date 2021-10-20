@@ -10,7 +10,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -58,11 +57,9 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		}
 		if err != nil {
 			s.onDone(s.s.Context())
-			s.done(s.c.runtime.GetState(), errors.HideEOF(err))
+			s.done(s.c.GetState(), errors.HideEOF(err))
 		}
 	}()
-
-	s.c.runtime.StreamRecv(timeutil.Now())
 
 	err = s.s.RecvMsg(m)
 

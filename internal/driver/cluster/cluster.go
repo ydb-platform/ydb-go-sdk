@@ -168,19 +168,23 @@ func (c *cluster) Insert(ctx context.Context, endpoint endpoint.Endpoint, opts .
 		defer holder.wg.Done()
 	}
 
-	conn := conn.New(
-		ctx,
-		endpoint,
-		c.dial,
-		holder.connConfig,
-	)
-
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.closed {
 		return
 	}
+
+	conn := conn.New(
+		endpoint,
+		c.dial,
+		holder.connConfig,
+	)
+
+	onDone := trace.DriverOnClusterInsert(c.trace, ctx, endpoint)
+	defer func() {
+		onDone(conn.GetState())
+	}()
 
 	_, has := c.index[endpoint.NodeID()]
 	if has {
@@ -193,9 +197,6 @@ func (c *cluster) Insert(ctx context.Context, endpoint endpoint.Endpoint, opts .
 			close(wait)
 		}
 	}()
-
-	onDone := trace.DriverOnClusterInsert(c.trace, ctx, endpoint)
-	defer onDone()
 
 	entry := entry.Entry{Info: info.Info{LoadFactor: endpoint.LoadFactor, Local: endpoint.Local}}
 	entry.Conn = conn
@@ -232,11 +233,11 @@ func (c *cluster) Update(ctx context.Context, endpoint endpoint.Endpoint, opts .
 	}
 
 	defer func() {
-		onDone(entry.Conn.Runtime().GetState())
+		onDone(entry.Conn.GetState())
 	}()
 
 	entry.Info = info.Info{LoadFactor: endpoint.LoadFactor, Local: endpoint.Local}
-	entry.Conn.Runtime().SetState(ctx, endpoint, state.Online)
+	entry.Conn.SetState(ctx, state.Online)
 	c.index[endpoint.NodeID()] = entry
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
@@ -277,7 +278,7 @@ func (c *cluster) Remove(ctx context.Context, endpoint endpoint.Endpoint, opts .
 		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
 		_ = entry.Conn.Close(ctx)
 	}
-	onDone(entry.Conn.Runtime().GetState())
+	onDone(entry.Conn.GetState())
 }
 
 func (c *cluster) Pessimize(ctx context.Context, endpoint endpoint.Endpoint) (err error) {
@@ -297,12 +298,12 @@ func (c *cluster) Pessimize(ctx context.Context, endpoint endpoint.Endpoint) (er
 	if !c.balancer.Contains(entry.Handle) {
 		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrUnknownBalancerElement)
 	}
-	entry.Conn.Runtime().SetState(ctx, entry.Conn.Endpoint(), state.Banned)
+	entry.Conn.SetState(ctx, state.Banned)
 	if c.explorer != nil {
 		// count ratio (banned/all)
 		online := 0
 		for _, e := range c.index {
-			if e.Conn != nil && e.Conn.Runtime().GetState() == state.Online {
+			if e.Conn != nil && e.Conn.GetState() == state.Online {
 				online++
 			}
 		}

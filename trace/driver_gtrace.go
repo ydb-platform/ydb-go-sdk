@@ -10,97 +10,97 @@ import (
 // both from t and x.
 func (t Driver) Compose(x Driver) (ret Driver) {
 	switch {
-	case t.OnConnReceiveBytes == nil:
-		ret.OnConnReceiveBytes = x.OnConnReceiveBytes
-	case x.OnConnReceiveBytes == nil:
-		ret.OnConnReceiveBytes = t.OnConnReceiveBytes
+	case t.OnNetRead == nil:
+		ret.OnNetRead = x.OnNetRead
+	case x.OnNetRead == nil:
+		ret.OnNetRead = t.OnNetRead
 	default:
-		h1 := t.OnConnReceiveBytes
-		h2 := x.OnConnReceiveBytes
-		ret.OnConnReceiveBytes = func(c ConnReceiveBytesStartInfo) func(ConnReceiveBytesDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		h1 := t.OnNetRead
+		h2 := x.OnNetRead
+		ret.OnNetRead = func(n NetReadStartInfo) func(NetReadDoneInfo) {
+			r1 := h1(n)
+			r2 := h2(n)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnReceiveBytesDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(n NetReadDoneInfo) {
+					r1(n)
+					r2(n)
 				}
 			}
 		}
 	}
 	switch {
-	case t.OnConnSendBytes == nil:
-		ret.OnConnSendBytes = x.OnConnSendBytes
-	case x.OnConnSendBytes == nil:
-		ret.OnConnSendBytes = t.OnConnSendBytes
+	case t.OnNetWrite == nil:
+		ret.OnNetWrite = x.OnNetWrite
+	case x.OnNetWrite == nil:
+		ret.OnNetWrite = t.OnNetWrite
 	default:
-		h1 := t.OnConnSendBytes
-		h2 := x.OnConnSendBytes
-		ret.OnConnSendBytes = func(c ConnSendBytesStartInfo) func(ConnSendBytesDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		h1 := t.OnNetWrite
+		h2 := x.OnNetWrite
+		ret.OnNetWrite = func(n NetWriteStartInfo) func(NetWriteDoneInfo) {
+			r1 := h1(n)
+			r2 := h2(n)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnSendBytesDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(n NetWriteDoneInfo) {
+					r1(n)
+					r2(n)
 				}
 			}
 		}
 	}
 	switch {
-	case t.OnConnNew == nil:
-		ret.OnConnNew = x.OnConnNew
-	case x.OnConnNew == nil:
-		ret.OnConnNew = t.OnConnNew
+	case t.OnNetDial == nil:
+		ret.OnNetDial = x.OnNetDial
+	case x.OnNetDial == nil:
+		ret.OnNetDial = t.OnNetDial
 	default:
-		h1 := t.OnConnNew
-		h2 := x.OnConnNew
-		ret.OnConnNew = func(c ConnNewStartInfo) func(ConnNewDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		h1 := t.OnNetDial
+		h2 := x.OnNetDial
+		ret.OnNetDial = func(n NetDialStartInfo) func(NetDialDoneInfo) {
+			r1 := h1(n)
+			r2 := h2(n)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnNewDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(n NetDialDoneInfo) {
+					r1(n)
+					r2(n)
 				}
 			}
 		}
 	}
 	switch {
-	case t.OnConnClose == nil:
-		ret.OnConnClose = x.OnConnClose
-	case x.OnConnClose == nil:
-		ret.OnConnClose = t.OnConnClose
+	case t.OnNetClose == nil:
+		ret.OnNetClose = x.OnNetClose
+	case x.OnNetClose == nil:
+		ret.OnNetClose = t.OnNetClose
 	default:
-		h1 := t.OnConnClose
-		h2 := x.OnConnClose
-		ret.OnConnClose = func(c ConnCloseStartInfo) func(ConnCloseDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		h1 := t.OnNetClose
+		h2 := x.OnNetClose
+		ret.OnNetClose = func(n NetCloseStartInfo) func(NetCloseDoneInfo) {
+			r1 := h1(n)
+			r2 := h2(n)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnCloseDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(n NetCloseDoneInfo) {
+					r1(n)
+					r2(n)
 				}
 			}
 		}
@@ -406,61 +406,61 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	}
 	return ret
 }
-func (t Driver) onConnReceiveBytes(c1 ConnReceiveBytesStartInfo) func(ConnReceiveBytesDoneInfo) {
-	fn := t.OnConnReceiveBytes
+func (t Driver) onNetRead(n NetReadStartInfo) func(NetReadDoneInfo) {
+	fn := t.OnNetRead
 	if fn == nil {
-		return func(ConnReceiveBytesDoneInfo) {
+		return func(NetReadDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(n)
 	if res == nil {
-		return func(ConnReceiveBytesDoneInfo) {
+		return func(NetReadDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onConnSendBytes(c1 ConnSendBytesStartInfo) func(ConnSendBytesDoneInfo) {
-	fn := t.OnConnSendBytes
+func (t Driver) onNetWrite(n NetWriteStartInfo) func(NetWriteDoneInfo) {
+	fn := t.OnNetWrite
 	if fn == nil {
-		return func(ConnSendBytesDoneInfo) {
+		return func(NetWriteDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(n)
 	if res == nil {
-		return func(ConnSendBytesDoneInfo) {
+		return func(NetWriteDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onConnNew(c1 ConnNewStartInfo) func(ConnNewDoneInfo) {
-	fn := t.OnConnNew
+func (t Driver) onNetDial(n NetDialStartInfo) func(NetDialDoneInfo) {
+	fn := t.OnNetDial
 	if fn == nil {
-		return func(ConnNewDoneInfo) {
+		return func(NetDialDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(n)
 	if res == nil {
-		return func(ConnNewDoneInfo) {
+		return func(NetDialDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onConnClose(c1 ConnCloseStartInfo) func(ConnCloseDoneInfo) {
-	fn := t.OnConnClose
+func (t Driver) onNetClose(n NetCloseStartInfo) func(NetCloseDoneInfo) {
+	fn := t.OnNetClose
 	if fn == nil {
-		return func(ConnCloseDoneInfo) {
+		return func(NetCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(n)
 	if res == nil {
-		return func(ConnCloseDoneInfo) {
+		return func(NetCloseDoneInfo) {
 			return
 		}
 	}
@@ -658,46 +658,46 @@ func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	}
 	return res
 }
-func DriverOnConnReceiveBytes(t Driver, address string, buffer int) func(received int, _ error) {
-	var p ConnReceiveBytesStartInfo
+func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ error) {
+	var p NetReadStartInfo
 	p.Address = address
 	p.Buffer = buffer
-	res := t.onConnReceiveBytes(p)
+	res := t.onNetRead(p)
 	return func(received int, e error) {
-		var p ConnReceiveBytesDoneInfo
+		var p NetReadDoneInfo
 		p.Received = received
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnConnSendBytes(t Driver, address string, bytes int) func(sent int, _ error) {
-	var p ConnSendBytesStartInfo
+func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ error) {
+	var p NetWriteStartInfo
 	p.Address = address
 	p.Bytes = bytes
-	res := t.onConnSendBytes(p)
+	res := t.onNetWrite(p)
 	return func(sent int, e error) {
-		var p ConnSendBytesDoneInfo
+		var p NetWriteDoneInfo
 		p.Sent = sent
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnConnNew(t Driver, address string) func(error) {
-	var p ConnNewStartInfo
+func DriverOnNetDial(t Driver, address string) func(error) {
+	var p NetDialStartInfo
 	p.Address = address
-	res := t.onConnNew(p)
+	res := t.onNetDial(p)
 	return func(e error) {
-		var p ConnNewDoneInfo
+		var p NetDialDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnConnClose(t Driver, address string) func(error) {
-	var p ConnCloseStartInfo
+func DriverOnNetClose(t Driver, address string) func(error) {
+	var p NetCloseStartInfo
 	p.Address = address
-	res := t.onConnClose(p)
+	res := t.onNetClose(p)
 	return func(e error) {
-		var p ConnCloseDoneInfo
+		var p NetCloseDoneInfo
 		p.Error = e
 		res(p)
 	}
@@ -747,14 +747,15 @@ func DriverOnConnNewStream(t Driver, c context.Context, endpoint endpointInfo, m
 		}
 	}
 }
-func DriverOnConnTake(t Driver, c context.Context, endpoint endpointInfo) func(lock int) {
+func DriverOnConnTake(t Driver, c context.Context, endpoint endpointInfo) func(lock int, _ error) {
 	var p ConnTakeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onConnTake(p)
-	return func(lock int) {
+	return func(lock int, e error) {
 		var p ConnTakeDoneInfo
 		p.Lock = lock
+		p.Error = e
 		res(p)
 	}
 }
@@ -780,13 +781,14 @@ func DriverOnClusterGet(t Driver, c context.Context) func(endpoint endpointInfo,
 		res(p)
 	}
 }
-func DriverOnClusterInsert(t Driver, c context.Context, endpoint endpointInfo) func() {
+func DriverOnClusterInsert(t Driver, c context.Context, endpoint endpointInfo) func(state ConnState) {
 	var p ClusterInsertStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onClusterInsert(p)
-	return func() {
+	return func(state ConnState) {
 		var p ClusterInsertDoneInfo
+		p.State = state
 		res(p)
 	}
 }

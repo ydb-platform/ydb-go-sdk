@@ -15,7 +15,7 @@ type netConn struct {
 }
 
 func newConn(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err error) {
-	onDone := trace.DriverOnConnNew(t, address)
+	onDone := trace.DriverOnNetDial(t, address)
 	defer func() {
 		onDone(err)
 	}()
@@ -31,7 +31,7 @@ func newConn(ctx context.Context, address string, t trace.Driver) (_ net.Conn, e
 }
 
 func (c *netConn) Read(b []byte) (n int, err error) {
-	onDone := trace.DriverOnConnReceiveBytes(c.trace, c.address, len(b))
+	onDone := trace.DriverOnNetRead(c.trace, c.address, len(b))
 	defer func() {
 		onDone(n, err)
 	}()
@@ -39,7 +39,7 @@ func (c *netConn) Read(b []byte) (n int, err error) {
 }
 
 func (c *netConn) Write(b []byte) (n int, err error) {
-	onDone := trace.DriverOnConnSendBytes(c.trace, c.address, len(b))
+	onDone := trace.DriverOnNetWrite(c.trace, c.address, len(b))
 	defer func() {
 		onDone(n, err)
 	}()
@@ -47,7 +47,7 @@ func (c *netConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *netConn) Close() (err error) {
-	onDone := trace.DriverOnConnClose(c.trace, c.address)
+	onDone := trace.DriverOnNetClose(c.trace, c.address)
 	defer func() {
 		onDone(err)
 	}()

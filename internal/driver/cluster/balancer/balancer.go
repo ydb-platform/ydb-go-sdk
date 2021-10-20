@@ -57,13 +57,6 @@ func newBalancer(cfg config.BalancerConfig) Balancer {
 	switch cfg.Algorithm {
 	case config.BalancingAlgorithmRoundRobin:
 		return &roundRobin{}
-	case config.BalancingAlgorithmP2C:
-		return &p2c{
-			Criterion: connRuntimeCriterion{
-				PreferLocal:     cfg.PreferLocal,
-				OpTimeThreshold: cfg.OpTimeThreshold,
-			},
-		}
 	case config.BalancingAlgorithmRandomChoice:
 		return &randomChoice{
 			r: rand.New(rand.NewSource(time.Now().UnixNano())),
