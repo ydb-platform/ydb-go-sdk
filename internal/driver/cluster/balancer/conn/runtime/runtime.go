@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/runtime/series"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -20,16 +21,15 @@ const (
 type Runtime interface {
 	Stats() stats.Stats
 	GetState() (s state.State)
-	Location() trace.Location
-	SetState(ctx context.Context, s state.State)
+	SetState(ctx context.Context, e endpoint.Endpoint, s state.State) state.State
 	OperationStart(start time.Time)
 	OperationDone(start, end time.Time, err error)
 	StreamStart(now time.Time)
 	StreamRecv(now time.Time)
 	StreamDone(now time.Time, err error)
 	SetOpStarted(id uint64)
-	Take()
-	Release()
+	Take(ctx context.Context, e endpoint.Endpoint)
+	Release(ctx context.Context, e endpoint.Endpoint)
 }
 
 type Addr interface {
@@ -37,11 +37,9 @@ type Addr interface {
 
 type runtime struct {
 	mu        sync.RWMutex
-	address   string
-	location  trace.Location
 	trace     trace.Driver
 	state     state.State
-	inflight  uint32
+	locks     int
 	opStarted uint64
 	opSucceed uint64
 	opFailed  uint64
@@ -50,31 +48,30 @@ type runtime struct {
 	errRate   *series.Series
 }
 
-func (r *runtime) Take() {
-	r.inflight++
+func (r *runtime) Take(ctx context.Context, e endpoint.Endpoint) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	onDone := trace.DriverOnConnTake(r.trace, ctx, e)
+	r.locks++
+	onDone(r.locks)
 }
 
-func (r *runtime) Release() {
-	if r.inflight == 0 {
-		panic("infilght must be grate than zero")
-	}
-	r.inflight--
+func (r *runtime) Release(ctx context.Context, e endpoint.Endpoint) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	onDone := trace.DriverOnConnRelease(r.trace, ctx, e)
+	r.locks--
+	onDone(r.locks)
 }
 
-func (r *runtime) Location() trace.Location {
-	return r.location
-}
-
-func New(trace trace.Driver, address string, location trace.Location) Runtime {
+func New(trace trace.Driver) Runtime {
 	return &runtime{
-		trace:    trace,
-		address:  address,
-		location: location,
-		state:    state.Unknown,
-		inflight: 0,
-		opTime:   series.NewSeries(statsDuration, statsBuckets),
-		opRate:   series.NewSeries(statsDuration, statsBuckets),
-		errRate:  series.NewSeries(statsDuration, statsBuckets),
+		trace:   trace,
+		state:   state.Unknown,
+		locks:   0,
+		opTime:  series.NewSeries(statsDuration, statsBuckets),
+		opRate:  series.NewSeries(statsDuration, statsBuckets),
+		errRate: series.NewSeries(statsDuration, statsBuckets),
 	}
 }
 
@@ -85,7 +82,7 @@ func (r *runtime) Stats() stats.Stats {
 	now := timeutil.Now()
 
 	s := stats.Stats{
-		InFlight:     r.inflight,
+		InFlight:     r.locks,
 		State:        r.state,
 		OpStarted:    r.opStarted,
 		OpSucceed:    r.opSucceed,
@@ -100,12 +97,13 @@ func (r *runtime) Stats() stats.Stats {
 	return s
 }
 
-func (r *runtime) SetState(ctx context.Context, s state.State) {
+func (r *runtime) SetState(ctx context.Context, e endpoint.Endpoint, s state.State) state.State {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	onDone := trace.DriverOnConnStateChange(r.trace, ctx, r.address, r.location, r.state)
+	onDone := trace.DriverOnConnStateChange(r.trace, ctx, e, r.state)
 	r.state = s
 	onDone(r.state)
+	return r.state
 }
 
 func (r *runtime) GetState() (s state.State) {

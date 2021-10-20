@@ -12,7 +12,7 @@ The recommended usage of this package is as follows:
 			// ydb/table.Client here. This may be useful when tracing setup
 			// must be prepared directly on Client structure.
 			//
-			// There are few other useful options, see Option types for
+			// There are few other useful options, see sqlOption types for
 			// more details.
 		))
 	}

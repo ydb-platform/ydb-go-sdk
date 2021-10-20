@@ -6,11 +6,16 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type configStub struct {
 	config.Config
+}
+
+func (c configStub) Pessimize(context.Context, endpoint.Endpoint) error {
+	return nil
 }
 
 func Config(c config.Config) conn.Config {
@@ -37,14 +42,10 @@ func (c configStub) Trace(context.Context) trace.Driver {
 	return c.Config.Trace()
 }
 
-func (c configStub) Pessimize(context.Context, string) error {
-	return nil
-}
-
 func (c configStub) StreamTimeout() time.Duration {
 	return c.Config.StreamTimeout()
 }
 
-func (c configStub) GrpcConnectionPolicy() conn.GrpcConnectionPolicy {
-	return conn.GrpcConnectionPolicy(c.Config.GrpcConnectionPolicy())
+func (c configStub) GrpcConnectionPolicy() config.GrpcConnectionPolicy {
+	return c.Config.GrpcConnectionPolicy()
 }

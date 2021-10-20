@@ -2,8 +2,6 @@ package balancer
 
 import (
 	"container/heap"
-	"context"
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -72,22 +70,6 @@ func (r *roundRobin) Remove(x Element) {
 	r.conns.Remove(el)
 	r.inspectMinMax(el.Info)
 	r.belt = r.distribute()
-}
-
-func (r *roundRobin) Pessimize(ctx context.Context, x Element) error {
-	if x == nil {
-		return ErrNilBalancerElement
-	}
-	el, ok := x.(*list.Element)
-	if !ok {
-		return ErrUnknownTypeOfBalancerElement
-	}
-	if !r.conns.Contains(el) {
-		return fmt.Errorf("rr: pessimize failed: %w", ErrUnknownBalancerElement)
-	}
-	el.Conn.Runtime().SetState(ctx, state.Banned)
-	r.belt = r.distribute()
-	return nil
 }
 
 func (r *roundRobin) Contains(x Element) bool {

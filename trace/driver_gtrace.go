@@ -106,54 +106,6 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
-	case t.OnConnDial == nil:
-		ret.OnConnDial = x.OnConnDial
-	case x.OnConnDial == nil:
-		ret.OnConnDial = t.OnConnDial
-	default:
-		h1 := t.OnConnDial
-		h2 := x.OnConnDial
-		ret.OnConnDial = func(c ConnDialStartInfo) func(ConnDialDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(c ConnDialDoneInfo) {
-					r1(c)
-					r2(c)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnConnDisconnect == nil:
-		ret.OnConnDisconnect = x.OnConnDisconnect
-	case x.OnConnDisconnect == nil:
-		ret.OnConnDisconnect = t.OnConnDisconnect
-	default:
-		h1 := t.OnConnDisconnect
-		h2 := x.OnConnDisconnect
-		ret.OnConnDisconnect = func(c ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(c ConnDisconnectDoneInfo) {
-					r1(c)
-					r2(c)
-				}
-			}
-		}
-	}
-	switch {
 	case t.OnConnStateChange == nil:
 		ret.OnConnStateChange = x.OnConnStateChange
 	case x.OnConnStateChange == nil:
@@ -514,36 +466,6 @@ func (t Driver) onConnClose(c1 ConnCloseStartInfo) func(ConnCloseDoneInfo) {
 	}
 	return res
 }
-func (t Driver) onConnDial(c1 ConnDialStartInfo) func(ConnDialDoneInfo) {
-	fn := t.OnConnDial
-	if fn == nil {
-		return func(ConnDialDoneInfo) {
-			return
-		}
-	}
-	res := fn(c1)
-	if res == nil {
-		return func(ConnDialDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t Driver) onConnDisconnect(c1 ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo) {
-	fn := t.OnConnDisconnect
-	if fn == nil {
-		return func(ConnDisconnectDoneInfo) {
-			return
-		}
-	}
-	res := fn(c1)
-	if res == nil {
-		return func(ConnDisconnectDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t Driver) onConnStateChange(c1 ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
 	fn := t.OnConnStateChange
 	if fn == nil {
@@ -760,60 +682,30 @@ func DriverOnConnSendBytes(t Driver, address string, bytes int) func(sent int, _
 		res(p)
 	}
 }
-func DriverOnConnNew(t Driver, c context.Context, address string, l Location) func() {
+func DriverOnConnNew(t Driver, address string) func(error) {
 	var p ConnNewStartInfo
-	p.Context = c
 	p.Address = address
-	p.Location = l
 	res := t.onConnNew(p)
-	return func() {
-		var p ConnNewDoneInfo
-		res(p)
-	}
-}
-func DriverOnConnClose(t Driver, c context.Context, address string, l Location, state ConnState) func() {
-	var p ConnCloseStartInfo
-	p.Context = c
-	p.Address = address
-	p.Location = l
-	p.State = state
-	res := t.onConnClose(p)
-	return func() {
-		var p ConnCloseDoneInfo
-		res(p)
-	}
-}
-func DriverOnConnDial(t Driver, c context.Context, address string, l Location) func(error) {
-	var p ConnDialStartInfo
-	p.Context = c
-	p.Address = address
-	p.Location = l
-	res := t.onConnDial(p)
 	return func(e error) {
-		var p ConnDialDoneInfo
+		var p ConnNewDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnConnDisconnect(t Driver, c context.Context, address string, l Location, state ConnState) func(state ConnState, _ error) {
-	var p ConnDisconnectStartInfo
-	p.Context = c
+func DriverOnConnClose(t Driver, address string) func(error) {
+	var p ConnCloseStartInfo
 	p.Address = address
-	p.Location = l
-	p.State = state
-	res := t.onConnDisconnect(p)
-	return func(state ConnState, e error) {
-		var p ConnDisconnectDoneInfo
-		p.State = state
+	res := t.onConnClose(p)
+	return func(e error) {
+		var p ConnCloseDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnConnStateChange(t Driver, c context.Context, address string, l Location, state ConnState) func(state ConnState) {
+func DriverOnConnStateChange(t Driver, c context.Context, endpoint endpointInfo, state ConnState) func(state ConnState) {
 	var p ConnStateChangeStartInfo
 	p.Context = c
-	p.Address = address
-	p.Location = l
+	p.Endpoint = endpoint
 	p.State = state
 	res := t.onConnStateChange(p)
 	return func(state ConnState) {
@@ -822,11 +714,10 @@ func DriverOnConnStateChange(t Driver, c context.Context, address string, l Loca
 		res(p)
 	}
 }
-func DriverOnConnInvoke(t Driver, c context.Context, address string, l Location, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
+func DriverOnConnInvoke(t Driver, c context.Context, endpoint endpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
 	var p ConnInvokeStartInfo
 	p.Context = c
-	p.Address = address
-	p.Location = l
+	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnInvoke(p)
 	return func(e error, issues []Issue, opID string, state ConnState) {
@@ -838,11 +729,10 @@ func DriverOnConnInvoke(t Driver, c context.Context, address string, l Location,
 		res(p)
 	}
 }
-func DriverOnConnNewStream(t Driver, c context.Context, address string, l Location, m Method) func(error) func(state ConnState, _ error) {
+func DriverOnConnNewStream(t Driver, c context.Context, endpoint endpointInfo, m Method) func(error) func(state ConnState, _ error) {
 	var p ConnNewStreamStartInfo
 	p.Context = c
-	p.Address = address
-	p.Location = l
+	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnNewStream(p)
 	return func(e error) func(ConnState, error) {
@@ -857,57 +747,53 @@ func DriverOnConnNewStream(t Driver, c context.Context, address string, l Locati
 		}
 	}
 }
-func DriverOnConnTake(t Driver, c context.Context, address string, l Location) func(error) {
+func DriverOnConnTake(t Driver, c context.Context, endpoint endpointInfo) func(lock int) {
 	var p ConnTakeStartInfo
 	p.Context = c
-	p.Address = address
-	p.Location = l
+	p.Endpoint = endpoint
 	res := t.onConnTake(p)
-	return func(e error) {
+	return func(lock int) {
 		var p ConnTakeDoneInfo
-		p.Error = e
+		p.Lock = lock
 		res(p)
 	}
 }
-func DriverOnConnRelease(t Driver, c context.Context, address string, l Location) func() {
+func DriverOnConnRelease(t Driver, c context.Context, endpoint endpointInfo) func(lock int) {
 	var p ConnReleaseStartInfo
 	p.Context = c
-	p.Address = address
-	p.Location = l
+	p.Endpoint = endpoint
 	res := t.onConnRelease(p)
-	return func() {
+	return func(lock int) {
 		var p ConnReleaseDoneInfo
+		p.Lock = lock
 		res(p)
 	}
 }
-func DriverOnClusterGet(t Driver, c context.Context) func(address string, _ Location, _ error) {
+func DriverOnClusterGet(t Driver, c context.Context) func(endpoint endpointInfo, _ error) {
 	var p ClusterGetStartInfo
 	p.Context = c
 	res := t.onClusterGet(p)
-	return func(address string, l Location, e error) {
+	return func(endpoint endpointInfo, e error) {
 		var p ClusterGetDoneInfo
-		p.Address = address
-		p.Location = l
+		p.Endpoint = endpoint
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnClusterInsert(t Driver, c context.Context, address string, l Location) func(Location) {
+func DriverOnClusterInsert(t Driver, c context.Context, endpoint endpointInfo) func() {
 	var p ClusterInsertStartInfo
 	p.Context = c
-	p.Address = address
-	p.Location = l
+	p.Endpoint = endpoint
 	res := t.onClusterInsert(p)
-	return func(l Location) {
+	return func() {
 		var p ClusterInsertDoneInfo
-		p.Location = l
 		res(p)
 	}
 }
-func DriverOnClusterUpdate(t Driver, c context.Context, address string) func(state ConnState) {
+func DriverOnClusterUpdate(t Driver, c context.Context, endpoint endpointInfo) func(state ConnState) {
 	var p ClusterUpdateStartInfo
 	p.Context = c
-	p.Address = address
+	p.Endpoint = endpoint
 	res := t.onClusterUpdate(p)
 	return func(state ConnState) {
 		var p ClusterUpdateDoneInfo
@@ -915,11 +801,10 @@ func DriverOnClusterUpdate(t Driver, c context.Context, address string) func(sta
 		res(p)
 	}
 }
-func DriverOnClusterRemove(t Driver, c context.Context, address string, l Location) func(state ConnState) {
+func DriverOnClusterRemove(t Driver, c context.Context, endpoint endpointInfo) func(state ConnState) {
 	var p ClusterRemoveStartInfo
 	p.Context = c
-	p.Address = address
-	p.Location = l
+	p.Endpoint = endpoint
 	res := t.onClusterRemove(p)
 	return func(state ConnState) {
 		var p ClusterRemoveDoneInfo
@@ -927,11 +812,10 @@ func DriverOnClusterRemove(t Driver, c context.Context, address string, l Locati
 		res(p)
 	}
 }
-func DriverOnPessimizeNode(t Driver, c context.Context, address string, l Location, state ConnState, cause error) func(state ConnState, _ error) {
+func DriverOnPessimizeNode(t Driver, c context.Context, endpoint endpointInfo, state ConnState, cause error) func(state ConnState, _ error) {
 	var p PessimizeNodeStartInfo
 	p.Context = c
-	p.Address = address
-	p.Location = l
+	p.Endpoint = endpoint
 	p.State = state
 	p.Cause = cause
 	res := t.onPessimizeNode(p)

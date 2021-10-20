@@ -160,19 +160,21 @@ func TestQuery(t *testing.T) {
 						testutil.InvokeHandlers{
 							// nolint:unparam
 							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-								return &Ydb_Table.CreateSessionResult{}, err
+								return &Ydb_Table.CreateSessionResult{
+									SessionId: testutil.SessionID(),
+								}, err
 							},
 							// nolint:unparam
-							testutil.TableExecuteDataQuery: func(_ interface{}) (result proto.Message, err error) {
+							testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
 								return &Ydb_Table.ExecuteQueryResult{
 									TxMeta: &Ydb_Table.TransactionMeta{
 										Id: "",
 									},
-								}, err
+								}, nil
 							},
 							// nolint:unparam
-							testutil.TableStreamExecuteScanQuery: func(_ interface{}) (result proto.Message, err error) {
-								return &Ydb_Table.ExecuteSchemeQueryResponse{}, err
+							testutil.TableStreamExecuteScanQuery: func(interface{}) (proto.Message, error) {
+								return &Ydb_Table.ExecuteSchemeQueryResponse{}, nil
 							},
 							// nolint:unparam
 							testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {

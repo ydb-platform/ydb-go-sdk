@@ -6,7 +6,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
@@ -45,10 +44,6 @@ type db struct {
 	coordination lazyCoordination
 	ratelimiter  lazyRatelimiter
 	discovery    lazyDiscovery
-}
-
-func (db *db) Stats(iterate func(address string, stats stats.Stats)) {
-	db.cluster.Stats(iterate)
 }
 
 func (db *db) Discovery() discovery.Client {

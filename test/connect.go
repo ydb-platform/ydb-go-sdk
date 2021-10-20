@@ -48,7 +48,7 @@ func openNative(ctx context.Context, opts ...ydb.Option) (ydb.Connection, error)
 	return ydb.New(ctx, appendConnectOptions(opts...)...)
 }
 
-func openSql(ctx context.Context, opts ...ydbsql.Option) (*sql.DB, error) {
+func openSql(ctx context.Context, opts ...ydbsql.sqlOption) (*sql.DB, error) {
 	opts = append(
 		opts,
 		ydbsql.With(appendConnectOptions()...),

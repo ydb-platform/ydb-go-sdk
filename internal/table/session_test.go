@@ -43,7 +43,9 @@ func TestSessionKeepAlive(t *testing.T) {
 					},
 					// nolint:unparam
 					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-						return &Ydb_Table.CreateSessionResult{}, nil
+						return &Ydb_Table.CreateSessionResult{
+							SessionId: testutil.SessionID(),
+						}, nil
 					},
 				},
 			),
@@ -91,10 +93,14 @@ func TestSessionDescribeTable(t *testing.T) {
 		Cluster: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
-						return &Ydb_Table.CreateSessionResult{}, nil
+					//nolint: unparam
+					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+						return &Ydb_Table.CreateSessionResult{
+							SessionId: testutil.SessionID(),
+						}, nil
 					},
-					testutil.TableDescribeTable: func(_ interface{}) (proto.Message, error) {
+					//nolint: unparam
+					testutil.TableDescribeTable: func(interface{}) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)
 						return r, e
@@ -324,7 +330,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
 										// nolint:unparam
-										testutil.TableExecuteDataQuery: func(_ interface{}) (result proto.Message, err error) {
+										testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.ExecuteQueryResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
 													Id: "",
@@ -332,7 +338,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 											}, nil
 										},
 										// nolint:unparam
-										testutil.TableBeginTransaction: func(_ interface{}) (result proto.Message, err error) {
+										testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.BeginTransactionResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
 													Id: "",
@@ -349,7 +355,9 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 										},
 										// nolint:unparam
 										testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.CreateSessionResult{}, nil
+											return &Ydb_Table.CreateSessionResult{
+												SessionId: testutil.SessionID(),
+											}, nil
 										},
 										// nolint:unparam
 										testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {

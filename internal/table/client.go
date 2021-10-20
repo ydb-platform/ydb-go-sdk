@@ -40,6 +40,7 @@ type SessionBuilder func(context.Context) (Session, error)
 type Client interface {
 	table.Client
 
+	Get(ctx context.Context) (s Session, err error)
 	Take(ctx context.Context, s Session) (took bool, err error)
 	Put(ctx context.Context, s Session) (err error)
 	Create(ctx context.Context) (s Session, err error)

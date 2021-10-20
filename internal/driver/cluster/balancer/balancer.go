@@ -1,11 +1,8 @@
 package balancer
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -45,9 +42,6 @@ type Balancer interface {
 
 	// Remove removes previously inserted connection.
 	Remove(Element)
-
-	// Pessimize pessimizes some Balancer element.
-	Pessimize(context.Context, Element) error
 
 	// Contains returns true if Balancer contains requested element.
 	Contains(Element) bool
@@ -178,30 +172,6 @@ func (m *multiBalancer) Remove(x Element) {
 	}
 }
 
-func (m *multiBalancer) Pessimize(ctx context.Context, x Element) error {
-	if x == nil {
-		return ErrNilBalancerElement
-	}
-	good := 0
-	all := 0
-	errs := make([]string, 0)
-	for i, x := range x.(multiHandle).elements {
-		if x == nil {
-			continue
-		}
-		all++
-		if e := m.balancer[i].Pessimize(ctx, x); e == nil {
-			good++
-		} else if !errors.Is(e, ErrUnknownBalancerElement) { // collect error only if not an ErrUnknownBalancerElement
-			errs = append(errs, e.Error())
-		}
-	}
-	if good > 0 || all == 0 {
-		return nil
-	}
-	return fmt.Errorf("[multiBalancer] unknown Balancer element %+v; errors: [ %s ]", x, strings.Join(errs, "; "))
-}
-
 type singleConnBalancer struct {
 	conn conn.Conn
 }
@@ -222,8 +192,7 @@ func (s *singleConnBalancer) Remove(x Element) {
 	}
 	s.conn = nil
 }
-func (s *singleConnBalancer) Update(Element, info.Info)                {}
-func (s *singleConnBalancer) Pessimize(context.Context, Element) error { return nil }
+func (s *singleConnBalancer) Update(Element, info.Info) {}
 func (s *singleConnBalancer) Contains(x Element) bool {
 	if x == nil {
 		return false

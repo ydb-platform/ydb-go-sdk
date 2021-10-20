@@ -7,10 +7,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -239,8 +238,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 			for _, e := range test.add {
 				c := conn.New(
 					context.Background(),
-					"",
-					trace.LocationUnknown,
+					e,
 					nil,
 					stub.Config(
 						config.New(
@@ -249,7 +247,12 @@ func TestRoundRobinBalancer(t *testing.T) {
 						),
 					),
 				)
-				c.Runtime().SetState(ctx, state.Online)
+				c.Runtime().SetState(ctx, endpoint.Endpoint{}, state.Online)
+				if test.banned != nil {
+					if _, ok := test.banned[e.Addr.Host]; ok {
+						c.Runtime().SetState(ctx, endpoint.Endpoint{}, state.Banned)
+					}
+				}
 				mconn[c] = e.Host
 				maddr[e.Host] = c
 				melem[e.Host] = r.Insert(c, info.Info{
@@ -258,11 +261,6 @@ func TestRoundRobinBalancer(t *testing.T) {
 			}
 			for _, e := range test.del {
 				r.Remove(melem[e.Host])
-			}
-			for addr := range test.banned {
-				if err := r.Pessimize(ctx, melem[addr]); err != nil {
-					t.Errorf("unexpected pessimization error: %w", err)
-				}
 			}
 			for i := 0; i < test.repeat; i++ {
 				conn := r.Next()
@@ -303,8 +301,16 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			)
 			r := new(roundRobin)
 			for _, e := range test.add {
-				c := conn.New(context.Background(), "", trace.LocationUnknown, nil, stub.Config(config.New()))
-				c.Runtime().SetState(ctx, state.Online)
+				c := conn.New(
+					context.Background(),
+					e,
+					nil,
+					stub.Config(config.New()),
+				)
+				c.Runtime().SetState(ctx, endpoint.Endpoint{}, state.Online)
+				if _, ok := test.banned[e.Addr.Host]; ok {
+					c.Runtime().SetState(ctx, endpoint.Endpoint{}, state.Banned)
+				}
 				mconn[c] = e.Host
 				maddr[e.Host] = c
 				melem[e.Host] = r.Insert(c, info.Info{
@@ -313,11 +319,6 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			}
 			for _, e := range test.del {
 				r.Remove(melem[e.Host])
-			}
-			for addr := range test.banned {
-				if err := r.Pessimize(ctx, melem[addr]); err != nil {
-					t.Errorf("unexpected pessimization error: %w", err)
-				}
 			}
 			for i := 0; i < test.repeat; i++ {
 				conn := r.Next()

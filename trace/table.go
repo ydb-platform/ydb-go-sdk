@@ -53,7 +53,7 @@ type (
 	}
 	sessionInfo interface {
 		ID() string
-		Address() string
+		NodeID() uint32
 		Status() string
 	}
 	transactionInfo interface {

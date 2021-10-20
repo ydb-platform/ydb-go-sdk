@@ -16,8 +16,6 @@ type (
 		OnConnSendBytes    func(ConnSendBytesStartInfo) func(ConnSendBytesDoneInfo)
 		OnConnNew          func(ConnNewStartInfo) func(ConnNewDoneInfo)
 		OnConnClose        func(ConnCloseStartInfo) func(ConnCloseDoneInfo)
-		OnConnDial         func(ConnDialStartInfo) func(ConnDialDoneInfo)
-		OnConnDisconnect   func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
 		OnConnStateChange  func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
 		OnConnInvoke       func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
 		OnConnNewStream    func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
@@ -76,63 +74,35 @@ type ConnState interface {
 	Code() int
 }
 
-type Location int
-
-const (
-	LocationUnknown = Location(iota)
-	LocationLocal
-	LocationRemote
-)
-
-func (l Location) String() string {
-	switch l {
-	case LocationLocal:
-		return "local"
-	case LocationRemote:
-		return "remote"
-	default:
-		return "unknown"
-	}
+type endpointInfo interface {
+	Address() string
+	LocalDC() bool
 }
 
 type (
 	ClusterInsertStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 	}
 	ClusterInsertDoneInfo struct {
-		Location Location
 	}
 	ClusterUpdateStartInfo struct {
-		Context context.Context
-		Address string
+		Context  context.Context
+		Endpoint endpointInfo
 	}
 	ClusterUpdateDoneInfo struct {
 		State ConnState
 	}
 	ClusterRemoveStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 	}
 	ClusterRemoveDoneInfo struct {
 		State ConnState
 	}
-	ConnDisconnectStartInfo struct {
-		Context  context.Context
-		Address  string
-		Location Location
-		State    ConnState
-	}
-	ConnDisconnectDoneInfo struct {
-		State ConnState
-		Error error
-	}
 	ConnStateChangeStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		State    ConnState
 	}
 	ConnStateChangeDoneInfo struct {
@@ -155,47 +125,34 @@ type (
 		Error error
 	}
 	ConnNewStartInfo struct {
-		Context  context.Context
-		Address  string
-		Location Location
+		Address string
 	}
 	ConnNewDoneInfo struct {
+		Error error
 	}
 	ConnTakeStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 	}
 	ConnTakeDoneInfo struct {
-		Error error
+		Lock int
 	}
 	ConnReleaseStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 	}
 	ConnReleaseDoneInfo struct {
+		Lock int
 	}
 	ConnCloseStartInfo struct {
-		Context  context.Context
-		Address  string
-		Location Location
-		State    ConnState
+		Address string
 	}
 	ConnCloseDoneInfo struct {
-	}
-	ConnDialStartInfo struct {
-		Context  context.Context
-		Address  string
-		Location Location
-	}
-	ConnDialDoneInfo struct {
 		Error error
 	}
 	ConnInvokeStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		Method   Method
 	}
 	ConnInvokeDoneInfo struct {
@@ -206,8 +163,7 @@ type (
 	}
 	ConnNewStreamStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		Method   Method
 	}
 	ConnNewStreamRecvInfo struct {
@@ -221,14 +177,12 @@ type (
 		Context context.Context
 	}
 	ClusterGetDoneInfo struct {
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		Error    error
 	}
 	PessimizeNodeStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		State    ConnState
 		Cause    error
 	}

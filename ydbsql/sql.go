@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -22,6 +23,21 @@ var (
 	ErrActiveTransaction   = errors.New("ydbsql: can not begin tx within active tx")
 	ErrNoActiveTransaction = errors.New("ydbsql: no active tx to work with")
 )
+
+func init() {
+	sql.Register("ydb", new(legacyDriver))
+}
+
+type legacyDriver struct {
+}
+
+func (d *legacyDriver) OpenConnector(connection string) (driver.Connector, error) {
+	return Connector(With(ydb.WithConnectionString(connection)))
+}
+
+func (d *legacyDriver) Open(name string) (driver.Conn, error) {
+	return nil, ErrDeprecated
+}
 
 type ydbWrapper struct {
 	dst *driver.Value
@@ -41,7 +57,7 @@ func (d *ydbWrapper) UnmarshalYDB(res types.RawValue) error {
 
 // sqlConn is a connection to the ydb.
 type sqlConn struct {
-	connector *connector       // Immutable and r/o usage.
+	connector *sqlConnector    // Immutable and r/o usage.
 	session   internal.Session // Immutable and r/o usage.
 
 	idle bool

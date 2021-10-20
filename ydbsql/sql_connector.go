@@ -5,7 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
@@ -13,40 +13,40 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Option func(*connector)
+type sqlOption func(*sqlConnector)
 
-func With(options ...ydb.Option) Option {
-	return func(c *connector) {
+func With(options ...ydb.Option) sqlOption {
+	return func(c *sqlConnector) {
 		c.options = append(c.options, options...)
 	}
 }
 
-func WithDefaultTxControl(txControl *table.TransactionControl) Option {
-	return func(c *connector) {
+func WithDefaultTxControl(txControl *table.TransactionControl) sqlOption {
+	return func(c *sqlConnector) {
 		c.defaultTxControl = txControl
 	}
 }
 
-func WithDefaultExecDataQueryOption(opts ...options.ExecuteDataQueryOption) Option {
-	return func(c *connector) {
+func WithDefaultExecDataQueryOption(opts ...options.ExecuteDataQueryOption) sqlOption {
+	return func(c *sqlConnector) {
 		c.dataOpts = append(c.dataOpts, opts...)
 	}
 }
 
-func WithDefaultExecScanQueryOption(opts ...options.ExecuteScanQueryOption) Option {
-	return func(c *connector) {
+func WithDefaultExecScanQueryOption(opts ...options.ExecuteScanQueryOption) sqlOption {
+	return func(c *sqlConnector) {
 		c.scanOpts = append(c.scanOpts, opts...)
 	}
 }
 
-func withClient(client internal.Client) Option {
-	return func(c *connector) {
+func withClient(client internal.Client) sqlOption {
+	return func(c *sqlConnector) {
 		c.client = client
 	}
 }
 
-func Connector(options ...Option) (driver.Connector, error) {
-	c := &connector{
+func Connector(options ...sqlOption) (driver.Connector, error) {
+	c := &sqlConnector{
 		defaultTxControl: table.TxControl(
 			table.BeginTx(
 				table.WithSerializableReadWrite(),
@@ -61,7 +61,7 @@ func Connector(options ...Option) (driver.Connector, error) {
 }
 
 // USE CONNECTOR ONLY
-type connector struct {
+type sqlConnector struct {
 	options []ydb.Option
 	client  internal.Client
 
@@ -71,7 +71,7 @@ type connector struct {
 	scanOpts []options.ExecuteScanQueryOption
 }
 
-func (c *connector) init(ctx context.Context) (err error) {
+func (c *sqlConnector) init(ctx context.Context) (err error) {
 	var db ydb.Connection
 	db, err = ydb.New(
 		ctx,
@@ -104,7 +104,7 @@ func (c *connector) init(ctx context.Context) (err error) {
 	return nil
 }
 
-func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
+func (c *sqlConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	if c.client == nil {
 		if err := c.init(ctx); err != nil {
 			return nil, err
@@ -123,26 +123,26 @@ func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
 	}, nil
 }
 
-func (c *connector) Driver() driver.Driver {
-	return &Driver{c}
+func (c *sqlConnector) Driver() driver.Driver {
+	return &sqlDriver{c}
 }
 
-// Driver is an adapter to allow the use table client as sql.Driver instance.
+// sqlDriver is an adapter to allow the use table client as sql.sqlDriver instance.
 // The main purpose of this types is exported is an ability to call Unwrap()
 // method on it to receive raw *table.client instance.
-type Driver struct {
-	c *connector
+type sqlDriver struct {
+	c *sqlConnector
 }
 
-func (d *Driver) Close(ctx context.Context) error {
+func (d *sqlDriver) Close(ctx context.Context) error {
 	return d.c.client.Close(ctx)
 }
 
 // Open returns a new connection to the ydb.
-func (d *Driver) Open(string) (driver.Conn, error) {
+func (d *sqlDriver) Open(string) (driver.Conn, error) {
 	return nil, ErrDeprecated
 }
 
-func (d *Driver) OpenConnector(string) (driver.Connector, error) {
+func (d *sqlDriver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
 }

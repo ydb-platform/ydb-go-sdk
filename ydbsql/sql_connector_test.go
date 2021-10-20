@@ -12,7 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
@@ -46,7 +46,7 @@ func TestConnectorDialOnPing(t *testing.T) {
 	)
 
 	if err != nil {
-		t.Fatalf("unexpected connector error: %v", err)
+		t.Fatalf("unexpected sql_connector error: %v", err)
 	}
 
 	db := sql.OpenDB(c)
@@ -106,7 +106,7 @@ func TestConnectorRedialOnError(t *testing.T) {
 		),
 	)
 	if err != nil {
-		t.Fatalf("unexpected connector error: %v", err)
+		t.Fatalf("unexpected sql_connector error: %v", err)
 	}
 
 	db := sql.OpenDB(c)
@@ -168,7 +168,9 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 								testutil.InvokeHandlers{
 									// nolint:unparam
 									testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
-										return &Ydb_Table.CreateSessionResult{}, nil
+										return &Ydb_Table.CreateSessionResult{
+											SessionId: testutil.SessionID(),
+										}, nil
 									},
 									// nolint:unparam
 									testutil.TableExecuteDataQuery: func(request interface{}) (result proto.Message, err error) {
@@ -187,7 +189,7 @@ func TestConnectorWithQueryCachePolicyKeepInCache(t *testing.T) {
 				),
 			)
 			if err != nil {
-				t.Fatalf("unexpected connector error: %v", err)
+				t.Fatalf("unexpected sql_connector error: %v", err)
 			}
 
 			db := sql.OpenDB(c)

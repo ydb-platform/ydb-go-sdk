@@ -1,6 +1,7 @@
 package dial
 
 import (
+	"context"
 	"net"
 	"time"
 
@@ -10,7 +11,23 @@ import (
 type netConn struct {
 	address string
 	trace   trace.Driver
-	raw     net.Conn
+	cc      net.Conn
+}
+
+func newConn(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err error) {
+	onDone := trace.DriverOnConnNew(t, address)
+	defer func() {
+		onDone(err)
+	}()
+	cc, err := (&net.Dialer{}).DialContext(ctx, "tcp", address)
+	if err != nil {
+		return nil, err
+	}
+	return &netConn{
+		address: address,
+		cc:      cc,
+		trace:   t,
+	}, nil
 }
 
 func (c *netConn) Read(b []byte) (n int, err error) {
@@ -18,7 +35,7 @@ func (c *netConn) Read(b []byte) (n int, err error) {
 	defer func() {
 		onDone(n, err)
 	}()
-	return c.raw.Read(b)
+	return c.cc.Read(b)
 }
 
 func (c *netConn) Write(b []byte) (n int, err error) {
@@ -26,29 +43,33 @@ func (c *netConn) Write(b []byte) (n int, err error) {
 	defer func() {
 		onDone(n, err)
 	}()
-	return c.raw.Write(b)
+	return c.cc.Write(b)
 }
 
-func (c *netConn) Close() error {
-	return c.raw.Close()
+func (c *netConn) Close() (err error) {
+	onDone := trace.DriverOnConnClose(c.trace, c.address)
+	defer func() {
+		onDone(err)
+	}()
+	return c.cc.Close()
 }
 
 func (c *netConn) LocalAddr() net.Addr {
-	return c.raw.LocalAddr()
+	return c.cc.LocalAddr()
 }
 
 func (c *netConn) RemoteAddr() net.Addr {
-	return c.raw.RemoteAddr()
+	return c.cc.RemoteAddr()
 }
 
 func (c *netConn) SetDeadline(t time.Time) error {
-	return c.raw.SetDeadline(t)
+	return c.cc.SetDeadline(t)
 }
 
 func (c *netConn) SetReadDeadline(t time.Time) error {
-	return c.raw.SetReadDeadline(t)
+	return c.cc.SetReadDeadline(t)
 }
 
 func (c *netConn) SetWriteDeadline(t time.Time) error {
-	return c.raw.SetWriteDeadline(t)
+	return c.cc.SetWriteDeadline(t)
 }

@@ -13,7 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -40,7 +40,7 @@ func (b *ClusterBuilder) Build() cluster.Cluster {
 	}
 	var (
 		mu        sync.RWMutex
-		sessionID int32
+		sessionID uint32
 		txID      int32
 
 		sessions = map[string]*session{}
@@ -49,8 +49,8 @@ func (b *ClusterBuilder) Build() cluster.Cluster {
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				// nolint:unparam
-				testutil.TableCreateSession: func(_ interface{}) (result proto.Message, err error) {
-					sid := fmt.Sprintf("ydb://test-session/%d", atomic.AddInt32(&sessionID, 1))
+				testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					sid := testutil.SessionID(testutil.WithServiceID(atomic.AddUint32(&sessionID, 1)))
 					b.log("[%q] create session", sid)
 
 					mu.Lock()

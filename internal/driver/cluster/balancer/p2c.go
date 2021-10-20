@@ -1,8 +1,6 @@
 package balancer
 
 import (
-	"context"
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -157,21 +155,6 @@ func (p *p2c) Update(x Element, info info.Info) {
 
 func (p *p2c) Remove(x Element) {
 	p.conns.Remove(x.(*list.Element))
-}
-
-func (p *p2c) Pessimize(ctx context.Context, x Element) error {
-	if x == nil {
-		return ErrNilBalancerElement
-	}
-	el, ok := x.(*list.Element)
-	if !ok {
-		return ErrUnknownTypeOfBalancerElement
-	}
-	if !p.conns.Contains(el) {
-		return fmt.Errorf("p2c: pessimize failed: %w", ErrUnknownBalancerElement)
-	}
-	el.Conn.Runtime().SetState(ctx, state.Banned)
-	return nil
 }
 
 func (p *p2c) Contains(x Element) bool {

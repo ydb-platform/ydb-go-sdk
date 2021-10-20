@@ -5,28 +5,15 @@ import (
 )
 
 type (
-	ctxClientConnApplierKey struct{}
+	ctxNodeIDKey struct{}
+	NodeID       uint32
 )
 
-type ClientConnApplier func(c ClientConnInterface)
-
-// WithClientConnApplier returns a copy of parent deadline with client Conn applier function
-func WithClientConnApplier(ctx context.Context, apply ClientConnApplier) context.Context {
-	if exist, ok := ContextClientConnApplier(ctx); ok {
-		return context.WithValue(
-			ctx,
-			ctxClientConnApplierKey{},
-			ClientConnApplier(func(conn ClientConnInterface) {
-				exist(conn)
-				apply(conn)
-			}),
-		)
-	}
-	return context.WithValue(ctx, ctxClientConnApplierKey{}, apply)
+func WithNodeID(ctx context.Context, nodeID NodeID) context.Context {
+	return context.WithValue(ctx, ctxNodeIDKey{}, nodeID)
 }
 
-// ContextClientConnApplier returns the ClientConnApplier within given deadline.
-func ContextClientConnApplier(ctx context.Context) (v ClientConnApplier, ok bool) {
-	v, ok = ctx.Value(ctxClientConnApplierKey{}).(ClientConnApplier)
-	return
+func ContextNodeID(ctx context.Context) (nodeID NodeID, ok bool) {
+	nodeID, ok = ctx.Value(ctxNodeIDKey{}).(NodeID)
+	return nodeID, ok
 }
