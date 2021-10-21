@@ -84,9 +84,8 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}
 	c.Lock()
 	defer c.Unlock()
-	//if isBroken(c.grpcConn) {
-	if c.cc == nil {
-		//_ = c.close(ctx)
+	if isBroken(c.cc) {
+		_ = c.close(ctx)
 		cc, err = c.dial(ctx, c.endpoint.Address())
 		if err != nil {
 			return nil, err
