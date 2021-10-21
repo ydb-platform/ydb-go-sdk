@@ -4,10 +4,8 @@ package test
 
 import (
 	"context"
-	"database/sql"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"github.com/ydb-platform/ydb-go-sdk/v3/ydbsql"
 	"log"
 	"os"
 )
@@ -44,22 +42,6 @@ func appendConnectOptions(opts ...ydb.Option) []ydb.Option {
 	return opts
 }
 
-func openNative(ctx context.Context, opts ...ydb.Option) (ydb.Connection, error) {
+func open(ctx context.Context, opts ...ydb.Option) (ydb.Connection, error) {
 	return ydb.New(ctx, appendConnectOptions(opts...)...)
-}
-
-func openSql(ctx context.Context, opts ...ydbsql.sqlOption) (*sql.DB, error) {
-	opts = append(
-		opts,
-		ydbsql.With(appendConnectOptions()...),
-	)
-
-	connector, err := ydbsql.Connector(opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	db := sql.OpenDB(connector)
-
-	return db, db.PingContext(ctx)
 }
