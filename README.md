@@ -59,17 +59,12 @@ The straightforward example of querying data may look similar to this:
    // Determine timeout for connect or do nothing
    ctx := context.Background()
 
-   connectParams, err := ydb.ConnectionString(os.Getenv("YDB"))
-   if err != nil {
-   _, _ = fmt.Fprintf(os.Stderr, "cannot create connect params from connection string env['YDB'] = '%s': %v\n", os.Getenv("YDB"), err)
-   os.Exit(1)
-   }
-   
    // connect package helps to connect to database, returns connection object which
    // provide necessary clients such as table.Client, scheme.Client, etc.
    db, err := ydb.New(
       ctx,
       connectParams,
+	  ydb.WithConnectionString(ydb.ConnectionString(os.Getenv("YDB_CONNECTION_STRING"))),
       ydb.WithDialTimeout(3 * time.Second),
       ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
       ydb.WithSessionPoolIdleThreshold(time.Second * 5),
