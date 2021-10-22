@@ -14,7 +14,6 @@ import (
 )
 
 type grpcClientStream struct {
-	ctx    context.Context
 	c      *conn
 	s      grpc.ClientStream
 	onDone func(ctx context.Context)
@@ -63,7 +62,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	if err != nil {
 		err = errors.MapGRPCError(err)
 		if errors.MustPessimizeEndpoint(err) {
-			s.c.pessimize(s.ctx, err)
+			s.c.pessimize(s.s.Context(), err)
 		}
 		return err
 	}

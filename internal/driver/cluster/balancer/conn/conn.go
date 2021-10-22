@@ -312,9 +312,8 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 	}
 
 	return &grpcClientStream{
-		ctx: rawCtx,
-		c:   c,
-		s:   s,
+		c: c,
+		s: s,
 		onDone: func(ctx context.Context) {
 			c.release(ctx)
 			cancel()
