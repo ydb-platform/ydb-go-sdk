@@ -1,3 +1,6 @@
+## 2.10.1
+* Fixed race on ydbsql concurrent connect. This hotfix only for v2 version
+
 ## 2.10.0
 * Added GlobalAsyncIndex implementation of index interface
 
