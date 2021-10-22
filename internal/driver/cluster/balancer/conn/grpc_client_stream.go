@@ -19,7 +19,6 @@ type grpcClientStream struct {
 	s      grpc.ClientStream
 	onDone func(ctx context.Context)
 	recv   func(error) func(trace.ConnState, error)
-	done   func(trace.ConnState, error)
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
@@ -52,12 +51,10 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	defer func() {
-		if s.done == nil {
-			s.done = s.recv(errors.HideEOF(err))
-		}
+		onDone := s.recv(errors.HideEOF(err))
 		if err != nil {
+			onDone(s.c.GetState(), errors.HideEOF(err))
 			s.onDone(s.s.Context())
-			s.done(s.c.GetState(), errors.HideEOF(err))
 		}
 	}()
 

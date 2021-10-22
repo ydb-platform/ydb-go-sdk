@@ -705,7 +705,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 			Path:      path,
 		}
 		response Ydb_Table.ReadTableResponse
-		client   Ydb_Table_V1.TableService_StreamReadTableClient
+		c        Ydb_Table_V1.TableService_StreamReadTableClient
 	)
 	for _, opt := range opts {
 		opt((*options.ReadTableDesc)(&request))
@@ -713,7 +713,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	client, err = s.tableService.StreamReadTable(cluster.WithNodeID(ctx, s.nodeID), &request)
+	c, err = s.tableService.StreamReadTable(cluster.WithNodeID(ctx, s.nodeID), &request)
 
 	onDone := trace.TableOnSessionQueryStreamRead(s.trace, ctx, s)
 	if err != nil {
@@ -730,14 +730,14 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		defer func() {
 			close(r.SetCh)
 			cancel()
-			onDone(r, err)
+			onDone(r, errors.HideEOF(err))
 		}()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
-				err = client.RecvMsg(&response)
+				err = c.RecvMsg(&response)
 				if err != nil {
 					if err != io.EOF {
 						r.SetChErr = &err
@@ -795,11 +795,11 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		defer func() {
 			close(r.SetCh)
 			cancel()
+			onDone(r, errors.HideEOF(err))
 		}()
 		for {
 			select {
 			case <-ctx.Done():
-				onDone(r, ctx.Err())
 				return
 			default:
 				if err = c.RecvMsg(&response); err != nil {
@@ -807,7 +807,6 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 						r.SetChErr = &err
 						err = nil
 					}
-					onDone(r, err)
 					return
 				}
 				if result := response.GetResult(); result != nil {
