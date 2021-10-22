@@ -1,4 +1,7 @@
-## 3.0.2
+## 3.0.4
+* Added push stage for changleg and version files checks on CI stage
+
+## 3.0.3
 * Added changleg and version files checks on CI stage
 
 ## 3.0.2

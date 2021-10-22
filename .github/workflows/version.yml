@@ -1,11 +1,12 @@
 on:
   pull_request_target:
+  push:
 
-name: Version check
+name: version
 
 jobs:
   changelog:
-    name: Version check
+    name: version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources

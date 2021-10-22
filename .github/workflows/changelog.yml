@@ -1,11 +1,12 @@
 on:
   pull_request_target:
+  push:
 
-name: Changelog check
+name: сhangelog
 
 jobs:
   changelog:
-    name: Changelog check
+    name: сhangelog
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
