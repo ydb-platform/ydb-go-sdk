@@ -4,11 +4,16 @@ import (
 	"time"
 
 	"google.golang.org/grpc/keepalive"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 )
 
-type GrpcConnectionPolicy conn.GrpcConnectionPolicy
+type GrpcConnectionPolicy struct {
+	keepalive.ClientParameters
+
+	// TTL is a duration for automatically close idle connections
+	// Zero TTL will disable automatically closing of idle connections
+	// By default TTL is sets to DefaultGrpcConnectionTTL
+	TTL time.Duration
+}
 
 var (
 	// DefaultKeepaliveInterval contains default duration between grpc keepalive

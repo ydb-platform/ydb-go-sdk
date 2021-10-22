@@ -81,7 +81,7 @@ func TestPoolHealth(t *testing.T) {
 
 	defer s.print(t)
 
-	db, err := openNative(
+	db, err := open(
 		ctx,
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithGrpcConnectionTTL(5*time.Second),

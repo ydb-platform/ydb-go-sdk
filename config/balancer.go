@@ -1,13 +1,10 @@
 package config
 
-import "time"
-
 type Algorithm uint8
 
 const (
 	BalancingAlgorithmRandomChoice = iota
 	BalancingAlgorithmRoundRobin
-	BalancingAlgorithmP2C
 
 	DefaultBalancingAlgorithm = BalancingAlgorithmRandomChoice
 )
@@ -33,10 +30,6 @@ type BalancerConfig struct {
 	// is, currently this Option may be called as experimental.
 	// You have been warned.
 	PreferLocal bool
-
-	// OpTimeThreshold specifies such difference between endpoint average
-	// operation time when it becomes significant to be used during comparison.
-	OpTimeThreshold time.Duration
 }
 
 var (

@@ -7,7 +7,7 @@ import (
 )
 
 type Stats struct {
-	InFlight     uint32
+	InFlight     int
 	State        state.State
 	OpStarted    uint64
 	OpFailed     uint64

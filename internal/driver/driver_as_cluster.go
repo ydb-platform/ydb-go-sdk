@@ -5,7 +5,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 )
 
@@ -38,18 +37,9 @@ func (d *driver) Close(ctx context.Context) error {
 }
 
 func (d *driver) getConn(ctx context.Context) (c conn.Conn, err error) {
-	// Remember raw deadline to pass it for the tracing functions.
-	rawCtx := ctx
-
 	c, err = d.get(ctx)
-
 	if err != nil {
 		return nil, err
 	}
-
-	if apply, ok := cluster.ContextClientConnApplier(rawCtx); ok {
-		apply(c)
-	}
-
 	return c, err
 }

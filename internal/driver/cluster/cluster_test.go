@@ -15,11 +15,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
 )
 
 func TestClusterFastRedial(t *testing.T) {
@@ -38,7 +38,7 @@ func TestClusterFastRedial(t *testing.T) {
 			return listener.Dial(ctx)
 		},
 		balancer: b,
-		index:    make(map[string]entry.Entry),
+		index:    make(map[endpoint.NodeID]entry.Entry),
 	}
 
 	pingConnects := func(size int) chan struct{} {
@@ -47,7 +47,7 @@ func TestClusterFastRedial(t *testing.T) {
 			for i := 0; i < size*10; i++ {
 				c, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && c != nil && c.Address() == "bad:0" {
+				if err == nil && c != nil && c.Endpoint().NodeID() == 1 {
 					_ = c.Close(ctx)
 				}
 			}
@@ -57,14 +57,14 @@ func TestClusterFastRedial(t *testing.T) {
 	}
 
 	ne := []endpoint.Endpoint{
-		{Addr: endpoint.Addr{Host: "foo"}},
-		{Addr: endpoint.Addr{Host: "bad"}},
+		{ID: 1, Addr: endpoint.Addr{Host: "foo"}},
+		{ID: 2, Addr: endpoint.Addr{Host: "bad"}},
 	}
 	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
 	select {
 	case <-pingConnects(len(ne)):
 
-	case <-time.After(time.Second * 10):
+	case <-time.After(time.Second * 15):
 		t.Fatalf("Time limit exceeded while %d endpoints in balance. Wait channel used", len(*l))
 	}
 }
@@ -87,7 +87,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			_, b := simpleBalancer()
 			return b
 		}(),
-		index: make(map[string]entry.Entry),
+		index: make(map[endpoint.NodeID]entry.Entry),
 	}
 
 	assert := func(t *testing.T, exp []endpoint.Endpoint) {
@@ -95,36 +95,36 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			t.Fatalf("unexpected number of endpoints %d: got %d", len(exp), len(c.index))
 		}
 		for _, e := range exp {
-			if _, ok := c.index[e.Address()]; !ok {
+			if _, ok := c.index[e.NodeID()]; !ok {
 				t.Fatalf("not found endpoint '%v' in index", e.String())
 			}
 		}
-		for address := range c.index {
+		for nodeID := range c.index {
 			if func() bool {
 				for _, e := range exp {
-					if e.Address() == address {
+					if e.NodeID() == nodeID {
 						return false
 					}
 				}
 				return true
 			}() {
-				t.Fatalf("unexpected endpoint '%v' in index", address)
+				t.Fatalf("unexpected endpoint '%v' in index", nodeID)
 			}
 		}
 	}
 
 	endpoints := []endpoint.Endpoint{
-		{Addr: endpoint.Addr{Host: "foo"}},
-		{Addr: endpoint.Addr{Host: "foo", Port: 123}},
+		{ID: 1, Addr: endpoint.Addr{Host: "foo"}},
+		{ID: 2, Addr: endpoint.Addr{Host: "foo", Port: 123}},
 	}
 	badEndpoints := []endpoint.Endpoint{
-		{Addr: endpoint.Addr{Host: "baz"}},
-		{Addr: endpoint.Addr{Host: "baz", Port: 123}},
+		{ID: 3, Addr: endpoint.Addr{Host: "baz"}},
+		{ID: 4, Addr: endpoint.Addr{Host: "baz", Port: 123}},
 	}
 	nextEndpoints := []endpoint.Endpoint{
-		{Addr: endpoint.Addr{Host: "foo"}},
-		{Addr: endpoint.Addr{Host: "bar"}},
-		{Addr: endpoint.Addr{Host: "bar", Port: 123}},
+		{ID: 5, Addr: endpoint.Addr{Host: "foo"}},
+		{ID: 6, Addr: endpoint.Addr{Host: "bar"}},
+		{ID: 7, Addr: endpoint.Addr{Host: "bar", Port: 123}},
 	}
 	nextBadEndpoints := []endpoint.Endpoint{
 		{Addr: endpoint.Addr{Host: "bad", Port: 23}},
@@ -194,7 +194,7 @@ func simpleBalancer() (*list.List, balancer.Balancer) {
 		},
 		OnPessimize: func(ctx context.Context, x balancer.Element) error {
 			e := x.(*list.Element)
-			e.Conn.Runtime().SetState(ctx, state.Banned)
+			e.Conn.SetState(ctx, state.Banned)
 			return nil
 		},
 		OnContains: func(x balancer.Element) bool {
@@ -308,28 +308,30 @@ func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []endp
 	SortEndpoints(next)
 	DiffEndpoints(curr, next,
 		func(i, j int) {
-			c.Update(ctx, next[j].Address(), append([]option{WithInfo(info.Info{LoadFactor: next[j].LoadFactor, Local: next[j].Local})}, opts...)...)
+			c.Update(ctx, next[j], opts...)
 		},
 		func(i, j int) {
-			c.Insert(ctx, next[j].Address(), append([]option{WithInfo(info.Info{LoadFactor: next[j].LoadFactor, Local: next[j].Local})}, opts...)...)
+			c.Insert(ctx, next[j], opts...)
 		},
 		func(i, j int) {
-			c.Remove(ctx, curr[i].Address(), opts...)
+			c.Remove(ctx, curr[i], opts...)
 		},
 	)
 }
 
 func TestDiffEndpoint(t *testing.T) {
 	// lists must be sorted
-	noEndpoints := []endpoint.Endpoint{}
+	var noEndpoints []endpoint.Endpoint
 	someEndpoints := []endpoint.Endpoint{
 		{
+			ID: 0,
 			Addr: endpoint.Addr{
 				Host: "0",
 				Port: 0,
 			},
 		},
 		{
+			ID: 1,
 			Addr: endpoint.Addr{
 				Host: "1",
 				Port: 1,
@@ -338,6 +340,7 @@ func TestDiffEndpoint(t *testing.T) {
 	}
 	sameSomeEndpoints := []endpoint.Endpoint{
 		{
+			ID: 0,
 			Addr: endpoint.Addr{
 				Host: "0",
 				Port: 0,
@@ -346,6 +349,7 @@ func TestDiffEndpoint(t *testing.T) {
 			Local:      true,
 		},
 		{
+			ID: 1,
 			Addr: endpoint.Addr{
 				Host: "1",
 				Port: 1,
@@ -356,12 +360,14 @@ func TestDiffEndpoint(t *testing.T) {
 	}
 	anotherEndpoints := []endpoint.Endpoint{
 		{
+			ID: 3,
 			Addr: endpoint.Addr{
 				Host: "2",
 				Port: 0,
 			},
 		},
 		{
+			ID: 4,
 			Addr: endpoint.Addr{
 				Host: "3",
 				Port: 1,
@@ -370,6 +376,7 @@ func TestDiffEndpoint(t *testing.T) {
 	}
 	moreEndpointsOverlap := []endpoint.Endpoint{
 		{
+			ID: 0,
 			Addr: endpoint.Addr{
 				Host: "0",
 				Port: 0,
@@ -378,12 +385,14 @@ func TestDiffEndpoint(t *testing.T) {
 			Local:      true,
 		},
 		{
+			ID: 1,
 			Addr: endpoint.Addr{
 				Host: "1",
 				Port: 1,
 			},
 		},
 		{
+			ID: 5,
 			Addr: endpoint.Addr{
 				Host: "1",
 				Port: 2,

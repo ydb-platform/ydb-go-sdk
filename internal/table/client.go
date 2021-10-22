@@ -40,6 +40,7 @@ type SessionBuilder func(context.Context) (Session, error)
 type Client interface {
 	table.Client
 
+	Get(ctx context.Context) (s Session, err error)
 	Take(ctx context.Context, s Session) (took bool, err error)
 	Put(ctx context.Context, s Session) (err error)
 	Create(ctx context.Context) (s Session, err error)
@@ -61,7 +62,7 @@ func newClient(
 	onDone := trace.TableOnPoolInit(config.Trace().Compose(trace.ContextTable(ctx)), ctx)
 	if builder == nil {
 		builder = func(ctx context.Context) (s Session, err error) {
-			return newSession(ctx, cluster, trace.ContextTable(ctx))
+			return newSession(ctx, cluster, config.Trace().Compose(trace.ContextTable(ctx)))
 		}
 	}
 	c := &client{
@@ -542,7 +543,7 @@ func (c *client) Close(ctx context.Context) (err error) {
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) Retry(ctx context.Context, isOperationIdempotent bool, op table.RetryOperation) (err error) {
 	return retryBackoff(
-		trace.WithTable(ctx, c.config.Trace().Compose(trace.ContextTable(ctx))),
+		ctx,
 		c,
 		retry.FastBackoff,
 		retry.SlowBackoff,

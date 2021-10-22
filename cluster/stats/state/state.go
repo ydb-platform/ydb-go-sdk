@@ -3,10 +3,11 @@ package state
 type State int8
 
 const (
-	Offline = State(iota)
-	Banned
-	Unknown
+	Created = State(iota)
 	Online
+	Banned
+	Offline
+	Destroyed
 )
 
 func (s State) Code() int {
@@ -15,17 +16,21 @@ func (s State) Code() int {
 
 func (s State) String() string {
 	switch s {
+	case Created:
+		return "created"
 	case Online:
 		return "online"
-	case Offline:
-		return "offline"
 	case Banned:
 		return "banned"
+	case Offline:
+		return "offline"
+	case Destroyed:
+		return "destroyed"
 	default:
 		return "unknown"
 	}
 }
 
 func (s State) IsValid() bool {
-	return s != Unknown
+	return s == Online || s == Banned || s == Offline
 }

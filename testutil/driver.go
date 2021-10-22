@@ -16,6 +16,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -159,8 +160,7 @@ type db struct {
 	onClose     func(ctx context.Context) error
 }
 
-func (c *db) Stats(func(address string, stats stats.Stats)) {
-}
+func (c *db) Stats(func(address string, stats stats.Stats)) {}
 
 func (c *db) Secure() bool {
 	return true
@@ -169,13 +169,6 @@ func (c *db) Secure() bool {
 func (c *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 	if c.onInvoke == nil {
 		return fmt.Errorf("db.onInvoke() not implemented")
-	}
-	if apply, ok := cluster.ContextClientConnApplier(ctx); ok {
-		cc, err := c.Get(ctx)
-		if err != nil {
-			return err
-		}
-		apply(cc)
 	}
 	return c.onInvoke(ctx, method, args, reply, opts...)
 }
@@ -266,14 +259,10 @@ func NewCluster(opts ...NewClusterOption) cluster.Cluster {
 type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onAddress   func() string
 }
 
-func (c *clientConn) Address() string {
-	if c.onAddress == nil {
-		return ""
-	}
-	return c.onAddress()
+func (c *clientConn) Endpoint() endpoint.Endpoint {
+	return endpoint.Endpoint{}
 }
 
 func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {

@@ -6,16 +6,16 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
 	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 // Dial dials given addr and initializes driver instance on success.
@@ -23,6 +23,11 @@ func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
 	grpcKeepalive := c.GrpcConnectionPolicy().Timeout
 	if grpcKeepalive <= 0 {
 		grpcKeepalive = config.MinKeepaliveInterval
+	}
+	var e endpoint.Endpoint
+	e, err = endpoint.New(c.Endpoint())
+	if err != nil {
+		return nil, err
 	}
 	return (&dialer{
 		netDial:   c.NetDial(),
@@ -36,7 +41,7 @@ func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
 			c.Trace(),
 			c.RequestsType(),
 		),
-	}).connect(ctx, c.Endpoint())
+	}).connect(ctx, e)
 }
 
 // dialer is an instance holding single Dialer.Dial() configuration parameters.
@@ -49,7 +54,7 @@ type dialer struct {
 	meta      meta.Meta
 }
 
-func (d *dialer) connect(ctx context.Context, address string) (_ public.Cluster, err error) {
+func (d *dialer) connect(ctx context.Context, endpoint endpoint.Endpoint) (_ public.Cluster, err error) {
 	c := d.newCluster(d.config.Trace())
 	defer func() {
 		if err != nil {
@@ -61,30 +66,24 @@ func (d *dialer) connect(ctx context.Context, address string) (_ public.Cluster,
 		d.meta,
 		c.Get,
 		c.Pessimize,
-		c.Stats,
 		c.Close,
 	)
 	if d.config.DiscoveryInterval() > 0 {
 		if err := d.discover(
 			ctx,
 			c,
-			conn.New(ctx, address, trace.LocationUnknown, d.dial, driver),
+			conn.New(endpoint, d.dial, driver),
 			driver,
 		); err != nil {
 			return nil, err
 		}
 	} else {
-		c.Insert(ctx, address, cluster.WithConnConfig(driver))
+		c.Insert(ctx, endpoint, cluster.WithConnConfig(driver))
 	}
 	return driver, nil
 }
 
 func (d *dialer) dial(ctx context.Context, address string) (_ *grpc.ClientConn, err error) {
-	if d.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, d.timeout)
-		defer cancel()
-	}
 	return grpc.DialContext(ctx, address, d.grpcDialOptions()...)
 }
 
@@ -93,19 +92,7 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 		opts = append(opts, grpc.WithContextDialer(d.netDial))
 	} else {
 		netDial := func(ctx context.Context, address string) (net.Conn, error) {
-			var dialer net.Dialer
-			if deadline, ok := ctx.Deadline(); ok {
-				dialer.Deadline = deadline
-			}
-			raw, err := dialer.Dial("tcp", address)
-			if err != nil {
-				return nil, err
-			}
-			return &netConn{
-				address: address,
-				raw:     raw,
-				trace:   d.config.Trace(),
-			}, nil
+			return newConn(ctx, address, d.config.Trace())
 		}
 		opts = append(opts, grpc.WithContextDialer(netDial))
 	}

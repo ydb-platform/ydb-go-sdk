@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 )
@@ -28,13 +27,9 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 	for _, e := range curr {
 		go c.Insert(
 			ctx,
-			e.Address(),
+			e,
 			cluster.WithWG(waitGroup),
 			cluster.WithConnConfig(connConfig),
-			cluster.WithInfo(info.Info{
-				LoadFactor: e.LoadFactor,
-				Local:      e.Local,
-			}),
 		)
 	}
 	if d.config.FastDial() {
@@ -72,32 +67,24 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 						// data such that load factor and others.
 						go c.Update(
 							ctx,
-							next[j].Address(),
+							next[j],
 							cluster.WithWG(waitGroup),
-							cluster.WithInfo(info.Info{
-								LoadFactor: next[j].LoadFactor,
-								Local:      next[j].Local,
-							}),
 						)
 					},
 					func(i, j int) {
 						actual++
 						go c.Insert(
 							ctx,
-							next[j].Address(),
+							next[j],
 							cluster.WithWG(waitGroup),
 							cluster.WithConnConfig(connConfig),
-							cluster.WithInfo(info.Info{
-								LoadFactor: next[j].LoadFactor,
-								Local:      next[j].Local,
-							}),
 						)
 					},
 					func(i, j int) {
 						actual++
 						go c.Remove(
 							ctx,
-							curr[i].Address(),
+							curr[i],
 							cluster.WithWG(waitGroup),
 						)
 					},

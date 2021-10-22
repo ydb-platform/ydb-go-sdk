@@ -2,8 +2,6 @@ package balancer
 
 import (
 	"container/heap"
-	"context"
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -74,22 +72,6 @@ func (r *roundRobin) Remove(x Element) {
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Pessimize(ctx context.Context, x Element) error {
-	if x == nil {
-		return ErrNilBalancerElement
-	}
-	el, ok := x.(*list.Element)
-	if !ok {
-		return ErrUnknownTypeOfBalancerElement
-	}
-	if !r.conns.Contains(el) {
-		return fmt.Errorf("rr: pessimize failed: %w", ErrUnknownBalancerElement)
-	}
-	el.Conn.Runtime().SetState(ctx, state.Banned)
-	r.belt = r.distribute()
-	return nil
-}
-
 func (r *roundRobin) Contains(x Element) bool {
 	if x == nil {
 		return false
@@ -150,7 +132,7 @@ func (r *roundRobin) spread(f func(float32) int32) []int {
 	)
 	fill := func(state state.State) (filled bool) {
 		for _, x := range r.conns {
-			if x.Conn.Runtime().GetState() == state {
+			if x.Conn.GetState() == state {
 				d := f(x.Info.LoadFactor)
 				dist = append(dist, d)
 				index = append(index, x.Index)
@@ -160,10 +142,11 @@ func (r *roundRobin) spread(f func(float32) int32) []int {
 		return filled
 	}
 	for _, s := range [...]state.State{
+		state.Created,
 		state.Online,
 		state.Banned,
-		state.Unknown,
 		state.Offline,
+		state.Destroyed,
 	} {
 		if fill(s) {
 			return genBelt(index, dist)

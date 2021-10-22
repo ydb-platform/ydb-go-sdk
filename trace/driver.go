@@ -11,18 +11,18 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Driver struct {
+		// Network events
+		OnNetRead  func(NetReadStartInfo) func(NetReadDoneInfo)
+		OnNetWrite func(NetWriteStartInfo) func(NetWriteDoneInfo)
+		OnNetDial  func(NetDialStartInfo) func(NetDialDoneInfo)
+		OnNetClose func(NetCloseStartInfo) func(NetCloseDoneInfo)
+
 		// Conn events
-		OnConnReceiveBytes func(ConnReceiveBytesStartInfo) func(ConnReceiveBytesDoneInfo)
-		OnConnSendBytes    func(ConnSendBytesStartInfo) func(ConnSendBytesDoneInfo)
-		OnConnNew          func(ConnNewStartInfo) func(ConnNewDoneInfo)
-		OnConnClose        func(ConnCloseStartInfo) func(ConnCloseDoneInfo)
-		OnConnDial         func(ConnDialStartInfo) func(ConnDialDoneInfo)
-		OnConnDisconnect   func(ConnDisconnectStartInfo) func(ConnDisconnectDoneInfo)
-		OnConnStateChange  func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
-		OnConnInvoke       func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
-		OnConnNewStream    func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
-		OnConnTake         func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
-		OnConnRelease      func(ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
+		OnConnStateChange func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
+		OnConnInvoke      func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
+		OnConnNewStream   func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
+		OnConnTake        func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
+		OnConnRelease     func(ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
 
 		// Cluster events
 		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
@@ -76,126 +76,87 @@ type ConnState interface {
 	Code() int
 }
 
-type Location int
-
-const (
-	LocationUnknown = Location(iota)
-	LocationLocal
-	LocationRemote
-)
-
-func (l Location) String() string {
-	switch l {
-	case LocationLocal:
-		return "local"
-	case LocationRemote:
-		return "remote"
-	default:
-		return "unknown"
-	}
+type endpointInfo interface {
+	Address() string
+	LocalDC() bool
 }
 
 type (
 	ClusterInsertStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 	}
 	ClusterInsertDoneInfo struct {
-		Location Location
+		State ConnState
 	}
 	ClusterUpdateStartInfo struct {
-		Context context.Context
-		Address string
+		Context  context.Context
+		Endpoint endpointInfo
 	}
 	ClusterUpdateDoneInfo struct {
 		State ConnState
 	}
 	ClusterRemoveStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 	}
 	ClusterRemoveDoneInfo struct {
 		State ConnState
 	}
-	ConnDisconnectStartInfo struct {
-		Context  context.Context
-		Address  string
-		Location Location
-		State    ConnState
-	}
-	ConnDisconnectDoneInfo struct {
-		State ConnState
-		Error error
-	}
 	ConnStateChangeStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		State    ConnState
 	}
 	ConnStateChangeDoneInfo struct {
 		State ConnState
 	}
-	ConnReceiveBytesStartInfo struct {
+	NetReadStartInfo struct {
 		Address string
 		Buffer  int
 	}
-	ConnReceiveBytesDoneInfo struct {
+	NetReadDoneInfo struct {
 		Received int
 		Error    error
 	}
-	ConnSendBytesStartInfo struct {
+	NetWriteStartInfo struct {
 		Address string
 		Bytes   int
 	}
-	ConnSendBytesDoneInfo struct {
+	NetWriteDoneInfo struct {
 		Sent  int
 		Error error
 	}
-	ConnNewStartInfo struct {
-		Context  context.Context
-		Address  string
-		Location Location
+	NetDialStartInfo struct {
+		Address string
 	}
-	ConnNewDoneInfo struct {
+	NetDialDoneInfo struct {
+		Error error
 	}
 	ConnTakeStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 	}
 	ConnTakeDoneInfo struct {
+		Lock  int
 		Error error
 	}
 	ConnReleaseStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 	}
 	ConnReleaseDoneInfo struct {
+		Lock int
 	}
-	ConnCloseStartInfo struct {
-		Context  context.Context
-		Address  string
-		Location Location
-		State    ConnState
+	NetCloseStartInfo struct {
+		Address string
 	}
-	ConnCloseDoneInfo struct {
-	}
-	ConnDialStartInfo struct {
-		Context  context.Context
-		Address  string
-		Location Location
-	}
-	ConnDialDoneInfo struct {
+	NetCloseDoneInfo struct {
 		Error error
 	}
 	ConnInvokeStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		Method   Method
 	}
 	ConnInvokeDoneInfo struct {
@@ -206,8 +167,7 @@ type (
 	}
 	ConnNewStreamStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		Method   Method
 	}
 	ConnNewStreamRecvInfo struct {
@@ -221,14 +181,12 @@ type (
 		Context context.Context
 	}
 	ClusterGetDoneInfo struct {
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		Error    error
 	}
 	PessimizeNodeStartInfo struct {
 		Context  context.Context
-		Address  string
-		Location Location
+		Endpoint endpointInfo
 		State    ConnState
 		Cause    error
 	}

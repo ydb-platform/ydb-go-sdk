@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+)
+
+const (
+	DefaultDiscoveryInterval = time.Minute
 )
 
 // Config contains driver configuration options.
@@ -316,7 +319,7 @@ func defaults() (c *config) {
 		}
 	}
 	return &config{
-		discoveryInterval:    discovery.DefaultDiscoveryInterval,
+		discoveryInterval:    DefaultDiscoveryInterval,
 		grpcConnectionPolicy: DefaultGrpcConnectionPolicy,
 		balancingConfig:      DefaultBalancer,
 		tlsConfig: &tls.Config{

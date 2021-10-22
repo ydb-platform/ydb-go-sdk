@@ -25,7 +25,7 @@ func TestRateLimiter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
-	db, err := openNative(
+	db, err := open(
 		ctx,
 		ydb.WithDriverConfigOptions(
 			config.WithRequestTimeout(time.Second*5),

@@ -11,7 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -71,6 +71,7 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
 			node := endpoint.Endpoint{
+				ID: endpoint.NodeID(e.NodeId),
 				Addr: endpoint.Addr{
 					Host: e.Address,
 					Port: int(e.Port),

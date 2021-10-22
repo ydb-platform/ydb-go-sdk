@@ -10,17 +10,14 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type grpcClientStream struct {
-	ctx    context.Context
 	c      *conn
 	s      grpc.ClientStream
-	cancel context.CancelFunc
+	onDone func(ctx context.Context)
 	recv   func(error) func(trace.ConnState, error)
-	done   func(trace.ConnState, error)
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
@@ -36,7 +33,6 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	if err != nil {
 		err = errors.MapGRPCError(err)
 	}
-	s.c.runtime.StreamDone(timeutil.Now(), errors.HideEOF(err))
 	return err
 }
 
@@ -54,25 +50,19 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	defer func() {
-		if s.done == nil {
-			s.done = s.recv(errors.HideEOF(err))
-		}
+		onDone := s.recv(errors.HideEOF(err))
 		if err != nil {
-			s.cancel()
-			s.done(s.c.runtime.GetState(), errors.HideEOF(err))
-			s.c.release(s.s.Context())
-			s.cancel = nil // second call RecvMesg will be raced
+			onDone(s.c.GetState(), errors.HideEOF(err))
+			s.onDone(s.s.Context())
 		}
 	}()
-
-	s.c.runtime.StreamRecv(timeutil.Now())
 
 	err = s.s.RecvMsg(m)
 
 	if err != nil {
 		err = errors.MapGRPCError(err)
 		if errors.MustPessimizeEndpoint(err) {
-			s.c.pessimize(s.ctx, err)
+			s.c.pessimize(s.s.Context(), err)
 		}
 		return err
 	}
