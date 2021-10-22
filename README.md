@@ -17,8 +17,6 @@
 3. [Prerequisites](#Prerequisites)
 4. [Installation](#Install)
 5. [Usage](#Usage)
-    * [Native API](#Native)
-    * [Database/sql API](#database-sql)
 6. [Credentials](#Credentials)
 7. [Examples](#examples)
 
@@ -54,8 +52,6 @@ go get -u github.com/ydb-platform/ydb-go-sdk/v3
 ```
 
 ## Usage <a name="Usage"></a>
-
-## Native usage <a name="Native"></a>
 
 The straightforward example of querying data may look similar to this:
 
@@ -167,15 +163,6 @@ reduce boilerplate overhead for such cases `ydb-go-sdk` provides generic retry l
 That is, instead of manual creation of `table.Session`, we give a
 `table.Client` such responsibility. It holds instances of active sessions and
 "pings" them periodically to keep them alive.
-
-### Database/sql driver <a name="database-sql"></a>
-
-There is a `database/sql` driver for the sql-based applications or those which
-by some reasons need to use additional layer of abstraction between user code
-and storage backend.
-
-For more information please see the docs of `ydbsql` package which provides
-`database/sql` driver implementation.
 
 ## Credentials <a name="Credentials"></a>
 
