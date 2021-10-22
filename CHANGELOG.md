@@ -1,4 +1,7 @@
 ## 3.0.2
+* Added changleg and version files checks on CI stage
+
+## 3.0.2
 * Appended changelog for 3.0.0-3.0.2 versions
 
 ## 3.0.1
