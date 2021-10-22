@@ -1,7 +1,5 @@
 package conn
 
-import "C"
-
 import (
 	"context"
 	"sync"
