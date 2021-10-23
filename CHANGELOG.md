@@ -1,3 +1,16 @@
+## 3.0.0
+* Refactored sources for splitting public interfaces and internal
+  implementation for core changes in the future without change major version
+* Refactored of transport level of driver - now we use grpc code generation by stock `protoc-gen-go` instead internal protoc codegen. New API provide operate from codegen grpc-clients with driver as a single grpc client connection. But driver hide inside self a pool of grpc connections to different cluster endpoints YDB. All communications with YDB (base services includes to driver: table, discovery, coordiantion and ratelimiter) provides stock codegen grpc-clients now.
+* Much changed API of driver for easy usage.
+* Dropped package `ydbsql` (moved to external project)
+* Extracted yandex-cloud authentication to external project
+* Extracted examples to external project
+* Changed of traces API for next usage in jaeger и prometheus
+* Dropped old APIs marked as `deprecated`
+* Added integration tests with docker ydb container
+* Changed table session and endpoint link type from string address to integer NodeID
+
 ## 2.10.1
 * Fixed race on ydbsql concurrent connect. This hotfix only for v2 version
 

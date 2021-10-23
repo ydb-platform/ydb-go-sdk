@@ -18,9 +18,9 @@ type lazyTable struct {
 	m       sync.Mutex
 }
 
-func (t *lazyTable) Pool(ctx context.Context) internal.Client {
+func (t *lazyTable) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
 	t.init(ctx)
-	return t.client.(internal.Client)
+	return t.client.Do(ctx, op, opts...)
 }
 
 func (t *lazyTable) Close(ctx context.Context) error {
@@ -33,17 +33,6 @@ func (t *lazyTable) Close(ctx context.Context) error {
 		t.client = nil
 	}()
 	return t.client.Close(ctx)
-}
-
-func (t *lazyTable) RetryIdempotent(ctx context.Context, op table.RetryOperation) (err error) {
-	t.init(ctx)
-	return t.client.RetryIdempotent(ctx, op)
-}
-
-func (t *lazyTable) RetryNonIdempotent(ctx context.Context, op table.RetryOperation) (err error) {
-	t.init(ctx)
-	return t.client.RetryNonIdempotent(ctx, op)
-
 }
 
 func (t *lazyTable) init(ctx context.Context) {

@@ -43,8 +43,6 @@ type Client interface {
 	Get(ctx context.Context) (s Session, err error)
 	Take(ctx context.Context, s Session) (took bool, err error)
 	Put(ctx context.Context, s Session) (err error)
-	Create(ctx context.Context) (s Session, err error)
-	Retry(ctx context.Context, isIdempotentOperation bool, op table.RetryOperation) error
 	Close(ctx context.Context) error
 }
 
@@ -112,14 +110,6 @@ type client struct {
 
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
-}
-
-func (c *client) RetryIdempotent(ctx context.Context, op table.RetryOperation) (err error) {
-	return c.Retry(ctx, true, op)
-}
-
-func (c *client) RetryNonIdempotent(ctx context.Context, op table.RetryOperation) (err error) {
-	return c.Retry(ctx, false, op)
 }
 
 func (c *client) isClosed() bool {
@@ -536,18 +526,22 @@ func (c *client) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-// Retry provide the best effort fo retrying operation
-// Retry implements internal busy loop until one of the following conditions is met:
+// Do provide the best effort for execute operation
+// Do implements internal busy loop until one of the following conditions is met:
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func (c *client) Retry(ctx context.Context, isOperationIdempotent bool, op table.RetryOperation) (err error) {
+func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+	options := table.Options{}
+	for _, o := range opts {
+		o(&options)
+	}
 	return retryBackoff(
 		ctx,
 		c,
 		retry.FastBackoff,
 		retry.SlowBackoff,
-		isOperationIdempotent,
+		options.Idempotent,
 		op,
 	)
 }

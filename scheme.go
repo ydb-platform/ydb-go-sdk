@@ -109,7 +109,7 @@ func (s *lazyScheme) CleanupDatabase(ctx context.Context, prefix string, names .
 				}
 
 			case scheme.EntryTable:
-				err = s.db.Table().RetryNonIdempotent(ctx, func(ctx context.Context, session table.Session) (err error) {
+				err = s.db.Table().Do(ctx, func(ctx context.Context, session table.Session) (err error) {
 					return session.DropTable(ctx, pt)
 				})
 				if err != nil {

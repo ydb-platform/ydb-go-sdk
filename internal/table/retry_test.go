@@ -43,7 +43,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			results := make(chan error)
 			go func() {
-				err := p.Retry(ctx, false, func(ctx context.Context, _ table.Session) error {
+				err := p.Do(ctx, func(ctx context.Context, _ table.Session) error {
 					return testErr
 				})
 				results <- err
@@ -86,9 +86,8 @@ func TestRetryerBadSession(t *testing.T) {
 		sessions   []table.Session
 	)
 	ctx, cancel := context.WithCancel(context.Background())
-	err := p.Retry(
+	err := p.Do(
 		ctx,
-		false,
 		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
 			i++
@@ -136,15 +135,14 @@ func TestRetryerImmediateReturn(t *testing.T) {
 					t.Fatalf("unexpected panic: %v", e)
 				}
 			}()
-			pool := SingleSession(
+			p := SingleSession(
 				simpleSession(t),
 				testutil.BackoffFunc(func(n int) <-chan time.Time {
 					panic("this code will not be called")
 				}),
 			)
-			err := pool.Retry(
+			err := p.Do(
 				context.Background(),
-				false,
 				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
@@ -256,7 +254,7 @@ func TestRetryContextDeadline(t *testing.T) {
 	client := &client{
 		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
-	pool := SessionProviderFunc{
+	p := SessionProviderFunc{
 		OnGet: client.createSession,
 	}
 	for i := range timeouts {
@@ -267,7 +265,7 @@ func TestRetryContextDeadline(t *testing.T) {
 				random := rand.New(rand.NewSource(time.Now().Unix()))
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
-				_ = pool.Retry(
+				_ = p.Do(
 					trace.WithRetry(
 						ctx,
 						trace.Retry{
@@ -280,7 +278,6 @@ func TestRetryContextDeadline(t *testing.T) {
 							},
 						},
 					),
-					false,
 					func(ctx context.Context, _ table.Session) error {
 						select {
 						case <-ctx.Done():

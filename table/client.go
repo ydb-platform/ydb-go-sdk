@@ -4,25 +4,29 @@ import (
 	"context"
 )
 
-// RetryOperation is the interface that holds an operation for retry.
-type RetryOperation func(context.Context, Session) (err error)
+// Operation is the interface that holds an operation for retry.
+type Operation func(context.Context, Session) (err error)
+
+type Option func(o *Options)
+
+type Options struct {
+	Idempotent bool
+}
+
+func WithIdempotent() Option {
+	return func(o *Options) {
+		o.Idempotent = true
+	}
+}
 
 type Client interface {
+	// Close closes table client
 	Close(ctx context.Context) error
 
-	// RetryIdempotent retries the retry operation as a idempotent
-	// operation (i.e. the operation can't change the state of the database)
-	// while the operation returns an error
-	//
-	// This is an experimental API that can be changed without changing
-	// the major version.
-	RetryIdempotent(ctx context.Context, op RetryOperation) (err error)
-
-	// RetryNonIdempotent retries the retry operation as a non-idempotent
-	// operation (i.e. the operation can change the state of the database)
-	// while the operation returns an error
-	//
-	// This is an experimental API that can be changed without changing
-	// the major version.
-	RetryNonIdempotent(ctx context.Context, op RetryOperation) (err error)
+	// Do provide the best effort for execute operation
+	// Do implements internal busy loop until one of the following conditions is met:
+	// - deadline was canceled or deadlined
+	// - retry operation returned nil as error
+	// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
+	Do(ctx context.Context, op Operation, opts ...Option) (err error)
 }

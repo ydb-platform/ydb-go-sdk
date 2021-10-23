@@ -25,23 +25,25 @@ type SessionProvider interface {
 	// CloseSession must be fast. If necessary, can be async.
 	CloseSession(ctx context.Context, s Session) error
 
-	// Retry provide the best effort fo retrying operation
-	// Retry implements internal busy loop until one of the following conditions is met:
-	// - deadline was canceled or deadlined
-	// - retry operation returned nil as error
-	// If deadline without deadline used build client RetryTimeout
-	Retry(ctx context.Context, retryNoIdempotent bool, op table.RetryOperation) (err error)
-
 	// Close provide cleanup sessions
 	Close(ctx context.Context) error
+
+	// Do provide the best effort for execute operation
+	// Do implements internal busy loop until one of the following conditions is met:
+	// - deadline was canceled or deadlined
+	// - retry operation returned nil as error
+	// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
+	Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error)
 }
 
 type SessionProviderFunc struct {
 	OnGet   func(context.Context) (Session, error)
 	OnPut   func(context.Context, Session) error
-	OnRetry func(context.Context, table.RetryOperation) error
+	OnDo    func(context.Context, table.Operation, ...table.Option) error
 	OnClose func(context.Context) error
 }
+
+var _ SessionProvider = SessionProviderFunc{}
 
 func (f SessionProviderFunc) Close(ctx context.Context) error {
 	if f.OnClose == nil {
@@ -64,11 +66,11 @@ func (f SessionProviderFunc) Put(ctx context.Context, s Session) error {
 	return f.OnPut(ctx, s)
 }
 
-func (f SessionProviderFunc) Retry(ctx context.Context, _ bool, op table.RetryOperation) (err error) {
-	if f.OnRetry == nil {
+func (f SessionProviderFunc) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+	if f.OnDo == nil {
 		return retryBackoff(ctx, f, nil, nil, false, op)
 	}
-	return f.OnRetry(ctx, op)
+	return f.OnDo(ctx, op)
 }
 
 func (f SessionProviderFunc) CloseSession(ctx context.Context, s Session) error {
@@ -93,12 +95,16 @@ type singleSession struct {
 	empty bool
 }
 
-func (s *singleSession) Close(ctx context.Context) error {
-	return s.CloseSession(ctx, s.s)
+func (s *singleSession) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+	options := table.Options{}
+	for _, o := range opts {
+		o(&options)
+	}
+	return retryBackoff(ctx, s, s.b, s.b, options.Idempotent, op)
 }
 
-func (s *singleSession) Retry(ctx context.Context, _ bool, op table.RetryOperation) (err error) {
-	return retryBackoff(ctx, s, s.b, s.b, false, op)
+func (s *singleSession) Close(ctx context.Context) error {
+	return s.CloseSession(ctx, s.s)
 }
 
 func (s *singleSession) Get(context.Context) (Session, error) {
@@ -137,7 +143,7 @@ func retryBackoff(
 	fastBackoff retry.Backoff,
 	slowBackoff retry.Backoff,
 	isOperationIdempotent bool,
-	op table.RetryOperation,
+	op table.Operation,
 ) (err error) {
 	var (
 		s              Session

@@ -59,17 +59,12 @@ The straightforward example of querying data may look similar to this:
    // Determine timeout for connect or do nothing
    ctx := context.Background()
 
-   connectParams, err := ydb.ConnectionString(os.Getenv("YDB"))
-   if err != nil {
-   _, _ = fmt.Fprintf(os.Stderr, "cannot create connect params from connection string env['YDB'] = '%s': %v\n", os.Getenv("YDB"), err)
-   os.Exit(1)
-   }
-   
    // connect package helps to connect to database, returns connection object which
    // provide necessary clients such as table.Client, scheme.Client, etc.
    db, err := ydb.New(
       ctx,
       connectParams,
+	  ydb.WithConnectionString(ydb.ConnectionString(os.Getenv("YDB_CONNECTION_STRING"))),
       ydb.WithDialTimeout(3 * time.Second),
       ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
       ydb.WithSessionPoolIdleThreshold(time.Second * 5),
@@ -80,35 +75,42 @@ The straightforward example of querying data may look similar to this:
    if err != nil {
       // handle error
    }
-   defer func() { _ = db.Close() }()
-   
-   // Create session for execute queries
-   session, err := db.Table().CreateSession(ctx)
-   if err != nil {
-       // handle error
-   }
-   defer session.Close(ctx)
+   defer func() { _ = db.Close(ctx) }()
 
    // Prepare transaction control for upcoming query execution.
    // NOTE: result of TxControl() may be reused.
    txc := table.TxControl(
-       table.BeginTx(table.WithSerializableReadWrite()),
-       table.CommitTx(),
+      table.BeginTx(table.WithSerializableReadWrite()),
+      table.CommitTx(),
    )
 
-   // Execute text query without preparation and with given "autocommit"
-   // transaction control. That is, transaction will be committed without
-   // additional calls. Notice the "_" unused variable – it stands for created
-   // transaction during execution, but as said above, transaction is committed
-   // for us and `ydb-go-sdk` do not want to do anything with it.
-   _, res, err := session.Execute(ctx, txc,
-       `--!syntax_v1
-           DECLARE $mystr AS Utf8?;
-           SELECT 42 as id, $mystr as mystr
-       `,
-       table.NewQueryParameters(
-           table.ValueParam("$mystr", types.OptionalValue(types.UTF8Value("test"))),
-       ),
+   var res *table.Result
+
+   // Do() provide the best effort for executing operation
+   // Do implements internal busy loop until one of the following conditions occurs:
+   // - deadline was cancelled or deadlined
+   // - operation returned nil as error
+   // Note that in case of prepared statements call to Prepare() must be made
+   // inside the function body.
+   err := c.Do(
+      ctx, 
+      func(ctx context.Context, s table.Session) (err error) {
+         // Execute text query without preparation and with given "autocommit"
+         // transaction control. That is, transaction will be committed without
+         // additional calls. Notice the "_" unused variable – it stands for created
+         // transaction during execution, but as said above, transaction is committed
+         // for us and `ydb-go-sdk` do not want to do anything with it.
+         _, res, err := session.Execute(ctx, txc,
+            `--!syntax_v1
+             DECLARE $mystr AS Utf8?;
+             SELECT 42 as id, $mystr as mystr
+             `,
+            table.NewQueryParameters(
+               table.ValueParam("$mystr", types.OptionalValue(types.UTF8Value("test"))),
+            ),
+         )
+         return err
+      },
    )
    if err != nil {
        return err // handle error
@@ -139,35 +141,13 @@ The straightforward example of querying data may look similar to this:
    }
 ```
 
-This example can be tested as https://github.com/ydb-platform/ydb-go-examples/tree/master/from_readme
-
 YDB sessions may become staled and appropriate error will be returned. To
-reduce boilerplate overhead for such cases `ydb-go-sdk` provides generic retry logic:
-
-```go
- var res *table.Result
- // Retry() provide the best effort fo retrying operation
- // Retry implements internal busy loop until one of the following conditions occurs:
- // - deadline was cancelled or deadlined
- // - retry operation returned nil as error
- // Note that in case of prepared statements call to Prepare() must be made
- // inside the function body.
- err := c.Retry(ctx, false,
-     func(ctx context.Context, s table.Session) (err error) {
-         res, err = s.Execute(...)
-         return
-     },
- )
-```
-
-That is, instead of manual creation of `table.Session`, we give a
-`table.Client` such responsibility. It holds instances of active sessions and
-"pings" them periodically to keep them alive.
+reduce boilerplate overhead for such cases `ydb-go-sdk` provides generic retry logic
 
 ## Credentials <a name="Credentials"></a>
 
 There are different variants to get `ydb.Credentials` object to get authorized.
-Usage examples can be found [here](https://github.com/ydb-platform/ydb-go-examples/tree/master/auth).
+Usage examples can be found [here](https://github.com/ydb-platform/ydb-go-examples/tree/master/cmd/auth).
 
 ## Examples <a name="examples"></a>
 
