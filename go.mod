@@ -1,6 +1,6 @@
 module github.com/ydb-platform/ydb-go-sdk/v3
 
-go 1.14
+go 1.16
 
 require (
 	github.com/ydb-platform/ydb-api-protos v0.0.0-20210921091122-f697ac767e19 // indirect
