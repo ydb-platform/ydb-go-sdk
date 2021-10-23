@@ -1,3 +1,6 @@
+## 3.0.1
+* refactored integration tests
+
 ## 3.0.0
 * Refactored sources for splitting public interfaces and internal
   implementation for core changes in the future without change major version
