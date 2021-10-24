@@ -35,6 +35,7 @@ type Session interface {
 	StreamExecuteScanQuery(ctx context.Context, query string, params *QueryParameters, opts ...options.ExecuteScanQueryOption) (_ resultset.Result, err error)
 	BulkUpsert(ctx context.Context, table string, rows types.Value) (err error)
 	BeginTransaction(ctx context.Context, tx *TransactionSettings) (x Transaction, err error)
+	KeepAlive(ctx context.Context) error
 }
 
 type TransactionSettings struct {

@@ -454,14 +454,13 @@ func (s *Statement) Text() string {
 // Prepare prepares data query within build s.
 func (s *session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
 	var (
-		cached   bool
 		q        *dataQuery
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 	)
 	onDone := trace.TableOnSessionQueryPrepare(s.trace, ctx, s, query)
 	defer func() {
-		onDone(query, q, cached, err)
+		onDone(q, err)
 	}()
 
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {

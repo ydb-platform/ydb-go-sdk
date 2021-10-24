@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"os"
 
 	"google.golang.org/grpc"
 
@@ -92,6 +93,7 @@ func (db *db) RateLimiter() ratelimiter.Client {
 // New connects to name and return name runtime holder
 func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	db := &db{}
+	opts = append([]Option{WithConnectionString(os.Getenv("YDB_CONNECTION_STRING"))}, opts...)
 	for _, opt := range opts {
 		err = opt(ctx, db)
 		if err != nil {

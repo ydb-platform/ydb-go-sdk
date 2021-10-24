@@ -831,17 +831,15 @@ func TableOnSessionKeepAlive(t Table, c context.Context, session sessionInfo) fu
 		res(p)
 	}
 }
-func TableOnSessionQueryPrepare(t Table, c context.Context, session sessionInfo, query string) func(query string, result dataQuery, cached bool, _ error) {
+func TableOnSessionQueryPrepare(t Table, c context.Context, session sessionInfo, query string) func(result dataQuery, _ error) {
 	var p SessionQueryPrepareStartInfo
 	p.Context = c
 	p.Session = session
 	p.Query = query
 	res := t.onSessionQueryPrepare(p)
-	return func(query string, result dataQuery, cached bool, e error) {
+	return func(result dataQuery, e error) {
 		var p PrepareDataQueryDoneInfo
-		p.Query = query
 		p.Result = result
-		p.Cached = cached
 		p.Error = e
 		res(p)
 	}

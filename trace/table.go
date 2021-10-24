@@ -94,9 +94,7 @@ type (
 		Query   string
 	}
 	PrepareDataQueryDoneInfo struct {
-		Query  string
 		Result dataQuery
-		Cached bool
 		Error  error
 	}
 	ExecuteDataQueryStartInfo struct {

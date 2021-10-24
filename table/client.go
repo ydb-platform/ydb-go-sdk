@@ -19,6 +19,16 @@ func WithIdempotent() Option {
 	}
 }
 
+type ctxIdempotentOperationKey struct{}
+
+func WithIdempotentOperation(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxIdempotentOperationKey{}, struct{}{})
+}
+
+func ContextIdempotentOperation(ctx context.Context) bool {
+	return ctx.Value(ctxIdempotentOperationKey{}) != nil
+}
+
 type Client interface {
 	// Close closes table client
 	Close(ctx context.Context) error

@@ -140,7 +140,6 @@ type Session interface {
 	IsClosed() bool
 	Status() string
 	OnClose(f func(ctx context.Context))
-	KeepAlive(ctx context.Context) error
 }
 
 type createSessionResult struct {
@@ -532,7 +531,9 @@ func (c *client) Close(ctx context.Context) (err error) {
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
-	options := table.Options{}
+	options := table.Options{
+		Idempotent: table.ContextIdempotentOperation(ctx),
+	}
 	for _, o := range opts {
 		o(&options)
 	}
