@@ -21,7 +21,7 @@ import (
 // Dial dials given addr and initializes driver instance on success.
 func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
 	grpcKeepalive := c.GrpcConnectionPolicy().Timeout
-	if grpcKeepalive <= 0 {
+	if grpcKeepalive <= config.MinKeepaliveInterval {
 		grpcKeepalive = config.MinKeepaliveInterval
 	}
 	var e endpoint.Endpoint
