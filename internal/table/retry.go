@@ -68,7 +68,7 @@ func (f SessionProviderFunc) Put(ctx context.Context, s Session) error {
 
 func (f SessionProviderFunc) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
 	if f.OnDo == nil {
-		return retryBackoff(ctx, f, nil, nil, false, op)
+		return retryBackoff(ctx, f, nil, nil, false, op, trace.ContextTable(ctx))
 	}
 	return f.OnDo(ctx, op)
 }
@@ -100,7 +100,7 @@ func (s *singleSession) Do(ctx context.Context, op table.Operation, opts ...tabl
 	for _, o := range opts {
 		o(&options)
 	}
-	return retryBackoff(ctx, s, s.b, s.b, options.Idempotent, op)
+	return retryBackoff(ctx, s, s.b, s.b, options.Idempotent, op, trace.ContextTable(ctx))
 }
 
 func (s *singleSession) Close(ctx context.Context) error {
@@ -144,13 +144,14 @@ func retryBackoff(
 	slowBackoff retry.Backoff,
 	isOperationIdempotent bool,
 	op table.Operation,
+	t trace.Table,
 ) (err error) {
 	var (
 		s              Session
 		i              int
 		attempts       int
 		code           = int32(0)
-		onIntermediate = trace.TableOnPoolRetry(trace.ContextTable(ctx), ctx, isOperationIdempotent)
+		onIntermediate = trace.TableOnPoolRetry(t, ctx, isOperationIdempotent)
 	)
 	defer func() {
 		if s != nil {

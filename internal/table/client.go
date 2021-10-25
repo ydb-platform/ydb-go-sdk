@@ -544,6 +544,7 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 		retry.SlowBackoff,
 		options.Idempotent,
 		op,
+		c.config.Trace(),
 	)
 }
 
