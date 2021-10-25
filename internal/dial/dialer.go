@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"net"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -20,10 +19,6 @@ import (
 
 // Dial dials given addr and initializes driver instance on success.
 func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
-	grpcKeepalive := c.GrpcConnectionPolicy().Timeout
-	if grpcKeepalive <= config.MinKeepaliveInterval {
-		grpcKeepalive = config.MinKeepaliveInterval
-	}
 	var e endpoint.Endpoint
 	e, err = endpoint.New(c.Endpoint())
 	if err != nil {
@@ -32,8 +27,6 @@ func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
 	return (&dialer{
 		netDial:   c.NetDial(),
 		tlsConfig: c.TLSConfig(),
-		timeout:   c.DialTimeout(),
-		keepalive: grpcKeepalive,
 		config:    c,
 		meta: meta.New(
 			c.Database(),
@@ -48,8 +41,6 @@ func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
 type dialer struct {
 	netDial   func(context.Context, string) (net.Conn, error)
 	tlsConfig *tls.Config
-	timeout   time.Duration
-	keepalive time.Duration
 	config    config.Config
 	meta      meta.Meta
 }
