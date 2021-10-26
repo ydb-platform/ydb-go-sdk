@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 

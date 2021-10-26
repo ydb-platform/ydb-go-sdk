@@ -1,3 +1,6 @@
+## 3.1.0
+* published scheme Client interface
+
 ## 3.0.1
 * refactored integration tests
 * fixed table retry trace calls

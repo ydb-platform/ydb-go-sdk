@@ -8,7 +8,8 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -22,6 +23,11 @@ type lazyScheme struct {
 	db     dbWithTable
 	client scheme.Scheme
 	m      sync.Mutex
+}
+
+func (s *lazyScheme) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
+	s.init()
+	return s.client.ModifyPermissions(ctx, path, opts...)
 }
 
 func (s *lazyScheme) Close(ctx context.Context) error {
@@ -39,7 +45,7 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 func (s *lazyScheme) init() {
 	s.m.Lock()
 	if s.client == nil {
-		s.client = scheme.New(s.db)
+		s.client = internal.New(s.db)
 	}
 	s.m.Unlock()
 }

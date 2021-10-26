@@ -10,7 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type Client interface {
