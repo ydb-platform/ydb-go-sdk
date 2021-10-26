@@ -4,30 +4,32 @@ import (
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 func TestSchemeOptions(t *testing.T) {
 	{
-		opts := []PermissionsOption{
-			WithClearPermissions(),
-			WithChangeOwner("ow"),
-			WithGrantPermissions(Permissions{
+		opts := []scheme.PermissionsOption{
+			scheme.WithClearPermissions(),
+			scheme.WithChangeOwner("ow"),
+			scheme.WithGrantPermissions(scheme.Permissions{
 				Subject:         "grant",
 				PermissionNames: []string{"a", "b", "c"},
 			}),
-			WithSetPermissions(Permissions{
+			scheme.WithSetPermissions(scheme.Permissions{
 				Subject:         "set",
 				PermissionNames: []string{"d"},
 			}),
-			WithRevokePermissions(Permissions{
+			scheme.WithRevokePermissions(scheme.Permissions{
 				Subject:         "revoke",
 				PermissionNames: []string{"e"},
 			}),
 		}
 
 		var desc permissionsDesc
-		for _, opt := range opts {
-			opt(&desc)
+		for _, o := range opts {
+			o(&desc)
 		}
 
 		if !desc.clear {

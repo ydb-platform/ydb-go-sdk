@@ -6,7 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type lazyCoordination struct {

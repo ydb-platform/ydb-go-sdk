@@ -7,52 +7,10 @@ type permissionsDesc struct {
 	actions []*Ydb_Scheme.PermissionsAction
 }
 
-func permissions(p Permissions) *Ydb_Scheme.Permissions {
-	var y Ydb_Scheme.Permissions
-	p.to(&y)
-	return &y
+func (p *permissionsDesc) SetClear(clear bool) {
+	p.clear = clear
 }
 
-type PermissionsOption func(*permissionsDesc)
-
-func WithClearPermissions() PermissionsOption {
-	return func(p *permissionsDesc) {
-		p.clear = true
-	}
-}
-func WithGrantPermissions(p Permissions) PermissionsOption {
-	return func(d *permissionsDesc) {
-		d.actions = append(d.actions, &Ydb_Scheme.PermissionsAction{
-			Action: &Ydb_Scheme.PermissionsAction_Grant{
-				Grant: permissions(p),
-			},
-		})
-	}
-}
-func WithRevokePermissions(p Permissions) PermissionsOption {
-	return func(d *permissionsDesc) {
-		d.actions = append(d.actions, &Ydb_Scheme.PermissionsAction{
-			Action: &Ydb_Scheme.PermissionsAction_Revoke{
-				Revoke: permissions(p),
-			},
-		})
-	}
-}
-func WithSetPermissions(p Permissions) PermissionsOption {
-	return func(d *permissionsDesc) {
-		d.actions = append(d.actions, &Ydb_Scheme.PermissionsAction{
-			Action: &Ydb_Scheme.PermissionsAction_Set{
-				Set: permissions(p),
-			},
-		})
-	}
-}
-func WithChangeOwner(owner string) PermissionsOption {
-	return func(d *permissionsDesc) {
-		d.actions = append(d.actions, &Ydb_Scheme.PermissionsAction{
-			Action: &Ydb_Scheme.PermissionsAction_ChangeOwner{
-				ChangeOwner: owner,
-			},
-		})
-	}
+func (p *permissionsDesc) AppendAction(action *Ydb_Scheme.PermissionsAction) {
+	p.actions = append(p.actions, action)
 }
