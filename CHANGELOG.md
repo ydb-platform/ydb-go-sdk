@@ -1,5 +1,6 @@
 ## 3.0.1
 * refactored integration tests
+* fixed table retry trace calls
 
 ## 3.0.0
 * Refactored sources for splitting public interfaces and internal
