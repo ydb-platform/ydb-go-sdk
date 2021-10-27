@@ -26,12 +26,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test $(go list ./... | egrep -v "\/(test|testutil|trace)^") -coverprofile=coverage.txt -covermode=atomic
+        run: go test $(go list ./... | egrep -v "\/(test|testutil|trace)^") -coverprofile=unit.txt -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.17.x' && github.ref == 'refs/heads/master'
         with:
-          file: ./coverage.txt
+          file: ./unit.txt
           flags: unit
           env_vars: OS,GO
           fail_ci_if_error: true
@@ -66,11 +66,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race ./... -coverprofile=coverage.txt -covermode=atomic
+        run: go test -race ./... -coverprofile=integration.txt -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
-          file: ./coverage.txt
+          file: ./integration.txt
           flags: integration
           env_vars: OS,GO
           fail_ci_if_error: true

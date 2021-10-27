@@ -11,9 +11,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type DB interface {
@@ -93,7 +96,21 @@ func (db *db) RateLimiter() ratelimiter.Client {
 // New connects to name and return name runtime holder
 func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	db := &db{}
-	opts = append([]Option{WithConnectionString(os.Getenv("YDB_CONNECTION_STRING"))}, opts...)
+	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
+		opts = append([]Option{WithCertificatesFromFile(caFile)}, opts...)
+	}
+	if logLevel, has := os.LookupEnv("YDB_LOG_SEVERITY_LEVEL"); has {
+		if l := logger.FromString(logLevel); l < logger.QUIET {
+			logger := logger.New("ydb", logger.FromString(logLevel))
+			opts = append(
+				[]Option{
+					WithTraceDriver(log.Driver(logger, trace.DetailsAll)),
+					WithTraceTable(log.Table(logger, trace.DetailsAll)),
+				},
+				opts...,
+			)
+		}
+	}
 	for _, opt := range opts {
 		err = opt(ctx, db)
 		if err != nil {

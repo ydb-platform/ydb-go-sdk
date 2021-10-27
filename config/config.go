@@ -4,10 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
-	"log"
 	"net"
-	"os"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
@@ -307,16 +304,9 @@ func New(opts ...Option) Config {
 }
 
 func defaults() (c *config) {
-	var certPool *x509.CertPool
 	certPool, err := x509.SystemCertPool()
 	if err != nil {
-		panic(fmt.Errorf("cannot load system certificates pool: %v", err))
-	}
-	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
-		// ignore any errors on load certificates
-		if err = credentials.AppendCertsFromFile(certPool, caFile); err != nil {
-			log.Printf("cannot load certificates from file '%s' by Env['YDB_SSL_ROOT_CERTIFICATES_FILE']: %v", caFile, err)
-		}
+		certPool = x509.NewCertPool()
 	}
 	return &config{
 		discoveryInterval:    DefaultDiscoveryInterval,
