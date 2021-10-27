@@ -62,11 +62,6 @@ message DatabaseOptions {
     uint32 plan_resolution = 3;
 }
 
-message Attribute {
-    string name = 1;
-    string value = 2;
-}
-
 // A set of quotas for schema operations
 message SchemaOperationQuotas {
     // A single quota based on leaky bucket
@@ -118,7 +113,7 @@ message CreateDatabaseRequest {
     // Additional database options.
     DatabaseOptions options = 4;
     // Attach attributes to database.
-    repeated Attribute attributes = 5;
+    map<string, string> attributes = 5;
     // Optional quotas for schema operations
     SchemaOperationQuotas schema_operation_quotas = 8;
     // Optional idempotency key
@@ -201,6 +196,8 @@ message AlterDatabaseRequest {
     string idempotency_key = 10;
     // Change quotas for the database
     DatabaseQuotas database_quotas = 11;
+    // Alter attributes. Leave the value blank to drop an attribute.
+    map<string, string> alter_attributes = 12;
 }
 
 message AlterDatabaseResponse {

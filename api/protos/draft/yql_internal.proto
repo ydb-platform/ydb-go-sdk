@@ -20,6 +20,7 @@ message GetTaskRequest {
     string owner_id = 2; // guid, should be refreshed on node restart
     string host = 3;
     Ydb.Operations.OperationParams operation_params = 4;
+    uint64 tasks_batch_size = 5;
 }
 
 message SignedIdentity {

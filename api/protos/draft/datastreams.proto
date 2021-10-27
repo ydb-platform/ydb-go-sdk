@@ -654,6 +654,8 @@ message DescribeStreamSummaryResponse {
 }
 
 message DescribeStreamSummaryResult {
+    // Stream description sumary
+    StreamDescriptionSummary stream_description_summary = 1;
 }
 
 message DisableEnhancedMonitoringRequest {

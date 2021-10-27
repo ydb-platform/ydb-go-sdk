@@ -5589,7 +5589,7 @@ type ReadInfoResult_TopicInfo_PartitionInfo struct {
 	ClientNode string `protobuf:"bytes,11,opt,name=client_node,json=clientNode,proto3" json:"client_node,omitempty"`
 	// Host name of proxy node that processing this reading session.
 	ProxyNode string `protobuf:"bytes,12,opt,name=proxy_node,json=proxyNode,proto3" json:"proxy_node,omitempty"`
-	// Host name of node where partition master is running.
+	// Host name of node where partition leader is running.
 	TabletNode string `protobuf:"bytes,13,opt,name=tablet_node,json=tabletNode,proto3" json:"tablet_node,omitempty"`
 	// Assign identifier of actual partition assignment.
 	AssignId uint64 `protobuf:"varint,14,opt,name=assign_id,json=assignId,proto3" json:"assign_id,omitempty"`

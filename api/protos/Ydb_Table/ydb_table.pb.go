@@ -1518,7 +1518,7 @@ type ReplicationPolicy struct {
 	// will be created in each availability zone.
 	CreatePerAvailabilityZone Ydb.FeatureFlag_Status `protobuf:"varint,3,opt,name=create_per_availability_zone,json=createPerAvailabilityZone,proto3,enum=Ydb.FeatureFlag_Status" json:"create_per_availability_zone,omitempty"`
 	// If this feature in enabled then read-only replicas can be promoted
-	// to master.
+	// to leader.
 	AllowPromotion       Ydb.FeatureFlag_Status `protobuf:"varint,4,opt,name=allow_promotion,json=allowPromotion,proto3,enum=Ydb.FeatureFlag_Status" json:"allow_promotion,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
 	XXX_unrecognized     []byte                 `json:"-"`

@@ -31,7 +31,7 @@ type ConsistencyMode int32
 const (
 	// The default or current value
 	ConsistencyMode_CONSISTENCY_MODE_UNSET ConsistencyMode = 0
-	// Strict mode makes sure operations may only complete on current master
+	// Strict mode makes sure operations may only complete on current leader
 	ConsistencyMode_CONSISTENCY_MODE_STRICT ConsistencyMode = 1
 	// Relaxed mode allows operations to complete on stale masters
 	ConsistencyMode_CONSISTENCY_MODE_RELAXED ConsistencyMode = 2
@@ -130,7 +130,7 @@ type Config struct {
 	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	// Period in milliseconds for self-checks (default 1 second)
 	SelfCheckPeriodMillis uint32 `protobuf:"varint,2,opt,name=self_check_period_millis,json=selfCheckPeriodMillis,proto3" json:"self_check_period_millis,omitempty"`
-	// Grace period for sessions on master change (default 10 seconds)
+	// Grace period for sessions on leader change (default 10 seconds)
 	SessionGracePeriodMillis uint32 `protobuf:"varint,3,opt,name=session_grace_period_millis,json=sessionGracePeriodMillis,proto3" json:"session_grace_period_millis,omitempty"`
 	// Concistency mode for read operations
 	ReadConsistencyMode ConsistencyMode `protobuf:"varint,4,opt,name=read_consistency_mode,json=readConsistencyMode,proto3,enum=Ydb.Coordination.ConsistencyMode" json:"read_consistency_mode,omitempty"`
