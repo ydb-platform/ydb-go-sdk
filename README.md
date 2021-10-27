@@ -18,7 +18,8 @@
 4. [Installation](#Install)
 5. [Usage](#Usage)
 6. [Credentials](#Credentials)
-7. [Examples](#examples)
+7. [Environment variables](#Environ)
+8. [Examples](#examples)
 
 ## Overview <a name="Overview"></a>
 
@@ -148,6 +149,13 @@ reduce boilerplate overhead for such cases `ydb-go-sdk` provides generic retry l
 
 There are different variants to get `ydb.Credentials` object to get authorized.
 Usage examples can be found [here](https://github.com/ydb-platform/ydb-go-examples/tree/master/cmd/auth).
+
+## Environment variables <a name="Environ"></a>
+
+Name | Type | Default | Description
+--- | --- | --- | ---
+`YDB_SSL_ROOT_CERTIFICATES_FILE` | `string` | | path to certificates file
+`YDB_LOG_SEVERITY_LEVEL` | `string` | `quiet` | severity logging level. Supported: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `quiet`
 
 ## Examples <a name="examples"></a>
 

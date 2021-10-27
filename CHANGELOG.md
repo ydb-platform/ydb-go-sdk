@@ -1,3 +1,12 @@
+## 3.2.0
+* added package `log` with interface `log.Logger`
+* implements `trace.Driver` and `trace.Table` with `log.Logger`
+* added internal leveled logger which implement interface `log.Logger`
+* supported environment variable `YDB_LOG_SEVERITY_LEVEL`
+* changed name of the field `RetryAttempts` to` Attempts` in the structure `trace.PoolGetDoneInfo`.
+  This change reduces back compatibility, but there are no external uses of v3 sdk, so this change is 
+  fine. We are sorry if this change broke your code
+
 ## 3.1.0
 * published scheme Client interface
 

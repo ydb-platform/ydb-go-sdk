@@ -169,9 +169,9 @@ type (
 		Context context.Context
 	}
 	PoolGetDoneInfo struct {
-		Session       sessionInfo
-		RetryAttempts int
-		Error         error
+		Session  sessionInfo
+		Attempts int
+		Error    error
 	}
 	PoolWaitStartInfo struct {
 		Context context.Context
