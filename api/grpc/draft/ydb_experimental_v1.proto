@@ -6,12 +6,6 @@ option java_package = "com.yandex.ydb.experimental.v1";
 import "kikimr/public/api/protos/ydb_experimental.proto";
 
 service ExperimentalService {
-    // Fast bulk load rows to a table bypassing transaction logic.
-    rpc UploadRows(Experimental.UploadRowsRequest) returns (Experimental.UploadRowsResponse);
-
     rpc ExecuteStreamQuery(Experimental.ExecuteStreamQueryRequest) returns (stream Experimental.ExecuteStreamQueryResponse);
-
-    // Returns disk space usage by database
-    rpc GetDiskSpaceUsage(Experimental.GetDiskSpaceUsageRequest) returns (Experimental.GetDiskSpaceUsageResponse);
 }
 

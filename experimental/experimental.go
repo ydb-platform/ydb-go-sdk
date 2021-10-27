@@ -14,17 +14,6 @@ type Client struct {
 	Driver ydb.Driver
 }
 
-// UploadRows not fully supported yet
-func (c *Client) UploadRows(ctx context.Context, tableName string, typ ydb.Value) (err error) {
-	req := Ydb_Experimental.UploadRowsRequest{
-		Table:           tableName,
-		Rows:            internal.ValueToYDB(typ),
-		OperationParams: nil,
-	}
-	_, err = c.Driver.Call(ctx, ydb.Wrap("/Ydb.Experimental.V1.ExperimentalService/UploadRows", &req, nil))
-	return
-}
-
 // ExecuteStreamQuery not fully supported yet
 func (c *Client) ExecuteStreamQuery(ctx context.Context, query string, params *QueryParameters, opts ...StreamQueryOption) (*StreamQueryResult, error) {
 	var res Ydb_Experimental.ExecuteStreamQueryResult
@@ -40,37 +29,6 @@ func (c *Client) ExecuteStreamQuery(ctx context.Context, query string, params *Q
 		return nil, err
 	}
 	return streamQueryResult(&res), nil
-}
-
-// GetDiskSpaceUsage return size database statistics
-func (c *Client) GetDiskSpaceUsage(ctx context.Context, database string) (*DiskSpaceResult, error) {
-	var res Ydb_Experimental.GetDiskSpaceUsageResult
-	req := Ydb_Experimental.GetDiskSpaceUsageRequest{
-		OperationParams: nil,
-		Database:        database,
-	}
-	_, err := c.Driver.Call(ctx, ydb.Wrap("/Ydb.Experimental.V1.ExperimentalService/GetDiskSpaceUsage", &req, &res))
-	if err != nil {
-		return nil, err
-	}
-
-	return &DiskSpaceResult{
-		CloudID:    res.CloudId,
-		FolderID:   res.FolderId,
-		DatabaseID: res.DatabaseId,
-		TotalSize:  res.TotalSize,
-		DataSize:   res.DataSize,
-		IndexSize:  res.IndexSize,
-	}, nil
-}
-
-type DiskSpaceResult struct {
-	CloudID    string
-	FolderID   string
-	DatabaseID string
-	TotalSize  uint64
-	DataSize   uint64
-	IndexSize  uint64
 }
 
 // QueryParameters TODO: unite with table query parameters
