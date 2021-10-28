@@ -1,8 +1,11 @@
+## 2.10.2
+* Fixed `mapBadSessionError()` in `ydbsql` package
+
 ## 2.10.1
-* Fixed race on ydbsql concurrent connect. This hotfix only for v2 version
+* Fixed race on `ydbsql` concurrent connect. This hotfix only for v2 version
 
 ## 2.10.0
-* Added GlobalAsyncIndex implementation of index interface
+* Added `GlobalAsyncIndex` implementation of index interface
 
 ## 2.9.6
 * Replaced `<session, endpoint>` link type from raw conn to plain endpoint address

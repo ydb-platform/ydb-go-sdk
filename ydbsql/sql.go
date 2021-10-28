@@ -671,7 +671,7 @@ func (r result) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (r result) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
 func mapBadSessionError(err error) error {
-	if ydb.IsOpError(err, ydb.StatusBadSession) {
+	if m := (&ydb.RetryChecker{}).Check(err); m.MustDeleteSession() {
 		return driver.ErrBadConn
 	}
 	return err
