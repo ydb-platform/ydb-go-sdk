@@ -1,3 +1,7 @@
+## 3.2.1
+* Upgraded dependencies
+* Added `WithEndpoint` and `WithDatabase` Option constructors
+
 ## 3.2.0
 * added package `log` with interface `log.Logger`
 * implements `trace.Driver` and `trace.Table` with `log.Logger`

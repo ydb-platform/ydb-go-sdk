@@ -33,6 +33,20 @@ func WithConnectionString(connection string) Option {
 	}
 }
 
+func WithEndpoint(endpoint string) Option {
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, config.WithEndpoint(endpoint))
+		return nil
+	}
+}
+
+func WithDatabase(database string) Option {
+	return func(ctx context.Context, db *db) error {
+		db.options = append(db.options, config.WithDatabase(database))
+		return nil
+	}
+}
+
 func WithConnectParams(params ConnectParams) Option {
 	return func(ctx context.Context, db *db) error {
 		db.options = append(db.options, config.WithEndpoint(params.Endpoint()))
