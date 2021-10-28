@@ -1,3 +1,6 @@
+## 2.10.3
+* Returned context error when context is done on `StreamExecuteScanQuery`
+
 ## 2.10.2
 * Fixed `mapBadSessionError()` in `ydbsql` package
 

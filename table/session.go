@@ -912,7 +912,11 @@ func (s *Session) StreamExecuteScanQuery(
 				}
 				select {
 				case <-ctx.Done():
-					once.Do(func() { close(r.setCh) })
+					once.Do(func() {
+						err = ctx.Err()
+						r.setChErr = &err
+						close(r.setCh)
+					})
 				default:
 					if result := resp.Result; result != nil {
 						if result.ResultSet != nil {
