@@ -11,18 +11,11 @@ func TestParseConnectionString(t *testing.T) {
 		connectionString string
 		schema           string
 		endpoint         string
-		databse          string
+		database         string
 		error            error
 	}{
 		{
 			"grpc://ydb-ru.yandex.net:2135/?database=/ru/home/gvit/mydb",
-			"grpc",
-			"ydb-ru.yandex.net:2135",
-			"/ru/home/gvit/mydb",
-			nil,
-		},
-		{
-			"grpc://ydb-ru.yandex.net:2135/ru/home/gvit/mydb",
 			"grpc",
 			"ydb-ru.yandex.net:2135",
 			"/ru/home/gvit/mydb",
@@ -36,21 +29,7 @@ func TestParseConnectionString(t *testing.T) {
 			nil,
 		},
 		{
-			"grpcs://ydb.serverless.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
-			"grpcs",
-			"ydb.serverless.yandexcloud.net:2135",
-			"/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
-			nil,
-		},
-		{
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/?database=/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
-			"grpcs",
-			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
-			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
-			nil,
-		},
-		{
-			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 			"grpcs",
 			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
@@ -71,7 +50,7 @@ func TestParseConnectionString(t *testing.T) {
 			}
 			require.Equal(t, test.schema, schema)
 			require.Equal(t, test.endpoint, endpoint)
-			require.Equal(t, test.databse, database)
+			require.Equal(t, test.database, database)
 		})
 	}
 }

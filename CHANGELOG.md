@@ -1,3 +1,7 @@
+## 2.10.4
+* Initialized repeater permanently regardless of the value `DriverConfig.DiscoveryInterval`
+  This change allow forcing re-discovery depends on cluster state
+
 ## 2.10.3
 * Returned context error when context is done on `StreamExecuteScanQuery`
 

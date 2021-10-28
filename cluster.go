@@ -201,7 +201,7 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 					// to the tracker.
 					conn.runtime.setState(ConnOffline)
 
-					// NOTE: we setting entry.conn to nil here to be more strict
+					// NOTE: we're setting entry.conn to nil here to be more strict
 					// about the ownership of conn. That is, tracker goroutine
 					// takes full ownership of conn after c.track(conn) call.
 					//
@@ -216,13 +216,18 @@ func (c *cluster) Get(ctx context.Context) (conn *conn, err error) {
 					c.ready--
 					ready = c.ready
 
-					// more then half connections under tracking - re-discover now
+					// more than half connections under tracking - re-discover now
 					if c.explorer != nil && ready*2 < len(c.index) {
+						// emit signal for re-discovery
 						c.explorer.Force()
 					}
 				}
 				c.mu.Unlock()
 			case ready <= 0:
+				if c.explorer != nil {
+					// emit signal for re-discovery
+					c.explorer.Force()
+				}
 				select {
 				// wait if no ready connections left
 				case <-wait():
