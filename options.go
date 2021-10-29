@@ -142,7 +142,7 @@ func WithCertificate(cert *x509.Certificate) Option {
 
 func WithCertificatesFromFile(caFile string) Option {
 	return func(ctx context.Context, db *db) error {
-		if len(caFile) > 0 || caFile[0] == '~' {
+		if len(caFile) > 0 && caFile[0] == '~' {
 			usr, err := user.Current()
 			if err != nil {
 				return err
