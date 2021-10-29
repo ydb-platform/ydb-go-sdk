@@ -148,7 +148,7 @@ type RawValue interface {
 	TzDate() (v time.Time)
 	TzDatetime() (v time.Time)
 	TzTimestamp() (v time.Time)
-	String() (v string)
+	String() (v []byte)
 	UTF8() (v string)
 	YSON() (v []byte)
 	JSON() (v []byte)

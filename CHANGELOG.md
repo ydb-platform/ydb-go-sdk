@@ -1,3 +1,7 @@
+## 3.2.2
+* Fixed result type of `RawValue.String` (ydb string compatible)
+* Fixed scans ydb types into string and slice byte receivers
+
 ## 3.2.1
 * Upgraded dependencies
 * Added `WithEndpoint` and `WithDatabase` Option constructors

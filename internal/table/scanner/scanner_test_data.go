@@ -20,7 +20,6 @@ type column struct {
 	ydbvalue    bool
 	testDefault bool
 	nilValue    bool
-	byteTest    bool
 }
 
 type intIncScanner int64
@@ -28,7 +27,7 @@ type intIncScanner int64
 func (s *intIncScanner) Scan(src interface{}) error {
 	v, ok := src.(int64)
 	if !ok {
-		return fmt.Errorf("wrong types")
+		return fmt.Errorf("wrong type: %T, exp: int64", src)
 	}
 	*s = intIncScanner(v + 10)
 	return nil
@@ -39,28 +38,9 @@ type dateScanner time.Time
 func (s *dateScanner) Scan(src interface{}) error {
 	v, ok := src.(time.Time)
 	if !ok {
-		return fmt.Errorf("wrong types")
+		return fmt.Errorf("wrong type: %T, exp: time.Time", src)
 	}
 	*s = dateScanner(v)
-	return nil
-}
-
-type nullStringScanner struct {
-	value string
-	isNil bool
-}
-
-func (s *nullStringScanner) Scan(src interface{}) error {
-	if src == nil {
-		s.isNil = true
-		return nil
-	}
-	v, ok := src.(string)
-	if !ok {
-		return fmt.Errorf("wrong types")
-	}
-	s.value = v
-	s.isNil = false
 	return nil
 }
 
@@ -164,7 +144,7 @@ var scannerData = []struct {
 			name:   "string",
 			typeID: Ydb.Type_STRING,
 		}},
-		values: []interface{}{new(string), new(string), new(string)},
+		values: []interface{}{new(string), new(string), new([]byte)},
 	},
 	{
 		name:  "Scan float32, int64, uint64 and skip other columns",
@@ -269,7 +249,7 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_STRING,
 			optional: true,
 		}},
-		values: []interface{}{new(*time.Time), new(*uint16), new(*string)},
+		values: []interface{}{new(*time.Time), new(*uint16), new(*[]byte)},
 	},
 	{
 		name:  "Scan optional values",
@@ -305,7 +285,7 @@ var scannerData = []struct {
 			typeID:  Ydb.Type_STRING,
 			scanner: true,
 		}},
-		values: []interface{}{new(intIncScanner), new(dateScanner), new(nullStringScanner)},
+		values: []interface{}{new(intIncScanner), new(dateScanner), new([]byte)},
 	},
 	{
 		name:  "Scan optional int64, date, string as ydb.Scanner",
@@ -324,9 +304,8 @@ var scannerData = []struct {
 			name:     "sstring",
 			typeID:   Ydb.Type_STRING,
 			optional: true,
-			scanner:  true,
 		}},
-		values: []interface{}{new(intIncScanner), new(dateScanner), new(nullStringScanner)},
+		values: []interface{}{new(intIncScanner), new(dateScanner), new(*[]byte)},
 	},
 	{
 		name:  "ScanWithDefaults optional int64, date, string with null values as ydb.Scanner",
@@ -348,10 +327,10 @@ var scannerData = []struct {
 			scanner:  true,
 			nilValue: true,
 		}},
-		values: []interface{}{new(intIncScanner), new(dateScanner), new(nullStringScanner)},
+		values: []interface{}{new(intIncScanner), new(dateScanner), new(*[]byte)},
 	},
 	{
-		name:  "ScanWithDefaults optional int32, timeinterval, string",
+		name:  "ScanWithDefaults optional int32, time interval, string",
 		count: 30,
 		columns: []*column{{
 			name:        "oint32",
@@ -369,10 +348,10 @@ var scannerData = []struct {
 			optional:    true,
 			testDefault: true,
 		}},
-		values: []interface{}{new(int32), new(time.Duration), new(string)},
+		values: []interface{}{new(int32), new(time.Duration), new([]byte)},
 	},
 	{
-		name:  "ScanWithDefaults optional int32, timeinterval, string, nil values applied as default value types",
+		name:  "ScanWithDefaults optional int32, time interval, string, nil values applied as default value types",
 		count: 14,
 		columns: []*column{{
 			name:        "oint32",
@@ -393,10 +372,10 @@ var scannerData = []struct {
 			testDefault: true,
 			nilValue:    true,
 		}},
-		values: []interface{}{new(int32), new(time.Duration), new(string)},
+		values: []interface{}{new(int32), new(time.Duration), new([]byte)},
 	},
 	{
-		name:  "Scan optional int32, timeinterval, string. All values are null",
+		name:  "Scan optional int32, time interval, string. All values are null",
 		count: 15,
 		columns: []*column{{
 			name:     "oint32",
@@ -414,7 +393,7 @@ var scannerData = []struct {
 			optional: true,
 			nilValue: true,
 		}},
-		values: []interface{}{new(*int32), new(*time.Duration), new(*string)},
+		values: []interface{}{new(*int32), new(*time.Duration), new(*[]byte)},
 	},
 	{
 		name:  "Scan optional uint8, yson, tzdatetime, uuid. All values are null",
@@ -446,11 +425,10 @@ var scannerData = []struct {
 		name:  "Scan string as byte array.",
 		count: 19,
 		columns: []*column{{
-			name:     "string",
-			typeID:   Ydb.Type_STRING,
-			byteTest: true,
+			name:   "string",
+			typeID: Ydb.Type_STRING,
 		}},
-		values: []interface{}{new([8]byte)},
+		values: []interface{}{new([]byte)},
 	},
 	{
 		name:  "Scan optional string as byte array.",
@@ -459,9 +437,8 @@ var scannerData = []struct {
 			name:     "string",
 			typeID:   Ydb.Type_STRING,
 			optional: true,
-			byteTest: true,
 		}},
-		values: []interface{}{new(*[8]byte)},
+		values: []interface{}{new(*[]byte)},
 	},
 	{
 		name:  "Scan optional null string as byte array.",
@@ -470,10 +447,9 @@ var scannerData = []struct {
 			name:     "string",
 			typeID:   Ydb.Type_STRING,
 			optional: true,
-			byteTest: true,
 			nilValue: true,
 		}},
-		values: []interface{}{new(*[8]byte)},
+		values: []interface{}{new(*[]byte)},
 	},
 	{
 		name:  "Scan optional default string as byte array.",
@@ -482,11 +458,10 @@ var scannerData = []struct {
 			name:        "string",
 			typeID:      Ydb.Type_STRING,
 			optional:    true,
-			byteTest:    true,
 			nilValue:    true,
 			testDefault: true,
 		}},
-		values: []interface{}{new([8]byte)},
+		values: []interface{}{new([]byte)},
 	},
 }
 

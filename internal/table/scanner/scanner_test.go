@@ -309,50 +309,22 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			ydbval := &Ydb.Value{
 				Value: &Ydb.Value_NullFlagValue{},
 			}
-			if c.scanner {
-				return ydbval, &nullStringScanner{
-					isNil: true,
-				}
-			}
-			if !c.byteTest {
-				if c.testDefault {
-					var dv string
-					return ydbval, &dv
-				}
-				var dv *string
-				return ydbval, &dv
-			}
 			if c.testDefault {
-				var dv [8]byte
+				var dv []byte
 				return ydbval, &dv
 			}
-			var dv *[8]byte
+			var dv *[]byte
 			return ydbval, &dv
 		}
-		v := make([]byte, 8)
-		binary.BigEndian.PutUint64(v, uint64(rv))
+		v := make([]byte, 16)
+		binary.BigEndian.PutUint64(v[0:8], uint64(rv))
+		binary.BigEndian.PutUint64(v[8:16], uint64(rv))
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_BytesValue{
 				BytesValue: v,
 			},
 		}
-
-		if c.scanner {
-			return ydbval, &nullStringScanner{
-				value: string(v),
-				isNil: false,
-			}
-		}
-		if !c.byteTest {
-			src := string(v)
-			if c.optional && !c.testDefault {
-				vp := &src
-				return ydbval, &vp
-			}
-			return ydbval, &src
-		}
-		var src [8]byte
-		copy(src[:], v)
+		src := v
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -484,9 +456,13 @@ func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]in
 				},
 			}
 		}
-		r.Columns = append(r.Columns, &Ydb.Column{
-			Name: c.name,
-			Type: t})
+		r.Columns = append(
+			r.Columns,
+			&Ydb.Column{
+				Name: c.name,
+				Type: t,
+			},
+		)
 	}
 
 	testValues = make([][]interface{}, count)
@@ -509,27 +485,29 @@ func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]in
 func TestScanSqlTypes(t *testing.T) {
 	s := initScanner()
 	for _, test := range scannerData {
-		set, expected := getResultSet(test.count, test.columns)
-		s.reset(set, test.setColumns...)
-		var err error
-		for s.NextRow() {
-			if test.columns[0].testDefault {
-				err = s.ScanWithDefaults(test.values...)
-			} else {
-				err = s.Scan(test.values...)
-			}
-			if err != nil {
-				t.Fatalf("test: %s; error: %s", test.name, err)
-			}
-			if test.setColumnIndexes != nil {
-				for i, v := range test.setColumnIndexes {
-					cmp.Equal(t, expected[0][v], test.values[i])
+		t.Run(test.name, func(t *testing.T) {
+			set, expected := getResultSet(test.count, test.columns)
+			s.reset(set, test.setColumns...)
+			for s.NextRow() {
+				if test.columns[0].testDefault {
+					if err := s.ScanWithDefaults(test.values...); err != nil {
+						t.Fatalf("test: %s; error: %s", test.name, err)
+					}
+				} else {
+					if err := s.Scan(test.values...); err != nil {
+						t.Fatalf("test: %s; error: %s", test.name, err)
+					}
 				}
-			} else {
-				cmp.Equal(t, expected[0], test.values)
+				if test.setColumnIndexes != nil {
+					for i, v := range test.setColumnIndexes {
+						cmp.Equal(t, expected[0][v], test.values[i])
+					}
+				} else {
+					cmp.Equal(t, expected[0], test.values)
+				}
+				expected = expected[1:]
 			}
-			expected = expected[1:]
-		}
+		})
 	}
 
 }
