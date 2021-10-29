@@ -277,7 +277,7 @@ func (s *scanner) any() interface{} {
 	case value.TypeDouble:
 		return s.double()
 	case value.TypeString:
-		return string(s.bytes())
+		return s.bytes()
 	case value.TypeUUID:
 		return s.uint128()
 	case value.TypeUint32:
@@ -554,12 +554,13 @@ func (s *scanner) setTime(dst *time.Time) {
 
 func (s *scanner) setString(dst *string) {
 	switch t := s.stack.current().t.GetTypeId(); t {
+	case Ydb.Type_UUID:
+		src := s.uint128()
+		*dst = string(src[:])
+	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
+		*dst = s.text()
 	case Ydb.Type_STRING:
 		*dst = string(s.bytes())
-	case Ydb.Type_UTF8:
-		*dst = s.text()
-	case Ydb.Type_DYNUMBER:
-		*dst = s.text()
 	default:
 		s.errorf("scan row failed: incorrect source types %s", t)
 	}
@@ -570,7 +571,7 @@ func (s *scanner) setByte(dst *[]byte) {
 	case Ydb.Type_UUID:
 		src := s.uint128()
 		*dst = src[:]
-	case Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
+	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = []byte(s.text())
 	case Ydb.Type_STRING:
 		*dst = s.bytes()

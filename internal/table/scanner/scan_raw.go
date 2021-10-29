@@ -20,6 +20,11 @@ type rawConverter struct {
 	*scanner
 }
 
+func (s *rawConverter) String() (v []byte) {
+	s.unwrap()
+	return s.bytes()
+}
+
 func (s *rawConverter) HasItems() bool {
 	return s.hasItems()
 }
@@ -203,11 +208,6 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 		s.errorf("scan raw failed: %w", err)
 	}
 	return src
-}
-
-func (s *rawConverter) String() (v string) {
-	s.unwrap()
-	return string(s.bytes())
 }
 
 func (s *rawConverter) UTF8() (v string) {
