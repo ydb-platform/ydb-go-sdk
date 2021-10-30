@@ -39,11 +39,21 @@
 * Added integration tests with docker ydb container
 * Changed table session and endpoint link type from string address to integer NodeID
 
+## 2.10.4
+* Initialized repeater permanently regardless of the value `DriverConfig.DiscoveryInterval`
+  This change allow forcing re-discovery depends on cluster state
+
+## 2.10.3
+* Returned context error when context is done on `StreamExecuteScanQuery`
+
+## 2.10.2
+* Fixed `mapBadSessionError()` in `ydbsql` package
+
 ## 2.10.1
-* Fixed race on ydbsql concurrent connect. This hotfix only for v2 version
+* Fixed race on `ydbsql` concurrent connect. This hotfix only for v2 version
 
 ## 2.10.0
-* Added GlobalAsyncIndex implementation of index interface
+* Added `GlobalAsyncIndex` implementation of index interface
 
 ## 2.9.6
 * Replaced `<session, endpoint>` link type from raw conn to plain endpoint address
