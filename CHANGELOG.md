@@ -1,3 +1,6 @@
+## 3.2.3
+* Fixed bug of interpret tilda in path of certificates file
+
 ## 3.2.2
 * Fixed result type of `RawValue.String` (ydb string compatible)
 * Fixed scans ydb types into string and slice byte receivers
