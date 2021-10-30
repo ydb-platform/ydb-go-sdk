@@ -1,3 +1,7 @@
+## 3.2.4
+* Returned context error when context is done on `session.StreamExecuteScanQuery` 
+  and `session.StreamReadTable`
+
 ## 3.2.3
 * Fixed bug of interpret tilda in path of certificates file
 * Added chapter to `README.md` about ecosystem of debug tools over `ydb-go-sdk`
