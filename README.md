@@ -19,7 +19,8 @@
 5. [Usage](#Usage)
 6. [Credentials](#Credentials)
 7. [Environment variables](#Environ)
-8. [Examples](#examples)
+8. [Ecosystem of debug tools](#Debug)
+9. [Examples](#Examples)
 
 ## Overview <a name="Overview"></a>
 
@@ -57,7 +58,6 @@ go get -u github.com/ydb-platform/ydb-go-sdk/v3
 The straightforward example of querying data may look similar to this:
 
 ```go
-   // Determine timeout for connect or do nothing
    ctx := context.Background()
 
    // connect package helps to connect to database, returns connection object which
@@ -148,6 +148,8 @@ reduce boilerplate overhead for such cases `ydb-go-sdk` provides generic retry l
 ## Credentials <a name="Credentials"></a>
 
 There are different variants to get `ydb.Credentials` object to get authorized.
+Spatial cases of credentials for `yandex-cloud` provides with package [ydb-go-yc](https://github.com/ydb-platform/ydb-go-yc)
+Package [ydb-go-sdk-auth-environ](https://github.com/ydb-platform/ydb-go-sdk-auth-environ) provide different credentials depending on the environment variables.
 Usage examples can be found [here](https://github.com/ydb-platform/ydb-go-examples/tree/master/cmd/auth).
 
 ## Environment variables <a name="Environ"></a>
@@ -157,7 +159,21 @@ Name | Type | Default | Description
 `YDB_SSL_ROOT_CERTIFICATES_FILE` | `string` | | path to certificates file
 `YDB_LOG_SEVERITY_LEVEL` | `string` | `quiet` | severity logging level. Supported: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `quiet`
 
-## Examples <a name="examples"></a>
+## Ecosystem of debug tools over `ydb-go-sdk` <a name="Debug"></a>
+
+Package ydb-go-sdk provide debugging over trace events in package `trace`. 
+Now supports driver events in `trace.Driver` struct and table-service events in `trace.Table` struct.
+Next packages provide debug tooling:
+
+Package | Type | Description | Link of example usage
+--- | --- | --- | ---
+[ydb-go-sdk-zap](https://github.com/ydb-platform/ydb-go-sdk-zap) | logging | logging ydb-go-sdk events with zap package | [trace.Driver](https://github.com/ydb-platform/ydb-go-sdk-zap/blob/master/internal/cmd/bench/main.go#L71) [trace.Table](https://github.com/ydb-platform/ydb-go-sdk-zap/blob/master/internal/cmd/bench/main.go#L75)
+[ydb-go-sdk-zerolog](https://github.com/ydb-platform/ydb-go-sdk-zap) | logging | logging ydb-go-sdk events with zerolog package | [trace.Driver](https://github.com/ydb-platform/ydb-go-sdk-zerolog/blob/master/internal/cmd/bench/main.go#L48) [trace.Table](https://github.com/ydb-platform/ydb-go-sdk-zerolog/blob/master/internal/cmd/bench/main.go#L52)
+[ydb-go-sdk-metrics](https://github.com/ydb-platform/ydb-go-sdk-metrics) | metrics | common metrics of ydb-go-sdk. Package declare interfaces such as `Registry`, `GaugeVec` and `Gauge` and use it for create `trace.Driver` and `trace.Table` traces |
+[ydb-go-sdk-prometheus](https://github.com/ydb-platform/ydb-go-sdk-prometheus) | metrics | metrics of ydb-go-sdk. Package use [ydb-go-sdk-metrics](https://github.com/ydb-platform/ydb-go-sdk-metrics) package and prometheus types for create `trace.Driver` and `trace.Table` traces | [trace.Driver](https://github.com/ydb-platform/ydb-go-sdk-prometheus/blob/master/internal/cmd/bench/main.go#L87) [trace.Table](https://github.com/ydb-platform/ydb-go-sdk-prometheus/blob/master/internal/cmd/bench/main.go#L91)
+ydb-go-sdk-opentracing | tracing | WIP | 
+
+## Examples <a name="Examples"></a>
 
 More examples are listed in [examples](https://github.com/ydb-platform/ydb-go-examples) repository.
 

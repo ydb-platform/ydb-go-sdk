@@ -1,5 +1,6 @@
 ## 3.2.3
 * Fixed bug of interpret tilda in path of certificates file
+* Added chapter to `README.md` about ecosystem of debug tools over `ydb-go-sdk`
 
 ## 3.2.2
 * Fixed result type of `RawValue.String` (ydb string compatible)
