@@ -29,12 +29,10 @@ jobs:
         run: go test $(go list ./... | egrep -v "\/(test|testutil|trace)^") -coverprofile=unit.txt -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.17.x' && github.ref == 'refs/heads/master'
         with:
           file: ./unit.txt
-          flags: unit
-          env_vars: OS,GO
-          fail_ci_if_error: true
+          flags: unit,${{ matrix.os }}
+          name: unit
   integration:
     strategy:
       matrix:
@@ -71,6 +69,5 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           file: ./integration.txt
-          flags: integration
-          env_vars: OS,GO
-          fail_ci_if_error: true
+          flags: integration,${{ matrix.os }}
+          name: integration
