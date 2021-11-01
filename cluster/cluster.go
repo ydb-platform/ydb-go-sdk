@@ -8,10 +8,12 @@ import (
 
 type ClientConnInterface interface {
 	grpc.ClientConnInterface
+
+	Address() string
 }
 
 type Cluster interface {
-	// ClientConnInterface interface allows DB use as grpc.ClientConnInterface
+	// ClientConnInterface interface allows Cluster use as grpc.ClientConnInterface
 	// with lazy getting raw grpc-connection in Invoke() or NewStream() stages.
 	// Lazy getting grpc-connection must use for embedded client-side balancing
 	// DB may be put into code-generated client constructor as is.

@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -159,42 +159,59 @@ type db struct {
 	onClose     func(ctx context.Context) error
 }
 
-func (c *db) Stats(func(address string, stats stats.Stats)) {}
+func (db *db) Address() string {
+	return ""
+}
 
-func (c *db) Secure() bool {
+func (db *db) Secure() bool {
 	return true
 }
 
-func (c *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-	if c.onInvoke == nil {
+func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) (err error) {
+	if db.onInvoke == nil {
 		return fmt.Errorf("db.onInvoke() not implemented")
 	}
-	return c.onInvoke(ctx, method, args, reply, opts...)
+	defer func() {
+		if err == nil {
+			if apply, ok := driver.ContextCallInfo(ctx); ok && apply != nil {
+				apply(db)
+			}
+		}
+	}()
+	return db.onInvoke(ctx, method, args, reply, opts...)
 }
 
-func (c *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	if c.onNewStream == nil {
+func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
+	if db.onNewStream == nil {
 		return nil, fmt.Errorf("db.onNewStream() not implemented")
 	}
-	return c.onNewStream(ctx, desc, method, opts...)
+	defer func() {
+		if err == nil {
+			if apply, ok := driver.ContextCallInfo(ctx); ok && apply != nil {
+				apply(db)
+			}
+		}
+	}()
+	return db.onNewStream(ctx, desc, method, opts...)
 }
 
-func (c *db) Get(context.Context) (conn cluster.ClientConnInterface, err error) {
-	return &clientConn{
-		onInvoke:    c.onInvoke,
-		onNewStream: c.onNewStream,
-	}, nil
+func (db *db) Get(context.Context) (conn cluster.ClientConnInterface, err error) {
+	cc := &clientConn{
+		onInvoke:    db.onInvoke,
+		onNewStream: db.onNewStream,
+	}
+	return cc, nil
 }
 
-func (c *db) Name() string {
+func (db *db) Name() string {
 	return "testutil.db"
 }
 
-func (c *db) Close(ctx context.Context) error {
-	if c.onClose == nil {
+func (db *db) Close(ctx context.Context) error {
+	if db.onClose == nil {
 		return fmt.Errorf("db.Close() not implemented")
 	}
-	return c.onClose(ctx)
+	return db.onClose(ctx)
 }
 
 type (
@@ -205,8 +222,8 @@ type (
 type NewClusterOption func(c *db)
 
 func WithInvokeHandlers(invokeHandlers InvokeHandlers) NewClusterOption {
-	return func(c *db) {
-		c.onInvoke = func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	return func(db *db) {
+		db.onInvoke = func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) (err error) {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
 				result, err := handler(args)
 				if err != nil {
@@ -231,8 +248,8 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) NewClusterOption {
 }
 
 func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) NewClusterOption {
-	return func(c *db) {
-		c.onNewStream = func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return func(db *db) {
+		db.onNewStream = func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
 			if handler, ok := newStreamHandlers[Method(method).Code()]; ok {
 				return handler(desc)
 			}
@@ -258,6 +275,14 @@ func NewCluster(opts ...NewClusterOption) cluster.Cluster {
 type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	onAddress   func() string
+}
+
+func (c *clientConn) Address() string {
+	if c.onAddress != nil {
+		return c.onAddress()
+	}
+	return ""
 }
 
 func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {

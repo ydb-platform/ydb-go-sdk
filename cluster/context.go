@@ -1,8 +1,6 @@
 package cluster
 
-import (
-	"context"
-)
+import "context"
 
 type (
 	ctxEndpointKey struct{}

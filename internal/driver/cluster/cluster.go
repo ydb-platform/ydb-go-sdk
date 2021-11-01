@@ -10,12 +10,14 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
+	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -109,6 +111,12 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
+	defer func() {
+		if apply, ok := driver.ContextCallInfo(ctx); ok && apply != nil && conn != nil {
+			apply(conn)
+		}
+	}()
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -116,7 +124,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 		return nil, ErrClusterClosed
 	}
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
-	if e, ok := ContextEndpoint(ctx); ok {
+	if e, ok := public.ContextEndpoint(ctx); ok {
 		if conn, ok := c.index[e.Address()]; ok {
 			return conn.Conn, nil
 		}
