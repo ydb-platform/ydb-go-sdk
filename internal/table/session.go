@@ -3,8 +3,6 @@ package table
 import (
 	"context"
 	"io"
-	"net/url"
-	"strconv"
 	"sync"
 	"time"
 
@@ -15,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
@@ -48,7 +47,6 @@ const (
 // Close() call.
 type session struct {
 	id           string
-	nodeID       cluster.NodeID
 	tableService Ydb_Table_V1.TableServiceClient
 	trace        trace.Table
 	mtx          sync.Mutex
@@ -119,17 +117,8 @@ func newSession(ctx context.Context, c cluster.Cluster, t trace.Table) (s Sessio
 	if err != nil {
 		return nil, err
 	}
-	u, err := url.Parse(result.GetSessionId())
-	if err != nil {
-		panic(err)
-	}
-	nodeID, err := strconv.ParseUint(u.Query().Get("node_id"), 10, 32)
-	if err != nil {
-		panic(err)
-	}
 	s = &session{
 		id:           result.GetSessionId(),
-		nodeID:       cluster.NodeID(nodeID),
 		tableService: client,
 		trace:        t,
 	}
@@ -174,17 +163,10 @@ func (s *session) Close(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	_, err = s.tableService.DeleteSession(cluster.WithNodeID(ctx, s.nodeID), &Ydb_Table.DeleteSessionRequest{
+	_, err = s.tableService.DeleteSession(internal.WithEndpoint(ctx, nil), &Ydb_Table.DeleteSessionRequest{
 		SessionId: s.id,
 	})
 	return err
-}
-
-func (s *session) NodeID() uint32 {
-	if s != nil {
-		return uint32(s.nodeID)
-	}
-	return 0
 }
 
 // KeepAlive keeps idle build alive.
@@ -197,7 +179,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	resp, err := s.tableService.KeepAlive(cluster.WithNodeID(ctx, s.nodeID), &Ydb_Table.KeepAliveRequest{
+	resp, err := s.tableService.KeepAlive(internal.WithEndpoint(ctx, nil), &Ydb_Table.KeepAliveRequest{
 		SessionId: s.id,
 	})
 	if err != nil {
@@ -225,7 +207,7 @@ func (s *session) CreateTable(ctx context.Context, path string, opts ...options.
 	for _, opt := range opts {
 		opt((*options.CreateTableDesc)(&request))
 	}
-	_, err = s.tableService.CreateTable(cluster.WithNodeID(ctx, s.nodeID), &request)
+	_, err = s.tableService.CreateTable(internal.WithEndpoint(ctx, nil), &request)
 	return err
 }
 
@@ -242,7 +224,7 @@ func (s *session) DescribeTable(ctx context.Context, path string, opts ...option
 	for _, opt := range opts {
 		opt((*options.DescribeTableDesc)(&request))
 	}
-	response, err = s.tableService.DescribeTable(cluster.WithNodeID(ctx, s.nodeID), &request)
+	response, err = s.tableService.DescribeTable(internal.WithEndpoint(ctx, nil), &request)
 	if err != nil {
 		return desc, err
 	}
@@ -348,7 +330,7 @@ func (s *session) DropTable(ctx context.Context, path string, opts ...options.Dr
 	for _, opt := range opts {
 		opt((*options.DropTableDesc)(&request))
 	}
-	_, err = s.tableService.DropTable(cluster.WithNodeID(ctx, s.nodeID), &request)
+	_, err = s.tableService.DropTable(internal.WithEndpoint(ctx, nil), &request)
 	return err
 }
 
@@ -361,7 +343,7 @@ func (s *session) AlterTable(ctx context.Context, path string, opts ...options.A
 	for _, opt := range opts {
 		opt((*options.AlterTableDesc)(&request))
 	}
-	_, err = s.tableService.AlterTable(cluster.WithNodeID(ctx, s.nodeID), &request)
+	_, err = s.tableService.AlterTable(internal.WithEndpoint(ctx, nil), &request)
 	return err
 }
 
@@ -375,7 +357,7 @@ func (s *session) CopyTable(ctx context.Context, dst, src string, opts ...option
 	for _, opt := range opts {
 		opt((*options.CopyTableDesc)(&request))
 	}
-	_, err = s.tableService.CopyTable(cluster.WithNodeID(ctx, s.nodeID), &request)
+	_, err = s.tableService.CopyTable(internal.WithEndpoint(ctx, nil), &request)
 	return err
 }
 
@@ -388,7 +370,7 @@ func (s *session) Explain(ctx context.Context, query string) (exp table.DataQuer
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.ExplainDataQuery(cluster.WithNodeID(ctx, s.nodeID), &Ydb_Table.ExplainDataQueryRequest{
+	response, err = s.tableService.ExplainDataQuery(internal.WithEndpoint(ctx, nil), &Ydb_Table.ExplainDataQueryRequest{
 		SessionId: s.id,
 		YqlText:   query,
 	})
@@ -466,7 +448,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.PrepareDataQuery(cluster.WithNodeID(ctx, s.nodeID), &Ydb_Table.PrepareDataQueryRequest{
+	response, err = s.tableService.PrepareDataQuery(internal.WithEndpoint(ctx, nil), &Ydb_Table.PrepareDataQueryRequest{
 		SessionId: s.id,
 		YqlText:   query,
 	})
@@ -569,7 +551,7 @@ func (s *session) executeDataQuery(
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.ExecuteDataQuery(cluster.WithNodeID(ctx, s.nodeID), request)
+	response, err = s.tableService.ExecuteDataQuery(internal.WithEndpoint(ctx, nil), request)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -586,7 +568,7 @@ func (s *session) ExecuteSchemeQuery(ctx context.Context, query string, opts ...
 	for _, opt := range opts {
 		opt((*options.ExecuteSchemeQueryDesc)(&request))
 	}
-	_, err = s.tableService.ExecuteSchemeQuery(cluster.WithNodeID(ctx, s.nodeID), &request)
+	_, err = s.tableService.ExecuteSchemeQuery(internal.WithEndpoint(ctx, nil), &request)
 	return err
 }
 
@@ -597,7 +579,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (desc options.TableO
 		result   Ydb_Table.DescribeTableOptionsResult
 	)
 	request := Ydb_Table.DescribeTableOptionsRequest{}
-	response, err = s.tableService.DescribeTableOptions(cluster.WithNodeID(ctx, s.nodeID), &request)
+	response, err = s.tableService.DescribeTableOptions(internal.WithEndpoint(ctx, nil), &request)
 	if err != nil {
 		return
 	}
@@ -711,7 +693,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	c, err = s.tableService.StreamReadTable(cluster.WithNodeID(ctx, s.nodeID), &request)
+	c, err = s.tableService.StreamReadTable(internal.WithEndpoint(ctx, nil), &request)
 
 	onDone := trace.TableOnSessionQueryStreamRead(s.trace, ctx, s)
 	if err != nil {
@@ -781,7 +763,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	c, err = s.tableService.StreamExecuteScanQuery(cluster.WithNodeID(ctx, s.nodeID), &request)
+	c, err = s.tableService.StreamExecuteScanQuery(internal.WithEndpoint(ctx, nil), &request)
 
 	onDone := trace.TableOnSessionQueryStreamExecute(s.trace, ctx, s, q, params)
 	if err != nil {
@@ -834,7 +816,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
-	_, err = s.tableService.BulkUpsert(cluster.WithNodeID(ctx, s.nodeID), &Ydb_Table.BulkUpsertRequest{
+	_, err = s.tableService.BulkUpsert(internal.WithEndpoint(ctx, nil), &Ydb_Table.BulkUpsertRequest{
 		Table: table,
 		Rows:  value.ToYDB(rows),
 	})
@@ -855,7 +837,7 @@ func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSet
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.BeginTransaction(cluster.WithNodeID(ctx, s.nodeID), &Ydb_Table.BeginTransactionRequest{
+	response, err = s.tableService.BeginTransaction(internal.WithEndpoint(ctx, nil), &Ydb_Table.BeginTransactionRequest{
 		SessionId:  s.id,
 		TxSettings: tx.Settings(),
 	})
@@ -929,7 +911,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = tx.s.tableService.CommitTransaction(cluster.WithNodeID(ctx, tx.s.nodeID), request)
+	response, err = tx.s.tableService.CommitTransaction(internal.WithEndpoint(ctx, nil), request)
 	if err != nil {
 		return nil, err
 	}
@@ -949,7 +931,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	_, err = tx.s.tableService.RollbackTransaction(cluster.WithNodeID(ctx, tx.s.nodeID), &Ydb_Table.RollbackTransactionRequest{
+	_, err = tx.s.tableService.RollbackTransaction(internal.WithEndpoint(ctx, nil), &Ydb_Table.RollbackTransactionRequest{
 		SessionId: tx.s.id,
 		TxId:      tx.id,
 	})

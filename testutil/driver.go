@@ -16,7 +16,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -259,10 +258,6 @@ func NewCluster(opts ...NewClusterOption) cluster.Cluster {
 type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-}
-
-func (c *clientConn) Endpoint() endpoint.Endpoint {
-	return endpoint.Endpoint{}
 }
 
 func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {

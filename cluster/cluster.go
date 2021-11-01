@@ -4,14 +4,10 @@ import (
 	"context"
 
 	"google.golang.org/grpc"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 )
 
 type ClientConnInterface interface {
 	grpc.ClientConnInterface
-
-	Endpoint() endpoint.Endpoint
 }
 
 type Cluster interface {

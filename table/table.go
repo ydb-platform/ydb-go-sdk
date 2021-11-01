@@ -15,7 +15,6 @@ import (
 
 type SessionInfo interface {
 	ID() string
-	NodeID() uint32
 }
 
 type Session interface {
