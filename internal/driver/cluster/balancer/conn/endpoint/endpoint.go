@@ -8,9 +8,10 @@ import (
 type NodeID uint32
 
 type Endpoint struct {
-	Addr
+	ID   NodeID
+	Host string
+	Port int
 
-	ID         NodeID
 	LoadFactor float32
 	Local      bool
 }
@@ -20,7 +21,7 @@ func (e Endpoint) NodeID() NodeID {
 }
 
 func (e Endpoint) Address() string {
-	return e.Addr.String()
+	return net.JoinHostPort(e.Host, strconv.Itoa(e.Port))
 }
 
 func (e Endpoint) LocalDC() bool {
@@ -29,10 +30,10 @@ func (e Endpoint) LocalDC() bool {
 
 func New(address string) (e Endpoint, err error) {
 	var port string
-	e.Addr.Host, port, err = net.SplitHostPort(address)
+	e.Host, port, err = net.SplitHostPort(address)
 	if err != nil {
 		return
 	}
-	e.Addr.Port, err = strconv.Atoi(port)
+	e.Port, err = strconv.Atoi(port)
 	return
 }

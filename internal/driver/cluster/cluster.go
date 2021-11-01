@@ -45,8 +45,6 @@ type cluster struct {
 	explorer repeater.Repeater
 
 	index map[endpoint.NodeID]entry.Entry
-	ready int
-	wait  chan struct{}
 
 	mu     sync.RWMutex
 	closed bool
@@ -95,17 +93,11 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 	}
 	c.closed = true
 
-	wait := c.wait
-	c.wait = nil
-
 	index := c.index
 	c.index = nil
 
 	c.mu.Unlock()
 
-	if wait != nil {
-		close(wait)
-	}
 	for _, entry := range index {
 		if entry.Conn != nil {
 			_ = entry.Conn.Close(ctx)
@@ -201,9 +193,6 @@ func (c *cluster) Insert(ctx context.Context, endpoint endpoint.Endpoint, opts .
 	entry := entry.Entry{Info: info.Info{LoadFactor: endpoint.LoadFactor, Local: endpoint.Local}}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
-	c.ready++
-	wait = c.wait
-	c.wait = nil
 	c.index[endpoint.NodeID()] = entry
 }
 
@@ -270,7 +259,6 @@ func (c *cluster) Remove(ctx context.Context, endpoint endpoint.Endpoint, opts .
 	onDone := trace.DriverOnClusterRemove(c.trace, ctx, endpoint)
 
 	entry.RemoveFrom(c.balancer)
-	c.ready--
 	delete(c.index, endpoint.NodeID())
 	c.mu.Unlock()
 
@@ -313,32 +301,6 @@ func (c *cluster) Pessimize(ctx context.Context, endpoint endpoint.Endpoint) (er
 		}
 	}
 	return err
-}
-
-// c.mu read lock must be held.
-// nolint:unused
-func (c *cluster) await() func() <-chan struct{} {
-	prev := c.wait
-	return func() <-chan struct{} {
-		c.mu.RLock()
-		wait := c.wait
-		c.mu.RUnlock()
-		if wait != prev {
-			return wait
-		}
-
-		c.mu.Lock()
-		wait = c.wait
-		if wait != prev {
-			c.mu.Unlock()
-			return wait
-		}
-		wait = make(chan struct{})
-		c.wait = wait
-		c.mu.Unlock()
-
-		return wait
-	}
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {

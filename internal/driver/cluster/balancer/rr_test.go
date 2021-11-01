@@ -24,8 +24,8 @@ var (
 	}{
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}},
-				{Addr: endpoint.Addr{Host: "bar"}},
+				{Host: "foo"},
+				{Host: "bar"},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -35,9 +35,9 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0.2},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 1},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 1},
+				{Host: "foo", LoadFactor: 0.2},
+				{Host: "bar", LoadFactor: 1},
+				{Host: "baz", LoadFactor: 1},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -48,9 +48,9 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 1},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0.1},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0.9},
+				{Host: "foo", LoadFactor: 1},
+				{Host: "bar", LoadFactor: 0.1},
+				{Host: "baz", LoadFactor: 0.9},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -61,12 +61,12 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0.25},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 1},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 1},
+				{Host: "foo", LoadFactor: 0.25},
+				{Host: "bar", LoadFactor: 1},
+				{Host: "baz", LoadFactor: 1},
 			},
 			del: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}},
+				{Host: "foo"},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -76,12 +76,12 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 1},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0.25},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0.25},
+				{Host: "foo", LoadFactor: 1},
+				{Host: "bar", LoadFactor: 0.25},
+				{Host: "baz", LoadFactor: 0.25},
 			},
 			del: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}},
+				{Host: "foo"},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -91,12 +91,12 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 1},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0.75},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0.25},
+				{Host: "foo", LoadFactor: 1},
+				{Host: "bar", LoadFactor: 0.75},
+				{Host: "baz", LoadFactor: 0.25},
 			},
 			del: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "bar"}},
+				{Host: "bar"},
 			},
 			repeat: 1200,
 			exp: map[string]int{
@@ -106,12 +106,12 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			del: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "baz"}},
+				{Host: "baz"},
 			},
 			repeat: 1000,
 			exp: map[string]int{
@@ -121,23 +121,23 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			del: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}},
-				{Addr: endpoint.Addr{Host: "bar"}},
-				{Addr: endpoint.Addr{Host: "baz"}},
+				{Host: "foo"},
+				{Host: "bar"},
+				{Host: "baz"},
 			},
 			repeat: 1,
 			err:    true,
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -151,9 +151,9 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -167,9 +167,9 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 0},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 0},
+				{Host: "foo", LoadFactor: 0},
+				{Host: "bar", LoadFactor: 0},
+				{Host: "baz", LoadFactor: 0},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -186,9 +186,9 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 10},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 20},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 30},
+				{Host: "foo", LoadFactor: 10},
+				{Host: "bar", LoadFactor: 20},
+				{Host: "baz", LoadFactor: 30},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -205,9 +205,9 @@ var (
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Addr: endpoint.Addr{Host: "foo"}, LoadFactor: 10},
-				{Addr: endpoint.Addr{Host: "bar"}, LoadFactor: 20},
-				{Addr: endpoint.Addr{Host: "baz"}, LoadFactor: 30},
+				{Host: "foo", LoadFactor: 10},
+				{Host: "bar", LoadFactor: 20},
+				{Host: "baz", LoadFactor: 30},
 			},
 			banned: map[string]struct{}{
 				"foo": {},
@@ -248,7 +248,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 				)
 				c.SetState(ctx, state.Online)
 				if test.banned != nil {
-					if _, ok := test.banned[e.Addr.Host]; ok {
+					if _, ok := test.banned[e.Host]; ok {
 						c.SetState(ctx, state.Banned)
 					}
 				}
@@ -306,7 +306,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 					stub.Config(config.New()),
 				)
 				c.SetState(ctx, state.Online)
-				if _, ok := test.banned[e.Addr.Host]; ok {
+				if _, ok := test.banned[e.Host]; ok {
 					c.SetState(ctx, state.Banned)
 				}
 				mconn[c] = e.Host

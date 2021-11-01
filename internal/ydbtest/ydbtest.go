@@ -131,10 +131,8 @@ func (s *YDB) StartEndpoint() *Endpoint {
 	}
 
 	e := endpoint.Endpoint{
-		Addr: endpoint.Addr{
-			Host: host,
-			Port: port,
-		},
+		Host: host,
+		Port: port,
 	}
 	srv := grpc.NewServer()
 	for _, desc := range s.descs {

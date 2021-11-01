@@ -71,11 +71,9 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
 			node := endpoint.Endpoint{
-				ID: endpoint.NodeID(e.NodeId),
-				Addr: endpoint.Addr{
-					Host: e.Address,
-					Port: int(e.Port),
-				},
+				ID:    endpoint.NodeID(e.NodeId),
+				Host:  e.Address,
+				Port:  int(e.Port),
 				Local: e.Location == listEndpointsResult.SelfLocation,
 			}
 			endpoints = append(endpoints, node)
