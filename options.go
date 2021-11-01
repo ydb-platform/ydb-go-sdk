@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
+	"os"
 	"os/user"
 	"path/filepath"
 	"time"
@@ -149,7 +149,7 @@ func WithCertificatesFromFile(caFile string) Option {
 			}
 			caFile = filepath.Join(usr.HomeDir, caFile[1:])
 		}
-		bytes, err := ioutil.ReadFile(caFile)
+		bytes, err := os.ReadFile(caFile)
 		if err != nil {
 			return err
 		}

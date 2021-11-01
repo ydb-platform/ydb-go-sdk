@@ -734,6 +734,8 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		for {
 			select {
 			case <-ctx.Done():
+				err = ctx.Err()
+				r.SetChErr = &err
 				return
 			default:
 				err = c.RecvMsg(&response)
@@ -799,6 +801,8 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		for {
 			select {
 			case <-ctx.Done():
+				err = ctx.Err()
+				r.SetChErr = &err
 				return
 			default:
 				if err = c.RecvMsg(&response); err != nil {

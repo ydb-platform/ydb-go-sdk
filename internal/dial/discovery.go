@@ -49,7 +49,6 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 					go func() {
 						time.Sleep(time.Second)
 						c.Force()
-
 					}()
 					return
 				}
