@@ -57,8 +57,8 @@ func TestClusterFastRedial(t *testing.T) {
 	}
 
 	ne := []endpoint.Endpoint{
-		{ID: 1, Addr: endpoint.Addr{Host: "foo"}},
-		{ID: 2, Addr: endpoint.Addr{Host: "bad"}},
+		{ID: 1, Host: "foo"},
+		{ID: 2, Host: "bad"},
 	}
 	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
 	select {
@@ -96,7 +96,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		}
 		for _, e := range exp {
 			if _, ok := c.index[e.NodeID()]; !ok {
-				t.Fatalf("not found endpoint '%v' in index", e.String())
+				t.Fatalf("not found endpoint '%v' in index", e.Address())
 			}
 		}
 		for nodeID := range c.index {
@@ -114,20 +114,20 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	}
 
 	endpoints := []endpoint.Endpoint{
-		{ID: 1, Addr: endpoint.Addr{Host: "foo"}},
-		{ID: 2, Addr: endpoint.Addr{Host: "foo", Port: 123}},
+		{ID: 1, Host: "foo"},
+		{ID: 2, Host: "foo", Port: 123},
 	}
 	badEndpoints := []endpoint.Endpoint{
-		{ID: 3, Addr: endpoint.Addr{Host: "baz"}},
-		{ID: 4, Addr: endpoint.Addr{Host: "baz", Port: 123}},
+		{ID: 3, Host: "baz"},
+		{ID: 4, Host: "baz", Port: 123},
 	}
 	nextEndpoints := []endpoint.Endpoint{
-		{ID: 5, Addr: endpoint.Addr{Host: "foo"}},
-		{ID: 6, Addr: endpoint.Addr{Host: "bar"}},
-		{ID: 7, Addr: endpoint.Addr{Host: "bar", Port: 123}},
+		{ID: 5, Host: "foo"},
+		{ID: 6, Host: "bar"},
+		{ID: 7, Host: "bar", Port: 123},
 	}
 	nextBadEndpoints := []endpoint.Endpoint{
-		{Addr: endpoint.Addr{Host: "bad", Port: 23}},
+		{Host: "bad", Port: 23},
 	}
 	t.Run("initial fill", func(t *testing.T) {
 		ne := append(endpoints, badEndpoints...)
@@ -324,79 +324,61 @@ func TestDiffEndpoint(t *testing.T) {
 	var noEndpoints []endpoint.Endpoint
 	someEndpoints := []endpoint.Endpoint{
 		{
-			ID: 0,
-			Addr: endpoint.Addr{
-				Host: "0",
-				Port: 0,
-			},
+			ID:   0,
+			Host: "0",
+			Port: 0,
 		},
 		{
-			ID: 1,
-			Addr: endpoint.Addr{
-				Host: "1",
-				Port: 1,
-			},
+			ID:   1,
+			Host: "1",
+			Port: 1,
 		},
 	}
 	sameSomeEndpoints := []endpoint.Endpoint{
 		{
-			ID: 0,
-			Addr: endpoint.Addr{
-				Host: "0",
-				Port: 0,
-			},
+			ID:         0,
+			Host:       "0",
+			Port:       0,
 			LoadFactor: 1,
 			Local:      true,
 		},
 		{
-			ID: 1,
-			Addr: endpoint.Addr{
-				Host: "1",
-				Port: 1,
-			},
+			ID:         1,
+			Host:       "1",
+			Port:       1,
 			LoadFactor: 2,
 			Local:      true,
 		},
 	}
 	anotherEndpoints := []endpoint.Endpoint{
 		{
-			ID: 3,
-			Addr: endpoint.Addr{
-				Host: "2",
-				Port: 0,
-			},
+			ID:   3,
+			Host: "2",
+			Port: 0,
 		},
 		{
-			ID: 4,
-			Addr: endpoint.Addr{
-				Host: "3",
-				Port: 1,
-			},
+			ID:   4,
+			Host: "3",
+			Port: 1,
 		},
 	}
 	moreEndpointsOverlap := []endpoint.Endpoint{
 		{
-			ID: 0,
-			Addr: endpoint.Addr{
-				Host: "0",
-				Port: 0,
-			},
+			ID:         0,
+			Host:       "0",
+			Port:       0,
 			LoadFactor: 1,
 			Local:      true,
 		},
 		{
-			ID: 1,
-			Addr: endpoint.Addr{
-				Host: "1",
-				Port: 1,
-			},
+			ID:   1,
+			Host: "1",
+			Port: 1,
 		},
 		{
-			ID: 5,
-			Addr: endpoint.Addr{
-				Host: "1",
-				Port: 2,
-			},
+			ID:   5,
+			Host: "1",
+			Port: 2,
 		},
 	}
 

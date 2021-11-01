@@ -14,7 +14,7 @@ import (
 )
 
 func isEvenConn(c conn.Conn, _ info.Info) bool {
-	n, err := strconv.Atoi(c.Endpoint().Addr.Host)
+	n, err := strconv.Atoi(c.Endpoint().Host)
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +49,7 @@ func TestMultiBalancer(t *testing.T) {
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(endpoint.Endpoint{Addr: endpoint.Addr{Host: strconv.Itoa(i)}}, nil, stub.Config(config.New()))
+		c := conn.New(endpoint.Endpoint{Host: strconv.Itoa(i)}, nil, stub.Config(config.New()))
 		e := m.Insert(c, info.Info{})
 		es[i] = e
 		el[c] = e

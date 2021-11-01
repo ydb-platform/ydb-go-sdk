@@ -703,8 +703,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 			SessionId: s.id,
 			Path:      path,
 		}
-		response Ydb_Table.ReadTableResponse
-		c        Ydb_Table_V1.TableService_StreamReadTableClient
+		c Ydb_Table_V1.TableService_StreamReadTableClient
 	)
 	for _, opt := range opts {
 		opt((*options.ReadTableDesc)(&request))
@@ -726,6 +725,10 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		SetChCancel: cancel,
 	}
 	go func() {
+		var (
+			response Ydb_Table.ReadTableResponse
+			err      error
+		)
 		defer func() {
 			close(r.SetCh)
 			cancel()
@@ -770,8 +773,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 			Parameters: params.Params(),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
-		response Ydb_Table.ExecuteScanQueryPartialResponse
-		c        Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
+		c Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 	)
 	for _, opt := range opts {
 		opt((*options.ExecuteScanQueryDesc)(&request))
@@ -793,6 +795,10 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		SetChCancel: cancel,
 	}
 	go func() {
+		var (
+			response Ydb_Table.ExecuteScanQueryPartialResponse
+			err      error
+		)
 		defer func() {
 			close(r.SetCh)
 			cancel()
