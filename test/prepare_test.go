@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"testing"
 	"text/template"
 	"time"
 
@@ -64,7 +63,7 @@ func seriesData(id uint64, released time.Time, title, info, comment string) type
 	}
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(id)),
-		types.StructFieldValue("release_date", types.Uint64Value(uint64(released.Sub(time.Unix(0, 0))/time.Hour/24))),
+		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
 		types.StructFieldValue("title", types.UTF8Value(title)),
 		types.StructFieldValue("series_info", types.UTF8Value(info)),
 		types.StructFieldValue("comment", commentv),
@@ -222,31 +221,33 @@ func Quet() {
 	log.SetOutput(&quet{})
 }
 
-func Prepare(ctx context.Context, t *testing.T, db ydb.Connection) {
+func Prepare(ctx context.Context, db ydb.Connection) error {
 	err := db.Scheme().CleanupDatabase(ctx, db.Name(), "series", "episodes", "seasons")
 	if err != nil {
-		t.Fatalf("cleaunup database failed: %v\n", err)
+		return fmt.Errorf("cleaunup database failed: %w", err)
 	}
 
 	err = db.Scheme().EnsurePathExists(ctx, db.Name())
 	if err != nil {
-		t.Fatalf("ensure path exists failed: %v\n", err)
+		return fmt.Errorf("ensure path exists failed: %w", err)
 	}
 
 	err = describeTableOptions(ctx, db.Table())
 	if err != nil {
-		t.Fatalf("describe table options error: %v\n", err)
+		return fmt.Errorf("describe table options error: %w", err)
 	}
 
 	err = createTables(ctx, db.Table(), db.Name())
 	if err != nil {
-		t.Fatalf("create tables error: %v\n", err)
+		return fmt.Errorf("create tables error: %w", err)
 	}
 
 	err = describeTable(ctx, db.Table(), path.Join(db.Name(), "series"))
 	if err != nil {
-		t.Fatalf("describe table error: %v\n", err)
+		return fmt.Errorf("describe table error: %w", err)
 	}
+
+	return nil
 }
 
 func Select(ctx context.Context, db ydb.Connection) error {
@@ -301,7 +302,7 @@ SELECT
 	series_id,
 	title,
 	series_info,
-	CAST(release_date AS Uint64) AS release_date,
+	release_date,
 	comment
 FROM AS_TABLE($seriesData);
 
@@ -310,8 +311,8 @@ SELECT
 	series_id,
 	season_id,
 	title,
-	CAST(first_aired AS Uint64) AS first_aired,
-	CAST(last_aired AS Uint64) AS last_aired
+	first_aired,
+	last_aired
 FROM AS_TABLE($seasonsData);
 
 REPLACE INTO episodes
@@ -320,12 +321,14 @@ SELECT
 	season_id,
 	episode_id,
 	title,
-	CAST(air_date AS Uint64) AS air_date
+	air_date
 FROM AS_TABLE($episodesData);
 `))
 
 func readTable(ctx context.Context, c table.Client, path string) error {
-	var res resultset.Result
+	var (
+		res resultset.Result
+	)
 	err := c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -335,7 +338,7 @@ func readTable(ctx context.Context, c table.Client, path string) error {
 				options.ReadColumn("title"),
 				options.ReadColumn("release_date"),
 			)
-			return
+			return err
 		},
 	)
 	if err != nil {
@@ -344,9 +347,8 @@ func readTable(ctx context.Context, c table.Client, path string) error {
 	var (
 		id    *uint64
 		title *string
-		date  *uint64
+		date  *time.Time
 	)
-
 	log.Printf("> read_table:\n")
 	for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 		for res.NextRow() {
@@ -354,15 +356,15 @@ func readTable(ctx context.Context, c table.Client, path string) error {
 			if err != nil {
 				return err
 			}
-			log.Printf("  > %d %s %d", *id, *title, *date)
+			log.Printf("  > %d %s %s", *id, *title, date.String())
 		}
 	}
 	if err := res.Err(); err != nil {
 		return err
 	}
-	stats := res.Stats()
+	s := res.Stats()
 	for i := 0; ; i++ {
-		phase, ok := stats.NextPhase()
+		phase, ok := s.NextPhase()
 		if !ok {
 			break
 		}
@@ -424,31 +426,33 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 }
 
 func selectSimple(ctx context.Context, c table.Client, prefix string) error {
-	query := render(
-		template.Must(template.New("").Parse(`
+	var (
+		query = render(
+			template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 			DECLARE $seriesID AS Uint64;
 			$format = DateTime::Format("%Y-%m-%d");
 			SELECT
 				series_id,
 				title,
-				$format(DateTime::FromSeconds(CAST(DateTime::ToSeconds(DateTime::IntervalFromDays(CAST(release_date AS Int16))) AS Uint32))) AS release_date
+				release_date
 			FROM
 				series
 			WHERE
 				series_id = $seriesID;
 		`)),
-		templateConfig{
-			TablePathPrefix: prefix,
-		},
+			templateConfig{
+				TablePathPrefix: prefix,
+			},
+		)
+		res    resultset.Result
+		readTx = table.TxControl(
+			table.BeginTx(
+				table.WithOnlineReadOnly(),
+			),
+			table.CommitTx(),
+		)
 	)
-	readTx := table.TxControl(
-		table.BeginTx(
-			table.WithOnlineReadOnly(),
-		),
-		table.CommitTx(),
-	)
-	var res resultset.Result
 	err := c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -461,17 +465,16 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 				),
 				options.WithCollectStatsModeBasic(),
 			)
-			return
+			return err
 		},
 	)
 	if err != nil {
 		return err
 	}
-
 	var (
 		id    *uint64
 		title *string
-		date  *[]byte
+		date  *time.Time
 	)
 
 	log.Printf("> select_simple_transaction:\n")
@@ -491,22 +494,23 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 }
 
 func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
-	query := render(
-		template.Must(template.New("").Parse(`
+	var (
+		query = render(
+			template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
 			DECLARE $series AS List<UInt64>;
 
-			SELECT series_id, season_id, title, CAST(CAST(first_aired AS Date) AS String) AS first_aired
+			SELECT series_id, season_id, title, first_aired
 			FROM seasons
 			WHERE series_id IN $series
 		`)),
-		templateConfig{
-			TablePathPrefix: prefix,
-		},
+			templateConfig{
+				TablePathPrefix: prefix,
+			},
+		)
+		res resultset.Result
 	)
-
-	var res resultset.Result
 	err := c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -520,7 +524,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 					),
 				),
 			)
-			return
+			return err
 		},
 	)
 	if err != nil {
@@ -530,7 +534,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 		seriesID uint64
 		seasonID uint64
 		title    string
-		date     string // due to cast in select query
+		date     time.Time
 	)
 	log.Printf("> scan_query_select:\n")
 	for res.NextResultSet(ctx) {
@@ -545,7 +549,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 	return res.Err()
 }
 
-func Fill(ctx context.Context, c table.Client, prefix string) error {
+func Fill(ctx context.Context, db ydb.Connection) error {
 	// Prepare write transaction.
 	writeTx := table.TxControl(
 		table.BeginTx(
@@ -553,11 +557,11 @@ func Fill(ctx context.Context, c table.Client, prefix string) error {
 		),
 		table.CommitTx(),
 	)
-	err := c.Do(
+	err := db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			stmt, err := s.Prepare(ctx, render(fill, templateConfig{
-				TablePathPrefix: prefix,
+				TablePathPrefix: db.Name(),
 			}))
 			if err != nil {
 				return
@@ -581,7 +585,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeUTF8)),
 				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
-				options.WithColumn("release_date", types.Optional(types.TypeUint64)),
+				options.WithColumn("release_date", types.Optional(types.TypeDate)),
 				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
 				options.WithPrimaryKeyColumn("series_id"),
 			)
@@ -598,8 +602,8 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options.WithColumn("first_aired", types.Optional(types.TypeUint64)),
-				options.WithColumn("last_aired", types.Optional(types.TypeUint64)),
+				options.WithColumn("first_aired", types.Optional(types.TypeDate)),
+				options.WithColumn("last_aired", types.Optional(types.TypeDate)),
 				options.WithPrimaryKeyColumn("series_id", "season_id"),
 			)
 		},
@@ -616,7 +620,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) error {
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options.WithColumn("air_date", types.Optional(types.TypeUint64)),
+				options.WithColumn("air_date", types.Optional(types.TypeDate)),
 				options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			)
 		},

@@ -3,11 +3,13 @@ package test
 import (
 	"context"
 	"math"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -39,12 +41,24 @@ func (s *stats) check(t *testing.T) {
 	if s.min > s.inFlight {
 		t.Fatalf("min > in_flight (%d > %d)", s.min, s.inFlight)
 	}
-	if s.inFlight > s.balance {
-		t.Fatalf("in_flight > balance (%d > %d)", s.inFlight, s.balance)
+	if s.inFlight > s.max {
+		t.Fatalf("in_flight > max (%d > %d)", s.inFlight, s.max)
 	}
 	if s.balance > s.max {
 		t.Fatalf("balance > max (%d > %d)", s.balance, s.max)
 	}
+}
+
+func (s *stats) Min() int {
+	s.Lock()
+	defer s.Unlock()
+	return s.min
+}
+
+func (s *stats) Max() int {
+	s.Lock()
+	defer s.Unlock()
+	return s.max
 }
 
 func (s *stats) addBalance(t *testing.T, delta int) {
@@ -62,8 +76,7 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 }
 
 func TestPoolHealth(t *testing.T) {
-	t.Skip("run under docker")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
 	defer cancel()
 
 	Quet()
@@ -81,9 +94,12 @@ func TestPoolHealth(t *testing.T) {
 
 	db, err := open(
 		ctx,
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		ydb.WithAnonymousCredentials(),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithGrpcConnectionTTL(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
+		ydb.WithSessionPoolSizeLimit(200),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithTraceTable(trace.Table{
@@ -94,7 +110,6 @@ func TestPoolHealth(t *testing.T) {
 					}
 				}
 			},
-			OnSessionKeepAlive: nil,
 			OnSessionDelete: func(info trace.SessionDeleteStartInfo) func(trace.SessionDeleteDoneInfo) {
 				return func(info trace.SessionDeleteDoneInfo) {
 					s.addBalance(t, -1)
@@ -129,9 +144,22 @@ func TestPoolHealth(t *testing.T) {
 		_ = db.Close(ctx)
 	}()
 
-	Prepare(ctx, t, db)
+	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
+		// after initializing pool
+		return nil
+	}); err != nil {
+		t.Fatalf("pool not initialized: %+v", err)
+	}
 
-	if err := Fill(ctx, db.Table(), db.Name()); err != nil {
+	if s.Min() < 0 || s.Max() != 200 {
+		t.Fatalf("pool sizes not applied: %+v", s)
+	}
+
+	if err := Prepare(ctx, db); err != nil {
+		t.Fatalf("fill failed: %v\n", err)
+	}
+
+	if err := Fill(ctx, db); err != nil {
 		t.Fatalf("fill failed: %v\n", err)
 	}
 

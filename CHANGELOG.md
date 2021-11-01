@@ -1,6 +1,8 @@
 ## 3.2.5
 * Dropped endpoint.Addr entity as unused. After change link type between session and endpoint 
   to NodeID endpoint.Addr became unnecessary for internal logic of driver
+* Enabled integration test table pool health
+* Fixed race on session stream requests
 
 ## 3.2.4
 * Returned context error when context is done on `session.StreamExecuteScanQuery` 
