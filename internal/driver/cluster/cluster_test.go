@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
@@ -20,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
 )
 
 func TestClusterFastRedial(t *testing.T) {
@@ -38,7 +38,7 @@ func TestClusterFastRedial(t *testing.T) {
 			return listener.Dial(ctx)
 		},
 		balancer: b,
-		index:    make(map[endpoint.NodeID]entry.Entry),
+		index:    make(map[string]entry.Entry),
 	}
 
 	pingConnects := func(size int) chan struct{} {
@@ -47,7 +47,7 @@ func TestClusterFastRedial(t *testing.T) {
 			for i := 0; i < size*10; i++ {
 				c, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && c != nil && c.Endpoint().NodeID() == 1 {
+				if err == nil && c != nil && c.Endpoint().ID == 1 {
 					_ = c.Close(ctx)
 				}
 			}
@@ -87,7 +87,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			_, b := simpleBalancer()
 			return b
 		}(),
-		index: make(map[endpoint.NodeID]entry.Entry),
+		index: make(map[string]entry.Entry),
 	}
 
 	assert := func(t *testing.T, exp []endpoint.Endpoint) {
@@ -95,20 +95,20 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			t.Fatalf("unexpected number of endpoints %d: got %d", len(exp), len(c.index))
 		}
 		for _, e := range exp {
-			if _, ok := c.index[e.NodeID()]; !ok {
+			if _, ok := c.index[e.Address()]; !ok {
 				t.Fatalf("not found endpoint '%v' in index", e.Address())
 			}
 		}
-		for nodeID := range c.index {
+		for address := range c.index {
 			if func() bool {
 				for _, e := range exp {
-					if e.NodeID() == nodeID {
+					if e.Address() == address {
 						return false
 					}
 				}
 				return true
 			}() {
-				t.Fatalf("unexpected endpoint '%v' in index", nodeID)
+				t.Fatalf("unexpected endpoint '%v' in index", address)
 			}
 		}
 	}

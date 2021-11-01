@@ -1,3 +1,7 @@
+## 3.2.6
+* Reverted `NodeID` as key for link between session and endpoint because yandex-cloud YDB 
+  installation not supported `Endpoint.ID` entity  
+
 ## 3.2.5
 * Dropped endpoint.Addr entity as unused. After change link type between session and endpoint 
   to NodeID endpoint.Addr became unnecessary for internal logic of driver

@@ -10,8 +10,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster/stats/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
@@ -22,6 +22,7 @@ type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
+	Address() string
 	GetState() state.State
 	SetState(context.Context, state.State) state.State
 	Close(ctx context.Context) error

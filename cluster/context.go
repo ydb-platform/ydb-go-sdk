@@ -1,19 +1,22 @@
 package cluster
 
-import (
-	"context"
-)
+import "context"
 
 type (
-	ctxNodeIDKey struct{}
-	NodeID       uint32
+	ctxEndpointKey struct{}
 )
 
-func WithNodeID(ctx context.Context, nodeID NodeID) context.Context {
-	return context.WithValue(ctx, ctxNodeIDKey{}, nodeID)
+type Endpoint interface {
+	Address() string
 }
 
-func ContextNodeID(ctx context.Context) (nodeID NodeID, ok bool) {
-	nodeID, ok = ctx.Value(ctxNodeIDKey{}).(NodeID)
-	return nodeID, ok
+func WithEndpoint(ctx context.Context, endpoint Endpoint) context.Context {
+	return context.WithValue(ctx, ctxEndpointKey{}, endpoint)
+}
+
+func ContextEndpoint(ctx context.Context) (e Endpoint, ok bool) {
+	if e, ok = ctx.Value(ctxEndpointKey{}).(Endpoint); ok {
+		return e, true
+	}
+	return nil, false
 }

@@ -16,10 +16,6 @@ type Endpoint struct {
 	Local      bool
 }
 
-func (e Endpoint) NodeID() NodeID {
-	return e.ID
-}
-
 func (e Endpoint) Address() string {
 	return net.JoinHostPort(e.Host, strconv.Itoa(e.Port))
 }
