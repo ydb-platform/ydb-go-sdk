@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -311,7 +312,13 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
-	return int(int64(a.ID) - int64(b.ID))
+	if c := strings.Compare(a.Host, b.Host); c != 0 {
+		return c
+	}
+	if c := a.Port - b.Port; c != 0 {
+		return c
+	}
+	return 0
 }
 
 func SortEndpoints(es []endpoint.Endpoint) {
