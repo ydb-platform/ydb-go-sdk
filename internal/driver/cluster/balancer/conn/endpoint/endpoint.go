@@ -5,10 +5,7 @@ import (
 	"strconv"
 )
 
-type NodeID uint32
-
 type Endpoint struct {
-	ID   NodeID
 	Host string
 	Port int
 

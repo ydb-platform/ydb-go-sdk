@@ -1,3 +1,6 @@
+## 3.2.7
+* Fixed compare endpoints func
+
 ## 3.2.6
 * Reverted `NodeID` as key for link between session and endpoint because yandex-cloud YDB 
   installation not supported `Endpoint.ID` entity  

@@ -47,7 +47,7 @@ func TestClusterFastRedial(t *testing.T) {
 			for i := 0; i < size*10; i++ {
 				c, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && c != nil && c.Endpoint().ID == 1 {
+				if err == nil && c != nil && c.Endpoint().Host == "bad" {
 					_ = c.Close(ctx)
 				}
 			}
@@ -57,8 +57,8 @@ func TestClusterFastRedial(t *testing.T) {
 	}
 
 	ne := []endpoint.Endpoint{
-		{ID: 1, Host: "foo"},
-		{ID: 2, Host: "bad"},
+		{Host: "foo"},
+		{Host: "bad"},
 	}
 	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
 	select {
@@ -114,17 +114,17 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	}
 
 	endpoints := []endpoint.Endpoint{
-		{ID: 1, Host: "foo"},
-		{ID: 2, Host: "foo", Port: 123},
+		{Host: "foo"},
+		{Host: "foo", Port: 123},
 	}
 	badEndpoints := []endpoint.Endpoint{
-		{ID: 3, Host: "baz"},
-		{ID: 4, Host: "baz", Port: 123},
+		{Host: "baz"},
+		{Host: "baz", Port: 123},
 	}
 	nextEndpoints := []endpoint.Endpoint{
-		{ID: 5, Host: "foo"},
-		{ID: 6, Host: "bar"},
-		{ID: 7, Host: "bar", Port: 123},
+		{Host: "foo"},
+		{Host: "bar"},
+		{Host: "bar", Port: 123},
 	}
 	nextBadEndpoints := []endpoint.Endpoint{
 		{Host: "bad", Port: 23},
@@ -324,26 +324,22 @@ func TestDiffEndpoint(t *testing.T) {
 	var noEndpoints []endpoint.Endpoint
 	someEndpoints := []endpoint.Endpoint{
 		{
-			ID:   0,
 			Host: "0",
 			Port: 0,
 		},
 		{
-			ID:   1,
 			Host: "1",
 			Port: 1,
 		},
 	}
 	sameSomeEndpoints := []endpoint.Endpoint{
 		{
-			ID:         0,
 			Host:       "0",
 			Port:       0,
 			LoadFactor: 1,
 			Local:      true,
 		},
 		{
-			ID:         1,
 			Host:       "1",
 			Port:       1,
 			LoadFactor: 2,
@@ -352,31 +348,26 @@ func TestDiffEndpoint(t *testing.T) {
 	}
 	anotherEndpoints := []endpoint.Endpoint{
 		{
-			ID:   3,
 			Host: "2",
 			Port: 0,
 		},
 		{
-			ID:   4,
 			Host: "3",
 			Port: 1,
 		},
 	}
 	moreEndpointsOverlap := []endpoint.Endpoint{
 		{
-			ID:         0,
 			Host:       "0",
 			Port:       0,
 			LoadFactor: 1,
 			Local:      true,
 		},
 		{
-			ID:   1,
 			Host: "1",
 			Port: 1,
 		},
 		{
-			ID:   5,
 			Host: "1",
 			Port: 2,
 		},
