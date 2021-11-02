@@ -95,7 +95,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			t.Fatalf("unexpected number of endpoints %d: got %d", len(exp), len(c.index))
 		}
 		for _, e := range exp {
-			if _, ok := c.index[e.ID()]; !ok {
+			if _, ok := c.index[e.NodeID()]; !ok {
 				t.Fatalf("not found endpoint '%v' in index", e.Address())
 			}
 		}

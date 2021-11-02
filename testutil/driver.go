@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -159,10 +158,6 @@ type db struct {
 	onClose     func(ctx context.Context) error
 }
 
-func (db *db) ID() uint32 {
-	return 0
-}
-
 func (db *db) Address() string {
 	return ""
 }
@@ -175,13 +170,6 @@ func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply
 	if db.onInvoke == nil {
 		return fmt.Errorf("db.onInvoke() not implemented")
 	}
-	defer func() {
-		if err == nil {
-			if apply, ok := driver.ContextCallInfo(ctx); ok && apply != nil {
-				apply(db)
-			}
-		}
-	}()
 	return db.onInvoke(ctx, method, args, reply, opts...)
 }
 
@@ -189,17 +177,10 @@ func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method strin
 	if db.onNewStream == nil {
 		return nil, fmt.Errorf("db.onNewStream() not implemented")
 	}
-	defer func() {
-		if err == nil {
-			if apply, ok := driver.ContextCallInfo(ctx); ok && apply != nil {
-				apply(db)
-			}
-		}
-	}()
 	return db.onNewStream(ctx, desc, method, opts...)
 }
 
-func (db *db) Get(context.Context) (conn cluster.ClientConnInterface, err error) {
+func (db *db) Get(context.Context) (conn grpc.ClientConnInterface, err error) {
 	cc := &clientConn{
 		onInvoke:    db.onInvoke,
 		onNewStream: db.onNewStream,
@@ -280,14 +261,6 @@ type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
 	onAddress   func() string
-	onID        func() uint32
-}
-
-func (c *clientConn) ID() uint32 {
-	if c.onID != nil {
-		return c.onID()
-	}
-	return 0
 }
 
 func (c *clientConn) Address() string {

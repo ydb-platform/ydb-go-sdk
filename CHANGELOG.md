@@ -2,6 +2,8 @@
 * Reverted ID in `endpoint.Endpoint` struct. If `ListEndpoints` discovery response  
   returns endpoints without `NodeID` - `endpoint.Endpoint.ID` applied from hash of 
   endpoint address 
+* On table session requests now preferred the endpoint by `ID` extracted from session `ID`. If 
+  endpoint by `ID` not found - using the endpoint from balancer 
 
 ## 3.2.7
 * Fixed compare endpoints func

@@ -7,9 +7,9 @@ import (
 )
 
 type Endpoint struct {
-	NodeID uint32
-	Host   string
-	Port   int
+	ID   uint32
+	Host string
+	Port int
 
 	LoadFactor float32
 	Local      bool
@@ -21,9 +21,9 @@ func hash(s string) uint32 {
 	return h.Sum32()
 }
 
-func (e Endpoint) ID() uint32 {
-	if e.NodeID > 0 {
-		return e.NodeID
+func (e Endpoint) NodeID() uint32 {
+	if e.ID > 0 {
+		return e.ID
 	}
 	return hash(e.Address())
 }

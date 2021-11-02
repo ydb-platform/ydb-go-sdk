@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc"
 
 	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
@@ -111,12 +110,6 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
-	defer func() {
-		if apply, ok := driver.ContextCallInfo(ctx); ok && apply != nil && conn != nil {
-			apply(conn.Endpoint())
-		}
-	}()
-
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -125,7 +118,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	}
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	if e, ok := public.ContextEndpoint(ctx); ok {
-		if conn, ok := c.index[e.ID()]; ok {
+		if conn, ok := c.index[e.NodeID()]; ok {
 			return conn.Conn, nil
 		}
 	}
@@ -185,7 +178,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		onDone(conn.GetState())
 	}()
 
-	_, has := c.index[e.ID()]
+	_, has := c.index[e.NodeID()]
 	if has {
 		panic("ydb: can't insert already existing endpoint")
 	}
@@ -200,7 +193,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	entry := entry.Entry{Info: info.Info{LoadFactor: e.LoadFactor, Local: e.Local}}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
-	c.index[e.ID()] = entry
+	c.index[e.NodeID()] = entry
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
@@ -220,7 +213,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	entry, has := c.index[e.ID()]
+	entry, has := c.index[e.NodeID()]
 	if !has {
 		panic("ydb: can't update not-existing endpoint")
 	}
@@ -234,7 +227,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 	entry.Info = info.Info{LoadFactor: e.LoadFactor, Local: e.Local}
 	entry.Conn.SetState(ctx, state.Online)
-	c.index[e.ID()] = entry
+	c.index[e.NodeID()] = entry
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, entry.Info)
@@ -257,7 +250,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	entry, has := c.index[e.ID()]
+	entry, has := c.index[e.NodeID()]
 	if !has {
 		c.mu.Unlock()
 		panic("ydb: can't remove not-existing endpoint")
@@ -266,7 +259,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	onDone := trace.DriverOnClusterRemove(c.trace, ctx, e)
 
 	entry.RemoveFrom(c.balancer)
-	delete(c.index, e.ID())
+	delete(c.index, e.NodeID())
 	c.mu.Unlock()
 
 	if entry.Conn != nil {
@@ -283,7 +276,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrClusterClosed)
 	}
 
-	entry, has := c.index[e.ID()]
+	entry, has := c.index[e.NodeID()]
 	if !has {
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
@@ -311,7 +304,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
-	return int(int64(a.ID()) - int64(b.ID()))
+	return int(int64(a.NodeID()) - int64(b.NodeID()))
 }
 
 func SortEndpoints(es []endpoint.Endpoint) {
