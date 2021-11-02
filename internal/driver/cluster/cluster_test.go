@@ -37,8 +37,9 @@ func TestClusterFastRedial(t *testing.T) {
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return listener.Dial(ctx)
 		},
-		balancer: b,
-		index:    make(map[string]entry.Entry),
+		balancer:  b,
+		index:     make(map[string]entry.Entry),
+		endpoints: make(map[uint32]conn.Conn),
 	}
 
 	pingConnects := func(size int) chan struct{} {
@@ -87,7 +88,8 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			_, b := simpleBalancer()
 			return b
 		}(),
-		index: make(map[string]entry.Entry),
+		index:     make(map[string]entry.Entry),
+		endpoints: make(map[uint32]conn.Conn),
 	}
 
 	assert := func(t *testing.T, exp []endpoint.Endpoint) {

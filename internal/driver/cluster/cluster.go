@@ -45,7 +45,8 @@ type cluster struct {
 	balancer balancer.Balancer
 	explorer repeater.Repeater
 
-	index map[string]entry.Entry
+	index     map[string]entry.Entry
+	endpoints map[uint32]conn.Conn // only one endpoint by node ID
 
 	mu     sync.RWMutex
 	closed bool
@@ -76,10 +77,11 @@ func New(
 	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
-		trace:    trace,
-		index:    make(map[string]entry.Entry),
-		dial:     dial,
-		balancer: balancer,
+		trace:     trace,
+		index:     make(map[string]entry.Entry),
+		endpoints: make(map[uint32]conn.Conn),
+		dial:      dial,
+		balancer:  balancer,
 	}
 }
 
@@ -96,6 +98,7 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 
 	index := c.index
 	c.index = nil
+	c.endpoints = nil
 
 	c.mu.Unlock()
 
@@ -119,10 +122,8 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	}
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	if e, ok := public.ContextEndpoint(ctx); ok {
-		for _, entry := range c.index {
-			if entry.Conn.Endpoint().NodeID() == e.NodeID() {
-				return entry.Conn, nil
-			}
+		if conn, ok = c.endpoints[e.NodeID()]; ok {
+			return conn, nil
 		}
 	}
 
@@ -193,10 +194,13 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		}
 	}()
 
-	entry := entry.Entry{Info: info.Info{LoadFactor: e.LoadFactor, Local: e.Local}}
+	entry := entry.Entry{Info: info.Info{ID: e.ID, LoadFactor: e.LoadFactor, Local: e.Local}}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
 	c.index[e.Address()] = entry
+	if e.ID > 0 {
+		c.endpoints[e.ID] = conn
+	}
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
@@ -228,9 +232,13 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		onDone(entry.Conn.GetState())
 	}()
 
-	entry.Info = info.Info{LoadFactor: e.LoadFactor, Local: e.Local}
+	delete(c.endpoints, entry.Info.ID)
+	entry.Info = info.Info{ID: e.ID, LoadFactor: e.LoadFactor, Local: e.Local}
 	entry.Conn.SetState(ctx, state.Online)
 	c.index[e.Address()] = entry
+	if e.ID > 0 {
+		c.endpoints[e.ID] = entry.Conn
+	}
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, entry.Info)
@@ -263,6 +271,8 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 	entry.RemoveFrom(c.balancer)
 	delete(c.index, e.Address())
+	delete(c.endpoints, entry.Info.ID)
+
 	c.mu.Unlock()
 
 	if entry.Conn != nil {

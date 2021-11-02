@@ -1,7 +1,5 @@
 ## 3.2.8
-* Reverted ID in `endpoint.Endpoint` struct. If `ListEndpoints` discovery response  
-  returns endpoints without `NodeID` - `endpoint.Endpoint.ID` applied from hash of 
-  endpoint address 
+* Stored node ID into `endpoint.Endpoint` struct. 
 * On table session requests now preferred the endpoint by `ID` extracted from session `ID`. If 
   endpoint by `ID` not found - using the endpoint from balancer 
 
