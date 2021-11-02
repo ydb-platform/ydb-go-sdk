@@ -312,6 +312,9 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
+	if c := int64(a.ID) - int64(b.ID); c != 0 {
+		return int(c)
+	}
 	if c := strings.Compare(a.Host, b.Host); c != 0 {
 		return c
 	}
