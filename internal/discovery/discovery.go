@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -71,15 +72,25 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
 			node := endpoint.Endpoint{
+				ID:    e.NodeId,
 				Host:  e.Address,
 				Port:  int(e.Port),
 				Local: e.Location == listEndpointsResult.SelfLocation,
+			}
+			if node.ID == 0 {
+				node.ID = hash([]byte(node.Address()))
 			}
 			endpoints = append(endpoints, node)
 		}
 	}
 
 	return endpoints, nil
+}
+
+func hash(b []byte) uint32 {
+	h := fnv.New32a()
+	h.Write(b)
+	return h.Sum32()
 }
 
 func (d *client) WhoAmI(ctx context.Context) (*WhoAmI, error) {

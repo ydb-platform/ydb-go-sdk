@@ -6,6 +6,7 @@ import (
 )
 
 type Endpoint struct {
+	ID   uint32
 	Host string
 	Port int
 
