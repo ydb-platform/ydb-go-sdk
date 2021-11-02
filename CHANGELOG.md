@@ -1,3 +1,8 @@
+## 3.2.8
+* Reverted ID in `endpoint.Endpoint` struct. If `ListEndpoints` discovery response  
+  returns endpoints without `NodeID` - `endpoint.Endpoint.ID` applied from hash of 
+  endpoint address 
+
 ## 3.2.7
 * Fixed compare endpoints func
 

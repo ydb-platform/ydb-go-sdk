@@ -157,6 +157,8 @@ Name | Type | Default | Description
 --- | --- | --- | ---
 `YDB_SSL_ROOT_CERTIFICATES_FILE` | `string` | | path to certificates file
 `YDB_LOG_SEVERITY_LEVEL` | `string` | `quiet` | severity logging level. Supported: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `quiet`
+`GRPC_GO_LOG_VERBOSITY_LEVEL` | `integer` | | set to `99` to see grpc logs  
+`GRPC_GO_LOG_SEVERITY_LEVEL` | `string` | | set to `info` to see grpc logs
 
 ## Ecosystem of debug tools over `ydb-go-sdk` <a name="Debug"></a>
 

@@ -242,7 +242,7 @@ func (s *YDB) StartBalancer() *Balancer {
 
 func (s *YDB) DialContext(ctx context.Context, addr string) (_ net.Conn, err error) {
 	var e endpoint.Endpoint
-	e.Host, e.Port, err = SplitHostPort(addr)
+	e.Host, e.Port, err = endpoint.SplitHostPort(addr)
 	if err != nil {
 		return
 	}
@@ -298,17 +298,7 @@ func NewListener() *Listener {
 }
 
 func (ln *Listener) HostPort() (host string, port int, err error) {
-	return SplitHostPort(ln.Addr().String())
-}
-
-func SplitHostPort(addr string) (host string, port int, err error) {
-	var prt string
-	host, prt, err = net.SplitHostPort(addr)
-	if err != nil {
-		return
-	}
-	port, err = strconv.Atoi(prt)
-	return
+	return endpoint.SplitHostPort(ln.Addr().String())
 }
 
 func (ln *Listener) Accept() (net.Conn, error) {

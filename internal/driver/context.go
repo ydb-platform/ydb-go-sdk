@@ -8,7 +8,7 @@ import (
 
 type ctxCallInfoKey struct{}
 
-type callInfo func(cc cluster.ClientConnInterface)
+type callInfo func(cc cluster.Endpoint)
 
 func WithCallInfo(ctx context.Context, info callInfo) context.Context {
 	return context.WithValue(ctx, ctxCallInfoKey{}, info)

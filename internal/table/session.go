@@ -103,13 +103,14 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 	var (
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
-		info     cluster.ClientConnInterface
+		endpoint cluster.Endpoint
 	)
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(
-		driver.WithCallInfo(ctx, func(cc cluster.ClientConnInterface) { info = cc }),
+	c := Ydb_Table_V1.NewTableServiceClient(cc)
+	response, err = c.CreateSession(
+		driver.WithCallInfo(ctx, func(e cluster.Endpoint) { endpoint = e }),
 		&Ydb_Table.CreateSessionRequest{},
 	)
 	if err != nil {
@@ -121,8 +122,8 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 	}
 	s = &session{
 		id:           result.GetSessionId(),
-		endpoint:     info,
-		tableService: Ydb_Table_V1.NewTableServiceClient(info),
+		endpoint:     endpoint,
+		tableService: c,
 		trace:        t,
 	}
 	return

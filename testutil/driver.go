@@ -159,6 +159,10 @@ type db struct {
 	onClose     func(ctx context.Context) error
 }
 
+func (db *db) ID() uint32 {
+	return 0
+}
+
 func (db *db) Address() string {
 	return ""
 }
@@ -276,6 +280,14 @@ type clientConn struct {
 	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
 	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
 	onAddress   func() string
+	onID        func() uint32
+}
+
+func (c *clientConn) ID() uint32 {
+	if c.onID != nil {
+		return c.onID()
+	}
+	return 0
 }
 
 func (c *clientConn) Address() string {

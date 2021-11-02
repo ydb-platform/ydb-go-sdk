@@ -104,7 +104,6 @@ func (c *conn) release(ctx context.Context) {
 	onDone(int(atomic.LoadInt32(&c.locks)))
 }
 
-//nolint: deadcode
 func isBroken(raw *grpc.ClientConn) bool {
 	if raw == nil {
 		return true
@@ -113,15 +112,6 @@ func isBroken(raw *grpc.ClientConn) bool {
 	return s == connectivity.Shutdown || s == connectivity.TransientFailure
 }
 
-//func (c *conn) IsReady() bool {
-//	if c == nil {
-//		return false
-//	}
-//	c.Lock()
-//	defer c.Unlock()
-//	return c.cc != nil && c.cc.GetState() == connectivity.Ready
-//}
-//
 func (c *conn) close(ctx context.Context) (err error) {
 	if c.cc == nil {
 		return nil

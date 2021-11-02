@@ -38,7 +38,7 @@ func TestClusterFastRedial(t *testing.T) {
 			return listener.Dial(ctx)
 		},
 		balancer: b,
-		index:    make(map[string]entry.Entry),
+		index:    make(map[uint32]entry.Entry),
 	}
 
 	pingConnects := func(size int) chan struct{} {
@@ -87,7 +87,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			_, b := simpleBalancer()
 			return b
 		}(),
-		index: make(map[string]entry.Entry),
+		index: make(map[uint32]entry.Entry),
 	}
 
 	assert := func(t *testing.T, exp []endpoint.Endpoint) {
@@ -95,20 +95,20 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			t.Fatalf("unexpected number of endpoints %d: got %d", len(exp), len(c.index))
 		}
 		for _, e := range exp {
-			if _, ok := c.index[e.Address()]; !ok {
+			if _, ok := c.index[e.ID()]; !ok {
 				t.Fatalf("not found endpoint '%v' in index", e.Address())
 			}
 		}
-		for address := range c.index {
+		for _, entry := range c.index {
 			if func() bool {
 				for _, e := range exp {
-					if e.Address() == address {
+					if e.Address() == entry.Conn.Address() {
 						return false
 					}
 				}
 				return true
 			}() {
-				t.Fatalf("unexpected endpoint '%v' in index", address)
+				t.Fatalf("unexpected endpoint '%v' in index", entry.Conn.Address())
 			}
 		}
 	}

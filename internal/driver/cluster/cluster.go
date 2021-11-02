@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -46,7 +45,7 @@ type cluster struct {
 	balancer balancer.Balancer
 	explorer repeater.Repeater
 
-	index map[string]entry.Entry
+	index map[uint32]entry.Entry
 
 	mu     sync.RWMutex
 	closed bool
@@ -78,7 +77,7 @@ func New(
 ) Cluster {
 	return &cluster{
 		trace:    trace,
-		index:    make(map[string]entry.Entry),
+		index:    make(map[uint32]entry.Entry),
 		dial:     dial,
 		balancer: balancer,
 	}
@@ -114,7 +113,7 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	defer func() {
 		if apply, ok := driver.ContextCallInfo(ctx); ok && apply != nil && conn != nil {
-			apply(conn)
+			apply(conn.Endpoint())
 		}
 	}()
 
@@ -126,7 +125,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	}
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	if e, ok := public.ContextEndpoint(ctx); ok {
-		if conn, ok := c.index[e.Address()]; ok {
+		if conn, ok := c.index[e.ID()]; ok {
 			return conn.Conn, nil
 		}
 	}
@@ -186,7 +185,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		onDone(conn.GetState())
 	}()
 
-	_, has := c.index[e.Address()]
+	_, has := c.index[e.ID()]
 	if has {
 		panic("ydb: can't insert already existing endpoint")
 	}
@@ -201,7 +200,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	entry := entry.Entry{Info: info.Info{LoadFactor: e.LoadFactor, Local: e.Local}}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
-	c.index[e.Address()] = entry
+	c.index[e.ID()] = entry
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
@@ -221,7 +220,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	entry, has := c.index[e.Address()]
+	entry, has := c.index[e.ID()]
 	if !has {
 		panic("ydb: can't update not-existing endpoint")
 	}
@@ -235,7 +234,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 	entry.Info = info.Info{LoadFactor: e.LoadFactor, Local: e.Local}
 	entry.Conn.SetState(ctx, state.Online)
-	c.index[e.Address()] = entry
+	c.index[e.ID()] = entry
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, entry.Info)
@@ -258,7 +257,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	entry, has := c.index[e.Address()]
+	entry, has := c.index[e.ID()]
 	if !has {
 		c.mu.Unlock()
 		panic("ydb: can't remove not-existing endpoint")
@@ -267,7 +266,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	onDone := trace.DriverOnClusterRemove(c.trace, ctx, e)
 
 	entry.RemoveFrom(c.balancer)
-	delete(c.index, e.Address())
+	delete(c.index, e.ID())
 	c.mu.Unlock()
 
 	if entry.Conn != nil {
@@ -284,7 +283,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrClusterClosed)
 	}
 
-	entry, has := c.index[e.Address()]
+	entry, has := c.index[e.ID()]
 	if !has {
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
@@ -298,8 +297,8 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 	if c.explorer != nil {
 		// count ratio (banned/all)
 		online := 0
-		for _, e := range c.index {
-			if e.Conn != nil && e.Conn.GetState() == state.Online {
+		for _, entry := range c.index {
+			if entry.Conn != nil && entry.Conn.GetState() == state.Online {
 				online++
 			}
 		}
@@ -312,16 +311,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
-	if c := int64(a.ID) - int64(b.ID); c != 0 {
-		return int(c)
-	}
-	if c := strings.Compare(a.Host, b.Host); c != 0 {
-		return c
-	}
-	if c := a.Port - b.Port; c != 0 {
-		return c
-	}
-	return 0
+	return int(int64(a.ID()) - int64(b.ID()))
 }
 
 func SortEndpoints(es []endpoint.Endpoint) {

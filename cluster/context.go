@@ -8,6 +8,7 @@ type (
 
 type Endpoint interface {
 	Address() string
+	ID() uint32
 }
 
 func WithEndpoint(ctx context.Context, endpoint Endpoint) context.Context {

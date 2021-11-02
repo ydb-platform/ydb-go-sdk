@@ -10,6 +10,7 @@ type ClientConnInterface interface {
 	grpc.ClientConnInterface
 
 	Address() string
+	ID() uint32
 }
 
 type Cluster interface {
