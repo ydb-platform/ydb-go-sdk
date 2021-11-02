@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,7 +45,7 @@ type cluster struct {
 	balancer balancer.Balancer
 	explorer repeater.Repeater
 
-	index map[uint32]entry.Entry
+	index map[string]entry.Entry
 
 	mu     sync.RWMutex
 	closed bool
@@ -76,7 +77,7 @@ func New(
 ) Cluster {
 	return &cluster{
 		trace:    trace,
-		index:    make(map[uint32]entry.Entry),
+		index:    make(map[string]entry.Entry),
 		dial:     dial,
 		balancer: balancer,
 	}
@@ -118,8 +119,10 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	}
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	if e, ok := public.ContextEndpoint(ctx); ok {
-		if conn, ok := c.index[e.NodeID()]; ok {
-			return conn.Conn, nil
+		for _, entry := range c.index {
+			if entry.Conn.Endpoint().NodeID() == e.NodeID() {
+				return entry.Conn, nil
+			}
 		}
 	}
 
@@ -178,7 +181,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		onDone(conn.GetState())
 	}()
 
-	_, has := c.index[e.NodeID()]
+	_, has := c.index[e.Address()]
 	if has {
 		panic("ydb: can't insert already existing endpoint")
 	}
@@ -193,7 +196,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	entry := entry.Entry{Info: info.Info{LoadFactor: e.LoadFactor, Local: e.Local}}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
-	c.index[e.NodeID()] = entry
+	c.index[e.Address()] = entry
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
@@ -213,7 +216,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	entry, has := c.index[e.NodeID()]
+	entry, has := c.index[e.Address()]
 	if !has {
 		panic("ydb: can't update not-existing endpoint")
 	}
@@ -227,7 +230,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 	entry.Info = info.Info{LoadFactor: e.LoadFactor, Local: e.Local}
 	entry.Conn.SetState(ctx, state.Online)
-	c.index[e.NodeID()] = entry
+	c.index[e.Address()] = entry
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, entry.Info)
@@ -250,7 +253,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	entry, has := c.index[e.NodeID()]
+	entry, has := c.index[e.Address()]
 	if !has {
 		c.mu.Unlock()
 		panic("ydb: can't remove not-existing endpoint")
@@ -259,7 +262,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	onDone := trace.DriverOnClusterRemove(c.trace, ctx, e)
 
 	entry.RemoveFrom(c.balancer)
-	delete(c.index, e.NodeID())
+	delete(c.index, e.Address())
 	c.mu.Unlock()
 
 	if entry.Conn != nil {
@@ -276,7 +279,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrClusterClosed)
 	}
 
-	entry, has := c.index[e.NodeID()]
+	entry, has := c.index[e.Address()]
 	if !has {
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
@@ -304,7 +307,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
-	return int(int64(a.NodeID()) - int64(b.NodeID()))
+	return strings.Compare(a.Address(), b.Address())
 }
 
 func SortEndpoints(es []endpoint.Endpoint) {

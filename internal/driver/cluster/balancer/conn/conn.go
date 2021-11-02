@@ -22,7 +22,6 @@ type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-	Address() string
 	GetState() state.State
 	SetState(context.Context, state.State) state.State
 	Close(ctx context.Context) error
@@ -45,6 +44,13 @@ type conn struct {
 	cc    *grpc.ClientConn
 	state state.State
 	locks int32
+}
+
+func (c *conn) NodeID() uint32 {
+	if c != nil {
+		return c.endpoint.ID
+	}
+	return 0
 }
 
 func (c *conn) Endpoint() endpoint.Endpoint {

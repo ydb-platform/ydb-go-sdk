@@ -1,7 +1,6 @@
 package endpoint
 
 import (
-	"hash/fnv"
 	"net"
 	"strconv"
 )
@@ -15,17 +14,8 @@ type Endpoint struct {
 	Local      bool
 }
 
-func hash(s string) uint32 {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return h.Sum32()
-}
-
 func (e Endpoint) NodeID() uint32 {
-	if e.ID > 0 {
-		return e.ID
-	}
-	return hash(e.Address())
+	return e.ID
 }
 
 func (e Endpoint) Address() string {
