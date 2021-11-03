@@ -1004,13 +1004,12 @@ func TableOnPoolGet(t Table, c context.Context) func(session sessionInfo, attemp
 		res(p)
 	}
 }
-func TableOnPoolWait(t Table, c context.Context) func(session sessionInfo, _ error) {
+func TableOnPoolWait(t Table, c context.Context) func(error) {
 	var p PoolWaitStartInfo
 	p.Context = c
 	res := t.onPoolWait(p)
-	return func(session sessionInfo, e error) {
+	return func(e error) {
 		var p PoolWaitDoneInfo
-		p.Session = session
 		p.Error = e
 		res(p)
 	}

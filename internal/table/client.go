@@ -313,7 +313,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 				// for the next waiter – build could be lost for a long time.
 				c.putWaitCh(ch)
 			}
-			waitDone(s, err)
+			waitDone(err)
 
 		case <-time.After(c.config.CreateSessionTimeout()):
 			// pass to next iteration
@@ -323,7 +323,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 			// difference – channel will be closed by notifying goroutine.
 			c.waitq.Remove(el)
 			c.mu.Unlock()
-			waitDone(s, err)
+			waitDone(err)
 
 		case <-ctx.Done():
 			c.mu.Lock()
@@ -336,7 +336,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 			if s != nil {
 				_ = c.Put(ctx, s)
 			}
-			waitDone(s, err)
+			waitDone(err)
 			return nil, err
 		}
 	}

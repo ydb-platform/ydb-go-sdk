@@ -466,11 +466,8 @@ func Table(log Logger, details trace.Details) trace.Table {
 				start := time.Now()
 				return func(info trace.PoolWaitDoneInfo) {
 					if info.Error == nil {
-						session := info.Session
-						log.Tracef(`wait done {latency:"%s",id:"%s",status:"%s"}`,
+						log.Tracef(`wait done {latency:"%s"}`,
 							time.Since(start),
-							session.ID(),
-							session.Status(),
 						)
 					} else {
 						log.Warnf(`wait failed {latency:"%s",error:"%s"}`,
