@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
@@ -29,7 +30,9 @@ type scanner struct {
 
 	columnIndexes           []int
 	defaultValueForOptional bool
-	err                     error
+
+	err    error
+	errMtx sync.RWMutex
 }
 
 // ColumnCount returns number of columns in the current result set.
@@ -140,6 +143,8 @@ func (s *scanner) Truncated() bool {
 
 // Err returns error caused Scanner to be broken.
 func (s *scanner) Err() error {
+	s.errMtx.RLock()
+	defer s.errMtx.RUnlock()
 	return s.err
 }
 
@@ -240,7 +245,7 @@ func (s *scanner) setColumnIndexes(columns []string) {
 //
 func (s *scanner) any() interface{} {
 	x := s.stack.current()
-	if s.err != nil || x.isEmpty() {
+	if s.Err() != nil || x.isEmpty() {
 		return nil
 	}
 
@@ -344,7 +349,7 @@ func (s *scanner) isNull() bool {
 // unwrap current item under scan interpreting it as Optional<T> types.
 // ignores if type is not optional
 func (s *scanner) unwrap() {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 
@@ -369,7 +374,7 @@ func (s *scanner) unwrapValue() (v *Ydb.Value) {
 }
 
 func (s *scanner) unwrapDecimal() (v types.Decimal) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -921,19 +926,17 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 	}
 }
 
-func (s *scanner) scan(values []interface{}) error {
-	if s.err != nil {
-		return s.err
+func (s *scanner) scan(values []interface{}) (err error) {
+	if err = s.Err(); err != nil {
+		return
 	}
 	if s.columnIndexes != nil {
 		if len(s.columnIndexes) != len(values) {
-			s.errorf("scan row failed: count of values and column are different")
-			return s.err
+			return s.errorf("scan row failed: count of values and column are different")
 		}
 	}
 	if s.ColumnCount() < len(values) {
-		s.errorf("scan row failed: count of columns less then values")
-		return s.err
+		return s.errorf("scan row failed: count of columns less then values")
 	}
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
@@ -944,8 +947,8 @@ func (s *scanner) scan(values []interface{}) error {
 		} else {
 			s.seekItemByID(s.columnIndexes[i])
 		}
-		if s.err != nil {
-			return s.err
+		if err = s.Err(); err != nil {
+			return
 		}
 		if s.isCurrentTypeOptional() {
 			s.scanOptional(value)
@@ -954,14 +957,19 @@ func (s *scanner) scan(values []interface{}) error {
 		}
 	}
 	s.nextItem += len(values)
-	return s.err
+	return s.Err()
 }
 
-func (s *scanner) errorf(f string, args ...interface{}) {
-	if s.err != nil {
+func (s *scanner) errorf(f string, args ...interface{}) (err error) {
+	err = s.Err()
+	if err != nil {
 		return
 	}
-	s.err = fmt.Errorf(f, args...)
+	err = fmt.Errorf(f, args...)
+	s.errMtx.Lock()
+	s.err = err
+	s.errMtx.Unlock()
+	return
 }
 
 func (s *scanner) typeError(act, exp interface{}) {
