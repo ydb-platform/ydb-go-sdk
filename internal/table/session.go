@@ -32,14 +32,6 @@ var (
 	ErrNilConnection = errors.New("build with nil connection")
 )
 
-type sessionFlags int
-
-const (
-	sessionClosed = sessionFlags(1 << iota)
-	sessionInPool
-	sessionInFlight
-)
-
 // session represents a single table API session.
 //
 // session methods are not goroutine safe. Simultaneous execution of requests
@@ -51,10 +43,15 @@ type session struct {
 	id           string
 	tableService Ydb_Table_V1.TableServiceClient
 	trace        trace.Table
-	mtx          sync.Mutex
-	flags        sessionFlags
-	status       options.SessionStatus
-	onClose      []func(ctx context.Context)
+
+	closed    bool
+	closedMtx sync.RWMutex
+
+	status    options.SessionStatus
+	statusMtx sync.RWMutex
+
+	onClose    []func(ctx context.Context)
+	onCloseMtx sync.RWMutex
 }
 
 func (s *session) NodeID() uint32 {
@@ -70,41 +67,21 @@ func (s *session) NodeID() uint32 {
 }
 
 func (s *session) Status() string {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	s.statusMtx.RLock()
+	defer s.statusMtx.RUnlock()
 	return s.status.String()
 }
 
 func (s *session) SetStatus(status options.SessionStatus) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	s.statusMtx.Lock()
 	s.status = status
-}
-
-func (s *session) SetInPool(ok bool) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	if ok {
-		s.flags |= sessionInPool
-	} else {
-		s.flags &= ^(1 << sessionInPool)
-	}
-}
-
-func (s *session) SetInFlight(ok bool) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	if ok {
-		s.flags |= sessionInFlight
-	} else {
-		s.flags &= ^(1 << sessionInFlight)
-	}
+	s.statusMtx.Unlock()
 }
 
 func (s *session) IsClosed() bool {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	return s.flags&sessionClosed != 0
+	s.closedMtx.RLock()
+	defer s.closedMtx.RUnlock()
+	return s.closed
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table) (s Session, err error) {
@@ -147,18 +124,19 @@ func (s *session) OnClose(cb func(ctx context.Context)) {
 	if s.IsClosed() {
 		return
 	}
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	s.onCloseMtx.Lock()
 	s.onClose = append(s.onClose, cb)
+	s.onCloseMtx.Unlock()
 }
 
 func (s *session) Close(ctx context.Context) (err error) {
-	if s.IsClosed() {
+	s.closedMtx.Lock()
+	if s.closed {
+		s.closedMtx.Unlock()
 		return nil
 	}
-	s.mtx.Lock()
-	s.flags |= sessionClosed
-	defer s.mtx.Unlock()
+	s.closed = true
+	s.closedMtx.Unlock()
 
 	onDone := trace.TableOnSessionDelete(s.trace, ctx, s)
 	defer func() {
@@ -167,9 +145,11 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 	// call all close listeners before doing request
 	// firstly this need to clear client from this build
+	s.onCloseMtx.RLock()
 	for _, cb := range s.onClose {
 		cb(ctx)
 	}
+	s.onCloseMtx.RUnlock()
 
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
