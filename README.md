@@ -64,8 +64,7 @@ The straightforward example of querying data may look similar to this:
    // provide necessary clients such as table.Client, scheme.Client, etc.
    db, err := ydb.New(
       ctx,
-      connectParams,
-	  ydb.WithConnectionString(ydb.ConnectionString(os.Getenv("YDB_CONNECTION_STRING"))),
+      ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
       ydb.WithDialTimeout(3 * time.Second),
       ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
       ydb.WithSessionPoolIdleThreshold(time.Second * 5),
@@ -93,7 +92,7 @@ The straightforward example of querying data may look similar to this:
    // - operation returned nil as error
    // Note that in case of prepared statements call to Prepare() must be made
    // inside the function body.
-   err := c.Do(
+   err := db.Table().Do(
       ctx, 
       func(ctx context.Context, s table.Session) (err error) {
          // Execute text query without preparation and with given "autocommit"
