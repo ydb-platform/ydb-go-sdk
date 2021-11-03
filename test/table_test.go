@@ -43,7 +43,7 @@ func (s *stats) check(t *testing.T) {
 	if s.min > s.inFlight {
 		t.Fatalf("min > in_flight (%d > %d)", s.min, s.inFlight)
 	}
-	if s.inFlight > s.max {
+	if s.inFlight > s.balance {
 		t.Fatalf("in_flight > max (%d > %d)", s.inFlight, s.max)
 	}
 	if s.balance > s.max {
@@ -134,6 +134,11 @@ func TestPoolHealth(t *testing.T) {
 			},
 			OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
 				return func(info trace.PoolPutDoneInfo) {
+					s.addInFlight(t, -1)
+				}
+			},
+			OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
+				return func(info trace.PoolSessionCloseDoneInfo) {
 					s.addInFlight(t, -1)
 				}
 			},
