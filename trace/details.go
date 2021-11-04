@@ -3,7 +3,8 @@ package trace
 type Details int
 
 const (
-	DriverClusterEvents = Details(1 << iota)
+	DriverSystemEvents = Details(1 << iota)
+	DriverClusterEvents
 	DriverNetEvents
 	DriverCoreEvents
 	DriverCredentialsEvents

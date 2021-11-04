@@ -48,7 +48,7 @@ type conn struct {
 
 func (c *conn) NodeID() uint32 {
 	if c != nil {
-		return c.endpoint.ID
+		return c.endpoint.NodeID()
 	}
 	return 0
 }

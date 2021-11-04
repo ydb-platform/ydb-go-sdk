@@ -48,7 +48,7 @@ func TestClusterFastRedial(t *testing.T) {
 			for i := 0; i < size*10; i++ {
 				c, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && c != nil && c.Endpoint().Host == "bad" {
+				if err == nil && c != nil && c.Endpoint().Address() == "bad:0" {
 					_ = c.Close(ctx)
 				}
 			}
@@ -58,8 +58,8 @@ func TestClusterFastRedial(t *testing.T) {
 	}
 
 	ne := []endpoint.Endpoint{
-		{Host: "foo"},
-		{Host: "bad"},
+		endpoint.New("foo:0"),
+		endpoint.New("bad:0"),
 	}
 	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
 	select {
@@ -116,20 +116,20 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	}
 
 	endpoints := []endpoint.Endpoint{
-		{Host: "foo"},
-		{Host: "foo", Port: 123},
+		endpoint.New("foo:0"),
+		endpoint.New("foo:123"),
 	}
 	badEndpoints := []endpoint.Endpoint{
-		{Host: "baz"},
-		{Host: "baz", Port: 123},
+		endpoint.New("baz:0"),
+		endpoint.New("baz:123"),
 	}
 	nextEndpoints := []endpoint.Endpoint{
-		{Host: "foo"},
-		{Host: "bar"},
-		{Host: "bar", Port: 123},
+		endpoint.New("foo:0"),
+		endpoint.New("bar:0"),
+		endpoint.New("bar:123"),
 	}
 	nextBadEndpoints := []endpoint.Endpoint{
-		{Host: "bad", Port: 23},
+		endpoint.New("bad:23"),
 	}
 	t.Run("initial fill", func(t *testing.T) {
 		ne := append(endpoints, badEndpoints...)
@@ -325,54 +325,21 @@ func TestDiffEndpoint(t *testing.T) {
 	// lists must be sorted
 	var noEndpoints []endpoint.Endpoint
 	someEndpoints := []endpoint.Endpoint{
-		{
-			Host: "0",
-			Port: 0,
-		},
-		{
-			Host: "1",
-			Port: 1,
-		},
+		endpoint.New("0:0"),
+		endpoint.New("1:1"),
 	}
 	sameSomeEndpoints := []endpoint.Endpoint{
-		{
-			Host:       "0",
-			Port:       0,
-			LoadFactor: 1,
-			Local:      true,
-		},
-		{
-			Host:       "1",
-			Port:       1,
-			LoadFactor: 2,
-			Local:      true,
-		},
+		endpoint.New("0:0", endpoint.WithLoadFactor(1), endpoint.WithLocalDC(true)),
+		endpoint.New("1:1", endpoint.WithLoadFactor(2), endpoint.WithLocalDC(true)),
 	}
 	anotherEndpoints := []endpoint.Endpoint{
-		{
-			Host: "2",
-			Port: 0,
-		},
-		{
-			Host: "3",
-			Port: 1,
-		},
+		endpoint.New("2:0"),
+		endpoint.New("3:1"),
 	}
 	moreEndpointsOverlap := []endpoint.Endpoint{
-		{
-			Host:       "0",
-			Port:       0,
-			LoadFactor: 1,
-			Local:      true,
-		},
-		{
-			Host: "1",
-			Port: 1,
-		},
-		{
-			Host: "1",
-			Port: 2,
-		},
+		endpoint.New("0:0", endpoint.WithLoadFactor(1), endpoint.WithLocalDC(true)),
+		endpoint.New("1:1"),
+		endpoint.New("1:2"),
 	}
 
 	type TC struct {

@@ -194,12 +194,12 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		}
 	}()
 
-	entry := entry.Entry{Info: info.Info{ID: e.ID, LoadFactor: e.LoadFactor, Local: e.Local}}
+	entry := entry.Entry{Info: info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
 	c.index[e.Address()] = entry
-	if e.ID > 0 {
-		c.endpoints[e.ID] = conn
+	if e.NodeID() > 0 {
+		c.endpoints[e.NodeID()] = conn
 	}
 }
 
@@ -233,11 +233,11 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 	}()
 
 	delete(c.endpoints, entry.Info.ID)
-	entry.Info = info.Info{ID: e.ID, LoadFactor: e.LoadFactor, Local: e.Local}
+	entry.Info = info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}
 	entry.Conn.SetState(ctx, state.Online)
 	c.index[e.Address()] = entry
-	if e.ID > 0 {
-		c.endpoints[e.ID] = entry.Conn
+	if e.NodeID() > 0 {
+		c.endpoints[e.NodeID()] = entry.Conn
 	}
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.

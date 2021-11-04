@@ -24,200 +24,200 @@ var (
 	}{
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo"},
-				{Host: "bar"},
+				endpoint.New("foo:0"),
+				endpoint.New("bar:0"),
 			},
 			repeat: 1000,
 			exp: map[string]int{
-				"foo": 500,
-				"bar": 500,
+				"foo:0": 500,
+				"bar:0": 500,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 0.2},
-				{Host: "bar", LoadFactor: 1},
-				{Host: "baz", LoadFactor: 1},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(0.2)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(1)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(1)),
 			},
 			repeat: 1000,
 			exp: map[string]int{
-				"foo": 600,
-				"bar": 200,
-				"baz": 200,
+				"foo:0": 600,
+				"bar:0": 200,
+				"baz:0": 200,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 1},
-				{Host: "bar", LoadFactor: 0.1},
-				{Host: "baz", LoadFactor: 0.9},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(1)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(0.1)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(0.9)),
 			},
 			repeat: 1000,
 			exp: map[string]int{
-				"foo": 200,
-				"bar": 600,
-				"baz": 200,
+				"foo:0": 200,
+				"bar:0": 600,
+				"baz:0": 200,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 0.25},
-				{Host: "bar", LoadFactor: 1},
-				{Host: "baz", LoadFactor: 1},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(0.25)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(1)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(1)),
 			},
 			del: []endpoint.Endpoint{
-				{Host: "foo"},
+				endpoint.New("foo:0"),
 			},
 			repeat: 1000,
 			exp: map[string]int{
-				"bar": 500,
-				"baz": 500,
+				"bar:0": 500,
+				"baz:0": 500,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 1},
-				{Host: "bar", LoadFactor: 0.25},
-				{Host: "baz", LoadFactor: 0.25},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(1)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(0.25)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(0.25)),
 			},
 			del: []endpoint.Endpoint{
-				{Host: "foo"},
+				endpoint.New("foo:0"),
 			},
 			repeat: 1000,
 			exp: map[string]int{
-				"bar": 500,
-				"baz": 500,
+				"bar:0": 500,
+				"baz:0": 500,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 1},
-				{Host: "bar", LoadFactor: 0.75},
-				{Host: "baz", LoadFactor: 0.25},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(1)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(0.75)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(0.25)),
 			},
 			del: []endpoint.Endpoint{
-				{Host: "bar"},
+				endpoint.New("bar:0"),
 			},
 			repeat: 1200,
 			exp: map[string]int{
-				"foo": 400,
-				"baz": 800,
+				"foo:0": 400,
+				"baz:0": 800,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
 			},
 			del: []endpoint.Endpoint{
-				{Host: "baz"},
+				endpoint.New("baz:0"),
 			},
 			repeat: 1000,
 			exp: map[string]int{
-				"foo": 500,
-				"bar": 500,
+				"foo:0": 500,
+				"bar:0": 500,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
 			},
 			del: []endpoint.Endpoint{
-				{Host: "foo"},
-				{Host: "bar"},
-				{Host: "baz"},
+				endpoint.New("foo:0"),
+				endpoint.New("bar:0"),
+				endpoint.New("baz:0"),
 			},
 			repeat: 1,
 			err:    true,
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
 			},
 			banned: map[string]struct{}{
-				"foo": {},
-				"bar": {},
+				"foo:0": {},
+				"bar:0": {},
 			},
 			repeat: 100,
 			err:    true,
 			exp: map[string]int{
-				"baz": 100,
+				"baz:0": 100,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
 			},
 			banned: map[string]struct{}{
-				"foo": {},
+				"foo:0": {},
 			},
 			repeat: 100,
 			err:    true,
 			exp: map[string]int{
-				"bar": 50,
-				"baz": 50,
+				"bar:0": 50,
+				"baz:0": 50,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 0},
-				{Host: "bar", LoadFactor: 0},
-				{Host: "baz", LoadFactor: 0},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
 			},
 			banned: map[string]struct{}{
-				"foo": {},
-				"bar": {},
-				"baz": {},
+				"foo:0": {},
+				"bar:0": {},
+				"baz:0": {},
 			},
 			repeat: 150,
 			err:    true,
 			exp: map[string]int{
-				"foo": 50,
-				"bar": 50,
-				"baz": 50,
+				"foo:0": 50,
+				"bar:0": 50,
+				"baz:0": 50,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 10},
-				{Host: "bar", LoadFactor: 20},
-				{Host: "baz", LoadFactor: 30},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(10)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(20)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(30)),
 			},
 			banned: map[string]struct{}{
-				"foo": {},
-				"bar": {},
-				"baz": {},
+				"foo:0": {},
+				"bar:0": {},
+				"baz:0": {},
 			},
 			repeat: 150,
 			err:    true,
 			exp: map[string]int{
-				"foo": 75,
-				"bar": 50,
-				"baz": 25,
+				"foo:0": 75,
+				"bar:0": 50,
+				"baz:0": 25,
 			},
 		},
 		{
 			add: []endpoint.Endpoint{
-				{Host: "foo", LoadFactor: 10},
-				{Host: "bar", LoadFactor: 20},
-				{Host: "baz", LoadFactor: 30},
+				endpoint.New("foo:0", endpoint.WithLoadFactor(10)),
+				endpoint.New("bar:0", endpoint.WithLoadFactor(20)),
+				endpoint.New("baz:0", endpoint.WithLoadFactor(30)),
 			},
 			banned: map[string]struct{}{
-				"foo": {},
+				"foo:0": {},
 			},
 			repeat: 150,
 			err:    true,
 			exp: map[string]int{
-				"foo": 0,
-				"bar": 100,
-				"baz": 50,
+				"foo:0": 0,
+				"bar:0": 100,
+				"baz:0": 50,
 			},
 		},
 	}
@@ -248,18 +248,18 @@ func TestRoundRobinBalancer(t *testing.T) {
 				)
 				c.SetState(ctx, state.Online)
 				if test.banned != nil {
-					if _, ok := test.banned[e.Host]; ok {
+					if _, ok := test.banned[e.Address()]; ok {
 						c.SetState(ctx, state.Banned)
 					}
 				}
-				mconn[c] = e.Host
-				maddr[e.Host] = c
-				melem[e.Host] = r.Insert(c, info.Info{
-					LoadFactor: e.LoadFactor,
+				mconn[c] = e.Address()
+				maddr[e.Address()] = c
+				melem[e.Address()] = r.Insert(c, info.Info{
+					LoadFactor: e.LoadFactor(),
 				})
 			}
 			for _, e := range test.del {
-				r.Remove(melem[e.Host])
+				r.Remove(melem[e.Address()])
 			}
 			for i := 0; i < test.repeat; i++ {
 				conn := r.Next()
@@ -306,17 +306,17 @@ func TestRandomChoiceBalancer(t *testing.T) {
 					stub.Config(config.New()),
 				)
 				c.SetState(ctx, state.Online)
-				if _, ok := test.banned[e.Host]; ok {
+				if _, ok := test.banned[e.Address()]; ok {
 					c.SetState(ctx, state.Banned)
 				}
-				mconn[c] = e.Host
-				maddr[e.Host] = c
-				melem[e.Host] = r.Insert(c, info.Info{
-					LoadFactor: e.LoadFactor,
+				mconn[c] = e.Address()
+				maddr[e.Address()] = c
+				melem[e.Address()] = r.Insert(c, info.Info{
+					LoadFactor: e.LoadFactor(),
 				})
 			}
 			for _, e := range test.del {
-				r.Remove(melem[e.Host])
+				r.Remove(melem[e.Address()])
 			}
 			for i := 0; i < test.repeat; i++ {
 				conn := r.Next()

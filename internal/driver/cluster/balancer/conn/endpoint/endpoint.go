@@ -6,24 +6,27 @@ import (
 )
 
 type Endpoint struct {
-	ID   uint32
-	Host string
-	Port int
+	id      uint32
+	address string
 
-	LoadFactor float32
-	Local      bool
+	loadFactor float32
+	local      bool
 }
 
 func (e Endpoint) NodeID() uint32 {
-	return e.ID
+	return e.id
 }
 
 func (e Endpoint) Address() string {
-	return net.JoinHostPort(e.Host, strconv.FormatUint(uint64(e.Port), 10))
+	return e.address
 }
 
 func (e Endpoint) LocalDC() bool {
-	return e.Local
+	return e.local
+}
+
+func (e Endpoint) LoadFactor() float32 {
+	return e.loadFactor
 }
 
 func SplitHostPort(addr string) (host string, port int, err error) {
@@ -36,7 +39,30 @@ func SplitHostPort(addr string) (host string, port int, err error) {
 	return
 }
 
-func New(address string) (e Endpoint, err error) {
-	e.Host, e.Port, err = SplitHostPort(address)
+type option func(e *Endpoint)
+
+func WithID(id uint32) option {
+	return func(e *Endpoint) {
+		e.id = id
+	}
+}
+
+func WithLocalDC(local bool) option {
+	return func(e *Endpoint) {
+		e.local = local
+	}
+}
+
+func WithLoadFactor(loadFactor float32) option {
+	return func(e *Endpoint) {
+		e.loadFactor = loadFactor
+	}
+}
+
+func New(address string, opts ...option) (e Endpoint) {
+	e.address = address
+	for _, o := range opts {
+		o(&e)
+	}
 	return
 }

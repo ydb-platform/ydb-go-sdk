@@ -19,11 +19,6 @@ import (
 
 // Dial dials given addr and initializes driver instance on success.
 func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
-	var e endpoint.Endpoint
-	e, err = endpoint.New(c.Endpoint())
-	if err != nil {
-		return nil, err
-	}
 	return (&dialer{
 		netDial:   c.NetDial(),
 		tlsConfig: c.TLSConfig(),
@@ -34,7 +29,7 @@ func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
 			c.Trace(),
 			c.RequestsType(),
 		),
-	}).connect(ctx, e)
+	}).connect(ctx, endpoint.New(c.Endpoint()))
 }
 
 // dialer is an instance holding single Dialer.Dial() configuration parameters.

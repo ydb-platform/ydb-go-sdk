@@ -76,7 +76,7 @@ type YDB struct {
 	descs []grpc.ServiceDesc
 
 	mu        sync.Mutex
-	endpoints map[endpoint.Endpoint]*Endpoint
+	endpoints map[string]*Endpoint
 }
 
 func (s *YDB) init() {
@@ -106,7 +106,7 @@ func (s *YDB) init() {
 			})
 		}
 
-		s.endpoints = make(map[endpoint.Endpoint]*Endpoint)
+		s.endpoints = make(map[string]*Endpoint)
 	})
 }
 
@@ -130,10 +130,7 @@ func (s *YDB) StartEndpoint() *Endpoint {
 		s.T.Fatal(err)
 	}
 
-	e := endpoint.Endpoint{
-		Host: host,
-		Port: port,
-	}
+	e := endpoint.New(net.JoinHostPort(host, strconv.Itoa(port)))
 	srv := grpc.NewServer()
 	for _, desc := range s.descs {
 		srv.RegisterService(&desc, stubHandler(1))
@@ -150,7 +147,7 @@ func (s *YDB) StartEndpoint() *Endpoint {
 		id:     e,
 		server: srv,
 	}
-	s.endpoints[e] = x
+	s.endpoints[e.Address()] = x
 
 	return x
 }
@@ -159,11 +156,11 @@ func (e *Endpoint) Close() {
 	e.db.mu.Lock()
 	defer e.db.mu.Unlock()
 
-	_, has := e.db.endpoints[e.id]
+	_, has := e.db.endpoints[e.id.Address()]
 	if !has {
 		e.db.T.Fatalf("endpoint not exists: %v", e.id)
 	}
-	delete(e.db.endpoints, e.id)
+	delete(e.db.endpoints, e.id.Address())
 	e.server.Stop()
 	_ = e.ln.Close()
 }
@@ -241,16 +238,11 @@ func (s *YDB) StartBalancer() *Balancer {
 }
 
 func (s *YDB) DialContext(ctx context.Context, addr string) (_ net.Conn, err error) {
-	var e endpoint.Endpoint
-	e.Host, e.Port, err = endpoint.SplitHostPort(addr)
-	if err != nil {
-		return
-	}
 	s.mu.Lock()
-	x := s.endpoints[e]
+	x := s.endpoints[addr]
 	s.mu.Unlock()
 	if x == nil {
-		return nil, fmt.Errorf("no such endpoint: %v", e)
+		return nil, fmt.Errorf("no such endpoint: %v", addr)
 	}
 	return x.DialContext(ctx)
 }
@@ -267,11 +259,23 @@ func (s *YDB) listEndpoints(db string) (resp *Ydb_Discovery.ListEndpointsResult,
 	defer s.mu.Unlock()
 
 	es := make([]*Ydb_Discovery.EndpointInfo, 0, len(s.endpoints))
-	for e := range s.endpoints {
+	for address, e := range s.endpoints {
+		var (
+			host, port string
+			prt        int
+		)
+		host, port, err = net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+		prt, err = strconv.Atoi(port)
+		if err != nil {
+			return nil, err
+		}
 		es = append(es, &Ydb_Discovery.EndpointInfo{
-			Address:    e.Host,
-			Port:       uint32(e.Port),
-			LoadFactor: e.LoadFactor,
+			Address:    host,
+			Port:       uint32(prt),
+			LoadFactor: e.id.LoadFactor(),
 		})
 	}
 	return &Ydb_Discovery.ListEndpointsResult{
