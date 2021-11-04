@@ -239,7 +239,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 			}
 			for addr := range test.banned {
 				if err := r.Pessimize(melem[addr]); err != nil {
-					t.Errorf("unexpected pessimization error: %w", err)
+					t.Errorf("unexpected pessimization error: %v", err)
 				}
 			}
 			for i := 0; i < test.repeat; i++ {
@@ -292,7 +292,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			}
 			for addr := range test.banned {
 				if err := r.Pessimize(melem[addr]); err != nil {
-					t.Errorf("unexpected pessimization error: %w", err)
+					t.Errorf("unexpected pessimization error: %v", err)
 				}
 			}
 			for i := 0; i < test.repeat; i++ {
