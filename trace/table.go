@@ -176,7 +176,8 @@ type (
 		Context context.Context
 	}
 	PoolWaitDoneInfo struct {
-		Error error
+		Session sessionInfo
+		Error   error
 	}
 	PoolTakeStartInfo struct {
 		Context context.Context
