@@ -23,13 +23,28 @@ const (
 
 	trace = "TRACE"
 	debug = "DEBUG"
-	info  = "INFO"
-	warn  = "WARN"
+	info  = " INFO"
+	warn  = " WARN"
 	error = "ERROR"
 	fatal = "FATAL"
 	quiet = "QUIET"
+
+	colouredTrace = "\033[47m" + trace
+	colouredDebug = "\033[100m" + debug
+	colouredInfo  = "\033[106m" + info
+	colouredWarn  = "\033[103m" + warn
+	colouredError = "\033[101m" + error
+	colouredFatal = "\033[101m" + fatal
+	colouredQuiet = quiet
 )
 
+//func init() {
+//	for i := 0; i < 256; i++ {
+//		fmt.Printf("\u001B[%dm color %d\u001B[0m\n", i, i)
+//	}
+//	os.Exit(0)
+//}
+//
 func (l Level) String() string {
 	switch l {
 	case TRACE:
@@ -49,19 +64,38 @@ func (l Level) String() string {
 	}
 }
 
+func (l Level) Colored() string {
+	switch l {
+	case TRACE:
+		return colouredTrace
+	case DEBUG:
+		return colouredDebug
+	case INFO:
+		return colouredInfo
+	case WARN:
+		return colouredWarn
+	case ERROR:
+		return colouredError
+	case FATAL:
+		return colouredFatal
+	default:
+		return colouredQuiet
+	}
+}
+
 func FromString(l string) Level {
 	switch strings.ToUpper(l) {
-	case trace:
+	case strings.TrimSpace(trace):
 		return TRACE
-	case debug:
+	case strings.TrimSpace(debug):
 		return DEBUG
-	case info:
+	case strings.TrimSpace(info):
 		return INFO
-	case warn:
+	case strings.TrimSpace(warn):
 		return WARN
-	case error:
+	case strings.TrimSpace(error):
 		return ERROR
-	case fatal:
+	case strings.TrimSpace(fatal):
 		return FATAL
 	default:
 		return QUIET
@@ -73,7 +107,38 @@ type logger struct {
 	minLevel  Level
 }
 
-const dateLayout = "2006-01-02 15:04:05.000"
+const (
+	dateLayout = "2006-01-02 15:04:05.000"
+
+	colorReset = "\033[0m"
+
+	colorTrace = "\033[38m"
+	colorDebug = "\033[37m"
+	colorInfo  = "\033[36m"
+	colorWarn  = "\033[33m"
+	colorError = "\033[31m"
+	colorFatal = "\033[41m"
+	colorQuiet = colorReset
+)
+
+func color(l Level) string {
+	switch l {
+	case TRACE:
+		return colorTrace
+	case DEBUG:
+		return colorDebug
+	case INFO:
+		return colorInfo
+	case WARN:
+		return colorWarn
+	case ERROR:
+		return colorError
+	case FATAL:
+		return colorFatal
+	default:
+		return colorQuiet
+	}
+}
 
 func New(namespace string, minLevel Level) *logger {
 	return &logger{
@@ -83,7 +148,7 @@ func New(namespace string, minLevel Level) *logger {
 }
 
 func (l *logger) format(format string, logLevel Level) string {
-	return fmt.Sprintf("%-5s %23s %-26s %s\n", logLevel.String(), time.Now().Format(dateLayout), "["+l.namespace+"]", format)
+	return fmt.Sprintf("%5s %23s %26s%s %s%s%s\n", logLevel.Colored(), time.Now().Format(dateLayout), "["+l.namespace+"]", colorReset, color(logLevel), format, colorReset)
 }
 
 func (l *logger) Tracef(format string, args ...interface{}) {
