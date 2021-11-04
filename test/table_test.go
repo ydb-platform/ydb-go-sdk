@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package test
@@ -152,7 +153,7 @@ func TestPoolHealth(t *testing.T) {
 	}()
 
 	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
-		// after initializing pool
+		// hack for wait pool initializing
 		return nil
 	}); err != nil {
 		t.Fatalf("pool not initialized: %+v", err)

@@ -932,11 +932,11 @@ func (s *scanner) scan(values []interface{}) (err error) {
 	}
 	if s.columnIndexes != nil {
 		if len(s.columnIndexes) != len(values) {
-			return s.errorf("scan row failed: count of values and column are different")
+			s.errorf("scan row failed: count of values and column are different")
 		}
 	}
 	if s.ColumnCount() < len(values) {
-		return s.errorf("scan row failed: count of columns less then values")
+		s.errorf("scan row failed: count of columns less then values")
 	}
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
@@ -960,16 +960,13 @@ func (s *scanner) scan(values []interface{}) (err error) {
 	return s.Err()
 }
 
-func (s *scanner) errorf(f string, args ...interface{}) (err error) {
-	err = s.Err()
-	if err != nil {
+func (s *scanner) errorf(f string, args ...interface{}) {
+	s.errMtx.Lock()
+	defer s.errMtx.Unlock()
+	if s.err != nil {
 		return
 	}
-	err = fmt.Errorf(f, args...)
-	s.errMtx.Lock()
-	s.err = err
-	s.errMtx.Unlock()
-	return
+	s.err = fmt.Errorf(f, args...)
 }
 
 func (s *scanner) typeError(act, exp interface{}) {
@@ -987,16 +984,11 @@ func (s *scanner) valueTypeError(act, exp interface{}) {
 }
 
 func (s *scanner) noValueError() {
-	s.errorf(
-		"no value at %q",
-		s.path(),
-	)
+	s.errorf("no value at %q", s.path())
 }
 
 func (s *scanner) noColumnError(name string) {
-	s.errorf(
-		"no column %q", name,
-	)
+	s.errorf("no column %q", name)
 }
 
 func (s *scanner) overflowError(i, n interface{}) {

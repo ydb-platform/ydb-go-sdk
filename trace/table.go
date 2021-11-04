@@ -175,6 +175,9 @@ type (
 	PoolWaitStartInfo struct {
 		Context context.Context
 	}
+	// PoolWaitDoneInfo means a wait iteration inside Get call is done
+	// Warning: Session and Error may be nil at the same time. This means
+	// that a wait iteration donned without any significant result
 	PoolWaitDoneInfo struct {
 		Session sessionInfo
 		Error   error
