@@ -101,7 +101,11 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}
 	if logLevel, has := os.LookupEnv("YDB_LOG_SEVERITY_LEVEL"); has {
 		if l := logger.FromString(logLevel); l < logger.QUIET {
-			logger := logger.New("ydb", logger.FromString(logLevel))
+			logger := logger.New(
+				logger.WithNamespace("ydb"),
+				logger.WithMinLevel(logger.FromString(logLevel)),
+				logger.WithNoColor(os.Getenv("YDB_LOG_NO_COLOR") != ""),
+			)
 			opts = append(
 				[]Option{
 					WithTraceDriver(log.Driver(logger, trace.DetailsAll)),
