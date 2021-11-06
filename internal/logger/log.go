@@ -134,27 +134,27 @@ type logger struct {
 	noColor   bool
 }
 
-type option func(l *logger)
+type Option func(l *logger)
 
-func WithNoColor(b bool) option {
+func WithNoColor(b bool) Option {
 	return func(l *logger) {
 		l.noColor = b
 	}
 }
 
-func WithMinLevel(level Level) option {
+func WithMinLevel(level Level) Option {
 	return func(l *logger) {
 		l.minLevel = level
 	}
 }
 
-func WithNamespace(namespace string) option {
+func WithNamespace(namespace string) Option {
 	return func(l *logger) {
 		l.namespace = namespace
 	}
 }
 
-func New(opts ...option) *logger {
+func New(opts ...Option) *logger {
 	l := &logger{}
 	for _, o := range opts {
 		o(l)

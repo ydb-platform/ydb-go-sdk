@@ -11,7 +11,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -44,6 +46,28 @@ func WithDatabase(database string) Option {
 	return func(ctx context.Context, db *db) error {
 		db.options = append(db.options, config.WithDatabase(database))
 		return nil
+	}
+}
+
+func WithNamespace(namespace string) logger.Option {
+	return logger.WithNamespace(namespace)
+}
+
+func WithMinLevel(minLevel logger.Level) logger.Option {
+	return logger.WithMinLevel(minLevel)
+}
+
+func WithNoColor(b bool) logger.Option {
+	return logger.WithNoColor(b)
+}
+
+func WithLogger(details trace.Details, opts ...logger.Option) Option {
+	return func(ctx context.Context, db *db) error {
+		l := logger.New(opts...)
+		if err := WithTraceDriver(log.Driver(l, details))(ctx, db); err != nil {
+			return err
+		}
+		return WithTraceTable(log.Table(l, details))(ctx, db)
 	}
 }
 

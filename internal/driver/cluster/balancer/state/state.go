@@ -32,5 +32,5 @@ func (s State) String() string {
 }
 
 func (s State) IsValid() bool {
-	return s == Online || s == Banned || s == Offline
+	return s != Created && s != Destroyed
 }
