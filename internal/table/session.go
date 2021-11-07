@@ -44,14 +44,14 @@ type session struct {
 	tableService Ydb_Table_V1.TableServiceClient
 	trace        trace.Table
 
-	closed    bool
 	closedMtx sync.RWMutex
+	closed    bool
 
-	status    options.SessionStatus
 	statusMtx sync.RWMutex
+	status    options.SessionStatus
 
-	onClose    []func(ctx context.Context)
 	onCloseMtx sync.RWMutex
+	onClose    []func(ctx context.Context)
 }
 
 func (s *session) NodeID() uint32 {

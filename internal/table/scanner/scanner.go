@@ -31,8 +31,8 @@ type scanner struct {
 	columnIndexes           []int
 	defaultValueForOptional bool
 
-	err    error
 	errMtx sync.RWMutex
+	err    error
 }
 
 // ColumnCount returns number of columns in the current result set.
