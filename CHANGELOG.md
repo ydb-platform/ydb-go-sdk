@@ -1,3 +1,6 @@
+## 3.3.2
+* Added `table.options.WithPartitioningSettings`
+
 ## 3.3.1
 * Added `trace.DriverConnEvents` constant
 
