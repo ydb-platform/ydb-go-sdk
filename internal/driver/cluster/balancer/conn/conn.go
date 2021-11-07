@@ -147,25 +147,20 @@ func (c *conn) Close(ctx context.Context) (err error) {
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
-	c.Lock()
-	if c.closed {
-		c.Unlock()
+	if c.isClosed() {
 		return
 	}
-	if c.state == state.Banned {
-		c.Unlock()
-		return
-	}
-	c.Unlock()
-	trace.DriverOnPessimizeNode(
+	onDone := trace.DriverOnPessimizeNode(
 		c.config.Trace(ctx),
 		ctx,
 		c.endpoint,
 		c.GetState(),
 		err,
-	)(
-		c.SetState(ctx, state.Banned),
-		c.config.Pessimize(ctx, c.endpoint),
+	)
+	err = c.config.Pessimize(ctx, c.endpoint)
+	onDone(
+		c.GetState(),
+		err,
 	)
 }
 
