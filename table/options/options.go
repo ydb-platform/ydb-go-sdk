@@ -334,6 +334,16 @@ func WithPartitioningSettingsObject(ps PartitioningSettings) CreateTableOption {
 	}
 }
 
+func WithPartitioningSettings(opts ...PartitioningSettingsOption) CreateTableOption {
+	return func(d *CreateTableDesc) {
+		settings := &ydbPartitioningSettings{}
+		for _, o := range opts {
+			o(settings)
+		}
+		d.PartitioningSettings = (*Ydb_Table.PartitioningSettings)(settings)
+	}
+}
+
 type (
 	ydbPartitioningSettings    Ydb_Table.PartitioningSettings
 	PartitioningSettingsOption func(settings *ydbPartitioningSettings)
