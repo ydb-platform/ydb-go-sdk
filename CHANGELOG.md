@@ -1,3 +1,6 @@
+## 3.3.1
+* Added `trace.DriverConnEvents` constant
+
 ## 3.3.0
 * Stored node ID into `endpoint.Endpoint` struct
 * Simplified <Host,Port> in `endpoint.Endpoint` to single fqdn Address
