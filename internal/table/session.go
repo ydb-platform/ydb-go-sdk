@@ -3,6 +3,8 @@ package table
 import (
 	"context"
 	"io"
+	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
@@ -31,14 +32,6 @@ var (
 	ErrNilConnection = errors.New("build with nil connection")
 )
 
-type sessionFlags int
-
-const (
-	sessionClosed = sessionFlags(1 << iota)
-	sessionInPool
-	sessionInFlight
-)
-
 // session represents a single table API session.
 //
 // session methods are not goroutine safe. Simultaneous execution of requests
@@ -48,51 +41,47 @@ const (
 // Close() call.
 type session struct {
 	id           string
-	endpoint     cluster.Endpoint
 	tableService Ydb_Table_V1.TableServiceClient
 	trace        trace.Table
-	mtx          sync.Mutex
-	flags        sessionFlags
-	status       options.SessionStatus
-	onClose      []func(ctx context.Context)
+
+	closedMtx sync.RWMutex
+	closed    bool
+
+	statusMtx sync.RWMutex
+	status    options.SessionStatus
+
+	onCloseMtx sync.RWMutex
+	onClose    []func(ctx context.Context)
+}
+
+func (s *session) NodeID() uint32 {
+	u, err := url.Parse(s.id)
+	if err != nil {
+		panic(err)
+	}
+	nodeID, err := strconv.ParseUint(u.Query().Get("node_id"), 10, 32)
+	if err != nil {
+		return 0
+	}
+	return uint32(nodeID)
 }
 
 func (s *session) Status() string {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	s.statusMtx.RLock()
+	defer s.statusMtx.RUnlock()
 	return s.status.String()
 }
 
 func (s *session) SetStatus(status options.SessionStatus) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	s.statusMtx.Lock()
 	s.status = status
-}
-
-func (s *session) SetInPool(ok bool) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	if ok {
-		s.flags |= sessionInPool
-	} else {
-		s.flags &= ^(1 << sessionInPool)
-	}
-}
-
-func (s *session) SetInFlight(ok bool) {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	if ok {
-		s.flags |= sessionInFlight
-	} else {
-		s.flags &= ^(1 << sessionInFlight)
-	}
+	s.statusMtx.Unlock()
 }
 
 func (s *session) IsClosed() bool {
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
-	return s.flags&sessionClosed != 0
+	s.closedMtx.RLock()
+	defer s.closedMtx.RUnlock()
+	return s.closed
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table) (s Session, err error) {
@@ -103,15 +92,12 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 	var (
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
-		info     cluster.ClientConnInterface
 	)
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = Ydb_Table_V1.NewTableServiceClient(cc).CreateSession(
-		driver.WithCallInfo(ctx, func(cc cluster.ClientConnInterface) { info = cc }),
-		&Ydb_Table.CreateSessionRequest{},
-	)
+	c := Ydb_Table_V1.NewTableServiceClient(cc)
+	response, err = c.CreateSession(ctx, &Ydb_Table.CreateSessionRequest{})
 	if err != nil {
 		return nil, err
 	}
@@ -121,8 +107,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 	}
 	s = &session{
 		id:           result.GetSessionId(),
-		endpoint:     info,
-		tableService: Ydb_Table_V1.NewTableServiceClient(info),
+		tableService: c,
 		trace:        t,
 	}
 	return
@@ -139,18 +124,19 @@ func (s *session) OnClose(cb func(ctx context.Context)) {
 	if s.IsClosed() {
 		return
 	}
-	s.mtx.Lock()
-	defer s.mtx.Unlock()
+	s.onCloseMtx.Lock()
 	s.onClose = append(s.onClose, cb)
+	s.onCloseMtx.Unlock()
 }
 
 func (s *session) Close(ctx context.Context) (err error) {
-	if s.IsClosed() {
+	s.closedMtx.Lock()
+	if s.closed {
+		s.closedMtx.Unlock()
 		return nil
 	}
-	s.mtx.Lock()
-	s.flags |= sessionClosed
-	defer s.mtx.Unlock()
+	s.closed = true
+	s.closedMtx.Unlock()
 
 	onDone := trace.TableOnSessionDelete(s.trace, ctx, s)
 	defer func() {
@@ -159,14 +145,16 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 	// call all close listeners before doing request
 	// firstly this need to clear client from this build
+	s.onCloseMtx.RLock()
 	for _, cb := range s.onClose {
 		cb(ctx)
 	}
+	s.onCloseMtx.RUnlock()
 
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	_, err = s.tableService.DeleteSession(cluster.WithEndpoint(ctx, s.endpoint), &Ydb_Table.DeleteSessionRequest{
+	_, err = s.tableService.DeleteSession(cluster.WithEndpoint(ctx, s), &Ydb_Table.DeleteSessionRequest{
 		SessionId: s.id,
 	})
 	return err
@@ -182,7 +170,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	resp, err := s.tableService.KeepAlive(cluster.WithEndpoint(ctx, s.endpoint), &Ydb_Table.KeepAliveRequest{
+	resp, err := s.tableService.KeepAlive(cluster.WithEndpoint(ctx, s), &Ydb_Table.KeepAliveRequest{
 		SessionId: s.id,
 	})
 	if err != nil {
@@ -210,7 +198,7 @@ func (s *session) CreateTable(ctx context.Context, path string, opts ...options.
 	for _, opt := range opts {
 		opt((*options.CreateTableDesc)(&request))
 	}
-	_, err = s.tableService.CreateTable(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	_, err = s.tableService.CreateTable(cluster.WithEndpoint(ctx, s), &request)
 	return err
 }
 
@@ -227,7 +215,7 @@ func (s *session) DescribeTable(ctx context.Context, path string, opts ...option
 	for _, opt := range opts {
 		opt((*options.DescribeTableDesc)(&request))
 	}
-	response, err = s.tableService.DescribeTable(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	response, err = s.tableService.DescribeTable(cluster.WithEndpoint(ctx, s), &request)
 	if err != nil {
 		return desc, err
 	}
@@ -333,7 +321,7 @@ func (s *session) DropTable(ctx context.Context, path string, opts ...options.Dr
 	for _, opt := range opts {
 		opt((*options.DropTableDesc)(&request))
 	}
-	_, err = s.tableService.DropTable(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	_, err = s.tableService.DropTable(cluster.WithEndpoint(ctx, s), &request)
 	return err
 }
 
@@ -346,7 +334,7 @@ func (s *session) AlterTable(ctx context.Context, path string, opts ...options.A
 	for _, opt := range opts {
 		opt((*options.AlterTableDesc)(&request))
 	}
-	_, err = s.tableService.AlterTable(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	_, err = s.tableService.AlterTable(cluster.WithEndpoint(ctx, s), &request)
 	return err
 }
 
@@ -360,7 +348,7 @@ func (s *session) CopyTable(ctx context.Context, dst, src string, opts ...option
 	for _, opt := range opts {
 		opt((*options.CopyTableDesc)(&request))
 	}
-	_, err = s.tableService.CopyTable(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	_, err = s.tableService.CopyTable(cluster.WithEndpoint(ctx, s), &request)
 	return err
 }
 
@@ -373,7 +361,7 @@ func (s *session) Explain(ctx context.Context, query string) (exp table.DataQuer
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.ExplainDataQuery(cluster.WithEndpoint(ctx, s.endpoint), &Ydb_Table.ExplainDataQueryRequest{
+	response, err = s.tableService.ExplainDataQuery(cluster.WithEndpoint(ctx, s), &Ydb_Table.ExplainDataQueryRequest{
 		SessionId: s.id,
 		YqlText:   query,
 	})
@@ -451,7 +439,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.PrepareDataQuery(cluster.WithEndpoint(ctx, s.endpoint), &Ydb_Table.PrepareDataQueryRequest{
+	response, err = s.tableService.PrepareDataQuery(cluster.WithEndpoint(ctx, s), &Ydb_Table.PrepareDataQueryRequest{
 		SessionId: s.id,
 		YqlText:   query,
 	})
@@ -554,7 +542,7 @@ func (s *session) executeDataQuery(
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.ExecuteDataQuery(cluster.WithEndpoint(ctx, s.endpoint), request)
+	response, err = s.tableService.ExecuteDataQuery(cluster.WithEndpoint(ctx, s), request)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -571,7 +559,7 @@ func (s *session) ExecuteSchemeQuery(ctx context.Context, query string, opts ...
 	for _, opt := range opts {
 		opt((*options.ExecuteSchemeQueryDesc)(&request))
 	}
-	_, err = s.tableService.ExecuteSchemeQuery(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	_, err = s.tableService.ExecuteSchemeQuery(cluster.WithEndpoint(ctx, s), &request)
 	return err
 }
 
@@ -582,7 +570,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (desc options.TableO
 		result   Ydb_Table.DescribeTableOptionsResult
 	)
 	request := Ydb_Table.DescribeTableOptionsRequest{}
-	response, err = s.tableService.DescribeTableOptions(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	response, err = s.tableService.DescribeTableOptions(cluster.WithEndpoint(ctx, s), &request)
 	if err != nil {
 		return
 	}
@@ -696,7 +684,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	c, err = s.tableService.StreamReadTable(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	c, err = s.tableService.StreamReadTable(cluster.WithEndpoint(ctx, s), &request)
 
 	onDone := trace.TableOnSessionQueryStreamRead(s.trace, ctx, s)
 	if err != nil {
@@ -766,7 +754,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	c, err = s.tableService.StreamExecuteScanQuery(cluster.WithEndpoint(ctx, s.endpoint), &request)
+	c, err = s.tableService.StreamExecuteScanQuery(cluster.WithEndpoint(ctx, s), &request)
 
 	onDone := trace.TableOnSessionQueryStreamExecute(s.trace, ctx, s, q, params)
 	if err != nil {
@@ -819,7 +807,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
-	_, err = s.tableService.BulkUpsert(cluster.WithEndpoint(ctx, s.endpoint), &Ydb_Table.BulkUpsertRequest{
+	_, err = s.tableService.BulkUpsert(cluster.WithEndpoint(ctx, s), &Ydb_Table.BulkUpsertRequest{
 		Table: table,
 		Rows:  value.ToYDB(rows),
 	})
@@ -840,7 +828,7 @@ func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSet
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.BeginTransaction(cluster.WithEndpoint(ctx, s.endpoint), &Ydb_Table.BeginTransactionRequest{
+	response, err = s.tableService.BeginTransaction(cluster.WithEndpoint(ctx, s), &Ydb_Table.BeginTransactionRequest{
 		SessionId:  s.id,
 		TxSettings: tx.Settings(),
 	})
@@ -914,7 +902,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = tx.s.tableService.CommitTransaction(cluster.WithEndpoint(ctx, tx.s.endpoint), request)
+	response, err = tx.s.tableService.CommitTransaction(cluster.WithEndpoint(ctx, tx.s), request)
 	if err != nil {
 		return nil, err
 	}
@@ -934,7 +922,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	_, err = tx.s.tableService.RollbackTransaction(cluster.WithEndpoint(ctx, tx.s.endpoint), &Ydb_Table.RollbackTransactionRequest{
+	_, err = tx.s.tableService.RollbackTransaction(cluster.WithEndpoint(ctx, tx.s), &Ydb_Table.RollbackTransactionRequest{
 		SessionId: tx.s.id,
 		TxId:      tx.id,
 	})

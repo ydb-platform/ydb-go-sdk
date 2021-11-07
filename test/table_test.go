@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package test
 
 import (
@@ -41,7 +44,7 @@ func (s *stats) check(t *testing.T) {
 	if s.min > s.inFlight {
 		t.Fatalf("min > in_flight (%d > %d)", s.min, s.inFlight)
 	}
-	if s.inFlight > s.max {
+	if s.inFlight > s.balance {
 		t.Fatalf("in_flight > max (%d > %d)", s.inFlight, s.max)
 	}
 	if s.balance > s.max {
@@ -135,6 +138,11 @@ func TestPoolHealth(t *testing.T) {
 					s.addInFlight(t, -1)
 				}
 			},
+			OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
+				return func(info trace.PoolSessionCloseDoneInfo) {
+					s.addInFlight(t, -1)
+				}
+			},
 		}),
 	)
 	if err != nil {
@@ -145,7 +153,7 @@ func TestPoolHealth(t *testing.T) {
 	}()
 
 	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
-		// after initializing pool
+		// hack for wait pool initializing
 		return nil
 	}); err != nil {
 		t.Fatalf("pool not initialized: %+v", err)

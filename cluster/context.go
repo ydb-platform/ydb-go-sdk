@@ -7,7 +7,7 @@ type (
 )
 
 type Endpoint interface {
-	Address() string
+	NodeID() uint32
 }
 
 func WithEndpoint(ctx context.Context, endpoint Endpoint) context.Context {

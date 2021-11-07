@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"net"
 	"strconv"
 	"testing"
 
@@ -14,7 +15,11 @@ import (
 )
 
 func isEvenConn(c conn.Conn, _ info.Info) bool {
-	n, err := strconv.Atoi(c.Endpoint().Host)
+	host, _, err := net.SplitHostPort(c.Endpoint().Address())
+	if err != nil {
+		panic(err)
+	}
+	n, err := strconv.Atoi(host)
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +54,7 @@ func TestMultiBalancer(t *testing.T) {
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(endpoint.Endpoint{Host: strconv.Itoa(i)}, nil, stub.Config(config.New()))
+		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), nil, stub.Config(config.New()))
 		e := m.Insert(c, info.Info{})
 		es[i] = e
 		el[c] = e

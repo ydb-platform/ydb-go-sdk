@@ -67,7 +67,7 @@ func (r *Result) Close() error {
 }
 
 func (r *Result) inactive() bool {
-	return r.closed || r.err != nil
+	return r.closed || r.Err() != nil
 }
 
 // NextStreamSet selects next result set from the result of streaming operation.
@@ -82,7 +82,9 @@ func (r *Result) nextStreamSet(ctx context.Context, columns ...string) bool {
 	case s, ok := <-r.SetCh:
 		if !ok {
 			if r.SetChErr != nil {
+				r.errMtx.Lock()
 				r.err = *r.SetChErr
+				r.errMtx.Unlock()
 			}
 			return false
 		}
@@ -90,9 +92,11 @@ func (r *Result) nextStreamSet(ctx context.Context, columns ...string) bool {
 		return true
 
 	case <-ctx.Done():
+		r.errMtx.Lock()
 		if r.err == nil {
 			r.err = ctx.Err()
 		}
+		r.errMtx.Unlock()
 		r.reset(nil)
 		return false
 	}

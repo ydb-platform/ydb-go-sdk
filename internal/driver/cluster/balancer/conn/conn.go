@@ -22,7 +22,6 @@ type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-	Address() string
 	GetState() state.State
 	SetState(context.Context, state.State) state.State
 	Close(ctx context.Context) error
@@ -45,6 +44,13 @@ type conn struct {
 	cc    *grpc.ClientConn
 	state state.State
 	locks int32
+}
+
+func (c *conn) NodeID() uint32 {
+	if c != nil {
+		return c.endpoint.NodeID()
+	}
+	return 0
 }
 
 func (c *conn) Endpoint() endpoint.Endpoint {
@@ -104,7 +110,6 @@ func (c *conn) release(ctx context.Context) {
 	onDone(int(atomic.LoadInt32(&c.locks)))
 }
 
-//nolint: deadcode
 func isBroken(raw *grpc.ClientConn) bool {
 	if raw == nil {
 		return true
@@ -113,15 +118,6 @@ func isBroken(raw *grpc.ClientConn) bool {
 	return s == connectivity.Shutdown || s == connectivity.TransientFailure
 }
 
-//func (c *conn) IsReady() bool {
-//	if c == nil {
-//		return false
-//	}
-//	c.Lock()
-//	defer c.Unlock()
-//	return c.cc != nil && c.cc.GetState() == connectivity.Ready
-//}
-//
 func (c *conn) close(ctx context.Context) (err error) {
 	if c.cc == nil {
 		return nil
@@ -151,25 +147,20 @@ func (c *conn) Close(ctx context.Context) (err error) {
 }
 
 func (c *conn) pessimize(ctx context.Context, err error) {
-	c.Lock()
-	if c.closed {
-		c.Unlock()
+	if c.isClosed() {
 		return
 	}
-	if c.state == state.Banned {
-		c.Unlock()
-		return
-	}
-	c.Unlock()
-	trace.DriverOnPessimizeNode(
+	onDone := trace.DriverOnPessimizeNode(
 		c.config.Trace(ctx),
 		ctx,
 		c.endpoint,
 		c.GetState(),
 		err,
-	)(
-		c.SetState(ctx, state.Banned),
-		c.config.Pessimize(ctx, c.endpoint),
+	)
+	err = c.config.Pessimize(ctx, c.endpoint)
+	onDone(
+		c.GetState(),
+		err,
 	)
 }
 

@@ -1,3 +1,10 @@
+## 3.3.0
+* Stored node ID into `endpoint.Endpoint` struct
+* Simplified <Host,Port> in `endpoint.Endpoint` to single fqdn Address
+* On table session requests now preferred the endpoint by `ID` extracted from session `ID`. If 
+  endpoint by `ID` not found - using the endpoint from balancer
+* Upgraded internal logger for print colored messages 
+
 ## 3.2.7
 * Fixed compare endpoints func
 

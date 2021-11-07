@@ -6,12 +6,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-type ClientConnInterface interface {
-	grpc.ClientConnInterface
-
-	Address() string
-}
-
 type Cluster interface {
 	// ClientConnInterface interface allows Cluster use as grpc.ClientConnInterface
 	// with lazy getting raw grpc-connection in Invoke() or NewStream() stages.

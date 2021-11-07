@@ -28,6 +28,28 @@ const (
 	error = "ERROR"
 	fatal = "FATAL"
 	quiet = "QUIET"
+
+	dateLayout = "2006-01-02 15:04:05.000"
+)
+
+const (
+	colorReset = "\033[0m"
+
+	colorTrace = "\033[38m"
+	colorDebug = "\033[37m"
+	colorInfo  = "\033[36m"
+	colorWarn  = "\033[33m"
+	colorError = "\033[31m"
+	colorFatal = "\033[41m"
+	colorQuiet = colorReset
+
+	colorTraceBold = "\033[47m"
+	colorDebugBold = "\033[100m"
+	colorInfoBold  = "\033[106m"
+	colorWarnBold  = "\033[103m"
+	colorErrorBold = "\033[101m"
+	colorFatalBold = "\033[101m"
+	colorQuietBold = ""
 )
 
 func (l Level) String() string {
@@ -46,6 +68,44 @@ func (l Level) String() string {
 		return fatal
 	default:
 		return quiet
+	}
+}
+
+func (l Level) boldColor() string {
+	switch l {
+	case TRACE:
+		return colorTraceBold
+	case DEBUG:
+		return colorDebugBold
+	case INFO:
+		return colorInfoBold
+	case WARN:
+		return colorWarnBold
+	case ERROR:
+		return colorErrorBold
+	case FATAL:
+		return colorFatalBold
+	default:
+		return colorQuietBold
+	}
+}
+
+func (l Level) color() string {
+	switch l {
+	case TRACE:
+		return colorTrace
+	case DEBUG:
+		return colorDebug
+	case INFO:
+		return colorInfo
+	case WARN:
+		return colorWarn
+	case ERROR:
+		return colorError
+	case FATAL:
+		return colorFatal
+	default:
+		return colorQuiet
 	}
 }
 
@@ -71,19 +131,42 @@ func FromString(l string) Level {
 type logger struct {
 	namespace string
 	minLevel  Level
+	noColor   bool
 }
 
-const dateLayout = "2006-01-02 15:04:05.000"
+type Option func(l *logger)
 
-func New(namespace string, minLevel Level) *logger {
-	return &logger{
-		namespace: namespace,
-		minLevel:  minLevel,
+func WithNoColor(b bool) Option {
+	return func(l *logger) {
+		l.noColor = b
 	}
 }
 
+func WithMinLevel(level Level) Option {
+	return func(l *logger) {
+		l.minLevel = level
+	}
+}
+
+func WithNamespace(namespace string) Option {
+	return func(l *logger) {
+		l.namespace = namespace
+	}
+}
+
+func New(opts ...Option) *logger {
+	l := &logger{}
+	for _, o := range opts {
+		o(l)
+	}
+	return l
+}
+
 func (l *logger) format(format string, logLevel Level) string {
-	return fmt.Sprintf("%-5s %23s %-26s %s\n", logLevel.String(), time.Now().Format(dateLayout), "["+l.namespace+"]", format)
+	if l.noColor {
+		return fmt.Sprintf("%-5s %23s %26s %s\n", logLevel.String(), time.Now().Format(dateLayout), "["+l.namespace+"]", format)
+	}
+	return fmt.Sprintf("%s%-5s %23s %26s%s %s%s%s\n", logLevel.boldColor(), logLevel.String(), time.Now().Format(dateLayout), "["+l.namespace+"]", colorReset, logLevel.color(), format, colorReset)
 }
 
 func (l *logger) Tracef(format string, args ...interface{}) {
@@ -142,5 +225,6 @@ func (l *logger) WithName(name string) log.Logger {
 	return &logger{
 		namespace: join(l.namespace, name),
 		minLevel:  l.minLevel,
+		noColor:   l.noColor,
 	}
 }

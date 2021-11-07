@@ -26,7 +26,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test $(go list ./... | egrep -v "\/(test|testutil.*|trace)$") -coverprofile=unit.txt -covermode=atomic
+        run: go test -race ./... -coverprofile=unit.txt -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -64,7 +64,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race $(go list ./... | egrep "\/(test)$") -coverprofile=integration.txt -covermode=atomic
+        run: go test -tags=integration -race ./... -coverprofile=integration.txt -covermode=atomic
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:

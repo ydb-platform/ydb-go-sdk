@@ -26,7 +26,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 						idempotent,
 					)
 				} else {
-					log.Debugf(`retry intermediate {latency:"%s",idempotent:%t,error:"%s"}`,
+					log.Debugf(`retry intermediate {latency:"%s",idempotent:%t,error:"%v"}`,
 						time.Since(start),
 						idempotent,
 						info.Error,
@@ -40,7 +40,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							info.Attempts,
 						)
 					} else {
-						log.Errorf(`retry failed {latency:"%s",idempotent:%t,attempts:%d,error:"%s"}`,
+						log.Errorf(`retry failed {latency:"%s",idempotent:%t,attempts:%d,error:"%v"}`,
 							time.Since(start),
 							idempotent,
 							info.Attempts,
@@ -65,7 +65,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							info.Session.ID(),
 						)
 					} else {
-						log.Warnf(`create failed {latency:"%s",error:"%s"}`,
+						log.Warnf(`create failed {latency:"%s",error:"%v"}`,
 							time.Since(start),
 							info.Error,
 						)
@@ -87,7 +87,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							session.Status(),
 						)
 					} else {
-						log.Warnf(`delete failed {latency:"%s",id:"%s",status:"%s",error:"%s"}`,
+						log.Warnf(`delete failed {latency:"%s",id:"%s",status:"%s",error:"%v"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
@@ -111,7 +111,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							session.Status(),
 						)
 					} else {
-						log.Warnf(`keep-alive failed {latency:"%s",id:"%s",status:"%s",error:"%s"}`,
+						log.Warnf(`keep-alive failed {latency:"%s",id:"%s",status:"%s",error:"%v"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
@@ -146,7 +146,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 								info.Result,
 							)
 						} else {
-							log.Errorf(`prepare failed {latency:"%s",id:"%s",status:"%s",query:"%s",error:"%s"}`,
+							log.Errorf(`prepare failed {latency:"%s",id:"%s",status:"%s",query:"%s",error:"%v"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -171,7 +171,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 					start := time.Now()
 					return func(info trace.SessionQueryPrepareDoneInfo) {
 						if info.Error == nil {
-							log.Debugf(`execute done {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%s"}}`,
+							log.Debugf(`execute done {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -182,7 +182,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 								info.Result.Err(),
 							)
 						} else {
-							log.Errorf(`execute failed {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,error:"%s"}`,
+							log.Errorf(`execute failed {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,error:"%v"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -221,7 +221,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 								info.Result.Err(),
 							)
 						} else {
-							log.Errorf(`execute failed {latency:"%s",id:"%s",status:"%s",query:"%s",params:"%s",error:"%s"}`,
+							log.Errorf(`execute failed {latency:"%s",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -248,7 +248,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 								info.Result.Err(),
 							)
 						} else {
-							log.Errorf(`read failed {latency:"%s",id:"%s",status:"%s",error:"%s"}`,
+							log.Errorf(`read failed {latency:"%s",id:"%s",status:"%s",error:"%v"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -278,7 +278,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							info.Tx.ID(),
 						)
 					} else {
-						log.Warnf(`begin failed {latency:"%s",id:"%s",status:"%s",error:"%s"}`,
+						log.Warnf(`begin failed {latency:"%s",id:"%s",status:"%s",error:"%v"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
@@ -305,7 +305,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							tx.ID(),
 						)
 					} else {
-						log.Errorf(`commit failed {latency:"%s",id:"%s",status:"%s",tx:"%s",error:"%s"}`,
+						log.Errorf(`commit failed {latency:"%s",id:"%s",status:"%s",tx:"%s",error:"%v"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
@@ -333,7 +333,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							tx.ID(),
 						)
 					} else {
-						log.Errorf(`rollback failed {latency:"%s",id:"%s",status:"%s",tx:"%s",error:"%s"}`,
+						log.Errorf(`rollback failed {latency:"%s",id:"%s",status:"%s",tx:"%s",error:"%v"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
@@ -369,7 +369,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							time.Since(start),
 						)
 					} else {
-						log.Errorf(`close failed {latency:"%s",error:"%s"}`,
+						log.Errorf(`close failed {latency:"%s",error:"%v"}`,
 							time.Since(start),
 							info.Error,
 						)
@@ -392,7 +392,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							session.Status(),
 						)
 					} else {
-						log.Errorf(`create failed {latency:"%s",error:"%s"}`,
+						log.Errorf(`create failed {latency:"%s",error:"%v"}`,
 							time.Since(start),
 							info.Error,
 						)
@@ -431,7 +431,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							session.Status(),
 						)
 					} else {
-						log.Errorf(`put failed {latency:"%s",id:"%s",status:"%s",error:"%s"}`,
+						log.Errorf(`put failed {latency:"%s",id:"%s",status:"%s",error:"%v"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
@@ -453,7 +453,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 							info.Attempts,
 						)
 					} else {
-						log.Warnf(`get failed {latency:"%s",attempts:%d,error:"%s"}`,
+						log.Warnf(`get failed {latency:"%s",attempts:%d,error:"%v"}`,
 							time.Since(start),
 							info.Attempts,
 							info.Error,
@@ -466,17 +466,31 @@ func Table(log Logger, details trace.Details) trace.Table {
 				start := time.Now()
 				return func(info trace.PoolWaitDoneInfo) {
 					if info.Error == nil {
-						session := info.Session
-						log.Tracef(`wait done {latency:"%s",id:"%s",status:"%s"}`,
-							time.Since(start),
-							session.ID(),
-							session.Status(),
-						)
+						if info.Session == nil {
+							log.Tracef(`wait done without any significant result {latency:"%s"}`,
+								time.Since(start),
+							)
+						} else {
+							log.Tracef(`wait done {latency:"%s",id:"%s",status:"%s"}`,
+								time.Since(start),
+								info.Session.ID(),
+								info.Session.Status(),
+							)
+						}
 					} else {
-						log.Warnf(`wait failed {latency:"%s",error:"%s"}`,
-							time.Since(start),
-							info.Error,
-						)
+						if info.Session == nil {
+							log.Tracef(`wait failed {latency:"%s",error:"%v"}`,
+								time.Since(start),
+								info.Error,
+							)
+						} else {
+							log.Tracef(`wait failed with session {latency:"%s",id:"%s",status:"%s",error:"%v"}`,
+								time.Since(start),
+								info.Session.ID(),
+								info.Session.Status(),
+								info.Error,
+							)
+						}
 					}
 				}
 			}
@@ -502,7 +516,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 								info.Took,
 							)
 						} else {
-							log.Errorf(`take failed {latency:"%s",id:"%s",status:"%s",took:%t,error:"%s"}`,
+							log.Errorf(`take failed {latency:"%s",id:"%s",status:"%s",took:%t,error:"%v"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),

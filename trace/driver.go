@@ -77,6 +77,7 @@ type ConnState interface {
 }
 
 type endpointInfo interface {
+	NodeID() uint32
 	Address() string
 	LocalDC() bool
 }

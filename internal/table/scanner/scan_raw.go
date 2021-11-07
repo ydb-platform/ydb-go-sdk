@@ -67,7 +67,7 @@ func (s *rawConverter) Type() types.Type {
 }
 
 func (s *rawConverter) Bool() (v bool) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -75,7 +75,7 @@ func (s *rawConverter) Bool() (v bool) {
 }
 
 func (s *rawConverter) Int8() (v int8) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -83,7 +83,7 @@ func (s *rawConverter) Int8() (v int8) {
 }
 
 func (s *rawConverter) Uint8() (v uint8) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -91,7 +91,7 @@ func (s *rawConverter) Uint8() (v uint8) {
 }
 
 func (s *rawConverter) Int16() (v int16) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -99,7 +99,7 @@ func (s *rawConverter) Int16() (v int16) {
 }
 
 func (s *rawConverter) Uint16() (v uint16) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -107,7 +107,7 @@ func (s *rawConverter) Uint16() (v uint16) {
 }
 
 func (s *rawConverter) Int32() (v int32) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -115,7 +115,7 @@ func (s *rawConverter) Int32() (v int32) {
 }
 
 func (s *rawConverter) Uint32() (v uint32) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -123,7 +123,7 @@ func (s *rawConverter) Uint32() (v uint32) {
 }
 
 func (s *rawConverter) Int64() (v int64) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -131,7 +131,7 @@ func (s *rawConverter) Int64() (v int64) {
 }
 
 func (s *rawConverter) Uint64() (v uint64) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -139,7 +139,7 @@ func (s *rawConverter) Uint64() (v uint64) {
 }
 
 func (s *rawConverter) Float() (v float32) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -147,7 +147,7 @@ func (s *rawConverter) Float() (v float32) {
 }
 
 func (s *rawConverter) Double() (v float64) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -211,7 +211,7 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 }
 
 func (s *rawConverter) UTF8() (v string) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -234,7 +234,7 @@ func (s *rawConverter) JSONDocument() (v []byte) {
 }
 
 func (s *rawConverter) UUID() (v [16]byte) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -242,7 +242,7 @@ func (s *rawConverter) UUID() (v [16]byte) {
 }
 
 func (s *rawConverter) DyNumber() (v string) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -255,7 +255,7 @@ func (s *rawConverter) Any() interface{} {
 
 // Value returns current item under scan as ydb.Value types.
 func (s *rawConverter) Value() types.Value {
-	if s.err != nil {
+	if s.Err() != nil {
 		return nil
 	}
 	s.unwrap()
@@ -267,21 +267,21 @@ func (s *rawConverter) AssertType(t types.Type) bool {
 }
 
 func (s *rawConverter) Null() {
-	if s.err != nil || !s.assertCurrentTypeNullable() {
+	if s.Err() != nil || !s.assertCurrentTypeNullable() {
 		return
 	}
 	s.null()
 }
 
 func (s *rawConverter) IsNull() bool {
-	if s.err != nil {
+	if s.Err() != nil {
 		return false
 	}
 	return s.isNull()
 }
 
 func (s *rawConverter) IsOptional() bool {
-	if s.err != nil {
+	if s.Err() != nil {
 		return false
 	}
 	return s.isCurrentTypeOptional()
@@ -290,7 +290,7 @@ func (s *rawConverter) IsOptional() bool {
 // --------non-primitive---------
 
 func (s *rawConverter) ListIn() (size int) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return 0
 	}
 	x := s.stack.current()
@@ -301,7 +301,7 @@ func (s *rawConverter) ListIn() (size int) {
 }
 
 func (s *rawConverter) ListItem(i int) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -318,7 +318,7 @@ func (s *rawConverter) ListItem(i int) {
 }
 
 func (s *rawConverter) ListOut() {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -328,7 +328,7 @@ func (s *rawConverter) ListOut() {
 }
 
 func (s *rawConverter) TupleIn() (size int) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return 0
 	}
 	x := s.stack.current()
@@ -339,7 +339,7 @@ func (s *rawConverter) TupleIn() (size int) {
 }
 
 func (s *rawConverter) TupleItem(i int) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -356,7 +356,7 @@ func (s *rawConverter) TupleItem(i int) {
 }
 
 func (s *rawConverter) TupleOut() {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -366,7 +366,7 @@ func (s *rawConverter) TupleOut() {
 }
 
 func (s *rawConverter) StructIn() (size int) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return 0
 	}
 	x := s.stack.current()
@@ -377,7 +377,7 @@ func (s *rawConverter) StructIn() (size int) {
 }
 
 func (s *rawConverter) StructField(i int) (name string) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -398,7 +398,7 @@ func (s *rawConverter) StructField(i int) (name string) {
 }
 
 func (s *rawConverter) StructOut() {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -408,7 +408,7 @@ func (s *rawConverter) StructOut() {
 }
 
 func (s *rawConverter) DictIn() (size int) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return 0
 	}
 	x := s.stack.current()
@@ -419,7 +419,7 @@ func (s *rawConverter) DictIn() (size int) {
 }
 
 func (s *rawConverter) DictKey(i int) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -436,7 +436,7 @@ func (s *rawConverter) DictKey(i int) {
 }
 
 func (s *rawConverter) DictPayload(i int) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -453,7 +453,7 @@ func (s *rawConverter) DictPayload(i int) {
 }
 
 func (s *rawConverter) DictOut() {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	p := s.stack.parent()
@@ -463,7 +463,7 @@ func (s *rawConverter) DictOut() {
 }
 
 func (s *rawConverter) Variant() (name string, index uint32) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	x := s.stack.current()
@@ -487,7 +487,7 @@ func (s *rawConverter) Variant() (name string, index uint32) {
 }
 
 func (s *rawConverter) Unwrap() {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	x := s.stack.current()
@@ -508,7 +508,7 @@ func (s *rawConverter) Unwrap() {
 }
 
 func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -519,7 +519,7 @@ func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
 }
 
 func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
-	if s.err != nil {
+	if s.Err() != nil {
 		return
 	}
 	s.unwrap()
@@ -535,7 +535,7 @@ func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
 }
 
 func (s *rawConverter) IsDecimal() bool {
-	if s.err != nil {
+	if s.Err() != nil {
 		return false
 	}
 	return s.isCurrentTypeDecimal()

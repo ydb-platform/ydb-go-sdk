@@ -32,5 +32,10 @@ func (s State) String() string {
 }
 
 func (s State) IsValid() bool {
-	return s == Online || s == Banned || s == Offline
+	switch s {
+	case Online, Offline, Banned:
+		return true
+	default:
+		return false
+	}
 }

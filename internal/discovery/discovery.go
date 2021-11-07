@@ -3,6 +3,8 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -70,12 +72,12 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	endpoints = make([]endpoint.Endpoint, 0, len(listEndpointsResult.Endpoints))
 	for _, e := range listEndpointsResult.Endpoints {
 		if e.Ssl == d.ssl {
-			node := endpoint.Endpoint{
-				Host:  e.Address,
-				Port:  int(e.Port),
-				Local: e.Location == listEndpointsResult.SelfLocation,
-			}
-			endpoints = append(endpoints, node)
+			endpoints = append(endpoints, endpoint.New(
+				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
+				endpoint.WithID(e.GetNodeId()),
+				endpoint.WithLoadFactor(e.GetLoadFactor()),
+				endpoint.WithLocalDC(e.GetLocation() == listEndpointsResult.GetSelfLocation()),
+			))
 		}
 	}
 

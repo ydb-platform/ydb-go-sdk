@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc"
 
 	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
@@ -46,7 +45,8 @@ type cluster struct {
 	balancer balancer.Balancer
 	explorer repeater.Repeater
 
-	index map[string]entry.Entry
+	index     map[string]entry.Entry
+	endpoints map[uint32]conn.Conn // only one endpoint by node ID
 
 	mu     sync.RWMutex
 	closed bool
@@ -77,10 +77,11 @@ func New(
 	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
-		trace:    trace,
-		index:    make(map[string]entry.Entry),
-		dial:     dial,
-		balancer: balancer,
+		trace:     trace,
+		index:     make(map[string]entry.Entry),
+		endpoints: make(map[uint32]conn.Conn),
+		dial:      dial,
+		balancer:  balancer,
 	}
 }
 
@@ -97,6 +98,7 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 
 	index := c.index
 	c.index = nil
+	c.endpoints = nil
 
 	c.mu.Unlock()
 
@@ -112,12 +114,6 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
-	defer func() {
-		if apply, ok := driver.ContextCallInfo(ctx); ok && apply != nil && conn != nil {
-			apply(conn)
-		}
-	}()
-
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -126,8 +122,8 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 	}
 	onDone := trace.DriverOnClusterGet(c.trace, ctx)
 	if e, ok := public.ContextEndpoint(ctx); ok {
-		if conn, ok := c.index[e.Address()]; ok {
-			return conn.Conn, nil
+		if conn, ok = c.endpoints[e.NodeID()]; ok {
+			return conn, nil
 		}
 	}
 
@@ -198,10 +194,13 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		}
 	}()
 
-	entry := entry.Entry{Info: info.Info{LoadFactor: e.LoadFactor, Local: e.Local}}
+	entry := entry.Entry{Info: info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}}
 	entry.Conn = conn
 	entry.InsertInto(c.balancer)
 	c.index[e.Address()] = entry
+	if e.NodeID() > 0 {
+		c.endpoints[e.NodeID()] = conn
+	}
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
@@ -233,9 +232,13 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		onDone(entry.Conn.GetState())
 	}()
 
-	entry.Info = info.Info{LoadFactor: e.LoadFactor, Local: e.Local}
+	delete(c.endpoints, entry.Info.ID)
+	entry.Info = info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}
 	entry.Conn.SetState(ctx, state.Online)
 	c.index[e.Address()] = entry
+	if e.NodeID() > 0 {
+		c.endpoints[e.NodeID()] = entry.Conn
+	}
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, entry.Info)
@@ -268,6 +271,8 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 	entry.RemoveFrom(c.balancer)
 	delete(c.index, e.Address())
+	delete(c.endpoints, entry.Info.ID)
+
 	c.mu.Unlock()
 
 	if entry.Conn != nil {
@@ -298,8 +303,8 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 	if c.explorer != nil {
 		// count ratio (banned/all)
 		online := 0
-		for _, e := range c.index {
-			if e.Conn != nil && e.Conn.GetState() == state.Online {
+		for _, entry := range c.index {
+			if entry.Conn != nil && entry.Conn.GetState() == state.Online {
 				online++
 			}
 		}
@@ -312,13 +317,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
-	if c := strings.Compare(a.Host, b.Host); c != 0 {
-		return c
-	}
-	if c := a.Port - b.Port; c != 0 {
-		return c
-	}
-	return 0
+	return strings.Compare(a.Address(), b.Address())
 }
 
 func SortEndpoints(es []endpoint.Endpoint) {
