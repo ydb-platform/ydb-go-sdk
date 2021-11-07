@@ -19,6 +19,7 @@ const (
 	TablePoolSessionLifeCycleEvents
 	TablePoolAPIEvents
 
+	DriverConnEvents        = DriverNetEvents | DriverCoreEvents
 	TableSessionQueryEvents = TableSessionQueryInvokeEvents | TableSessionQueryStreamEvents
 	TableSessionEvents      = TableSessionLifeCycleEvents | TableSessionQueryEvents | TableSessionTransactionEvents
 	TablePoolEvents         = TablePoolLifeCycleEvents | TablePoolRetryEvents | TablePoolSessionLifeCycleEvents | TablePoolAPIEvents
