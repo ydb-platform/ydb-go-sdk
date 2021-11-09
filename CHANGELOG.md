@@ -1,3 +1,6 @@
+## 2.10.5
+* Fixed panic when ready conns iz zero
+
 ## 2.10.4
 * Initialized repeater permanently regardless of the value `DriverConfig.DiscoveryInterval`
   This change allow forcing re-discovery depends on cluster state

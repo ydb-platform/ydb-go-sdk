@@ -159,12 +159,21 @@ func (c *cluster) getNext(
 ) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	closed = c.closed
+	wait = c.await()
+	ready = c.ready
+	size = len(c.index)
+	if ready == 0 {
+		return
+	}
 	if endpointInfo := ContextEndpointInfo(ctx); endpointInfo != nil {
 		if connEntry, ok := c.index[connAddrFromString(endpointInfo.Address())]; ok && isReady(connEntry.conn) {
-			return connEntry.conn, c.closed, c.await(), c.ready, len(c.index)
+			conn = connEntry.conn
+			return
 		}
 	}
-	return c.balancer.Next(), c.closed, c.await(), c.ready, len(c.index)
+	conn = c.balancer.Next()
+	return
 }
 
 // Get returns next available connection.
