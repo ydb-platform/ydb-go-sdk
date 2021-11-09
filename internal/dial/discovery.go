@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
@@ -39,7 +40,7 @@ func (d *dialer) discover(ctx context.Context, c cluster.Cluster, conn conn.Conn
 	}
 	c.SetExplorer(
 		repeater.NewRepeater(
-			ctx,
+			deadline.ContextWithoutDeadline(ctx),
 			d.config.DiscoveryInterval(),
 			func(ctx context.Context) {
 				next, err := discoveryClient.Discover(ctx)

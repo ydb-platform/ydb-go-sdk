@@ -1,3 +1,7 @@
+## 3.3.3
+* Cleared repeater context for discovery goroutine
+* Fixed type of `trace.Details`
+
 ## 3.3.2
 * Added `table.options.WithPartitioningSettings`
 
