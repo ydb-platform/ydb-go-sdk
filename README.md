@@ -100,7 +100,7 @@ The straightforward example of querying data may look similar to this:
          // additional calls. Notice the "_" unused variable – it stands for created
          // transaction during execution, but as said above, transaction is committed
          // for us and `ydb-go-sdk` do not want to do anything with it.
-         _, res, err := session.Execute(ctx, txc,
+         _, res, err := s.Execute(ctx, txc,
             `--!syntax_v1
              DECLARE $mystr AS Utf8?;
              SELECT 42 as id, $mystr as mystr
@@ -124,7 +124,7 @@ The straightforward example of querying data may look similar to this:
        id    int32
        myStr *string //optional value
    )
-   for res.NextResultSet("id", "mystr") {
+   for res.NextResultSet(ctx, "id", "mystr") {
        for res.NextRow() {
            // Suppose our "users" table has two rows: id and age.
            // Thus, current row will contain two appropriate items with
