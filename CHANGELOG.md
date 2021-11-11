@@ -1,3 +1,6 @@
+## 3.4.1
+* Fixed retry reaction on operation error NotFound (non-retryable now)
+
 ## 3.4.0
 * Fixed logic bug in `trace.Table.ExecuteDataQuery{Start,Done}Info`
 

@@ -500,8 +500,8 @@ func TestRetryModes(t *testing.T) {
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: true,
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
 			},
 		},
 		{
