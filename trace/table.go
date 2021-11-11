@@ -99,11 +99,11 @@ type (
 	ExecuteDataQueryStartInfo struct {
 		Context    context.Context
 		Session    sessionInfo
-		Tx         transactionInfo
 		Query      dataQuery
 		Parameters queryParameters
 	}
 	SessionQueryPrepareDoneInfo struct {
+		Tx       transactionInfo
 		Prepared bool
 		Result   result
 		Error    error

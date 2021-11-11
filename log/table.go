@@ -159,18 +159,17 @@ func Table(log Logger, details trace.Details) trace.Table {
 				t.OnSessionQueryExecute = func(info trace.ExecuteDataQueryStartInfo) func(trace.SessionQueryPrepareDoneInfo) {
 					session := info.Session
 					query := info.Query
-					tx := info.Tx
 					params := info.Parameters
-					log.Tracef(`execute start {id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s"}`,
+					log.Tracef(`execute start {id:"%s",status:"%s",query:"%s",params:"%s"}`,
 						session.ID(),
 						session.Status(),
-						tx.ID(),
 						query,
 						params,
 					)
 					start := time.Now()
 					return func(info trace.SessionQueryPrepareDoneInfo) {
 						if info.Error == nil {
+							tx := info.Tx
 							log.Debugf(`execute done {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
 								time.Since(start),
 								session.ID(),
@@ -182,11 +181,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 								info.Result.Err(),
 							)
 						} else {
-							log.Errorf(`execute failed {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,error:"%v"}`,
+							log.Errorf(`execute failed {latency:"%s",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
-								tx.ID(),
 								query,
 								params,
 								info.Prepared,

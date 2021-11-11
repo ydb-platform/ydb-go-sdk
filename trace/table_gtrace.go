@@ -844,16 +844,16 @@ func TableOnSessionQueryPrepare(t Table, c context.Context, session sessionInfo,
 		res(p)
 	}
 }
-func TableOnSessionQueryExecute(t Table, c context.Context, session sessionInfo, tx transactionInfo, query dataQuery, parameters queryParameters) func(prepared bool, result result, _ error) {
+func TableOnSessionQueryExecute(t Table, c context.Context, session sessionInfo, query dataQuery, parameters queryParameters) func(tx transactionInfo, prepared bool, result result, _ error) {
 	var p ExecuteDataQueryStartInfo
 	p.Context = c
 	p.Session = session
-	p.Tx = tx
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onSessionQueryExecute(p)
-	return func(prepared bool, result result, e error) {
+	return func(tx transactionInfo, prepared bool, result result, e error) {
 		var p SessionQueryPrepareDoneInfo
+		p.Tx = tx
 		p.Prepared = prepared
 		p.Result = result
 		p.Error = e
