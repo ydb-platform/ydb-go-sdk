@@ -84,7 +84,7 @@ The straightforward example of querying data may look similar to this:
       table.CommitTx(),
    )
 
-   var res *table.Result
+   var res resultset.Result
 
    // Do() provide the best effort for executing operation
    // Do implements internal busy loop until one of the following conditions occurs:
@@ -115,6 +115,9 @@ The straightforward example of querying data may look similar to this:
    if err != nil {
        return err // handle error
    }
+   defer func() {
+      _ = res.Close()
+   }()
    // Scan for received values within the result set(s).
    // res.Err() reports the reason of last unsuccessful one.
    var (
