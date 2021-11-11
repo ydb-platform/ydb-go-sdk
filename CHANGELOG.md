@@ -1,3 +1,6 @@
+## 3.4.0
+* Fixed logic bug in `trace.Table.ExecuteDataQuery{Start,Done}Info`
+
 ## 3.3.3
 * Cleared repeater context for discovery goroutine
 * Fixed type of `trace.Details`

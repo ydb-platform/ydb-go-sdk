@@ -394,9 +394,9 @@ func (s *Statement) Execute(
 ) (
 	txr table.Transaction, r resultset.Result, err error,
 ) {
-	onDone := trace.TableOnSessionQueryExecute(s.session.trace, ctx, s.session, txr, s.query, params)
+	onDone := trace.TableOnSessionQueryExecute(s.session.trace, ctx, s.session, s.query, params)
 	defer func() {
-		onDone(true, r, err)
+		onDone(txr, true, r, err)
 	}()
 	return s.execute(ctx, tx, params, opts...)
 }
@@ -475,9 +475,9 @@ func (s *session) Execute(
 	q := new(dataQuery)
 	q.initFromText(query)
 
-	onDone := trace.TableOnSessionQueryExecute(s.trace, ctx, s, txr, q, params)
+	onDone := trace.TableOnSessionQueryExecute(s.trace, ctx, s, q, params)
 	defer func() {
-		onDone(true, r, err)
+		onDone(txr, true, r, err)
 	}()
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
