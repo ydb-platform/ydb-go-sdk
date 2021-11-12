@@ -102,8 +102,7 @@ func (e StatusCode) OperationCompleted() OperationCompleted {
 		StatusUnavailable,
 		StatusOverloaded,
 		StatusBadSession,
-		StatusSessionBusy,
-		StatusNotFound:
+		StatusSessionBusy:
 		return OperationCompletedFalse
 	case
 		StatusUndetermined:
