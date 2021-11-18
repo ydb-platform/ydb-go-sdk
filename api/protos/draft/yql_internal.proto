@@ -20,7 +20,6 @@ message GetTaskRequest {
     string owner_id = 2; // guid, should be refreshed on node restart
     string host = 3;
     Ydb.Operations.OperationParams operation_params = 4;
-    uint64 tasks_batch_size = 5;
 }
 
 message SignedIdentity {
@@ -66,6 +65,9 @@ message GetTaskResult {
         repeated TopicConsumer created_topic_consumers = 19;
         int32 dq_graph_index = 20;
         map<string, string> sensor_labels = 21;
+
+        bool automatic = 22;
+        string query_name = 23;
     }
     repeated Task tasks = 1;
 }
