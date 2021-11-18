@@ -284,6 +284,13 @@ func (c *connector) Driver() driver.Driver {
 	return &Driver{c}
 }
 
+func (c *connector) unwrap(ctx context.Context) (*table.Client, error) {
+	if err := c.init(ctx); err != nil {
+		return nil, err
+	}
+	return c.client, nil
+}
+
 // Driver is an adapter to allow the use table client as sql.Driver instance.
 type Driver struct {
 	c *connector
@@ -305,4 +312,8 @@ func (d *Driver) Open(string) (driver.Conn, error) {
 
 func (d *Driver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
+}
+
+func (d *Driver) Unwrap(ctx context.Context) (*table.Client, error) {
+	return d.c.unwrap(ctx)
 }
