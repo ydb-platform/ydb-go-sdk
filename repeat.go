@@ -30,12 +30,30 @@ type repeater struct {
 	force    chan struct{}
 }
 
+type repeaterOptionsHolder struct {
+	ctx context.Context
+}
+
+type repeaterOption func(h *repeaterOptionsHolder)
+
+func withRepeaterContext(ctx context.Context) repeaterOption {
+	return func(h *repeaterOptionsHolder) {
+		h.ctx = ctx
+	}
+}
+
 // NewRepeater creates and begins to execute task periodically.
-func NewRepeater(interval, timeout time.Duration, task func(ctx context.Context)) *repeater {
+func NewRepeater(interval, timeout time.Duration, task func(ctx context.Context), opts ...repeaterOption) *repeater {
 	if interval <= 0 {
 		return nil
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	h := &repeaterOptionsHolder{
+		ctx: context.Background(),
+	}
+	for _, o := range opts {
+		o(h)
+	}
+	ctx, cancel := context.WithCancel(h.ctx)
 	r := &repeater{
 		interval: interval,
 		timeout:  timeout,

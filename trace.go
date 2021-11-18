@@ -103,6 +103,7 @@ type (
 	}
 	DiscoveryStartInfo struct {
 		Context context.Context
+		Address string
 	}
 	DiscoveryDoneInfo struct {
 		Context   context.Context

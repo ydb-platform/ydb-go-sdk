@@ -22,6 +22,7 @@ func New(ctx context.Context, params ConnectParams, opts ...ConnectOption) (c *C
 	if c.driverConfig == nil {
 		c.driverConfig = &ydb.DriverConfig{}
 	}
+	c.driverConfig.Trace = c.driverConfig.Trace.Compose(ydb.ContextDriverTrace(ctx))
 	c.driverConfig.Database = params.Database()
 	if c.driverConfig.Credentials == nil {
 		c.driverConfig.Credentials, err = auth.FromEnviron(ctx)

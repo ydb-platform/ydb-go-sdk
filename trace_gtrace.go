@@ -705,9 +705,10 @@ func driverTraceOnGetCredentials(ctx context.Context, t DriverTrace, c context.C
 		res(p)
 	}
 }
-func driverTraceOnDiscovery(ctx context.Context, t DriverTrace, c context.Context) func(_ context.Context, endpoints []Endpoint, _ error) {
+func driverTraceOnDiscovery(ctx context.Context, t DriverTrace, c context.Context, address string) func(_ context.Context, endpoints []Endpoint, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
+	p.Address = address
 	res := t.onDiscovery(ctx, p)
 	return func(c context.Context, endpoints []Endpoint, e error) {
 		var p DiscoveryDoneInfo

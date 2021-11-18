@@ -29,7 +29,9 @@ func WithDialer(d ydb.Dialer) ConnectorOption {
 
 func WithClient(client *table.Client) ConnectorOption {
 	return func(c *connector) {
+		c.mu.Lock()
 		c.client = client
+		c.mu.Unlock()
 	}
 }
 
@@ -69,50 +71,52 @@ func WithClientTrace(t table.ClientTrace) ConnectorOption {
 	}
 }
 
+// WithSessionPoolTrace
+// Deprecated: has no effect, use database/sql session pool management
 func WithSessionPoolTrace(t table.SessionPoolTrace) ConnectorOption {
-	return func(c *connector) {
-		c.pool.Trace = t
-	}
+	return func(c *connector) {}
 }
 
+// WithSessionPoolSizeLimit
+// Deprecated: has no effect, use database/sql session pool management
 func WithSessionPoolSizeLimit(n int) ConnectorOption {
-	return func(c *connector) {
-		c.pool.SizeLimit = n
-	}
+	return func(c *connector) {}
 }
 
+// WithSessionPoolIdleThreshold
+// Deprecated: has no effect, use database/sql session pool management
 func WithSessionPoolIdleThreshold(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.IdleThreshold = d
-	}
+	return func(c *connector) {}
 }
 
-// Deprecated: has no effect now
+// WithSessionPoolBusyCheckInterval
+// Deprecated: has no effect, use database/sql session pool management
 func WithSessionPoolBusyCheckInterval(time.Duration) ConnectorOption {
 	return func(c *connector) {}
 }
 
-// Deprecated: has no effect now
+// WithSessionPoolKeepAliveBatchSize
+// Deprecated: has no effect, use database/sql session pool management
 func WithSessionPoolKeepAliveBatchSize(int) ConnectorOption {
 	return func(c *connector) {}
 }
 
+// WithSessionPoolKeepAliveTimeout
+// Deprecated: has no effect, use database/sql session pool management
 func WithSessionPoolKeepAliveTimeout(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.KeepAliveTimeout = d
-	}
+	return func(c *connector) {}
 }
 
+// WithSessionPoolCreateSessionTimeout
+// Deprecated: has no effect, use database/sql session pool management
 func WithSessionPoolCreateSessionTimeout(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.CreateSessionTimeout = d
-	}
+	return func(c *connector) {}
 }
 
+// WithSessionPoolDeleteTimeout
+// Deprecated: has no effect, use database/sql session pool management
 func WithSessionPoolDeleteTimeout(d time.Duration) ConnectorOption {
-	return func(c *connector) {
-		c.pool.DeleteTimeout = d
-	}
+	return func(c *connector) {}
 }
 
 func WithMaxRetries(n int) ConnectorOption {
@@ -201,9 +205,7 @@ type connector struct {
 	clientTrace table.ClientTrace
 
 	mu     sync.RWMutex
-	ready  chan struct{}
 	client *table.Client
-	pool   table.SessionPool // Used as a template for created connections.
 
 	retryConfig      RetryConfig
 	defaultTxControl *table.TransactionControl
@@ -225,16 +227,9 @@ func (c *connector) init(ctx context.Context) (err error) {
 	// database/sql.DB.SetMaxIdleConns() call. Unfortunately, we can not
 	// receive that limit here and we do not want to force user to
 	// configure it twice (and pass it as an option to connector).
-	if c.pool.SizeLimit == 0 {
-		c.pool.SizeLimit = DefaultSessionPoolSizeLimit
-	}
-	if c.pool.IdleThreshold == 0 {
-		c.pool.IdleThreshold = DefaultIdleThreshold
-	}
 	if c.client == nil {
 		c.client, err = c.dial(ctx)
 	}
-	c.pool.Builder = c.client
 	return
 }
 
@@ -252,45 +247,54 @@ func (c *connector) dial(ctx context.Context) (*table.Client, error) {
 	}, nil
 }
 
-func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
-	if err := c.init(ctx); err != nil {
+func (c *connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
+	if err = c.init(ctx); err != nil {
 		return nil, err
 	}
-	c.mu.RLock()
-	s, err := c.pool.Create(ctx)
-	c.mu.RUnlock()
-	if err != nil {
-		return nil, err
+	var (
+		s *table.Session
+	)
+	for i := 0; ; i++ {
+		if err = ctx.Err(); err != nil {
+			return nil, err
+		}
+		c.mu.RLock()
+		s, err = c.client.CreateSession(ctx)
+		c.mu.RUnlock()
+		if err == nil {
+			if s == nil {
+				panic("ydbsql: abnormal result of pool.Create()")
+			}
+			return &conn{
+				connector: c,
+				session:   s,
+			}, nil
+		}
+		m := ydb.DefaultRetryChecker.Check(err)
+		if !m.MustRetry(true) {
+			return nil, err
+		}
+		if e := backoff(ctx, m, &c.retryConfig, i); e != nil {
+			return nil, err
+		}
 	}
-	if s == nil {
-		panic("ydbsql: abnormal result of pool.Create()")
-	}
-	return &conn{
-		connector: c,
-		session:   s,
-	}, nil
 }
 
 func (c *connector) Driver() driver.Driver {
 	return &Driver{c}
 }
 
-func (c *connector) unwrap(ctx context.Context) (*table.Client, error) {
-	if err := c.init(ctx); err != nil {
-		return nil, err
-	}
-	return c.client, nil
-}
-
 // Driver is an adapter to allow the use table client as sql.Driver instance.
-// The main purpose of this type is exported is an ability to call Unwrap()
-// method on it to receive raw *table.Client instance.
 type Driver struct {
 	c *connector
 }
 
 func (d *Driver) Close() error {
-	_ = d.c.pool.Close(context.Background())
+	d.c.mu.RLock()
+	defer d.c.mu.RUnlock()
+	if d.c.client == nil {
+		return nil
+	}
 	return d.c.client.Driver.Close()
 }
 
@@ -301,8 +305,4 @@ func (d *Driver) Open(string) (driver.Conn, error) {
 
 func (d *Driver) OpenConnector(string) (driver.Connector, error) {
 	return d.c, nil
-}
-
-func (d *Driver) Unwrap(ctx context.Context) (*table.Client, error) {
-	return d.c.unwrap(ctx)
 }

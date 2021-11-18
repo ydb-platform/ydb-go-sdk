@@ -157,16 +157,12 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 	var (
 		dtrace ydb.DriverTrace
 		ctrace table.ClientTrace
-		strace table.SessionPoolTrace
 	)
 	traceutil.Stub(&dtrace, func(name string, args ...interface{}) {
 		log.Printf("[driver] %s: %+v", name, traceutil.ClearContext(args))
 	})
 	traceutil.Stub(&ctrace, func(name string, args ...interface{}) {
 		log.Printf("[client] %s: %+v", name, traceutil.ClearContext(args))
-	})
-	traceutil.Stub(&strace, func(name string, args ...interface{}) {
-		log.Printf("[session] %s: %+v", name, traceutil.ClearContext(args))
 	})
 
 	db := sql.OpenDB(Connector(
@@ -177,8 +173,6 @@ func openDB(ctx context.Context) (*sql.DB, error) {
 		}),
 		WithDriverTrace(dtrace),
 		WithClientTrace(ctrace),
-		WithSessionPoolTrace(strace),
-		WithSessionPoolIdleThreshold(time.Second),
 	))
 
 	return db, db.PingContext(ctx)

@@ -34,33 +34,15 @@ type conn struct {
 	txc *table.TransactionControl
 }
 
-func (c *conn) takeSession(ctx context.Context) bool {
-	if !c.idle {
-		return true
-	}
-	if has, _ := c.pool().Take(ctx, c.session); !has {
-		return false
-	}
-	c.idle = false
-	return true
-}
-
 func (c *conn) ResetSession(ctx context.Context) error {
 	if c.idle {
 		return nil
-	}
-	err := c.pool().Put(ctx, c.session)
-	if err != nil {
-		return mapBadSessionError(err)
 	}
 	c.idle = true
 	return nil
 }
 
 func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	if !c.takeSession(ctx) {
-		return nil, driver.ErrBadConn
-	}
 	s, err := c.session.Prepare(ctx, query)
 	if err != nil {
 		return nil, mapBadSessionError(err)
@@ -116,9 +98,6 @@ func txIsolationOrControl(opts driver.TxOptions) (isolation table.TxOption, cont
 }
 
 func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (tx driver.Tx, err error) {
-	if !c.takeSession(ctx) {
-		return nil, driver.ErrBadConn
-	}
 	if c.tx != nil || c.txc != nil {
 		return nil, ErrActiveTransaction
 	}
@@ -178,7 +157,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	return result{}, nil
 }
 
-func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
 	if ContextScanQueryMode(ctx) {
 		// Allow to use scanQuery only through QueryContext API.
 		return c.scanQueryContext(ctx, query, args)
@@ -189,19 +168,19 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	res, err := c.exec(ctx, &reqQuery{text: query}, params(args))
 	if err != nil {
-		return nil, err
+		return nil, mapBadSessionError(err)
 	}
 	res.NextSet()
-	return &rows{res: res}, nil
+	return &rows{res: res}, mapBadSessionError(res.Err())
 }
 
 func (c *conn) scanQueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	res, err := c.exec(ctx, &reqScanQuery{text: query}, params(args))
 	if err != nil {
-		return nil, err
+		return nil, mapBadSessionError(err)
 	}
 	res.NextStreamSet(ctx)
-	return &stream{ctx: ctx, res: res}, res.Err()
+	return &stream{ctx: ctx, res: res}, mapBadSessionError(res.Err())
 }
 
 func (c *conn) CheckNamedValue(v *driver.NamedValue) error {
@@ -209,18 +188,12 @@ func (c *conn) CheckNamedValue(v *driver.NamedValue) error {
 }
 
 func (c *conn) Ping(ctx context.Context) error {
-	if !c.takeSession(ctx) {
-		return driver.ErrBadConn
-	}
 	_, err := c.session.KeepAlive(ctx)
 	return mapBadSessionError(err)
 }
 
 func (c *conn) Close() error {
 	ctx := context.Background()
-	if !c.takeSession(ctx) {
-		return driver.ErrBadConn
-	}
 	err := c.session.Close(ctx)
 	return mapBadSessionError(err)
 }
@@ -234,9 +207,6 @@ func (c *conn) Begin() (driver.Tx, error) {
 }
 
 func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParameters) (res *table.Result, err error) {
-	if !c.takeSession(ctx) {
-		return nil, driver.ErrBadConn
-	}
 	rc := c.retryConfig()
 	retryNoIdempotent := ydb.IsOperationIdempotent(ctx)
 	maxRetries := rc.MaxRetries
@@ -263,7 +233,7 @@ func (c *conn) exec(ctx context.Context, req processor, params *table.QueryParam
 			break
 		}
 	}
-	return nil, err
+	return nil, mapBadSessionError(err)
 }
 
 func (c *conn) txControl() *table.TransactionControl {
@@ -279,10 +249,6 @@ func (c *conn) dataOpts() []table.ExecuteDataQueryOption {
 
 func (c *conn) scanOpts() []table.ExecuteScanQueryOption {
 	return c.connector.scanOpts
-}
-
-func (c *conn) pool() *table.SessionPool {
-	return &c.connector.pool
 }
 
 func (c *conn) retryConfig() *RetryConfig {
@@ -359,23 +325,19 @@ func (d TxDoer) Do(ctx context.Context, f TxOperationFunc) (err error) {
 		rc = &d.DB.Driver().(*Driver).c.retryConfig
 	}
 	for i := 0; i <= rc.MaxRetries; i++ {
-		if err = d.do(ctx, f); err == nil {
+		err = d.do(ctx, f)
+		if err == nil {
 			return
-		}
-		if err == driver.ErrBadConn {
-			// ErrBadConn returned by us to indicate that conn's underlying
-			// session must be closed. Thus we could retry whole transaction.
-			continue
 		}
 		m := rc.RetryChecker.Check(err)
 		if !m.MustRetry(retryNoIdempotent) {
-			return err
+			return mapBadSessionError(err)
 		}
 		if e := backoff(ctx, m, rc, i); e != nil {
 			break
 		}
 	}
-	return
+	return mapBadSessionError(err)
 }
 
 func (d TxDoer) do(ctx context.Context, f TxOperationFunc) error {
@@ -384,7 +346,8 @@ func (d TxDoer) do(ctx context.Context, f TxOperationFunc) error {
 		return err
 	}
 	defer tx.Rollback()
-	if err := f(ctx, tx); err != nil {
+	err = f(ctx, tx)
+	if err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -458,19 +421,19 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 func (s *stmt) queryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	res, err := s.conn.exec(ctx, &reqStmt{stmt: s.stmt}, params(args))
 	if err != nil {
-		return nil, err
+		return nil, mapBadSessionError(err)
 	}
 	res.NextSet()
-	return &rows{res: res}, nil
+	return &rows{res: res}, mapBadSessionError(res.Err())
 }
 
 func (s *stmt) scanQueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	res, err := s.conn.exec(ctx, &reqScanQuery{text: s.stmt.Text()}, params(args))
 	if err != nil {
-		return nil, err
+		return nil, mapBadSessionError(err)
 	}
 	res.NextStreamSet(ctx)
-	return &stream{ctx: ctx, res: res}, res.Err()
+	return &stream{ctx: ctx, res: res}, mapBadSessionError(res.Err())
 }
 
 func checkNamedValue(v *driver.NamedValue) (err error) {
@@ -671,8 +634,18 @@ func (r result) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (r result) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
 func mapBadSessionError(err error) error {
-	if m := (&ydb.RetryChecker{}).Check(err); m.MustDeleteSession() {
-		return driver.ErrBadConn
+	if err == nil {
+		return nil
 	}
-	return err
+	m := (&ydb.RetryChecker{}).Check(err)
+	switch {
+	case
+		m.MustDeleteSession(),
+		ydb.IsOpError(err, ydb.StatusOverloaded),
+		ydb.IsOpError(err, ydb.StatusUnavailable),
+		ydb.IsTransportError(err, ydb.TransportErrorResourceExhausted):
+		return driver.ErrBadConn
+	default:
+		return err
+	}
 }

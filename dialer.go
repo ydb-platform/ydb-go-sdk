@@ -98,6 +98,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 	cluster := cluster{
 		dial:  d.dialHostPort,
 		trace: d.config.Trace,
+		index: make(map[connAddr]connEntry),
 	}
 	defer func() {
 		if err != nil {
@@ -178,7 +179,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 				wg.Add(actual - max) // adjust
 				wg.Wait()
 				curr = next
-			})
+			}, withRepeaterContext(ContextWithoutDeadline(ctx)))
 	} else {
 		var (
 			e   Endpoint
@@ -242,7 +243,7 @@ func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
 }
 
 func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoint, err error) {
-	driverTraceDiscoveryDone := driverTraceOnDiscovery(ctx, d.config.Trace, ctx)
+	driverTraceDiscoveryDone := driverTraceOnDiscovery(ctx, d.config.Trace, ctx, addr)
 	defer func() {
 		driverTraceDiscoveryDone(ctx, endpoints, err)
 	}()
@@ -286,6 +287,7 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 			Timeout:             d.timeout,
 			PermitWithoutStream: true,
 		}),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
 	)
 	opts = append(opts, grpc.WithDefaultCallOptions(
 		grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),

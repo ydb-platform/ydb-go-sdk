@@ -95,8 +95,8 @@ func ContextEndpointInfo(ctx context.Context) (endpointInfo EndpointInfo) {
 }
 
 // WithOperationCancelAfter returns a copy of parent context in which YDB operation
-// cancel after parameter is set to d. If parent context cancelation timeout is smaller
-// than d, parent context context is returned.
+// cancel after parameter is set to d. If parent context cancellation timeout is smaller
+// than d, parent context is returned.
 func WithOperationCancelAfter(ctx context.Context, d time.Duration) context.Context {
 	if cur, ok := ContextOperationCancelAfter(ctx); ok && d >= cur {
 		// The current cancelation timeout is already smaller than the new one.
@@ -105,9 +105,9 @@ func WithOperationCancelAfter(ctx context.Context, d time.Duration) context.Cont
 	return context.WithValue(ctx, ctxOpCancelAfterKey{}, d)
 }
 
-// ContextOperationTimeout returns the timeout within given context after which
+// ContextOperationCancelAfter returns the timeout within given context after which
 // YDB should try to cancel operation and return result regardless of the
-// cancelation.
+// cancellation.
 func ContextOperationCancelAfter(ctx context.Context) (d time.Duration, ok bool) {
 	d, ok = ctx.Value(ctxOpCancelAfterKey{}).(time.Duration)
 	return
@@ -169,6 +169,7 @@ func (m OperationMode) String() string {
 		return "unknown"
 	}
 }
+
 func (m OperationMode) toYDB() Ydb_Operations.OperationParams_OperationMode {
 	switch m {
 	case OperationModeSync:
