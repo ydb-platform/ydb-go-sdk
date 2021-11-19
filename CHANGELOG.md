@@ -79,6 +79,18 @@
 * Added integration tests with docker ydb container
 * Changed table session and endpoint link type from string address to integer NodeID
 
+## 2.10.6
+* Thrown context without deadline into discovery goroutine
+* Added `Address` param to `DiscoveryStartInfo` struct
+* Forced `round_bobin` grpc load balancing config instead default `pick_first`
+* Fixed applying driver trace from context in `connect.New`
+* Excluded using session pool usage for create/take sessions in `database/sql`
+  driver implementation. Package `ydbsql` with `database/sql` driver implementation
+  used direct `CreateSession` table client call in the best effort loop
+
+## 2.10.5
+* Fixed panic when ready conns iz zero
+
 ## 2.10.4
 * Initialized repeater permanently regardless of the value `DriverConfig.DiscoveryInterval`
   This change allow forcing re-discovery depends on cluster state
