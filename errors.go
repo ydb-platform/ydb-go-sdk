@@ -26,42 +26,52 @@ func IsTimeoutError(err error) bool {
 	return errors.IsTimeoutError(err)
 }
 
-func IsTransportError(err error) (ok bool, code int32, name string) {
-	var t *errors.TransportError
-	if !errors.As(err, &t) {
-		return
-	}
-	return true, int32(t.Reason), t.Reason.String()
+func IsTransportError(err error) bool {
+	return TransportErrorDescription(err) != nil
 }
 
-func IsOperationError(err error) (ok bool, code int32, name string) {
-	var o *errors.OpError
-	if !errors.As(err, &o) {
-		return
+type Error interface {
+	error
+
+	Code() int32
+	Name() string
+}
+
+func TransportErrorDescription(err error) Error {
+	var t *errors.TransportError
+	if errors.As(err, &t) {
+		return t
 	}
-	return true, int32(o.Reason), o.Reason.String()
+	return nil
+}
+
+func IsYdbError(err error) bool {
+	return IsTransportError(err) || IsOperationError(err)
+}
+
+func IsOperationError(err error) bool {
+	return OperationErrorDescription(err) != nil
+}
+
+func OperationErrorDescription(err error) Error {
+	var o *errors.OpError
+	if errors.As(err, &o) {
+		return o
+	}
+	return nil
 }
 
 func IsStatusAlreadyExistsError(err error) bool {
-	var o *errors.OpError
-	if !errors.As(err, &o) {
-		return false
-	}
-	return o.Reason == errors.StatusAlreadyExists
+	d := OperationErrorDescription(err)
+	return d != nil && d.Code() == int32(errors.StatusAlreadyExists)
 }
 
 func IsStatusNotFoundError(err error) bool {
-	var o *errors.OpError
-	if !errors.As(err, &o) {
-		return false
-	}
-	return o.Reason == errors.StatusNotFound
+	d := OperationErrorDescription(err)
+	return d != nil && d.Code() == int32(errors.StatusNotFound)
 }
 
 func IsStatusSchemeError(err error) bool {
-	var o *errors.OpError
-	if !errors.As(err, &o) {
-		return false
-	}
-	return o.Reason == errors.StatusSchemeError
+	d := OperationErrorDescription(err)
+	return d != nil && d.Code() == int32(errors.StatusSchemeError)
 }
