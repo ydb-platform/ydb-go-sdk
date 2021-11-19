@@ -47,6 +47,14 @@ type TransportError struct {
 	err     error
 }
 
+func (t *TransportError) Code() int32 {
+	return int32(t.Reason)
+}
+
+func (t *TransportError) Name() string {
+	return t.Reason.String()
+}
+
 type teOpt func(te *TransportError)
 
 func WithTEReason(reason TransportErrorCode) teOpt {

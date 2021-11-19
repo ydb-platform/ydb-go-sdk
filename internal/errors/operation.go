@@ -15,6 +15,14 @@ type OpError struct {
 	issues []*Ydb_Issue.IssueMessage
 }
 
+func (e *OpError) Code() int32 {
+	return int32(e.Reason)
+}
+
+func (e *OpError) Name() string {
+	return e.Reason.String()
+}
+
 type operation interface {
 	GetStatus() Ydb.StatusIds_StatusCode
 	GetIssues() []*Ydb_Issue.IssueMessage
