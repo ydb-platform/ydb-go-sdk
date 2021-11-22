@@ -113,6 +113,7 @@ type (
 		State ConnState
 	}
 	NetReadStartInfo struct {
+		Context context.Context
 		Address string
 		Buffer  int
 	}
@@ -121,6 +122,7 @@ type (
 		Error    error
 	}
 	NetWriteStartInfo struct {
+		Context context.Context
 		Address string
 		Bytes   int
 	}
@@ -129,6 +131,7 @@ type (
 		Error error
 	}
 	NetDialStartInfo struct {
+		Context context.Context
 		Address string
 	}
 	NetDialDoneInfo struct {
@@ -150,6 +153,7 @@ type (
 		Lock int
 	}
 	NetCloseStartInfo struct {
+		Context context.Context
 		Address string
 	}
 	NetCloseDoneInfo struct {
@@ -204,6 +208,7 @@ type (
 	}
 	DiscoveryStartInfo struct {
 		Context context.Context
+		Address string
 	}
 	DiscoveryDoneInfo struct {
 		Endpoints []string

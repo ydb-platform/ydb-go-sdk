@@ -22,6 +22,9 @@ import (
 type DB interface {
 	cluster.Cluster
 
+	// Endpoint returns initial endpoint
+	Endpoint() string
+
 	// Name returns database name
 	Name() string
 
@@ -52,6 +55,10 @@ type db struct {
 
 func (db *db) Discovery() discovery.Client {
 	return &db.discovery
+}
+
+func (db *db) Endpoint() string {
+	return db.config.Endpoint()
 }
 
 func (db *db) Name() string {

@@ -2,6 +2,8 @@
 * Added `ClosabelSession` interface which extends `Session` interface 
   and provide `Close` method
 * Added `CreateSession` method into `table.Client` interface
+* Added `Context` field into `trace.Driver.Net{Dial,Read,Write,Close}StartInfo` structs
+* Added `Address` field into `trace.Driver.DiscoveryStartInfo` struct
 
 ## 3.4.3
 * Forced `round_bobin` grpc load balancing instead default `pick_first`

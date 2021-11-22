@@ -658,8 +658,9 @@ func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	}
 	return res
 }
-func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ error) {
+func DriverOnNetRead(t Driver, c context.Context, address string, buffer int) func(received int, _ error) {
 	var p NetReadStartInfo
+	p.Context = c
 	p.Address = address
 	p.Buffer = buffer
 	res := t.onNetRead(p)
@@ -670,8 +671,9 @@ func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ 
 		res(p)
 	}
 }
-func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ error) {
+func DriverOnNetWrite(t Driver, c context.Context, address string, bytes int) func(sent int, _ error) {
 	var p NetWriteStartInfo
+	p.Context = c
 	p.Address = address
 	p.Bytes = bytes
 	res := t.onNetWrite(p)
@@ -682,8 +684,9 @@ func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ erro
 		res(p)
 	}
 }
-func DriverOnNetDial(t Driver, address string) func(error) {
+func DriverOnNetDial(t Driver, c context.Context, address string) func(error) {
 	var p NetDialStartInfo
+	p.Context = c
 	p.Address = address
 	res := t.onNetDial(p)
 	return func(e error) {
@@ -692,8 +695,9 @@ func DriverOnNetDial(t Driver, address string) func(error) {
 		res(p)
 	}
 }
-func DriverOnNetClose(t Driver, address string) func(error) {
+func DriverOnNetClose(t Driver, c context.Context, address string) func(error) {
 	var p NetCloseStartInfo
+	p.Context = c
 	p.Address = address
 	res := t.onNetClose(p)
 	return func(e error) {
@@ -839,9 +843,10 @@ func DriverOnGetCredentials(t Driver, c context.Context) func(tokenOk bool, _ er
 		res(p)
 	}
 }
-func DriverOnDiscovery(t Driver, c context.Context) func(endpoints []string, _ error) {
+func DriverOnDiscovery(t Driver, c context.Context, address string) func(endpoints []string, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c
+	p.Address = address
 	res := t.onDiscovery(p)
 	return func(endpoints []string, e error) {
 		var p DiscoveryDoneInfo
