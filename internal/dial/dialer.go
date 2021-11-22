@@ -91,6 +91,14 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 	}
 	opts = append(opts,
 		grpc.WithKeepaliveParams(d.config.GrpcConnectionPolicy().ClientParameters),
+		grpc.WithDefaultServiceConfig(`{
+			"loadBalancingConfig": [
+				{
+					"round_robin":{}
+				}
+			],
+			"loadBalancingPolicy":"round_robin"
+		}`),
 	)
 	opts = append(opts, grpc.WithDefaultCallOptions(
 		grpc.MaxCallRecvMsgSize(config.DefaultGRPCMsgSize),

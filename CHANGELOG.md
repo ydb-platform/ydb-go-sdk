@@ -1,3 +1,7 @@
+## 3.4.3
+* Forced `round_bobin` grpc load balancing instead default `pick_first`
+* Added checker `IsTransportErrorCancelled`
+
 ## 3.4.2
 * Simplified `Is{Transport,Operation}Error`
 * Added `IsYdbError` helper

@@ -30,6 +30,11 @@ func IsTransportError(err error) bool {
 	return TransportErrorDescription(err) != nil
 }
 
+func IsTransportErrorCancelled(err error) bool {
+	d := TransportErrorDescription(err)
+	return d != nil && d.Code() == int32(errors.TransportErrorCanceled)
+}
+
 type Error interface {
 	error
 
