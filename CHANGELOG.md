@@ -1,3 +1,8 @@
+## 3.5.0
+* Added `ClosabelSession` interface which extends `Session` interface 
+  and provide `Close` method
+* Added `CreateSession` method into `table.Client` interface
+
 ## 3.4.3
 * Forced `round_bobin` grpc load balancing instead default `pick_first`
 * Added checker `IsTransportErrorCancelled`

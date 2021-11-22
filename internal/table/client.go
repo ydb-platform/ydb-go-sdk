@@ -112,6 +112,10 @@ type client struct {
 	testHookGetWaitCh func() // nil except some tests.
 }
 
+func (c *client) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
+	return c.build(ctx)
+}
+
 func (c *client) isClosed() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -134,9 +138,8 @@ func isCreateSessionErrorRetriable(err error) bool {
 }
 
 type Session interface {
-	table.Session
+	table.ClosableSession
 
-	Close(ctx context.Context) (err error)
 	IsClosed() bool
 	Status() string
 	OnClose(f func(ctx context.Context))

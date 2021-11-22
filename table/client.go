@@ -29,9 +29,20 @@ func ContextIdempotentOperation(ctx context.Context) bool {
 	return ctx.Value(ctxIdempotentOperationKey{}) != nil
 }
 
+type ClosableSession interface {
+	Session
+
+	Close(ctx context.Context) (err error)
+}
+
 type Client interface {
 	// Close closes table client
 	Close(ctx context.Context) error
+
+	// CreateSession returns session or error for manually control of session lifecycle
+	// CreateSession do not provide retry loop for failed create session requests.
+	// Best effort policy may be implements with outer retry loop includes CreateSession call
+	CreateSession(ctx context.Context) (s ClosableSession, err error)
 
 	// Do provide the best effort for execute operation
 	// Do implements internal busy loop until one of the following conditions is met:

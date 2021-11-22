@@ -18,6 +18,11 @@ type lazyTable struct {
 	m       sync.Mutex
 }
 
+func (t *lazyTable) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
+	t.init(ctx)
+	return t.client.CreateSession(ctx)
+}
+
 func (t *lazyTable) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
 	t.init(ctx)
 	return t.client.Do(ctx, op, opts...)
