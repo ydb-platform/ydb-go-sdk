@@ -57,7 +57,7 @@ func newClient(
 	builder SessionBuilder,
 	config config.Config,
 ) *client {
-	onDone := trace.TableOnPoolInit(config.Trace().Compose(trace.ContextTable(ctx)), ctx)
+	onDone := trace.TableOnPoolInit(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
 	if builder == nil {
 		builder = func(ctx context.Context) (s Session, err error) {
 			return newSession(ctx, cluster, config.Trace().Compose(trace.ContextTable(ctx)))
@@ -172,7 +172,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 			t = c.config.Trace().Compose(trace.ContextTable(ctx))
 		)
 
-		onDone := trace.TableOnPoolSessionNew(t, ctx)
+		onDone := trace.TableOnPoolSessionNew(t, &ctx)
 		defer func() {
 			onDone(r.s, r.err)
 		}()
@@ -209,7 +209,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 				return
 			}
 
-			onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), ctx, r.s)
+			onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, r.s)
 
 			delete(c.index, r.s)
 			c.notify(nil)
@@ -256,7 +256,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		t = c.config.Trace().Compose(trace.ContextTable(ctx))
 	)
 
-	onDone := trace.TableOnPoolGet(t, ctx)
+	onDone := trace.TableOnPoolGet(t, &ctx)
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -300,7 +300,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		el = c.waitq.PushBack(ch)
 		c.mu.Unlock()
 
-		waitDone := trace.TableOnPoolWait(t, ctx)
+		waitDone := trace.TableOnPoolWait(t, &ctx)
 		var ok bool
 		select {
 		case s, ok = <-*ch:
@@ -360,7 +360,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
 func (c *client) Put(ctx context.Context, s Session) (err error) {
-	onDone := trace.TableOnPoolPut(c.config.Trace().Compose(trace.ContextTable(ctx)), ctx, s)
+	onDone := trace.TableOnPoolPut(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
 	defer func() {
 		onDone(err)
 	}()
@@ -403,7 +403,7 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 //
 // It is assumed that Take() callers never call Get() method.
 func (c *client) Take(ctx context.Context, s Session) (took bool, err error) {
-	onWait := trace.TableOnPoolTake(c.config.Trace().Compose(trace.ContextTable(ctx)), ctx, s)
+	onWait := trace.TableOnPoolTake(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
 	var onDone func(took bool, _ error)
 	defer func() {
 		if onDone == nil {
@@ -482,7 +482,7 @@ func (c *client) Create(ctx context.Context) (s Session, err error) {
 // It returns first error occurred during stale sessions' deletion.
 // Note that even on error it calls Close() on each build.
 func (c *client) Close(ctx context.Context) (err error) {
-	onDone := trace.TableOnPoolClose(c.config.Trace().Compose(trace.ContextTable(ctx)), ctx)
+	onDone := trace.TableOnPoolClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
 	defer func() {
 		onDone(err)
 	}()

@@ -85,7 +85,7 @@ func (s *session) IsClosed() bool {
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table) (s Session, err error) {
-	onDone := trace.TableOnSessionNew(t, ctx)
+	onDone := trace.TableOnSessionNew(t, &ctx)
 	defer func() {
 		onDone(s, err)
 	}()
@@ -138,7 +138,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 	s.closed = true
 	s.closedMtx.Unlock()
 
-	onDone := trace.TableOnSessionDelete(s.trace, ctx, s)
+	onDone := trace.TableOnSessionDelete(s.trace, &ctx, s)
 	defer func() {
 		onDone(err)
 	}()
@@ -162,7 +162,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 // KeepAlive keeps idle build alive.
 func (s *session) KeepAlive(ctx context.Context) (err error) {
-	onDone := trace.TableOnSessionKeepAlive(s.trace, ctx, s)
+	onDone := trace.TableOnSessionKeepAlive(s.trace, &ctx, s)
 	defer func() {
 		onDone(err)
 	}()
@@ -394,7 +394,7 @@ func (s *Statement) Execute(
 ) (
 	txr table.Transaction, r resultset.Result, err error,
 ) {
-	onDone := trace.TableOnSessionQueryExecute(s.session.trace, ctx, s.session, s.query, params)
+	onDone := trace.TableOnSessionQueryExecute(s.session.trace, &ctx, s.session, s.query, params)
 	defer func() {
 		onDone(txr, true, r, err)
 	}()
@@ -431,7 +431,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 	)
-	onDone := trace.TableOnSessionQueryPrepare(s.trace, ctx, s, query)
+	onDone := trace.TableOnSessionQueryPrepare(s.trace, &ctx, s, query)
 	defer func() {
 		onDone(q, err)
 	}()
@@ -475,7 +475,7 @@ func (s *session) Execute(
 	q := new(dataQuery)
 	q.initFromText(query)
 
-	onDone := trace.TableOnSessionQueryExecute(s.trace, ctx, s, q, params)
+	onDone := trace.TableOnSessionQueryExecute(s.trace, &ctx, s, q, params)
 	defer func() {
 		onDone(txr, true, r, err)
 	}()
@@ -686,7 +686,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 
 	c, err = s.tableService.StreamReadTable(cluster.WithEndpoint(ctx, s), &request)
 
-	onDone := trace.TableOnSessionQueryStreamRead(s.trace, ctx, s)
+	onDone := trace.TableOnSessionQueryStreamRead(s.trace, &ctx, s)
 	if err != nil {
 		cancel()
 		onDone(nil, err)
@@ -756,7 +756,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 
 	c, err = s.tableService.StreamExecuteScanQuery(cluster.WithEndpoint(ctx, s), &request)
 
-	onDone := trace.TableOnSessionQueryStreamExecute(s.trace, ctx, s, q, params)
+	onDone := trace.TableOnSessionQueryStreamExecute(s.trace, &ctx, s, q, params)
 	if err != nil {
 		cancel()
 		onDone(nil, err)
@@ -817,7 +817,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 // BeginTransaction begins new transaction within given build with given
 // settings.
 func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
-	onDone := trace.TableOnSessionTransactionBegin(s.trace, ctx, s)
+	onDone := trace.TableOnSessionTransactionBegin(s.trace, &ctx, s)
 	defer func() {
 		onDone(x, err)
 	}()
@@ -884,7 +884,7 @@ func (tx *Transaction) ExecuteStatement(
 
 // CommitTx commits specified active transaction.
 func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r resultset.Result, err error) {
-	onDone := trace.TableOnSessionTransactionCommit(tx.s.trace, ctx, tx.s, tx)
+	onDone := trace.TableOnSessionTransactionCommit(tx.s.trace, &ctx, tx.s, tx)
 	defer func() {
 		onDone(err)
 	}()
@@ -915,7 +915,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *Transaction) Rollback(ctx context.Context) (err error) {
-	onDone := trace.TableOnSessionTransactionRollback(tx.s.trace, ctx, tx.s, tx)
+	onDone := trace.TableOnSessionTransactionRollback(tx.s.trace, &ctx, tx.s, tx)
 	defer func() {
 		onDone(err)
 	}()

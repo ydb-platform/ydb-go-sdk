@@ -3,14 +3,14 @@ package discovery
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
-	"google.golang.org/grpc"
 	"net"
 	"strconv"
 	"strings"
 
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
@@ -51,7 +51,7 @@ type client struct {
 }
 
 func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
-	onDone := trace.DriverOnDiscovery(d.trace, ctx, d.endpoint)
+	onDone := trace.DriverOnDiscovery(d.trace, &ctx, d.endpoint)
 	defer func() {
 		nodes := make([]string, 0)
 		for _, e := range endpoints {

@@ -84,28 +84,28 @@ type endpointInfo interface {
 
 type (
 	ClusterInsertStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 	}
 	ClusterInsertDoneInfo struct {
 		State ConnState
 	}
 	ClusterUpdateStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 	}
 	ClusterUpdateDoneInfo struct {
 		State ConnState
 	}
 	ClusterRemoveStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 	}
 	ClusterRemoveDoneInfo struct {
 		State ConnState
 	}
 	ConnStateChangeStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 		State    ConnState
 	}
@@ -113,7 +113,6 @@ type (
 		State ConnState
 	}
 	NetReadStartInfo struct {
-		Context context.Context
 		Address string
 		Buffer  int
 	}
@@ -122,7 +121,6 @@ type (
 		Error    error
 	}
 	NetWriteStartInfo struct {
-		Context context.Context
 		Address string
 		Bytes   int
 	}
@@ -131,14 +129,20 @@ type (
 		Error error
 	}
 	NetDialStartInfo struct {
-		Context context.Context
+		Context *context.Context
 		Address string
 	}
 	NetDialDoneInfo struct {
 		Error error
 	}
+	NetCloseStartInfo struct {
+		Address string
+	}
+	NetCloseDoneInfo struct {
+		Error error
+	}
 	ConnTakeStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 	}
 	ConnTakeDoneInfo struct {
@@ -146,21 +150,14 @@ type (
 		Error error
 	}
 	ConnReleaseStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 	}
 	ConnReleaseDoneInfo struct {
 		Lock int
 	}
-	NetCloseStartInfo struct {
-		Context context.Context
-		Address string
-	}
-	NetCloseDoneInfo struct {
-		Error error
-	}
 	ConnInvokeStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 		Method   Method
 	}
@@ -171,7 +168,7 @@ type (
 		State  ConnState
 	}
 	ConnNewStreamStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 		Method   Method
 	}
@@ -183,14 +180,14 @@ type (
 		Error error
 	}
 	ClusterGetStartInfo struct {
-		Context context.Context
+		Context *context.Context
 	}
 	ClusterGetDoneInfo struct {
 		Endpoint endpointInfo
 		Error    error
 	}
 	PessimizeNodeStartInfo struct {
-		Context  context.Context
+		Context  *context.Context
 		Endpoint endpointInfo
 		State    ConnState
 		Cause    error
@@ -200,14 +197,14 @@ type (
 		Error error
 	}
 	GetCredentialsStartInfo struct {
-		Context context.Context
+		Context *context.Context
 	}
 	GetCredentialsDoneInfo struct {
 		TokenOk bool
 		Error   error
 	}
 	DiscoveryStartInfo struct {
-		Context context.Context
+		Context *context.Context
 		Address string
 	}
 	DiscoveryDoneInfo struct {

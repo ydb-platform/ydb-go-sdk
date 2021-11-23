@@ -798,7 +798,7 @@ func (t Table) onPoolTake(p PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolT
 		return res
 	}
 }
-func TableOnSessionNew(t Table, c context.Context) func(session sessionInfo, _ error) {
+func TableOnSessionNew(t Table, c *context.Context) func(session sessionInfo, _ error) {
 	var p SessionNewStartInfo
 	p.Context = c
 	res := t.onSessionNew(p)
@@ -809,7 +809,7 @@ func TableOnSessionNew(t Table, c context.Context) func(session sessionInfo, _ e
 		res(p)
 	}
 }
-func TableOnSessionDelete(t Table, c context.Context, session sessionInfo) func(error) {
+func TableOnSessionDelete(t Table, c *context.Context, session sessionInfo) func(error) {
 	var p SessionDeleteStartInfo
 	p.Context = c
 	p.Session = session
@@ -820,7 +820,7 @@ func TableOnSessionDelete(t Table, c context.Context, session sessionInfo) func(
 		res(p)
 	}
 }
-func TableOnSessionKeepAlive(t Table, c context.Context, session sessionInfo) func(error) {
+func TableOnSessionKeepAlive(t Table, c *context.Context, session sessionInfo) func(error) {
 	var p KeepAliveStartInfo
 	p.Context = c
 	p.Session = session
@@ -831,7 +831,7 @@ func TableOnSessionKeepAlive(t Table, c context.Context, session sessionInfo) fu
 		res(p)
 	}
 }
-func TableOnSessionQueryPrepare(t Table, c context.Context, session sessionInfo, query string) func(result dataQuery, _ error) {
+func TableOnSessionQueryPrepare(t Table, c *context.Context, session sessionInfo, query string) func(result dataQuery, _ error) {
 	var p SessionQueryPrepareStartInfo
 	p.Context = c
 	p.Session = session
@@ -844,7 +844,7 @@ func TableOnSessionQueryPrepare(t Table, c context.Context, session sessionInfo,
 		res(p)
 	}
 }
-func TableOnSessionQueryExecute(t Table, c context.Context, session sessionInfo, query dataQuery, parameters queryParameters) func(tx transactionInfo, prepared bool, result result, _ error) {
+func TableOnSessionQueryExecute(t Table, c *context.Context, session sessionInfo, query dataQuery, parameters queryParameters) func(tx transactionInfo, prepared bool, result result, _ error) {
 	var p ExecuteDataQueryStartInfo
 	p.Context = c
 	p.Session = session
@@ -860,7 +860,7 @@ func TableOnSessionQueryExecute(t Table, c context.Context, session sessionInfo,
 		res(p)
 	}
 }
-func TableOnSessionQueryStreamExecute(t Table, c context.Context, session sessionInfo, query dataQuery, parameters queryParameters) func(result streamResult, _ error) {
+func TableOnSessionQueryStreamExecute(t Table, c *context.Context, session sessionInfo, query dataQuery, parameters queryParameters) func(result streamResult, _ error) {
 	var p SessionQueryStreamExecuteStartInfo
 	p.Context = c
 	p.Session = session
@@ -874,7 +874,7 @@ func TableOnSessionQueryStreamExecute(t Table, c context.Context, session sessio
 		res(p)
 	}
 }
-func TableOnSessionQueryStreamRead(t Table, c context.Context, session sessionInfo) func(result streamResult, _ error) {
+func TableOnSessionQueryStreamRead(t Table, c *context.Context, session sessionInfo) func(result streamResult, _ error) {
 	var p SessionQueryStreamReadStartInfo
 	p.Context = c
 	p.Session = session
@@ -886,7 +886,7 @@ func TableOnSessionQueryStreamRead(t Table, c context.Context, session sessionIn
 		res(p)
 	}
 }
-func TableOnSessionTransactionBegin(t Table, c context.Context, session sessionInfo) func(tx transactionInfo, _ error) {
+func TableOnSessionTransactionBegin(t Table, c *context.Context, session sessionInfo) func(tx transactionInfo, _ error) {
 	var p SessionTransactionBeginStartInfo
 	p.Context = c
 	p.Session = session
@@ -898,7 +898,7 @@ func TableOnSessionTransactionBegin(t Table, c context.Context, session sessionI
 		res(p)
 	}
 }
-func TableOnSessionTransactionCommit(t Table, c context.Context, session sessionInfo, tx transactionInfo) func(error) {
+func TableOnSessionTransactionCommit(t Table, c *context.Context, session sessionInfo, tx transactionInfo) func(error) {
 	var p SessionTransactionCommitStartInfo
 	p.Context = c
 	p.Session = session
@@ -910,7 +910,7 @@ func TableOnSessionTransactionCommit(t Table, c context.Context, session session
 		res(p)
 	}
 }
-func TableOnSessionTransactionRollback(t Table, c context.Context, session sessionInfo, tx transactionInfo) func(error) {
+func TableOnSessionTransactionRollback(t Table, c *context.Context, session sessionInfo, tx transactionInfo) func(error) {
 	var p SessionTransactionRollbackStartInfo
 	p.Context = c
 	p.Session = session
@@ -922,7 +922,7 @@ func TableOnSessionTransactionRollback(t Table, c context.Context, session sessi
 		res(p)
 	}
 }
-func TableOnPoolInit(t Table, c context.Context) func(limit int, keepAliveMinSize int) {
+func TableOnPoolInit(t Table, c *context.Context) func(limit int, keepAliveMinSize int) {
 	var p PoolInitStartInfo
 	p.Context = c
 	res := t.onPoolInit(p)
@@ -933,7 +933,7 @@ func TableOnPoolInit(t Table, c context.Context) func(limit int, keepAliveMinSiz
 		res(p)
 	}
 }
-func TableOnPoolClose(t Table, c context.Context) func(error) {
+func TableOnPoolClose(t Table, c *context.Context) func(error) {
 	var p PoolCloseStartInfo
 	p.Context = c
 	res := t.onPoolClose(p)
@@ -943,7 +943,7 @@ func TableOnPoolClose(t Table, c context.Context) func(error) {
 		res(p)
 	}
 }
-func TableOnPoolRetry(t Table, c context.Context, idempotent bool) func(error) func(attempts int, _ error) {
+func TableOnPoolRetry(t Table, c *context.Context, idempotent bool) func(error) func(attempts int, _ error) {
 	var p PoolRetryStartInfo
 	p.Context = c
 	p.Idempotent = idempotent
@@ -960,7 +960,7 @@ func TableOnPoolRetry(t Table, c context.Context, idempotent bool) func(error) f
 		}
 	}
 }
-func TableOnPoolSessionNew(t Table, c context.Context) func(session sessionInfo, _ error) {
+func TableOnPoolSessionNew(t Table, c *context.Context) func(session sessionInfo, _ error) {
 	var p PoolSessionNewStartInfo
 	p.Context = c
 	res := t.onPoolSessionNew(p)
@@ -971,7 +971,7 @@ func TableOnPoolSessionNew(t Table, c context.Context) func(session sessionInfo,
 		res(p)
 	}
 }
-func TableOnPoolSessionClose(t Table, c context.Context, session sessionInfo) func() {
+func TableOnPoolSessionClose(t Table, c *context.Context, session sessionInfo) func() {
 	var p PoolSessionCloseStartInfo
 	p.Context = c
 	p.Session = session
@@ -981,7 +981,7 @@ func TableOnPoolSessionClose(t Table, c context.Context, session sessionInfo) fu
 		res(p)
 	}
 }
-func TableOnPoolPut(t Table, c context.Context, session sessionInfo) func(error) {
+func TableOnPoolPut(t Table, c *context.Context, session sessionInfo) func(error) {
 	var p PoolPutStartInfo
 	p.Context = c
 	p.Session = session
@@ -992,7 +992,7 @@ func TableOnPoolPut(t Table, c context.Context, session sessionInfo) func(error)
 		res(p)
 	}
 }
-func TableOnPoolGet(t Table, c context.Context) func(session sessionInfo, attempts int, _ error) {
+func TableOnPoolGet(t Table, c *context.Context) func(session sessionInfo, attempts int, _ error) {
 	var p PoolGetStartInfo
 	p.Context = c
 	res := t.onPoolGet(p)
@@ -1004,7 +1004,7 @@ func TableOnPoolGet(t Table, c context.Context) func(session sessionInfo, attemp
 		res(p)
 	}
 }
-func TableOnPoolWait(t Table, c context.Context) func(session sessionInfo, _ error) {
+func TableOnPoolWait(t Table, c *context.Context) func(session sessionInfo, _ error) {
 	var p PoolWaitStartInfo
 	p.Context = c
 	res := t.onPoolWait(p)
@@ -1015,7 +1015,7 @@ func TableOnPoolWait(t Table, c context.Context) func(session sessionInfo, _ err
 		res(p)
 	}
 }
-func TableOnPoolTake(t Table, c context.Context, session sessionInfo) func() func(took bool, _ error) {
+func TableOnPoolTake(t Table, c *context.Context, session sessionInfo) func() func(took bool, _ error) {
 	var p PoolTakeStartInfo
 	p.Context = c
 	p.Session = session

@@ -67,7 +67,7 @@ func (c *conn) SetState(ctx context.Context, s state.State) state.State {
 }
 
 func (c *conn) setState(ctx context.Context, s state.State) state.State {
-	onDone := trace.DriverOnConnStateChange(c.config.Trace(ctx), ctx, c.endpoint, c.state)
+	onDone := trace.DriverOnConnStateChange(c.config.Trace(ctx), &ctx, c.endpoint, c.state)
 	c.state = s
 	onDone(c.state)
 	return c.state
@@ -80,7 +80,7 @@ func (c *conn) GetState() (s state.State) {
 }
 
 func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
-	onDone := trace.DriverOnConnTake(c.config.Trace(ctx), ctx, c.endpoint)
+	onDone := trace.DriverOnConnTake(c.config.Trace(ctx), &ctx, c.endpoint)
 	defer func() {
 		onDone(int(atomic.LoadInt32(&c.locks)), err)
 	}()
@@ -105,7 +105,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 func (c *conn) release(ctx context.Context) {
 	c.Lock()
 	defer c.Unlock()
-	onDone := trace.DriverOnConnRelease(c.config.Trace(ctx), ctx, c.endpoint)
+	onDone := trace.DriverOnConnRelease(c.config.Trace(ctx), &ctx, c.endpoint)
 	atomic.AddInt32(&c.locks, -1)
 	onDone(int(atomic.LoadInt32(&c.locks)))
 }
@@ -152,7 +152,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	}
 	onDone := trace.DriverOnPessimizeNode(
 		c.config.Trace(ctx),
-		ctx,
+		&ctx,
 		c.endpoint,
 		c.GetState(),
 		err,
@@ -169,7 +169,6 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		return errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
 	}
 	var (
-		rawCtx = ctx
 		cancel context.CancelFunc
 		opID   string
 		issues []trace.Issue
@@ -199,7 +198,7 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		return err
 	}
 
-	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), rawCtx, c.endpoint, trace.Method(method))
+	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), &ctx, c.endpoint, trace.Method(method))
 	defer func() {
 		onDone(err, issues, opID, c.GetState())
 	}()
@@ -248,9 +247,6 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
 	}
 
-	// Remember raw deadline to pass it for the tracing functions.
-	rawCtx := ctx
-
 	var cancel context.CancelFunc
 	if t := c.config.StreamTimeout(); t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
@@ -273,7 +269,7 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		return nil, err
 	}
 
-	streamRecv := trace.DriverOnConnNewStream(c.config.Trace(ctx), rawCtx, c.endpoint, trace.Method(method))
+	streamRecv := trace.DriverOnConnNewStream(c.config.Trace(ctx), &ctx, c.endpoint, trace.Method(method))
 	defer func() {
 		if err != nil {
 			streamRecv(err)(c.GetState(), err)
