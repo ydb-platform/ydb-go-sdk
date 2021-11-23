@@ -4,9 +4,10 @@
 * Added `CreateSession` method into `table.Client` interface
 * Added `Context` field into `trace.Driver.Net{Dial,Read,Write,Close}StartInfo` structs
 * Added `Address` field into `trace.Driver.DiscoveryStartInfo` struct
+* Improved logger options (provide err and out writers, provide external logger)
 
 ## 3.4.3
-* Forced `round_bobin` grpc load balancing instead default `pick_first`
+* Forced `round_robin` grpc load balancing instead default `pick_first`
 * Added checker `IsTransportErrorCancelled`
 
 ## 3.4.2

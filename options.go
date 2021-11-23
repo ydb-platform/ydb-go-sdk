@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"io"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -59,6 +60,18 @@ func WithMinLevel(minLevel logger.Level) logger.Option {
 
 func WithNoColor(b bool) logger.Option {
 	return logger.WithNoColor(b)
+}
+
+func WithExternalLogger(external log.Logger) logger.Option {
+	return logger.WithExternalLogger(external)
+}
+
+func WithOutWriter(out io.Writer) logger.Option {
+	return logger.WithOutWriter(out)
+}
+
+func WithErrWriter(err io.Writer) logger.Option {
+	return logger.WithErrWriter(err)
 }
 
 func WithLogger(details trace.Details, opts ...logger.Option) Option {
