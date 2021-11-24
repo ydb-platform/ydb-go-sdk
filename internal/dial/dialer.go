@@ -3,6 +3,7 @@ package dial
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 
 	"google.golang.org/grpc"
@@ -19,6 +20,12 @@ import (
 
 // Dial dials given addr and initializes driver instance on success.
 func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
+	if c.Endpoint() == "" {
+		return nil, fmt.Errorf("empty dial address")
+	}
+	if c.Database() == "" {
+		return nil, fmt.Errorf("empty database")
+	}
 	return (&dialer{
 		netDial:   c.NetDial(),
 		tlsConfig: c.TLSConfig(),

@@ -114,13 +114,25 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
+	defer cancel()
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if c.closed {
 		return nil, ErrClusterClosed
 	}
+
 	onDone := trace.DriverOnClusterGet(c.trace, &ctx)
+	defer func() {
+		if err != nil {
+			onDone(nil, err)
+		} else {
+			onDone(conn.Endpoint(), nil)
+		}
+	}()
 	if e, ok := public.ContextEndpoint(ctx); ok {
 		if conn, ok = c.endpoints[e.NodeID()]; ok {
 			return conn, nil
@@ -129,10 +141,10 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 
 	conn = c.balancer.Next()
 	if conn == nil {
-		err = ErrClusterEmpty
+		return nil, ErrClusterEmpty
 	}
-	onDone(conn.Endpoint(), err)
-	return conn, err
+
+	return conn, nil
 }
 
 type optionsHolder struct {
