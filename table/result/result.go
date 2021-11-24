@@ -1,9 +1,8 @@
-package resultset
+package result
 
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
@@ -37,7 +36,7 @@ type Result interface {
 	NextResultSet(ctx context.Context, columns ...string) bool
 
 	// CurrentResultSet get current result set to use ColumnCount(), RowCount() and other methods
-	CurrentResultSet() ResultSet
+	CurrentResultSet() Set
 
 	// HasNextRow reports whether result row may be advanced.
 	// It may be useful to call HasNextRow() instead of NextRow() to look ahead
@@ -86,7 +85,7 @@ type Result interface {
 
 	// Err return scanner error
 	// To handle errors, do not need to check after scanning each row
-	// It is enough to check after reading all ResultSet
+	// It is enough to check after reading all Set
 	Err() error
 
 	// Close closes the Result, preventing further iteration.
@@ -109,21 +108,4 @@ type Result interface {
 	TotalRowCount() int
 
 	///--------------non-stream-----------------/>
-}
-
-type ResultSet interface {
-	// ColumnCount returns number of columns in the current result set.
-	ColumnCount() int
-
-	// Columns allows to iterate over all columns of the current result set.
-	Columns(it func(options.Column))
-
-	// RowCount returns number of rows in the result set.
-	RowCount() int
-
-	// ItemCount returns number of items in the current row.
-	ItemCount() int
-
-	// Truncated returns true if current result set has been truncated by server
-	Truncated() bool
 }

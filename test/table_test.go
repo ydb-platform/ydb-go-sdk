@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"log"
 	"math"
@@ -522,7 +522,7 @@ FROM AS_TABLE($episodesData);
 
 func readTable(ctx context.Context, c table.Client, path string) error {
 	var (
-		res resultset.Result
+		res result.Result
 	)
 	err := c.Do(
 		ctx,
@@ -643,7 +643,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 				TablePathPrefix: prefix,
 			},
 		)
-		res    resultset.Result
+		res    result.Result
 		readTx = table.TxControl(
 			table.BeginTx(
 				table.WithOnlineReadOnly(),
@@ -710,7 +710,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 				TablePathPrefix: prefix,
 			},
 		)
-		res resultset.Result
+		res result.Result
 	)
 	err := c.Do(
 		ctx,

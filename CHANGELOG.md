@@ -5,6 +5,7 @@
 * Added `Context` field into `trace.Driver.Net{Dial,Read,Write,Close}StartInfo` structs
 * Added `Address` field into `trace.Driver.DiscoveryStartInfo` struct
 * Improved logger options (provide err and out writers, provide external logger)
+* Renamed package `table.resultset` to `table.result`
 
 ## 3.4.3
 * Forced `round_robin` grpc load balancing instead default `pick_first`

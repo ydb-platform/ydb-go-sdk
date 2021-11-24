@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
@@ -25,7 +25,7 @@ type Result struct {
 	closed  bool
 }
 
-var _ resultset.Result = &Result{}
+var _ result.Result = &Result{}
 
 // NextResultSet selects next result set in the result.
 // columns - names of columns in the resultSet that will be scanned
@@ -41,7 +41,7 @@ func (r *Result) NextResultSet(ctx context.Context, columns ...string) bool {
 }
 
 // CurrentResultSet get current result set
-func (r *Result) CurrentResultSet() resultset.ResultSet {
+func (r *Result) CurrentResultSet() result.Set {
 	return r
 }
 

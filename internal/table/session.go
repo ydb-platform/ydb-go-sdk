@@ -23,7 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -392,7 +392,7 @@ func (s *Statement) Execute(
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r resultset.Result, err error,
+	txr table.Transaction, r result.Result, err error,
 ) {
 	onDone := trace.TableOnSessionQueryExecute(s.session.trace, &ctx, s.session, s.query, params)
 	defer func() {
@@ -407,7 +407,7 @@ func (s *Statement) execute(
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r resultset.Result, err error,
+	txr table.Transaction, r result.Result, err error,
 ) {
 	_, res, err := s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
 	if err != nil {
@@ -470,7 +470,7 @@ func (s *session) Execute(
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r resultset.Result, err error,
+	txr table.Transaction, r result.Result, err error,
 ) {
 	q := new(dataQuery)
 	q.initFromText(query)
@@ -504,7 +504,7 @@ func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
 
 // executeQueryResult returns Transaction and Result built from received
 // result.
-func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.Transaction, resultset.Result, error) {
+func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.Transaction, result.Result, error) {
 	t := &Transaction{
 		id: res.GetTxMeta().GetId(),
 		s:  s,
@@ -670,7 +670,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (desc options.TableO
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
-func (s *session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ resultset.Result, err error) {
+func (s *session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ result.Result, err error) {
 	var (
 		request = Ydb_Table.ReadTableRequest{
 			SessionId: s.id,
@@ -737,7 +737,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamExecuteScanQuery() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
-func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, params *table.QueryParameters, opts ...options.ExecuteScanQueryOption) (_ resultset.Result, err error) {
+func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, params *table.QueryParameters, opts ...options.ExecuteScanQueryOption) (_ result.Result, err error) {
 	q := new(dataQuery)
 	q.initFromText(query)
 	var (
@@ -867,7 +867,7 @@ func (tx *Transaction) Execute(
 	ctx context.Context,
 	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
-) (r resultset.Result, err error) {
+) (r result.Result, err error) {
 	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
 	return
 }
@@ -877,13 +877,13 @@ func (tx *Transaction) ExecuteStatement(
 	ctx context.Context,
 	stmt table.Statement, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
-) (r resultset.Result, err error) {
+) (r result.Result, err error) {
 	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
 	return
 }
 
 // CommitTx commits specified active transaction.
-func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r resultset.Result, err error) {
+func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r result.Result, err error) {
 	onDone := trace.TableOnSessionTransactionCommit(tx.s.trace, &ctx, tx.s, tx)
 	defer func() {
 		onDone(err)
