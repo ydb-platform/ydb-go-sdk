@@ -1,3 +1,8 @@
+## 2.10.7
+* Dropped internal cluster connections tracker
+* Switched initial connect to all endpoints after discovery to lazy connect
+* Added reconnect for broken conns
+
 ## 2.10.6
 * Thrown context without deadline into discovery goroutine
 * Added `Address` param to `DiscoveryStartInfo` struct

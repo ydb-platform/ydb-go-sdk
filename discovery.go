@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/yandex-cloud/ydb-go-sdk/v2/api/protos/Ydb_Discovery"
@@ -18,7 +19,7 @@ type Endpoint struct {
 }
 
 type discoveryClient struct {
-	conn *conn
+	cc   *grpc.ClientConn
 	meta *meta
 }
 
@@ -39,7 +40,7 @@ func (d *discoveryClient) Discover(ctx context.Context, database string, ssl boo
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 	err = invoke(
-		ctx, d.conn.conn, internal.WrapOpResponse(&resp),
+		ctx, d.cc, internal.WrapOpResponse(&resp),
 		"/Ydb.Discovery.V1.DiscoveryService/ListEndpoints", &req, &res,
 	)
 	if err != nil {

@@ -67,22 +67,28 @@ func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err err
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
-	conn, err := d.cluster.Get(ctx)
-	addr := ""
-	if conn != nil {
-		addr = conn.addr.String()
-	}
-	driverTraceGetConnDone(rawCtx, addr, err)
+	var cc *conn
+	cc, err = d.cluster.Get(ctx)
 	if err != nil {
 		return
 	}
 
-	info = conn
+	defer func() {
+		if err != nil {
+			err = mapGRPCError(err)
+			if isTransportError(err) {
+				d.pessimizeConn(rawCtx, cc, err)
+			}
+		}
+	}()
 
-	if conn.conn == nil {
-		return info, ErrNilConnection
+	var raw *grpc.ClientConn
+	raw, err = cc.getConn(ctx)
+	if err != nil {
+		return
 	}
+
+	info = &callInfo{address: cc.Address()}
 
 	method, req, res, resp := internal.Unwrap(op)
 	if resp == nil {
@@ -94,28 +100,23 @@ func (d *driver) Call(ctx context.Context, op Operation) (info CallInfo, err err
 		setOperationParams(req, params)
 	}
 
+	onDone := driverTraceOnOperation(ctx, d.trace, ctx, cc.Address(), Method(method), params)
+	defer func() {
+		onDone(rawCtx, cc.Address(), Method(method), params, resp.GetOpID(), resp.GetIssues(), err)
+	}()
+
 	start := timeutil.Now()
-	conn.runtime.operationStart(start)
-	driverTraceOperationDone := driverTraceOnOperation(ctx, d.trace, ctx, conn.addr.String(), Method(method), params)
-
-	err = invoke(ctx, conn.conn, resp, method, req, res)
-
-	conn.runtime.operationDone(
+	cc.runtime.operationStart(start)
+	err = invoke(ctx, raw, resp, method, req, res)
+	cc.runtime.operationDone(
 		start, timeutil.Now(),
 		errIf(isTimeoutError(err), err),
 	)
-	driverTraceOperationDone(rawCtx, conn.addr.String(), Method(method), params, resp.GetOpID(), resp.GetIssues(), err)
-
-	if err != nil {
-		if isTransportError(err) {
-			d.pessimizeConn(rawCtx, conn, err)
-		}
-	}
 
 	return
 }
 
-func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (_ CallInfo, err error) {
+func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (info CallInfo, err error) {
 	// Remember raw context to pass it for the tracing functions.
 	rawCtx := ctx
 
@@ -143,10 +144,28 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (_ CallInfo
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
-	var conn *conn
-	driverTraceGetConnDone := driverTraceOnGetConn(ctx, d.trace, ctx)
-	conn, err = d.cluster.Get(ctx)
-	driverTraceGetConnDone(rawCtx, conn.Address(), err)
+	var cc *conn
+	cc, err = d.cluster.Get(ctx)
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if err != nil {
+			err = mapGRPCError(err)
+			if isTransportError(err) {
+				d.pessimizeConn(rawCtx, cc, err)
+			}
+		}
+	}()
+
+	var raw *grpc.ClientConn
+	raw, err = cc.getConn(ctx)
+	if err != nil {
+		return
+	}
+
+	info = &callInfo{address: cc.Address()}
 
 	if err != nil {
 		return nil, err
@@ -158,77 +177,65 @@ func (d *driver) StreamRead(ctx context.Context, op StreamOperation) (_ CallInfo
 		ServerStreams: true,
 	}
 
-	conn.runtime.streamStart(timeutil.Now())
-	driverTraceStreamDone := driverTraceOnStream(ctx, d.trace, ctx, conn.addr.String(), Method(method))
+	cc.runtime.streamStart(timeutil.Now())
+	onDone := driverTraceOnStream(ctx, d.trace, ctx, cc.Address(), Method(method))
 	defer func() {
 		if err != nil {
-			conn.runtime.streamDone(timeutil.Now(), err)
-			driverTraceStreamDone(rawCtx, conn.addr.String(), Method(method), err)
+			cc.runtime.streamDone(timeutil.Now(), err)
+			onDone(rawCtx, cc.Address(), Method(method), err)
 		}
 	}()
 
 	var s grpc.ClientStream
-	s, err = grpc.NewClientStream(ctx, &desc, conn.conn, method,
+	s, err = grpc.NewClientStream(ctx, &desc, raw, method,
 		grpc.MaxCallRecvMsgSize(50*1024*1024), // 50MB
 	)
 	if err != nil {
-		err = mapGRPCError(err)
-		if isTransportError(err) {
-			d.pessimizeConn(rawCtx, conn, err)
-		}
-		return nil, err
+		return
 	}
 	if err = s.SendMsg(req); err != nil {
-		err = mapGRPCError(err)
-		if isTransportError(err) {
-			d.pessimizeConn(rawCtx, conn, err)
-		}
-		return nil, err
+		return
 	}
 	if err = s.CloseSend(); err != nil {
-		err = mapGRPCError(err)
-		if isTransportError(err) {
-			d.pessimizeConn(rawCtx, conn, err)
-		}
-		return nil, err
+		return
 	}
 
 	go func() {
 		var err error
 		defer func() {
-			conn.runtime.streamDone(timeutil.Now(), hideEOF(err))
-			driverTraceStreamDone(rawCtx, conn.addr.String(), Method(method), hideEOF(err))
+			if err != nil {
+				if isTransportError(err) {
+					d.pessimizeConn(rawCtx, cc, err)
+				}
+			}
+			cc.runtime.streamDone(timeutil.Now(), hideEOF(err))
+			onDone(rawCtx, cc.Address(), Method(method), hideEOF(err))
 			// cancel directly on exit from goroutine
 			// this need for break grpc client stream
 			cancel()
 		}()
-		for err == nil {
-			conn.runtime.streamRecv(timeutil.Now())
-			driverTraceStreamRecvDone := driverTraceOnStreamRecv(ctx, d.trace, ctx, conn.addr.String(), Method(method))
-
-			err = s.RecvMsg(resp)
-			if resp != nil {
-				driverTraceStreamRecvDone(rawCtx, conn.addr.String(), Method(method), resp.GetIssues(), hideEOF(err))
-			} else {
-				driverTraceStreamRecvDone(rawCtx, conn.addr.String(), Method(method), nil, hideEOF(err))
-			}
-			if err != nil {
-				err = mapGRPCError(err)
-				if isTransportError(err) {
-					d.pessimizeConn(rawCtx, conn, err)
-				}
-			} else {
-				if s := resp.GetStatus(); s != Ydb.StatusIds_SUCCESS {
-					err = &OpError{
-						Reason: statusCode(s),
-						issues: resp.GetIssues(),
+		for ; err == nil; err = func() (err error) { // isolate scope for defer effect without for-defer effect
+			onDone := driverTraceOnStreamRecv(ctx, d.trace, ctx, cc.Address(), Method(method))
+			defer func() {
+				if err == nil {
+					cc.runtime.streamRecv(timeutil.Now())
+					if s := resp.GetStatus(); s != Ydb.StatusIds_SUCCESS {
+						err = &OpError{
+							Reason: statusCode(s),
+							issues: resp.GetIssues(),
+						}
 					}
+				} else {
+					err = mapGRPCError(err)
 				}
-			}
-			// NOTE: do not hide even io.EOF for this call.
-			process(err)
+				// NOTE: do not hide even io.EOF for this call.
+				process(err)
+				onDone(rawCtx, cc.Address(), Method(method), resp.GetIssues(), hideEOF(err))
+			}()
+			return s.RecvMsg(resp)
+		}() {
 		}
 	}()
 
-	return conn, nil
+	return
 }

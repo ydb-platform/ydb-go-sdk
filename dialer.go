@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"strconv"
 	"sync"
@@ -55,6 +56,12 @@ type Dialer struct {
 
 // Dial dials given addr and initializes driver instance on success.
 func (d *Dialer) Dial(ctx context.Context, addr string) (_ Driver, err error) {
+	if addr == "" {
+		return nil, fmt.Errorf("empty dial address")
+	}
+	if d.DriverConfig.Database == "" {
+		return nil, fmt.Errorf("empty database")
+	}
 	config := d.DriverConfig.withDefaults()
 	grpcKeepalive := d.Keepalive
 	if grpcKeepalive == 0 {
@@ -94,9 +101,9 @@ type dialer struct {
 	meta      *meta
 }
 
-func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
+func (d *dialer) dial(ctx context.Context, address string) (_ Driver, err error) {
 	cluster := cluster{
-		dial:  d.dialHostPort,
+		dial:  d.dialAddress,
 		trace: d.config.Trace,
 		index: make(map[connAddr]connEntry),
 	}
@@ -124,7 +131,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		}
 
 		var curr []Endpoint
-		curr, err = d.discover(ctx, addr)
+		curr, err = d.discover(ctx, address)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +149,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 		}
 		cluster.explorer = NewRepeater(d.config.DiscoveryInterval, 0,
 			func(ctx context.Context) {
-				next, err := d.discover(ctx, addr)
+				next, err := d.discover(ctx, address)
 				// if nothing endpoint - re-discover after one second
 				// and use old endpoint list
 				if err != nil || len(next) == 0 {
@@ -185,7 +192,7 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 			e   Endpoint
 			err error
 		)
-		e.Addr, e.Port, err = splitHostPort(addr)
+		e.Addr, e.Port, err = splitHostPort(address)
 		if err != nil {
 			return nil, err
 		}
@@ -210,51 +217,38 @@ func (d *dialer) dial(ctx context.Context, addr string) (_ Driver, err error) {
 	}, nil
 }
 
-func (d *dialer) dialHostPort(ctx context.Context, host string, port int) (*conn, error) {
+func (d *dialer) dialAddress(ctx context.Context, address string) (*grpc.ClientConn, error) {
 	rawctx := ctx
 	if d.timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, d.timeout)
 		defer cancel()
 	}
-	addr := connAddr{
-		addr: host,
-		port: port,
-	}
-	s := addr.String()
-	driverTraceDialDone := driverTraceOnDial(ctx, d.config.Trace, ctx, s)
+	onDone := driverTraceOnDial(ctx, d.config.Trace, ctx, address)
 
-	cc, err := grpc.DialContext(ctx, s, d.grpcDialOptions()...)
+	cc, err := grpc.DialContext(ctx, address, d.grpcDialOptions()...)
 
-	driverTraceDialDone(rawctx, s, err)
+	onDone(rawctx, address, err)
 	if err != nil {
 		return nil, err
 	}
 
-	return newConn(cc, addr), nil
+	return cc, nil
 }
 
-func (d *dialer) dialAddr(ctx context.Context, addr string) (*conn, error) {
-	host, port, err := splitHostPort(addr)
-	if err != nil {
-		return nil, err
-	}
-	return d.dialHostPort(ctx, host, port)
-}
-
-func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoint, err error) {
-	driverTraceDiscoveryDone := driverTraceOnDiscovery(ctx, d.config.Trace, ctx, addr)
+func (d *dialer) discover(ctx context.Context, address string) (endpoints []Endpoint, err error) {
+	driverTraceDiscoveryDone := driverTraceOnDiscovery(ctx, d.config.Trace, ctx, address)
 	defer func() {
 		driverTraceDiscoveryDone(ctx, endpoints, err)
 	}()
 
-	var conn *conn
-	conn, err = d.dialAddr(ctx, addr)
+	var cc *grpc.ClientConn
+	cc, err = d.dialAddress(ctx, address)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		_ = conn.conn.Close()
+		_ = cc.Close()
 	}()
 
 	subCtx := ctx
@@ -265,7 +259,7 @@ func (d *dialer) discover(ctx context.Context, addr string) (endpoints []Endpoin
 	}
 
 	return (&discoveryClient{
-		conn: conn,
+		cc:   cc,
 		meta: d.meta,
 	}).Discover(subCtx, d.config.Database, d.useTLS())
 }
