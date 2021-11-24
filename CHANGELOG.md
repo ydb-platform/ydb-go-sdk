@@ -13,7 +13,7 @@
   used direct `CreateSession` table client call in the best effort loop
 
 ## 2.10.5
-* Fixed panic when ready conns iz zero
+* Fixed panic when ready conns is zero
 
 ## 2.10.4
 * Initialized repeater permanently regardless of the value `DriverConfig.DiscoveryInterval`
