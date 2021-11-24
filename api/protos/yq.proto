@@ -124,9 +124,11 @@ message QueryMeta {
         RESUMING = 6; // Resuming query execution from PAUSED status
         RUNNING = 7; // Query started for execution
         COMPLETED = 8; // Query completed successfully
+        COMPLETING = 12; // Finalizing query before become COMPLETED
         FAILED = 9; // Query completed with errors
-        PAUSING = 10; // Query starts pausing
+        FAILING = 13; // Finalizing query before become FAILED
         PAUSED = 11; // Query paused
+        PAUSING = 10; // Query starts pausing
     }
 
     CommonMeta common = 1;
@@ -237,6 +239,20 @@ message DescribeQueryResponse {
 
 message DescribeQueryResult {
     Query query = 1;
+}
+
+// Getting status of the query
+message GetQueryStatusRequest {
+    Ydb.Operations.OperationParams operation_params = 1;
+    string query_id = 2 [(Ydb.length).range = {min: 1, max: 1024}];
+}
+
+message GetQueryStatusResponse {
+    Ydb.Operations.Operation operation = 1; // GetQueryStatusResult
+}
+
+message GetQueryStatusResult {
+    QueryMeta.ComputeStatus status = 1;
 }
 
 // Complete removal of query. Recovery of the query after this operation is not possible
