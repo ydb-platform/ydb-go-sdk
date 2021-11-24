@@ -10,6 +10,54 @@ import (
 // both from t and x.
 func (t Driver) Compose(x Driver) (ret Driver) {
 	switch {
+	case t.OnInit == nil:
+		ret.OnInit = x.OnInit
+	case x.OnInit == nil:
+		ret.OnInit = t.OnInit
+	default:
+		h1 := t.OnInit
+		h2 := x.OnInit
+		ret.OnInit = func(i InitStartInfo) func(InitDoneInfo) {
+			r1 := h1(i)
+			r2 := h2(i)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(i InitDoneInfo) {
+					r1(i)
+					r2(i)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnClose == nil:
+		ret.OnClose = x.OnClose
+	case x.OnClose == nil:
+		ret.OnClose = t.OnClose
+	default:
+		h1 := t.OnClose
+		h2 := x.OnClose
+		ret.OnClose = func(c CloseStartInfo) func(CloseDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c CloseDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnNetRead == nil:
 		ret.OnNetRead = x.OnNetRead
 	case x.OnNetRead == nil:
@@ -406,6 +454,36 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	}
 	return ret
 }
+func (t Driver) onInit(i InitStartInfo) func(InitDoneInfo) {
+	fn := t.OnInit
+	if fn == nil {
+		return func(InitDoneInfo) {
+			return
+		}
+	}
+	res := fn(i)
+	if res == nil {
+		return func(InitDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onClose(c1 CloseStartInfo) func(CloseDoneInfo) {
+	fn := t.OnClose
+	if fn == nil {
+		return func(CloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(CloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onNetRead(n NetReadStartInfo) func(NetReadDoneInfo) {
 	fn := t.OnNetRead
 	if fn == nil {
@@ -657,6 +735,26 @@ func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 		}
 	}
 	return res
+}
+func DriverOnInit(t Driver, c *context.Context) func(error) {
+	var p InitStartInfo
+	p.Context = c
+	res := t.onInit(p)
+	return func(e error) {
+		var p InitDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnClose(t Driver, c *context.Context) func(error) {
+	var p CloseStartInfo
+	p.Context = c
+	res := t.onClose(p)
+	return func(e error) {
+		var p CloseDoneInfo
+		p.Error = e
+		res(p)
+	}
 }
 func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ error) {
 	var p NetReadStartInfo

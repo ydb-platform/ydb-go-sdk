@@ -129,9 +129,10 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		}
 	}
 	db.config = config.New(db.options...)
-	if err != nil {
-		return nil, err
-	}
+	onDone := trace.DriverOnInit(db.config.Trace(), &ctx)
+	defer func() {
+		onDone(err)
+	}()
 	db.cluster, err = dial.Dial(ctx, db.config)
 	if err != nil {
 		return nil, err

@@ -6,6 +6,7 @@
 * Added `Address` field into `trace.Driver.DiscoveryStartInfo` struct
 * Improved logger options (provide err and out writers, provide external logger)
 * Renamed package `table.resultset` to `table.result`
+* Added `trace.Driver.{OnInit,OnClose}` events
 
 ## 3.4.3
 * Forced `round_robin` grpc load balancing instead default `pick_first`

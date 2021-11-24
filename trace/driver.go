@@ -11,6 +11,10 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Driver struct {
+		// Driver runtime events
+		OnInit  func(InitStartInfo) func(InitDoneInfo)
+		OnClose func(CloseStartInfo) func(CloseDoneInfo)
+
 		// Network events
 		OnNetRead  func(NetReadStartInfo) func(NetReadDoneInfo)
 		OnNetWrite func(NetWriteStartInfo) func(NetWriteDoneInfo)
@@ -210,5 +214,17 @@ type (
 	DiscoveryDoneInfo struct {
 		Endpoints []string
 		Error     error
+	}
+	InitStartInfo struct {
+		Context *context.Context
+	}
+	InitDoneInfo struct {
+		Error error
+	}
+	CloseStartInfo struct {
+		Context *context.Context
+	}
+	CloseDoneInfo struct {
+		Error error
 	}
 )
