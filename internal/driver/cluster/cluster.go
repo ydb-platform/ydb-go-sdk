@@ -183,11 +183,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	conn := conn.New(
-		e,
-		c.dial,
-		holder.connConfig,
-	)
+	conn := conn.New(e, c.dial, holder.connConfig)
 
 	onDone := trace.DriverOnClusterInsert(c.trace, &ctx, e)
 	defer func() {

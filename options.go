@@ -133,14 +133,6 @@ func WithBalancingConfig(balancerConfig config.BalancerConfig) Option {
 	}
 }
 
-func WithGrpcConnectionTTL(ttl time.Duration) Option {
-	return func(ctx context.Context, db *db) error {
-		// TODO: sync with table session keep-alive timeout
-		db.options = append(db.options, config.WithGrpcConnectionTTL(ttl))
-		return nil
-	}
-}
-
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(ctx context.Context, db *db) error {
 		db.options = append(db.options, config.WithDialTimeout(timeout))

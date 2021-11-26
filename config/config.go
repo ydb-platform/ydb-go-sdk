@@ -1,11 +1,11 @@
 package config
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"net"
 	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -23,7 +23,7 @@ type Config interface {
 	// Database is a required database name.
 	Database() string
 
-	// Secure() is an flag for secure connection
+	// Secure is an flag for secure connection
 	Secure() bool
 
 	// Credentials is an ydb client credentials.
@@ -63,10 +63,6 @@ type Config interface {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval() time.Duration
 
-	// GrpcConnectionPolicy define lifecycle behavior of grpc connection
-	// By default GrpcConnectionPolicy is sets to DefaultGrpcConnectionPolicy
-	GrpcConnectionPolicy() GrpcConnectionPolicy
-
 	// BalancingConfig is an optional configuration related to selected
 	// BalancingMethod. That is, some balancing methods allow to be configured.
 	BalancingConfig() BalancerConfig
@@ -88,9 +84,9 @@ type Config interface {
 	// If TLSConfig is zero then connections are insecure.
 	TLSConfig() *tls.Config
 
-	// NetDial is an optional function that may replace default network dialing
-	// function such as net.Dial("tcp").
-	NetDial() func(context.Context, string) (net.Conn, error)
+	// GrpcDialOptions is an custom client grpc dial options which will appends to
+	// default grpc dial options
+	GrpcDialOptions() []grpc.DialOption
 }
 
 // Config contains driver configuration options.
@@ -105,13 +101,16 @@ type config struct {
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
 	discoveryInterval    time.Duration
-	grpcConnectionPolicy GrpcConnectionPolicy
 	balancingConfig      BalancerConfig
 	requestsType         string
 	fastDial             bool
 	dialTimeout          time.Duration
 	tlsConfig            *tls.Config
-	netDial              func(context.Context, string) (net.Conn, error)
+	grpcOptions          []grpc.DialOption
+}
+
+func (c *config) GrpcDialOptions() []grpc.DialOption {
+	return c.grpcOptions
 }
 
 func (c *config) Secure() bool {
@@ -124,10 +123,6 @@ func (c *config) Endpoint() string {
 
 func (c *config) TLSConfig() *tls.Config {
 	return c.tlsConfig
-}
-
-func (c *config) NetDial() func(context.Context, string) (net.Conn, error) {
-	return c.netDial
 }
 
 func (c *config) DialTimeout() time.Duration {
@@ -164,10 +159,6 @@ func (c *config) OperationCancelAfter() time.Duration {
 
 func (c *config) DiscoveryInterval() time.Duration {
 	return c.discoveryInterval
-}
-
-func (c *config) GrpcConnectionPolicy() GrpcConnectionPolicy {
-	return c.grpcConnectionPolicy
 }
 
 func (c *config) BalancingConfig() BalancerConfig {
@@ -250,21 +241,9 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
-func WithGrpcConnectionTTL(ttl time.Duration) Option {
-	return func(c *config) {
-		c.grpcConnectionPolicy.TTL = ttl
-	}
-}
-
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(c *config) {
 		c.dialTimeout = timeout
-	}
-}
-
-func WithGrpcConnectionPolicy(grpcConnectionPolicy GrpcConnectionPolicy) Option {
-	return func(c *config) {
-		c.grpcConnectionPolicy = grpcConnectionPolicy
 	}
 }
 
@@ -286,9 +265,9 @@ func WithFastDial(fastDial bool) Option {
 	}
 }
 
-func WithNetDial(netDial func(context.Context, string) (net.Conn, error)) Option {
+func WithGrpcOptions(option ...grpc.DialOption) Option {
 	return func(c *config) {
-		c.netDial = netDial
+		c.grpcOptions = append(c.grpcOptions, option...)
 	}
 }
 
@@ -309,9 +288,8 @@ func defaults() (c *config) {
 		certPool = x509.NewCertPool()
 	}
 	return &config{
-		discoveryInterval:    DefaultDiscoveryInterval,
-		grpcConnectionPolicy: DefaultGrpcConnectionPolicy,
-		balancingConfig:      DefaultBalancer,
+		discoveryInterval: DefaultDiscoveryInterval,
+		balancingConfig:   DefaultBalancer,
 		tlsConfig: &tls.Config{
 			RootCAs: certPool,
 		},

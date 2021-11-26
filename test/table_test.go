@@ -108,7 +108,6 @@ func TestPoolHealth(t *testing.T) {
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
 		ydb.WithDialTimeout(5*time.Second),
-		ydb.WithGrpcConnectionTTL(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithSessionPoolSizeLimit(200),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),

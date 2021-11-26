@@ -22,13 +22,19 @@ var ErrNotImplemented = errors.New("testutil: not implemented")
 type MethodCode uint
 
 func (m MethodCode) String() string {
-	return codeToString[m]
+	if method, ok := codeToString[m]; ok {
+		return method
+	}
+	return ""
 }
 
 type Method string
 
 func (m Method) Code() MethodCode {
-	return grpcMethodToCode[m]
+	if code, ok := grpcMethodToCode[m]; ok {
+		return code
+	}
+	return UnknownMethod
 }
 
 const (

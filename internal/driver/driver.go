@@ -73,6 +73,6 @@ func (d *driver) StreamTimeout() time.Duration {
 	return d.config.StreamTimeout()
 }
 
-func (d *driver) GrpcConnectionPolicy() config.GrpcConnectionPolicy {
-	return d.config.GrpcConnectionPolicy()
+func (d *driver) DialTimeout() time.Duration {
+	return d.config.DialTimeout()
 }

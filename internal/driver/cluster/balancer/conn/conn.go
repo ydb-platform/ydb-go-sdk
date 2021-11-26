@@ -91,6 +91,9 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	defer c.Unlock()
 	if isBroken(c.cc) {
 		_ = c.close(ctx)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.config.DialTimeout())
+		defer cancel()
 		cc, err = c.dial(ctx, c.endpoint.Address())
 		if err != nil {
 			return nil, err
