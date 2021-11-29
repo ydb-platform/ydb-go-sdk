@@ -11,6 +11,10 @@ import (
 )
 
 func TestMetaRequiredHeaders(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	m := &meta{
 		database:     "database",
 		requestsType: "requestType",

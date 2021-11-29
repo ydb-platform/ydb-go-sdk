@@ -6,15 +6,27 @@ import (
 	"testing"
 )
 
-func TestTable(t *testing.T) {
+func TestTraceTable(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	testSingleTrace(t, Table{}, "Table")
 }
 
 func TestTraceDriver(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	testSingleTrace(t, Driver{}, "Driver")
 }
 
 func TestRetry(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	testSingleTrace(t, Retry{}, "Driver")
 }
 

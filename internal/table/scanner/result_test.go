@@ -15,6 +15,10 @@ import (
 )
 
 func TestResultAny(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	for _, test := range []struct {
 		name    string
 		columns []options.Column
@@ -71,6 +75,10 @@ func TestResultAny(t *testing.T) {
 }
 
 func TestResultOUint32(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	for _, test := range []struct {
 		name    string
 		columns []options.Column

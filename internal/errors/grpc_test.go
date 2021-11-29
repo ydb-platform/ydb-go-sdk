@@ -8,6 +8,10 @@ import (
 )
 
 func TestIsTransportError(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	code := TransportErrorCanceled
 	for _, err := range []error{
 		&TransportError{Reason: code},
@@ -22,7 +26,11 @@ func TestIsTransportError(t *testing.T) {
 	}
 }
 
-func TestIsNotTransportError(t *testing.T) {
+func TestIsNonTransportError(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	code := TransportErrorCanceled
 	for _, err := range []error{
 		&TransportError{Reason: TransportErrorAborted},
@@ -39,6 +47,10 @@ func TestIsNotTransportError(t *testing.T) {
 }
 
 func TestTransportErrorWrapsContextError(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	err := fmt.Errorf("wrapped: %w", &TransportError{
 		Reason: TransportErrorCanceled,
 		err:    context.Canceled,
@@ -48,7 +60,11 @@ func TestTransportErrorWrapsContextError(t *testing.T) {
 	}
 }
 
-func TestIsNotOpError(t *testing.T) {
+func TestIsNonOperationError(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	code := StatusBadRequest
 	for _, err := range []error{
 		&OpError{Reason: StatusTimeout},

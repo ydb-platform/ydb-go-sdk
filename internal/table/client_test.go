@@ -25,6 +25,10 @@ import (
 )
 
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(
@@ -63,6 +67,10 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 }
 
 func TestSessionPoolKeeperWake(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
@@ -130,6 +138,10 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 }
 
 func TestSessionPoolCloseWhenWaiting(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	for _, test := range []struct {
 		name string
 		racy bool
@@ -228,6 +240,10 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 }
 
 func TestSessionPoolClose(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	wg := sync.WaitGroup{}
 	p := newClientWithStubBuilder(
 		t,
@@ -304,6 +320,10 @@ func TestSessionPoolClose(t *testing.T) {
 }
 
 func TestSessionPoolDeleteReleaseWait(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	for _, test := range []struct {
 		name string
 		racy bool
@@ -392,6 +412,10 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 }
 
 func TestSessionPoolRacyGet(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	type createReq struct {
 		release chan struct{}
 		session Session
@@ -468,6 +492,10 @@ func TestSessionPoolRacyGet(t *testing.T) {
 }
 
 func TestSessionPoolPutInFull(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
@@ -493,6 +521,10 @@ func TestSessionPoolPutInFull(t *testing.T) {
 }
 
 func TestSessionPoolSizeLimitOverflow(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	type sessionAndError struct {
 		session Session
 		err     error
@@ -601,6 +633,10 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 // TestSessionPoolGetDisconnected tests case when build successfully created,
 // but after that connection become broken and cannot be reestablished.
 func TestSessionPoolGetDisconnected(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
@@ -699,6 +735,10 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 }
 
 func TestSessionPoolGetPut(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	var (
 		created int
 		deleted int
@@ -763,6 +803,10 @@ func TestSessionPoolGetPut(t *testing.T) {
 }
 
 func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
@@ -793,6 +837,10 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 }
 
 func TestSessionPoolKeepAlive(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
@@ -871,6 +919,10 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 }
 
 func TestSessionPoolKeepAliveOrdering(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
@@ -950,6 +1002,10 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 }
 
 func TestSessionPoolDoublePut(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
@@ -977,6 +1033,10 @@ func TestSessionPoolDoublePut(t *testing.T) {
 }
 
 func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
@@ -1064,6 +1124,10 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 }
 
 func TestSessionPoolKeepAliveMinSize(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 
@@ -1138,6 +1202,10 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 }
 
 func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(
@@ -1176,6 +1244,10 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 }
 
 func TestSessionPoolKeeperRetry(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	timer := timetest.StubSingleTimer(t)
 	defer timer.Cleanup()
 	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))

@@ -17,6 +17,10 @@ var (
 )
 
 func TestSessionOptionsProfile(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	{
 		opt := WithProfile(
 			WithProfilePreset(abc),
@@ -123,6 +127,10 @@ func TestSessionOptionsProfile(t *testing.T) {
 }
 
 func TestStoragePolicyOptions(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	{
 		opt := WithProfile(
 			WithStoragePolicy(
@@ -149,6 +157,10 @@ func TestStoragePolicyOptions(t *testing.T) {
 }
 
 func TestAlterTableOptions(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	{
 		opt := WithAddColumn("a", types.TypeBool)
 		req := Ydb_Table.AlterTableRequest{}

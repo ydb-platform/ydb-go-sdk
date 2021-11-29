@@ -25,6 +25,10 @@ import (
 )
 
 func TestSessionKeepAlive(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -81,6 +85,10 @@ func TestSessionKeepAlive(t *testing.T) {
 }
 
 func TestSessionDescribeTable(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -208,6 +216,10 @@ func TestSessionDescribeTable(t *testing.T) {
 }
 
 func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	fromTo := [...]struct {
 		srcMode operation.Mode
 		dstMode operation.Mode

@@ -10,6 +10,10 @@ import (
 )
 
 func TestUnwrapOptionalValue(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	v := value.OptionalValue(value.OptionalValue(value.UTF8Value("a")))
 	val := unwrapTypedValue(v.ToYDB())
 	typeID := val.Type.GetTypeId()
@@ -24,6 +28,10 @@ func TestUnwrapOptionalValue(t *testing.T) {
 }
 
 func TestUnwrapPrimitiveValue(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	v := value.UTF8Value("a")
 	val := unwrapTypedValue(v.ToYDB())
 	typeID := val.Type.GetTypeId()
@@ -38,6 +46,10 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 }
 
 func TestUnwrapNullValue(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	v := value.NullValue(value.TypeUTF8)
 	val := unwrapTypedValue(v.ToYDB())
 	typeID := val.Type.GetTypeId()

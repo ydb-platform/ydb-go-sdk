@@ -34,6 +34,10 @@ func BenchmarkTestScan(b *testing.B) {
 }
 
 func TestOverallApproaches(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	for k, f := range map[string]func(b *testing.B){
 		"BenchmarkTestScanWithColumns": BenchmarkTestScanWithColumns,
 		"BenchmarkTestScan":            BenchmarkTestScan,
@@ -44,6 +48,10 @@ func TestOverallApproaches(t *testing.T) {
 }
 
 func TestOverallSliceApproaches(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	sizear := []int{2, 5, 10, 20, 50, 100}
 	for _, testSize = range sizear {
 		t.Logf("Slice size: %d", testSize)

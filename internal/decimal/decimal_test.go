@@ -6,6 +6,10 @@ import (
 )
 
 func TestFromBytes(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	for _, test := range []struct {
 		name      string
 		bts       []byte

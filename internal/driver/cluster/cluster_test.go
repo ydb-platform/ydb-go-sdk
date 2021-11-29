@@ -23,6 +23,10 @@ import (
 )
 
 func TestClusterFastRedial(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -71,6 +75,10 @@ func TestClusterFastRedial(t *testing.T) {
 }
 
 func TestClusterMergeEndpoints(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -322,6 +330,10 @@ func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []endp
 }
 
 func TestDiffEndpoint(t *testing.T) {
+	if !testing.Short() {
+		t.Skip("skipping testing in non-short mode")
+	}
+
 	// lists must be sorted
 	var noEndpoints []endpoint.Endpoint
 	someEndpoints := []endpoint.Endpoint{
