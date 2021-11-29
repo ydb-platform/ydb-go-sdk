@@ -1,3 +1,6 @@
+## 2.10.8
+* Fixed data race on cluster get/pessimize
+
 ## 2.10.7
 * Dropped internal cluster connections tracker
 * Switched initial connect to all endpoints after discovery to lazy connect

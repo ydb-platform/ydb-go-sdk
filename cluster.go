@@ -101,20 +101,22 @@ func (c *cluster) Close() (err error) {
 // Get returns next available connection.
 // It returns error on given context cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (cc *conn, err error) {
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	onDone := driverTraceOnGetConn(ctx, c.trace, ctx)
 	defer func() {
 		onDone(ctx, cc.Address(), err)
 	}()
-	// Hard limit for get operation.
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
-	defer cancel()
+
 	c.mu.RLock()
 	closed := c.closed
 	c.mu.RUnlock()
 	if closed {
 		return nil, ErrClusterClosed
 	}
+
 	if endpointInfo := ContextEndpointInfo(ctx); endpointInfo != nil {
 		c.mu.RLock()
 		entry, ok := c.index[connAddrFromString(endpointInfo.Address())]
@@ -123,10 +125,10 @@ func (c *cluster) Get(ctx context.Context) (cc *conn, err error) {
 			return entry.conn, nil
 		}
 	}
-	if err = ctx.Err(); err != nil {
-		return nil, err
-	}
+
+	c.mu.Lock()
 	cc = c.balancer.Next()
+	c.mu.Unlock()
 	if cc == nil {
 		return nil, ErrClusterEmpty
 	}
