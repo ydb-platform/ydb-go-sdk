@@ -126,21 +126,22 @@ message WriteTaskResultResponse {
     Ydb.Operations.Operation operation = 1; // WriteRowsResultResult
 }
 
+message NodeInfo {
+    uint32 node_id = 1;
+    string instance_id = 2;
+    string hostname = 3;
+    uint64 active_workers = 4;
+    uint64 memory_limit = 5;
+    uint64 memory_allocated = 6;
+}
+
 message NodesHealthCheckRequest {
     string tenant = 1;
-    uint32 node_id = 2;
-    string instance_id = 3;
-    string hostname = 4;
-    uint64 active_workers = 5;
+    NodeInfo node = 2;
     Ydb.Operations.OperationParams operation_params = 6;
 }
 
 message NodesHealthCheckResult {
-    message NodeInfo {
-        uint32 node_id = 1;
-        string instance_id = 2;
-        string hostname = 3;
-    }
     repeated NodeInfo nodes = 1;
 }
 
