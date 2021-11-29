@@ -7,6 +7,10 @@
 * Improved logger options (provide err and out writers, provide external logger)
 * Renamed package `table.resultset` to `table.result`
 * Added `trace.Driver.{OnInit,OnClose}` events
+* Changed unit/integration tests running
+* Fixed/added YDB error checkers
+* Dropped `ydb.WithDriverConfigOptions` (duplicate of `ydb.With`)
+* Fixed freeze on closing driver
 
 ## 3.4.3
 * Forced `round_robin` grpc load balancing instead default `pick_first`

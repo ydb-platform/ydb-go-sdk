@@ -119,13 +119,6 @@ func WithCredentials(c credentials.Credentials) Option {
 	})
 }
 
-func WithDriverConfigOptions(options ...config.Option) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, options...)
-		return nil
-	}
-}
-
 func WithBalancingConfig(balancerConfig config.BalancerConfig) Option {
 	return func(ctx context.Context, db *db) error {
 		db.options = append(db.options, config.WithBalancingConfig(balancerConfig))

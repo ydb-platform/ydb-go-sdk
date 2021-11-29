@@ -1,15 +1,9 @@
-//go:build integration
-// +build integration
-
 package test
 
 import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"log"
 	"math"
 	"os"
@@ -19,8 +13,12 @@ import (
 	"text/template"
 	"time"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -87,6 +85,10 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 }
 
 func TestPoolHealth(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
 	defer cancel()
 
@@ -103,10 +105,18 @@ func TestPoolHealth(t *testing.T) {
 
 	defer s.print(t)
 
-	db, err := open(
+	db, err := ydb.New(
 		ctx,
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
+		ydb.WithTraceDriver(driverTrace()),
+		ydb.WithTraceTable(tableTrace()),
+		ydb.With(
+			config.WithRequestTimeout(time.Second*5),
+			config.WithStreamTimeout(time.Second*5),
+			config.WithOperationTimeout(time.Second*5),
+			config.WithOperationCancelAfter(time.Second*5),
+		),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithSessionPoolSizeLimit(200),
@@ -152,6 +162,7 @@ func TestPoolHealth(t *testing.T) {
 			},
 		}),
 	)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,26 +237,6 @@ func tableTrace() trace.Table {
 		log.Printf("[table] %s: %+v", name, trace.ClearContext(args))
 	})
 	return t
-}
-
-func appendConnectOptions(opts ...ydb.Option) []ydb.Option {
-	opts = append(
-		opts,
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-		ydb.WithTraceDriver(driverTrace()),
-		ydb.WithTraceTable(tableTrace()),
-	)
-	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		opts = append(opts, ydb.WithAccessTokenCredentials(token))
-	}
-	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
-		opts = append(opts, ydb.WithAnonymousCredentials())
-	}
-	return opts
-}
-
-func open(ctx context.Context, opts ...ydb.Option) (ydb.Connection, error) {
-	return ydb.New(ctx, appendConnectOptions(opts...)...)
 }
 
 func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {

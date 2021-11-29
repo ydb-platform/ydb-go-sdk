@@ -30,9 +30,25 @@ func IsTransportError(err error) bool {
 	return TransportErrorDescription(err) != nil
 }
 
-func IsTransportErrorCancelled(err error) bool {
+func IsTransportErrorCode(err error, codes ...int32) bool {
 	d := TransportErrorDescription(err)
-	return d != nil && d.Code() == int32(errors.TransportErrorCanceled)
+	if d == nil {
+		return false
+	}
+	for _, code := range codes {
+		if d.Code() == code {
+			return true
+		}
+	}
+	return false
+}
+
+func IsTransportErrorCancelled(err error) bool {
+	return IsTransportErrorCode(err, int32(errors.TransportErrorCanceled))
+}
+
+func IsTransportErrorResourceExhausted(err error) bool {
+	return IsTransportErrorCode(err, int32(errors.TransportErrorResourceExhausted))
 }
 
 type Error interface {
@@ -58,6 +74,19 @@ func IsOperationError(err error) bool {
 	return OperationErrorDescription(err) != nil
 }
 
+func IsOperationErrorCode(err error, codes ...int32) bool {
+	d := OperationErrorDescription(err)
+	if d == nil {
+		return false
+	}
+	for _, code := range codes {
+		if d.Code() == code {
+			return true
+		}
+	}
+	return false
+}
+
 func OperationErrorDescription(err error) Error {
 	var o *errors.OpError
 	if errors.As(err, &o) {
@@ -66,17 +95,22 @@ func OperationErrorDescription(err error) Error {
 	return nil
 }
 
-func IsStatusAlreadyExistsError(err error) bool {
-	d := OperationErrorDescription(err)
-	return d != nil && d.Code() == int32(errors.StatusAlreadyExists)
+func IsOperationErrorOverloaded(err error) bool {
+	return IsOperationErrorCode(err, int32(errors.StatusOverloaded))
 }
 
-func IsStatusNotFoundError(err error) bool {
-	d := OperationErrorDescription(err)
-	return d != nil && d.Code() == int32(errors.StatusNotFound)
+func IsOperationErrorUnavailable(err error) bool {
+	return IsOperationErrorCode(err, int32(errors.StatusUnavailable))
 }
 
-func IsStatusSchemeError(err error) bool {
-	d := OperationErrorDescription(err)
-	return d != nil && d.Code() == int32(errors.StatusSchemeError)
+func IsOperationErrorAlreadyExistsError(err error) bool {
+	return IsOperationErrorCode(err, int32(errors.StatusAlreadyExists))
+}
+
+func IsOperationErrorNotFoundError(err error) bool {
+	return IsOperationErrorCode(err, int32(errors.StatusNotFound))
+}
+
+func IsOperationErrorSchemeError(err error) bool {
+	return IsOperationErrorCode(err, int32(errors.StatusSchemeError))
 }
