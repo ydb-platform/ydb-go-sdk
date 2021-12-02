@@ -15,6 +15,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -407,12 +408,12 @@ func Quet() {
 }
 
 func Prepare(ctx context.Context, db ydb.Connection) error {
-	err := db.Scheme().CleanupDatabase(ctx, db.Name(), "series", "episodes", "seasons")
+	err := sugar.RmPath(ctx, db, "")
 	if err != nil {
 		return fmt.Errorf("cleaunup database failed: %w", err)
 	}
 
-	err = db.Scheme().EnsurePathExists(ctx, db.Name())
+	err = sugar.MakePath(ctx, db, "")
 	if err != nil {
 		return fmt.Errorf("ensure path exists failed: %w", err)
 	}

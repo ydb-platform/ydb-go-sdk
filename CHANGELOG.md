@@ -11,7 +11,9 @@
 * Fixed/added YDB error checkers
 * Dropped `ydb.WithDriverConfigOptions` (duplicate of `ydb.With`)
 * Fixed freeze on closing driver
-* Fixed `CGO` race on `Darwin` system when SDK tried to expand tilde on certificates path 
+* Fixed `CGO` race on `Darwin` system when SDK tried to expand tilde on certificates path
+* Removed `EnsurePathExists` and `CleanupDatabase` from API of `scheme.Client`
+* Added helpers `MakePath` and `CleanPath` to root of package `ydb-go-sdk`
 
 ## 3.4.3
 * Forced `round_robin` grpc load balancing instead default `pick_first`
