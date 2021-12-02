@@ -6,7 +6,6 @@ import (
 	"encoding/pem"
 	"io"
 	"os"
-	"os/user"
 	"path/filepath"
 	"time"
 
@@ -165,11 +164,11 @@ func WithCertificate(cert *x509.Certificate) Option {
 func WithCertificatesFromFile(caFile string) Option {
 	return func(ctx context.Context, db *db) error {
 		if len(caFile) > 0 && caFile[0] == '~' {
-			usr, err := user.Current()
+			home, err := os.UserHomeDir()
 			if err != nil {
 				return err
 			}
-			caFile = filepath.Join(usr.HomeDir, caFile[1:])
+			caFile = filepath.Join(home, caFile[1:])
 		}
 		bytes, err := os.ReadFile(caFile)
 		if err != nil {

@@ -11,6 +11,7 @@
 * Fixed/added YDB error checkers
 * Dropped `ydb.WithDriverConfigOptions` (duplicate of `ydb.With`)
 * Fixed freeze on closing driver
+* Fixed `CGO` race on `Darwin` system when SDK tried to expand tilde on certificates path 
 
 ## 3.4.3
 * Forced `round_robin` grpc load balancing instead default `pick_first`
