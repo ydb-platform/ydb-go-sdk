@@ -14,6 +14,7 @@
 * Fixed `CGO` race on `Darwin` system when SDK tried to expand tilde on certificates path
 * Removed `EnsurePathExists` and `CleanupDatabase` from API of `scheme.Client`
 * Added helpers `MakePath` and `CleanPath` to root of package `ydb-go-sdk`
+* Removed call `scanner.Scanner.UnmarshalYDB()` inside `scanner.setDefaults()` 
 
 ## 3.4.3
 * Forced `round_robin` grpc load balancing instead default `pick_first`

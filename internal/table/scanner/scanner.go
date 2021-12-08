@@ -909,11 +909,6 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
 		}
-	case types.Scanner:
-		err := v.UnmarshalYDB(s.converter)
-		if err != nil {
-			s.errorf("ydb.Scanner error: %w", err)
-		}
 	case *types.Value:
 		*v = s.value()
 	case *types.Decimal:
