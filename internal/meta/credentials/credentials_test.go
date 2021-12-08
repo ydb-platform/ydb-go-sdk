@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestCredentialsString(t *testing.T) {
@@ -35,7 +35,7 @@ func TestCredentialsString(t *testing.T) {
 	} {
 		t.Run(test.s, func(t *testing.T) {
 			if stringer, ok := test.c.(fmt.Stringer); ok {
-				cmp.Equal(t, test.s, stringer.String())
+				testutil.Equal(t, test.s, stringer.String())
 			}
 		})
 

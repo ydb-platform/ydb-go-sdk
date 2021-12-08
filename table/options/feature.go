@@ -7,6 +7,6 @@ import (
 type FeatureFlag = feature.Flag
 
 const (
-	FeatureEnabled  = feature.FeatureEnabled
-	FeatureDisabled = feature.FeatureDisabled
+	FeatureEnabled  = feature.Enabled
+	FeatureDisabled = feature.Disabled
 )

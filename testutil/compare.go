@@ -1,4 +1,4 @@
-package cmp
+package testutil
 
 import (
 	"bytes"

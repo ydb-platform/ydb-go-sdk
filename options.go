@@ -53,8 +53,19 @@ func WithNamespace(namespace string) logger.Option {
 	return logger.WithNamespace(namespace)
 }
 
-func WithMinLevel(minLevel logger.Level) logger.Option {
-	return logger.WithMinLevel(minLevel)
+type Level logger.Level
+
+const (
+	TRACE = Level(logger.TRACE)
+	DEBUG = Level(logger.DEBUG)
+	INFO  = Level(logger.INFO)
+	WARN  = Level(logger.WARN)
+	ERROR = Level(logger.ERROR)
+	FATAL = Level(logger.FATAL)
+)
+
+func WithMinLevel(minLevel Level) logger.Option {
+	return logger.WithMinLevel(logger.Level(minLevel))
 }
 
 func WithNoColor(b bool) logger.Option {

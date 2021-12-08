@@ -551,6 +551,44 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	)
 }
 
+// DoTx provide the best effort for execute operation
+// DoTx implements internal busy loop until one of the following conditions is met:
+// - deadline was canceled or deadlined
+// - retry operation returned nil as error
+// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
+func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
+	options := table.Options{
+		Idempotent: table.ContextIdempotentOperation(ctx),
+		TxSettings: table.ContextTransactionSettings(ctx),
+	}
+	for _, o := range opts {
+		o(&options)
+	}
+	return retryBackoff(
+		ctx,
+		c,
+		retry.FastBackoff,
+		retry.SlowBackoff,
+		options.Idempotent,
+		func(ctx context.Context, s table.Session) (err error) {
+			tx, err := s.BeginTransaction(ctx, options.TxSettings)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = tx.Rollback(ctx)
+			}()
+			err = op(ctx, tx)
+			if err != nil {
+				return err
+			}
+			_, err = tx.CommitTx(ctx, options.TxCommitOptions...)
+			return err
+		},
+		c.config.Trace(),
+	)
+}
+
 func (c *client) Stats() poolStats {
 	c.mu.Lock()
 	defer c.mu.Unlock()

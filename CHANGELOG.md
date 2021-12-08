@@ -15,6 +15,7 @@
 * Removed `EnsurePathExists` and `CleanupDatabase` from API of `scheme.Client`
 * Added helpers `MakePath` and `CleanPath` to root of package `ydb-go-sdk`
 * Removed call `scanner.Scanner.UnmarshalYDB()` inside `scanner.setDefaults()` 
+* Added `DoTx()` API method into `table.Client`
 
 ## 3.4.3
 * Forced `round_robin` grpc load balancing instead default `pick_first`

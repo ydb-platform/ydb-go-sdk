@@ -58,13 +58,17 @@ type (
 	transactionInfo interface {
 		ID() string
 	}
-	streamResult interface {
+	result interface {
 		Err() error
 	}
+	streamResult interface {
+		result
+	}
 	unaryResult interface {
+		result
+
 		ResultSetCount() int
 		TotalRowCount() int
-		Err() error
 	}
 	SessionNewStartInfo struct {
 		Context *context.Context

@@ -28,6 +28,11 @@ func (t *lazyTable) Do(ctx context.Context, op table.Operation, opts ...table.Op
 	return t.client.Do(ctx, op, opts...)
 }
 
+func (t *lazyTable) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
+	t.init(ctx)
+	return t.client.DoTx(ctx, op, opts...)
+}
+
 func (t *lazyTable) Close(ctx context.Context) error {
 	t.m.Lock()
 	defer t.m.Unlock()

@@ -31,7 +31,7 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           file: ./unit.txt
-          flags: unit,${{ matrix.os }}
+          flags: unit,${{ matrix.os }},${{ matrix.go-version }}
           name: unit
   integration:
     strategy:
@@ -69,5 +69,5 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           file: ./integration.txt
-          flags: integration,${{ matrix.os }}
+          flags: integration,${{ matrix.os }},${{ matrix.go-version }}
           name: integration

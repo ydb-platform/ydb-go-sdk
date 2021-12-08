@@ -133,6 +133,13 @@ func TestPoolHealth(t *testing.T) {
 		ydb.WithSessionPoolSizeLimit(200),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5*time.Second),
+		ydb.WithLogger(
+			trace.DetailsAll,
+			ydb.WithNamespace("ydb"),
+			ydb.WithOutWriter(os.Stdout),
+			ydb.WithErrWriter(os.Stderr),
+			ydb.WithMinLevel(ydb.TRACE),
+		),
 		ydb.WithTraceTable(trace.Table{
 			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
 				return func(info trace.SessionNewDoneInfo) {
@@ -227,22 +234,6 @@ func TestPoolHealth(t *testing.T) {
 	}()
 
 	wg.Wait()
-}
-
-func driverTrace() trace.Driver {
-	var t trace.Driver
-	trace.Stub(&t, func(name string, args ...interface{}) {
-		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
-	})
-	return t
-}
-
-func tableTrace() trace.Table {
-	var t trace.Table
-	trace.Stub(&t, func(name string, args ...interface{}) {
-		log.Printf("[table] %s: %+v", name, trace.ClearContext(args))
-	})
-	return t
 }
 
 func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
