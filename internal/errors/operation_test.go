@@ -6,10 +6,6 @@ import (
 )
 
 func TestIsOperationError(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	for _, code := range [...]StatusCode{
 		StatusBadRequest,
 		StatusBadSession,

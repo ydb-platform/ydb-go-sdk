@@ -2,129 +2,200 @@ package scanner
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-type Result struct {
+var (
+	errAlreadyClosed = fmt.Errorf("result already closed")
+)
+
+type result struct {
 	scanner
 
-	Sets       []*Ydb.ResultSet
-	QueryStats *Ydb_TableStats.QueryStats
+	stats *Ydb_TableStats.QueryStats
 
-	SetCh       chan *Ydb.ResultSet
-	SetChErr    *error
-	SetChCancel func()
-
-	nextSet int
-	closed  bool
+	closedMtx sync.RWMutex
+	closed    bool
 }
 
-var _ result.Result = &Result{}
+type streamResult struct {
+	result
+
+	ch chan *Ydb.ResultSet
+}
+
+type unaryResult struct {
+	result
+
+	sets    []*Ydb.ResultSet
+	nextSet int
+}
+
+func (r *unaryResult) ResultSetCount() int {
+	return len(r.sets)
+}
+
+func (r *unaryResult) TotalRowCount() (n int) {
+	for _, s := range r.sets {
+		n += len(s.Rows)
+	}
+	return
+}
+
+func (r *result) isClosed() bool {
+	r.closedMtx.RLock()
+	defer r.closedMtx.RUnlock()
+	return r.closed
+}
+
+func (r *result) UpdateStats(stats *Ydb_TableStats.QueryStats) {
+	r.stats = stats
+}
+
+func (r *streamResult) Append(set *Ydb.ResultSet) {
+	if r.isClosed() {
+		return
+	}
+	r.ch <- set
+}
+
+type resultWithError interface {
+	SetErr(err error)
+}
+
+type UnaryResult interface {
+	public.UnaryResult
+	resultWithError
+}
+
+type StreamResult interface {
+	public.StreamResult
+	resultWithError
+
+	Append(set *Ydb.ResultSet)
+	UpdateStats(stats *Ydb_TableStats.QueryStats)
+}
+
+func NewStream() StreamResult {
+	r := &streamResult{
+		ch: make(chan *Ydb.ResultSet, 1),
+	}
+	return r
+}
+
+func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats) UnaryResult {
+	r := &unaryResult{
+		result: result{
+			stats: stats,
+		},
+		sets: sets,
+	}
+	return r
+}
+
+func (r *result) Reset(set *Ydb.ResultSet, columnNames ...string) {
+	r.reset(set)
+	r.setColumnIndexes(columnNames)
+}
 
 // NextResultSet selects next result set in the result.
 // columns - names of columns in the resultSet that will be scanned
 // It returns false if there are no more result sets.
 // Stream sets are supported.
-func (r *Result) NextResultSet(ctx context.Context, columns ...string) bool {
+func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
 	if !r.HasNextResultSet() {
-		return r.nextStreamSet(ctx, columns...)
+		return false
 	}
-	r.reset(r.Sets[r.nextSet], columns...)
+	r.Reset(r.sets[r.nextSet], columns...)
 	r.nextSet++
 	return true
 }
 
+// NextResultSet selects next result set in the result.
+// columns - names of columns in the resultSet that will be scanned
+// It returns false if there are no more result sets.
+// Stream sets are supported.
+func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
+	if r.inactive() {
+		return false
+	}
+	select {
+	case s, ok := <-r.ch:
+		if !ok {
+			return false
+		}
+		r.Reset(s, columns...)
+		return true
+
+	case <-ctx.Done():
+		if r.err == nil {
+			r.err = ctx.Err()
+		}
+		r.Reset(nil)
+		return false
+	}
+}
+
 // CurrentResultSet get current result set
-func (r *Result) CurrentResultSet() result.Set {
+func (r *result) CurrentResultSet() public.Set {
 	return r
 }
 
-// Stats returns query execution QueryStats.
-func (r *Result) Stats() stats.QueryStats {
+// Stats returns query execution queryStats.
+func (r *result) Stats() stats.QueryStats {
 	var s queryStats
-	s.stats = r.QueryStats
-	s.processCPUTime = time.Microsecond * time.Duration(r.QueryStats.GetProcessCpuTimeUs())
+	s.stats = r.stats
+	s.processCPUTime = time.Microsecond * time.Duration(r.stats.GetProcessCpuTimeUs())
 	s.pos = 0
 	return &s
 }
 
-// Close closes the Result, preventing further iteration.
-func (r *Result) Close() error {
+// Close closes the result, preventing further iteration.
+func (r *result) Close() error {
 	if r.closed {
-		return nil
+		return errAlreadyClosed
 	}
 	r.closed = true
-	if r.SetCh != nil {
-		r.SetChCancel()
+	return nil
+}
+
+// Close closes the result, preventing further iteration.
+func (r *streamResult) Close() (err error) {
+	if err = r.result.Close(); err != nil {
+		return err
+	}
+	if r.ch != nil {
+		close(r.ch)
 	}
 	return nil
 }
 
-func (r *Result) inactive() bool {
-	return r.closed || r.Err() != nil
-}
-
-// NextStreamSet selects next result set from the result of streaming operation.
-// columns - names of columns in the resultSet that will be scanned
-// It returns false if stream is closed or ctx is canceled.
-// Note that in case of deadline cancelation it marks via error set.
-func (r *Result) nextStreamSet(ctx context.Context, columns ...string) bool {
-	if r.inactive() || r.SetCh == nil {
-		return false
-	}
-	select {
-	case s, ok := <-r.SetCh:
-		if !ok {
-			if r.SetChErr != nil {
-				r.errMtx.Lock()
-				r.err = *r.SetChErr
-				r.errMtx.Unlock()
-			}
-			return false
-		}
-		r.reset(s, columns...)
-		return true
-
-	case <-ctx.Done():
-		r.errMtx.Lock()
-		if r.err == nil {
-			r.err = ctx.Err()
-		}
-		r.errMtx.Unlock()
-		r.reset(nil)
-		return false
-	}
-}
-
-///<--------------non-stream-----------------
-
-// ResultSetCount returns number of result sets.
-// Note that it does not work if r is the result of streaming operation.
-func (r *Result) ResultSetCount() int {
-	return len(r.Sets)
-}
-
-// TotalRowCount returns the number of rows among the all result sets.
-// Note that it does not work if r is the result of streaming operation.
-func (r *Result) TotalRowCount() (n int) {
-	for _, s := range r.Sets {
-		n += len(s.Rows)
-	}
-	return
+func (r *result) inactive() bool {
+	return r.isClosed() || r.Err() != nil
 }
 
 // HasNextResultSet reports whether result set may be advanced.
 // It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
 // without advancing the result set.
 // Note that it does not work with sets from stream.
-func (r *Result) HasNextResultSet() bool {
-	if r.inactive() || r.nextSet == len(r.Sets) {
+func (r *streamResult) HasNextResultSet() bool {
+	return !r.inactive()
+}
+
+// HasNextResultSet reports whether result set may be advanced.
+// It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
+// without advancing the result set.
+// Note that it does not work with sets from stream.
+func (r *unaryResult) HasNextResultSet() bool {
+	if r.inactive() || r.nextSet >= len(r.sets) {
 		return false
 	}
 	return true

@@ -9,10 +9,6 @@ import (
 )
 
 func TestSchemeOptions(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	{
 		opts := []scheme.PermissionsOption{
 			scheme.WithClearPermissions(),

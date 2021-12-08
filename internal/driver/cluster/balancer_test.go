@@ -31,10 +31,6 @@ func isOddConn(c conn.Conn, info info.Info) bool {
 }
 
 func TestMultiBalancer(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	cs1, b1 := simpleBalancer()
 	cs2, b2 := simpleBalancer()
 	forEachList := func(it func(*list.List)) {

@@ -13,10 +13,6 @@ import (
 )
 
 func TestRepeater(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	timerC := make(chan time.Time, 1)
 	timer := timetest.Timer{
 		Ch: timerC,
@@ -45,10 +41,6 @@ func TestRepeater(t *testing.T) {
 }
 
 func TestRepeaterCancellation(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	var (
 		timerC = make(chan time.Time)
 		enter  = make(chan struct{}, 2)

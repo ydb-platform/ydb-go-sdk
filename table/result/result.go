@@ -27,7 +27,7 @@ import (
 // If current value under scan
 // is not requested types, then res.err() become non-nil.
 // After that, NextResultSet(), NextRow() will return false.
-type Result interface {
+type result interface {
 
 	// NextResultSet selects next result set in the result.
 	// columns - names of columns in the resultSet that will be scanned
@@ -90,8 +90,10 @@ type Result interface {
 
 	// Close closes the Result, preventing further iteration.
 	Close() error
+}
 
-	///<--------------non-stream-----------------
+type UnaryResult interface {
+	result
 
 	// HasNextResultSet reports whether result set may be advanced.
 	// It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
@@ -106,6 +108,8 @@ type Result interface {
 	// TotalRowCount returns the number of rows among the all result sets.
 	// Note that it does not work if r is the result of streaming operation.
 	TotalRowCount() int
+}
 
-	///--------------non-stream-----------------/>
+type StreamResult interface {
+	result
 }

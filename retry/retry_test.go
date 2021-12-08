@@ -13,10 +13,6 @@ import (
 )
 
 func TestLogBackoff(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	type exp struct {
 		eq  time.Duration
 		gte time.Duration
@@ -117,10 +113,6 @@ func TestLogBackoff(t *testing.T) {
 }
 
 func TestRetryModes(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	type CanRetry struct {
 		idempotentOperation    bool // after an error we must retry idempotent operation or no
 		nonIdempotentOperation bool // after an error we must retry non-idempotent operation or no

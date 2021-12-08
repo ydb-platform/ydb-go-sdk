@@ -483,10 +483,6 @@ func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]in
 }
 
 func TestScanSqlTypes(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	s := initScanner()
 	for _, test := range scannerData {
 		t.Run(test.name, func(t *testing.T) {

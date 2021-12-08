@@ -15,10 +15,6 @@ import (
 )
 
 func TestResultAny(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	for _, test := range []struct {
 		name    string
 		columns []options.Column
@@ -44,11 +40,14 @@ func TestResultAny(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			res := NewResult(
-				NewResultSet(
-					WithColumns(test.columns...),
-					WithValues(test.values...),
-				),
+			res := NewUnary(
+				[]*Ydb.ResultSet{
+					NewResultSet(
+						WithColumns(test.columns...),
+						WithValues(test.values...),
+					),
+				},
+				nil,
 			)
 			var i int
 			var act interface{}
@@ -75,10 +74,6 @@ func TestResultAny(t *testing.T) {
 }
 
 func TestResultOUint32(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	for _, test := range []struct {
 		name    string
 		columns []options.Column
@@ -109,11 +104,14 @@ func TestResultOUint32(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			res := NewResult(
-				NewResultSet(
-					WithColumns(test.columns...),
-					WithValues(test.values...),
-				),
+			res := NewUnary(
+				[]*Ydb.ResultSet{
+					NewResultSet(
+						WithColumns(test.columns...),
+						WithValues(test.values...),
+					),
+				},
+				nil,
 			)
 			var i int
 			var act uint32
@@ -194,10 +192,4 @@ func NewResultSet(opts ...ResultSetOption) *Ydb.ResultSet {
 		opt(&d)
 	}
 	return (*Ydb.ResultSet)(&d)
-}
-
-func NewResult(sets ...*Ydb.ResultSet) *Result {
-	return &Result{
-		Sets: sets,
-	}
 }

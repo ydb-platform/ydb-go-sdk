@@ -392,7 +392,7 @@ func (s *Statement) Execute(
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
+	txr table.Transaction, r result.UnaryResult, err error,
 ) {
 	onDone := trace.TableOnSessionQueryExecute(s.session.trace, &ctx, s.session, s.query, params)
 	defer func() {
@@ -407,7 +407,7 @@ func (s *Statement) execute(
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
+	txr table.Transaction, r result.UnaryResult, err error,
 ) {
 	_, res, err := s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
 	if err != nil {
@@ -470,7 +470,7 @@ func (s *session) Execute(
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
+	txr table.Transaction, r result.UnaryResult, err error,
 ) {
 	q := new(dataQuery)
 	q.initFromText(query)
@@ -502,17 +502,14 @@ func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
 	return p != nil && p.KeepInCache
 }
 
-// executeQueryResult returns Transaction and Result built from received
+// executeQueryResult returns Transaction and result built from received
 // result.
-func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.Transaction, result.Result, error) {
+func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.Transaction, result.UnaryResult, error) {
 	t := &Transaction{
 		id: res.GetTxMeta().GetId(),
 		s:  s,
 	}
-	r := &scanner.Result{
-		Sets:       res.GetResultSets(),
-		QueryStats: res.GetQueryStats(),
-	}
+	r := scanner.NewUnary(res.GetResultSets(), res.GetQueryStats())
 	return t, r, nil
 }
 
@@ -670,7 +667,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (desc options.TableO
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
-func (s *session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ result.Result, err error) {
+func (s *session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ result.StreamResult, err error) {
 	var (
 		request = Ydb_Table.ReadTableRequest{
 			SessionId: s.id,
@@ -693,17 +690,13 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		return nil, err
 	}
 
-	r := &scanner.Result{
-		SetCh:       make(chan *Ydb.ResultSet, 1),
-		SetChCancel: cancel,
-	}
+	r := scanner.NewStream()
 	go func() {
 		var (
 			response Ydb_Table.ReadTableResponse
 			err      error
 		)
 		defer func() {
-			close(r.SetCh)
 			cancel()
 			onDone(r, errors.HideEOF(err))
 		}()
@@ -711,19 +704,19 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 			select {
 			case <-ctx.Done():
 				err = ctx.Err()
-				r.SetChErr = &err
+				r.SetErr(err)
 				return
 			default:
 				err = c.RecvMsg(&response)
 				if err != nil {
 					if err != io.EOF {
-						r.SetChErr = &err
+						r.SetErr(err)
 					}
 					return
 				}
 				if result := response.GetResult(); result != nil {
 					if resultSet := result.GetResultSet(); resultSet != nil {
-						r.SetCh <- resultSet
+						r.Append(resultSet)
 					}
 				}
 			}
@@ -737,7 +730,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamExecuteScanQuery() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
-func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, params *table.QueryParameters, opts ...options.ExecuteScanQueryOption) (_ result.Result, err error) {
+func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, params *table.QueryParameters, opts ...options.ExecuteScanQueryOption) (_ result.StreamResult, err error) {
 	q := new(dataQuery)
 	q.initFromText(query)
 	var (
@@ -763,17 +756,13 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		return nil, err
 	}
 
-	r := &scanner.Result{
-		SetCh:       make(chan *Ydb.ResultSet, 1),
-		SetChCancel: cancel,
-	}
+	r := scanner.NewStream()
 	go func() {
 		var (
 			response Ydb_Table.ExecuteScanQueryPartialResponse
 			err      error
 		)
 		defer func() {
-			close(r.SetCh)
 			cancel()
 			onDone(r, errors.HideEOF(err))
 		}()
@@ -781,22 +770,22 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 			select {
 			case <-ctx.Done():
 				err = ctx.Err()
-				r.SetChErr = &err
+				r.SetErr(err)
 				return
 			default:
 				if err = c.RecvMsg(&response); err != nil {
 					if err != io.EOF {
-						r.SetChErr = &err
+						r.SetErr(err)
 						err = nil
 					}
 					return
 				}
 				if result := response.GetResult(); result != nil {
 					if resultSet := result.GetResultSet(); resultSet != nil {
-						r.SetCh <- resultSet
+						r.Append(resultSet)
 					}
 					if stats := result.GetQueryStats(); stats != nil {
-						r.QueryStats = stats
+						r.UpdateStats(stats)
 					}
 				}
 			}
@@ -867,7 +856,7 @@ func (tx *Transaction) Execute(
 	ctx context.Context,
 	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
-) (r result.Result, err error) {
+) (r result.UnaryResult, err error) {
 	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
 	return
 }
@@ -877,13 +866,13 @@ func (tx *Transaction) ExecuteStatement(
 	ctx context.Context,
 	stmt table.Statement, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
-) (r result.Result, err error) {
+) (r result.UnaryResult, err error) {
 	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
 	return
 }
 
 // CommitTx commits specified active transaction.
-func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r result.Result, err error) {
+func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r result.UnaryResult, err error) {
 	onDone := trace.TableOnSessionTransactionCommit(tx.s.trace, &ctx, tx.s, tx)
 	defer func() {
 		onDone(err)
@@ -910,7 +899,7 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 	if err != nil {
 		return nil, err
 	}
-	return &scanner.Result{QueryStats: result.GetQueryStats()}, nil
+	return scanner.NewUnary(nil, result.GetQueryStats()), nil
 }
 
 // Rollback performs a rollback of the specified active transaction.

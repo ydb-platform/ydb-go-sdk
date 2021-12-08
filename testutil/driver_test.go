@@ -3,10 +3,6 @@ package testutil
 import "testing"
 
 func TestGetField(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	type Bar struct {
 		Baz string
 	}

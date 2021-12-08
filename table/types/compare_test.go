@@ -6,10 +6,6 @@ import (
 )
 
 func TestUint8(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := Uint8Value(byte(1))
 	r := Uint8Value(byte(10))
 	c, err := Compare(l, r)
@@ -26,10 +22,6 @@ func TestUint8(t *testing.T) {
 }
 
 func TestInt8(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := Int8Value(int8(1))
 	r := Int8Value(int8(10))
 	c, err := Compare(l, r)
@@ -46,10 +38,6 @@ func TestInt8(t *testing.T) {
 }
 
 func TestTimestamp(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := TimestampValue(1)
 	r := TimestampValue(10)
 	c, err := Compare(l, r)
@@ -66,10 +54,6 @@ func TestTimestamp(t *testing.T) {
 }
 
 func TestDateTime(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := DatetimeValue(1)
 	r := DatetimeValue(10)
 	c, err := Compare(l, r)
@@ -86,10 +70,6 @@ func TestDateTime(t *testing.T) {
 }
 
 func TestUint64(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := Uint64Value(uint64(1))
 	r := Uint64Value(uint64(10))
 	c, err := Compare(l, r)
@@ -106,10 +86,6 @@ func TestUint64(t *testing.T) {
 }
 
 func TestInt64(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := Int64Value(int64(1))
 	r := Int64Value(int64(10))
 	c, err := Compare(l, r)
@@ -126,10 +102,6 @@ func TestInt64(t *testing.T) {
 }
 
 func TestDouble(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := DoubleValue(1.0)
 	r := DoubleValue(2.0)
 	c, err := Compare(l, r)
@@ -146,10 +118,6 @@ func TestDouble(t *testing.T) {
 }
 
 func TestFloat(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := FloatValue(1.0)
 	r := FloatValue(2.0)
 	c, err := Compare(l, r)
@@ -166,10 +134,6 @@ func TestFloat(t *testing.T) {
 }
 
 func TestUTF8(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := UTF8Value("abc")
 	r := UTF8Value("abx")
 	c, err := Compare(l, r)
@@ -186,10 +150,6 @@ func TestUTF8(t *testing.T) {
 }
 
 func TestOptionalUTF8(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := OptionalValue(OptionalValue(UTF8Value("abc")))
 	r := UTF8Value("abx")
 	c, err := Compare(l, r)
@@ -206,10 +166,6 @@ func TestOptionalUTF8(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := StringValue([]byte{1, 2, 3})
 	r := StringValue([]byte{1, 2, 5})
 	c, err := Compare(l, r)
@@ -226,10 +182,6 @@ func TestString(t *testing.T) {
 }
 
 func TestNull(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := NullValue(TypeUTF8)
 	r := UTF8Value("abc")
 	c, err := Compare(l, r)
@@ -246,10 +198,6 @@ func TestNull(t *testing.T) {
 }
 
 func TestTuple(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	withNull := TupleValue(Uint64Value(1), NullValue(TypeUTF8))
 	least := TupleValue(Uint64Value(1), UTF8Value("abc"))
 	medium := TupleValue(Uint64Value(1), UTF8Value("def"))
@@ -278,10 +226,6 @@ func TestTuple(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	least := ListValue(Uint64Value(1), Uint64Value(1))
 	medium := ListValue(Uint64Value(1), Uint64Value(2))
 	largest := ListValue(Uint64Value(2), Uint64Value(1))
@@ -301,10 +245,6 @@ func TestList(t *testing.T) {
 }
 
 func TestDyNumber(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := DyNumberValue("2")
 	r := DyNumberValue("12")
 	c, err := Compare(l, r)
@@ -321,10 +261,6 @@ func TestDyNumber(t *testing.T) {
 }
 
 func TestUUID(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 	r := UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
 	g := UUIDValue([16]byte{100, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
@@ -346,10 +282,6 @@ func TestUUID(t *testing.T) {
 }
 
 func TestIncompatiblePrimitives(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := Uint64Value(1)
 	r := TimestampValue(2)
 	_, err := Compare(l, r)
@@ -362,10 +294,6 @@ func TestIncompatiblePrimitives(t *testing.T) {
 }
 
 func TestIncompatibleTuples(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := TupleValue(Uint64Value(1), UTF8Value("abc"))
 	r := TupleValue(Uint64Value(1), StringValue([]byte("abc")))
 	_, err := Compare(l, r)
@@ -379,10 +307,6 @@ func TestIncompatibleTuples(t *testing.T) {
 }
 
 func TestTupleOfDifferentLength(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := TupleValue(Uint64Value(1), UTF8Value("abc"))
 	r := TupleValue(Uint64Value(1), UTF8Value("abc"), UTF8Value("def"))
 
@@ -396,10 +320,6 @@ func TestTupleOfDifferentLength(t *testing.T) {
 }
 
 func TestTupleInTuple(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := TupleValue(Uint64Value(1), TupleValue(UTF8Value("abc"), StringValue([]byte("xyz"))))
 	r := TupleValue(Uint64Value(1), TupleValue(UTF8Value("def"), StringValue([]byte("xyz"))))
 
@@ -417,10 +337,6 @@ func TestTupleInTuple(t *testing.T) {
 }
 
 func TestListInList(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	l := ListValue(ListValue(UTF8Value("abc"), UTF8Value("def")), ListValue(UTF8Value("uvw"), UTF8Value("xyz")))
 	r := ListValue(ListValue(UTF8Value("abc"), UTF8Value("deg")), ListValue(UTF8Value("uvw"), UTF8Value("xyz")))
 

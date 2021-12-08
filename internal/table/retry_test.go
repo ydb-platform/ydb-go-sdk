@@ -18,10 +18,6 @@ import (
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
 		errors.NewTransportError(
@@ -73,10 +69,6 @@ func _newSession(t *testing.T, c cluster.Cluster) Session {
 }
 
 func TestRetryerBadSession(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	closed := make(map[table.Session]bool)
 	p := SessionProviderFunc{
 		OnGet: func(ctx context.Context) (Session, error) {
@@ -122,10 +114,6 @@ func TestRetryerBadSession(t *testing.T) {
 }
 
 func TestRetryerImmediateReturn(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	for _, testErr := range []error{
 		errors.NewOpError(
 			errors.WithOEReason(errors.StatusGenericError),
@@ -169,10 +157,6 @@ func TestRetryerImmediateReturn(t *testing.T) {
 // We are testing all suspentions of custom operation func against to all deadline
 // timeouts - all sub-tests must have latency less than timeouts (+tolerance)
 func TestRetryContextDeadline(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	tolerance := 10 * time.Millisecond
 	timeouts := []time.Duration{
 		50 * time.Millisecond,

@@ -224,10 +224,6 @@ var (
 )
 
 func TestRoundRobinBalancer(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -292,10 +288,6 @@ func TestRoundRobinBalancer(t *testing.T) {
 }
 
 func TestRandomChoiceBalancer(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

@@ -8,10 +8,6 @@ import (
 )
 
 func TestCredentialsString(t *testing.T) {
-	if !testing.Short() {
-		t.Skip("skipping testing in non-short mode")
-	}
-
 	for _, test := range []struct {
 		c Credentials
 		s string

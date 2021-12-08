@@ -58,12 +58,12 @@ type (
 	transactionInfo interface {
 		ID() string
 	}
-	result interface {
-		ResultSetCount() int
-		TotalRowCount() int
+	streamResult interface {
 		Err() error
 	}
-	streamResult interface {
+	unaryResult interface {
+		ResultSetCount() int
+		TotalRowCount() int
 		Err() error
 	}
 	SessionNewStartInfo struct {
@@ -105,7 +105,7 @@ type (
 	SessionQueryPrepareDoneInfo struct {
 		Tx       transactionInfo
 		Prepared bool
-		Result   result
+		Result   unaryResult
 		Error    error
 	}
 	SessionQueryStreamReadStartInfo struct {

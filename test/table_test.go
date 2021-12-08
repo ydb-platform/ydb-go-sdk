@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package test
 
 import (
@@ -86,10 +89,6 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 }
 
 func TestPoolHealth(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping testing in short mode")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
 	defer cancel()
 
@@ -104,7 +103,18 @@ func TestPoolHealth(t *testing.T) {
 		waited:   0,
 	}
 
-	defer s.print(t)
+	defer func() {
+		s.print(t)
+		if s.inFlight != 0 {
+			t.Fatalf("inFlight not a zero after closing pool")
+		}
+		if s.balance != 0 {
+			t.Fatalf("balance not a zero after closing pool")
+		}
+		if s.waited != 0 {
+			t.Fatalf("waited not a zero after closing pool")
+		}
+	}()
 
 	db, err := ydb.New(
 		ctx,
@@ -156,11 +166,6 @@ func TestPoolHealth(t *testing.T) {
 					s.addInFlight(t, -1)
 				}
 			},
-			OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
-				return func(info trace.PoolSessionCloseDoneInfo) {
-					s.addInFlight(t, -1)
-				}
-			},
 		}),
 	)
 
@@ -190,7 +195,7 @@ func TestPoolHealth(t *testing.T) {
 		t.Fatalf("fill failed: %v\n", err)
 	}
 
-	concurrency := 200
+	concurrency := 300
 	wg := sync.WaitGroup{}
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
@@ -513,7 +518,7 @@ FROM AS_TABLE($episodesData);
 
 func readTable(ctx context.Context, c table.Client, path string) error {
 	var (
-		res result.Result
+		res result.StreamResult
 	)
 	err := c.Do(
 		ctx,
@@ -634,7 +639,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 				TablePathPrefix: prefix,
 			},
 		)
-		res    result.Result
+		res    result.UnaryResult
 		readTx = table.TxControl(
 			table.BeginTx(
 				table.WithOnlineReadOnly(),
@@ -701,7 +706,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 				TablePathPrefix: prefix,
 			},
 		)
-		res result.Result
+		res result.StreamResult
 	)
 	err := c.Do(
 		ctx,
