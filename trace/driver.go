@@ -88,6 +88,10 @@ type endpointInfo interface {
 
 type (
 	ClusterInsertStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 	}
@@ -95,6 +99,10 @@ type (
 		State ConnState
 	}
 	ClusterUpdateStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 	}
@@ -102,6 +110,10 @@ type (
 		State ConnState
 	}
 	ClusterRemoveStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 	}
@@ -109,6 +121,10 @@ type (
 		State ConnState
 	}
 	ConnStateChangeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 		State    ConnState
@@ -133,6 +149,10 @@ type (
 		Error error
 	}
 	NetDialStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Address string
 	}
@@ -146,6 +166,10 @@ type (
 		Error error
 	}
 	ConnTakeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 	}
@@ -154,6 +178,10 @@ type (
 		Error error
 	}
 	ConnReleaseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 	}
@@ -161,6 +189,10 @@ type (
 		Lock int
 	}
 	ConnInvokeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 		Method   Method
@@ -172,6 +204,10 @@ type (
 		State  ConnState
 	}
 	ConnNewStreamStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 		Method   Method
@@ -184,6 +220,10 @@ type (
 		Error error
 	}
 	ClusterGetStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	ClusterGetDoneInfo struct {
@@ -191,6 +231,10 @@ type (
 		Error    error
 	}
 	PessimizeNodeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
 		Endpoint endpointInfo
 		State    ConnState
@@ -201,6 +245,10 @@ type (
 		Error error
 	}
 	GetCredentialsStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	GetCredentialsDoneInfo struct {
@@ -208,6 +256,10 @@ type (
 		Error   error
 	}
 	DiscoveryStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Address string
 	}
@@ -216,12 +268,20 @@ type (
 		Error     error
 	}
 	InitStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	InitDoneInfo struct {
 		Error error
 	}
 	CloseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	CloseDoneInfo struct {

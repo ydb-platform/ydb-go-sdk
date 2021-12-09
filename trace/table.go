@@ -71,6 +71,10 @@ type (
 		TotalRowCount() int
 	}
 	SessionNewStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	SessionNewDoneInfo struct {
@@ -78,6 +82,10 @@ type (
 		Error   error
 	}
 	KeepAliveStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 	}
@@ -85,6 +93,10 @@ type (
 		Error error
 	}
 	SessionDeleteStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 	}
@@ -92,6 +104,10 @@ type (
 		Error error
 	}
 	SessionQueryPrepareStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 		Query   string
@@ -101,6 +117,10 @@ type (
 		Error  error
 	}
 	ExecuteDataQueryStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Session    sessionInfo
 		Query      dataQuery
@@ -113,6 +133,10 @@ type (
 		Error    error
 	}
 	SessionQueryStreamReadStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 	}
@@ -121,6 +145,10 @@ type (
 		Error  error
 	}
 	SessionQueryStreamExecuteStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Session    sessionInfo
 		Query      dataQuery
@@ -131,6 +159,10 @@ type (
 		Error  error
 	}
 	SessionTransactionBeginStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 	}
@@ -139,6 +171,10 @@ type (
 		Error error
 	}
 	SessionTransactionCommitStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 		Tx      transactionInfo
@@ -147,6 +183,10 @@ type (
 		Error error
 	}
 	SessionTransactionRollbackStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 		Tx      transactionInfo
@@ -155,6 +195,10 @@ type (
 		Error error
 	}
 	PoolInitStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	PoolInitDoneInfo struct {
@@ -162,6 +206,10 @@ type (
 		KeepAliveMinSize int
 	}
 	PoolSessionNewStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	PoolSessionNewDoneInfo struct {
@@ -169,6 +217,10 @@ type (
 		Error   error
 	}
 	PoolGetStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	PoolGetDoneInfo struct {
@@ -177,6 +229,10 @@ type (
 		Error    error
 	}
 	PoolWaitStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	// PoolWaitDoneInfo means a wait iteration inside Get call is done
@@ -187,6 +243,10 @@ type (
 		Error   error
 	}
 	PoolTakeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 	}
@@ -197,6 +257,10 @@ type (
 		Error error
 	}
 	PoolPutStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 	}
@@ -204,18 +268,30 @@ type (
 		Error error
 	}
 	PoolSessionCloseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 	}
 	PoolSessionCloseDoneInfo struct {
 	}
 	PoolCloseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
 	PoolCloseDoneInfo struct {
 		Error error
 	}
 	PoolRetryStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Idempotent bool
 	}
