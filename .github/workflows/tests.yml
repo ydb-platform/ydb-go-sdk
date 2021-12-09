@@ -26,12 +26,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race ./... -coverprofile=unit.txt -covermode=atomic
+        run: go test -race -coverprofile=unit.txt -covermode=atomic $(go list ./... | egrep -v "\/(testutil|trace)")
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
           file: ./unit.txt
-          flags: unit,${{ matrix.os }}
+          flags: unit,${{ matrix.os }},${{ matrix.go-version }}
           name: unit
   integration:
     strategy:
@@ -64,10 +64,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -tags=integration -race ./... -coverprofile=integration.txt -covermode=atomic
+        run: go test -race -tags=integration -coverpkg $(go list ./... | egrep -v "\/(testutil|trace)") -coverprofile=integration.txt -covermode=atomic ./test/...
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
           file: ./integration.txt
-          flags: integration,${{ matrix.os }}
+          flags: integration,${{ matrix.os }},${{ matrix.go-version }}
           name: integration
