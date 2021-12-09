@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestIsOpError(t *testing.T) {
+func TestIsOperationError(t *testing.T) {
 	for _, code := range [...]StatusCode{
 		StatusBadRequest,
 		StatusBadSession,

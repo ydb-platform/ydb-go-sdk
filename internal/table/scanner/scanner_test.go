@@ -9,9 +9,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
@@ -500,10 +500,10 @@ func TestScanSqlTypes(t *testing.T) {
 				}
 				if test.setColumnIndexes != nil {
 					for i, v := range test.setColumnIndexes {
-						cmp.Equal(t, expected[0][v], test.values[i])
+						testutil.Equal(t, expected[0][v], test.values[i])
 					}
 				} else {
-					cmp.Equal(t, expected[0], test.values)
+					testutil.Equal(t, expected[0], test.values)
 				}
 				expected = expected[1:]
 			}

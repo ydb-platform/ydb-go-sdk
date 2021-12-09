@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
@@ -32,7 +33,11 @@ func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method st
 	)
 }
 
-func (d *driver) Close(ctx context.Context) error {
+func (d *driver) Close(ctx context.Context) (err error) {
+	onDone := trace.DriverOnClose(d.Trace(ctx), &ctx)
+	defer func() {
+		onDone(err)
+	}()
 	return d.close(ctx)
 }
 

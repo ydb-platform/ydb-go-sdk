@@ -7,9 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"log"
 	"math"
 	"os"
@@ -19,8 +16,13 @@ import (
 	"text/template"
 	"time"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -101,18 +103,43 @@ func TestPoolHealth(t *testing.T) {
 		waited:   0,
 	}
 
-	defer s.print(t)
+	defer func() {
+		s.print(t)
+		if s.inFlight != 0 {
+			t.Fatalf("inFlight not a zero after closing pool")
+		}
+		if s.balance != 0 {
+			t.Fatalf("balance not a zero after closing pool")
+		}
+		if s.waited != 0 {
+			t.Fatalf("waited not a zero after closing pool")
+		}
+	}()
 
-	db, err := open(
+	db, err := ydb.New(
 		ctx,
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
+		ydb.WithTraceDriver(driverTrace()),
+		ydb.WithTraceTable(tableTrace()),
+		ydb.With(
+			config.WithRequestTimeout(time.Second*5),
+			config.WithStreamTimeout(time.Second*5),
+			config.WithOperationTimeout(time.Second*5),
+			config.WithOperationCancelAfter(time.Second*5),
+		),
 		ydb.WithDialTimeout(5*time.Second),
-		ydb.WithGrpcConnectionTTL(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithSessionPoolSizeLimit(200),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5*time.Second),
+		ydb.WithLogger(
+			trace.DetailsAll,
+			ydb.WithNamespace("ydb"),
+			ydb.WithOutWriter(os.Stdout),
+			ydb.WithErrWriter(os.Stderr),
+			ydb.WithMinLevel(ydb.TRACE),
+		),
 		ydb.WithTraceTable(trace.Table{
 			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
 				return func(info trace.SessionNewDoneInfo) {
@@ -146,13 +173,9 @@ func TestPoolHealth(t *testing.T) {
 					s.addInFlight(t, -1)
 				}
 			},
-			OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
-				return func(info trace.PoolSessionCloseDoneInfo) {
-					s.addInFlight(t, -1)
-				}
-			},
 		}),
 	)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +202,7 @@ func TestPoolHealth(t *testing.T) {
 		t.Fatalf("fill failed: %v\n", err)
 	}
 
-	concurrency := 200
+	concurrency := 300
 	wg := sync.WaitGroup{}
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
@@ -211,42 +234,6 @@ func TestPoolHealth(t *testing.T) {
 	}()
 
 	wg.Wait()
-}
-
-func driverTrace() trace.Driver {
-	var t trace.Driver
-	trace.Stub(&t, func(name string, args ...interface{}) {
-		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
-	})
-	return t
-}
-
-func tableTrace() trace.Table {
-	var t trace.Table
-	trace.Stub(&t, func(name string, args ...interface{}) {
-		log.Printf("[table] %s: %+v", name, trace.ClearContext(args))
-	})
-	return t
-}
-
-func appendConnectOptions(opts ...ydb.Option) []ydb.Option {
-	opts = append(
-		opts,
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-		ydb.WithTraceDriver(driverTrace()),
-		ydb.WithTraceTable(tableTrace()),
-	)
-	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		opts = append(opts, ydb.WithAccessTokenCredentials(token))
-	}
-	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
-		opts = append(opts, ydb.WithAnonymousCredentials())
-	}
-	return opts
-}
-
-func open(ctx context.Context, opts ...ydb.Option) (ydb.Connection, error) {
-	return ydb.New(ctx, appendConnectOptions(opts...)...)
 }
 
 func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
@@ -417,12 +404,12 @@ func Quet() {
 }
 
 func Prepare(ctx context.Context, db ydb.Connection) error {
-	err := db.Scheme().CleanupDatabase(ctx, db.Name(), "series", "episodes", "seasons")
+	err := sugar.RmPath(ctx, db, "")
 	if err != nil {
 		return fmt.Errorf("cleaunup database failed: %w", err)
 	}
 
-	err = db.Scheme().EnsurePathExists(ctx, db.Name())
+	err = sugar.MakePath(ctx, db, "")
 	if err != nil {
 		return fmt.Errorf("ensure path exists failed: %w", err)
 	}
@@ -522,7 +509,7 @@ FROM AS_TABLE($episodesData);
 
 func readTable(ctx context.Context, c table.Client, path string) error {
 	var (
-		res resultset.Result
+		res result.StreamResult
 	)
 	err := c.Do(
 		ctx,
@@ -643,7 +630,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 				TablePathPrefix: prefix,
 			},
 		)
-		res    resultset.Result
+		res    result.UnaryResult
 		readTx = table.TxControl(
 			table.BeginTx(
 				table.WithOnlineReadOnly(),
@@ -710,7 +697,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 				TablePathPrefix: prefix,
 			},
 		)
-		res resultset.Result
+		res result.StreamResult
 	)
 	err := c.Do(
 		ctx,

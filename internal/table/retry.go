@@ -151,7 +151,7 @@ func retryBackoff(
 		i              int
 		attempts       int
 		code           = int32(0)
-		onIntermediate = trace.TableOnPoolRetry(t, ctx, isOperationIdempotent)
+		onIntermediate = trace.TableOnPoolRetry(t, &ctx, isOperationIdempotent)
 	)
 	defer func() {
 		if s != nil {

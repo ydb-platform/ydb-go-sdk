@@ -9,7 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -27,11 +27,11 @@ type Session interface {
 	CopyTable(ctx context.Context, dst, src string, opts ...options.CopyTableOption) (err error)
 	Explain(ctx context.Context, query string) (exp DataQueryExplanation, err error)
 	Prepare(ctx context.Context, query string) (stmt Statement, err error)
-	Execute(ctx context.Context, tx *TransactionControl, query string, params *QueryParameters, opts ...options.ExecuteDataQueryOption) (txr Transaction, r resultset.Result, err error)
+	Execute(ctx context.Context, tx *TransactionControl, query string, params *QueryParameters, opts ...options.ExecuteDataQueryOption) (txr Transaction, r result.UnaryResult, err error)
 	ExecuteSchemeQuery(ctx context.Context, query string, opts ...options.ExecuteSchemeQueryOption) (err error)
 	DescribeTableOptions(ctx context.Context) (desc options.TableOptionsDescription, err error)
-	StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (r resultset.Result, err error)
-	StreamExecuteScanQuery(ctx context.Context, query string, params *QueryParameters, opts ...options.ExecuteScanQueryOption) (_ resultset.Result, err error)
+	StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (r result.StreamResult, err error)
+	StreamExecuteScanQuery(ctx context.Context, query string, params *QueryParameters, opts ...options.ExecuteScanQueryOption) (_ result.StreamResult, err error)
 	BulkUpsert(ctx context.Context, table string, rows types.Value) (err error)
 	BeginTransaction(ctx context.Context, tx *TransactionSettings) (x Transaction, err error)
 	KeepAlive(ctx context.Context) error
@@ -60,14 +60,14 @@ type DataQuery interface {
 
 type Transaction interface {
 	ID() string
-	Execute(ctx context.Context, query string, params *QueryParameters, opts ...options.ExecuteDataQueryOption) (resultset.Result, error)
-	ExecuteStatement(ctx context.Context, stmt Statement, params *QueryParameters, opts ...options.ExecuteDataQueryOption) (resultset.Result, error)
-	CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r resultset.Result, err error)
+	Execute(ctx context.Context, query string, params *QueryParameters, opts ...options.ExecuteDataQueryOption) (result.UnaryResult, error)
+	ExecuteStatement(ctx context.Context, stmt Statement, params *QueryParameters, opts ...options.ExecuteDataQueryOption) (result.UnaryResult, error)
+	CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r result.UnaryResult, err error)
 	Rollback(ctx context.Context) (err error)
 }
 
 type Statement interface {
-	Execute(ctx context.Context, tx *TransactionControl, params *QueryParameters, opts ...options.ExecuteDataQueryOption) (txr Transaction, r resultset.Result, err error)
+	Execute(ctx context.Context, tx *TransactionControl, params *QueryParameters, opts ...options.ExecuteDataQueryOption) (txr Transaction, r result.UnaryResult, err error)
 	NumInput() int
 	Text() string
 }

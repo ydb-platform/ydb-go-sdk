@@ -908,11 +908,6 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 		*v = s.value()
 	case *types.Decimal:
 		*v = types.Decimal{}
-	case types.Scanner:
-		err := v.UnmarshalYDB(s.converter)
-		if err != nil {
-			s.errorf("ydb.Scanner error: %w", err)
-		}
 	case sql.Scanner:
 		err := v.Scan(nil)
 		if err != nil {
@@ -932,16 +927,16 @@ func (s *scanner) scan(values []interface{}) (err error) {
 	}
 	if s.columnIndexes != nil {
 		if len(s.columnIndexes) != len(values) {
-			s.errorf("scan row failed: count of values and column are different")
+			s.errorf("scan row failed: count of values and column are different (%d != %d)", len(s.columnIndexes), len(values))
 		}
 	}
 	if s.ColumnCount() < len(values) {
-		s.errorf("scan row failed: count of columns less then values")
+		s.errorf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), len(values))
 	}
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
 	}
-	for i, value := range values {
+	for i := range values {
 		if s.columnIndexes == nil {
 			s.seekItemByID(i)
 		} else {
@@ -951,13 +946,19 @@ func (s *scanner) scan(values []interface{}) (err error) {
 			return
 		}
 		if s.isCurrentTypeOptional() {
-			s.scanOptional(value)
+			s.scanOptional(values[i])
 		} else {
-			s.scanRequired(value)
+			s.scanRequired(values[i])
 		}
 	}
 	s.nextItem += len(values)
 	return s.Err()
+}
+
+func (r *result) SetErr(err error) {
+	r.errMtx.Lock()
+	r.err = err
+	r.errMtx.Unlock()
 }
 
 func (s *scanner) errorf(f string, args ...interface{}) {
