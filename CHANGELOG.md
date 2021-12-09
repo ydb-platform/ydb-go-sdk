@@ -90,6 +90,14 @@
 * Added integration tests with docker ydb container
 * Changed table session and endpoint link type from string address to integer NodeID
 
+## 2.10.8
+* Fixed data race on cluster get/pessimize
+
+## 2.10.7
+* Dropped internal cluster connections tracker
+* Switched initial connect to all endpoints after discovery to lazy connect
+* Added reconnect for broken conns
+
 ## 2.10.6
 * Thrown context without deadline into discovery goroutine
 * Added `Address` param to `DiscoveryStartInfo` struct
@@ -100,7 +108,7 @@
   used direct `CreateSession` table client call in the best effort loop
 
 ## 2.10.5
-* Fixed panic when ready conns iz zero
+* Fixed panic when ready conns is zero
 
 ## 2.10.4
 * Initialized repeater permanently regardless of the value `DriverConfig.DiscoveryInterval`
