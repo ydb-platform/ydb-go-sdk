@@ -64,7 +64,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race -tags=integration -coverpkg=$(go list ./... | egrep -v "\/(testutil|trace|test)") -coverprofile=integration.txt -covermode=atomic ./test/...
+        run: go test -race -tags=integration -coverpkg=./... -coverprofile=integration.txt -covermode=atomic ./test/...
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
