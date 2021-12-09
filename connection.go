@@ -35,11 +35,35 @@ type DB interface {
 type Connection interface {
 	DB
 
-	Table() table.Client
-	Scheme() scheme.Client
-	Coordination() coordination.Client
-	RateLimiter() ratelimiter.Client
-	Discovery() discovery.Client
+	// Table returns table client with options from Connection instance.
+	// Options provide options replacement for requested table client
+	// such as endpoint, database, secure connection flag and credentials
+	// Options replacement feature not implements now
+	Table(opts ...Option) table.Client
+
+	// Scheme returns scheme client with options from Connection instance.
+	// Options provide options replacement for requested scheme client
+	// such as endpoint, database, secure connection flag and credentials
+	// Options replacement feature not implements now
+	Scheme(opts ...Option) scheme.Client
+
+	// Coordination returns coordination client with options from Connection instance.
+	// Options provide options replacement for requested coordination client
+	// such as endpoint, database, secure connection flag and credentials
+	// Options replacement feature not implements now
+	Coordination(opts ...Option) coordination.Client
+
+	// RateLimiter returns rate limiter client with options from Connection instance.
+	// Options provide options replacement for requested rate limiter client
+	// such as endpoint, database, secure connection flag and credentials
+	// Options replacement feature not implements now
+	RateLimiter(opts ...Option) ratelimiter.Client
+
+	// Discovery returns discovery client with options from Connection instance.
+	// Options provide options replacement for requested discovery client
+	// such as endpoint, database, secure connection flag and credentials
+	// Options replacement feature not implements now
+	Discovery(opts ...Option) discovery.Client
 }
 
 type db struct {
@@ -53,7 +77,7 @@ type db struct {
 	discovery    lazyDiscovery
 }
 
-func (db *db) Discovery() discovery.Client {
+func (db *db) Discovery(opts ...Option) discovery.Client {
 	return &db.discovery
 }
 
@@ -84,19 +108,19 @@ func (db *db) Close(ctx context.Context) error {
 	return db.cluster.Close(ctx)
 }
 
-func (db *db) Table() table.Client {
+func (db *db) Table(opts ...Option) table.Client {
 	return &db.table
 }
 
-func (db *db) Scheme() scheme.Client {
+func (db *db) Scheme(opts ...Option) scheme.Client {
 	return &db.scheme
 }
 
-func (db *db) Coordination() coordination.Client {
+func (db *db) Coordination(opts ...Option) coordination.Client {
 	return &db.coordination
 }
 
-func (db *db) RateLimiter() ratelimiter.Client {
+func (db *db) RateLimiter(opts ...Option) ratelimiter.Client {
 	return &db.ratelimiter
 }
 
