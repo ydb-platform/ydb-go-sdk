@@ -7,10 +7,10 @@ import (
 )
 
 // Operation is the interface that holds an operation for retry.
-type Operation func(context.Context, Session) (err error)
+type Operation func(context.Context, Session) error
 
 // TxOperation is the interface that holds an operation for retry.
-type TxOperation func(context.Context, Transaction) (err error)
+type TxOperation func(context.Context, Transaction) error
 
 type Option func(o *Options)
 
@@ -81,12 +81,12 @@ type Client interface {
 	// - deadline was canceled or deadlined
 	// - retry operation returned nil as error
 	// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-	Do(ctx context.Context, op Operation, opts ...Option) (err error)
+	Do(ctx context.Context, op Operation, opts ...Option) error
 
 	// DoTx provide the best effort for execute operation
 	// DoTx implements internal busy loop until one of the following conditions is met:
 	// - deadline was canceled or deadlined
 	// - retry operation returned nil as error
 	// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-	DoTx(ctx context.Context, op TxOperation, opts ...Option) (err error)
+	DoTx(ctx context.Context, op TxOperation, opts ...Option) error
 }
