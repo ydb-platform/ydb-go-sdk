@@ -17,6 +17,9 @@
 * Removed call `scanner.Scanner.UnmarshalYDB()` inside `scanner.setDefaults()` 
 * Added `DoTx()` API method into `table.Client`
 
+## 3.4.4
+* Prefer types.Scanner (ydb) scanner implementation over sql.Scanner, when both available.
+
 ## 3.4.3
 * Forced `round_robin` grpc load balancing instead default `pick_first`
 * Added checker `IsTransportErrorCancelled`

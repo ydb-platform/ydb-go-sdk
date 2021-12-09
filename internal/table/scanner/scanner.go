@@ -663,20 +663,20 @@ func (s *scanner) scanRequired(value interface{}) {
 		*v = s.uint128()
 	case *interface{}:
 		*v = s.any()
-	case sql.Scanner:
-		err := v.Scan(s.any())
-		if err != nil {
-			s.errorf("sql.Scanner error: %w", err)
-		}
+	case *types.Value:
+		*v = s.value()
+	case *types.Decimal:
+		*v = s.unwrapDecimal()
 	case types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			s.errorf("ydb.Scanner error: %w", err)
 		}
-	case *types.Value:
-		*v = s.value()
-	case *types.Decimal:
-		*v = s.unwrapDecimal()
+	case sql.Scanner:
+		err := v.Scan(s.any())
+		if err != nil {
+			s.errorf("sql.Scanner error: %w", err)
+		}
 	default:
 		ok := s.trySetByteArray(v, false, false)
 		if !ok {
@@ -835,16 +835,6 @@ func (s *scanner) scanOptional(value interface{}) {
 			src := s.any()
 			*v = &src
 		}
-	case sql.Scanner:
-		err := v.Scan(s.any())
-		if err != nil {
-			s.errorf("sql.Scanner error: %w", err)
-		}
-	case types.Scanner:
-		err := v.UnmarshalYDB(s.converter)
-		if err != nil {
-			s.errorf("ydb.Scanner error: %w", err)
-		}
 	case *types.Value:
 		*v = s.value()
 	case **types.Decimal:
@@ -853,6 +843,16 @@ func (s *scanner) scanOptional(value interface{}) {
 		} else {
 			src := s.unwrapDecimal()
 			*v = &src
+		}
+	case types.Scanner:
+		err := v.UnmarshalYDB(s.converter)
+		if err != nil {
+			s.errorf("ydb.Scanner error: %w", err)
+		}
+	case sql.Scanner:
+		err := v.Scan(s.any())
+		if err != nil {
+			s.errorf("sql.Scanner error: %w", err)
 		}
 	default:
 		s.unwrap()
@@ -904,15 +904,15 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 		*v = [16]byte{}
 	case *interface{}:
 		*v = nil
+	case *types.Value:
+		*v = s.value()
+	case *types.Decimal:
+		*v = types.Decimal{}
 	case sql.Scanner:
 		err := v.Scan(nil)
 		if err != nil {
 			s.errorf("sql.Scanner error: %w", err)
 		}
-	case *types.Value:
-		*v = s.value()
-	case *types.Decimal:
-		*v = types.Decimal{}
 	default:
 		ok := s.trySetByteArray(v, false, true)
 		if !ok {
