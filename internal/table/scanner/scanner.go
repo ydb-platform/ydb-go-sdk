@@ -904,20 +904,20 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 		*v = [16]byte{}
 	case *interface{}:
 		*v = nil
-	case sql.Scanner:
-		err := v.Scan(nil)
-		if err != nil {
-			s.errorf("sql.Scanner error: %w", err)
-		}
+	case *types.Value:
+		*v = s.value()
+	case *types.Decimal:
+		*v = types.Decimal{}
 	case types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			s.errorf("ydb.Scanner error: %w", err)
 		}
-	case *types.Value:
-		*v = s.value()
-	case *types.Decimal:
-		*v = types.Decimal{}
+	case sql.Scanner:
+		err := v.Scan(nil)
+		if err != nil {
+			s.errorf("sql.Scanner error: %w", err)
+		}
 	default:
 		ok := s.trySetByteArray(v, false, true)
 		if !ok {
