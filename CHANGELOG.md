@@ -1,3 +1,6 @@
+## 3.4.4
+* Prefer types.Scanner (ydb) scanner implementation over sql.Scanner, when both available.
+
 ## 3.4.3
 * Forced `round_bobin` grpc load balancing instead default `pick_first`
 * Added checker `IsTransportErrorCancelled`
