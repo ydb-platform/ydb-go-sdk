@@ -40,7 +40,7 @@ func TestRepeater(t *testing.T) {
 	assertNoRecv(t, 50*time.Millisecond, exec)
 }
 
-func TestRepeaterCancelation(t *testing.T) {
+func TestRepeaterCancellation(t *testing.T) {
 	var (
 		timerC = make(chan time.Time)
 		enter  = make(chan struct{}, 2)

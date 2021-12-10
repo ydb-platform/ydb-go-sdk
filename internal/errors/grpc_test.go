@@ -22,7 +22,7 @@ func TestIsTransportError(t *testing.T) {
 	}
 }
 
-func TestIsNotTransportError(t *testing.T) {
+func TestIsNonTransportError(t *testing.T) {
 	code := TransportErrorCanceled
 	for _, err := range []error{
 		&TransportError{Reason: TransportErrorAborted},
@@ -48,7 +48,7 @@ func TestTransportErrorWrapsContextError(t *testing.T) {
 	}
 }
 
-func TestIsNotOpError(t *testing.T) {
+func TestIsNonOperationError(t *testing.T) {
 	code := StatusBadRequest
 	for _, err := range []error{
 		&OpError{Reason: StatusTimeout},

@@ -32,24 +32,26 @@ type Client interface {
 	Close(ctx context.Context) error
 }
 
-func New(conn grpc.ClientConnInterface, database string, ssl bool, trace trace.Driver) Client {
+func New(conn grpc.ClientConnInterface, endpoint, database string, ssl bool, trace trace.Driver) Client {
 	return &client{
 		trace:    trace,
-		service:  Ydb_Discovery_V1.NewDiscoveryServiceClient(conn),
+		endpoint: endpoint,
 		database: database,
 		ssl:      ssl,
+		service:  Ydb_Discovery_V1.NewDiscoveryServiceClient(conn),
 	}
 }
 
 type client struct {
 	trace    trace.Driver
-	service  Ydb_Discovery_V1.DiscoveryServiceClient
+	endpoint string
 	database string
 	ssl      bool
+	service  Ydb_Discovery_V1.DiscoveryServiceClient
 }
 
 func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
-	onDone := trace.DriverOnDiscovery(d.trace, ctx)
+	onDone := trace.DriverOnDiscovery(d.trace, &ctx, d.endpoint)
 	defer func() {
 		nodes := make([]string, 0)
 		for _, e := range endpoints {
@@ -80,7 +82,6 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 			))
 		}
 	}
-
 	return endpoints, nil
 }
 

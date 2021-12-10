@@ -40,11 +40,14 @@ func TestResultAny(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			res := NewResult(
-				NewResultSet(
-					WithColumns(test.columns...),
-					WithValues(test.values...),
-				),
+			res := NewUnary(
+				[]*Ydb.ResultSet{
+					NewResultSet(
+						WithColumns(test.columns...),
+						WithValues(test.values...),
+					),
+				},
+				nil,
 			)
 			var i int
 			var act interface{}
@@ -101,11 +104,14 @@ func TestResultOUint32(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			res := NewResult(
-				NewResultSet(
-					WithColumns(test.columns...),
-					WithValues(test.values...),
-				),
+			res := NewUnary(
+				[]*Ydb.ResultSet{
+					NewResultSet(
+						WithColumns(test.columns...),
+						WithValues(test.values...),
+					),
+				},
+				nil,
 			)
 			var i int
 			var act uint32
@@ -186,10 +192,4 @@ func NewResultSet(opts ...ResultSetOption) *Ydb.ResultSet {
 		opt(&d)
 	}
 	return (*Ydb.ResultSet)(&d)
-}
-
-func NewResult(sets ...*Ydb.ResultSet) *Result {
-	return &Result{
-		Sets: sets,
-	}
 }

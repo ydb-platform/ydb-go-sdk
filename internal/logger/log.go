@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -129,9 +130,12 @@ func FromString(l string) Level {
 }
 
 type logger struct {
+	external  log.Logger
 	namespace string
 	minLevel  Level
 	noColor   bool
+	out       io.Writer
+	err       io.Writer
 }
 
 type Option func(l *logger)
@@ -154,8 +158,31 @@ func WithNamespace(namespace string) Option {
 	}
 }
 
+func WithExternalLogger(external log.Logger) Option {
+	return func(l *logger) {
+		l.external = external
+	}
+}
+
+func WithOutWriter(out io.Writer) Option {
+	return func(l *logger) {
+		l.out = out
+	}
+}
+
+func WithErrWriter(err io.Writer) Option {
+	return func(l *logger) {
+		l.err = err
+	}
+}
+
 func New(opts ...Option) *logger {
-	l := &logger{}
+	l := &logger{
+		minLevel: INFO,
+		noColor:  false,
+		out:      os.Stdout,
+		err:      os.Stderr,
+	}
 	for _, o := range opts {
 		o(l)
 	}
@@ -173,42 +200,66 @@ func (l *logger) Tracef(format string, args ...interface{}) {
 	if l.minLevel > TRACE {
 		return
 	}
-	fmt.Fprintf(os.Stdout, l.format(format, TRACE), args...)
+	if l.external != nil {
+		l.Tracef(l.format(format, TRACE), args...)
+	} else {
+		fmt.Fprintf(l.out, l.format(format, TRACE), args...)
+	}
 }
 
 func (l *logger) Debugf(format string, args ...interface{}) {
 	if l.minLevel > DEBUG {
 		return
 	}
-	fmt.Fprintf(os.Stdout, l.format(format, DEBUG), args...)
+	if l.external != nil {
+		l.Debugf(l.format(format, DEBUG), args...)
+	} else {
+		fmt.Fprintf(l.out, l.format(format, DEBUG), args...)
+	}
 }
 
 func (l *logger) Infof(format string, args ...interface{}) {
 	if l.minLevel > INFO {
 		return
 	}
-	fmt.Fprintf(os.Stdout, l.format(format, INFO), args...)
+	if l.external != nil {
+		l.Infof(l.format(format, INFO), args...)
+	} else {
+		fmt.Fprintf(l.out, l.format(format, INFO), args...)
+	}
 }
 
 func (l *logger) Warnf(format string, args ...interface{}) {
 	if l.minLevel > WARN {
 		return
 	}
-	fmt.Fprintf(os.Stderr, l.format(format, WARN), args...)
+	if l.external != nil {
+		l.Warnf(l.format(format, WARN), args...)
+	} else {
+		fmt.Fprintf(l.err, l.format(format, WARN), args...)
+	}
 }
 
 func (l *logger) Errorf(format string, args ...interface{}) {
 	if l.minLevel > ERROR {
 		return
 	}
-	fmt.Fprintf(os.Stderr, l.format(format, ERROR), args...)
+	if l.external != nil {
+		l.Errorf(l.format(format, ERROR), args...)
+	} else {
+		fmt.Fprintf(l.err, l.format(format, ERROR), args...)
+	}
 }
 
 func (l *logger) Fatalf(format string, args ...interface{}) {
 	if l.minLevel > FATAL {
 		return
 	}
-	fmt.Fprintf(os.Stderr, l.format(format, FATAL), args...)
+	if l.external != nil {
+		l.Fatalf(l.format(format, FATAL), args...)
+	} else {
+		fmt.Fprintf(l.err, l.format(format, FATAL), args...)
+	}
 }
 
 func join(a, b string) string {
@@ -223,6 +274,9 @@ func join(a, b string) string {
 
 func (l *logger) WithName(name string) log.Logger {
 	return &logger{
+		external:  l.external,
+		out:       l.out,
+		err:       l.err,
 		namespace: join(l.namespace, name),
 		minLevel:  l.minLevel,
 		noColor:   l.noColor,

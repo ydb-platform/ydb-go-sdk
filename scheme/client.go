@@ -7,13 +7,6 @@ import (
 )
 
 type Client interface {
-	Scheme
-
-	CleanupDatabase(ctx context.Context, prefix string, names ...string) error
-	EnsurePathExists(ctx context.Context, path string) error
-}
-
-type Scheme interface {
 	DescribePath(ctx context.Context, path string) (e Entry, err error)
 	MakeDirectory(ctx context.Context, path string) (err error)
 	ListDirectory(ctx context.Context, path string) (d Directory, err error)

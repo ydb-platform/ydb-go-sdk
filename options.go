@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"io"
 	"os"
-	"os/user"
 	"path/filepath"
 	"time"
 
@@ -53,12 +53,35 @@ func WithNamespace(namespace string) logger.Option {
 	return logger.WithNamespace(namespace)
 }
 
-func WithMinLevel(minLevel logger.Level) logger.Option {
-	return logger.WithMinLevel(minLevel)
+type Level logger.Level
+
+const (
+	TRACE = Level(logger.TRACE)
+	DEBUG = Level(logger.DEBUG)
+	INFO  = Level(logger.INFO)
+	WARN  = Level(logger.WARN)
+	ERROR = Level(logger.ERROR)
+	FATAL = Level(logger.FATAL)
+)
+
+func WithMinLevel(minLevel Level) logger.Option {
+	return logger.WithMinLevel(logger.Level(minLevel))
 }
 
 func WithNoColor(b bool) logger.Option {
 	return logger.WithNoColor(b)
+}
+
+func WithExternalLogger(external log.Logger) logger.Option {
+	return logger.WithExternalLogger(external)
+}
+
+func WithOutWriter(out io.Writer) logger.Option {
+	return logger.WithOutWriter(out)
+}
+
+func WithErrWriter(err io.Writer) logger.Option {
+	return logger.WithErrWriter(err)
 }
 
 func WithLogger(details trace.Details, opts ...logger.Option) Option {
@@ -106,24 +129,9 @@ func WithCredentials(c credentials.Credentials) Option {
 	})
 }
 
-func WithDriverConfigOptions(options ...config.Option) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, options...)
-		return nil
-	}
-}
-
 func WithBalancingConfig(balancerConfig config.BalancerConfig) Option {
 	return func(ctx context.Context, db *db) error {
 		db.options = append(db.options, config.WithBalancingConfig(balancerConfig))
-		return nil
-	}
-}
-
-func WithGrpcConnectionTTL(ttl time.Duration) Option {
-	return func(ctx context.Context, db *db) error {
-		// TODO: sync with table session keep-alive timeout
-		db.options = append(db.options, config.WithGrpcConnectionTTL(ttl))
 		return nil
 	}
 }
@@ -167,11 +175,11 @@ func WithCertificate(cert *x509.Certificate) Option {
 func WithCertificatesFromFile(caFile string) Option {
 	return func(ctx context.Context, db *db) error {
 		if len(caFile) > 0 && caFile[0] == '~' {
-			usr, err := user.Current()
+			home, err := os.UserHomeDir()
 			if err != nil {
 				return err
 			}
-			caFile = filepath.Join(usr.HomeDir, caFile[1:])
+			caFile = filepath.Join(home, caFile[1:])
 		}
 		bytes, err := os.ReadFile(caFile)
 		if err != nil {

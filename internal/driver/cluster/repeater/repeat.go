@@ -75,13 +75,13 @@ func (r *repeater) worker(onDone func()) {
 			onDone()
 		}
 	}()
+	r.task(r.ctx)
 	for {
-		r.task(r.ctx)
 		select {
 		case <-r.stop:
 			return
 		case <-r.timer.C():
-
+			r.task(r.ctx)
 		case <-r.force:
 			if !r.timer.Stop() {
 				<-r.timer.C()

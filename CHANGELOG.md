@@ -1,8 +1,26 @@
+## 3.5.0
+* Added `ClosabelSession` interface which extends `Session` interface and provide `Close` method
+* Added `CreateSession` method into `table.Client` interface
+* Added `Context` field into `trace.Driver.Net{Dial,Read,Write,Close}StartInfo` structs
+* Added `Address` field into `trace.Driver.DiscoveryStartInfo` struct
+* Improved logger options (provide err and out writers, provide external logger)
+* Renamed package `table.resultset` to `table.result`
+* Added `trace.Driver.{OnInit,OnClose}` events
+* Changed unit/integration tests running
+* Fixed/added YDB error checkers
+* Dropped `ydb.WithDriverConfigOptions` (duplicate of `ydb.With`)
+* Fixed freeze on closing driver
+* Fixed `CGO` race on `Darwin` system when driver tried to expand tilde on certificates path
+* Removed `EnsurePathExists` and `CleanupDatabase` from API of `scheme.Client`
+* Added helpers `MakePath` and `CleanPath` to root of package `ydb-go-sdk`
+* Removed call `types.Scanner.UnmarshalYDB()` inside `scanner.setDefaults()` 
+* Added `DoTx()` API method into `table.Client`
+
 ## 3.4.4
-* Prefer types.Scanner (ydb) scanner implementation over sql.Scanner, when both available.
+* Prefer `ydb.table.types.Scanner` scanner implementation over `sql.Scanner`, when both available.
 
 ## 3.4.3
-* Forced `round_bobin` grpc load balancing instead default `pick_first`
+* Forced `round_robin` grpc load balancing instead default `pick_first`
 * Added checker `IsTransportErrorCancelled`
 
 ## 3.4.2

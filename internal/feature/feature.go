@@ -5,18 +5,18 @@ import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 type Flag int
 
 const (
-	FeatureUnknown Flag = iota
-	FeatureEnabled
-	FeatureDisabled
+	Unknown Flag = iota
+	Enabled
+	Disabled
 )
 
 func (f Flag) ToYDB() Ydb.FeatureFlag_Status {
 	switch f {
-	case FeatureEnabled:
+	case Enabled:
 		return Ydb.FeatureFlag_ENABLED
-	case FeatureDisabled:
+	case Disabled:
 		return Ydb.FeatureFlag_DISABLED
-	case FeatureUnknown:
+	case Unknown:
 		return Ydb.FeatureFlag_STATUS_UNSPECIFIED
 	default:
 		panic("ydb: unknown feature flag status")
@@ -26,11 +26,11 @@ func (f Flag) ToYDB() Ydb.FeatureFlag_Status {
 func FromYDB(f Ydb.FeatureFlag_Status) Flag {
 	switch f {
 	case Ydb.FeatureFlag_ENABLED:
-		return FeatureEnabled
+		return Enabled
 	case Ydb.FeatureFlag_DISABLED:
-		return FeatureDisabled
+		return Disabled
 	case Ydb.FeatureFlag_STATUS_UNSPECIFIED:
-		return FeatureUnknown
+		return Unknown
 	default:
 		panic("ydb: unknown Ydb feature flag status")
 	}
