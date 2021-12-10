@@ -101,11 +101,13 @@ func (r *repeater) worker() {
 		}
 		r.timer.Reset(r.interval)
 		ctx := r.ctx
+		var cancel context.CancelFunc
 		if t := r.timeout; t > 0 {
-			var cancel context.CancelFunc
 			ctx, cancel = context.WithTimeout(ctx, t)
-			defer cancel()
+		} else {
+			ctx, cancel = context.WithCancel(ctx)
 		}
 		r.task(ctx)
+		cancel()
 	}
 }

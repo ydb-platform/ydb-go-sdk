@@ -1,3 +1,6 @@
+## 2.10.9
+* Fixed context cancellation inside repeater loop
+
 ## 2.10.8
 * Fixed data race on cluster get/pessimize
 
