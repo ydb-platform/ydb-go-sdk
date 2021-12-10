@@ -90,6 +90,9 @@
 * Added integration tests with docker ydb container
 * Changed table session and endpoint link type from string address to integer NodeID
 
+## 2.10.9
+* Fixed context cancellation inside repeater loop
+
 ## 2.10.8
 * Fixed data race on cluster get/pessimize
 
