@@ -1,20 +1,19 @@
 syntax = "proto3";
 
-package Yql.Analytics.V1;
-option java_package = "com.yandex.yql.analytics.db.v1";
+package Yq.Private.V1;
 
-import "kikimr/public/api/protos/draft/yql_internal.proto";
+import "kikimr/public/api/protos/draft/yq_private.proto";
 
-service YqlInternalTaskService {
+service YqPrivateTaskService {
     // gets new task
-    rpc GetTask(Yql.Analytics.GetTaskRequest) returns (Yql.Analytics.GetTaskResponse);
+    rpc GetTask(Yq.Private.GetTaskRequest) returns (Yq.Private.GetTaskResponse);
 
     // pings new task (also can update metadata)
-    rpc PingTask(Yql.Analytics.PingTaskRequest) returns (Yql.Analytics.PingTaskResponse);
+    rpc PingTask(Yq.Private.PingTaskRequest) returns (Yq.Private.PingTaskResponse);
 
     // writes rows
-    rpc WriteTaskResult(Yql.Analytics.WriteTaskResultRequest) returns (Yql.Analytics.WriteTaskResultResponse);
+    rpc WriteTaskResult(Yq.Private.WriteTaskResultRequest) returns (Yq.Private.WriteTaskResultResponse);
 
     //Nodes
-    rpc NodesHealthCheck(Yql.Analytics.NodesHealthCheckRequest) returns (Yql.Analytics.NodesHealthCheckResponse);
+    rpc NodesHealthCheck(Yq.Private.NodesHealthCheckRequest) returns (Yq.Private.NodesHealthCheckResponse);
 }

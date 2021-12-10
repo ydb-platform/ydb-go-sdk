@@ -1,9 +1,7 @@
 syntax = "proto3";
 option cc_enable_arenas = true;
 
-package Yql.Analytics;
-option java_package = "com.yandex.yql.analytics.internal";
-option java_outer_classname = "AnalyticsIntenalProtos";
+package Yq.Private;
 
 import "kikimr/public/api/protos/ydb_operation.proto";
 import "kikimr/public/api/protos/ydb_value.proto";
@@ -25,6 +23,11 @@ message GetTaskRequest {
 message SignedIdentity {
     string value = 1;
     string signature = 2;
+}
+
+message SignedTimestamp {
+    uint64 value = 1;
+    uint64 signature = 2;
 }
 
 message TopicConsumer {
@@ -68,6 +71,7 @@ message GetTaskResult {
 
         bool automatic = 22;
         string query_name = 23;
+        SignedTimestamp deadline = 24;
     }
     repeated Task tasks = 1;
 }
@@ -98,6 +102,7 @@ message PingTaskRequest {
     string scope = 100; //TODO remove
     google.protobuf.Timestamp started_at = 101;
     google.protobuf.Timestamp finished_at = 102;
+    SignedTimestamp deadline = 103;
 }
 
 message PingTaskResult {
@@ -116,6 +121,7 @@ message WriteTaskResultRequest {
     uint64 offset = 5;
     uint64 request_id = 6;
     Ydb.Operations.OperationParams operation_params = 7;
+    SignedTimestamp deadline = 8;
 }
 
 message WriteTaskResultResult {
@@ -133,6 +139,8 @@ message NodeInfo {
     uint64 active_workers = 4;
     uint64 memory_limit = 5;
     uint64 memory_allocated = 6;
+    uint32 interconnect_port = 7;
+    string node_address = 8;
 }
 
 message NodesHealthCheckRequest {

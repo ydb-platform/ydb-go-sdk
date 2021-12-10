@@ -23,11 +23,10 @@ message StatusFlag {
 }
 
 message SelfCheckRequest {
-    Ydb.Operations.OperationParams operation_params = 1;
-    bool return_verbose_status = 2;
-    StatusFlag.Status minimum_status = 3;
-    uint32 maximum_level = 4;
-    uint32 timeout = 5;
+    Ydb.Operations.OperationParams operation_params = 1; // basic operation params, including timeout
+    bool return_verbose_status = 2; // return detailed info about components checked with their statuses
+    StatusFlag.Status minimum_status = 3; // minimum status of issues to return
+    uint32 maximum_level = 4; // maximum level of issues to return
 }
 
 message SelfCheckResponse {

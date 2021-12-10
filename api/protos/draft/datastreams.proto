@@ -15,6 +15,7 @@ enum EFieldTransformationType {
     TRANSFORM_NONE = 0;
     TRANSFORM_BASE64 = 1;
     TRANSFORM_DOUBLE_S_TO_INT_MS = 2;
+    TRANSFORM_EMPTY_TO_NOTHING = 3;
 }
 
 extend google.protobuf.FieldOptions {
@@ -117,11 +118,11 @@ message SequenceNumberRange {
 // Represents shard details
 message Shard {
     // Id of the shard adjacent to the shard's parent
-    string adjacent_parent_shard_id = 1;
+    string adjacent_parent_shard_id = 1 [(FieldTransformer) = TRANSFORM_EMPTY_TO_NOTHING];
     // The range of possible hash key values for the shard
     HashKeyRange hash_key_range = 2;
     // Id of the shard's parent
-    string parent_shard_id = 3;
+    string parent_shard_id = 3 [(FieldTransformer) = TRANSFORM_EMPTY_TO_NOTHING];
     // The range of possible sequence numbers for the shard
     SequenceNumberRange sequence_number_range = 4;
     // Unique id of the shard within stream
@@ -173,7 +174,7 @@ message ShardFilter {
         FROM_TRIM_HORIZON = 3;
         // Include only the currently open shards
         AT_LATEST = 4;
-        // Include all the shars whose start timestamp is <= to the given
+        // Include all the shards whose start timestamp is <= to the given
         AT_TIMESTAMP = 5;
         // Include all closed shards whose end timestamp >= to the given
         FROM_TIMESTAMP = 6;
@@ -476,8 +477,8 @@ message PutRecordsRequestEntry {
 
 // Represents result of an individual record
 message PutRecordsResultEntry {
-    string error_message = 2;
-    string error_code = 3;
+    string error_message = 2 [(FieldTransformer) = TRANSFORM_EMPTY_TO_NOTHING];
+    string error_code = 3 [(FieldTransformer) = TRANSFORM_EMPTY_TO_NOTHING];
     string sequence_number = 4;
     string shard_id = 5;
 }

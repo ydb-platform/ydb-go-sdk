@@ -138,6 +138,8 @@ message QueryMeta {
     ComputeStatus status = 5;
     int64 last_job_query_revision = 6;
     string last_job_id = 7;
+    google.protobuf.Timestamp expire_at = 8;
+    google.protobuf.Timestamp result_expire_at = 9;
 }
 
 message BriefQuery {
@@ -313,6 +315,7 @@ message BriefJob {
     string query_name = 9;
     Acl.Visibility visibility = 10;
     bool automatic = 11;
+    google.protobuf.Timestamp expire_at = 12;
 }
 
 message Job {
@@ -327,6 +330,7 @@ message Job {
     string query_name = 9;
     Acl acl = 10;
     bool automatic = 11;
+    google.protobuf.Timestamp expire_at = 12;
 }
 
 // Information about recent query runs
