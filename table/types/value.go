@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -133,19 +132,4 @@ func DictValue(pairs ...Value) Value {
 
 func VariantValue(v Value, i uint32, variantT Type) Value {
 	return value.VariantValue(v, i, variantT)
-}
-
-// Compare compares its operands.
-// It returns -1, 0, 1 if l < r, l == r, l > r. Returns error if types are not comparable.
-// Comparable types are all integer types, UUID, DyNumber, Float, Double, String, UTF8,
-// Date, Datetime, Timestamp, Tuples and Lists.
-// Primitive arguments are comparable if their types are the same.
-// Optional types is comparable to underlying types, e.g. Optional<Optional<Float>> is comparable to Float.
-// Null value is comparable to non-null value of the same types and is considered less than any non-null value.
-// Tuples and Lists are comparable if their elements are comparable.
-// Tuples and Lists are compared lexicographically. If tuples (lists) have different length and elements of the
-// shorter tuple (list) are all equal to corresponding elements of the other tuple (list), than the shorter tuple (list)
-// is considered less than the longer one.
-func Compare(l, r Value) (int, error) {
-	return cmp.Compare(l, r)
 }

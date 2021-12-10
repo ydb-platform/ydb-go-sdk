@@ -3,6 +3,7 @@ package dial
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 
 	"google.golang.org/grpc"
@@ -19,8 +20,14 @@ import (
 
 // Dial dials given addr and initializes driver instance on success.
 func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
+	if c.Endpoint() == "" {
+		return nil, fmt.Errorf("empty dial address")
+	}
+	if c.Database() == "" {
+		return nil, fmt.Errorf("empty database")
+	}
 	return (&dialer{
-		netDial:   c.NetDial(),
+		opts:      c.GrpcDialOptions(),
 		tlsConfig: c.TLSConfig(),
 		config:    c,
 		meta: meta.New(
@@ -34,7 +41,7 @@ func Dial(ctx context.Context, c config.Config) (_ public.Cluster, err error) {
 
 // dialer is an instance holding single Dialer.Dial() configuration parameters.
 type dialer struct {
-	netDial   func(context.Context, string) (net.Conn, error)
+	opts      []grpc.DialOption
 	tlsConfig *tls.Config
 	config    config.Config
 	meta      meta.Meta
@@ -74,23 +81,12 @@ func (d *dialer) dial(ctx context.Context, address string) (_ *grpc.ClientConn, 
 }
 
 func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
-	if d.netDial != nil {
-		opts = append(opts, grpc.WithContextDialer(d.netDial))
-	} else {
-		netDial := func(ctx context.Context, address string) (net.Conn, error) {
+	opts = append(
+		opts,
+		grpc.WithContextDialer(func(ctx context.Context, address string) (net.Conn, error) {
 			return newConn(ctx, address, d.config.Trace())
-		}
-		opts = append(opts, grpc.WithContextDialer(netDial))
-	}
-	if d.config.Secure() {
-		opts = append(opts, grpc.WithTransportCredentials(
-			credentials.NewTLS(d.tlsConfig),
-		))
-	} else {
-		opts = append(opts, grpc.WithInsecure())
-	}
-	opts = append(opts,
-		grpc.WithKeepaliveParams(d.config.GrpcConnectionPolicy().ClientParameters),
+		}),
+		grpc.WithKeepaliveParams(DefaultGrpcConnectionPolicy),
 		grpc.WithDefaultServiceConfig(`{
 			"loadBalancingConfig": [
 				{
@@ -99,11 +95,18 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 			],
 			"loadBalancingPolicy":"round_robin"
 		}`),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
+			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
+		),
+		grpc.WithBlock(),
 	)
-	opts = append(opts, grpc.WithDefaultCallOptions(
-		grpc.MaxCallRecvMsgSize(config.DefaultGRPCMsgSize),
-		grpc.MaxCallSendMsgSize(config.DefaultGRPCMsgSize),
-	))
-
-	return append(opts, grpc.WithBlock())
+	if d.config.Secure() {
+		opts = append(opts, grpc.WithTransportCredentials(
+			credentials.NewTLS(d.tlsConfig),
+		))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
+	}
+	return append(opts, d.opts...)
 }

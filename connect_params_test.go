@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestParseConnectionString(t *testing.T) {
@@ -55,10 +55,10 @@ func TestParseConnectionString(t *testing.T) {
 			if !errors.Is(err, test.error) {
 				t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
 			}
-			cmp.Equal(t, test.schema, schema)
-			cmp.Equal(t, test.endpoint, endpoint)
-			cmp.Equal(t, test.database, database)
-			cmp.Equal(t, test.token, token)
+			testutil.Equal(t, test.schema, schema)
+			testutil.Equal(t, test.endpoint, endpoint)
+			testutil.Equal(t, test.database, database)
+			testutil.Equal(t, test.token, token)
 		})
 	}
 }

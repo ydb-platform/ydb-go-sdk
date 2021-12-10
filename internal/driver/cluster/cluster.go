@@ -114,13 +114,25 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
+	defer cancel()
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	if c.closed {
 		return nil, ErrClusterClosed
 	}
-	onDone := trace.DriverOnClusterGet(c.trace, ctx)
+
+	onDone := trace.DriverOnClusterGet(c.trace, &ctx)
+	defer func() {
+		if err != nil {
+			onDone(nil, err)
+		} else {
+			onDone(conn.Endpoint(), nil)
+		}
+	}()
 	if e, ok := public.ContextEndpoint(ctx); ok {
 		if conn, ok = c.endpoints[e.NodeID()]; ok {
 			return conn, nil
@@ -129,10 +141,10 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 
 	conn = c.balancer.Next()
 	if conn == nil {
-		err = ErrClusterEmpty
+		return nil, ErrClusterEmpty
 	}
-	onDone(conn.Endpoint(), err)
-	return conn, err
+
+	return conn, nil
 }
 
 type optionsHolder struct {
@@ -171,13 +183,9 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	conn := conn.New(
-		e,
-		c.dial,
-		holder.connConfig,
-	)
+	conn := conn.New(e, c.dial, holder.connConfig)
 
-	onDone := trace.DriverOnClusterInsert(c.trace, ctx, e)
+	onDone := trace.DriverOnClusterInsert(c.trace, &ctx, e)
 	defer func() {
 		onDone(conn.GetState())
 	}()
@@ -205,7 +213,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 // Update updates existing connection's runtime stats such that load factor and others.
 func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...option) {
-	onDone := trace.DriverOnClusterUpdate(c.trace, ctx, e)
+	onDone := trace.DriverOnClusterUpdate(c.trace, &ctx, e)
 	holder := optionsHolder{}
 	for _, o := range opts {
 		o(&holder)
@@ -234,7 +242,6 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 	delete(c.endpoints, entry.Info.ID)
 	entry.Info = info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}
-	entry.Conn.SetState(ctx, state.Online)
 	c.index[e.Address()] = entry
 	if e.NodeID() > 0 {
 		c.endpoints[e.NodeID()] = entry.Conn
@@ -267,7 +274,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterRemove(c.trace, ctx, e)
+	onDone := trace.DriverOnClusterRemove(c.trace, &ctx, e)
 
 	entry.RemoveFrom(c.balancer)
 	delete(c.index, e.Address())

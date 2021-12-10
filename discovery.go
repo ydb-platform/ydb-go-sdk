@@ -41,7 +41,7 @@ func (d *lazyDiscovery) Close(ctx context.Context) error {
 func (d *lazyDiscovery) init() {
 	d.m.Lock()
 	if d.client == nil {
-		d.client = discovery.New(d.db, d.db.Name(), d.db.Secure(), d.trace)
+		d.client = discovery.New(d.db, d.db.Endpoint(), d.db.Name(), d.db.Secure(), d.trace)
 	}
 	d.m.Unlock()
 }

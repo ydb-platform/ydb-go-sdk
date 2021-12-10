@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestTable(t *testing.T) {
+func TestTraceTable(t *testing.T) {
 	testSingleTrace(t, Table{}, "Table")
 }
 

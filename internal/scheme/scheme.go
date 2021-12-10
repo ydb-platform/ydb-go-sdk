@@ -21,7 +21,7 @@ func (c *client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(c cluster.Cluster) scheme.Scheme {
+func New(c cluster.Cluster) scheme.Client {
 	return &client{
 		cluster: c,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(c),

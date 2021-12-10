@@ -15,7 +15,7 @@ type netConn struct {
 }
 
 func newConn(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err error) {
-	onDone := trace.DriverOnNetDial(t, address)
+	onDone := trace.DriverOnNetDial(t, &ctx, address)
 	defer func() {
 		onDone(err)
 	}()
