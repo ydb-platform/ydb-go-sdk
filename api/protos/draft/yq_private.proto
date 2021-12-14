@@ -25,11 +25,6 @@ message SignedIdentity {
     string signature = 2;
 }
 
-message SignedTimestamp {
-    uint64 value = 1;
-    uint64 signature = 2;
-}
-
 message TopicConsumer {
     string database_id = 1;
     string database = 2;
@@ -71,7 +66,7 @@ message GetTaskResult {
 
         bool automatic = 22;
         string query_name = 23;
-        SignedTimestamp deadline = 24;
+        google.protobuf.Timestamp deadline = 24;
     }
     repeated Task tasks = 1;
 }
@@ -102,7 +97,7 @@ message PingTaskRequest {
     string scope = 100; //TODO remove
     google.protobuf.Timestamp started_at = 101;
     google.protobuf.Timestamp finished_at = 102;
-    SignedTimestamp deadline = 103;
+    google.protobuf.Timestamp deadline = 103;
 }
 
 message PingTaskResult {
@@ -121,7 +116,7 @@ message WriteTaskResultRequest {
     uint64 offset = 5;
     uint64 request_id = 6;
     Ydb.Operations.OperationParams operation_params = 7;
-    SignedTimestamp deadline = 8;
+    google.protobuf.Timestamp deadline = 8;
 }
 
 message WriteTaskResultResult {
