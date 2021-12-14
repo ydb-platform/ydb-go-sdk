@@ -1,3 +1,6 @@
+## 2.11.0
+* Added possibility to override `x-ydb-database` metadata value
+
 ## 2.10.9
 * Fixed context cancellation inside repeater loop
 

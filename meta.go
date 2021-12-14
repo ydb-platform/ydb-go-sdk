@@ -22,12 +22,18 @@ type meta struct {
 	requestsType string
 }
 
+type MetaDatabaseCtxKey struct{}
+
 func (m *meta) md(ctx context.Context) (md metadata.MD, err error) {
 	var has bool
 	if md, has = metadata.FromOutgoingContext(ctx); !has {
 		md = metadata.MD{}
 	}
-	md.Set(metaDatabase, m.database)
+	database := m.database
+	if v, ok := ctx.Value(MetaDatabaseCtxKey{}).(string); ok {
+		database = v
+	}
+	md.Set(metaDatabase, database)
 	md.Set(metaVersion, Version)
 	if m.requestsType != "" {
 		md.Set(metaRequestType, m.requestsType)
