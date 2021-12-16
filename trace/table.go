@@ -58,14 +58,14 @@ type (
 	transactionInfo interface {
 		ID() string
 	}
-	result interface {
+	resultErr interface {
 		Err() error
 	}
 	streamResult interface {
-		result
+		resultErr
 	}
-	unaryResult interface {
-		result
+	result interface {
+		resultErr
 
 		ResultSetCount() int
 		TotalRowCount() int
@@ -129,7 +129,7 @@ type (
 	SessionQueryPrepareDoneInfo struct {
 		Tx       transactionInfo
 		Prepared bool
-		Result   unaryResult
+		Result   result
 		Error    error
 	}
 	SessionQueryStreamReadStartInfo struct {
@@ -237,7 +237,7 @@ type (
 	}
 	// PoolWaitDoneInfo means a wait iteration inside Get call is done
 	// Warning: Session and Error may be nil at the same time. This means
-	// that a wait iteration donned without any significant result
+	// that a wait iteration donned without any significant resultErr
 	PoolWaitDoneInfo struct {
 		Session sessionInfo
 		Error   error
