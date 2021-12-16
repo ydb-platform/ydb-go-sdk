@@ -254,7 +254,8 @@ type RawValue interface {
 	Err() error
 }
 
-// Scanner scanning non-primitive yql types
+// Scanner scanning raw ydb types
 type Scanner interface {
-	UnmarshalYDB(res RawValue) error
+	// UnmarshalYDB must be implemented on client-side for unmarshal raw ydb value.
+	UnmarshalYDB(raw RawValue) error
 }

@@ -914,7 +914,10 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 			s.errorf("sql.Scanner error: %w", err)
 		}
 	case types.Scanner:
-		// nothing to do
+		err := v.UnmarshalYDB(s.converter)
+		if err != nil {
+			s.errorf("ydb.Scanner error: %w", err)
+		}
 	default:
 		ok := s.trySetByteArray(v, false, true)
 		if !ok {
