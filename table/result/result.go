@@ -50,6 +50,10 @@ type result interface {
 	// ScanWithDefaults scan with default types values.
 	// Nil values applied as default value types
 	// Input params - pointers to types.
+	// If some value implements ydb.table.types.Scanner then will be called
+	// value.(ydb.table.types.Scanner).UnmarshalYDB(raw) where raw may be null.
+	// In this case client-side implementation UnmarshalYDB must check raw.IsNull() and
+	// applied default value or nothing to do
 	ScanWithDefaults(values ...interface{}) error
 
 	// Scan values.
