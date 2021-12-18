@@ -42,6 +42,9 @@ type TransactionSettings struct {
 }
 
 func (t *TransactionSettings) Settings() *Ydb_Table.TransactionSettings {
+	if t == nil {
+		return nil
+	}
 	return &t.settings
 }
 
@@ -161,6 +164,9 @@ type TransactionControl struct {
 }
 
 func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
+	if t == nil {
+		return nil
+	}
 	return &t.desc
 }
 
