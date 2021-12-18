@@ -38,6 +38,7 @@ type ConnectParams interface {
 	Database() string
 	Secure() bool
 	Token() string
+	String() string
 }
 
 type connectParams struct {
@@ -45,6 +46,18 @@ type connectParams struct {
 	database string
 	secure   bool
 	token    string
+}
+
+func (c connectParams) String() (uri string) {
+	uri += "grpc"
+	if c.secure {
+		uri += "s"
+	}
+	uri += "://" + c.endpoint + "/?database=" + c.database
+	if c.token != "" {
+		uri += "&token=" + c.token
+	}
+	return uri
 }
 
 func (c connectParams) Endpoint() string {

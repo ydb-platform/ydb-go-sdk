@@ -15,6 +15,7 @@
 * Added helpers `MakePath` and `CleanPath` to root of package `ydb-go-sdk`
 * Removed call `types.Scanner.UnmarshalYDB()` inside `scanner.setDefaults()` 
 * Added `DoTx()` API method into `table.Client`
+* Added `String()` method into `ConnectParams` for serialize params to connection string 
 
 ## 3.4.4
 * Prefer `ydb.table.types.Scanner` scanner implementation over `sql.Scanner`, when both available.
