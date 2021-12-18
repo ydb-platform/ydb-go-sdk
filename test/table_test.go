@@ -404,12 +404,12 @@ func Quet() {
 }
 
 func Prepare(ctx context.Context, db ydb.Connection) error {
-	err := sugar.RmPath(ctx, db, "")
+	err := sugar.RmPath(ctx, db, "/", "series", "seasons", "episodes")
 	if err != nil {
 		return fmt.Errorf("cleaunup database failed: %w", err)
 	}
 
-	err = sugar.MakePath(ctx, db, "")
+	err = sugar.MakePath(ctx, db, "/")
 	if err != nil {
 		return fmt.Errorf("ensure path exists failed: %w", err)
 	}
