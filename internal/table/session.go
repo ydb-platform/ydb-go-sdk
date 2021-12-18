@@ -841,6 +841,8 @@ type Transaction struct {
 	id string
 	s  *session
 	c  *table.TransactionControl
+
+	committed bool
 }
 
 func (tx *Transaction) ID() string {
@@ -873,6 +875,14 @@ func (tx *Transaction) ExecuteStatement(
 
 // CommitTx commits specified active transaction.
 func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r result.Result, err error) {
+	if tx.committed {
+		return nil, errors.ErrAlreadyCommited
+	}
+	defer func() {
+		if err == nil {
+			tx.committed = true
+		}
+	}()
 	onDone := trace.TableOnSessionTransactionCommit(tx.s.trace, &ctx, tx.s, tx)
 	defer func() {
 		onDone(err)
@@ -904,6 +914,9 @@ func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTrans
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *Transaction) Rollback(ctx context.Context) (err error) {
+	if tx.committed {
+		return nil
+	}
 	onDone := trace.TableOnSessionTransactionRollback(tx.s.trace, &ctx, tx.s, tx)
 	defer func() {
 		onDone(err)
