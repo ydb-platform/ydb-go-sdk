@@ -3,7 +3,6 @@ package balancer
 import (
 	"container/heap"
 	"math"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 )
 
 // roundRobin is an implementation of weighted round-robin balancing algorithm.
@@ -28,7 +28,6 @@ type roundRobin struct {
 
 type randomChoice struct {
 	roundRobin
-	r *rand.Rand // without seed by default
 	m sync.Mutex
 }
 
@@ -46,7 +45,7 @@ func (r *randomChoice) Next() conn.Conn {
 		return nil
 	}
 	r.m.Lock()
-	i := r.belt[r.r.Intn(len(r.belt))]
+	i := r.belt[rand.Int(len(r.belt))]
 	r.m.Unlock()
 	return r.conns[i].Conn
 }

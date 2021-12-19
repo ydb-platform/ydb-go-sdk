@@ -181,7 +181,7 @@ func WithCertificatesFromFile(caFile string) Option {
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
-		bytes, err := os.ReadFile(caFile)
+		bytes, err := os.ReadFile(filepath.Clean(caFile))
 		if err != nil {
 			return err
 		}
