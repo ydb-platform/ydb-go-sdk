@@ -17,6 +17,8 @@
 * Added `DoTx()` API method into `table.Client`
 * Added `String()` method into `ConnectParams` for serialize params to connection string
 * Added early exit from Rollback for committed transaction
+* Moved `HasNextResultSet()` method from `Result` interface to common `result` interface.
+  It provides access to `HasNextResultSet()` on both result interfaces (unary and stream results)
 
 ## 3.4.4
 * Prefer `ydb.table.types.Scanner` scanner implementation over `sql.Scanner`, when both available.

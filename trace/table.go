@@ -66,9 +66,7 @@ type (
 	}
 	result interface {
 		resultErr
-
 		ResultSetCount() int
-		TotalRowCount() int
 	}
 	SessionNewStartInfo struct {
 		// Context make available context in trace callback function.
