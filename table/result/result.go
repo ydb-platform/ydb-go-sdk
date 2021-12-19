@@ -29,6 +29,12 @@ import (
 // After that, NextResultSet(), NextRow() will return false.
 type result interface {
 
+	// HasNextResultSet reports whether result set may be advanced.
+	// It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
+	// without advancing the result set.
+	// Note that it does not work with sets from stream.
+	HasNextResultSet() bool
+
 	// NextResultSet selects next result set in the result.
 	// columns - names of columns in the resultSet that will be scanned
 	// It returns false if there are no more result sets.
@@ -99,19 +105,9 @@ type result interface {
 type Result interface {
 	result
 
-	// HasNextResultSet reports whether result set may be advanced.
-	// It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
-	// without advancing the result set.
-	// Note that it does not work with sets from stream.
-	HasNextResultSet() bool
-
 	// ResultSetCount returns number of result sets.
 	// Note that it does not work if r is the result of streaming operation.
 	ResultSetCount() int
-
-	// TotalRowCount returns the number of rows among the all result sets.
-	// Note that it does not work if r is the result of streaming operation.
-	TotalRowCount() int
 }
 
 type StreamResult interface {
