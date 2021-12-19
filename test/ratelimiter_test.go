@@ -1,5 +1,5 @@
-//go:build integration
-// +build integration
+//go:build !fast
+// +build !fast
 
 package test
 
