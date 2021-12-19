@@ -43,13 +43,6 @@ func (r *unaryResult) ResultSetCount() int {
 	return len(r.sets)
 }
 
-func (r *unaryResult) TotalRowCount() (n int) {
-	for _, s := range r.sets {
-		n += len(s.Rows)
-	}
-	return
-}
-
 func (r *result) isClosed() bool {
 	r.closedMtx.RLock()
 	defer r.closedMtx.RUnlock()
