@@ -3,10 +3,10 @@ package retry
 import (
 	"context"
 	"math"
-	"math/rand"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -155,7 +155,7 @@ func (b logBackoff) delay(i int) time.Duration {
 	if f == d {
 		return f
 	}
-	return f + time.Duration(rand.Intn(int(d-f)+1))
+	return f + time.Duration(rand.Int64(int64(d-f)+1))
 }
 
 func min(a, b uint) uint {

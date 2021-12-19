@@ -2,8 +2,6 @@ package balancer
 
 import (
 	"errors"
-	"math/rand"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
@@ -48,9 +46,7 @@ type Balancer interface {
 }
 
 func defaultBalancer() Balancer {
-	return &randomChoice{
-		r: rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
+	return &randomChoice{}
 }
 
 func newBalancer(cfg config.BalancerConfig) Balancer {
@@ -58,9 +54,7 @@ func newBalancer(cfg config.BalancerConfig) Balancer {
 	case config.BalancingAlgorithmRoundRobin:
 		return &roundRobin{}
 	case config.BalancingAlgorithmRandomChoice:
-		return &randomChoice{
-			r: rand.New(rand.NewSource(time.Now().UnixNano())),
-		}
+		return &randomChoice{}
 	default:
 		return defaultBalancer()
 	}
