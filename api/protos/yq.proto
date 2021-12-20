@@ -5,7 +5,8 @@ package YandexQuery;
 option java_package = "com.yandex.query";
 option java_outer_classname = "YandexQueryProtos";
 
-import "kikimr/public/api/protos/validation/validation.proto";
+import "kikimr/public/api/protos/annotations/sensitive.proto";
+import "kikimr/public/api/protos/annotations/validation.proto";
 import "kikimr/public/api/protos/ydb_operation.proto";
 import "kikimr/public/api/protos/ydb_value.proto";
 import "kikimr/public/api/protos/ydb_issue_message.proto";
@@ -418,8 +419,8 @@ message YdbDatabase {
 
 message ClickHouseCluster {
     string database_id = 1 [(Ydb.length).le = 1024];
-    string login = 2 [(Ydb.length).le = 1024];
-    string password = 3 [(Ydb.length).le = 1024];
+    string login = 2 [(Ydb.length).le = 1024, (Ydb.sensitive) = true];
+    string password = 3 [(Ydb.length).le = 1024, (Ydb.sensitive) = true];
     IamAuth auth = 4;
 
     // for internal usage

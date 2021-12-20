@@ -4,7 +4,7 @@ option cc_enable_arenas = true;
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 
-import "kikimr/public/api/protos/validation/validation.proto";
+import "kikimr/public/api/protos/annotations/validation.proto";
 import "kikimr/public/api/protos/ydb_common.proto";
 import "kikimr/public/api/protos/ydb_issue_message.proto";
 import "kikimr/public/api/protos/ydb_status_codes.proto";

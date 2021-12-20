@@ -3,7 +3,7 @@ import "kikimr/public/api/protos/ydb_operation.proto";
 import "kikimr/public/api/protos/ydb_scheme.proto";
 import "kikimr/public/api/protos/ydb_status_codes.proto";
 import "kikimr/public/api/protos/ydb_issue_message.proto";
-import "kikimr/public/api/protos/validation/validation.proto";
+import "kikimr/public/api/protos/annotations/validation.proto";
 
 package Ydb.PersQueue.V1;
 
