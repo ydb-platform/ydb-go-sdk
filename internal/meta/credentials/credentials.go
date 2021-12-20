@@ -40,9 +40,9 @@ type AccessTokenCredentials struct {
 	sourceInfo string
 }
 
-func NewAccessTokenCredentials(AccessToken string, sourceInfo string) *AccessTokenCredentials {
+func NewAccessTokenCredentials(accessToken string, sourceInfo string) *AccessTokenCredentials {
 	return &AccessTokenCredentials{
-		AccessToken: AccessToken,
+		AccessToken: accessToken,
 		sourceInfo:  sourceInfo,
 	}
 }
