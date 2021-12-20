@@ -12,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -21,7 +20,7 @@ type Option func(ctx context.Context, db *db) error
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
-		internal.NewAccessTokenCredentials(accessToken, "ydb.WithAccessTokenCredentials(accessToken)"), // hide access token for logs
+		credentials.NewAccessTokenCredentials(accessToken, credentials.WithSourceInfo("ydb.WithAccessTokenCredentials(accessToken)")), // hide access token for logs
 	)
 }
 
@@ -100,7 +99,7 @@ func WithConnectParams(params ConnectParams) Option {
 		db.options = append(db.options, config.WithDatabase(params.Database()))
 		db.options = append(db.options, config.WithSecure(params.Secure()))
 		if params.Token() != "" {
-			db.options = append(db.options, config.WithCredentials(internal.NewAccessTokenCredentials(params.Token(), "config.WithConnectParams()")))
+			db.options = append(db.options, config.WithCredentials(credentials.NewAccessTokenCredentials(params.Token(), credentials.WithSourceInfo("config.WithConnectParams()"))))
 		}
 		return nil
 	}
@@ -108,7 +107,7 @@ func WithConnectParams(params ConnectParams) Option {
 
 func WithAnonymousCredentials() Option {
 	return WithCredentials(
-		internal.NewAnonymousCredentials("ydb.WithAnonymousCredentials()"),
+		credentials.NewAnonymousCredentials(credentials.WithSourceInfo("ydb.WithAnonymousCredentials()")),
 	)
 }
 
