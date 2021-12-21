@@ -122,7 +122,7 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 	}
 	select {
 	case s, ok := <-r.ch:
-		if !ok {
+		if !ok || s == nil {
 			return false
 		}
 		r.Reset(s, columns...)

@@ -14,7 +14,7 @@ import (
 
 // MakePath creates path inside database
 func MakePath(ctx context.Context, db ydb.Connection, path string) error {
-	for i := 0; i < len(path); i++ {
+	for i := len(db.Name()) + 1; i < len(path); i++ {
 		x := strings.IndexByte(path[i:], '/')
 		if x == -1 {
 			x = len(path[i:]) - 1
@@ -22,8 +22,8 @@ func MakePath(ctx context.Context, db ydb.Connection, path string) error {
 		i += x
 		sub := path[:i+1]
 		info, err := db.Scheme().DescribePath(ctx, sub)
-		operr, ok := err.(*errors.OpError)
-		if ok && operr.Reason == errors.StatusSchemeError {
+		opErr, ok := err.(*errors.OpError)
+		if ok && opErr.Reason == errors.StatusSchemeError {
 			err = db.Scheme().MakeDirectory(ctx, sub)
 		}
 		if err != nil {

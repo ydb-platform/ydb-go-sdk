@@ -699,6 +699,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 		defer func() {
 			cancel()
 			onDone(r, errors.HideEOF(err))
+			r.Append(nil)
 		}()
 		for {
 			select {
@@ -765,6 +766,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 		defer func() {
 			cancel()
 			onDone(r, errors.HideEOF(err))
+			r.Append(nil)
 		}()
 		for {
 			select {
