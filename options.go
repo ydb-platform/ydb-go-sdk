@@ -149,6 +149,17 @@ func With(options ...config.Option) Option {
 	}
 }
 
+func MergeOptions(options ...Option) Option {
+	return func(ctx context.Context, db *db) error {
+		for _, o := range options {
+			if err := o(ctx, db); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, db *db) error {
 		db.options = append(db.options, config.WithDiscoveryInterval(discoveryInterval))

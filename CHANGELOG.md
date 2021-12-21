@@ -1,3 +1,9 @@
+## 3.5.1
+* Added system certificates for `darwin` system
+* Fixed `table.StreamResult` finishing
+* Fixes `sugar.MakePath()`
+* Added helper `ydb.MergeOptions()` for merge several `ydb.Option` to single `ydb.Option`
+
 ## 3.5.0
 * Added `ClosabelSession` interface which extends `Session` interface and provide `Close` method
 * Added `CreateSession` method into `table.Client` interface

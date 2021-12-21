@@ -3,7 +3,6 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"runtime"
 	"time"
 
 	"google.golang.org/grpc"
@@ -288,12 +287,8 @@ func defaults() (c *config) {
 		certPool *x509.CertPool
 		err      error
 	)
-	if runtime.GOOS != "darwin" {
-		certPool, err = x509.SystemCertPool()
-		if err != nil {
-			certPool = x509.NewCertPool()
-		}
-	} else {
+	certPool, err = x509.SystemCertPool()
+	if err != nil {
 		certPool = x509.NewCertPool()
 	}
 	return &config{
