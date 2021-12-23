@@ -144,6 +144,9 @@ message ColumnFamilyPolicy {
     // Storage settings for the column group (default to values in storage policy)
     StoragePool data = 2;
     StoragePool external = 3;
+
+    // When enabled table data will be kept in memory
+    // WARNING: DO NOT USE
     Ydb.FeatureFlag.Status keep_in_memory = 4;
 
     // Optionally specify whether data should be compressed
@@ -318,7 +321,8 @@ message StorageSettings {
     StoragePool external = 4;
 
     // Optionally store large values in "external blobs"
-    // Don't use unless required, restrictions apply:
+    // WARNING: DO NOT USE
+    // This feature is experimental and should not be used, restrictions apply:
     // * Table cannot split/merge when this is enabled
     // * Table cannot be copied or backed up when this is enabled
     // * This feature cannot be disabled once enabled for a table
@@ -342,7 +346,8 @@ message ColumnFamily {
     // Optionally specify how data should be compressed
     Compression compression = 3;
 
-    // When enabled keeps data pages in memory
+    // When enabled table data will be kept in memory
+    // WARNING: DO NOT USE
     Ydb.FeatureFlag.Status keep_in_memory = 4;
 }
 

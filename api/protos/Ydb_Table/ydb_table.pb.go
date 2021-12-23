@@ -1139,8 +1139,10 @@ type ColumnFamilyPolicy struct {
 	// primary column family that contains as least primary key columns
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Storage settings for the column group (default to values in storage policy)
-	Data         *StoragePool           `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	External     *StoragePool           `protobuf:"bytes,3,opt,name=external,proto3" json:"external,omitempty"`
+	Data     *StoragePool `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	External *StoragePool `protobuf:"bytes,3,opt,name=external,proto3" json:"external,omitempty"`
+	// When enabled table data will be kept in memory
+	// WARNING: DO NOT USE
 	KeepInMemory Ydb.FeatureFlag_Status `protobuf:"varint,4,opt,name=keep_in_memory,json=keepInMemory,proto3,enum=Ydb.FeatureFlag_Status" json:"keep_in_memory,omitempty"`
 	// Optionally specify whether data should be compressed
 	Compression          ColumnFamilyPolicy_Compression `protobuf:"varint,5,opt,name=compression,proto3,enum=Ydb.Table.ColumnFamilyPolicy_Compression" json:"compression,omitempty"`
@@ -2025,7 +2027,8 @@ type StorageSettings struct {
 	// This specifies external blobs storage pool
 	External *StoragePool `protobuf:"bytes,4,opt,name=external,proto3" json:"external,omitempty"`
 	// Optionally store large values in "external blobs"
-	// Don't use unless required, restrictions apply:
+	// WARNING: DO NOT USE
+	// This feature is experimental and should not be used, restrictions apply:
 	// * Table cannot split/merge when this is enabled
 	// * Table cannot be copied or backed up when this is enabled
 	// * This feature cannot be disabled once enabled for a table
@@ -2096,7 +2099,8 @@ type ColumnFamily struct {
 	Data *StoragePool `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	// Optionally specify how data should be compressed
 	Compression ColumnFamily_Compression `protobuf:"varint,3,opt,name=compression,proto3,enum=Ydb.Table.ColumnFamily_Compression" json:"compression,omitempty"`
-	// When enabled keeps data pages in memory
+	// When enabled table data will be kept in memory
+	// WARNING: DO NOT USE
 	KeepInMemory         Ydb.FeatureFlag_Status `protobuf:"varint,4,opt,name=keep_in_memory,json=keepInMemory,proto3,enum=Ydb.FeatureFlag_Status" json:"keep_in_memory,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
 	XXX_unrecognized     []byte                 `json:"-"`

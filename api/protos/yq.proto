@@ -256,6 +256,7 @@ message GetQueryStatusResponse {
 
 message GetQueryStatusResult {
     QueryMeta.ComputeStatus status = 1;
+    int64 meta_revision = 2;
 }
 
 // Complete removal of query. Recovery of the query after this operation is not possible
