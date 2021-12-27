@@ -55,7 +55,7 @@ func (s *stats) check(t *testing.T) {
 		t.Fatalf("min > in_flight (%d > %d)", s.min, s.inFlight)
 	}
 	if s.inFlight > s.balance {
-		t.Fatalf("in_flight > max (%d > %d)", s.inFlight, s.max)
+		t.Fatalf("in_flight > balance (%d > %d)", s.inFlight, s.balance)
 	}
 	if s.balance > s.max {
 		t.Fatalf("balance > max (%d > %d)", s.balance, s.max)
