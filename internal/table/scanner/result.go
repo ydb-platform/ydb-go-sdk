@@ -129,9 +129,11 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 		return true
 
 	case <-ctx.Done():
+		r.errMtx.Lock()
 		if r.err == nil {
 			r.err = ctx.Err()
 		}
+		r.errMtx.Unlock()
 		r.Reset(nil)
 		return false
 	}
@@ -153,6 +155,8 @@ func (r *result) Stats() stats.QueryStats {
 
 // Close closes the result, preventing further iteration.
 func (r *result) Close() error {
+	r.closedMtx.Lock()
+	defer r.closedMtx.Unlock()
 	if r.closed {
 		return errAlreadyClosed
 	}

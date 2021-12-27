@@ -1,3 +1,6 @@
+## 3.5.2
+* Fixed data race on closing table result
+
 ## 3.5.1
 * Added system certificates for `darwin` system
 * Fixed `table.StreamResult` finishing

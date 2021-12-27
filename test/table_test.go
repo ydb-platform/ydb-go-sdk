@@ -169,8 +169,8 @@ func TestPoolHealth(t *testing.T) {
 				}
 			},
 			OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
+				s.addInFlight(t, -1)
 				return func(info trace.PoolPutDoneInfo) {
-					s.addInFlight(t, -1)
 				}
 			},
 		}),
