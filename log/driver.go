@@ -103,6 +103,42 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 	if details&trace.DriverCoreEvents != 0 {
 		//nolint: govet
 		log := log.WithName(`core`)
+		t.OnInit = func(info trace.InitStartInfo) func(trace.InitDoneInfo) {
+			log.Infof(`init start`)
+			start := time.Now()
+			return func(info trace.InitDoneInfo) {
+				if info.Error == nil {
+					log.Infof(
+						`init done {latency:"%s"}`,
+						time.Since(start),
+					)
+				} else {
+					log.Warnf(
+						`init failed {latency:"%s",error:"%s"}`,
+						time.Since(start),
+						info.Error,
+					)
+				}
+			}
+		}
+		t.OnClose = func(info trace.CloseStartInfo) func(trace.CloseDoneInfo) {
+			log.Infof(`close start`)
+			start := time.Now()
+			return func(info trace.CloseDoneInfo) {
+				if info.Error == nil {
+					log.Infof(
+						`close done {latency:"%s"}`,
+						time.Since(start),
+					)
+				} else {
+					log.Warnf(
+						`close failed {latency:"%s",error:"%s"}`,
+						time.Since(start),
+						info.Error,
+					)
+				}
+			}
+		}
 		t.OnConnTake = func(info trace.ConnTakeStartInfo) func(trace.ConnTakeDoneInfo) {
 			address := info.Endpoint.Address()
 			local := info.Endpoint.LocalDC()

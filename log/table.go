@@ -362,7 +362,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 				log.Infof(`close start`)
 				start := time.Now()
 				return func(info trace.PoolCloseDoneInfo) {
-					if info.Error != nil {
+					if info.Error == nil {
 						log.Infof(`close done {latency:"%s"}`,
 							time.Since(start),
 						)
