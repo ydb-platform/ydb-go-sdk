@@ -118,7 +118,7 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 	timer.C <- timeutil.Now()
 	<-done
 
-	// Return build to wake up the keeper.
+	// Return session to wake up the keeper.
 	mustPutSession(t, p, s)
 	<-timer.Reset
 
@@ -192,18 +192,18 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			}()
 
 			regWait := whenWantWaitCh(p)
-			<-get     // Await for getter blocked on awaiting build.
+			<-get     // Await for getter blocked on awaiting session.
 			<-regWait // Let the getter register itself in the wait queue.
 
 			if test.racy {
-				// We are testing the case, when build consumer registered
+				// We are testing the case, when session consumer registered
 				// himself in the wait queue, but not ready to receive the
-				// build when build arrives (that is, stuck between
+				// session when session arrives (that is, stuck between
 				// pushing channel in the list and reading from the channel).
 				_ = p.Close(context.Background())
 				<-wait
 			} else {
-				// We are testing the normal case, when build consumer registered
+				// We are testing the normal case, when session consumer registered
 				// himself in the wait queue and successfully blocked on
 				// reading from signaling channel.
 				<-wait
@@ -287,7 +287,7 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatalf("session2 was not closed")
 	}
 	if closed3 {
-		t.Fatalf("unexpected build close")
+		t.Fatalf("unexpected session close")
 	}
 
 	if err := p.Put(context.Background(), s3); err != ErrSessionPoolClosed {
@@ -299,7 +299,7 @@ func TestSessionPoolClose(t *testing.T) {
 	wg.Wait()
 
 	if !closed3 {
-		t.Fatalf("build was not closed")
+		t.Fatalf("session was not closed")
 	}
 }
 
@@ -361,18 +361,18 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 			}()
 
 			regWait := whenWantWaitCh(p)
-			<-get     // Await for getter blocked on awaiting build.
+			<-get     // Await for getter blocked on awaiting session.
 			<-regWait // Let the getter register itself in the wait queue.
 
 			if test.racy {
-				// We are testing the case, when build consumer registered
+				// We are testing the case, when session consumer registered
 				// himself in the wait queue, but not ready to receive the
-				// build when build arrives (that is, it was stucked between
+				// session when session arrives (that is, it was stucked between
 				// pushing channel in the list and reading from the channel).
 				_ = s.Close(context.Background())
 				<-wait
 			} else {
-				// We are testing the normal case, when build consumer registered
+				// We are testing the normal case, when session consumer registered
 				// himself in the wait queue and successfully blocked on
 				// reading from signaling channel.
 				<-wait
@@ -433,7 +433,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 				return
 			}
 			if s != expSession {
-				err = fmt.Errorf("unexpected build: %v; want %v", s, expSession)
+				err = fmt.Errorf("unexpected session: %v; want %v", s, expSession)
 				return
 			}
 			mustPutSession(t, p, s)
@@ -446,23 +446,23 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	r1 := <-create
 	select {
 	case <-create:
-		t.Fatalf("build 2 on race created while client size 1")
+		t.Fatalf("session 2 on race created while client size 1")
 	case <-time.After(time.Millisecond * 5):
 		// ok
 	}
 
-	// Release the first create build request.
-	// Created build must be stored in the client.
+	// Release the first create session request.
+	// Created session must be stored in the client.
 	expSession = r1.session
 	expSession.OnClose(func(context.Context) {
-		t.Fatalf("unexpected first build close")
+		t.Fatalf("unexpected first session close")
 	})
 	close(r1.release)
 
-	// Wait for r1's build will be stored in the client.
+	// Wait for r1's session will be stored in the client.
 	<-done
 
-	// Ensure that build is in the client.
+	// Ensure that session is in the client.
 	s := mustGetSession(t, p)
 	mustPutSession(t, p, s)
 }
@@ -484,11 +484,11 @@ func TestSessionPoolPutInFull(t *testing.T) {
 	)
 	s := mustGetSession(t, p)
 	if err := p.Put(context.Background(), s); err != nil {
-		t.Fatalf("unexpected error on put build into non-full client: %v, wand: %v", err, nil)
+		t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
 	}
 
 	if err := p.Put(context.Background(), simpleSession(t)); err != ErrSessionPoolOverflow {
-		t.Fatalf("unexpected error on put build into full client: %v, wand: %v", err, ErrSessionPoolOverflow)
+		t.Fatalf("unexpected error on put session into full client: %v, wand: %v", err, ErrSessionPoolOverflow)
 	}
 }
 
@@ -563,18 +563,18 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			}()
 
 			regWait := whenWantWaitCh(p)
-			<-get     // Await for getter blocked on awaiting build.
+			<-get     // Await for getter blocked on awaiting session.
 			<-regWait // Let the getter register itself in the wait queue.
 
 			if test.racy {
-				// We are testing the case, when build consumer registered
+				// We are testing the case, when session consumer registered
 				// himself in the wait queue, but not ready to receive the
-				// build when build arrives (that is, it was stucked between
+				// session when session arrives (that is, it was stucked between
 				// pushing channel in the list and reading from the channel).
 				_ = p.Put(context.Background(), s)
 				<-wait
 			} else {
-				// We are testing the normal case, when build consumer registered
+				// We are testing the normal case, when session consumer registered
 				// himself in the wait queue and successfully blocked on
 				// reading from signaling channel.
 				<-wait
@@ -589,16 +589,16 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 					t.Fatal(se.err)
 				}
 				if se.session != s {
-					t.Fatalf("unexpected build")
+					t.Fatalf("unexpected session")
 				}
 			case <-time.After(timeout):
-				t.Fatalf("no build after %s", timeout)
+				t.Fatalf("no session after %s", timeout)
 			}
 		})
 	}
 }
 
-// TestSessionPoolGetDisconnected tests case when build successfully created,
+// TestSessionPoolGetDisconnected tests case when session successfully created,
 // but after that connection become broken and cannot be reestablished.
 func TestSessionPoolGetDisconnected(t *testing.T) {
 	timer := timetest.StubSingleTimer(t)
@@ -654,7 +654,7 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 	timer.C <- timeutil.Now()
 	<-keepalive
 
-	// Here we are in touching state. That is, there are no build in the client
+	// Here we are in touching state. That is, there are no session in the client
 	// – it is removed for keepalive operation.
 	//
 	// We expect that Get() method will fail on ctx cancellation.
@@ -666,10 +666,10 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if x != nil {
-		t.Fatalf("obtained unexpected build")
+		t.Fatalf("obtained unexpected session")
 	}
 
-	// Release build s – connection established.
+	// Release session s – connection established.
 	release <- struct{}{}
 	<-timer.Reset
 	<-touched // Wait until first keep alive loop finished.
@@ -690,10 +690,10 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if took {
-		t.Fatalf("unexpected take over build")
+		t.Fatalf("unexpected take over session")
 	}
 
-	// Release build s to not block on defer p.Close().
+	// Release session s to not block on defer p.Close().
 	release <- struct{}{}
 	<-timer.Reset
 }
@@ -856,11 +856,11 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 		t.Fatal("unexpected number of keepalives")
 	}
 
-	// Now get first build and "spent" some time working within it.
+	// Now get first session and "spent" some time working within it.
 	x := mustGetSession(t, p)
 	shiftTime(idleThreshold / 2)
 
-	// Now put that build back and emulate keepalive moment.
+	// Now put that session back and emulate keepalive moment.
 	mustPutSession(t, p, x)
 	shiftTime(idleThreshold / 2)
 	// We expect here next tick to be registered after half of a idleThreshold.
@@ -1023,7 +1023,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	<-timer.Created
 
 	// Now the most interesting and delicate part: we want to emulate a race
-	// condition between awaiting the build by touchCond() call and build
+	// condition between awaiting the session by touchCond() call and session
 	// deletion after failed Keepalive().
 	//
 	// So first step is to force keepalive. Note that we do not send keepalive
@@ -1057,7 +1057,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	<-deleteSession
 	assertFilled(false)
 
-	// Complete the build deletion routine. After that cond must become
+	// Complete the session deletion routine. After that cond must become
 	// fulfilled.
 	deleteSessionResult <- nil
 	assertFilled(true)
@@ -1131,7 +1131,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 
 	s := mustGetSession(t, p)
 	if s != s3 {
-		t.Fatalf("build is not reused")
+		t.Fatalf("session is not reused")
 	}
 	_ = s.Close(context.Background())
 	<-c3
@@ -1222,10 +1222,10 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	shiftTime(p.config.IdleThreshold())
 	timer.C <- timeutil.Now()
 	<-timer.Reset
-	//get first build
+	//get first session
 	s1 := mustGetSession(t, p)
 	if s2 == s1 {
-		t.Fatalf("retry build is not returned")
+		t.Fatalf("retry session is not returned")
 	}
 	mustPutSession(t, p, s1)
 	//keepalive success
@@ -1233,10 +1233,10 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	timer.C <- timeutil.Now()
 	<-timer.Reset
 
-	// get retry build
+	// get retry session
 	s1 = mustGetSession(t, p)
 	if s == s1 {
-		t.Fatalf("second build is not returned")
+		t.Fatalf("second session is not returned")
 	}
 }
 
@@ -1335,7 +1335,7 @@ func mustTakeSession(t *testing.T, p *client, s Session) {
 	)
 	if !took {
 		t.Helper()
-		t.Fatalf("%s: can not take build (%v)", caller(), err)
+		t.Fatalf("%s: can not take session (%v)", caller(), err)
 	}
 }
 
@@ -1461,7 +1461,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session Session, err e
 	s.mu.Lock()
 	if s.Limit > 0 && s.actual == s.Limit {
 		s.mu.Unlock()
-		return nil, fmt.Errorf("stub build: limit overflow")
+		return nil, fmt.Errorf("stub session: limit overflow")
 	}
 	s.mu.Unlock()
 

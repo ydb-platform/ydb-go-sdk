@@ -103,12 +103,12 @@ func TestRetryerBadSession(t *testing.T) {
 	seen := make(map[table.Session]bool, len(sessions))
 	for _, s := range sessions {
 		if seen[s] {
-			t.Errorf("build used twice")
+			t.Errorf("session used twice")
 		} else {
 			seen[s] = true
 		}
 		if !closed[s] {
-			t.Errorf("bad build was not closed")
+			t.Errorf("bad session was not closed")
 		}
 	}
 }

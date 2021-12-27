@@ -78,6 +78,7 @@ func (s *stats) addBalance(t *testing.T, delta int) {
 	defer s.check(t)
 	s.Lock()
 	s.balance += delta
+	fmt.Println("balance:", s.balance-delta, "+", delta, "=", s.balance, "inFlight:", s.inFlight)
 	s.Unlock()
 }
 
@@ -85,6 +86,7 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 	defer s.check(t)
 	s.Lock()
 	s.inFlight += delta
+	fmt.Println("inFlight:", s.inFlight-delta, "+", delta, "=", s.inFlight, "balance:", s.balance)
 	s.Unlock()
 }
 
@@ -138,7 +140,7 @@ func TestPoolHealth(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.TRACE),
+			ydb.WithMinLevel(ydb.DEBUG),
 		),
 		ydb.WithTraceTable(trace.Table{
 			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
@@ -169,8 +171,13 @@ func TestPoolHealth(t *testing.T) {
 				}
 			},
 			OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
-				s.addInFlight(t, -1)
 				return func(info trace.PoolPutDoneInfo) {
+					s.addInFlight(t, -1)
+				}
+			},
+			OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
+				return func(info trace.PoolSessionCloseDoneInfo) {
+					s.addInFlight(t, -1)
 				}
 			},
 		}),
@@ -180,7 +187,9 @@ func TestPoolHealth(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = db.Close(ctx)
+		if e := db.Close(ctx); e != nil {
+			t.Fatalf("db close failed: %+v", e)
+		}
 	}()
 
 	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
@@ -206,22 +215,16 @@ func TestPoolHealth(t *testing.T) {
 	wg := sync.WaitGroup{}
 	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
-		t.Run("", func(t *testing.T) {
+		go func(t *testing.T) {
 			defer wg.Done()
 			for {
-				err := Select(ctx, db)
-				if err != nil {
-					if ctx.Err() != nil {
-						return
-					}
-					t.Fatalf("select error: %v\n", err)
-				}
+				Select(ctx, db, t)
 			}
-		})
+		}(t)
 	}
 
 	wg.Add(1)
-	go func() {
+	go func(t *testing.T) {
 		defer wg.Done()
 		for {
 			select {
@@ -231,7 +234,7 @@ func TestPoolHealth(t *testing.T) {
 				s.check(t)
 			}
 		}
-	}()
+	}(t)
 
 	wg.Wait()
 }
@@ -432,23 +435,21 @@ func Prepare(ctx context.Context, db ydb.Connection) error {
 	return nil
 }
 
-func Select(ctx context.Context, db ydb.Connection) error {
+func Select(ctx context.Context, db ydb.Connection, t *testing.T) {
 	err := selectSimple(ctx, db.Table(), db.Name())
 	if err != nil {
-		return fmt.Errorf("select simple error: %w", err)
+		t.Fatalf("select simple error: %+v", err)
 	}
 
 	err = scanQuerySelect(ctx, db.Table(), db.Name())
 	if err != nil {
-		return fmt.Errorf("scan query error: %w", err)
+		t.Fatalf("scan query error: %+v", err)
 	}
 
 	err = readTable(ctx, db.Table(), path.Join(db.Name(), "series"))
 	if err != nil {
-		return fmt.Errorf("read table error: %w", err)
+		t.Fatalf("read table error: %+v", err)
 	}
-
-	return nil
 }
 
 type templateConfig struct {

@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -54,4 +55,31 @@ func Is(err, target error) bool {
 // This need to single import errors
 func New(text string) error {
 	return errors.New(text)
+}
+
+// NewWithIssues returns error which contains child issues
+func NewWithIssues(text string, issues ...error) error {
+	return &errorWithIssues{
+		reason: text,
+		issues: issues,
+	}
+}
+
+type errorWithIssues struct {
+	reason string
+	issues []error
+}
+
+func (e *errorWithIssues) Error() string {
+	var b bytes.Buffer
+	b.WriteString(e.reason)
+	b.WriteString(", issues: [")
+	for i, issue := range e.issues {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(issue.Error())
+	}
+	b.WriteString("]")
+	return b.String()
 }
