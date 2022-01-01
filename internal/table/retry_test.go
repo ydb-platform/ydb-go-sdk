@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -262,7 +262,6 @@ func TestRetryContextDeadline(t *testing.T) {
 			timeout := timeouts[i]
 			sleep := sleeps[j]
 			t.Run(fmt.Sprintf("timeout %v, sleep %v", timeout, sleep), func(t *testing.T) {
-				random := rand.New(rand.NewSource(time.Now().Unix()))
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 				_ = p.Do(
@@ -283,7 +282,7 @@ func TestRetryContextDeadline(t *testing.T) {
 						case <-ctx.Done():
 							return ctx.Err()
 						case <-time.After(sleep):
-							return errs[random.Intn(len(errs))]
+							return errs[rand.Int(len(errs))]
 						}
 					},
 				)

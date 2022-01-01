@@ -87,14 +87,12 @@ func (d *dialer) grpcDialOptions() (opts []grpc.DialOption) {
 			return newConn(ctx, address, d.config.Trace())
 		}),
 		grpc.WithKeepaliveParams(DefaultGrpcConnectionPolicy),
-		grpc.WithDefaultServiceConfig(`{
-			"loadBalancingConfig": [
-				{
-					"round_robin":{}
-				}
-			],
-			"loadBalancingPolicy":"round_robin"
-		}`),
+		grpc.WithResolvers(
+			newResolver(""), // for use this resolver by default
+			newResolver("grpc"),
+			newResolver("grpcs"),
+		),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
 			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),

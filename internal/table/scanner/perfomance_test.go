@@ -4,9 +4,7 @@ import (
 	"testing"
 )
 
-var (
-	testSize = 10000
-)
+var testSize = 10000
 
 func BenchmarkTestScanWithColumns(b *testing.B) {
 	b.ReportAllocs()
@@ -66,24 +64,24 @@ func TestOverallSliceApproaches(t *testing.T) {
 }
 
 func BenchmarkTestSliceReduce(b *testing.B) {
-	var c = make([]*column, testSize)
+	slice := make([]*column, testSize)
 	for j := 0; j < testSize; j++ {
-		c[j] = &column{}
+		slice[j] = &column{}
 	}
 	b.ResetTimer()
 	var row column
 	for i := 0; i < b.N; i++ {
-		slice := c
+		c := slice
 		for j := 0; j < testSize; j++ {
-			row = *slice[0]
-			slice = slice[1:]
+			row = *c[0]
+			slice = c[1:]
 		}
 	}
 	_ = row
 }
 
 func BenchmarkTestSliceIncrement(b *testing.B) {
-	var slice = make([]*column, testSize)
+	slice := make([]*column, testSize)
 	for j := 0; j < testSize; j++ {
 		slice[j] = &column{}
 	}
@@ -101,7 +99,7 @@ func BenchmarkTestSliceIncrement(b *testing.B) {
 }
 
 func BenchmarkTestTempValue(b *testing.B) {
-	var slice = make([]*column, testSize)
+	slice := make([]*column, testSize)
 	for j := 0; j < testSize; j++ {
 		slice[j] = &column{}
 	}
@@ -116,7 +114,7 @@ func BenchmarkTestTempValue(b *testing.B) {
 }
 
 func BenchmarkTestDoubleIndex(b *testing.B) {
-	var slice = make([]*column, testSize)
+	slice := make([]*column, testSize)
 	for j := 0; j < testSize; j++ {
 		slice[j] = &column{}
 	}

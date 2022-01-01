@@ -25,7 +25,6 @@ import (
 
 const (
 	MaxGetConnTimeout = 10 * time.Second
-	//ConnResetOfflineRate = uint64(10)
 )
 
 var (

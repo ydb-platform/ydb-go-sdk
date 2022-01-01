@@ -211,9 +211,11 @@ func (x *distItem) index() int {
 
 type distItemsHeap []*distItem
 
-func (h distItemsHeap) Len() int           { return len(h) }
+func (h distItemsHeap) Len() int { return len(h) }
+
 func (h distItemsHeap) Less(i, j int) bool { return h[i].value < h[j].value }
-func (h distItemsHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h distItemsHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 
 func (h *distItemsHeap) Push(x interface{}) {
 	*h = append(*h, x.(*distItem))

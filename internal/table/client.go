@@ -3,6 +3,7 @@ package table
 import (
 	"container/list"
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -19,20 +20,22 @@ import (
 var (
 	// ErrSessionPoolClosed is returned by a client instance to indicate
 	// that client is closed and not able to complete requested operation.
-	ErrSessionPoolClosed = errors.New("ydb: table: session client is closed")
+	ErrSessionPoolClosed = errors.New("ydb: table: session pool is closed")
 
 	// ErrSessionPoolOverflow is returned by a client instance to indicate
 	// that the client is full and requested operation is not able to complete.
-	ErrSessionPoolOverflow = errors.New("ydb: table: session client overflow")
+	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
 
 	// ErrSessionUnknown is returned by a client instance to indicate that
 	// requested session does not exist within the client.
 	ErrSessionUnknown = errors.New("ydb: table: unknown session")
-
-	// ErrNoProgress is returned by a client instance to indicate that
-	// operation could not be completed.
-	ErrNoProgress = errors.New("ydb: table: no progress")
 )
+
+// ErrNoProgress is returned by a client instance to indicate that
+// operation could not be completed.
+func ErrNoProgress(attempts int) error {
+	return fmt.Errorf("ydb: table: no progress (%d attempts)", attempts)
+}
 
 // SessionBuilder is the interface that holds logic of creating sessions.
 type SessionBuilder func(context.Context) (Session, error)
@@ -41,9 +44,8 @@ type Client interface {
 	table.Client
 
 	Get(ctx context.Context) (s Session, err error)
-	Take(ctx context.Context, s Session) (took bool, err error)
 	Put(ctx context.Context, s Session) (err error)
-	Close(ctx context.Context) error
+	CloseSession(ctx context.Context, s Session) (err error)
 }
 
 func New(ctx context.Context, cluster cluster.Cluster, opts ...config.Option) Client {
@@ -71,6 +73,12 @@ func newClient(
 		idle:    list.New(),
 		waitq:   list.New(),
 		limit:   config.SizeLimit(),
+		waitChPool: sync.Pool{
+			New: func() interface{} {
+				ch := make(chan Session)
+				return &ch
+			},
+		},
 	}
 	if config.IdleThreshold() > 0 {
 		c.keeperStop = make(chan struct{})
@@ -110,6 +118,8 @@ type client struct {
 
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
+
+	wgClosed sync.WaitGroup
 }
 
 func (c *client) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
@@ -209,12 +219,8 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 				return
 			}
 
-			onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, r.s)
-
 			delete(c.index, r.s)
 			c.notify(nil)
-
-			onDone()
 
 			if info.idle != nil {
 				panic("ydb: table: session closed while still in idle client")
@@ -240,7 +246,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 		// read result from resCh for prevention of forgetting session
 		go func() {
 			if r, ok := <-resCh; ok && r.s != nil {
-				_ = c.CloseSession(ctx, r.s)
+				_ = r.s.Close(ctx)
 			}
 		}()
 		return nil, ctx.Err()
@@ -248,8 +254,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 }
 
 // Get returns first idle session from the client and removes it from
-// there. If no items stored in client it creates new one by calling
-// client.createSession() method and returns it.
+// there. If no items stored in client it creates new one returns it.
 func (c *client) Get(ctx context.Context) (s Session, err error) {
 	var (
 		i = 0
@@ -263,11 +268,6 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
-		var (
-			ch *chan Session
-			el *list.Element // Element in the wait queue.
-		)
-
 		if c.isClosed() {
 			return nil, ErrSessionPoolClosed
 		}
@@ -283,11 +283,13 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 
 		// Second, we try to create new session
 		s, err = c.createSession(ctx)
+		if s == nil && err == nil {
+			panic("both of session and err are nil")
+		}
 		// got session or err is not recoverable
 		if s != nil || !isCreateSessionErrorRetriable(err) {
 			return s, err
 		}
-		err = nil
 
 		// Third, we try to wait for a touched session - client is full.
 		//
@@ -295,59 +297,60 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// are less than maximum amount of touched session. That is, we want to
 		// be fair here and not to lock more goroutines than we could ship
 		// session to.
-		c.mu.Lock()
-		ch = c.getWaitCh()
-		el = c.waitq.PushBack(ch)
-		c.mu.Unlock()
-
-		waitDone := trace.TableOnPoolWait(t, &ctx)
-		var ok bool
-		select {
-		case s, ok = <-*ch:
-			// Note that race may occur and some goroutine may try to write
-			// session into channel after it was enqueued but before it being
-			// read here. In that case we will receive nil here and will retry.
-			//
-			// The same way will work when some session become deleted - the
-			// nil value will be sent into the channel.
-			if ok {
-				// Put only filled and not closed channel back to the client.
-				// That is, we need to avoid races on filling reused channel
-				// for the next waiter – session could be lost for a long time.
-				c.putWaitCh(ch)
-			}
-			waitDone(s, err)
-
-		case <-time.After(c.config.CreateSessionTimeout()):
-			// pass to next iteration
-			c.mu.Lock()
-			// Note that el can be already removed here while we were moving
-			// from reading from ch to this case. This does not make any
-			// difference – channel will be closed by notifying goroutine.
-			c.waitq.Remove(el)
-			c.mu.Unlock()
-			waitDone(s, err)
-
-		case <-ctx.Done():
-			c.mu.Lock()
-			// Note that el can be already removed here while we were moving
-			// from reading from ch to this case. This does not make any
-			// difference – channel will be closed by notifying goroutine.
-			c.waitq.Remove(el)
-			c.mu.Unlock()
-			err = ctx.Err()
-			if s != nil {
-				_ = c.Put(ctx, s)
-			}
-			waitDone(s, err)
-			return nil, err
-		}
+		s, err = c.waitFromCh(ctx, t)
 	}
 	if s == nil && err == nil {
-		err = ErrNoProgress
+		err = ErrNoProgress(i)
 	}
-
 	return s, err
+}
+
+func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err error) {
+	var (
+		ch *chan Session
+		el *list.Element // Element in the wait queue.
+		ok bool
+	)
+
+	c.mu.Lock()
+	ch = c.getWaitCh()
+	el = c.waitq.PushBack(ch)
+	c.mu.Unlock()
+
+	waitDone := trace.TableOnPoolWait(t, &ctx)
+
+	defer func() {
+		waitDone(s, err)
+	}()
+
+	select {
+	case s, ok = <-*ch:
+		// Note that race may occur and some goroutine may try to write
+		// session into channel after it was enqueued but before it being
+		// read here. In that case we will receive nil here and will retry.
+		//
+		// The same way will work when some session become deleted - the
+		// nil value will be sent into the channel.
+		if ok {
+			// Put only filled and not closed channel back to the client.
+			// That is, we need to avoid races on filling reused channel
+			// for the next waiter – session could be lost for a long time.
+			c.putWaitCh(ch)
+		}
+		return s, nil
+
+	case <-time.After(c.config.CreateSessionTimeout()):
+		c.mu.Lock()
+		c.waitq.Remove(el)
+		c.mu.Unlock()
+		return nil, nil
+
+	case <-ctx.Done():
+		c.mu.Lock()
+		c.waitq.Remove(el)
+		c.mu.Unlock()
+		return nil, ctx.Err()
+	}
 }
 
 // Put returns session to the client for further reuse.
@@ -381,13 +384,7 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 	c.mu.Unlock()
 
 	if err != nil {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(
-			deadline.ContextWithoutDeadline(ctx),
-			c.config.DeleteTimeout(),
-		)
-		_ = s.Close(ctx)
-		cancel()
+		_ = c.CloseSession(ctx, s)
 	}
 
 	return
@@ -451,7 +448,8 @@ func (c *client) Take(ctx context.Context, s Session) (took bool, err error) {
 // The intended way of Create() usage relates to Take() method.
 func (c *client) Create(ctx context.Context) (s Session, err error) {
 	const maxAttempts = 10
-	for i := 0; i < maxAttempts; i++ {
+	i := 0
+	for ; i < maxAttempts; i++ {
 		c.mu.Lock()
 		// NOTE: here is a race condition with keeper() running.
 		// session could be deleted by some reason after we released the mutex.
@@ -478,7 +476,7 @@ func (c *client) Create(ctx context.Context) (s Session, err error) {
 		return s, nil
 	}
 
-	return nil, ErrNoProgress
+	return nil, ErrNoProgress(i)
 }
 
 // Close deletes all stored sessions inside client.
@@ -528,6 +526,7 @@ func (c *client) Close(ctx context.Context) (err error) {
 			cancel()
 		}()
 	}
+	c.wgClosed.Wait()
 
 	return nil
 }
@@ -782,10 +781,7 @@ func (c *client) getWaitCh() *chan Session {
 	ch := c.waitChPool.Get()
 	s, ok := ch.(*chan Session)
 	if !ok {
-		// NOTE: MUST NOT be buffered.
-		// In other case we could cork an already no-owned channel.
-		ch := make(chan Session)
-		s = &ch
+		panic(fmt.Sprintf("%T is not a chan of sessions", ch))
 	}
 	return s
 }
@@ -882,14 +878,23 @@ func (c *client) notify(s Session) (notified bool) {
 // instead of plain session.Close().
 // CloseSession must be fast. If necessary, can be async.
 func (c *client) CloseSession(ctx context.Context, s Session) error {
-	go func() {
+	c.wgClosed.Add(1)
+	onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
+	defer onDone()
+	fn := func() {
+		defer c.wgClosed.Done()
 		closeCtx, cancel := context.WithTimeout(
 			deadline.ContextWithoutDeadline(ctx),
 			c.config.DeleteTimeout(),
 		)
+		defer cancel()
 		_ = s.Close(closeCtx)
-		cancel()
-	}()
+	}
+	if c.isClosed() {
+		fn()
+	} else {
+		go fn()
+	}
 	return nil
 }
 

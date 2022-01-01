@@ -287,5 +287,4 @@ func compareUUID(l, r *Ydb.Value) int {
 	default:
 		return 0
 	}
-
 }

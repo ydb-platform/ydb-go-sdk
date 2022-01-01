@@ -32,6 +32,4 @@ type BalancerConfig struct {
 	PreferLocal bool
 }
 
-var (
-	DefaultBalancer = BalancerConfig{Algorithm: DefaultBalancingAlgorithm, PreferLocal: true}
-)
+var DefaultBalancer = BalancerConfig{Algorithm: DefaultBalancingAlgorithm, PreferLocal: true}

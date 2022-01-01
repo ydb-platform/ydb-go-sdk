@@ -9,7 +9,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func (d *driver) Invoke(ctx context.Context, method string, request interface{}, response interface{}, opts ...grpc.CallOption) (err error) {
+func (d *driver) Invoke(
+	ctx context.Context,
+	method string,
+	request interface{},
+	response interface{},
+	opts ...grpc.CallOption,
+) (err error) {
 	var c conn.Conn
 	c, err = d.getConn(ctx)
 	if err != nil {
@@ -19,7 +25,12 @@ func (d *driver) Invoke(ctx context.Context, method string, request interface{},
 	return c.Invoke(ctx, method, request, response, opts...)
 }
 
-func (d *driver) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
+func (d *driver) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (_ grpc.ClientStream, err error) {
 	c, err := d.getConn(ctx)
 	if err != nil {
 		return

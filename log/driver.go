@@ -11,7 +11,7 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 	log = log.WithName(`driver`)
 	t := trace.Driver{}
 	if details&trace.DriverNetEvents != 0 {
-		//nolint: govet
+		// nolint: govet
 		log := log.WithName(`net`)
 		t.OnNetRead = func(info trace.NetReadStartInfo) func(trace.NetReadDoneInfo) {
 			address := info.Address
@@ -101,7 +101,7 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 		}
 	}
 	if details&trace.DriverCoreEvents != 0 {
-		//nolint: govet
+		// nolint: govet
 		log := log.WithName(`core`)
 		t.OnInit = func(info trace.InitStartInfo) func(trace.InitDoneInfo) {
 			log.Infof(`init start`)
@@ -228,6 +228,7 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 				}
 			}
 		}
+		// nolint: lll
 		t.OnConnNewStream = func(info trace.ConnNewStreamStartInfo) func(trace.ConnNewStreamRecvInfo) func(trace.ConnNewStreamDoneInfo) {
 			address := info.Endpoint.Address()
 			local := info.Endpoint.LocalDC()
@@ -277,7 +278,7 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 		}
 	}
 	if details&trace.DriverDiscoveryEvents != 0 {
-		//nolint: govet
+		// nolint: govet
 		log := log.WithName(`discovery`)
 		t.OnDiscovery = func(info trace.DiscoveryStartInfo) func(trace.DiscoveryDoneInfo) {
 			log.Debugf(`discover start`)
@@ -298,7 +299,7 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 		}
 	}
 	if details&trace.DriverClusterEvents != 0 {
-		//nolint: govet
+		// nolint: govet
 		log := log.WithName(`cluster`)
 		t.OnClusterGet = func(info trace.ClusterGetStartInfo) func(trace.ClusterGetDoneInfo) {
 			log.Tracef(`get start`)
@@ -390,7 +391,7 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 		}
 	}
 	if details&trace.DriverCredentialsEvents != 0 {
-		//nolint: govet
+		// nolint: govet
 		log := log.WithName(`credentials`)
 		t.OnGetCredentials = func(info trace.GetCredentialsStartInfo) func(trace.GetCredentialsDoneInfo) {
 			log.Tracef(`get start`)

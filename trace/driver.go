@@ -1,6 +1,6 @@
 package trace
 
-//go:generate gtrace
+// go:generate gtrace
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 )
 
 type (
-	//gtrace:gen
-	//gtrace:set Shortcut
+	// gtrace:gen
+	// gtrace:set Shortcut
 	Driver struct {
 		// Driver runtime events
 		OnInit  func(InitStartInfo) func(InitDoneInfo)

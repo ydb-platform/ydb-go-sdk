@@ -234,26 +234,31 @@ func WithStoragePolicyPreset(name string) StoragePolicyOption {
 		s.PresetName = name
 	}
 }
+
 func WithStoragePolicySyslog(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
 		s.Syslog = &Ydb_Table.StoragePool{Media: kind}
 	}
 }
+
 func WithStoragePolicyLog(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
 		s.Log = &Ydb_Table.StoragePool{Media: kind}
 	}
 }
+
 func WithStoragePolicyData(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
 		s.Data = &Ydb_Table.StoragePool{Media: kind}
 	}
 }
+
 func WithStoragePolicyExternal(kind string) StoragePolicyOption {
 	return func(s *storagePolicy) {
 		s.External = &Ydb_Table.StoragePool{Media: kind}
 	}
 }
+
 func WithStoragePolicyKeepInMemory(flag FeatureFlag) StoragePolicyOption {
 	return func(s *storagePolicy) {
 		s.KeepInMemory = flag.ToYDB()
@@ -269,11 +274,13 @@ func WithPartitioningPolicyPreset(name string) PartitioningPolicyOption {
 		p.PresetName = name
 	}
 }
+
 func WithPartitioningPolicyMode(mode PartitioningMode) PartitioningPolicyOption {
 	return func(p *partitioningPolicy) {
 		p.AutoPartitioning = mode.toYDB()
 	}
 }
+
 func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption {
 	return func(p *partitioningPolicy) {
 		p.Partitions = &Ydb_Table.PartitioningPolicy_UniformPartitions{
@@ -281,6 +288,7 @@ func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption 
 		}
 	}
 }
+
 func WithPartitioningPolicyExplicitPartitions(splitPoints ...types.Value) PartitioningPolicyOption {
 	return func(p *partitioningPolicy) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
@@ -300,16 +308,19 @@ func WithReplicationPolicyPreset(name string) ReplicationPolicyOption {
 		e.PresetName = name
 	}
 }
+
 func WithReplicationPolicyReplicasCount(n uint32) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
 		e.ReplicasCount = n
 	}
 }
+
 func WithReplicationPolicyCreatePerAZ(flag FeatureFlag) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
 		e.CreatePerAvailabilityZone = flag.ToYDB()
 	}
 }
+
 func WithReplicationPolicyAllowPromotion(flag FeatureFlag) ReplicationPolicyOption {
 	return func(e *replicationPolicy) {
 		e.AllowPromotion = flag.ToYDB()
@@ -354,21 +365,25 @@ func WithPartitioningBySize(flag FeatureFlag) PartitioningSettingsOption {
 		settings.PartitioningBySize = flag.ToYDB()
 	}
 }
+
 func WithPartitionSizeMb(partitionSizeMb uint64) PartitioningSettingsOption {
 	return func(settings *ydbPartitioningSettings) {
 		settings.PartitionSizeMb = partitionSizeMb
 	}
 }
+
 func WithPartitioningByLoad(flag FeatureFlag) PartitioningSettingsOption {
 	return func(settings *ydbPartitioningSettings) {
 		settings.PartitioningByLoad = flag.ToYDB()
 	}
 }
+
 func WithMinPartitionsCount(minPartitionsCount uint64) PartitioningSettingsOption {
 	return func(settings *ydbPartitioningSettings) {
 		settings.MinPartitionsCount = minPartitionsCount
 	}
 }
+
 func WithMaxPartitionsCount(maxPartitionsCount uint64) PartitioningSettingsOption {
 	return func(settings *ydbPartitioningSettings) {
 		settings.MaxPartitionsCount = maxPartitionsCount
@@ -616,6 +631,7 @@ func ReadLessOrEqual(x types.Value) ReadTableOption {
 		}
 	}
 }
+
 func ReadRowLimit(n uint64) ReadTableOption {
 	return func(desc *ReadTableDesc) {
 		desc.RowLimit = n

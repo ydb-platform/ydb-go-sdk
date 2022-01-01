@@ -132,6 +132,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		endpoint.New("bad:23"),
 	}
 	t.Run("initial fill", func(t *testing.T) {
+		// nolint: gocritic
 		ne := append(endpoints, badEndpoints...)
 		// merge new endpoints into balancer
 		mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
@@ -139,6 +140,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		assert(t, ne)
 	})
 	t.Run("update with another endpoints", func(t *testing.T) {
+		// nolint: gocritic
 		ne := append(nextEndpoints, nextBadEndpoints...)
 		// merge new endpoints into balancer
 		mergeEndpointIntoCluster(ctx, c, append(endpoints, badEndpoints...), ne, WithConnConfig(stub.Config(config.New())))
@@ -212,22 +214,26 @@ func (s stubBalancer) Next() conn.Conn {
 	}
 	return nil
 }
+
 func (s stubBalancer) Insert(c conn.Conn, i info.Info) balancer.Element {
 	if f := s.OnInsert; f != nil {
 		return f(c, i)
 	}
 	return nil
 }
+
 func (s stubBalancer) Update(el balancer.Element, i info.Info) {
 	if f := s.OnUpdate; f != nil {
 		f(el, i)
 	}
 }
+
 func (s stubBalancer) Remove(el balancer.Element) {
 	if f := s.OnRemove; f != nil {
 		f(el)
 	}
 }
+
 func (s stubBalancer) Pessimize(ctx context.Context, el balancer.Element) error {
 	if f := s.OnPessimize; f != nil {
 		return f(ctx, el)

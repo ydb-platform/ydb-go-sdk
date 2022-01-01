@@ -30,7 +30,14 @@ func (c *lazyCoordination) DropNode(ctx context.Context, path string) (err error
 	return c.client.DropNode(ctx, path)
 }
 
-func (c *lazyCoordination) DescribeNode(ctx context.Context, path string) (_ *scheme.Entry, _ *coordination.Config, err error) {
+func (c *lazyCoordination) DescribeNode(
+	ctx context.Context,
+	path string,
+) (
+	_ *scheme.Entry,
+	_ *coordination.Config,
+	err error,
+) {
 	c.init()
 	return c.client.DescribeNode(ctx, path)
 }

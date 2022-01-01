@@ -680,6 +680,7 @@ func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.Type_ListType) {
 	}
 	return
 }
+
 func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
 	x := typ.Type
 	if t, _ = x.(*Ydb.Type_TupleType); t == nil {
@@ -687,6 +688,7 @@ func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
 	}
 	return
 }
+
 func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) {
 	x := typ.Type
 	if t, _ = x.(*Ydb.Type_StructType); t == nil {
@@ -694,6 +696,7 @@ func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) 
 	}
 	return
 }
+
 func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
 	x := typ.Type
 	if t, _ = x.(*Ydb.Type_DictType); t == nil {
@@ -701,6 +704,7 @@ func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
 	}
 	return
 }
+
 func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
 	x := typ.Type
 	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {

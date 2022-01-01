@@ -22,13 +22,13 @@ const (
 
 	QUIET
 
-	trace = "TRACE"
-	debug = "DEBUG"
-	info  = "INFO"
-	warn  = "WARN"
-	error = "ERROR"
-	fatal = "FATAL"
-	quiet = "QUIET"
+	lblTrace = "TRACE"
+	lblDebug = "DEBUG"
+	lblInfo  = "INFO"
+	lblWarn  = "WARN"
+	lblError = "ERROR"
+	lblFatal = "FATAL"
+	lblQuiet = "QUIET"
 
 	dateLayout = "2006-01-02 15:04:05.000"
 )
@@ -56,19 +56,19 @@ const (
 func (l Level) String() string {
 	switch l {
 	case TRACE:
-		return trace
+		return lblTrace
 	case DEBUG:
-		return debug
+		return lblDebug
 	case INFO:
-		return info
+		return lblInfo
 	case WARN:
-		return warn
+		return lblWarn
 	case ERROR:
-		return error
+		return lblError
 	case FATAL:
-		return fatal
+		return lblFatal
 	default:
-		return quiet
+		return lblQuiet
 	}
 }
 
@@ -112,17 +112,17 @@ func (l Level) color() string {
 
 func FromString(l string) Level {
 	switch strings.ToUpper(l) {
-	case trace:
+	case lblTrace:
 		return TRACE
-	case debug:
+	case lblDebug:
 		return DEBUG
-	case info:
+	case lblInfo:
 		return INFO
-	case warn:
+	case lblWarn:
 		return WARN
-	case error:
+	case lblError:
 		return ERROR
-	case fatal:
+	case lblFatal:
 		return FATAL
 	default:
 		return QUIET
@@ -191,9 +191,25 @@ func New(opts ...Option) *logger {
 
 func (l *logger) format(format string, logLevel Level) string {
 	if l.noColor {
-		return fmt.Sprintf("%-5s %23s %26s %s\n", logLevel.String(), time.Now().Format(dateLayout), "["+l.namespace+"]", format)
+		return fmt.Sprintf(
+			"%-5s %23s %26s %s\n",
+			logLevel.String(),
+			time.Now().Format(dateLayout),
+			"["+l.namespace+"]",
+			format,
+		)
 	}
-	return fmt.Sprintf("%s%-5s %23s %26s%s %s%s%s\n", logLevel.boldColor(), logLevel.String(), time.Now().Format(dateLayout), "["+l.namespace+"]", colorReset, logLevel.color(), format, colorReset)
+	return fmt.Sprintf(
+		"%s%-5s %23s %26s%s %s%s%s\n",
+		logLevel.boldColor(),
+		logLevel.String(),
+		time.Now().Format(dateLayout),
+		"["+l.namespace+"]",
+		colorReset,
+		logLevel.color(),
+		format,
+		colorReset,
+	)
 }
 
 func (l *logger) Tracef(format string, args ...interface{}) {

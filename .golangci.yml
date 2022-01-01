@@ -126,17 +126,46 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+#    - cyclop
     - deadcode
     - depguard
+    - dogsled
+#    - dupl
     - errcheck
+    - errorlint
+#    - exhaustive
+#    - exhaustivestruct
+#    - forbidigo
+#    - funlen
+#    - gci
+#    - gocognit
     - goconst
+    - gocritic
+    - gocyclo
+#    - godot
+    - godox
     - gofmt # On why gofmt when goimports is enabled - https://github.com/golang/go/issues/21476
+    - gofumpt
+    - goheader
     - goimports
+#    - gomnd
+#    - gomoddirectives
+#    - gomodguard
+    - gosec
     - revive
     - gosimple
     - govet
+    - depguard
+#    - ifshort
+#    - ireturn
+    - lll
+    - makezero
     - ineffassign
     - misspell
+    - prealloc
+    - predeclared
+    - rowserrcheck
+    - revive
     - staticcheck
     - structcheck
     - typecheck

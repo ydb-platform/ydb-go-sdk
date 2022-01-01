@@ -14,8 +14,8 @@ type Type interface {
 	value.T
 }
 
-func List(T Type) Type {
-	return value.ListType{T: T}
+func List(t Type) Type {
+	return value.ListType{T: t}
 }
 
 func Tuple(elems ...Type) Type {
@@ -68,8 +68,8 @@ func Void() Type {
 	return value.VoidType{}
 }
 
-func Optional(T Type) Type {
-	return value.OptionalType{T: T}
+func Optional(t Type) Type {
+	return value.OptionalType{T: t}
 }
 
 var DefaultDecimal = DecimalType(22, 9)
@@ -87,9 +87,6 @@ func DecimalTypeFromDecimal(d *Decimal) Type {
 		Scale:     d.Scale,
 	}
 }
-
-// TODO(kamardin): rename types to consistent format like values: BoolType,
-// IntType and so on. Do not forget about code generation.
 
 // Primitive types known by YDB.
 const (

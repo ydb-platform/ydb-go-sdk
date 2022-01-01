@@ -3,7 +3,6 @@ package table
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"path"
 	"runtime"
 	"sync"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -25,12 +25,18 @@ import (
 )
 
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
+	limit := 8128 / 10
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		55*time.Second,
+	)
+	defer cancel()
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -40,25 +46,36 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 				},
 			),
 		),
-		1000,
-		config.WithSizeLimit(1000),
+		limit,
+		config.WithSizeLimit(limit),
 	)
 	defer func() {
 		_ = p.Close(context.Background())
 	}()
-	for i := 0; i < 10000; i++ {
-		t.Run("", func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				time.Duration(rand.Float32()+float32(time.Second)),
-			)
-			defer cancel()
-			s, err := p.createSession(ctx)
-
-			if s == nil && err == nil {
-				t.Fatalf("unexpected result: <%v, %v>", s, err)
-			}
-		})
+	errCh := make(chan error, limit*10)
+	fn := func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		childCtx, childCancel := context.WithTimeout(
+			ctx,
+			time.Duration(rand.Int64(int64(time.Minute))),
+		)
+		defer childCancel()
+		s, err := p.createSession(childCtx)
+		if s == nil && err == nil {
+			errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
+		}
+	}
+	wg := &sync.WaitGroup{}
+	wg.Add(limit * 10)
+	for i := 0; i < limit*10; i++ {
+		go fn(wg)
+	}
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+	for e := range errCh {
+		t.Fatal(e)
 	}
 }
 
@@ -69,9 +86,7 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
 	defer cleanupNow()
 
-	var (
-		keepalive = make(chan struct{})
-	)
+	keepalive := make(chan struct{})
 
 	p := newClientWithStubBuilder(
 		t,
@@ -152,13 +167,13 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			p := newClientWithStubBuilder(
 				t,
 				testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
-					}},
-				)),
+					},
+				})),
 				1,
 				config.WithSizeLimit(1),
 				config.WithTrace(
@@ -214,7 +229,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			const timeout = time.Second
 			select {
 			case err := <-got:
-				if err != ErrSessionPoolClosed {
+				if !errors.Is(err, ErrSessionPoolClosed) {
 					t.Fatalf(
 						"unexpected error: %v; want %v",
 						err, ErrSessionPoolClosed,
@@ -232,13 +247,13 @@ func TestSessionPoolClose(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			//nolint: unparam
+			// nolint: unparam
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
 				}, nil
-			}},
-		)),
+			},
+		})),
 		3,
 		config.WithSizeLimit(3),
 		config.WithIdleThreshold(time.Hour),
@@ -290,7 +305,7 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatalf("unexpected session close")
 	}
 
-	if err := p.Put(context.Background(), s3); err != ErrSessionPoolClosed {
+	if err := p.Put(context.Background(), s3); !errors.Is(err, ErrSessionPoolClosed) {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
 			err, ErrSessionPoolClosed,
@@ -326,13 +341,13 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 			p := newClientWithStubBuilder(
 				t,
 				testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
-					}},
-				)),
+					},
+				})),
 				2,
 				config.WithSizeLimit(1),
 				config.WithIdleThreshold(time.Hour),
@@ -471,13 +486,13 @@ func TestSessionPoolPutInFull(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			//nolint: unparam
+			// nolint: unparam
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
 				}, nil
-			}},
-		)),
+			},
+		})),
 		1,
 		config.WithSizeLimit(1),
 		config.WithIdleThreshold(-1),
@@ -487,7 +502,7 @@ func TestSessionPoolPutInFull(t *testing.T) {
 		t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
 	}
 
-	if err := p.Put(context.Background(), simpleSession(t)); err != ErrSessionPoolOverflow {
+	if err := p.Put(context.Background(), simpleSession(t)); !errors.Is(err, ErrSessionPoolOverflow) {
 		t.Fatalf("unexpected error on put session into full client: %v, wand: %v", err, ErrSessionPoolOverflow)
 	}
 }
@@ -519,13 +534,13 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			p := newClientWithStubBuilder(
 				t,
 				testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
-					}},
-				)),
+					},
+				})),
 				1,
 				config.WithSizeLimit(1),
 			)
@@ -536,7 +551,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			{
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
-				if _, err := p.Get(ctx); err != context.Canceled {
+				if _, err := p.Get(ctx); !errors.Is(err, context.Canceled) {
 					t.Fatalf(
 						"unexpected error: %v; want %v",
 						err, context.Canceled,
@@ -662,7 +677,7 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 	time.AfterFunc(500*time.Millisecond, cancel)
 
 	x, err := p.Get(ctx1)
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if x != nil {
@@ -686,7 +701,7 @@ func TestSessionPoolGetDisconnected(t *testing.T) {
 	time.AfterFunc(500*time.Millisecond, cancel)
 
 	took, err := p.Take(ctx2, s)
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if took {
@@ -769,13 +784,13 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			//nolint: unparam
+			// nolint: unparam
 			testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
 				}, nil
-			}},
-		)),
+			},
+		})),
 		1,
 		config.WithSizeLimit(1),
 		config.WithIdleThreshold(-1),
@@ -953,15 +968,15 @@ func TestSessionPoolDoublePut(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			//nolint: unparam
+			// nolint: unparam
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
 				}, nil
-			}},
-		)),
+			},
+		})),
 		1,
-		config.WithSizeLimit(1),
+		config.WithSizeLimit(2),
 		config.WithIdleThreshold(-1),
 	)
 
@@ -1075,13 +1090,13 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 		testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableKeepAlive: func(interface{}) (result proto.Message, _ error) {
 						return &Ydb_Table.KeepAliveResult{}, nil
 					},
@@ -1218,17 +1233,17 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	s2 := mustCreateSession(t, p)
 	mustPutSession(t, p, s)
 	mustPutSession(t, p, s2)
-	//retry
+	// retry
 	shiftTime(p.config.IdleThreshold())
 	timer.C <- timeutil.Now()
 	<-timer.Reset
-	//get first session
+	// get first session
 	s1 := mustGetSession(t, p)
 	if s2 == s1 {
 		t.Fatalf("retry session is not returned")
 	}
 	mustPutSession(t, p, s1)
-	//keepalive success
+	// keepalive success
 	shiftTime(p.config.IdleThreshold())
 	timer.C <- timeutil.Now()
 	<-timer.Reset
@@ -1473,13 +1488,13 @@ func (s *StubBuilder) createSession(ctx context.Context) (session Session, err e
 }
 
 func (c *client) debug() {
-	fmt.Printf("head ")
+	fmt.Print("head ")
 	for el := c.idle.Front(); el != nil; el = el.Next() {
 		s := el.Value.(Session)
 		x := c.index[s]
 		fmt.Printf("<-> %s(%d) ", s.ID(), x.touched.Unix())
 	}
-	fmt.Printf("<-> tail\n")
+	fmt.Print("<-> tail\n")
 }
 
 func whenWantWaitCh(p *client) <-chan struct{} {

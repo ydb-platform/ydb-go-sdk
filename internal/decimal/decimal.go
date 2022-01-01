@@ -5,7 +5,6 @@ import (
 	"math/bits"
 )
 
-// TODO(berezhnov): delete unused functions
 const wordSize = bits.UintSize / 8
 
 var (
@@ -209,9 +208,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	bts := make([]byte, 40)
 	pos := len(bts)
 
-	var (
-		digit big.Int
-	)
+	var digit big.Int
 	for ; v.Cmp(zero) > 0; v.Div(v, ten) {
 		if precision == 0 {
 			return errorTag
@@ -280,9 +277,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 }
 
 func put(x *big.Int, p []byte) {
-	var (
-		neg = x.Sign() < 0
-	)
+	neg := x.Sign() < 0
 	if neg {
 		x = complement(x)
 	}

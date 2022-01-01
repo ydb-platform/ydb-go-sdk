@@ -5,12 +5,10 @@ import (
 	"errors"
 )
 
-var (
-	// ErrCredentialsNoCredentials may be returned by Credentials implementations to
-	// make driver act as if there no Credentials at all. That is, driver will
-	// not send any token meta information during request.
-	ErrCredentialsNoCredentials = errors.New("ydb: credentials: no credentials")
-)
+// ErrCredentialsNoCredentials may be returned by Credentials implementations to
+// make driver act as if there no Credentials at all. That is, driver will
+// not send any token meta information during request.
+var ErrCredentialsNoCredentials = errors.New("ydb: credentials: no credentials")
 
 // Credentials is an interface that contains options used to authorize a
 // client.

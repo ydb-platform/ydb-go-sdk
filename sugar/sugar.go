@@ -22,15 +22,12 @@ func MakePath(ctx context.Context, db ydb.Connection, path string) error {
 		i += x
 		sub := path[:i+1]
 		info, err := db.Scheme().DescribePath(ctx, sub)
-		opErr, ok := err.(*errors.OpError)
-		if ok && opErr.Reason == errors.StatusSchemeError {
+		var opErr *errors.OpError
+		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
 			err = db.Scheme().MakeDirectory(ctx, sub)
 		}
 		if err != nil {
 			return err
-		}
-		if ok {
-			continue
 		}
 		switch info.Type {
 		case
@@ -60,8 +57,8 @@ func RmPath(ctx context.Context, db ydb.Connection, pathToRemove string, names .
 	var list func(int, string) error
 	list = func(i int, p string) error {
 		dir, err := db.Scheme().ListDirectory(ctx, p)
-		operr, ok := err.(*errors.OpError)
-		if ok && operr.Reason == errors.StatusSchemeError {
+		var opErr *errors.OpError
+		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
 			return nil
 		}
 		if err != nil {

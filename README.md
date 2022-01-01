@@ -60,8 +60,8 @@ The straightforward example of querying data may look similar to this:
 ```go
    ctx := context.Background()
 
-   // connect package helps to connect to database, returns connection object which
-   // provide necessary clients such as table.Client, scheme.Client, etc.
+   // ydb.New() returns connection object which provide necessary clients for different ydb services
+   // such as table.Client, scheme.Client, coordination.Client, etc.
    db, err := ydb.New(
       ctx,
       ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),

@@ -2,20 +2,22 @@ package scanner
 
 import (
 	"encoding/binary"
-	"math/rand"
+	"math"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
+// nolint: gocyclo
 func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
-	rv := rand.Int63()
+	rv := rand.Int64(math.MaxInt16)
 	switch c.typeID {
 	case Ydb.Type_BOOL:
 		v := rv%2 == 1
@@ -238,7 +240,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			var dv *time.Duration
 			return ydbval, &dv
 		}
-		rv = rv % time.Now().Unix()
+		rv %= time.Now().Unix()
 		v := rv
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_Int64Value{
@@ -252,7 +254,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 		}
 		return ydbval, &src
 	case Ydb.Type_TZ_DATE:
-		rv = rv % (time.Now().Unix() / 24 / 60 / 60)
+		rv %= (time.Now().Unix() / 24 / 60 / 60)
 		v := timeutil.MarshalTzDate(timeutil.UnmarshalDate(uint32(rv)))
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
@@ -277,7 +279,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			var dv *time.Time
 			return ydbval, &dv
 		}
-		rv = rv % time.Now().Unix()
+		rv %= time.Now().Unix()
 		v := timeutil.MarshalTzDatetime(timeutil.UnmarshalDatetime(uint32(rv)))
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
@@ -291,7 +293,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 		}
 		return ydbval, &src
 	case Ydb.Type_TZ_TIMESTAMP:
-		rv = rv % time.Now().Unix()
+		rv %= time.Now().Unix()
 		v := timeutil.MarshalTzTimestamp(timeutil.UnmarshalTimestamp(uint64(rv)))
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
@@ -509,5 +511,4 @@ func TestScanSqlTypes(t *testing.T) {
 			}
 		})
 	}
-
 }

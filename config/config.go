@@ -282,21 +282,28 @@ func New(opts ...Option) Config {
 	return c
 }
 
-func defaults() (c *config) {
-	var (
-		certPool *x509.CertPool
-		err      error
-	)
+func certPool() (certPool *x509.CertPool) {
+	defer func() {
+		// on darwin system panic raced on getting system security checks
+		if e := recover(); e != nil {
+			certPool = x509.NewCertPool()
+		}
+	}()
+	var err error
 	certPool, err = x509.SystemCertPool()
 	if err != nil {
 		certPool = x509.NewCertPool()
 	}
+	return
+}
+
+func defaults() (c *config) {
 	return &config{
 		discoveryInterval: DefaultDiscoveryInterval,
 		balancingConfig:   DefaultBalancer,
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool,
+			RootCAs:    certPool(),
 		},
 	}
 }

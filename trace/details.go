@@ -19,9 +19,16 @@ const (
 	TablePoolSessionLifeCycleEvents // 4096
 	TablePoolAPIEvents              // 8192
 
-	DriverConnEvents        = DriverNetEvents | DriverCoreEvents                                                                     // 12
-	TableSessionQueryEvents = TableSessionQueryInvokeEvents | TableSessionQueryStreamEvents                                          // 384
-	TableSessionEvents      = TableSessionLifeCycleEvents | TableSessionQueryEvents | TableSessionTransactionEvents                  // 960
-	TablePoolEvents         = TablePoolLifeCycleEvents | TablePoolRetryEvents | TablePoolSessionLifeCycleEvents | TablePoolAPIEvents // 15360
-	DetailsAll              = ^Details(0)                                                                                            // 18446744073709551615
+	DriverConnEvents = DriverNetEvents |
+		DriverCoreEvents // 12
+	TableSessionQueryEvents = TableSessionQueryInvokeEvents |
+		TableSessionQueryStreamEvents // 384
+	TableSessionEvents = TableSessionLifeCycleEvents |
+		TableSessionQueryEvents |
+		TableSessionTransactionEvents // 960
+	TablePoolEvents = TablePoolLifeCycleEvents |
+		TablePoolRetryEvents |
+		TablePoolSessionLifeCycleEvents |
+		TablePoolAPIEvents // 15360
+	DetailsAll = ^Details(0) // 18446744073709551615
 )

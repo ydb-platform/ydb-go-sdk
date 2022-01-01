@@ -119,13 +119,14 @@ func TestRetryModes(t *testing.T) {
 	}
 	type Case struct {
 		err           error              // given error
-		backoff       errors.BackoffType // type of backoff: no backoff (=== no operationCompleted), fast backoff, slow backoff
+		backoff       errors.BackoffType // no backoff (=== no operationCompleted), fast backoff, slow backoff
 		deleteSession bool               // close session and delete from pool
 		canRetry      CanRetry
 	}
 	errs := []Case{
 		{
-			err:           fmt.Errorf("unknown error"), // retryer given unknown error - we will not operationCompleted and will close session
+			// retryer given unknown error - we will not operationCompleted and will close session
+			err:           fmt.Errorf("unknown error"),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -134,7 +135,8 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err:           context.DeadlineExceeded, // golang context deadline exceeded
+			// golang context deadline exceeded
+			err:           context.DeadlineExceeded,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -143,7 +145,8 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err:           context.Canceled, // golang context canceled
+			// golang context canceled
+			err:           context.Canceled,
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -564,16 +567,32 @@ func TestRetryModes(t *testing.T) {
 		t.Run(test.err.Error(), func(t *testing.T) {
 			m := Check(test.err)
 			if m.MustRetry(true) != test.canRetry.idempotentOperation {
-				t.Errorf("unexpected must retry idempotent operation status: %v, want: %v", m.MustRetry(true), test.canRetry.idempotentOperation)
+				t.Errorf(
+					"unexpected must retry idempotent operation status: %v, want: %v",
+					m.MustRetry(true),
+					test.canRetry.idempotentOperation,
+				)
 			}
 			if m.MustRetry(false) != test.canRetry.nonIdempotentOperation {
-				t.Errorf("unexpected must retry non-idempotent operation status: %v, want: %v", m.MustRetry(false), test.canRetry.nonIdempotentOperation)
+				t.Errorf(
+					"unexpected must retry non-idempotent operation status: %v, want: %v",
+					m.MustRetry(false),
+					test.canRetry.nonIdempotentOperation,
+				)
 			}
 			if m.backoff != test.backoff {
-				t.Errorf("unexpected backoff status: %v, want: %v", m.backoff, test.backoff)
+				t.Errorf(
+					"unexpected backoff status: %v, want: %v",
+					m.backoff,
+					test.backoff,
+				)
 			}
 			if m.deleteSession != test.deleteSession {
-				t.Errorf("unexpected delete session status: %v, want: %v", m.deleteSession, test.deleteSession)
+				t.Errorf(
+					"unexpected delete session status: %v, want: %v",
+					m.deleteSession,
+					test.deleteSession,
+				)
 			}
 		})
 	}

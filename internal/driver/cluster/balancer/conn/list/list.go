@@ -37,9 +37,7 @@ func (cs *List) Remove(x *Element) {
 
 func (cs *List) Contains(x *Element) bool {
 	l := *cs
-	var (
-		n = len(l)
-	)
+	n := len(l)
 	if x.Index >= n {
 		return false
 	}

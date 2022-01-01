@@ -12,12 +12,39 @@ import (
 )
 
 type Client interface {
-	CreateResource(ctx context.Context, coordinationNodePath string, resource ratelimiter.Resource) (err error)
-	AlterResource(ctx context.Context, coordinationNodePath string, resource ratelimiter.Resource) (err error)
-	DropResource(ctx context.Context, coordinationNodePath string, resourcePath string) (err error)
-	ListResource(ctx context.Context, coordinationNodePath string, resourcePath string, recursive bool) (_ []string, err error)
-	DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (_ *ratelimiter.Resource, err error)
-	AcquireResource(ctx context.Context, coordinationNodePath string, resourcePath string, amount uint64, isUsedAmount bool) (err error)
+	CreateResource(
+		ctx context.Context,
+		coordinationNodePath string,
+		resource ratelimiter.Resource,
+	) (err error)
+	AlterResource(
+		ctx context.Context,
+		coordinationNodePath string,
+		resource ratelimiter.Resource,
+	) (err error)
+	DropResource(
+		ctx context.Context,
+		coordinationNodePath string,
+		resourcePath string,
+	) (err error)
+	ListResource(
+		ctx context.Context,
+		coordinationNodePath string,
+		resourcePath string,
+		recursive bool,
+	) (_ []string, err error)
+	DescribeResource(
+		ctx context.Context,
+		coordinationNodePath string,
+		resourcePath string,
+	) (_ *ratelimiter.Resource, err error)
+	AcquireResource(
+		ctx context.Context,
+		coordinationNodePath string,
+		resourcePath string,
+		amount uint64,
+		isUsedAmount bool,
+	) (err error)
 	Close(ctx context.Context) error
 }
 
@@ -35,7 +62,11 @@ func New(c cluster.Cluster) Client {
 	}
 }
 
-func (c *client) CreateResource(ctx context.Context, coordinationNodePath string, resource ratelimiter.Resource) (err error) {
+func (c *client) CreateResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resource ratelimiter.Resource,
+) (err error) {
 	_, err = c.ratelimiterService.CreateResource(ctx, &Ydb_RateLimiter.CreateResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
@@ -51,7 +82,11 @@ func (c *client) CreateResource(ctx context.Context, coordinationNodePath string
 	return
 }
 
-func (c *client) AlterResource(ctx context.Context, coordinationNodePath string, resource ratelimiter.Resource) (err error) {
+func (c *client) AlterResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resource ratelimiter.Resource,
+) (err error) {
 	_, err = c.ratelimiterService.AlterResource(ctx, &Ydb_RateLimiter.AlterResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
@@ -67,7 +102,11 @@ func (c *client) AlterResource(ctx context.Context, coordinationNodePath string,
 	return
 }
 
-func (c *client) DropResource(ctx context.Context, coordinationNodePath string, resourcePath string) (err error) {
+func (c *client) DropResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resourcePath string,
+) (err error) {
 	_, err = c.ratelimiterService.DropResource(ctx, &Ydb_RateLimiter.DropResourceRequest{
 		OperationParams:      nil,
 		CoordinationNodePath: coordinationNodePath,
@@ -76,7 +115,12 @@ func (c *client) DropResource(ctx context.Context, coordinationNodePath string, 
 	return
 }
 
-func (c *client) ListResource(ctx context.Context, coordinationNodePath string, resourcePath string, recursive bool) (_ []string, err error) {
+func (c *client) ListResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resourcePath string,
+	recursive bool,
+) (_ []string, err error) {
 	var (
 		response *Ydb_RateLimiter.ListResourcesResponse
 		result   Ydb_RateLimiter.ListResourcesResult
@@ -95,7 +139,11 @@ func (c *client) ListResource(ctx context.Context, coordinationNodePath string, 
 	return result.GetResourcePaths(), nil
 }
 
-func (c *client) DescribeResource(ctx context.Context, coordinationNodePath string, resourcePath string) (_ *ratelimiter.Resource, err error) {
+func (c *client) DescribeResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resourcePath string,
+) (_ *ratelimiter.Resource, err error) {
 	var (
 		response *Ydb_RateLimiter.DescribeResourceResponse
 		result   Ydb_RateLimiter.DescribeResourceResult
@@ -128,7 +176,13 @@ func (c *client) DescribeResource(ctx context.Context, coordinationNodePath stri
 	return resource, nil
 }
 
-func (c *client) AcquireResource(ctx context.Context, coordinationNodePath string, resourcePath string, amount uint64, isUsedAmount bool) (err error) {
+func (c *client) AcquireResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resourcePath string,
+	amount uint64,
+	isUsedAmount bool,
+) (err error) {
 	var request Ydb_RateLimiter.AcquireResourceRequest
 	if isUsedAmount {
 		request = Ydb_RateLimiter.AcquireResourceRequest{

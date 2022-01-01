@@ -12,9 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
-var (
-	abc = "abc"
-)
+var abc = "abc"
 
 func TestSessionOptionsProfile(t *testing.T) {
 	{

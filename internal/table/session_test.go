@@ -94,13 +94,13 @@ func TestSessionDescribeTable(t *testing.T) {
 		Cluster: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableDescribeTable: func(interface{}) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)

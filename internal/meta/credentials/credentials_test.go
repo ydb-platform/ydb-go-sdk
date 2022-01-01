@@ -14,7 +14,7 @@ func TestCredentialsString(t *testing.T) {
 	}{
 		{
 			nil,
-			"",
+			"without credentials",
 		},
 		{
 			NewAnonymousCredentials(""),
@@ -38,6 +38,5 @@ func TestCredentialsString(t *testing.T) {
 				testutil.Equal(t, test.s, stringer.String())
 			}
 		})
-
 	}
 }

@@ -46,9 +46,7 @@ func stubEachFunc(x reflect.Value) map[string]bool {
 }
 
 func callEachFunc(x reflect.Value) {
-	var (
-		t = x.Type()
-	)
+	t := x.Type()
 	for i := 0; i < t.NumField(); i++ {
 		var (
 			f  = x.Field(i)
@@ -61,8 +59,8 @@ func callEachFunc(x reflect.Value) {
 			continue
 		}
 		args := make([]reflect.Value, ft.NumIn())
-		for i := range args {
-			args[i] = reflect.New(ft.In(i)).Elem()
+		for j := range args {
+			args[j] = reflect.New(ft.In(j)).Elem()
 		}
 		f.Call(args)
 	}

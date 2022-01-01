@@ -30,7 +30,7 @@ func ErrIf(cond bool, err error) error {
 }
 
 func HideEOF(err error) error {
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		return nil
 	}
 	return err
