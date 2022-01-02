@@ -117,8 +117,13 @@ type DataQuery interface {
 	YQL() string
 }
 
-type Transaction interface {
+type TransactionIdentifier interface {
 	ID() string
+}
+
+type TransactionActor interface {
+	TransactionIdentifier
+
 	Execute(
 		ctx context.Context,
 		query string,
@@ -131,6 +136,11 @@ type Transaction interface {
 		params *QueryParameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
+}
+
+type Transaction interface {
+	TransactionActor
+
 	CommitTx(
 		ctx context.Context,
 		opts ...options.CommitTransactionOption,

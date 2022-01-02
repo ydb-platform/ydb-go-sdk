@@ -12,19 +12,28 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-// MakePath creates path inside database
-func MakePath(ctx context.Context, db ydb.Connection, path string) error {
-	for i := len(db.Name()) + 1; i < len(path); i++ {
-		x := strings.IndexByte(path[i:], '/')
+const (
+	sysTable = ".sys"
+)
+
+// MakeRecursive creates path inside database
+func MakeRecursive(ctx context.Context, db ydb.Connection, folder string) error {
+	folder = path.Join(db.Name(), folder)
+	for i := len(db.Name()) + 1; i < len(folder); i++ {
+		x := strings.IndexByte(folder[i:], '/')
 		if x == -1 {
-			x = len(path[i:]) - 1
+			x = len(folder[i:]) - 1
 		}
 		i += x
-		sub := path[:i+1]
+		sub := folder[:i+1]
 		info, err := db.Scheme().DescribePath(ctx, sub)
 		var opErr *errors.OpError
 		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
 			err = db.Scheme().MakeDirectory(ctx, sub)
+			if err != nil {
+				return err
+			}
+			info, err = db.Scheme().DescribePath(ctx, sub)
 		}
 		if err != nil {
 			return err
@@ -41,19 +50,15 @@ func MakePath(ctx context.Context, db ydb.Connection, path string) error {
 			)
 		}
 	}
-
 	return nil
 }
 
-// RmPath remove selected directory or table names in database.
+// RemoveRecursive remove selected directory or table names in database.
 // All database entities in prefix path will remove if names list is empty.
 // Empty prefix means than use root of database.
-// RmPath method equal bash command `rm -rf ./pathToRemove/{name1,name2,name3}`
-func RmPath(ctx context.Context, db ydb.Connection, pathToRemove string, names ...string) error {
-	filter := make(map[string]struct{}, len(names))
-	for _, n := range names {
-		filter[n] = struct{}{}
-	}
+// RemoveRecursive method equal bash command `rm -rf ./path/to/remove`
+func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string) error {
+	fullSysTablePath := path.Join(db.Name(), sysTable)
 	var list func(int, string) error
 	list = func(i int, p string) error {
 		dir, err := db.Scheme().ListDirectory(ctx, p)
@@ -65,10 +70,10 @@ func RmPath(ctx context.Context, db ydb.Connection, pathToRemove string, names .
 			return err
 		}
 		for _, child := range dir.Children {
-			if _, has := filter[child.Name]; !has {
+			pt := path.Join(p, child.Name)
+			if pt == fullSysTablePath {
 				continue
 			}
-			pt := path.Join(p, child.Name)
 			switch child.Type {
 			case scheme.EntryDirectory:
 				if err = list(i+1, pt); err != nil {

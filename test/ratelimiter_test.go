@@ -5,7 +5,6 @@ package test
 
 import (
 	"context"
-	"log"
 	"os"
 	"testing"
 	"time"
@@ -17,29 +16,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	public "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 const (
 	testCoordinationNodePath = "/local/test"
 	testResource             = "test_res"
 )
-
-func driverTrace() trace.Driver {
-	var t trace.Driver
-	trace.Stub(&t, func(name string, args ...interface{}) {
-		log.Printf("[driver] %s: %+v", name, trace.ClearContext(args))
-	})
-	return t
-}
-
-func tableTrace() trace.Table {
-	var t trace.Table
-	trace.Stub(&t, func(name string, args ...interface{}) {
-		log.Printf("[table] %s: %+v", name, trace.ClearContext(args))
-	})
-	return t
-}
 
 func TestRateLimiter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
@@ -49,8 +31,6 @@ func TestRateLimiter(t *testing.T) {
 		ctx,
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
-		ydb.WithTraceDriver(driverTrace()),
-		ydb.WithTraceTable(tableTrace()),
 		ydb.With(
 			config.WithRequestTimeout(time.Second*5),
 			config.WithStreamTimeout(time.Second*5),

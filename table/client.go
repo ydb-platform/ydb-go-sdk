@@ -7,10 +7,10 @@ import (
 )
 
 // Operation is the interface that holds an operation for retry.
-type Operation func(context.Context, Session) error
+type Operation func(ctx context.Context, s Session) error
 
 // TxOperation is the interface that holds an operation for retry.
-type TxOperation func(context.Context, Transaction) error
+type TxOperation func(ctx context.Context, tx TransactionActor) error
 
 type Option func(o *Options)
 
