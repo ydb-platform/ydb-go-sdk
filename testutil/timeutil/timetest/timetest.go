@@ -93,7 +93,7 @@ func StubTimers(t *testing.T, callers ...string) (ts TimerStubs, cleanup func())
 			},
 		}
 	})
-	return
+	return ts, cleanup
 }
 
 func StubSingleTimer(t *testing.T) *SingleTimerStub {

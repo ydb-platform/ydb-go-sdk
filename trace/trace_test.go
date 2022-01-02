@@ -19,12 +19,14 @@ func TestRetry(t *testing.T) {
 }
 
 func testSingleTrace(t *testing.T, x interface{}, traceName string) {
+	t.Helper()
 	a := reflect.New(reflect.TypeOf(x))
 	defer assertCalled(t, traceName, stubEachFunc(a))
 	callEachFunc(a.Elem())
 }
 
 func assertCalled(t *testing.T, prefix string, called map[string]bool) {
+	t.Helper()
 	for name, called := range called {
 		if !called {
 			t.Error(prefix, fmt.Sprintf("%s field is not called", name))

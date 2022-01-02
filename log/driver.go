@@ -10,6 +10,7 @@ import (
 func Driver(log Logger, details trace.Details) trace.Driver {
 	log = log.WithName(`driver`)
 	t := trace.Driver{}
+	// nolint: nestif
 	if details&trace.DriverNetEvents != 0 {
 		// nolint: govet
 		log := log.WithName(`net`)
@@ -100,6 +101,7 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 			}
 		}
 	}
+	// nolint: nestif
 	if details&trace.DriverCoreEvents != 0 {
 		// nolint: govet
 		log := log.WithName(`core`)

@@ -87,7 +87,6 @@ func RmPath(ctx context.Context, db ydb.Connection, pathToRemove string, names .
 				}
 
 			default:
-
 			}
 		}
 		return nil

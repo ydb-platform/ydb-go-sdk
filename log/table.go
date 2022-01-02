@@ -53,6 +53,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 			}
 		}
 	}
+	// nolint: nestif
 	if details&trace.TableSessionEvents != 0 {
 		// nolint: govet
 		log := log.WithName(`session`)
@@ -172,7 +173,6 @@ func Table(log Logger, details trace.Details) trace.Table {
 					return func(info trace.SessionQueryPrepareDoneInfo) {
 						if info.Error == nil {
 							tx := info.Tx
-							// nolint: lll
 							log.Debugf(
 								`execute done {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
 								time.Since(start),
@@ -185,7 +185,6 @@ func Table(log Logger, details trace.Details) trace.Table {
 								info.Result.Err(),
 							)
 						} else {
-							// nolint: lll
 							log.Errorf(`execute failed {latency:"%s",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v"}`,
 								time.Since(start),
 								session.ID(),
@@ -353,6 +352,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 			}
 		}
 	}
+	// nolint: nestif
 	if details&trace.TablePoolEvents != 0 {
 		// nolint: govet
 		log := log.WithName(`pool`)

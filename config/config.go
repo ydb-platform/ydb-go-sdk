@@ -91,22 +91,22 @@ type Config interface {
 
 // Config contains driver configuration options.
 type config struct {
-	endpoint             string
-	database             string
-	secure               bool
-	credentials          credentials.Credentials
 	trace                trace.Driver
 	requestTimeout       time.Duration
 	streamTimeout        time.Duration
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
 	discoveryInterval    time.Duration
-	balancingConfig      BalancerConfig
-	requestsType         string
-	fastDial             bool
 	dialTimeout          time.Duration
-	tlsConfig            *tls.Config
+	balancingConfig      BalancerConfig
+	secure               bool
+	fastDial             bool
+	endpoint             string
+	database             string
+	requestsType         string
 	grpcOptions          []grpc.DialOption
+	credentials          credentials.Credentials
+	tlsConfig            *tls.Config
 }
 
 func (c *config) GrpcDialOptions() []grpc.DialOption {

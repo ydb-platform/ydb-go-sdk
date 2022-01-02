@@ -94,32 +94,24 @@ func newClient(
 type client struct {
 	// build holds an object capable for creating sessions.
 	// It must not be nil.
-	build   SessionBuilder
-	cluster cluster.Cluster
-
-	config config.Config
-
-	index            map[Session]sessionInfo
-	createInProgress int        // KIKIMR-9163: in-create-process counter
-	limit            int        // Upper bound for client size.
-	idle             *list.List // list<table.session>
-	waitq            *list.List // list<*chan table.session>
-
-	keeperWake chan struct{} // Set by keeper.
-	keeperStop chan struct{}
-	keeperDone chan struct{}
-
-	touchingDone chan struct{}
-
-	mu sync.Mutex
-
-	touching bool
-	closed   bool
-
+	build             SessionBuilder
+	cluster           cluster.Cluster
+	config            config.Config
+	index             map[Session]sessionInfo
+	createInProgress  int           // KIKIMR-9163: in-create-process counter
+	limit             int           // Upper bound for client size.
+	idle              *list.List    // list<table.session>
+	waitq             *list.List    // list<*chan table.session>
+	keeperWake        chan struct{} // Set by keeper.
+	keeperStop        chan struct{}
+	keeperDone        chan struct{}
+	touchingDone      chan struct{}
+	mu                sync.Mutex
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
-
-	wgClosed sync.WaitGroup
+	wgClosed          sync.WaitGroup
+	touching          bool
+	closed            bool
 }
 
 func (c *client) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
@@ -343,7 +335,7 @@ func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 		c.mu.Lock()
 		c.waitq.Remove(el)
 		c.mu.Unlock()
-		return nil, nil
+		return s, nil
 
 	case <-ctx.Done():
 		c.mu.Lock()

@@ -33,17 +33,14 @@ func (c *conn) Address() string {
 
 type conn struct {
 	sync.Mutex
-
+	config   Config // ro access
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
-	endpoint endpoint.Endpoint // ro access
+	cc       *grpc.ClientConn
 	done     chan struct{}
+	endpoint endpoint.Endpoint // ro access
 	closed   bool
-
-	config Config // ro access
-
-	cc    *grpc.ClientConn
-	state state.State
-	locks int32
+	state    state.State
+	locks    int32
 }
 
 func (c *conn) NodeID() uint32 {
@@ -250,7 +247,7 @@ func (c *conn) Invoke(
 		}
 	}
 
-	return
+	return err
 }
 
 func (c *conn) NewStream(

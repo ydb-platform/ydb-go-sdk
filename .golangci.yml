@@ -160,19 +160,35 @@ linters:
 #    - ireturn
     - lll
     - makezero
+    - maligned
+    - misspell
     - ineffassign
     - misspell
+    - nakedret
+    - nestif
+#    - nilnil
+#    - nlreturn
+    - nolintlint
     - prealloc
     - predeclared
     - rowserrcheck
     - revive
     - staticcheck
+    - stylecheck
     - structcheck
+#    - tagliatelle
+#    - testpackage
+#    - thelper
+#    - tenv
     - typecheck
     - unconvert
     - unparam
     - unused
+#    - varnamelen
     - varcheck
+    - whitespace
+#    - wrapcheck
+#    - wsl
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.
