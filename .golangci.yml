@@ -126,24 +126,69 @@ linters-settings:
 linters:
   disable-all: true
   enable:
+#    - cyclop
     - deadcode
     - depguard
+    - dogsled
+#    - dupl
     - errcheck
+    - errorlint
+#    - exhaustive
+#    - exhaustivestruct
+#    - forbidigo
+#    - funlen
+#    - gci
+#    - gocognit
     - goconst
+    - gocritic
+    - gocyclo
+#    - godot
+    - godox
     - gofmt # On why gofmt when goimports is enabled - https://github.com/golang/go/issues/21476
+    - gofumpt
+    - goheader
     - goimports
+#    - gomnd
+#    - gomoddirectives
+#    - gomodguard
+    - gosec
     - revive
     - gosimple
     - govet
+    - depguard
+#    - ifshort
+#    - ireturn
+    - lll
+    - makezero
+    - maligned
+    - misspell
     - ineffassign
     - misspell
+    - nakedret
+    - nestif
+#    - nilnil
+#    - nlreturn
+    - nolintlint
+    - prealloc
+    - predeclared
+    - rowserrcheck
+    - revive
     - staticcheck
+    - stylecheck
     - structcheck
+#    - tagliatelle
+#    - testpackage
+#    - thelper
+#    - tenv
     - typecheck
     - unconvert
     - unparam
     - unused
+#    - varnamelen
     - varcheck
+    - whitespace
+#    - wrapcheck
+#    - wsl
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.

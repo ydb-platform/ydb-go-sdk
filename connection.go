@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -93,19 +94,43 @@ func (db *db) Secure() bool {
 	return db.config.Secure()
 }
 
-func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+func (db *db) Invoke(
+	ctx context.Context,
+	method string,
+	args interface{},
+	reply interface{},
+	opts ...grpc.CallOption,
+) error {
 	return db.cluster.Invoke(ctx, method, args, reply, opts...)
 }
 
-func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+func (db *db) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
 	return db.cluster.NewStream(ctx, desc, method, opts...)
 }
 
 func (db *db) Close(ctx context.Context) error {
-	_ = db.Table().Close(ctx)
-	_ = db.Scheme().Close(ctx)
-	_ = db.Coordination().Close(ctx)
-	return db.cluster.Close(ctx)
+	issues := make([]error, 0, 4)
+	if err := db.cluster.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := db.Table().Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := db.Scheme().Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := db.Coordination().Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if len(issues) > 0 {
+		return errors.NewWithIssues("close failed", issues...)
+	}
+	return nil
 }
 
 func (db *db) Table(opts ...Option) table.Client {

@@ -239,7 +239,6 @@ func TestTuple(t *testing.T) {
 	c, err = Compare(withNull, withNull)
 	requireNoError(t, err)
 	requireEqualValues(t, 0, c)
-
 }
 
 func TestList(t *testing.T) {
@@ -258,7 +257,6 @@ func TestList(t *testing.T) {
 	c, err = Compare(largest, medium)
 	requireNoError(t, err)
 	requireEqualValues(t, 1, c)
-
 }
 
 func TestDyNumber(t *testing.T) {
@@ -316,10 +314,8 @@ func TestIncompatibleTuples(t *testing.T) {
 	_, err := Compare(l, r)
 	if err == nil {
 		t.Error("Error expected")
-	} else {
-		if !strings.HasPrefix(err.Error(), "not comparable:") {
-			t.Errorf("Unexpected error message: %s", err.Error())
-		}
+	} else if !strings.HasPrefix(err.Error(), "not comparable:") {
+		t.Errorf("Unexpected error message: %s", err.Error())
 	}
 }
 

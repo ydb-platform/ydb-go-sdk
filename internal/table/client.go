@@ -3,6 +3,7 @@ package table
 import (
 	"container/list"
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -19,20 +20,22 @@ import (
 var (
 	// ErrSessionPoolClosed is returned by a client instance to indicate
 	// that client is closed and not able to complete requested operation.
-	ErrSessionPoolClosed = errors.New("ydb: table: build client is closed")
+	ErrSessionPoolClosed = errors.New("ydb: table: session pool is closed")
 
 	// ErrSessionPoolOverflow is returned by a client instance to indicate
 	// that the client is full and requested operation is not able to complete.
-	ErrSessionPoolOverflow = errors.New("ydb: table: build client overflow")
+	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
 
 	// ErrSessionUnknown is returned by a client instance to indicate that
-	// requested build does not exist within the client.
-	ErrSessionUnknown = errors.New("ydb: table: unknown build")
-
-	// ErrNoProgress is returned by a client instance to indicate that
-	// operation could not be completed.
-	ErrNoProgress = errors.New("ydb: table: no progress")
+	// requested session does not exist within the client.
+	ErrSessionUnknown = errors.New("ydb: table: unknown session")
 )
+
+// ErrNoProgress is returned by a client instance to indicate that
+// operation could not be completed.
+func ErrNoProgress(attempts int) error {
+	return fmt.Errorf("ydb: table: no progress (%d attempts)", attempts)
+}
 
 // SessionBuilder is the interface that holds logic of creating sessions.
 type SessionBuilder func(context.Context) (Session, error)
@@ -41,9 +44,8 @@ type Client interface {
 	table.Client
 
 	Get(ctx context.Context) (s Session, err error)
-	Take(ctx context.Context, s Session) (took bool, err error)
 	Put(ctx context.Context, s Session) (err error)
-	Close(ctx context.Context) error
+	CloseSession(ctx context.Context, s Session) (err error)
 }
 
 func New(ctx context.Context, cluster cluster.Cluster, opts ...config.Option) Client {
@@ -71,6 +73,12 @@ func newClient(
 		idle:    list.New(),
 		waitq:   list.New(),
 		limit:   config.SizeLimit(),
+		waitChPool: sync.Pool{
+			New: func() interface{} {
+				ch := make(chan Session)
+				return &ch
+			},
+		},
 	}
 	if config.IdleThreshold() > 0 {
 		c.keeperStop = make(chan struct{})
@@ -86,30 +94,24 @@ func newClient(
 type client struct {
 	// build holds an object capable for creating sessions.
 	// It must not be nil.
-	build   SessionBuilder
-	cluster cluster.Cluster
-
-	config config.Config
-
-	index            map[Session]sessionInfo
-	createInProgress int        // KIKIMR-9163: in-create-process counter
-	limit            int        // Upper bound for client size.
-	idle             *list.List // list<table.session>
-	waitq            *list.List // list<*chan table.session>
-
-	keeperWake chan struct{} // Set by keeper.
-	keeperStop chan struct{}
-	keeperDone chan struct{}
-
-	touchingDone chan struct{}
-
-	mu sync.Mutex
-
-	touching bool
-	closed   bool
-
+	build             SessionBuilder
+	cluster           cluster.Cluster
+	config            config.Config
+	index             map[Session]sessionInfo
+	createInProgress  int           // KIKIMR-9163: in-create-process counter
+	limit             int           // Upper bound for client size.
+	idle              *list.List    // list<table.session>
+	waitq             *list.List    // list<*chan table.session>
+	keeperWake        chan struct{} // Set by keeper.
+	keeperStop        chan struct{}
+	keeperDone        chan struct{}
+	touchingDone      chan struct{}
+	mu                sync.Mutex
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
+	wgClosed          sync.WaitGroup
+	touching          bool
+	closed            bool
 }
 
 func (c *client) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
@@ -188,9 +190,9 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 		}()
 
 		r.s, r.err = c.build(createSessionCtx)
-		// if build not nil - error must be nil and vice versa
+		// if session not nil - error must be nil and vice versa
 		if r.s == nil && r.err == nil {
-			panic("ydb: abnormal result of client.build.createSession()")
+			panic("ydb: abnormal result of session build")
 		}
 
 		if r.err != nil {
@@ -209,19 +211,15 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 				return
 			}
 
-			onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, r.s)
-
 			delete(c.index, r.s)
 			c.notify(nil)
 
-			onDone()
-
 			if info.idle != nil {
-				panic("ydb: table: build closed while still in idle client")
+				panic("ydb: table: session closed while still in idle client")
 			}
 		})
 
-		// Slot for build already reserved early
+		// Slot for session already reserved early
 		c.mu.Lock()
 		c.index[r.s] = sessionInfo{}
 		c.createInProgress--
@@ -237,19 +235,18 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 		}
 		return r.s, r.err
 	case <-ctx.Done():
-		// read result from resCh for prevention of forgetting build
+		// read result from resCh for prevention of forgetting session
 		go func() {
 			if r, ok := <-resCh; ok && r.s != nil {
-				_ = c.CloseSession(ctx, r.s)
+				_ = r.s.Close(ctx)
 			}
 		}()
 		return nil, ctx.Err()
 	}
 }
 
-// Get returns first idle build from the client and removes it from
-// there. If no items stored in client it creates new one by calling
-// build.CreateSession() method and returns it.
+// Get returns first idle session from the client and removes it from
+// there. If no items stored in client it creates new one returns it.
 func (c *client) Get(ctx context.Context) (s Session, err error) {
 	var (
 		i = 0
@@ -263,16 +260,11 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
-		var (
-			ch *chan Session
-			el *list.Element // Element in the wait queue.
-		)
-
 		if c.isClosed() {
 			return nil, ErrSessionPoolClosed
 		}
 
-		// First, we try to get build from idle
+		// First, we try to get session from idle
 		c.mu.Lock()
 		s = c.removeFirstIdle()
 		c.mu.Unlock()
@@ -281,76 +273,79 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 			return s, nil
 		}
 
-		// Second, we try to create new build
+		// Second, we try to create new session
 		s, err = c.createSession(ctx)
-		// got build or err is not recoverable
+		if s == nil && err == nil {
+			panic("both of session and err are nil")
+		}
+		// got session or err is not recoverable
 		if s != nil || !isCreateSessionErrorRetriable(err) {
 			return s, err
 		}
-		err = nil
 
-		// Third, we try to wait for a touched build - client is full.
+		// Third, we try to wait for a touched session - client is full.
 		//
 		// This should be done only if number of currently waiting goroutines
-		// are less than maximum amount of touched build. That is, we want to
+		// are less than maximum amount of touched session. That is, we want to
 		// be fair here and not to lock more goroutines than we could ship
-		// build to.
-		c.mu.Lock()
-		ch = c.getWaitCh()
-		el = c.waitq.PushBack(ch)
-		c.mu.Unlock()
-
-		waitDone := trace.TableOnPoolWait(t, &ctx)
-		var ok bool
-		select {
-		case s, ok = <-*ch:
-			// Note that race may occur and some goroutine may try to write
-			// build into channel after it was enqueued but before it being
-			// read here. In that case we will receive nil here and will retry.
-			//
-			// The same way will work when some build become deleted - the
-			// nil value will be sent into the channel.
-			if ok {
-				// Put only filled and not closed channel back to the client.
-				// That is, we need to avoid races on filling reused channel
-				// for the next waiter – build could be lost for a long time.
-				c.putWaitCh(ch)
-			}
-			waitDone(s, err)
-
-		case <-time.After(c.config.CreateSessionTimeout()):
-			// pass to next iteration
-			c.mu.Lock()
-			// Note that el can be already removed here while we were moving
-			// from reading from ch to this case. This does not make any
-			// difference – channel will be closed by notifying goroutine.
-			c.waitq.Remove(el)
-			c.mu.Unlock()
-			waitDone(s, err)
-
-		case <-ctx.Done():
-			c.mu.Lock()
-			// Note that el can be already removed here while we were moving
-			// from reading from ch to this case. This does not make any
-			// difference – channel will be closed by notifying goroutine.
-			c.waitq.Remove(el)
-			c.mu.Unlock()
-			err = ctx.Err()
-			if s != nil {
-				_ = c.Put(ctx, s)
-			}
-			waitDone(s, err)
-			return nil, err
-		}
+		// session to.
+		s, err = c.waitFromCh(ctx, t)
 	}
 	if s == nil && err == nil {
-		err = ErrNoProgress
+		err = ErrNoProgress(i)
 	}
-
 	return s, err
 }
 
-// Put returns build to the client for further reuse.
+func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err error) {
+	var (
+		ch *chan Session
+		el *list.Element // Element in the wait queue.
+		ok bool
+	)
+
+	c.mu.Lock()
+	ch = c.getWaitCh()
+	el = c.waitq.PushBack(ch)
+	c.mu.Unlock()
+
+	waitDone := trace.TableOnPoolWait(t, &ctx)
+
+	defer func() {
+		waitDone(s, err)
+	}()
+
+	select {
+	case s, ok = <-*ch:
+		// Note that race may occur and some goroutine may try to write
+		// session into channel after it was enqueued but before it being
+		// read here. In that case we will receive nil here and will retry.
+		//
+		// The same way will work when some session become deleted - the
+		// nil value will be sent into the channel.
+		if ok {
+			// Put only filled and not closed channel back to the client.
+			// That is, we need to avoid races on filling reused channel
+			// for the next waiter – session could be lost for a long time.
+			c.putWaitCh(ch)
+		}
+		return s, nil
+
+	case <-time.After(c.config.CreateSessionTimeout()):
+		c.mu.Lock()
+		c.waitq.Remove(el)
+		c.mu.Unlock()
+		return s, nil
+
+	case <-ctx.Done():
+		c.mu.Lock()
+		c.waitq.Remove(el)
+		c.mu.Unlock()
+		return nil, ctx.Err()
+	}
+}
+
+// Put returns session to the client for further reuse.
 // If client is already closed Put() calls s.Close(ctx) and returns
 // ErrSessionPoolClosed.
 // If client is overflow calls s.Close(ctx) and returns
@@ -381,24 +376,22 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 	c.mu.Unlock()
 
 	if err != nil {
-		closeCtx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), c.config.DeleteTimeout())
-		_ = s.Close(closeCtx)
-		cancel()
+		_ = c.CloseSession(ctx, s)
 	}
 
 	return
 }
 
-// Take removes build from the client and ensures that s will not be returned
+// Take removes session from the client and ensures that s will not be returned
 // by other Take() or Get() calls.
 //
-// The intended way of Take() use is to create build by calling Create() and
-// Put() it later to prepare KeepAlive tracking when build is idle. When
-// build becomes active, one should call Take() to stop KeepAlive tracking
-// (simultaneous use of build is prohibited).
+// The intended way of Take() use is to create session by calling Create() and
+// Put() it later to prepare KeepAlive tracking when session is idle. When
+// session becomes active, one should call Take() to stop KeepAlive tracking
+// (simultaneous use of session is prohibited).
 //
-// After build returned to the client by calling PutBusy() it can not be taken
-// by Take() any more. That is, semantically PutBusy() is the same as build's
+// After session returned to the client by calling PutBusy() it can not be taken
+// by Take() any more. That is, semantically PutBusy() is the same as session's
 // Close().
 //
 // It is assumed that Take() callers never call Get() method.
@@ -424,7 +417,7 @@ func (c *client) Take(ctx context.Context, s Session) (took bool, err error) {
 		onDone = onWait()
 
 		// Keepalive processing takes place right now.
-		// Try to await touched build before creation of new one.
+		// Try to await touched session before creation of new one.
 		select {
 		case <-cond:
 
@@ -443,15 +436,16 @@ func (c *client) Take(ctx context.Context, s Session) (took bool, err error) {
 	return took, err
 }
 
-// Create creates new build and returns it.
+// Create creates new session and returns it.
 // The intended way of Create() usage relates to Take() method.
 func (c *client) Create(ctx context.Context) (s Session, err error) {
 	const maxAttempts = 10
-	for i := 0; i < maxAttempts; i++ {
+	i := 0
+	for ; i < maxAttempts; i++ {
 		c.mu.Lock()
 		// NOTE: here is a race condition with keeper() running.
-		// build could be deleted by some reason after we released the mutex.
-		// We are not dealing with this because even if build is not deleted
+		// session could be deleted by some reason after we released the mutex.
+		// We are not dealing with this because even if session is not deleted
 		// by keeper() it could be staled on the server and the same user
 		// experience will appear.
 		s, _ = c.peekFirstIdle()
@@ -463,7 +457,7 @@ func (c *client) Create(ctx context.Context) (s Session, err error) {
 
 		took, e := c.Take(ctx, s)
 		if e == nil && !took || errors.Is(e, ErrSessionUnknown) {
-			// build was marked for deletion or deleted by keeper() - race happen - retry
+			// session was marked for deletion or deleted by keeper() - race happen - retry
 			s = nil
 			continue
 		}
@@ -474,13 +468,13 @@ func (c *client) Create(ctx context.Context) (s Session, err error) {
 		return s, nil
 	}
 
-	return nil, ErrNoProgress
+	return nil, ErrNoProgress(i)
 }
 
 // Close deletes all stored sessions inside client.
 // It also stops all underlying timers and goroutines.
 // It returns first error occurred during stale sessions' deletion.
-// Note that even on error it calls Close() on each build.
+// Note that even on error it calls Close() on each session.
 func (c *client) Close(ctx context.Context) (err error) {
 	onDone := trace.TableOnPoolClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
 	defer func() {
@@ -524,6 +518,7 @@ func (c *client) Close(ctx context.Context) (err error) {
 			cancel()
 		}()
 	}
+	c.wgClosed.Wait()
 
 	return nil
 }
@@ -534,6 +529,9 @@ func (c *client) Close(ctx context.Context) (err error) {
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+	if c.isClosed() {
+		return ErrSessionPoolClosed
+	}
 	options := table.Options{
 		Idempotent: table.ContextIdempotentOperation(ctx),
 	}
@@ -557,6 +555,9 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
+	if c.isClosed() {
+		return ErrSessionPoolClosed
+	}
 	options := table.Options{
 		Idempotent: table.ContextIdempotentOperation(ctx),
 		TxSettings: table.ContextTransactionSettings(ctx),
@@ -667,8 +668,9 @@ func (c *client) keeper() {
 				keepAliveCount := c.incrementKeepAlive(s)
 				lenIndex := len(c.index)
 				c.mu.Unlock()
-				// if keepAlive was called more than the corresponding limit for the build to be alive and more
-				// sessions are open than the lower limit of continuously kept sessions
+				// if keepAlive was called more than the corresponding limit for the
+				// session to be alive and more sessions are open than the lower limit
+				// of continuously kept sessions
 				if c.config.IdleKeepAliveThreshold() > 0 {
 					if keepAliveCount >= c.config.IdleKeepAliveThreshold() {
 						if c.config.KeepAliveMinSize() < lenIndex-len(toDelete) {
@@ -693,14 +695,14 @@ func (c *client) keeper() {
 
 				c.mu.Lock()
 				if !c.notify(s) {
-					// Need to push back build into list in order, to prevent
+					// Need to push back session into list in order, to prevent
 					// shuffling of sessions order.
 					//
-					// That is, there may be a race condition, when some build S1
+					// That is, there may be a race condition, when some session S1
 					// pushed back in the list before we took the mutex. Suppose S1
 					// touched time is greater than ours `now` for S0. If so, it
 					// then may interrupt next keep alive iteration earlier and
-					// prevent our build S0 being touched:
+					// prevent our session S0 being touched:
 					// time.Since(S1) < threshold but time.Since(S0) > threshold.
 					mark = c.pushIdleInOrderAfter(s, now, mark)
 				}
@@ -725,7 +727,7 @@ func (c *client) keeper() {
 
 			if s, touched := c.peekFirstIdle(); s == nil {
 				// No sessions to check. Let the Put() caller to wake up
-				// keeper when build arrive.
+				// keeper when session arrive.
 				sleep = true
 				c.keeperWake = wake
 			} else {
@@ -771,10 +773,7 @@ func (c *client) getWaitCh() *chan Session {
 	ch := c.waitChPool.Get()
 	s, ok := ch.(*chan Session)
 	if !ok {
-		// NOTE: MUST NOT be buffered.
-		// In other case we could cork an already no-owned channel.
-		ch := make(chan Session)
-		s = &ch
+		panic(fmt.Sprintf("%T is not a chan of sessions", ch))
 	}
 	return s
 }
@@ -796,7 +795,7 @@ func (c *client) peekFirstIdle() (s Session, touched time.Time) {
 	s = el.Value.(Session)
 	info, has := c.index[s]
 	if !has || el != info.idle {
-		panicLocked(&c.mu, "ydb: table: inconsistent build client index")
+		panicLocked(&c.mu, "ydb: table: inconsistent session client index")
 	}
 	return s, info.touched
 }
@@ -841,12 +840,12 @@ func (c *client) touchCond() <-chan struct{} {
 // p.mu must be held.
 func (c *client) notify(s Session) (notified bool) {
 	for el := c.waitq.Front(); el != nil; el = c.waitq.Front() {
-		// Some goroutine is waiting for a build.
+		// Some goroutine is waiting for a session.
 		//
 		// It could be in this states:
 		//   1) Reached the select code and awaiting for a value in channel.
 		//   2) Reached the select code but already in branch of deadline
-		//   cancelation. In this case it is locked on p.mu.Lock().
+		//   cancellation. In this case it is locked on p.mu.Lock().
 		//   3) Not reached the select code and thus not reading yet from the
 		//   channel.
 		//
@@ -867,15 +866,27 @@ func (c *client) notify(s Session) (notified bool) {
 	return false
 }
 
-// CloseSession provides the most effective way of build closing
-// instead of plain build.Close.
+// CloseSession provides the most effective way of session closing
+// instead of plain session.Close().
 // CloseSession must be fast. If necessary, can be async.
 func (c *client) CloseSession(ctx context.Context, s Session) error {
-	go func() {
-		closeCtx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), c.config.DeleteTimeout())
+	c.wgClosed.Add(1)
+	onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
+	defer onDone()
+	fn := func() {
+		defer c.wgClosed.Done()
+		closeCtx, cancel := context.WithTimeout(
+			deadline.ContextWithoutDeadline(ctx),
+			c.config.DeleteTimeout(),
+		)
+		defer cancel()
 		_ = s.Close(closeCtx)
-		cancel()
-	}()
+	}
+	if c.isClosed() {
+		fn()
+	} else {
+		go fn()
+	}
 	return nil
 }
 
@@ -889,7 +900,7 @@ func (c *client) keepAliveSession(ctx context.Context, s Session) error {
 func (c *client) removeIdle(s Session) sessionInfo {
 	info, has := c.index[s]
 	if !has || info.idle == nil {
-		panicLocked(&c.mu, "ydb: table: inconsistent build client index")
+		panicLocked(&c.mu, "ydb: table: inconsistent session client index")
 	}
 
 	c.idle.Remove(info.idle)
@@ -906,12 +917,12 @@ func (c *client) takeIdle(s Session) (has, took bool) {
 	var info sessionInfo
 	info, has = c.index[s]
 	if !has {
-		// Could not be strict here and panic – build may become deleted by
+		// Could not be strict here and panic – session may become deleted by
 		// keeper().
 		return
 	}
 	if info.idle == nil {
-		// build s is not idle.
+		// session s is not idle.
 		return
 	}
 	took = true
@@ -963,10 +974,10 @@ func (c *client) pushIdleInOrderAfter(s Session, now time.Time, mark *list.Eleme
 func (c *client) handlePushIdle(s Session, now time.Time, el *list.Element) {
 	info, has := c.index[s]
 	if !has {
-		panicLocked(&c.mu, "ydb: table: trying to store build created outside of the client")
+		panicLocked(&c.mu, "ydb: table: trying to store session created outside of the client")
 	}
 	if info.idle != nil {
-		panicLocked(&c.mu, "ydb: table: inconsistent build client index")
+		panicLocked(&c.mu, "ydb: table: inconsistent session client index")
 	}
 
 	info.touched = now

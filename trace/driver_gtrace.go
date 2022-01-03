@@ -454,6 +454,7 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	}
 	return ret
 }
+
 func (t Driver) onInit(i InitStartInfo) func(InitDoneInfo) {
 	fn := t.OnInit
 	if fn == nil {
@@ -469,6 +470,7 @@ func (t Driver) onInit(i InitStartInfo) func(InitDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onClose(c1 CloseStartInfo) func(CloseDoneInfo) {
 	fn := t.OnClose
 	if fn == nil {
@@ -484,6 +486,7 @@ func (t Driver) onClose(c1 CloseStartInfo) func(CloseDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onNetRead(n NetReadStartInfo) func(NetReadDoneInfo) {
 	fn := t.OnNetRead
 	if fn == nil {
@@ -499,6 +502,7 @@ func (t Driver) onNetRead(n NetReadStartInfo) func(NetReadDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onNetWrite(n NetWriteStartInfo) func(NetWriteDoneInfo) {
 	fn := t.OnNetWrite
 	if fn == nil {
@@ -514,6 +518,7 @@ func (t Driver) onNetWrite(n NetWriteStartInfo) func(NetWriteDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onNetDial(n NetDialStartInfo) func(NetDialDoneInfo) {
 	fn := t.OnNetDial
 	if fn == nil {
@@ -529,6 +534,7 @@ func (t Driver) onNetDial(n NetDialStartInfo) func(NetDialDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onNetClose(n NetCloseStartInfo) func(NetCloseDoneInfo) {
 	fn := t.OnNetClose
 	if fn == nil {
@@ -544,6 +550,7 @@ func (t Driver) onNetClose(n NetCloseStartInfo) func(NetCloseDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onConnStateChange(c1 ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
 	fn := t.OnConnStateChange
 	if fn == nil {
@@ -559,6 +566,7 @@ func (t Driver) onConnStateChange(c1 ConnStateChangeStartInfo) func(ConnStateCha
 	}
 	return res
 }
+
 func (t Driver) onConnInvoke(c1 ConnInvokeStartInfo) func(ConnInvokeDoneInfo) {
 	fn := t.OnConnInvoke
 	if fn == nil {
@@ -574,6 +582,7 @@ func (t Driver) onConnInvoke(c1 ConnInvokeStartInfo) func(ConnInvokeDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onConnNewStream(c1 ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
 	fn := t.OnConnNewStream
 	if fn == nil {
@@ -601,6 +610,7 @@ func (t Driver) onConnNewStream(c1 ConnNewStreamStartInfo) func(ConnNewStreamRec
 		return res
 	}
 }
+
 func (t Driver) onConnTake(c1 ConnTakeStartInfo) func(ConnTakeDoneInfo) {
 	fn := t.OnConnTake
 	if fn == nil {
@@ -616,6 +626,7 @@ func (t Driver) onConnTake(c1 ConnTakeStartInfo) func(ConnTakeDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onConnRelease(c1 ConnReleaseStartInfo) func(ConnReleaseDoneInfo) {
 	fn := t.OnConnRelease
 	if fn == nil {
@@ -631,6 +642,7 @@ func (t Driver) onConnRelease(c1 ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
 	}
 	return res
 }
+
 func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
 	fn := t.OnClusterGet
 	if fn == nil {
@@ -646,6 +658,7 @@ func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
 	}
 	return res
 }
+
 func (t Driver) onClusterInsert(c1 ClusterInsertStartInfo) func(ClusterInsertDoneInfo) {
 	fn := t.OnClusterInsert
 	if fn == nil {
@@ -661,6 +674,7 @@ func (t Driver) onClusterInsert(c1 ClusterInsertStartInfo) func(ClusterInsertDon
 	}
 	return res
 }
+
 func (t Driver) onClusterUpdate(c1 ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo) {
 	fn := t.OnClusterUpdate
 	if fn == nil {
@@ -676,6 +690,7 @@ func (t Driver) onClusterUpdate(c1 ClusterUpdateStartInfo) func(ClusterUpdateDon
 	}
 	return res
 }
+
 func (t Driver) onClusterRemove(c1 ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo) {
 	fn := t.OnClusterRemove
 	if fn == nil {
@@ -691,6 +706,7 @@ func (t Driver) onClusterRemove(c1 ClusterRemoveStartInfo) func(ClusterRemoveDon
 	}
 	return res
 }
+
 func (t Driver) onPessimizeNode(p PessimizeNodeStartInfo) func(PessimizeNodeDoneInfo) {
 	fn := t.OnPessimizeNode
 	if fn == nil {
@@ -706,6 +722,7 @@ func (t Driver) onPessimizeNode(p PessimizeNodeStartInfo) func(PessimizeNodeDone
 	}
 	return res
 }
+
 func (t Driver) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
 	if fn == nil {
@@ -721,6 +738,7 @@ func (t Driver) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsD
 	}
 	return res
 }
+
 func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	fn := t.OnDiscovery
 	if fn == nil {
@@ -736,6 +754,7 @@ func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
 	}
 	return res
 }
+
 func DriverOnInit(t Driver, c *context.Context) func(error) {
 	var p InitStartInfo
 	p.Context = c
@@ -746,6 +765,7 @@ func DriverOnInit(t Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
+
 func DriverOnClose(t Driver, c *context.Context) func(error) {
 	var p CloseStartInfo
 	p.Context = c
@@ -756,6 +776,7 @@ func DriverOnClose(t Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
+
 func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ error) {
 	var p NetReadStartInfo
 	p.Address = address
@@ -768,6 +789,7 @@ func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ 
 		res(p)
 	}
 }
+
 func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ error) {
 	var p NetWriteStartInfo
 	p.Address = address
@@ -780,6 +802,7 @@ func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ erro
 		res(p)
 	}
 }
+
 func DriverOnNetDial(t Driver, c *context.Context, address string) func(error) {
 	var p NetDialStartInfo
 	p.Context = c
@@ -791,6 +814,7 @@ func DriverOnNetDial(t Driver, c *context.Context, address string) func(error) {
 		res(p)
 	}
 }
+
 func DriverOnNetClose(t Driver, address string) func(error) {
 	var p NetCloseStartInfo
 	p.Address = address
@@ -801,6 +825,7 @@ func DriverOnNetClose(t Driver, address string) func(error) {
 		res(p)
 	}
 }
+
 func DriverOnConnStateChange(t Driver, c *context.Context, endpoint endpointInfo, state ConnState) func(state ConnState) {
 	var p ConnStateChangeStartInfo
 	p.Context = c
@@ -813,6 +838,7 @@ func DriverOnConnStateChange(t Driver, c *context.Context, endpoint endpointInfo
 		res(p)
 	}
 }
+
 func DriverOnConnInvoke(t Driver, c *context.Context, endpoint endpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
 	var p ConnInvokeStartInfo
 	p.Context = c
@@ -828,6 +854,7 @@ func DriverOnConnInvoke(t Driver, c *context.Context, endpoint endpointInfo, m M
 		res(p)
 	}
 }
+
 func DriverOnConnNewStream(t Driver, c *context.Context, endpoint endpointInfo, m Method) func(error) func(state ConnState, _ error) {
 	var p ConnNewStreamStartInfo
 	p.Context = c
@@ -846,6 +873,7 @@ func DriverOnConnNewStream(t Driver, c *context.Context, endpoint endpointInfo, 
 		}
 	}
 }
+
 func DriverOnConnTake(t Driver, c *context.Context, endpoint endpointInfo) func(lock int, _ error) {
 	var p ConnTakeStartInfo
 	p.Context = c
@@ -858,6 +886,7 @@ func DriverOnConnTake(t Driver, c *context.Context, endpoint endpointInfo) func(
 		res(p)
 	}
 }
+
 func DriverOnConnRelease(t Driver, c *context.Context, endpoint endpointInfo) func(lock int) {
 	var p ConnReleaseStartInfo
 	p.Context = c
@@ -869,6 +898,7 @@ func DriverOnConnRelease(t Driver, c *context.Context, endpoint endpointInfo) fu
 		res(p)
 	}
 }
+
 func DriverOnClusterGet(t Driver, c *context.Context) func(endpoint endpointInfo, _ error) {
 	var p ClusterGetStartInfo
 	p.Context = c
@@ -880,6 +910,7 @@ func DriverOnClusterGet(t Driver, c *context.Context) func(endpoint endpointInfo
 		res(p)
 	}
 }
+
 func DriverOnClusterInsert(t Driver, c *context.Context, endpoint endpointInfo) func(state ConnState) {
 	var p ClusterInsertStartInfo
 	p.Context = c
@@ -891,6 +922,7 @@ func DriverOnClusterInsert(t Driver, c *context.Context, endpoint endpointInfo) 
 		res(p)
 	}
 }
+
 func DriverOnClusterUpdate(t Driver, c *context.Context, endpoint endpointInfo) func(state ConnState) {
 	var p ClusterUpdateStartInfo
 	p.Context = c
@@ -902,6 +934,7 @@ func DriverOnClusterUpdate(t Driver, c *context.Context, endpoint endpointInfo) 
 		res(p)
 	}
 }
+
 func DriverOnClusterRemove(t Driver, c *context.Context, endpoint endpointInfo) func(state ConnState) {
 	var p ClusterRemoveStartInfo
 	p.Context = c
@@ -913,6 +946,7 @@ func DriverOnClusterRemove(t Driver, c *context.Context, endpoint endpointInfo) 
 		res(p)
 	}
 }
+
 func DriverOnPessimizeNode(t Driver, c *context.Context, endpoint endpointInfo, state ConnState, cause error) func(state ConnState, _ error) {
 	var p PessimizeNodeStartInfo
 	p.Context = c
@@ -927,6 +961,7 @@ func DriverOnPessimizeNode(t Driver, c *context.Context, endpoint endpointInfo, 
 		res(p)
 	}
 }
+
 func DriverOnGetCredentials(t Driver, c *context.Context) func(tokenOk bool, _ error) {
 	var p GetCredentialsStartInfo
 	p.Context = c
@@ -938,6 +973,7 @@ func DriverOnGetCredentials(t Driver, c *context.Context) func(tokenOk bool, _ e
 		res(p)
 	}
 }
+
 func DriverOnDiscovery(t Driver, c *context.Context, address string) func(endpoints []string, _ error) {
 	var p DiscoveryStartInfo
 	p.Context = c

@@ -7,12 +7,14 @@ import (
 )
 
 // Table makes trace.Table with internal logging
+// nolint: gocyclo
 func Table(log Logger, details trace.Details) trace.Table {
 	log = log.WithName(`table`)
 	t := trace.Table{}
 	if details&trace.TablePoolRetryEvents != 0 {
-		//nolint: govet
+		// nolint: govet
 		log := log.WithName(`retry`)
+		// nolint: lll
 		t.OnPoolRetry = func(info trace.PoolRetryStartInfo) func(info trace.PoolRetryInternalInfo) func(trace.PoolRetryDoneInfo) {
 			idempotent := info.Idempotent
 			log.Tracef(`retry start {idempotent:%t}`,
@@ -51,8 +53,9 @@ func Table(log Logger, details trace.Details) trace.Table {
 			}
 		}
 	}
+	// nolint: nestif
 	if details&trace.TableSessionEvents != 0 {
-		//nolint: govet
+		// nolint: govet
 		log := log.WithName(`session`)
 		if details&trace.TableSessionLifeCycleEvents != 0 {
 			t.OnSessionNew = func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
@@ -122,10 +125,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 			}
 		}
 		if details&trace.TableSessionQueryEvents != 0 {
-			//nolint: govet
+			// nolint: govet
 			log := log.WithName(`query`)
 			if details&trace.TableSessionQueryInvokeEvents != 0 {
-				//nolint: govet
+				// nolint: govet
 				log := log.WithName(`invoke`)
 				t.OnSessionQueryPrepare = func(info trace.SessionQueryPrepareStartInfo) func(trace.PrepareDataQueryDoneInfo) {
 					session := info.Session
@@ -170,7 +173,8 @@ func Table(log Logger, details trace.Details) trace.Table {
 					return func(info trace.SessionQueryPrepareDoneInfo) {
 						if info.Error == nil {
 							tx := info.Tx
-							log.Debugf(`execute done {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
+							log.Debugf(
+								`execute done {latency:"%s",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -195,8 +199,9 @@ func Table(log Logger, details trace.Details) trace.Table {
 				}
 			}
 			if details&trace.TableSessionQueryStreamEvents != 0 {
-				//nolint: govet
+				// nolint: govet
 				log := log.WithName(`stream`)
+				// nolint: lll
 				t.OnSessionQueryStreamExecute = func(info trace.SessionQueryStreamExecuteStartInfo) func(trace.SessionQueryStreamExecuteDoneInfo) {
 					session := info.Session
 					query := info.Query
@@ -230,6 +235,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 						}
 					}
 				}
+				// nolint: lll
 				t.OnSessionQueryStreamRead = func(info trace.SessionQueryStreamReadStartInfo) func(trace.SessionQueryStreamReadDoneInfo) {
 					session := info.Session
 					log.Tracef(`read start {id:"%s",status:"%s"}`,
@@ -258,8 +264,9 @@ func Table(log Logger, details trace.Details) trace.Table {
 			}
 		}
 		if details&trace.TableSessionTransactionEvents != 0 {
-			//nolint: govet
+			// nolint: govet
 			log := log.WithName(`transaction`)
+			// nolint: lll
 			t.OnSessionTransactionBegin = func(info trace.SessionTransactionBeginStartInfo) func(trace.SessionTransactionBeginDoneInfo) {
 				session := info.Session
 				log.Tracef(`begin start {id:"%s",status:"%s"}`,
@@ -285,6 +292,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
+			// nolint: lll
 			t.OnSessionTransactionCommit = func(info trace.SessionTransactionCommitStartInfo) func(trace.SessionTransactionCommitDoneInfo) {
 				session := info.Session
 				tx := info.Tx
@@ -313,6 +321,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
+			// nolint: lll
 			t.OnSessionTransactionRollback = func(info trace.SessionTransactionRollbackStartInfo) func(trace.SessionTransactionRollbackDoneInfo) {
 				session := info.Session
 				tx := info.Tx
@@ -343,8 +352,9 @@ func Table(log Logger, details trace.Details) trace.Table {
 			}
 		}
 	}
+	// nolint: nestif
 	if details&trace.TablePoolEvents != 0 {
-		//nolint: govet
+		// nolint: govet
 		log := log.WithName(`pool`)
 		if details&trace.TablePoolLifeCycleEvents != 0 {
 			t.OnPoolInit = func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
@@ -376,7 +386,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 			}
 		}
 		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
-			//nolint: govet
+			// nolint: govet
 			log := log.WithName(`session`)
 			t.OnPoolSessionNew = func(info trace.PoolSessionNewStartInfo) func(trace.PoolSessionNewDoneInfo) {
 				log.Tracef(`create start`)
@@ -492,6 +502,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
+			// nolint: lll
 			t.OnPoolTake = func(info trace.PoolTakeStartInfo) func(doneInfo trace.PoolTakeWaitInfo) func(doneInfo trace.PoolTakeDoneInfo) {
 				session := info.Session
 				log.Tracef(`take start {id:"%s",status:"%s"}`,

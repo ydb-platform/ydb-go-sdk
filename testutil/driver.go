@@ -159,9 +159,22 @@ func getField(name string, src, dst interface{}) bool {
 }
 
 type db struct {
-	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
-	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onClose     func(ctx context.Context) error
+	onInvoke func(
+		ctx context.Context,
+		method string,
+		args interface{},
+		reply interface{},
+		opts ...grpc.CallOption,
+	) error
+	onNewStream func(
+		ctx context.Context,
+		desc *grpc.StreamDesc,
+		method string,
+		opts ...grpc.CallOption,
+	) (grpc.ClientStream, error)
+	onClose func(
+		ctx context.Context,
+	) error
 }
 
 func (db *db) Address() string {
@@ -172,14 +185,25 @@ func (db *db) Secure() bool {
 	return true
 }
 
-func (db *db) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) (err error) {
+func (db *db) Invoke(
+	ctx context.Context,
+	method string,
+	args interface{},
+	reply interface{},
+	opts ...grpc.CallOption,
+) (err error) {
 	if db.onInvoke == nil {
 		return fmt.Errorf("db.onInvoke() not implemented")
 	}
 	return db.onInvoke(ctx, method, args, reply, opts...)
 }
 
-func (db *db) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
+func (db *db) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (_ grpc.ClientStream, err error) {
 	if db.onNewStream == nil {
 		return nil, fmt.Errorf("db.onNewStream() not implemented")
 	}
@@ -214,7 +238,13 @@ type NewClusterOption func(c *db)
 
 func WithInvokeHandlers(invokeHandlers InvokeHandlers) NewClusterOption {
 	return func(db *db) {
-		db.onInvoke = func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) (err error) {
+		db.onInvoke = func(
+			ctx context.Context,
+			method string,
+			args interface{},
+			reply interface{},
+			opts ...grpc.CallOption,
+		) (err error) {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
 				result, err := handler(args)
 				if err != nil {
@@ -240,7 +270,12 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) NewClusterOption {
 
 func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) NewClusterOption {
 	return func(db *db) {
-		db.onNewStream = func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
+		db.onNewStream = func(
+			ctx context.Context,
+			desc *grpc.StreamDesc,
+			method string,
+			opts ...grpc.CallOption,
+		) (_ grpc.ClientStream, err error) {
 			if handler, ok := newStreamHandlers[Method(method).Code()]; ok {
 				return handler(desc)
 			}
@@ -264,9 +299,20 @@ func NewCluster(opts ...NewClusterOption) cluster.Cluster {
 }
 
 type clientConn struct {
-	onInvoke    func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
-	onNewStream func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
-	onAddress   func() string
+	onInvoke func(
+		ctx context.Context,
+		method string,
+		args interface{},
+		reply interface{},
+		opts ...grpc.CallOption,
+	) error
+	onNewStream func(
+		ctx context.Context,
+		desc *grpc.StreamDesc,
+		method string,
+		opts ...grpc.CallOption,
+	) (grpc.ClientStream, error)
+	onAddress func() string
 }
 
 func (c *clientConn) Address() string {
@@ -276,14 +322,25 @@ func (c *clientConn) Address() string {
 	return ""
 }
 
-func (c *clientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+func (c *clientConn) Invoke(
+	ctx context.Context,
+	method string,
+	args interface{},
+	reply interface{},
+	opts ...grpc.CallOption,
+) error {
 	if c.onInvoke == nil {
 		return fmt.Errorf("onInvoke not implemented (method: %s, request: %v, response: %v)", method, args, reply)
 	}
 	return c.onInvoke(ctx, method, args, reply, opts...)
 }
 
-func (c *clientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+func (c *clientConn) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
 	if c.onNewStream == nil {
 		return nil, fmt.Errorf("onNewStream not implemented (method: %s, desc: %v)", method, desc)
 	}
@@ -332,7 +389,6 @@ func (s *ClientStream) SendMsg(m interface{}) error {
 		return ErrNotImplemented
 	}
 	return s.OnSendMsg(m)
-
 }
 
 func (s *ClientStream) RecvMsg(m interface{}) error {

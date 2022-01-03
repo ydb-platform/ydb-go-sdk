@@ -415,7 +415,7 @@ type KeyRange struct {
 	To   types.Value
 }
 
-// Deprecated use TimeToLiveSettings instead.
+// Deprecated: use TimeToLiveSettings instead.
 // Will be removed after Jan 2022.
 type TTLSettings struct {
 	DateTimeColumn string

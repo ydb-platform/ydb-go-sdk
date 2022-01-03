@@ -33,17 +33,14 @@ func (c *conn) Address() string {
 
 type conn struct {
 	sync.Mutex
-
+	config   Config // ro access
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
-	endpoint endpoint.Endpoint // ro access
+	cc       *grpc.ClientConn
 	done     chan struct{}
+	endpoint endpoint.Endpoint // ro access
 	closed   bool
-
-	config Config // ro access
-
-	cc    *grpc.ClientConn
-	state state.State
-	locks int32
+	state    state.State
+	locks    int32
 }
 
 func (c *conn) NodeID() uint32 {
@@ -169,7 +166,13 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	)
 }
 
-func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) (err error) {
+func (c *conn) Invoke(
+	ctx context.Context,
+	method string,
+	req interface{},
+	res interface{},
+	opts ...grpc.CallOption,
+) (err error) {
 	if c.isClosed() {
 		return errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
 	}
@@ -244,10 +247,15 @@ func (c *conn) Invoke(ctx context.Context, method string, req interface{}, res i
 		}
 	}
 
-	return
+	return err
 }
 
-func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (_ grpc.ClientStream, err error) {
+func (c *conn) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (_ grpc.ClientStream, err error) {
 	if c.isClosed() {
 		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
 	}
@@ -293,8 +301,8 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 
 	var s grpc.ClientStream
 	s, err = cc.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
+	c.release(ctx)
 	if err != nil {
-		c.release(ctx)
 		err = errors.MapGRPCError(err)
 		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
@@ -306,7 +314,6 @@ func (c *conn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method stri
 		c: c,
 		s: s,
 		onDone: func(ctx context.Context) {
-			c.release(ctx)
 			cancel()
 		},
 		recv: streamRecv,

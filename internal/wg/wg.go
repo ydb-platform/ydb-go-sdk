@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-// wrap sync.WaitGroup to allow for 'wait 1st' logic
+// WG wraps sync.WaitGroup to allow for 'wait 1st' logic
 type WG interface {
 	Done()
 	Wait()
@@ -18,8 +18,10 @@ type wg struct {
 	firstDone chan struct{}
 }
 
-var _ WG = &sync.WaitGroup{}
-var _ WG = &wg{}
+var (
+	_ WG = &sync.WaitGroup{}
+	_ WG = &wg{}
+)
 
 func (w *wg) Done() {
 	w.once.Do(w.first)

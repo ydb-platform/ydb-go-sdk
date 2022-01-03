@@ -13,9 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-var (
-	errAlreadyClosed = fmt.Errorf("result already closed")
-)
+var errAlreadyClosed = fmt.Errorf("result already closed")
 
 type result struct {
 	scanner
@@ -54,7 +52,9 @@ func (r *result) UpdateStats(stats *Ydb_TableStats.QueryStats) {
 }
 
 func (r *streamResult) Append(set *Ydb.ResultSet) {
-	if r.isClosed() {
+	r.closedMtx.RLock()
+	defer r.closedMtx.RUnlock()
+	if r.closed {
 		return
 	}
 	r.ch <- set
@@ -129,9 +129,11 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 		return true
 
 	case <-ctx.Done():
+		r.errMtx.Lock()
 		if r.err == nil {
 			r.err = ctx.Err()
 		}
+		r.errMtx.Unlock()
 		r.Reset(nil)
 		return false
 	}
@@ -153,6 +155,8 @@ func (r *result) Stats() stats.QueryStats {
 
 // Close closes the result, preventing further iteration.
 func (r *result) Close() error {
+	r.closedMtx.Lock()
+	defer r.closedMtx.Unlock()
 	if r.closed {
 		return errAlreadyClosed
 	}
@@ -193,5 +197,3 @@ func (r *unaryResult) HasNextResultSet() bool {
 	}
 	return true
 }
-
-///---------------non-stream-----------------/>

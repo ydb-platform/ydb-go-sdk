@@ -19,12 +19,14 @@ func TestRetry(t *testing.T) {
 }
 
 func testSingleTrace(t *testing.T, x interface{}, traceName string) {
+	t.Helper()
 	a := reflect.New(reflect.TypeOf(x))
 	defer assertCalled(t, traceName, stubEachFunc(a))
 	callEachFunc(a.Elem())
 }
 
 func assertCalled(t *testing.T, prefix string, called map[string]bool) {
+	t.Helper()
 	for name, called := range called {
 		if !called {
 			t.Error(prefix, fmt.Sprintf("%s field is not called", name))
@@ -46,9 +48,7 @@ func stubEachFunc(x reflect.Value) map[string]bool {
 }
 
 func callEachFunc(x reflect.Value) {
-	var (
-		t = x.Type()
-	)
+	t := x.Type()
 	for i := 0; i < t.NumField(); i++ {
 		var (
 			f  = x.Field(i)
@@ -61,8 +61,8 @@ func callEachFunc(x reflect.Value) {
 			continue
 		}
 		args := make([]reflect.Value, ft.NumIn())
-		for i := range args {
-			args[i] = reflect.New(ft.In(i)).Elem()
+		for j := range args {
+			args[j] = reflect.New(ft.In(j)).Elem()
 		}
 		f.Call(args)
 	}

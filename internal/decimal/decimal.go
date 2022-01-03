@@ -5,7 +5,6 @@ import (
 	"math/bits"
 )
 
-// TODO(berezhnov): delete unused functions
 const wordSize = bits.UintSize / 8
 
 var (
@@ -145,6 +144,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		}
 		integral--
 	}
+	// nolint: nestif
 	if len(s) > 0 { // Characters remaining.
 		c := s[0]
 		if !isDigit(c) {
@@ -209,9 +209,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	bts := make([]byte, 40)
 	pos := len(bts)
 
-	var (
-		digit big.Int
-	)
+	var digit big.Int
 	for ; v.Cmp(zero) > 0; v.Div(v, ten) {
 		if precision == 0 {
 			return errorTag
@@ -258,17 +256,12 @@ func Format(x *big.Int, precision, scale uint32) string {
 	return string(bts[pos:])
 }
 
-// Int128 returns the 16-byte array representation of x.
+// BigIntToByte returns the 16-byte array representation of x.
 //
 // If x value does not fit in 16 bytes with given precision, it returns 16-byte
-// representation of infinity or negative infinity value accordingly to x's
-// sign.
+// representation of infinity or negative infinity value accordingly to x's sign.
 func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
-	if !IsInf(x) &&
-		!IsNaN(x) &&
-		!IsErr(x) &&
-		x.CmpAbs(pow(ten, precision)) >= 0 {
-
+	if !IsInf(x) && !IsNaN(x) && !IsErr(x) && x.CmpAbs(pow(ten, precision)) >= 0 {
 		if x.Sign() < 0 {
 			x = neginf
 		} else {
@@ -280,9 +273,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 }
 
 func put(x *big.Int, p []byte) {
-	var (
-		neg = x.Sign() < 0
-	)
+	neg := x.Sign() < 0
 	if neg {
 		x = complement(x)
 	}

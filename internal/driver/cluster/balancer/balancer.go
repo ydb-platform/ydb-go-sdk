@@ -19,8 +19,7 @@ var (
 
 // Element is an empty interface that holds some Balancer specific
 // data.
-type Element interface {
-}
+type Element interface{}
 
 // Balancer is an interface that implements particular load-balancing
 // algorithm.
@@ -166,6 +165,7 @@ type singleConnBalancer struct {
 func (s *singleConnBalancer) Next() conn.Conn {
 	return s.conn
 }
+
 func (s *singleConnBalancer) Insert(conn conn.Conn, _ info.Info) Element {
 	if s.conn != nil {
 		panic("ydb: single Conn Balancer: double Insert()")
@@ -173,13 +173,16 @@ func (s *singleConnBalancer) Insert(conn conn.Conn, _ info.Info) Element {
 	s.conn = conn
 	return conn
 }
+
 func (s *singleConnBalancer) Remove(x Element) {
 	if s.conn != x.(conn.Conn) {
 		panic("ydb: single Conn Balancer: Remove() unknown Conn")
 	}
 	s.conn = nil
 }
+
 func (s *singleConnBalancer) Update(Element, info.Info) {}
+
 func (s *singleConnBalancer) Contains(x Element) bool {
 	if x == nil {
 		return false

@@ -191,10 +191,13 @@ func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
 	}
 }
 
-func (m retryMode) StatusCode() int32               { return m.statusCode }
-func (m retryMode) MustBackoff() bool               { return m.backoff&errors.BackoffTypeBackoffAny != 0 }
+func (m retryMode) StatusCode() int32 { return m.statusCode }
+
+func (m retryMode) MustBackoff() bool { return m.backoff&errors.BackoffTypeBackoffAny != 0 }
+
 func (m retryMode) BackoffType() errors.BackoffType { return m.backoff }
-func (m retryMode) MustDeleteSession() bool         { return m.deleteSession }
+
+func (m retryMode) MustDeleteSession() bool { return m.deleteSession }
 
 // Backoff is the interface that contains logic of delaying operation retry.
 type Backoff interface {

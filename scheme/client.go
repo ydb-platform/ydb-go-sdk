@@ -66,21 +66,27 @@ type Entry struct {
 func (e *Entry) IsDirectory() bool {
 	return e.Type == EntryDirectory
 }
+
 func (e *Entry) IsTable() bool {
 	return e.Type == EntryTable
 }
+
 func (e *Entry) IsPersQueueGroup() bool {
 	return e.Type == EntryPersQueueGroup
 }
+
 func (e *Entry) IsDatabase() bool {
 	return e.Type == EntryDatabase
 }
+
 func (e *Entry) IsRtmrVolume() bool {
 	return e.Type == EntryRtmrVolume
 }
+
 func (e *Entry) IsBlockStoreVolume() bool {
 	return e.Type == EntryBlockStoreVolume
 }
+
 func (e *Entry) IsCoordinationNode() bool {
 	return e.Type == EntryCoordinationNode
 }

@@ -154,8 +154,9 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) T {
 	}
 }
 
+// ListType wraps proto message List
 // TODO prepare toYDB() calls in constructors as an optimization.
-
+// nolint: godox
 type ListType struct {
 	T T
 }
@@ -462,11 +463,9 @@ func (v VoidType) toString(buf *bytes.Buffer) {
 	buf.WriteString(v.String())
 }
 
-var (
-	void = &Ydb.Type{
-		Type: &Ydb.Type_VoidType{},
-	}
-)
+var void = &Ydb.Type{
+	Type: &Ydb.Type_VoidType{},
+}
 
 type OptionalType struct {
 	T T

@@ -92,7 +92,6 @@ func (c *client) DescribeNode(ctx context.Context, path string) (_ *scheme.Entry
 		AttachConsistencyMode:    consistencyMode(result.GetConfig().GetAttachConsistencyMode()),
 		RateLimiterCountersMode:  rateLimiterCountersMode(result.GetConfig().GetRateLimiterCountersMode()),
 	}, nil
-
 }
 
 func (c *client) Close(ctx context.Context) error {

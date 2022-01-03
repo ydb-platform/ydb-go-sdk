@@ -124,7 +124,8 @@ func (s *scanner) ScanWithDefaults(values ...interface{}) error {
 // For optional types use double pointer construction.
 // For unknown types use interface types.
 // Supported scanning byte arrays of various length.
-// For complex yql types: Dict, List, Tuple and own specific scanning logic implement ydb.Scanner with UnmarshalYDB method
+// For complex yql types: Dict, List, Tuple and own specific scanning logic implement
+// ydb.Scanner with UnmarshalYDB method
 // See examples for more detailed information.
 // Output param - Scanner error
 func (s *scanner) Scan(values ...interface{}) error {
@@ -243,6 +244,7 @@ func (s *scanner) setColumnIndexes(columns []string) {
 //   string
 //   [16]byte
 //
+// nolint: gocyclo
 func (s *scanner) any() interface{} {
 	x := s.stack.current()
 	if s.Err() != nil || x.isEmpty() {
@@ -396,6 +398,7 @@ func (s *scanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
 	}
 	return
 }
+
 func (s *scanner) bool() (v bool) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_BoolValue)
 	if x == nil {
@@ -404,6 +407,7 @@ func (s *scanner) bool() (v bool) {
 	}
 	return x.BoolValue
 }
+
 func (s *scanner) int8() (v int8) {
 	d := s.int32()
 	if d < math.MinInt8 || math.MaxInt8 < d {
@@ -412,6 +416,7 @@ func (s *scanner) int8() (v int8) {
 	}
 	return int8(d)
 }
+
 func (s *scanner) uint8() (v uint8) {
 	d := s.uint32()
 	if d > math.MaxUint8 {
@@ -420,6 +425,7 @@ func (s *scanner) uint8() (v uint8) {
 	}
 	return uint8(d)
 }
+
 func (s *scanner) int16() (v int16) {
 	d := s.int32()
 	if d < math.MinInt16 || math.MaxInt16 < d {
@@ -428,6 +434,7 @@ func (s *scanner) int16() (v int16) {
 	}
 	return int16(d)
 }
+
 func (s *scanner) uint16() (v uint16) {
 	d := s.uint32()
 	if d > math.MaxUint16 {
@@ -436,6 +443,7 @@ func (s *scanner) uint16() (v uint16) {
 	}
 	return uint16(d)
 }
+
 func (s *scanner) int32() (v int32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Int32Value)
 	if x == nil {
@@ -444,6 +452,7 @@ func (s *scanner) int32() (v int32) {
 	}
 	return x.Int32Value
 }
+
 func (s *scanner) uint32() (v uint32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Uint32Value)
 	if x == nil {
@@ -452,6 +461,7 @@ func (s *scanner) uint32() (v uint32) {
 	}
 	return x.Uint32Value
 }
+
 func (s *scanner) int64() (v int64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Int64Value)
 	if x == nil {
@@ -460,6 +470,7 @@ func (s *scanner) int64() (v int64) {
 	}
 	return x.Int64Value
 }
+
 func (s *scanner) uint64() (v uint64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Uint64Value)
 	if x == nil {
@@ -468,6 +479,7 @@ func (s *scanner) uint64() (v uint64) {
 	}
 	return x.Uint64Value
 }
+
 func (s *scanner) float() (v float32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_FloatValue)
 	if x == nil {
@@ -476,6 +488,7 @@ func (s *scanner) float() (v float32) {
 	}
 	return x.FloatValue
 }
+
 func (s *scanner) double() (v float64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_DoubleValue)
 	if x == nil {
@@ -484,6 +497,7 @@ func (s *scanner) double() (v float64) {
 	}
 	return x.DoubleValue
 }
+
 func (s *scanner) bytes() (v []byte) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_BytesValue)
 	if x == nil {
@@ -492,6 +506,7 @@ func (s *scanner) bytes() (v []byte) {
 	}
 	return x.BytesValue
 }
+
 func (s *scanner) text() (v string) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_TextValue)
 	if x == nil {
@@ -500,6 +515,7 @@ func (s *scanner) text() (v string) {
 	}
 	return x.TextValue
 }
+
 func (s *scanner) low128() (v uint64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Low_128)
 	if x == nil {
@@ -508,6 +524,7 @@ func (s *scanner) low128() (v uint64) {
 	}
 	return x.Low_128
 }
+
 func (s *scanner) uint128() (v [16]byte) {
 	c := s.stack.current()
 	if c.isEmpty() {
@@ -685,6 +702,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	}
 }
 
+// nolint: gocyclo
 func (s *scanner) scanOptional(value interface{}) {
 	if s.defaultValueForOptional {
 		if s.isNull() {

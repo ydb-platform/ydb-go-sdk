@@ -32,16 +32,16 @@ func (d *driver) Name() string {
 func New(
 	config config.Config,
 	meta meta.Meta,
-	get func(ctx context.Context) (conn conn.Conn, err error),
-	pessimize func(ctx context.Context, endpoint endpoint.Endpoint) error,
-	close func(ctx context.Context) error,
+	doGet func(ctx context.Context) (conn conn.Conn, err error),
+	doPessimize func(ctx context.Context, endpoint endpoint.Endpoint) error,
+	doClose func(ctx context.Context) error,
 ) *driver {
 	return &driver{
 		config:    config,
 		meta:      meta,
-		get:       get,
-		pessimize: pessimize,
-		close:     close,
+		get:       doGet,
+		pessimize: doPessimize,
+		close:     doClose,
 	}
 }
 

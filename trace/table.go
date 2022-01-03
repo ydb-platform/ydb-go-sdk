@@ -4,12 +4,12 @@ import (
 	"context"
 )
 
-//go:generate gtrace
+// go:generate gtrace
 
 type (
 	// Table contains options for tracing table client activity.
-	//gtrace:gen
-	//gtrace:set Shortcut
+	// gtrace:gen
+	// gtrace:set Shortcut
 	Table struct {
 		// Session events
 		OnSessionNew       func(SessionNewStartInfo) func(SessionNewDoneInfo)
@@ -248,8 +248,7 @@ type (
 		Context *context.Context
 		Session sessionInfo
 	}
-	PoolTakeWaitInfo struct {
-	}
+	PoolTakeWaitInfo struct{}
 	PoolTakeDoneInfo struct {
 		Took  bool
 		Error error
@@ -273,9 +272,8 @@ type (
 		Context *context.Context
 		Session sessionInfo
 	}
-	PoolSessionCloseDoneInfo struct {
-	}
-	PoolCloseStartInfo struct {
+	PoolSessionCloseDoneInfo struct{}
+	PoolCloseStartInfo       struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.

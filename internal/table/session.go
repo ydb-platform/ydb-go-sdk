@@ -28,9 +28,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var (
-	ErrNilConnection = errors.New("build with nil connection")
-)
+var ErrNilConnection = errors.New("session with nil connection")
 
 // session represents a single table API session.
 //
@@ -144,7 +142,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 	}()
 
 	// call all close listeners before doing request
-	// firstly this need to clear client from this build
+	// firstly this need to clear client from this session
 	s.onCloseMtx.RLock()
 	for _, cb := range s.onClose {
 		cb(ctx)
@@ -154,13 +152,16 @@ func (s *session) Close(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	_, err = s.tableService.DeleteSession(cluster.WithEndpoint(ctx, s), &Ydb_Table.DeleteSessionRequest{
-		SessionId: s.id,
-	})
+	_, err = s.tableService.DeleteSession(
+		cluster.WithEndpoint(ctx, s),
+		&Ydb_Table.DeleteSessionRequest{
+			SessionId: s.id,
+		},
+	)
 	return err
 }
 
-// KeepAlive keeps idle build alive.
+// KeepAlive keeps idle session alive.
 func (s *session) KeepAlive(ctx context.Context) (err error) {
 	onDone := trace.TableOnSessionKeepAlive(s.trace, &ctx, s)
 	defer func() {
@@ -203,7 +204,11 @@ func (s *session) CreateTable(ctx context.Context, path string, opts ...options.
 }
 
 // DescribeTable describes table at given path.
-func (s *session) DescribeTable(ctx context.Context, path string, opts ...options.DescribeTableOption) (desc options.Description, err error) {
+func (s *session) DescribeTable(
+	ctx context.Context,
+	path string,
+	opts ...options.DescribeTableOption,
+) (desc options.Description, err error) {
 	var (
 		response *Ydb_Table.DescribeTableResponse
 		result   Ydb_Table.DescribeTableResult
@@ -263,7 +268,10 @@ func (s *session) DescribeTable(ctx context.Context, path string, opts ...option
 			creationTime = time.Unix(resStats.GetCreationTime().GetSeconds(), int64(resStats.GetCreationTime().GetNanos()))
 		}
 		if resStats.ModificationTime.GetSeconds() != 0 {
-			modificationTime = time.Unix(resStats.GetModificationTime().GetSeconds(), int64(resStats.GetModificationTime().GetNanos()))
+			modificationTime = time.Unix(
+				resStats.GetModificationTime().GetSeconds(),
+				int64(resStats.GetModificationTime().GetNanos()),
+			)
 		}
 
 		stats = &options.TableStats{
@@ -378,7 +386,7 @@ func (s *session) Explain(ctx context.Context, query string) (exp table.DataQuer
 	}, nil
 }
 
-// Statement is a prepared statement. Like a single build, it is not safe for
+// Statement is a prepared statement. Like a single session, it is not safe for
 // concurrent use by multiple goroutines.
 type Statement struct {
 	session *session
@@ -424,7 +432,7 @@ func (s *Statement) Text() string {
 	return s.query.YQL()
 }
 
-// Prepare prepares data query within build s.
+// Prepare prepares data query within session s.
 func (s *session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
 	var (
 		q        *dataQuery
@@ -523,9 +531,7 @@ func (s *session) executeDataQuery(
 	result *Ydb_Table.ExecuteQueryResult,
 	err error,
 ) {
-	var (
-		response *Ydb_Table.ExecuteDataQueryResponse
-	)
+	var response *Ydb_Table.ExecuteDataQueryResponse
 	result = &Ydb_Table.ExecuteQueryResult{}
 	request = &Ydb_Table.ExecuteDataQueryRequest{
 		SessionId:  s.id,
@@ -548,7 +554,11 @@ func (s *session) executeDataQuery(
 }
 
 // ExecuteSchemeQuery executes scheme query.
-func (s *session) ExecuteSchemeQuery(ctx context.Context, query string, opts ...options.ExecuteSchemeQueryOption) (err error) {
+func (s *session) ExecuteSchemeQuery(
+	ctx context.Context,
+	query string,
+	opts ...options.ExecuteSchemeQueryOption,
+) (err error) {
 	request := Ydb_Table.ExecuteSchemeQueryRequest{
 		SessionId: s.id,
 		YqlText:   query,
@@ -667,7 +677,11 @@ func (s *session) DescribeTableOptions(ctx context.Context) (desc options.TableO
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
-func (s *session) StreamReadTable(ctx context.Context, path string, opts ...options.ReadTableOption) (_ result.StreamResult, err error) {
+func (s *session) StreamReadTable(
+	ctx context.Context,
+	path string,
+	opts ...options.ReadTableOption,
+) (_ result.StreamResult, err error) {
 	var (
 		request = Ydb_Table.ReadTableRequest{
 			SessionId: s.id,
@@ -710,7 +724,7 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 			default:
 				err = c.RecvMsg(&response)
 				if err != nil {
-					if err != io.EOF {
+					if !errors.Is(err, io.EOF) {
 						r.SetErr(err)
 					}
 					return
@@ -731,7 +745,12 @@ func (s *session) StreamReadTable(ctx context.Context, path string, opts ...opti
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamExecuteScanQuery() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
-func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, params *table.QueryParameters, opts ...options.ExecuteScanQueryOption) (_ result.StreamResult, err error) {
+func (s *session) StreamExecuteScanQuery(
+	ctx context.Context,
+	query string,
+	params *table.QueryParameters,
+	opts ...options.ExecuteScanQueryOption,
+) (_ result.StreamResult, err error) {
 	q := new(dataQuery)
 	q.initFromText(query)
 	var (
@@ -776,7 +795,7 @@ func (s *session) StreamExecuteScanQuery(ctx context.Context, query string, para
 				return
 			default:
 				if err = c.RecvMsg(&response); err != nil {
-					if err != io.EOF {
+					if !errors.Is(err, io.EOF) {
 						r.SetErr(err)
 						err = nil
 					}
@@ -805,9 +824,12 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 	return err
 }
 
-// BeginTransaction begins new transaction within given build with given
+// BeginTransaction begins new transaction within given session with given
 // settings.
-func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSettings) (x table.Transaction, err error) {
+func (s *session) BeginTransaction(
+	ctx context.Context,
+	tx *table.TransactionSettings,
+) (x table.Transaction, err error) {
 	onDone := trace.TableOnSessionTransactionBegin(s.trace, &ctx, s)
 	defer func() {
 		onDone(x, err)
@@ -837,7 +859,7 @@ func (s *session) BeginTransaction(ctx context.Context, tx *table.TransactionSet
 }
 
 // Transaction is a database transaction.
-// Hence build methods are not goroutine safe, Transaction is not goroutine
+// Hence session methods are not goroutine safe, Transaction is not goroutine
 // safe either.
 type Transaction struct {
 	id string
@@ -876,7 +898,10 @@ func (tx *Transaction) ExecuteStatement(
 }
 
 // CommitTx commits specified active transaction.
-func (tx *Transaction) CommitTx(ctx context.Context, opts ...options.CommitTransactionOption) (r result.Result, err error) {
+func (tx *Transaction) CommitTx(
+	ctx context.Context,
+	opts ...options.CommitTransactionOption,
+) (r result.Result, err error) {
 	if tx.committed {
 		return nil, errors.ErrAlreadyCommited
 	}

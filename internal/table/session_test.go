@@ -38,12 +38,13 @@ func TestSessionKeepAlive(t *testing.T) {
 		Cluster: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
-					testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
+					// nolint: unparam
+					// nolint: nolintlint
+					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
 					},
-					// nolint:unparam
-					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					// nolint: unparam
+					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
@@ -94,13 +95,12 @@ func TestSessionDescribeTable(t *testing.T) {
 		Cluster: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					//nolint: unparam
+					// nolint: unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					//nolint: unparam
 					testutil.TableDescribeTable: func(interface{}) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)
@@ -330,7 +330,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 							testutil.NewCluster(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
-										// nolint:unparam
+										// nolint: unparam
 										testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.ExecuteQueryResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
@@ -338,7 +338,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 												},
 											}, nil
 										},
-										// nolint:unparam
+										// nolint: unparam
 										testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.BeginTransactionResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
@@ -346,33 +346,27 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 												},
 											}, nil
 										},
-										// nolint:unparam
 										testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.ExecuteQueryResult{}, nil
 										},
-										// nolint:unparam
 										testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.PrepareQueryResult{}, nil
 										},
-										// nolint:unparam
-										testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+										// nolint: unparam
+										testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.CreateSessionResult{
 												SessionId: testutil.SessionID(),
 											}, nil
 										},
-										// nolint:unparam
 										testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.DeleteSessionResponse{}, nil
 										},
-										// nolint:unparam
 										testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.CommitTransactionResponse{}, nil
 										},
-										// nolint:unparam
 										testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.RollbackTransactionResponse{}, nil
 										},
-										// nolint:unparam
 										testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.KeepAliveResult{}, nil
 										},
@@ -421,7 +415,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 				Cluster: testutil.NewCluster(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
-							// nolint:unparam
+							// nolint: unparam
 							testutil.TableExecuteDataQuery: func(request interface{}) (proto.Message, error) {
 								r, ok := request.(*Ydb_Table.ExecuteDataQueryRequest)
 								if !ok {
@@ -442,8 +436,8 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 									},
 								}, nil
 							},
-							// nolint:unparam
-							testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+							// nolint: unparam
+							testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 								return &Ydb_Table.CreateSessionResult{
 									SessionId: testutil.SessionID(),
 								}, nil
@@ -485,7 +479,6 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 		Cluster: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableBeginTransaction: func(request interface{}) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.BeginTransactionRequest)
 						if !ok {
@@ -510,7 +503,6 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							},
 						}, nil
 					},
-					// nolint:unparam
 					testutil.TableCommitTransaction: func(request interface{}) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.CommitTransactionRequest)
 						if !ok {
@@ -531,7 +523,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							},
 						}, nil
 					},
-					// nolint:unparam
+					// nolint: unparam
 					testutil.TableRollbackTransaction: func(request interface{}) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.RollbackTransactionRequest)
 						if !ok {
@@ -545,8 +537,8 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							},
 						}, nil
 					},
-					// nolint:unparam
-					testutil.TableCreateSession: func(request interface{}) (result proto.Message, err error) {
+					// nolint: unparam
+					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil

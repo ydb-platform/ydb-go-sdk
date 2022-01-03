@@ -22,6 +22,7 @@ func WithClearPermissions() PermissionsOption {
 		p.SetClear(true)
 	}
 }
+
 func WithGrantPermissions(p Permissions) PermissionsOption {
 	return func(d permissionsDesc) {
 		d.AppendAction(&Ydb_Scheme.PermissionsAction{
@@ -31,6 +32,7 @@ func WithGrantPermissions(p Permissions) PermissionsOption {
 		})
 	}
 }
+
 func WithRevokePermissions(p Permissions) PermissionsOption {
 	return func(d permissionsDesc) {
 		d.AppendAction(&Ydb_Scheme.PermissionsAction{
@@ -40,6 +42,7 @@ func WithRevokePermissions(p Permissions) PermissionsOption {
 		})
 	}
 }
+
 func WithSetPermissions(p Permissions) PermissionsOption {
 	return func(d permissionsDesc) {
 		d.AppendAction(&Ydb_Scheme.PermissionsAction{
@@ -49,6 +52,7 @@ func WithSetPermissions(p Permissions) PermissionsOption {
 		})
 	}
 }
+
 func WithChangeOwner(owner string) PermissionsOption {
 	return func(d permissionsDesc) {
 		d.AppendAction(&Ydb_Scheme.PermissionsAction{

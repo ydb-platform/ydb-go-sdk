@@ -1,3 +1,10 @@
+## 3.5.2
+* Fixed data race on closing table result
+* Added custom dns-resolver to grpc options for use dns-balancing with round_robin balancing policy
+* Wrapped with `recover()` system panic on getting system certificates pool
+* Added linters and fixed issues from them
+* Changed API of `sugar` package
+
 ## 3.5.1
 * Added system certificates for `darwin` system
 * Fixed `table.StreamResult` finishing

@@ -177,6 +177,7 @@ func (v Value) ToYDB() *Ydb.TypedValue {
 	// TODO: may be optimized -1 allocation: make all *Value() methods return
 	// *Value, put TypedValue, Value and Type on Value and then use pointer to
 	// already heap-allocated bytes.
+	// nolint: godox
 	return &Ydb.TypedValue{
 		Type:  v.t.toYDB(),
 		Value: v.v,
@@ -193,6 +194,7 @@ func BoolValue(v bool) Value {
 		},
 	}
 }
+
 func Int8Value(v int8) Value {
 	return Value{
 		t: TypeInt8,
@@ -203,6 +205,7 @@ func Int8Value(v int8) Value {
 		},
 	}
 }
+
 func Uint8Value(v uint8) Value {
 	return Value{
 		t: TypeUint8,
@@ -213,6 +216,7 @@ func Uint8Value(v uint8) Value {
 		},
 	}
 }
+
 func Int16Value(v int16) Value {
 	return Value{
 		t: TypeInt16,
@@ -223,6 +227,7 @@ func Int16Value(v int16) Value {
 		},
 	}
 }
+
 func Uint16Value(v uint16) Value {
 	return Value{
 		t: TypeUint16,
@@ -233,6 +238,7 @@ func Uint16Value(v uint16) Value {
 		},
 	}
 }
+
 func Int32Value(v int32) Value {
 	return Value{
 		t: TypeInt32,
@@ -243,6 +249,7 @@ func Int32Value(v int32) Value {
 		},
 	}
 }
+
 func Uint32Value(v uint32) Value {
 	return Value{
 		t: TypeUint32,
@@ -253,6 +260,7 @@ func Uint32Value(v uint32) Value {
 		},
 	}
 }
+
 func Int64Value(v int64) Value {
 	return Value{
 		t: TypeInt64,
@@ -263,6 +271,7 @@ func Int64Value(v int64) Value {
 		},
 	}
 }
+
 func Uint64Value(v uint64) Value {
 	return Value{
 		t: TypeUint64,
@@ -273,6 +282,7 @@ func Uint64Value(v uint64) Value {
 		},
 	}
 }
+
 func FloatValue(v float32) Value {
 	return Value{
 		t: TypeFloat,
@@ -283,6 +293,7 @@ func FloatValue(v float32) Value {
 		},
 	}
 }
+
 func DoubleValue(v float64) Value {
 	return Value{
 		t: TypeDouble,
@@ -293,6 +304,7 @@ func DoubleValue(v float64) Value {
 		},
 	}
 }
+
 func DateValue(v uint32) Value {
 	return Value{
 		t: TypeDate,
@@ -303,6 +315,7 @@ func DateValue(v uint32) Value {
 		},
 	}
 }
+
 func DatetimeValue(v uint32) Value {
 	return Value{
 		t: TypeDatetime,
@@ -313,6 +326,7 @@ func DatetimeValue(v uint32) Value {
 		},
 	}
 }
+
 func TimestampValue(v uint64) Value {
 	return Value{
 		t: TypeTimestamp,
@@ -323,6 +337,7 @@ func TimestampValue(v uint64) Value {
 		},
 	}
 }
+
 func IntervalValue(v int64) Value {
 	return Value{
 		t: TypeInterval,
@@ -333,6 +348,7 @@ func IntervalValue(v int64) Value {
 		},
 	}
 }
+
 func TzDateValue(v string) Value {
 	return Value{
 		t: TypeTzDate,
@@ -343,6 +359,7 @@ func TzDateValue(v string) Value {
 		},
 	}
 }
+
 func TzDatetimeValue(v string) Value {
 	return Value{
 		t: TypeTzDatetime,
@@ -353,6 +370,7 @@ func TzDatetimeValue(v string) Value {
 		},
 	}
 }
+
 func TzTimestampValue(v string) Value {
 	return Value{
 		t: TypeTzTimestamp,
@@ -363,6 +381,7 @@ func TzTimestampValue(v string) Value {
 		},
 	}
 }
+
 func StringValue(v []byte) Value {
 	return Value{
 		t: TypeString,
@@ -373,6 +392,7 @@ func StringValue(v []byte) Value {
 		},
 	}
 }
+
 func UTF8Value(v string) Value {
 	return Value{
 		t: TypeUTF8,
@@ -383,6 +403,7 @@ func UTF8Value(v string) Value {
 		},
 	}
 }
+
 func YSONValue(v string) Value {
 	return Value{
 		t: TypeYSON,
@@ -393,6 +414,7 @@ func YSONValue(v string) Value {
 		},
 	}
 }
+
 func JSONValue(v string) Value {
 	return Value{
 		t: TypeJSON,
@@ -403,6 +425,7 @@ func JSONValue(v string) Value {
 		},
 	}
 }
+
 func UUIDValue(v [16]byte) Value {
 	return Value{
 		t: TypeUUID,
@@ -414,6 +437,7 @@ func UUIDValue(v [16]byte) Value {
 		},
 	}
 }
+
 func JSONDocumentValue(v string) Value {
 	return Value{
 		t: TypeJSONDocument,
@@ -424,6 +448,7 @@ func JSONDocumentValue(v string) Value {
 		},
 	}
 }
+
 func DyNumberValue(v string) Value {
 	return Value{
 		t: TypeDyNumber,
@@ -434,6 +459,7 @@ func DyNumberValue(v string) Value {
 		},
 	}
 }
+
 func DecimalValue(t T, v [16]byte) Value {
 	return Value{
 		t: t,
@@ -473,8 +499,6 @@ func TupleValue(n int, it func(int) V) Value {
 type StructValueProto struct {
 	Fields []StructField
 	Values []*Ydb.Value
-	//TODO: proto reuse ability – maintain an index of fieldname -> int (for
-	//Set(name, value) method).
 }
 
 func (s *StructValueProto) Add(name string, value V) {
@@ -534,7 +558,7 @@ func DictValue(n int, it func(int) V) Value {
 // It panics if vs is empty or contains not equal types.
 func ListValue(n int, it func(int) V) Value {
 	t := it(0).(Value).t
-	var items = make([]*Ydb.Value, n)
+	items := make([]*Ydb.Value, n)
 	for i := 0; i < n; i++ {
 		v := it(i).(Value)
 		if !TypesEqual(v.t, t) {

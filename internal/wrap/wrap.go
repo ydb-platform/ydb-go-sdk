@@ -5,33 +5,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
 
-//type Operation struct {
-//	method string
-//	req    proto.Message
-//	res    proto.Message
-//	resp   response.Response
-//}
-//
-//func WithResponse(method string, req proto.Message, resp response.Response) Operation {
-//	return Operation{
-//		method: method,
-//		req:    req,
-//		resp:   resp,
-//	}
-//}
-//
-//func Wrap(method string, req, res proto.Message) Operation {
-//	return Operation{
-//		method: method,
-//		req:    req,
-//		res:    res,
-//	}
-//}
-//
-//func Unwrap(op Operation) (method string, req, res proto.Message, resp response.Response) {
-//	return op.method, op.req, op.res, op.resp
-//}
-
 // StreamOperationResponse is an interface that provides access to the
 // API-specific response fields.
 //
@@ -43,31 +16,3 @@ type StreamOperationResponse interface {
 	GetStatus() Ydb.StatusIds_StatusCode
 	GetIssues() []*Ydb_Issue.IssueMessage
 }
-
-//type StreamOperation struct {
-//	method    string
-//	req       proto.Message
-//	resp      StreamOperationResponse
-//	processor func(error)
-//}
-//
-//func NewStreamOperation(
-//	method string, req proto.Message,
-//	resp StreamOperationResponse,
-//	p func(error),
-//) StreamOperation {
-//	return StreamOperation{
-//		method:    method,
-//		req:       req,
-//		resp:      resp,
-//		processor: p,
-//	}
-//}
-//
-//func UnwrapStreamOperation(op StreamOperation) (
-//	method string, req proto.Message,
-//	resp StreamOperationResponse,
-//	processor func(error),
-//) {
-//	return op.method, op.req, op.resp, op.processor
-//}

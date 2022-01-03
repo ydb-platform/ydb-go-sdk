@@ -15,9 +15,7 @@ const (
 	tzLayoutTimestamp = "2006-01-02T15:04:05.000000,MST"
 )
 
-var (
-	unix = time.Unix(0, 0)
-)
+var unix = time.Unix(0, 0)
 
 // UnmarshalInterval up to ±292 years.
 func UnmarshalInterval(n int64) time.Duration {

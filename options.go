@@ -20,7 +20,12 @@ type Option func(ctx context.Context, db *db) error
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
-		credentials.NewAccessTokenCredentials(accessToken, credentials.WithSourceInfo("ydb.WithAccessTokenCredentials(accessToken)")), // hide access token for logs
+		credentials.NewAccessTokenCredentials(
+			accessToken,
+			credentials.WithSourceInfo(
+				"ydb.WithAccessTokenCredentials(accessToken)", // hide access token for logs
+			),
+		),
 	)
 }
 
@@ -55,6 +60,7 @@ func WithNamespace(namespace string) logger.Option {
 type Level logger.Level
 
 const (
+	QUIET = Level(logger.QUIET)
 	TRACE = Level(logger.TRACE)
 	DEBUG = Level(logger.DEBUG)
 	INFO  = Level(logger.INFO)
@@ -99,7 +105,15 @@ func WithConnectParams(params ConnectParams) Option {
 		db.options = append(db.options, config.WithDatabase(params.Database()))
 		db.options = append(db.options, config.WithSecure(params.Secure()))
 		if params.Token() != "" {
-			db.options = append(db.options, config.WithCredentials(credentials.NewAccessTokenCredentials(params.Token(), credentials.WithSourceInfo("config.WithConnectParams()"))))
+			db.options = append(
+				db.options,
+				config.WithCredentials(
+					credentials.NewAccessTokenCredentials(
+						params.Token(),
+						credentials.WithSourceInfo("config.WithConnectParams()"),
+					),
+				),
+			)
 		}
 		return nil
 	}

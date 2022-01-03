@@ -91,22 +91,22 @@ type Config interface {
 
 // Config contains driver configuration options.
 type config struct {
-	endpoint             string
-	database             string
-	secure               bool
-	credentials          credentials.Credentials
 	trace                trace.Driver
 	requestTimeout       time.Duration
 	streamTimeout        time.Duration
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
 	discoveryInterval    time.Duration
-	balancingConfig      BalancerConfig
-	requestsType         string
-	fastDial             bool
 	dialTimeout          time.Duration
-	tlsConfig            *tls.Config
+	balancingConfig      BalancerConfig
+	secure               bool
+	fastDial             bool
+	endpoint             string
+	database             string
+	requestsType         string
 	grpcOptions          []grpc.DialOption
+	credentials          credentials.Credentials
+	tlsConfig            *tls.Config
 }
 
 func (c *config) GrpcDialOptions() []grpc.DialOption {
@@ -282,21 +282,28 @@ func New(opts ...Option) Config {
 	return c
 }
 
-func defaults() (c *config) {
-	var (
-		certPool *x509.CertPool
-		err      error
-	)
+func certPool() (certPool *x509.CertPool) {
+	defer func() {
+		// on darwin system panic raced on getting system security checks
+		if e := recover(); e != nil {
+			certPool = x509.NewCertPool()
+		}
+	}()
+	var err error
 	certPool, err = x509.SystemCertPool()
 	if err != nil {
 		certPool = x509.NewCertPool()
 	}
+	return
+}
+
+func defaults() (c *config) {
 	return &config{
 		discoveryInterval: DefaultDiscoveryInterval,
 		balancingConfig:   DefaultBalancer,
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool,
+			RootCAs:    certPool(),
 		},
 	}
 }
