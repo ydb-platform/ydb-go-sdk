@@ -28,8 +28,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var ErrNilConnection = errors.New("session with nil connection")
-
 // session represents a single table API session.
 //
 // session methods are not goroutine safe. Simultaneous execution of requests
@@ -713,7 +711,6 @@ func (s *session) StreamReadTable(
 		defer func() {
 			cancel()
 			onDone(r, errors.HideEOF(err))
-			r.Append(nil)
 		}()
 		for {
 			select {
@@ -785,7 +782,6 @@ func (s *session) StreamExecuteScanQuery(
 		defer func() {
 			cancel()
 			onDone(r, errors.HideEOF(err))
-			r.Append(nil)
 		}()
 		for {
 			select {

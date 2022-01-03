@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -8,12 +9,18 @@ import (
 
 // Driver makes trace.Driver with internal logging
 func Driver(log Logger, details trace.Details) trace.Driver {
-	log = log.WithName(`driver`)
+	log, ok := log.WithName(`driver`).(Logger)
+	if !ok {
+		panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+	}
 	t := trace.Driver{}
 	// nolint: nestif
 	if details&trace.DriverNetEvents != 0 {
 		// nolint: govet
-		log := log.WithName(`net`)
+		log, ok := log.WithName(`net`).(Logger)
+		if !ok {
+			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+		}
 		t.OnNetRead = func(info trace.NetReadStartInfo) func(trace.NetReadDoneInfo) {
 			address := info.Address
 			log.Tracef(`read start {address:"%s"}`,
@@ -104,7 +111,10 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 	// nolint: nestif
 	if details&trace.DriverCoreEvents != 0 {
 		// nolint: govet
-		log := log.WithName(`core`)
+		log, ok := log.WithName(`core`).(Logger)
+		if !ok {
+			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+		}
 		t.OnInit = func(info trace.InitStartInfo) func(trace.InitDoneInfo) {
 			log.Infof(`init start`)
 			start := time.Now()
@@ -281,7 +291,10 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 	}
 	if details&trace.DriverDiscoveryEvents != 0 {
 		// nolint: govet
-		log := log.WithName(`discovery`)
+		log, ok := log.WithName(`discovery`).(Logger)
+		if !ok {
+			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+		}
 		t.OnDiscovery = func(info trace.DiscoveryStartInfo) func(trace.DiscoveryDoneInfo) {
 			log.Debugf(`discover start`)
 			start := time.Now()
@@ -302,7 +315,10 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 	}
 	if details&trace.DriverClusterEvents != 0 {
 		// nolint: govet
-		log := log.WithName(`cluster`)
+		log, ok := log.WithName(`cluster`).(Logger)
+		if !ok {
+			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+		}
 		t.OnClusterGet = func(info trace.ClusterGetStartInfo) func(trace.ClusterGetDoneInfo) {
 			log.Tracef(`get start`)
 			start := time.Now()
@@ -394,7 +410,10 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 	}
 	if details&trace.DriverCredentialsEvents != 0 {
 		// nolint: govet
-		log := log.WithName(`credentials`)
+		log, ok := log.WithName(`credentials`).(Logger)
+		if !ok {
+			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+		}
 		t.OnGetCredentials = func(info trace.GetCredentialsStartInfo) func(trace.GetCredentialsDoneInfo) {
 			log.Tracef(`get start`)
 			start := time.Now()

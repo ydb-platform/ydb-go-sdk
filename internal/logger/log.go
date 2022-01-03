@@ -288,7 +288,7 @@ func join(a, b string) string {
 	return a + "." + b
 }
 
-func (l *logger) WithName(name string) log.Logger {
+func (l *logger) WithName(name string) interface{} {
 	return &logger{
 		external:  l.external,
 		out:       l.out,
