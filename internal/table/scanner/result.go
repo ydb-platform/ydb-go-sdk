@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
-
-var errAlreadyClosed = fmt.Errorf("result already closed")
 
 type result struct {
 	scanner
@@ -35,6 +32,17 @@ type unaryResult struct {
 
 	sets    []*Ydb.ResultSet
 	nextSet int
+}
+
+// Close closes the result, preventing further iteration.
+func (r *unaryResult) Close() error {
+	r.closedMtx.Lock()
+	defer r.closedMtx.Unlock()
+	if r.closed {
+		return nil
+	}
+	r.closed = true
+	return nil
 }
 
 func (r *unaryResult) ResultSetCount() int {
@@ -154,24 +162,14 @@ func (r *result) Stats() stats.QueryStats {
 }
 
 // Close closes the result, preventing further iteration.
-func (r *result) Close() error {
+func (r *streamResult) Close() (err error) {
 	r.closedMtx.Lock()
 	defer r.closedMtx.Unlock()
 	if r.closed {
-		return errAlreadyClosed
+		return nil
 	}
 	r.closed = true
-	return nil
-}
-
-// Close closes the result, preventing further iteration.
-func (r *streamResult) Close() (err error) {
-	if err = r.result.Close(); err != nil {
-		return err
-	}
-	if r.ch != nil {
-		close(r.ch)
-	}
+	close(r.ch)
 	return nil
 }
 
