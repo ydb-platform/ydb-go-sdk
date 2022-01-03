@@ -2,15 +2,125 @@ package balancer
 
 import (
 	"context"
+	"net"
+	"strconv"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
+	stubConn "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/multi"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/rr"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
+	stubBalancer "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/stub"
 )
+
+func isEvenConn(c conn.Conn, _ info.Info) bool {
+	host, _, err := net.SplitHostPort(c.Endpoint().Address())
+	if err != nil {
+		panic(err)
+	}
+	n, err := strconv.Atoi(host)
+	if err != nil {
+		panic(err)
+	}
+	return n%2 == 0
+}
+
+func isOddConn(c conn.Conn, info info.Info) bool {
+	return !isEvenConn(c, info)
+}
+
+func TestMulti(t *testing.T) {
+	cs1, b1 := stubBalancer.Stub()
+	cs2, b2 := stubBalancer.Stub()
+	forEachList := func(it func(*list.List)) {
+		it(cs1)
+		it(cs2)
+	}
+	forEachConn := func(it func(conn.Conn, info.Info)) {
+		forEachList(func(cs *list.List) {
+			for _, e := range *cs {
+				it(e.Conn, e.Info)
+			}
+		})
+	}
+	m := multi.Balancer(
+		multi.WithBalancer(b1, isOddConn),
+		multi.WithBalancer(b2, isEvenConn),
+	)
+	const n = 100
+	var (
+		es = make([]iface.Element, n)
+		el = make(map[conn.Conn]iface.Element, n)
+	)
+	for i := 0; i < n; i++ {
+		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), nil, stubConn.Config(config.New()))
+		e := m.Insert(c, info.Info{})
+		es[i] = e
+		el[c] = e
+	}
+	forEachList(func(cs *list.List) {
+		if act, exp := len(*cs), n/2; act != exp {
+			t.Errorf(
+				"unexepcted number of conns: %d; want %d",
+				act, exp,
+			)
+		}
+	})
+	for i := 0; i < n; i++ {
+		m.Update(es[i], info.Info{
+			LoadFactor: 1,
+		})
+	}
+	forEachConn(func(conn conn.Conn, info info.Info) {
+		if act, exp := info.LoadFactor, float32(1); act != exp {
+			t.Errorf(
+				"unexpected load factor: %f; want %f",
+				act, exp,
+			)
+		}
+	})
+
+	// Multibalancer must check first Balancer first.
+	// Thus, we expect here that until first Balancer is not empty
+	// multibalancer will return connections only from it.
+	for i := 0; i < n; i++ {
+		c := m.Next()
+		if !isOddConn(c, info.Info{}) {
+			t.Fatalf("Next() returned unexpected Conn")
+		}
+	}
+	// Now remove all connections from first Balancer.
+	for i := 0; i < n/2; i++ {
+		c := m.Next()
+		if isOddConn(c, info.Info{}) {
+			m.Remove(el[c])
+		}
+	}
+	// And check that multibalancer returns connections from the second
+	// Balancer.
+	for i := 0; i < n; i++ {
+		c := m.Next()
+		if !isEvenConn(c, info.Info{}) {
+			t.Fatalf("Next() returned unexpected Conn")
+		}
+	}
+	// Now remove all connections from second Balancer.
+	for i := 0; i < n/2; i++ {
+		c := m.Next()
+		if isEvenConn(c, info.Info{}) {
+			m.Remove(el[c])
+		}
+	}
+	if c := m.Next(); c != nil {
+		t.Fatalf("Next() returned unexpected non-nil Conn")
+	}
+}
 
 var testData = [...]struct {
 	name   string
@@ -221,7 +331,7 @@ var testData = [...]struct {
 	},
 }
 
-func TestRoundRobinBalancer(t *testing.T) {
+func TestRoundRobin(t *testing.T) {
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -229,15 +339,15 @@ func TestRoundRobinBalancer(t *testing.T) {
 			var (
 				mconn = map[conn.Conn]string{} // Conn to addr mapping for easy matching.
 				maddr = map[string]conn.Conn{} // addr to Conn mapping.
-				melem = map[string]Element{}
+				melem = map[string]iface.Element{}
 				mdist = map[string]int{}
 			)
-			r := new(roundRobin)
+			r := rr.RoundRobin()
 			for _, e := range test.add {
 				c := conn.New(
 					e,
 					nil,
-					stub.Config(
+					stubConn.Config(
 						config.New(
 							config.WithDatabase("test"),
 							config.WithEndpoint("test"),
@@ -285,7 +395,7 @@ func TestRoundRobinBalancer(t *testing.T) {
 	}
 }
 
-func TestRandomChoiceBalancer(t *testing.T) {
+func TestRandomChoice(t *testing.T) {
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -293,15 +403,15 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			var (
 				mconn = map[conn.Conn]string{} // Conn to addr mapping for easy matching.
 				maddr = map[string]conn.Conn{} // addr to Conn mapping.
-				melem = map[string]Element{}
+				melem = map[string]iface.Element{}
 				mdist = map[string]int{}
 			)
-			r := new(roundRobin)
+			r := rr.RandomChoice()
 			for _, e := range test.add {
 				c := conn.New(
 					e,
 					nil,
-					stub.Config(config.New()),
+					stubConn.Config(config.New()),
 				)
 				c.SetState(ctx, state.Online)
 				if _, ok := test.banned[e.Address()]; ok {
@@ -316,7 +426,7 @@ func TestRandomChoiceBalancer(t *testing.T) {
 			for _, e := range test.del {
 				r.Remove(melem[e.Address()])
 			}
-			for i := 0; i < test.repeat; i++ {
+			for i := 0; i < test.repeat*10; i++ {
 				conn := r.Next()
 				if conn == nil {
 					if len(test.add) > len(test.del) {
@@ -327,10 +437,11 @@ func TestRandomChoiceBalancer(t *testing.T) {
 				}
 			}
 			for addr, exp := range test.exp {
+				exp *= 10
 				if act := mdist[addr]; act < int(float64(exp)*0.9) || act > int(float64(exp)*1.1) {
 					t.Errorf(
-						"unexpected distribution for addr %q: %v; want %v",
-						addr, act, exp,
+						"unexpected distribution for addr %q: %v; want between %v and %v",
+						addr, act, int(float64(exp)*0.9), int(float64(exp)*1.1),
 					)
 				}
 				delete(mdist, addr)

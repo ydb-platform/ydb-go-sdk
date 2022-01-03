@@ -1,3 +1,8 @@
+## 3.6.0
+* Added `config/balancer` package with popular balancers
+* Removed `config.BalancerConfig` struct
+* Refactored internal balancer package
+
 ## 3.5.4
 * Added auto-close stream result on end of stream
 

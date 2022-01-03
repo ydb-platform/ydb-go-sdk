@@ -1,4 +1,4 @@
-package balancer
+package rr
 
 import (
 	"container/heap"
@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 )
@@ -24,6 +25,14 @@ type roundRobin struct {
 	belt  []int
 	next  int32
 	conns list.List
+}
+
+func RoundRobin() iface.Balancer {
+	return &roundRobin{}
+}
+
+func RandomChoice() iface.Balancer {
+	return &randomChoice{}
 }
 
 type randomChoice struct {
@@ -50,28 +59,28 @@ func (r *randomChoice) Next() conn.Conn {
 	return r.conns[i].Conn
 }
 
-func (r *roundRobin) Insert(conn conn.Conn, info info.Info) Element {
+func (r *roundRobin) Insert(conn conn.Conn, info info.Info) iface.Element {
 	e := r.conns.Insert(conn, info)
 	r.updateMinMax(info)
 	r.belt = r.distribute()
 	return e
 }
 
-func (r *roundRobin) Update(el Element, info info.Info) {
+func (r *roundRobin) Update(el iface.Element, info info.Info) {
 	e := el.(*list.Element)
 	e.Info = info
 	r.updateMinMax(info)
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Remove(x Element) {
+func (r *roundRobin) Remove(x iface.Element) {
 	el := x.(*list.Element)
 	r.conns.Remove(el)
 	r.inspectMinMax(el.Info)
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Contains(x Element) bool {
+func (r *roundRobin) Contains(x iface.Element) bool {
 	if x == nil {
 		return false
 	}
