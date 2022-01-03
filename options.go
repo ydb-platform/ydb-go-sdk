@@ -53,10 +53,6 @@ func WithDatabase(database string) Option {
 	}
 }
 
-func WithNamespace(namespace string) logger.Option {
-	return logger.WithNamespace(namespace)
-}
-
 type Level logger.Level
 
 const (
@@ -69,29 +65,39 @@ const (
 	FATAL = Level(logger.FATAL)
 )
 
-func WithMinLevel(minLevel Level) logger.Option {
-	return logger.WithMinLevel(logger.Level(minLevel))
+type LoggerOption logger.Option
+
+func WithNamespace(namespace string) LoggerOption {
+	return LoggerOption(logger.WithNamespace(namespace))
 }
 
-func WithNoColor(b bool) logger.Option {
-	return logger.WithNoColor(b)
+func WithMinLevel(minLevel Level) LoggerOption {
+	return LoggerOption(logger.WithMinLevel(logger.Level(minLevel)))
 }
 
-func WithExternalLogger(external log.Logger) logger.Option {
-	return logger.WithExternalLogger(external)
+func WithNoColor(b bool) LoggerOption {
+	return LoggerOption(logger.WithNoColor(b))
 }
 
-func WithOutWriter(out io.Writer) logger.Option {
-	return logger.WithOutWriter(out)
+func WithExternalLogger(external log.Logger) LoggerOption {
+	return LoggerOption(logger.WithExternalLogger(external))
 }
 
-func WithErrWriter(err io.Writer) logger.Option {
-	return logger.WithErrWriter(err)
+func WithOutWriter(out io.Writer) LoggerOption {
+	return LoggerOption(logger.WithOutWriter(out))
 }
 
-func WithLogger(details trace.Details, opts ...logger.Option) Option {
+func WithErrWriter(err io.Writer) LoggerOption {
+	return LoggerOption(logger.WithErrWriter(err))
+}
+
+func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 	return func(ctx context.Context, db *db) error {
-		l := logger.New(opts...)
+		nativeOpts := make([]logger.Option, 0, len(opts))
+		for _, o := range opts {
+			nativeOpts = append(nativeOpts, logger.Option(o))
+		}
+		l := logger.New(nativeOpts...)
 		if err := WithTraceDriver(log.Driver(l, details))(ctx, db); err != nil {
 			return err
 		}

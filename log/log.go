@@ -15,5 +15,5 @@ type Logger interface {
 	Fatalf(format string, args ...interface{})
 
 	// WithName provide applying sub-scope of logger messages
-	WithName(name string) Logger
+	WithName(name string) interface{} // interface must cast to Logger type
 }

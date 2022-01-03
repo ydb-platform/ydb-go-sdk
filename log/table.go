@@ -1,6 +1,7 @@
 package log
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -9,11 +10,18 @@ import (
 // Table makes trace.Table with internal logging
 // nolint: gocyclo
 func Table(log Logger, details trace.Details) trace.Table {
-	log = log.WithName(`table`)
+	log, ok := log.WithName(`table`).(Logger)
+	if !ok {
+		panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+	}
 	t := trace.Table{}
+	// nolint: nestif
 	if details&trace.TablePoolRetryEvents != 0 {
 		// nolint: govet
-		log := log.WithName(`retry`)
+		log, ok := log.WithName(`retry`).(Logger)
+		if !ok {
+			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+		}
 		// nolint: lll
 		t.OnPoolRetry = func(info trace.PoolRetryStartInfo) func(info trace.PoolRetryInternalInfo) func(trace.PoolRetryDoneInfo) {
 			idempotent := info.Idempotent
@@ -56,7 +64,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 	// nolint: nestif
 	if details&trace.TableSessionEvents != 0 {
 		// nolint: govet
-		log := log.WithName(`session`)
+		log, ok := log.WithName(`session`).(Logger)
+		if !ok {
+			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+		}
 		if details&trace.TableSessionLifeCycleEvents != 0 {
 			t.OnSessionNew = func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
 				log.Tracef(`create start`)
@@ -126,10 +137,16 @@ func Table(log Logger, details trace.Details) trace.Table {
 		}
 		if details&trace.TableSessionQueryEvents != 0 {
 			// nolint: govet
-			log := log.WithName(`query`)
+			log, ok := log.WithName(`query`).(Logger)
+			if !ok {
+				panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+			}
 			if details&trace.TableSessionQueryInvokeEvents != 0 {
 				// nolint: govet
-				log := log.WithName(`invoke`)
+				log, ok := log.WithName(`invoke`).(Logger)
+				if !ok {
+					panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+				}
 				t.OnSessionQueryPrepare = func(info trace.SessionQueryPrepareStartInfo) func(trace.PrepareDataQueryDoneInfo) {
 					session := info.Session
 					query := info.Query
@@ -200,7 +217,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 			}
 			if details&trace.TableSessionQueryStreamEvents != 0 {
 				// nolint: govet
-				log := log.WithName(`stream`)
+				log, ok := log.WithName(`stream`).(Logger)
+				if !ok {
+					panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+				}
 				// nolint: lll
 				t.OnSessionQueryStreamExecute = func(info trace.SessionQueryStreamExecuteStartInfo) func(trace.SessionQueryStreamExecuteDoneInfo) {
 					session := info.Session
@@ -265,7 +285,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 		}
 		if details&trace.TableSessionTransactionEvents != 0 {
 			// nolint: govet
-			log := log.WithName(`transaction`)
+			log, ok := log.WithName(`transaction`).(Logger)
+			if !ok {
+				panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+			}
 			// nolint: lll
 			t.OnSessionTransactionBegin = func(info trace.SessionTransactionBeginStartInfo) func(trace.SessionTransactionBeginDoneInfo) {
 				session := info.Session
@@ -355,7 +378,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 	// nolint: nestif
 	if details&trace.TablePoolEvents != 0 {
 		// nolint: govet
-		log := log.WithName(`pool`)
+		log, ok := log.WithName(`pool`).(Logger)
+		if !ok {
+			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+		}
 		if details&trace.TablePoolLifeCycleEvents != 0 {
 			t.OnPoolInit = func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
 				log.Infof(`initialize start`)
@@ -387,7 +413,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 		}
 		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
 			// nolint: govet
-			log := log.WithName(`session`)
+			log, ok := log.WithName(`session`).(Logger)
+			if !ok {
+				panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
+			}
 			t.OnPoolSessionNew = func(info trace.PoolSessionNewStartInfo) func(trace.PoolSessionNewDoneInfo) {
 				log.Tracef(`create start`)
 				start := time.Now()

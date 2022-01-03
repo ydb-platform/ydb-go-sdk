@@ -1,3 +1,8 @@
+## 3.5.3
+* Changed `Logger` interface for support custom loggers
+* Added public type `LoggerOption` for proxies to internal `logger.Option`
+* Fixed deadlock on table stream requests
+
 ## 3.5.2
 * Fixed data race on closing table result
 * Added custom dns-resolver to grpc options for use dns-balancing with round_robin balancing policy

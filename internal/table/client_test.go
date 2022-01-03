@@ -25,7 +25,7 @@ import (
 )
 
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
-	limit := 8128 / 10
+	limit := 100
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		55*time.Second,
