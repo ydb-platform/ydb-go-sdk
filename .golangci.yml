@@ -152,7 +152,6 @@ linters:
 #    - gomoddirectives
 #    - gomodguard
     - gosec
-    - revive
     - gosimple
     - govet
     - depguard
