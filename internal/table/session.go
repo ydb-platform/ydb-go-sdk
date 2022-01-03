@@ -711,6 +711,7 @@ func (s *session) StreamReadTable(
 		defer func() {
 			cancel()
 			onDone(r, errors.HideEOF(err))
+			r.Close()
 		}()
 		for {
 			select {
@@ -782,6 +783,7 @@ func (s *session) StreamExecuteScanQuery(
 		defer func() {
 			cancel()
 			onDone(r, errors.HideEOF(err))
+			r.Close()
 		}()
 		for {
 			select {

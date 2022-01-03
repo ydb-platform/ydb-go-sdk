@@ -1,3 +1,6 @@
+## 3.5.4
+* Added auto-close stream result on end of stream
+
 ## 3.5.3
 * Changed `Logger` interface for support custom loggers
 * Added public type `LoggerOption` for proxies to internal `logger.Option`
