@@ -11,7 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	ibalancer "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"

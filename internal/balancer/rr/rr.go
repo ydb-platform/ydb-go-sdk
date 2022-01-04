@@ -6,11 +6,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/list"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 )
 
@@ -27,11 +27,11 @@ type roundRobin struct {
 	conns list.List
 }
 
-func RoundRobin() iface.Balancer {
+func RoundRobin() ibalancer.Balancer {
 	return &roundRobin{}
 }
 
-func RandomChoice() iface.Balancer {
+func RandomChoice() ibalancer.Balancer {
 	return &randomChoice{}
 }
 
@@ -59,28 +59,28 @@ func (r *randomChoice) Next() conn.Conn {
 	return r.conns[i].Conn
 }
 
-func (r *roundRobin) Insert(conn conn.Conn) iface.Element {
+func (r *roundRobin) Insert(conn conn.Conn) ibalancer.Element {
 	e := r.conns.Insert(conn)
 	r.updateMinMax(e.Conn)
 	r.belt = r.distribute()
 	return e
 }
 
-func (r *roundRobin) Update(el iface.Element, info info.Info) {
+func (r *roundRobin) Update(el ibalancer.Element, info info.Info) {
 	e := el.(*list.Element)
 	e.Info = info
 	r.updateMinMax(e.Conn)
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Remove(x iface.Element) {
+func (r *roundRobin) Remove(x ibalancer.Element) {
 	el := x.(*list.Element)
 	r.conns.Remove(el)
 	r.inspectMinMax(el.Info)
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Contains(x iface.Element) bool {
+func (r *roundRobin) Contains(x ibalancer.Element) bool {
 	if x == nil {
 		return false
 	}

@@ -1,9 +1,9 @@
 package dial
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster"
-	ibalancer "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/single"
+	ibalancer "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 

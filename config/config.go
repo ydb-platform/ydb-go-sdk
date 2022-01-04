@@ -9,7 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	ibalancer "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -65,7 +65,7 @@ type Config interface {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval() time.Duration
 
-	// Balancer is an optional configuration related to selected Balancer.
+	// Balancer is an optional configuration related to selected ibalancer.
 	// That is, some balancing methods allow to be configured.
 	Balancer() ibalancer.Balancer
 

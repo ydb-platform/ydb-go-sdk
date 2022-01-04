@@ -1,12 +1,12 @@
 package multi
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
-func Balancer(opts ...Option) iface.Balancer {
+func Balancer(opts ...Option) ibalancer.Balancer {
 	m := new(multiBalancer)
 	for _, opt := range opts {
 		opt(m)
@@ -15,15 +15,15 @@ func Balancer(opts ...Option) iface.Balancer {
 }
 
 type multiHandle struct {
-	elements []iface.Element
+	elements []ibalancer.Element
 }
 
 type multiBalancer struct {
-	balancer []iface.Balancer
+	balancer []ibalancer.Balancer
 	filter   []func(conn.Conn) bool
 }
 
-func WithBalancer(b iface.Balancer, filter func(cc conn.Conn) bool) Option {
+func WithBalancer(b ibalancer.Balancer, filter func(cc conn.Conn) bool) Option {
 	return func(m *multiBalancer) {
 		m.balancer = append(m.balancer, b)
 		m.filter = append(m.filter, filter)
@@ -32,7 +32,7 @@ func WithBalancer(b iface.Balancer, filter func(cc conn.Conn) bool) Option {
 
 type Option func(*multiBalancer)
 
-func (m *multiBalancer) Contains(x iface.Element) bool {
+func (m *multiBalancer) Contains(x ibalancer.Element) bool {
 	for i, x := range x.(multiHandle).elements {
 		if x == nil {
 			continue
@@ -53,10 +53,10 @@ func (m *multiBalancer) Next() conn.Conn {
 	return nil
 }
 
-func (m *multiBalancer) Insert(conn conn.Conn) iface.Element {
+func (m *multiBalancer) Insert(conn conn.Conn) ibalancer.Element {
 	n := len(m.filter)
 	h := multiHandle{
-		elements: make([]iface.Element, n),
+		elements: make([]ibalancer.Element, n),
 	}
 	for i, f := range m.filter {
 		if f(conn) {
@@ -67,7 +67,7 @@ func (m *multiBalancer) Insert(conn conn.Conn) iface.Element {
 	return h
 }
 
-func (m *multiBalancer) Update(x iface.Element, info info.Info) {
+func (m *multiBalancer) Update(x ibalancer.Element, info info.Info) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
 			m.balancer[i].Update(x, info)
@@ -75,7 +75,7 @@ func (m *multiBalancer) Update(x iface.Element, info info.Info) {
 	}
 }
 
-func (m *multiBalancer) Remove(x iface.Element) {
+func (m *multiBalancer) Remove(x ibalancer.Element) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
 			m.balancer[i].Remove(x)

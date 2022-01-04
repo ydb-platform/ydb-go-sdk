@@ -1,39 +1,41 @@
 package balancer
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/multi"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/rr"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/single"
+	"regexp"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/multi"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/rr"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
-func RoundRobin() iface.Balancer {
+func RoundRobin() ibalancer.Balancer {
 	return rr.RoundRobin()
 }
 
-func RandomChoice() iface.Balancer {
+func RandomChoice() ibalancer.Balancer {
 	return rr.RandomChoice()
 }
 
-func SingleConn() iface.Balancer {
+func SingleConn() ibalancer.Balancer {
 	return single.Balancer()
 }
 
-func PreferLocal(primary iface.Balancer) iface.Balancer {
+func PreferLocal(primary ibalancer.Balancer) ibalancer.Balancer {
 	return multi.Balancer(
 		multi.WithBalancer(primary, func(cc conn.Conn) bool { return cc.Endpoint().LocalDC() }),
 	)
 }
 
-func PreferLocalWithFallback(primary, fallback iface.Balancer) iface.Balancer {
+func PreferLocalWithFallback(primary, fallback ibalancer.Balancer) ibalancer.Balancer {
 	return multi.Balancer(
 		multi.WithBalancer(primary, func(cc conn.Conn) bool { return cc.Endpoint().LocalDC() }),
 		multi.WithBalancer(fallback, func(cc conn.Conn) bool { return !cc.Endpoint().LocalDC() }),
 	)
 }
 
-func PreferEndpoints(primary iface.Balancer, endpoints ...string) iface.Balancer {
+func PreferEndpoint(primary ibalancer.Balancer, endpoints ...string) ibalancer.Balancer {
 	if len(endpoints) == 0 {
 		panic("empty list of endpoints")
 	}
@@ -50,7 +52,15 @@ func PreferEndpoints(primary iface.Balancer, endpoints ...string) iface.Balancer
 	)
 }
 
-func PreferEndpointsWithFallback(primary, fallback iface.Balancer, endpoints ...string) iface.Balancer {
+func PreferEndpointRegEx(primary ibalancer.Balancer, re regexp.Regexp) ibalancer.Balancer {
+	return multi.Balancer(
+		multi.WithBalancer(primary, func(cc conn.Conn) bool {
+			return re.MatchString(cc.Endpoint().Address())
+		}),
+	)
+}
+
+func PreferEndpointWithFallback(primary, fallback ibalancer.Balancer, endpoints ...string) ibalancer.Balancer {
 	if len(endpoints) == 0 {
 		panic("empty list of endpoints")
 	}
@@ -76,6 +86,17 @@ func PreferEndpointsWithFallback(primary, fallback iface.Balancer, endpoints ...
 	)
 }
 
-func Default() iface.Balancer {
+func PreferEndpointWithFallbackRegEx(primary, fallback ibalancer.Balancer, re regexp.Regexp) ibalancer.Balancer {
+	return multi.Balancer(
+		multi.WithBalancer(primary, func(cc conn.Conn) bool {
+			return re.MatchString(cc.Endpoint().Address())
+		}),
+		multi.WithBalancer(fallback, func(cc conn.Conn) bool {
+			return !re.MatchString(cc.Endpoint().Address())
+		}),
+	)
+}
+
+func Default() ibalancer.Balancer {
 	return PreferLocalWithFallback(RandomChoice(), RandomChoice())
 }

@@ -12,12 +12,12 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	connConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	connConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
 func TestClusterFastRedial(t *testing.T) {
@@ -82,7 +82,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return ln.Dial(ctx)
 		},
-		balancer: func() iface.Balancer {
+		balancer: func() ibalancer.Balancer {
 			_, b := stub.Balancer()
 			return b
 		}(),

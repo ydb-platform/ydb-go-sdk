@@ -1,7 +1,8 @@
 ## 3.6.0
 * Added `config/balancer` package with popular balancers
+* Added new `PreferEndpoint[WithFallback][RegEx]` balancer
 * Removed `config.BalancerConfig` struct
-* Refactored internal balancer package
+* Refactored internal packages (tree to flat, split balancers to different packages)
 
 ## 3.5.4
 * Added auto-close stream result on end of stream
