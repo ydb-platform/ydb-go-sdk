@@ -3,6 +3,7 @@
 * Added new `PreferEndpoint[WithFallback][RegEx]` balancer
 * Removed `config.BalancerConfig` struct
 * Refactored internal packages (tree to flat, split balancers to different packages)
+* Moved a taking conn to start of `conn.Invoke` /` conn.NewStream` for applying timeouts to alive conn instead lazy conn (previous logic applied timeouts to all request including dialing on lazy conn)
 
 ## 3.5.4
 * Added auto-close stream result on end of stream
