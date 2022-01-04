@@ -1,8 +1,8 @@
 package list
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
 type Element struct {
@@ -13,11 +13,16 @@ type Element struct {
 
 type List []*Element
 
-func (cs *List) Insert(conn conn.Conn, info info.Info) *Element {
+func (cs *List) Insert(cc conn.Conn) *Element {
 	e := &Element{
 		Index: len(*cs),
-		Conn:  conn,
-		Info:  info,
+		Conn:  cc,
+		Info: info.Info{
+			Address:    cc.Endpoint().Address(),
+			ID:         cc.Endpoint().NodeID(),
+			LoadFactor: cc.Endpoint().LoadFactor(),
+			Local:      cc.Endpoint().LocalDC(),
+		},
 	}
 	*cs = append(*cs, e)
 	return e

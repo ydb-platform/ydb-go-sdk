@@ -10,8 +10,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
@@ -176,6 +176,17 @@ func (c *conn) Invoke(
 	if c.isClosed() {
 		return errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
 	}
+
+	var cc *grpc.ClientConn
+	cc, err = c.take(ctx)
+	if err != nil {
+		err = errors.MapGRPCError(err)
+		if errors.MustPessimizeEndpoint(err) {
+			c.pessimize(ctx, err)
+		}
+		return
+	}
+
 	var (
 		cancel context.CancelFunc
 		opID   string
@@ -210,16 +221,6 @@ func (c *conn) Invoke(
 	defer func() {
 		onDone(err, issues, opID, c.GetState())
 	}()
-
-	var cc *grpc.ClientConn
-	cc, err = c.take(ctx)
-	if err != nil {
-		err = errors.MapGRPCError(err)
-		if errors.MustPessimizeEndpoint(err) {
-			c.pessimize(ctx, err)
-		}
-		return
-	}
 
 	err = cc.Invoke(ctx, method, req, res, opts...)
 
@@ -260,6 +261,16 @@ func (c *conn) NewStream(
 		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
 	}
 
+	var cc *grpc.ClientConn
+	cc, err = c.take(ctx)
+	if err != nil {
+		err = errors.MapGRPCError(err)
+		if errors.MustPessimizeEndpoint(err) {
+			c.pessimize(ctx, err)
+		}
+		return
+	}
+
 	var cancel context.CancelFunc
 	if t := c.config.StreamTimeout(); t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
@@ -288,16 +299,6 @@ func (c *conn) NewStream(
 			streamRecv(err)(c.GetState(), err)
 		}
 	}()
-
-	var cc *grpc.ClientConn
-	cc, err = c.take(ctx)
-	if err != nil {
-		err = errors.MapGRPCError(err)
-		if errors.MustPessimizeEndpoint(err) {
-			c.pessimize(ctx, err)
-		}
-		return
-	}
 
 	var s grpc.ClientStream
 	s, err = cc.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)

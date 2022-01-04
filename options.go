@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -148,9 +149,9 @@ func WithCredentials(c credentials.Credentials) Option {
 	})
 }
 
-func WithBalancingConfig(balancerConfig config.BalancerConfig) Option {
+func WithBalancer(balancer ibalancer.Balancer) Option {
 	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithBalancingConfig(balancerConfig))
+		db.options = append(db.options, config.WithBalancer(balancer))
 		return nil
 	}
 }

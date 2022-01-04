@@ -12,13 +12,13 @@ import (
 	"google.golang.org/grpc"
 
 	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/repeater"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -36,12 +36,19 @@ var (
 
 	// ErrUnknownEndpoint returned when no connections left in cluster.
 	ErrUnknownEndpoint = errors.New("unknown endpoint")
+
+	// ErrNilBalancerElement returned when requested on a nil Balancer element.
+	ErrNilBalancerElement = errors.New("nil balancer element")
+	// ErrUnknownBalancerElement returned when requested on a unknown Balancer element.
+	ErrUnknownBalancerElement = errors.New("unknown balancer element")
+	// ErrUnknownTypeOfBalancerElement returned when requested on a unknown types of Balancer element.
+	ErrUnknownTypeOfBalancerElement = errors.New("unknown types of balancer element")
 )
 
 type cluster struct {
 	trace    trace.Driver
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
-	balancer balancer.Balancer
+	balancer ibalancer.Balancer
 	explorer repeater.Repeater
 
 	index     map[string]entry.Entry
@@ -73,7 +80,7 @@ type Cluster interface {
 func New(
 	trace trace.Driver,
 	dial func(context.Context, string) (*grpc.ClientConn, error),
-	balancer balancer.Balancer,
+	balancer ibalancer.Balancer,
 ) Cluster {
 	return &cluster{
 		trace:     trace,
@@ -201,8 +208,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		}
 	}()
 
-	entry := entry.Entry{Info: info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}}
-	entry.Conn = conn
+	entry := entry.Entry{Conn: conn}
 	entry.InsertInto(c.balancer)
 	c.index[e.Address()] = entry
 	if e.NodeID() > 0 {
@@ -239,15 +245,14 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		onDone(entry.Conn.GetState())
 	}()
 
-	delete(c.endpoints, entry.Info.ID)
-	entry.Info = info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}
+	delete(c.endpoints, e.NodeID())
 	c.index[e.Address()] = entry
 	if e.NodeID() > 0 {
 		c.endpoints[e.NodeID()] = entry.Conn
 	}
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
-		c.balancer.Update(entry.Handle, entry.Info)
+		c.balancer.Update(entry.Handle, info.Info{})
 	}
 }
 
@@ -277,7 +282,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 	entry.RemoveFrom(c.balancer)
 	delete(c.index, e.Address())
-	delete(c.endpoints, entry.Info.ID)
+	delete(c.endpoints, e.NodeID())
 
 	c.mu.Unlock()
 
@@ -300,10 +305,10 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
 	if entry.Handle == nil {
-		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrNilBalancerElement)
+		return fmt.Errorf("cluster: pessimize failed: %w", ErrNilBalancerElement)
 	}
 	if !c.balancer.Contains(entry.Handle) {
-		return fmt.Errorf("cluster: pessimize failed: %w", balancer.ErrUnknownBalancerElement)
+		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownBalancerElement)
 	}
 	entry.Conn.SetState(ctx, state.Banned)
 	if c.explorer != nil {

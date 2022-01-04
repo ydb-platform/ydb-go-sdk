@@ -7,7 +7,9 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -63,9 +65,9 @@ type Config interface {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval() time.Duration
 
-	// BalancingConfig is an optional configuration related to selected
-	// BalancingMethod. That is, some balancing methods allow to be configured.
-	BalancingConfig() BalancerConfig
+	// Balancer is an optional configuration related to selected ibalancer.
+	// That is, some balancing methods allow to be configured.
+	Balancer() ibalancer.Balancer
 
 	// RequestsType set an additional types hint to all requests.
 	// It is needed only for debug purposes and advanced cases.
@@ -98,7 +100,7 @@ type config struct {
 	operationCancelAfter time.Duration
 	discoveryInterval    time.Duration
 	dialTimeout          time.Duration
-	balancingConfig      BalancerConfig
+	balancer             ibalancer.Balancer
 	secure               bool
 	fastDial             bool
 	endpoint             string
@@ -161,8 +163,8 @@ func (c *config) DiscoveryInterval() time.Duration {
 	return c.discoveryInterval
 }
 
-func (c *config) BalancingConfig() BalancerConfig {
-	return c.balancingConfig
+func (c *config) Balancer() ibalancer.Balancer {
+	return c.balancer
 }
 
 func (c *config) RequestsType() string {
@@ -247,9 +249,9 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
-func WithBalancingConfig(balancingConfig BalancerConfig) Option {
+func WithBalancer(balancer ibalancer.Balancer) Option {
 	return func(c *config) {
-		c.balancingConfig = balancingConfig
+		c.balancer = balancer
 	}
 }
 
@@ -272,7 +274,7 @@ func WithGrpcOptions(option ...grpc.DialOption) Option {
 }
 
 func New(opts ...Option) Config {
-	c := defaults()
+	c := defaultConfig()
 	for _, o := range opts {
 		o(c)
 	}
@@ -284,7 +286,7 @@ func New(opts ...Option) Config {
 
 func certPool() (certPool *x509.CertPool) {
 	defer func() {
-		// on darwin system panic raced on getting system security checks
+		// on darwin system panic raced on checking system security
 		if e := recover(); e != nil {
 			certPool = x509.NewCertPool()
 		}
@@ -297,10 +299,10 @@ func certPool() (certPool *x509.CertPool) {
 	return
 }
 
-func defaults() (c *config) {
+func defaultConfig() (c *config) {
 	return &config{
 		discoveryInterval: DefaultDiscoveryInterval,
-		balancingConfig:   DefaultBalancer,
+		balancer:          balancer.Default(),
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			RootCAs:    certPool(),

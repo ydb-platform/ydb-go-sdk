@@ -12,14 +12,12 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	connConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
 func TestClusterFastRedial(t *testing.T) {
@@ -32,7 +30,7 @@ func TestClusterFastRedial(t *testing.T) {
 		_ = server.Serve(listener)
 	}()
 
-	l, b := simpleBalancer()
+	l, b := stub.Balancer()
 	c := &cluster{
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return listener.Dial(ctx)
@@ -61,7 +59,7 @@ func TestClusterFastRedial(t *testing.T) {
 		endpoint.New("foo:0"),
 		endpoint.New("bad:0"),
 	}
-	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
+	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(connConfig.Config(config.New())))
 	select {
 	case <-pingConnects(len(ne)):
 
@@ -84,8 +82,8 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return ln.Dial(ctx)
 		},
-		balancer: func() balancer.Balancer {
-			_, b := simpleBalancer()
+		balancer: func() ibalancer.Balancer {
+			_, b := stub.Balancer()
 			return b
 		}(),
 		index:     make(map[string]entry.Entry),
@@ -136,7 +134,13 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		// nolint: nolintlint
 		ne := append(endpoints, badEndpoints...)
 		// merge new endpoints into balancer
-		mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stub.Config(config.New())))
+		mergeEndpointIntoCluster(
+			ctx,
+			c,
+			[]endpoint.Endpoint{},
+			ne,
+			WithConnConfig(connConfig.Config(config.New())),
+		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
 	})
@@ -145,109 +149,41 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		// nolint: nolintlint
 		ne := append(nextEndpoints, nextBadEndpoints...)
 		// merge new endpoints into balancer
-		mergeEndpointIntoCluster(ctx, c, append(endpoints, badEndpoints...), ne, WithConnConfig(stub.Config(config.New())))
+		mergeEndpointIntoCluster(
+			ctx,
+			c,
+			append(endpoints, badEndpoints...),
+			ne,
+			WithConnConfig(connConfig.Config(config.New())),
+		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
 	})
 	t.Run("left only bad", func(t *testing.T) {
 		ne := nextBadEndpoints
 		// merge new endpoints into balancer
-		mergeEndpointIntoCluster(ctx, c, append(nextEndpoints, nextBadEndpoints...), ne)
+		mergeEndpointIntoCluster(
+			ctx,
+			c,
+			append(nextEndpoints, nextBadEndpoints...),
+			ne,
+		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
 	})
 	t.Run("left only good", func(t *testing.T) {
 		ne := nextEndpoints
 		// merge new endpoints into balancer
-		mergeEndpointIntoCluster(ctx, c, nextBadEndpoints, ne, WithConnConfig(stub.Config(config.New())))
+		mergeEndpointIntoCluster(
+			ctx,
+			c,
+			nextBadEndpoints,
+			ne,
+			WithConnConfig(connConfig.Config(config.New())),
+		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
 	})
-}
-
-type stubBalancer struct {
-	OnNext      func() conn.Conn
-	OnInsert    func(conn.Conn, info.Info) balancer.Element
-	OnUpdate    func(balancer.Element, info.Info)
-	OnRemove    func(balancer.Element)
-	OnPessimize func(context.Context, balancer.Element) error
-	OnContains  func(balancer.Element) bool
-}
-
-func simpleBalancer() (*list.List, balancer.Balancer) {
-	cs := new(list.List)
-	var i int
-	return cs, stubBalancer{
-		OnNext: func() conn.Conn {
-			n := len(*cs)
-			if n == 0 {
-				return nil
-			}
-			e := (*cs)[i%n]
-			i++
-			return e.Conn
-		},
-		OnInsert: func(conn conn.Conn, info info.Info) balancer.Element {
-			return cs.Insert(conn, info)
-		},
-		OnRemove: func(x balancer.Element) {
-			e := x.(*list.Element)
-			cs.Remove(e)
-		},
-		OnUpdate: func(x balancer.Element, info info.Info) {
-			e := x.(*list.Element)
-			e.Info = info
-		},
-		OnPessimize: func(ctx context.Context, x balancer.Element) error {
-			e := x.(*list.Element)
-			e.Conn.SetState(ctx, state.Banned)
-			return nil
-		},
-		OnContains: func(x balancer.Element) bool {
-			e := x.(*list.Element)
-			return cs.Contains(e)
-		},
-	}
-}
-
-func (s stubBalancer) Next() conn.Conn {
-	if f := s.OnNext; f != nil {
-		return f()
-	}
-	return nil
-}
-
-func (s stubBalancer) Insert(c conn.Conn, i info.Info) balancer.Element {
-	if f := s.OnInsert; f != nil {
-		return f(c, i)
-	}
-	return nil
-}
-
-func (s stubBalancer) Update(el balancer.Element, i info.Info) {
-	if f := s.OnUpdate; f != nil {
-		f(el, i)
-	}
-}
-
-func (s stubBalancer) Remove(el balancer.Element) {
-	if f := s.OnRemove; f != nil {
-		f(el)
-	}
-}
-
-func (s stubBalancer) Pessimize(ctx context.Context, el balancer.Element) error {
-	if f := s.OnPessimize; f != nil {
-		return f(ctx, el)
-	}
-	return nil
-}
-
-func (s stubBalancer) Contains(el balancer.Element) bool {
-	if f := s.OnContains; f != nil {
-		return f(el)
-	}
-	return false
 }
 
 type stubListener struct {
