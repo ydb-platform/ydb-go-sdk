@@ -59,9 +59,9 @@ func (r *randomChoice) Next() conn.Conn {
 	return r.conns[i].Conn
 }
 
-func (r *roundRobin) Insert(conn conn.Conn, info info.Info) iface.Element {
-	e := r.conns.Insert(conn, info)
-	r.updateMinMax(info)
+func (r *roundRobin) Insert(conn conn.Conn) iface.Element {
+	e := r.conns.Insert(conn)
+	r.updateMinMax(e.Conn)
 	r.belt = r.distribute()
 	return e
 }
@@ -69,7 +69,7 @@ func (r *roundRobin) Insert(conn conn.Conn, info info.Info) iface.Element {
 func (r *roundRobin) Update(el iface.Element, info info.Info) {
 	e := el.(*list.Element)
 	e.Info = info
-	r.updateMinMax(info)
+	r.updateMinMax(e.Conn)
 	r.belt = r.distribute()
 }
 
@@ -91,17 +91,17 @@ func (r *roundRobin) Contains(x iface.Element) bool {
 	return r.conns.Contains(el)
 }
 
-func (r *roundRobin) updateMinMax(info info.Info) {
+func (r *roundRobin) updateMinMax(cc conn.Conn) {
 	if len(r.conns) == 1 {
-		r.min = info.LoadFactor
-		r.max = info.LoadFactor
+		r.min = cc.Endpoint().LoadFactor()
+		r.max = cc.Endpoint().LoadFactor()
 		return
 	}
-	if info.LoadFactor < r.min {
-		r.min = info.LoadFactor
+	if cc.Endpoint().LoadFactor() < r.min {
+		r.min = cc.Endpoint().LoadFactor()
 	}
-	if info.LoadFactor > r.max {
-		r.max = info.LoadFactor
+	if cc.Endpoint().LoadFactor() > r.max {
+		r.max = cc.Endpoint().LoadFactor()
 	}
 }
 

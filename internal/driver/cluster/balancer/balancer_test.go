@@ -8,18 +8,18 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	connConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/list"
-	stubConn "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/multi"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/rr"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/state"
-	stubBalancer "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/stub"
 )
 
-func isEvenConn(c conn.Conn, _ info.Info) bool {
+func isEvenConn(c conn.Conn) bool {
 	host, _, err := net.SplitHostPort(c.Endpoint().Address())
 	if err != nil {
 		panic(err)
@@ -31,13 +31,13 @@ func isEvenConn(c conn.Conn, _ info.Info) bool {
 	return n%2 == 0
 }
 
-func isOddConn(c conn.Conn, info info.Info) bool {
-	return !isEvenConn(c, info)
+func isOddConn(c conn.Conn) bool {
+	return !isEvenConn(c)
 }
 
 func TestMulti(t *testing.T) {
-	cs1, b1 := stubBalancer.Stub()
-	cs2, b2 := stubBalancer.Stub()
+	cs1, b1 := stub.Balancer()
+	cs2, b2 := stub.Balancer()
 	forEachList := func(it func(*list.List)) {
 		it(cs1)
 		it(cs2)
@@ -59,8 +59,8 @@ func TestMulti(t *testing.T) {
 		el = make(map[conn.Conn]iface.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), nil, stubConn.Config(config.New()))
-		e := m.Insert(c, info.Info{})
+		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), nil, connConfig.Config(config.New()))
+		e := m.Insert(c)
 		es[i] = e
 		el[c] = e
 	}
@@ -86,34 +86,103 @@ func TestMulti(t *testing.T) {
 		}
 	})
 
-	// Multibalancer must check first Balancer first.
-	// Thus, we expect here that until first Balancer is not empty
-	// multibalancer will return connections only from it.
+	// Check first balancer first.
+	// Thus, we expect here that until first balancer is not empty
+	// balancer will return connections only from it.
 	for i := 0; i < n; i++ {
 		c := m.Next()
-		if !isOddConn(c, info.Info{}) {
+		if !isOddConn(c) {
 			t.Fatalf("Next() returned unexpected Conn")
 		}
 	}
-	// Now remove all connections from first Balancer.
+	// Now remove all connections from first balancer.
 	for i := 0; i < n/2; i++ {
 		c := m.Next()
-		if isOddConn(c, info.Info{}) {
+		if isOddConn(c) {
 			m.Remove(el[c])
 		}
 	}
-	// And check that multibalancer returns connections from the second
+	// And check that balancer returns connections from the second
 	// Balancer.
 	for i := 0; i < n; i++ {
 		c := m.Next()
-		if !isEvenConn(c, info.Info{}) {
+		if !isEvenConn(c) {
 			t.Fatalf("Next() returned unexpected Conn")
 		}
 	}
-	// Now remove all connections from second Balancer.
+	// Now remove all connections from second balancer.
 	for i := 0; i < n/2; i++ {
 		c := m.Next()
-		if isEvenConn(c, info.Info{}) {
+		if isEvenConn(c) {
+			m.Remove(el[c])
+		}
+	}
+	if c := m.Next(); c != nil {
+		t.Fatalf("Next() returned unexpected non-nil Conn")
+	}
+}
+
+func TestPreferLocal(t *testing.T) {
+	m := multi.Balancer(
+		multi.WithBalancer(
+			rr.RoundRobin(),
+			func(cc conn.Conn) bool {
+				return cc.Endpoint().LocalDC()
+			},
+		),
+		multi.WithBalancer(
+			rr.RoundRobin(),
+			func(cc conn.Conn) bool {
+				return !cc.Endpoint().LocalDC()
+			},
+		),
+	)
+	const n = 100
+	var (
+		es = make([]iface.Element, n)
+		el = make(map[conn.Conn]iface.Element, n)
+	)
+	for i := 0; i < n; i++ {
+		c := conn.New(
+			endpoint.New(
+				strconv.Itoa(i)+":0",
+				endpoint.WithLocalDC(i%2 == 0),
+			),
+			nil,
+			connConfig.Config(config.New()),
+		)
+		e := m.Insert(c)
+		es[i] = e
+		el[c] = e
+	}
+
+	// Check first balancer first.
+	// Thus, we expect here that until first balancer is not empty
+	// balancer will return connections only from it.
+	for i := 0; i < n; i++ {
+		c := m.Next()
+		if !c.Endpoint().LocalDC() {
+			t.Fatalf("Next() returned unexpected Conn")
+		}
+	}
+	// Now remove all connections from first balancer.
+	for i := 0; i < n/2; i++ {
+		c := m.Next()
+		if c.Endpoint().LocalDC() {
+			m.Remove(el[c])
+		}
+	}
+	// And check that balancer returns connections from the second balancer.
+	for i := 0; i < n; i++ {
+		c := m.Next()
+		if c.Endpoint().LocalDC() {
+			t.Fatalf("Next() returned unexpected Conn")
+		}
+	}
+	// Now remove all connections from second balancer.
+	for i := 0; i < n/2; i++ {
+		c := m.Next()
+		if !c.Endpoint().LocalDC() {
 			m.Remove(el[c])
 		}
 	}
@@ -347,7 +416,7 @@ func TestRoundRobin(t *testing.T) {
 				c := conn.New(
 					e,
 					nil,
-					stubConn.Config(
+					connConfig.Config(
 						config.New(
 							config.WithDatabase("test"),
 							config.WithEndpoint("test"),
@@ -362,9 +431,7 @@ func TestRoundRobin(t *testing.T) {
 				}
 				mconn[c] = e.Address()
 				maddr[e.Address()] = c
-				melem[e.Address()] = r.Insert(c, info.Info{
-					LoadFactor: e.LoadFactor(),
-				})
+				melem[e.Address()] = r.Insert(c)
 			}
 			for _, e := range test.del {
 				r.Remove(melem[e.Address()])
@@ -411,7 +478,7 @@ func TestRandomChoice(t *testing.T) {
 				c := conn.New(
 					e,
 					nil,
-					stubConn.Config(config.New()),
+					connConfig.Config(config.New()),
 				)
 				c.SetState(ctx, state.Online)
 				if _, ok := test.banned[e.Address()]; ok {
@@ -419,9 +486,7 @@ func TestRandomChoice(t *testing.T) {
 				}
 				mconn[c] = e.Address()
 				maddr[e.Address()] = c
-				melem[e.Address()] = r.Insert(c, info.Info{
-					LoadFactor: e.LoadFactor(),
-				})
+				melem[e.Address()] = r.Insert(c)
 			}
 			for _, e := range test.del {
 				r.Remove(melem[e.Address()])

@@ -12,14 +12,14 @@ import (
 
 type stubBalancer struct {
 	OnNext      func() conn.Conn
-	OnInsert    func(conn.Conn, info.Info) iface.Element
+	OnInsert    func(conn.Conn) iface.Element
 	OnUpdate    func(iface.Element, info.Info)
 	OnRemove    func(iface.Element)
 	OnPessimize func(context.Context, iface.Element) error
 	OnContains  func(iface.Element) bool
 }
 
-func Stub() (*list.List, iface.Balancer) {
+func Balancer() (*list.List, iface.Balancer) {
 	cs := new(list.List)
 	var i int
 	return cs, stubBalancer{
@@ -32,8 +32,8 @@ func Stub() (*list.List, iface.Balancer) {
 			i++
 			return e.Conn
 		},
-		OnInsert: func(conn conn.Conn, info info.Info) iface.Element {
-			return cs.Insert(conn, info)
+		OnInsert: func(conn conn.Conn) iface.Element {
+			return cs.Insert(conn)
 		},
 		OnRemove: func(x iface.Element) {
 			e := x.(*list.Element)
@@ -62,9 +62,9 @@ func (s stubBalancer) Next() conn.Conn {
 	return nil
 }
 
-func (s stubBalancer) Insert(c conn.Conn, i info.Info) iface.Element {
+func (s stubBalancer) Insert(c conn.Conn) iface.Element {
 	if f := s.OnInsert; f != nil {
-		return f(c, i)
+		return f(c)
 	}
 	return nil
 }

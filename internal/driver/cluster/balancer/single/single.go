@@ -18,7 +18,7 @@ func (s *singleConnBalancer) Next() conn.Conn {
 	return s.conn
 }
 
-func (s *singleConnBalancer) Insert(conn conn.Conn, _ info.Info) iface.Element {
+func (s *singleConnBalancer) Insert(conn conn.Conn) iface.Element {
 	if s.conn != nil {
 		panic("ydb: single Conn Balancer: double Insert()")
 	}

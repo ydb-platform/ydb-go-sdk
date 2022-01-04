@@ -208,8 +208,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		}
 	}()
 
-	entry := entry.Entry{Info: info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}}
-	entry.Conn = conn
+	entry := entry.Entry{Conn: conn}
 	entry.InsertInto(c.balancer)
 	c.index[e.Address()] = entry
 	if e.NodeID() > 0 {
@@ -246,15 +245,14 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		onDone(entry.Conn.GetState())
 	}()
 
-	delete(c.endpoints, entry.Info.ID)
-	entry.Info = info.Info{ID: e.NodeID(), LoadFactor: e.LoadFactor(), Local: e.LocalDC()}
+	delete(c.endpoints, e.NodeID())
 	c.index[e.Address()] = entry
 	if e.NodeID() > 0 {
 		c.endpoints[e.NodeID()] = entry.Conn
 	}
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
-		c.balancer.Update(entry.Handle, entry.Info)
+		c.balancer.Update(entry.Handle, info.Info{})
 	}
 }
 
@@ -284,7 +282,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 	entry.RemoveFrom(c.balancer)
 	delete(c.index, e.Address())
-	delete(c.endpoints, entry.Info.ID)
+	delete(c.endpoints, e.NodeID())
 
 	c.mu.Unlock()
 

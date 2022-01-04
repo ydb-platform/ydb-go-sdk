@@ -20,7 +20,7 @@ type Balancer interface {
 	Next() conn.Conn
 
 	// Insert inserts new connection.
-	Insert(conn.Conn, info.Info) Element
+	Insert(conn.Conn) Element
 
 	// Update updates previously inserted connection.
 	Update(Element, info.Info)

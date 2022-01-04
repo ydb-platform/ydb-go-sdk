@@ -20,10 +20,10 @@ type multiHandle struct {
 
 type multiBalancer struct {
 	balancer []iface.Balancer
-	filter   []func(conn.Conn, info.Info) bool
+	filter   []func(conn.Conn) bool
 }
 
-func WithBalancer(b iface.Balancer, filter func(conn.Conn, info.Info) bool) Option {
+func WithBalancer(b iface.Balancer, filter func(cc conn.Conn) bool) Option {
 	return func(m *multiBalancer) {
 		m.balancer = append(m.balancer, b)
 		m.filter = append(m.filter, filter)
@@ -53,14 +53,14 @@ func (m *multiBalancer) Next() conn.Conn {
 	return nil
 }
 
-func (m *multiBalancer) Insert(conn conn.Conn, info info.Info) iface.Element {
+func (m *multiBalancer) Insert(conn conn.Conn) iface.Element {
 	n := len(m.filter)
 	h := multiHandle{
 		elements: make([]iface.Element, n),
 	}
 	for i, f := range m.filter {
-		if f(conn, info) {
-			x := m.balancer[i].Insert(conn, info)
+		if f(conn) {
+			x := m.balancer[i].Insert(conn)
 			h.elements[i] = x
 		}
 	}

@@ -13,11 +13,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn"
+	connConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/entry"
-	stubConn "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/conn/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/iface"
-	stubBalancer "github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/driver/cluster/balancer/stub"
 )
 
 func TestClusterFastRedial(t *testing.T) {
@@ -30,7 +30,7 @@ func TestClusterFastRedial(t *testing.T) {
 		_ = server.Serve(listener)
 	}()
 
-	l, b := stubBalancer.Stub()
+	l, b := stub.Balancer()
 	c := &cluster{
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return listener.Dial(ctx)
@@ -59,7 +59,7 @@ func TestClusterFastRedial(t *testing.T) {
 		endpoint.New("foo:0"),
 		endpoint.New("bad:0"),
 	}
-	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(stubConn.Config(config.New())))
+	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(connConfig.Config(config.New())))
 	select {
 	case <-pingConnects(len(ne)):
 
@@ -83,7 +83,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			return ln.Dial(ctx)
 		},
 		balancer: func() iface.Balancer {
-			_, b := stubBalancer.Stub()
+			_, b := stub.Balancer()
 			return b
 		}(),
 		index:     make(map[string]entry.Entry),
@@ -139,7 +139,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			[]endpoint.Endpoint{},
 			ne,
-			WithConnConfig(stubConn.Config(config.New())),
+			WithConnConfig(connConfig.Config(config.New())),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -154,7 +154,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			append(endpoints, badEndpoints...),
 			ne,
-			WithConnConfig(stubConn.Config(config.New())),
+			WithConnConfig(connConfig.Config(config.New())),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -179,7 +179,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			nextBadEndpoints,
 			ne,
-			WithConnConfig(stubConn.Config(config.New())),
+			WithConnConfig(connConfig.Config(config.New())),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
