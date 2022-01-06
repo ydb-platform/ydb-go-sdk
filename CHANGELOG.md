@@ -1,6 +1,7 @@
 ## 3.6.2
 * Refactored table retry helpers
 * Added new `PreferLocations[WithFallback][RegEx]` balancers
+* Implement `Stringer` interface for `trace.Details` type 
 
 ## 3.6.1
 * Switched closing cluster after closing all sub-services
