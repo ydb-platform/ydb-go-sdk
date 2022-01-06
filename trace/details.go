@@ -1,7 +1,8 @@
 package trace
 
 import (
-	"bytes"
+	"sort"
+	"strings"
 )
 
 type Details uint64
@@ -37,87 +38,82 @@ const (
 	DetailsAll = ^Details(0) // 18446744073709551615
 )
 
-func (d Details) knownDetailsString(collectedDetails bool) string {
-	switch d {
-	case DriverSystemEvents:
-		return "DriverSystemEvents"
-	case DriverClusterEvents:
-		return "DriverClusterEvents"
-	case DriverNetEvents:
-		return "DriverNetEvents"
-	case DriverCoreEvents:
-		return "DriverCoreEvents"
-	case DriverCredentialsEvents:
-		return "DriverCredentialsEvents"
-	case DriverDiscoveryEvents:
-		return "DriverDiscoveryEvents"
-	case TableSessionLifeCycleEvents:
-		return "TableSessionLifeCycleEvents"
-	case TableSessionQueryInvokeEvents:
-		return "TableSessionQueryInvokeEvents"
-	case TableSessionQueryStreamEvents:
-		return "TableSessionQueryStreamEvents"
-	case TableSessionTransactionEvents:
-		return "TableSessionTransactionEvents"
-	case TablePoolLifeCycleEvents:
-		return "TablePoolLifeCycleEvents"
-	case TablePoolRetryEvents:
-		return "TablePoolRetryEvents"
-	case TablePoolSessionLifeCycleEvents:
-		return "TablePoolSessionLifeCycleEvents"
-	case TablePoolAPIEvents:
-		return "TablePoolAPIEvents"
-	case DriverConnEvents:
-		if collectedDetails {
-			return "DriverConnEvents"
-		}
-	case TableSessionQueryEvents:
-		if collectedDetails {
-			return "TableSessionQueryEvents"
-		}
-	case TableSessionEvents:
-		if collectedDetails {
-			return "TableSessionEvents"
-		}
-	case TablePoolEvents:
-		if collectedDetails {
-			return "TablePoolEvents"
-		}
-	case DetailsAll:
-		if collectedDetails {
-			return "DetailsAll"
+var (
+	detailsToString = map[Details]string{
+		DriverSystemEvents:              "DriverSystemEvents",
+		DriverClusterEvents:             "DriverClusterEvents",
+		DriverNetEvents:                 "DriverNetEvents",
+		DriverCoreEvents:                "DriverCoreEvents",
+		DriverCredentialsEvents:         "DriverCredentialsEvents",
+		DriverDiscoveryEvents:           "DriverDiscoveryEvents",
+		TableSessionLifeCycleEvents:     "TableSessionLifeCycleEvents",
+		TableSessionQueryInvokeEvents:   "TableSessionQueryInvokeEvents",
+		TableSessionQueryStreamEvents:   "TableSessionQueryStreamEvents",
+		TableSessionTransactionEvents:   "TableSessionTransactionEvents",
+		TablePoolLifeCycleEvents:        "TablePoolLifeCycleEvents",
+		TablePoolRetryEvents:            "TablePoolRetryEvents",
+		TablePoolSessionLifeCycleEvents: "TablePoolSessionLifeCycleEvents",
+		TablePoolAPIEvents:              "TablePoolAPIEvents",
+	}
+	stringToDetails = map[string]Details{
+		"DriverSystemEvents":              DriverSystemEvents,
+		"DriverClusterEvents":             DriverClusterEvents,
+		"DriverNetEvents":                 DriverNetEvents,
+		"DriverCoreEvents":                DriverCoreEvents,
+		"DriverCredentialsEvents":         DriverCredentialsEvents,
+		"DriverDiscoveryEvents":           DriverDiscoveryEvents,
+		"TableSessionLifeCycleEvents":     TableSessionLifeCycleEvents,
+		"TableSessionQueryInvokeEvents":   TableSessionQueryInvokeEvents,
+		"TableSessionQueryStreamEvents":   TableSessionQueryStreamEvents,
+		"TableSessionTransactionEvents":   TableSessionTransactionEvents,
+		"TablePoolLifeCycleEvents":        TablePoolLifeCycleEvents,
+		"TablePoolRetryEvents":            TablePoolRetryEvents,
+		"TablePoolSessionLifeCycleEvents": TablePoolSessionLifeCycleEvents,
+		"TablePoolAPIEvents":              TablePoolAPIEvents,
+	}
+	maskDetails = DriverSystemEvents |
+		DriverClusterEvents |
+		DriverNetEvents |
+		DriverCoreEvents |
+		DriverCredentialsEvents |
+		DriverDiscoveryEvents |
+		TableSessionLifeCycleEvents |
+		TableSessionQueryInvokeEvents |
+		TableSessionQueryStreamEvents |
+		TableSessionTransactionEvents |
+		TablePoolLifeCycleEvents |
+		TablePoolRetryEvents |
+		TablePoolSessionLifeCycleEvents |
+		TablePoolAPIEvents
+)
+
+func DetailsFromString(s string) (d Details) {
+	if len(s) == 0 {
+		return 0
+	}
+	if dd, ok := stringToDetails[s]; ok {
+		return dd
+	}
+	s = strings.Trim(s, "[]")
+	ss := strings.Split(s, ",")
+	for _, sss := range ss {
+		if v, ok := stringToDetails[sss]; ok {
+			d |= v
 		}
 	}
-	return ""
+	return d
 }
 
-func (d Details) String() (s string) {
-	if s = d.knownDetailsString(true); s != "" {
+func (d Details) String() string {
+	if s, ok := detailsToString[d]; ok {
 		return s
 	}
-	var buf bytes.Buffer
-	for _, v := range []Details{
-		DriverSystemEvents,
-		DriverClusterEvents,
-		DriverNetEvents,
-		DriverCoreEvents,
-		DriverCredentialsEvents,
-		DriverDiscoveryEvents,
-		TableSessionLifeCycleEvents,
-		TableSessionQueryInvokeEvents,
-		TableSessionQueryStreamEvents,
-		TableSessionTransactionEvents,
-		TablePoolLifeCycleEvents,
-		TablePoolRetryEvents,
-		TablePoolSessionLifeCycleEvents,
-		TablePoolAPIEvents,
-	} {
-		if d&v != 0 {
-			if buf.Len() != 0 {
-				buf.WriteString(",")
-			}
-			buf.WriteString(v.knownDetailsString(false))
+	var ss []string
+	for k, v := range detailsToString {
+		if d&k != 0 {
+			ss = append(ss, v)
 		}
 	}
-	return "[" + buf.String() + "]"
+	sort.Strings(ss)
+	return "[" + strings.Join(ss, ",") + "]"
 }
