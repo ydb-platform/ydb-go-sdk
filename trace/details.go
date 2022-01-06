@@ -70,6 +70,11 @@ var (
 		"TablePoolRetryEvents":            TablePoolRetryEvents,
 		"TablePoolSessionLifeCycleEvents": TablePoolSessionLifeCycleEvents,
 		"TablePoolAPIEvents":              TablePoolAPIEvents,
+		"DriverConnEvents":                DriverConnEvents,
+		"TableSessionQueryEvents":         TableSessionQueryEvents,
+		"TableSessionEvents":              TableSessionEvents,
+		"TablePoolEvents":                 TablePoolEvents,
+		"DetailsAll":                      DetailsAll,
 	}
 	maskDetails = DriverSystemEvents |
 		DriverClusterEvents |
@@ -88,14 +93,13 @@ var (
 )
 
 func DetailsFromString(s string) (d Details) {
-	if len(s) == 0 {
+	return DetailsFromStrings(strings.Split(s, "|"))
+}
+
+func DetailsFromStrings(ss []string) (d Details) {
+	if len(ss) == 0 {
 		return 0
 	}
-	if dd, ok := stringToDetails[s]; ok {
-		return dd
-	}
-	s = strings.Trim(s, "[]")
-	ss := strings.Split(s, ",")
 	for _, sss := range ss {
 		if v, ok := stringToDetails[sss]; ok {
 			d |= v
@@ -108,12 +112,15 @@ func (d Details) String() string {
 	if s, ok := detailsToString[d]; ok {
 		return s
 	}
-	var ss []string
+	return strings.Join(d.Strings(), "|")
+}
+
+func (d Details) Strings() (ss []string) {
 	for k, v := range detailsToString {
 		if d&k != 0 {
 			ss = append(ss, v)
 		}
 	}
 	sort.Strings(ss)
-	return "[" + strings.Join(ss, ",") + "]"
+	return
 }

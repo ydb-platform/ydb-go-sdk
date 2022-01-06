@@ -67,16 +67,16 @@ func TestDetailsString(t *testing.T) {
 		},
 		{
 			details: DriverSystemEvents | DriverCoreEvents,
-			exp:     "[DriverCoreEvents,DriverSystemEvents]",
+			exp:     "DriverCoreEvents|DriverSystemEvents",
 		},
 		{
 			details: DriverClusterEvents | TablePoolAPIEvents,
-			exp:     "[DriverClusterEvents,TablePoolAPIEvents]",
+			exp:     "DriverClusterEvents|TablePoolAPIEvents",
 		},
 		{
 			details: DriverSystemEvents | DriverClusterEvents | DriverCoreEvents | TablePoolEvents,
-			exp: "[DriverClusterEvents,DriverCoreEvents,DriverSystemEvents,TablePoolAPIEvents," +
-				"TablePoolLifeCycleEvents,TablePoolRetryEvents,TablePoolSessionLifeCycleEvents]",
+			exp: "DriverClusterEvents|DriverCoreEvents|DriverSystemEvents|TablePoolAPIEvents|" +
+				"TablePoolLifeCycleEvents|TablePoolRetryEvents|TablePoolSessionLifeCycleEvents",
 		},
 	} {
 		t.Run(test.exp, func(t *testing.T) {
@@ -149,16 +149,16 @@ func TestDetailsFromString(t *testing.T) {
 			exp: TablePoolAPIEvents,
 		},
 		{
-			s:   "[DriverCoreEvents,DriverSystemEvents]",
+			s:   "DriverCoreEvents|DriverSystemEvents",
 			exp: DriverSystemEvents | DriverCoreEvents,
 		},
 		{
-			s:   "[DriverClusterEvents,TablePoolAPIEvents]",
+			s:   "DriverClusterEvents|TablePoolAPIEvents",
 			exp: DriverClusterEvents | TablePoolAPIEvents,
 		},
 		{
-			s: "[DriverClusterEvents,DriverCoreEvents,DriverSystemEvents,TablePoolAPIEvents," +
-				"TablePoolLifeCycleEvents,TablePoolRetryEvents,TablePoolSessionLifeCycleEvents]",
+			s: "DriverClusterEvents|DriverCoreEvents|DriverSystemEvents|TablePoolAPIEvents|" +
+				"TablePoolLifeCycleEvents|TablePoolRetryEvents|TablePoolSessionLifeCycleEvents",
 			exp: DriverSystemEvents | DriverClusterEvents | DriverCoreEvents | TablePoolEvents,
 		},
 	} {
