@@ -1,3 +1,7 @@
+## 3.6.1
+* Switched closing cluster after closing all sub-services
+* Added windows and macOS runtimes to unit and integration tests 
+
 ## 3.6.0
 * Added `config/balancer` package with popular balancers
 * Added new `PreferEndpoint[WithFallback][RegEx]` balancer

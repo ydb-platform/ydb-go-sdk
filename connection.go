@@ -115,9 +115,6 @@ func (db *db) NewStream(
 
 func (db *db) Close(ctx context.Context) error {
 	issues := make([]error, 0, 4)
-	if err := db.cluster.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
 	if err := db.Table().Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
@@ -125,6 +122,9 @@ func (db *db) Close(ctx context.Context) error {
 		issues = append(issues, err)
 	}
 	if err := db.Coordination().Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := db.cluster.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 	if len(issues) > 0 {

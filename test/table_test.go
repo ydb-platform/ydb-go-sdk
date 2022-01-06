@@ -18,6 +18,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -131,6 +132,11 @@ func TestTablePoolHealth(t *testing.T) {
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
 		),
+		ydb.WithBalancer(balancer.PreferEndpointWithFallback( // for max tests coverage
+			balancer.RandomChoice(),
+			balancer.RoundRobin(),
+			"localhost:2135",
+		)),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithSessionPoolSizeLimit(limit),
@@ -879,6 +885,10 @@ func TestTableTx(t *testing.T) {
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
 		),
+		ydb.WithBalancer(balancer.PreferLocalWithFallback( // for max tests coverage
+			balancer.RandomChoice(),
+			balancer.RoundRobin(),
+		)),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithSessionPoolSizeLimit(50),
