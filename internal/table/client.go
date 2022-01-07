@@ -532,20 +532,12 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	if c.isClosed() {
 		return ErrSessionPoolClosed
 	}
-	options := table.Options{
-		Idempotent: table.ContextIdempotentOperation(ctx),
-	}
-	for _, o := range opts {
-		o(&options)
-	}
-	return retryBackoff(
+	return do(
 		ctx,
 		c,
-		retry.FastBackoff,
-		retry.SlowBackoff,
-		options.Idempotent,
 		op,
-		c.config.Trace(),
+		withOptions(opts...),
+		withTrace(c.config.Trace()),
 	)
 }
 

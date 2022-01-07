@@ -24,33 +24,72 @@ type SessionProvider interface {
 	// instead of plain session.Close().
 	// CloseSession must be fast. If necessary, can be async.
 	CloseSession(ctx context.Context, s Session) error
+}
 
-	// Close provide cleanup sessions
-	Close(ctx context.Context) error
+type retryOptions struct {
+	options     table.Options
+	fastBackoff retry.Backoff
+	slowBackoff retry.Backoff
+	trace       trace.Table
+}
 
-	// Do provide the best effort for execute operation
-	// Do implements internal busy loop until one of the following conditions is met:
-	// - deadline was canceled or deadlined
-	// - retry operation returned nil as error
-	// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-	Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error)
+type retryOption func(o *retryOptions)
+
+func withOptions(opts ...table.Option) retryOption {
+	return func(options *retryOptions) {
+		for _, o := range opts {
+			o(&options.options)
+		}
+	}
+}
+
+func withTrace(t trace.Table) retryOption {
+	return func(options *retryOptions) {
+		options.trace = options.trace.Compose(t)
+	}
+}
+
+func withFastBackoff(fastBackoff retry.Backoff) retryOption {
+	return func(options *retryOptions) {
+		options.fastBackoff = fastBackoff
+	}
+}
+
+func withSlowBackoff(slowBackoff retry.Backoff) retryOption {
+	return func(options *retryOptions) {
+		options.slowBackoff = slowBackoff
+	}
+}
+
+func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retryOption) (err error) {
+	options := retryOptions{
+		options: table.Options{
+			Idempotent: table.ContextIdempotentOperation(ctx),
+		},
+		fastBackoff: retry.FastBackoff,
+		slowBackoff: retry.SlowBackoff,
+		trace:       trace.Table{},
+	}
+	for _, o := range opts {
+		o(&options)
+	}
+	return retryBackoff(
+		ctx,
+		c,
+		options.fastBackoff,
+		options.slowBackoff,
+		options.options.Idempotent,
+		op,
+		options.trace,
+	)
 }
 
 type SessionProviderFunc struct {
-	OnGet   func(context.Context) (Session, error)
-	OnPut   func(context.Context, Session) error
-	OnDo    func(context.Context, table.Operation, ...table.Option) error
-	OnClose func(context.Context) error
+	OnGet func(context.Context) (Session, error)
+	OnPut func(context.Context, Session) error
 }
 
 var _ SessionProvider = SessionProviderFunc{}
-
-func (f SessionProviderFunc) Close(ctx context.Context) error {
-	if f.OnClose == nil {
-		return nil
-	}
-	return f.OnClose(ctx)
-}
 
 func (f SessionProviderFunc) Get(ctx context.Context) (Session, error) {
 	if f.OnGet == nil {
@@ -66,21 +105,14 @@ func (f SessionProviderFunc) Put(ctx context.Context, s Session) error {
 	return f.OnPut(ctx, s)
 }
 
-func (f SessionProviderFunc) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
-	if f.OnDo == nil {
-		return retryBackoff(ctx, f, nil, nil, false, op, trace.ContextTable(ctx))
-	}
-	return f.OnDo(ctx, op)
-}
-
 func (f SessionProviderFunc) CloseSession(ctx context.Context, s Session) error {
 	return s.Close(ctx)
 }
 
 // SingleSession returns SessionProvider that uses only given session during
 // retries.
-func SingleSession(s Session, b retry.Backoff) SessionProvider {
-	return &singleSession{s: s, b: b}
+func SingleSession(s Session) SessionProvider {
+	return &singleSession{s: s}
 }
 
 var (
@@ -91,16 +123,7 @@ var (
 
 type singleSession struct {
 	s     Session
-	b     retry.Backoff
 	empty bool
-}
-
-func (s *singleSession) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
-	options := table.Options{}
-	for _, o := range opts {
-		o(&options)
-	}
-	return retryBackoff(ctx, s, s.b, s.b, options.Idempotent, op, trace.ContextTable(ctx))
 }
 
 func (s *singleSession) Close(ctx context.Context) error {

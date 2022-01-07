@@ -1,3 +1,6 @@
+## 3.6.2
+* Refactored table retry helpers
+
 ## 3.6.1
 * Switched closing cluster after closing all sub-services
 * Added windows and macOS runtimes to unit and integration tests 

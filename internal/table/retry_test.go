@@ -33,19 +33,28 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			backoff := make(chan chan time.Time)
 			p := SingleSession(
 				simpleSession(t),
-				testutil.BackoffFunc(func(n int) <-chan time.Time {
-					ch := make(chan time.Time)
-					backoff <- ch
-					return ch
-				}),
 			)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			results := make(chan error)
 			go func() {
-				err := p.Do(ctx, func(ctx context.Context, _ table.Session) error {
-					return testErr
-				})
+				err := do(
+					ctx,
+					p,
+					func(ctx context.Context, _ table.Session) error {
+						return testErr
+					},
+					withFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+						ch := make(chan time.Time)
+						backoff <- ch
+						return ch
+					})),
+					withSlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+						ch := make(chan time.Time)
+						backoff <- ch
+						return ch
+					})),
+				)
 				results <- err
 			}()
 
@@ -86,8 +95,9 @@ func TestRetryerBadSession(t *testing.T) {
 		sessions   []table.Session
 	)
 	ctx, cancel := context.WithCancel(context.Background())
-	err := p.Do(
+	err := do(
 		ctx,
+		p,
 		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
 			i++
@@ -137,15 +147,19 @@ func TestRetryerImmediateReturn(t *testing.T) {
 			}()
 			p := SingleSession(
 				simpleSession(t),
-				testutil.BackoffFunc(func(n int) <-chan time.Time {
-					panic("this code will not be called")
-				}),
 			)
-			err := p.Do(
+			err := do(
 				context.Background(),
+				p,
 				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
+				withFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+					panic("this code will not be called")
+				})),
+				withSlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+					panic("this code will not be called")
+				})),
 			)
 			if !errors.Is(err, testErr) {
 				t.Fatalf("unexpected error: %v", err)
@@ -264,7 +278,7 @@ func TestRetryContextDeadline(t *testing.T) {
 			t.Run(fmt.Sprintf("timeout %v, sleep %v", timeout, sleep), func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
-				_ = p.Do(
+				_ = do(
 					trace.WithRetry(
 						ctx,
 						trace.Retry{
@@ -277,6 +291,7 @@ func TestRetryContextDeadline(t *testing.T) {
 							},
 						},
 					),
+					p,
 					func(ctx context.Context, _ table.Session) error {
 						select {
 						case <-ctx.Done():
