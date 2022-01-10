@@ -132,10 +132,10 @@ func TestTablePoolHealth(t *testing.T) {
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
 		),
-		ydb.WithBalancer(balancer.PreferEndpointWithFallback( // for max tests coverage
+		ydb.WithBalancer(balancer.PreferLocationsWithFallback( // for max tests coverage
 			balancer.RandomChoice(),
 			balancer.RoundRobin(),
-			"localhost:2135",
+			"MAN",
 		)),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),

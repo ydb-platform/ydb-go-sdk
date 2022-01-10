@@ -76,6 +76,7 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		if e.Ssl == d.ssl {
 			endpoints = append(endpoints, endpoint.New(
 				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
+				endpoint.WithLocation(e.GetLocation()),
 				endpoint.WithID(e.GetNodeId()),
 				endpoint.WithLoadFactor(e.GetLoadFactor()),
 				endpoint.WithLocalDC(e.GetLocation() == listEndpointsResult.GetSelfLocation()),

@@ -1,13 +1,9 @@
 package endpoint
 
-import (
-	"net"
-	"strconv"
-)
-
 type Endpoint struct {
-	id      uint32
-	address string
+	id       uint32
+	address  string
+	location string
 
 	loadFactor float32
 	local      bool
@@ -21,6 +17,10 @@ func (e Endpoint) Address() string {
 	return e.address
 }
 
+func (e Endpoint) Location() string {
+	return e.location
+}
+
 func (e Endpoint) LocalDC() bool {
 	return e.local
 }
@@ -29,21 +29,17 @@ func (e Endpoint) LoadFactor() float32 {
 	return e.loadFactor
 }
 
-func SplitHostPort(addr string) (host string, port int, err error) {
-	var prt string
-	host, prt, err = net.SplitHostPort(addr)
-	if err != nil {
-		return
-	}
-	port, err = strconv.Atoi(prt)
-	return
-}
-
 type option func(e *Endpoint)
 
 func WithID(id uint32) option {
 	return func(e *Endpoint) {
 		e.id = id
+	}
+}
+
+func WithLocation(location string) option {
+	return func(e *Endpoint) {
+		e.location = location
 	}
 }
 
