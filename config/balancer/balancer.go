@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/multi"
@@ -93,6 +94,74 @@ func PreferEndpointWithFallbackRegEx(primary, fallback ibalancer.Balancer, re re
 		}),
 		multi.WithBalancer(fallback, func(cc conn.Conn) bool {
 			return !re.MatchString(cc.Endpoint().Address())
+		}),
+	)
+}
+
+func PreferLocations(primary ibalancer.Balancer, locations ...string) ibalancer.Balancer {
+	if len(locations) == 0 {
+		panic("empty list of locations")
+	}
+	for i := range locations {
+		locations[i] = strings.ToUpper(locations[i])
+	}
+	return multi.Balancer(
+		multi.WithBalancer(primary, func(cc conn.Conn) bool {
+			location := strings.ToUpper(cc.Endpoint().Location())
+			for _, l := range locations {
+				if location == l {
+					return true
+				}
+			}
+			return false
+		}),
+	)
+}
+
+func PreferLocationsRegEx(primary ibalancer.Balancer, re regexp.Regexp) ibalancer.Balancer {
+	return multi.Balancer(
+		multi.WithBalancer(primary, func(cc conn.Conn) bool {
+			return re.MatchString(strings.ToUpper(cc.Endpoint().Location()))
+		}),
+	)
+}
+
+func PreferLocationsWithFallback(primary, fallback ibalancer.Balancer, locations ...string) ibalancer.Balancer {
+	if len(locations) == 0 {
+		panic("empty list of locations")
+	}
+	for i := range locations {
+		locations[i] = strings.ToUpper(locations[i])
+	}
+	return multi.Balancer(
+		multi.WithBalancer(primary, func(cc conn.Conn) bool {
+			location := strings.ToUpper(cc.Endpoint().Location())
+			for _, l := range locations {
+				if location == l {
+					return true
+				}
+			}
+			return false
+		}),
+		multi.WithBalancer(fallback, func(cc conn.Conn) bool {
+			location := strings.ToUpper(cc.Endpoint().Location())
+			for _, l := range locations {
+				if location == l {
+					return false
+				}
+			}
+			return true
+		}),
+	)
+}
+
+func PreferLocationsWithFallbackRegEx(primary, fallback ibalancer.Balancer, re regexp.Regexp) ibalancer.Balancer {
+	return multi.Balancer(
+		multi.WithBalancer(primary, func(cc conn.Conn) bool {
+			return re.MatchString(strings.ToUpper(cc.Endpoint().Location()))
+		}),
+		multi.WithBalancer(fallback, func(cc conn.Conn) bool {
+			return !re.MatchString(strings.ToUpper(cc.Endpoint().Location()))
 		}),
 	)
 }

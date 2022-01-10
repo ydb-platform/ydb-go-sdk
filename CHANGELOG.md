@@ -1,5 +1,6 @@
 ## 3.6.2
 * Refactored table retry helpers
+* Added new `PreferLocations[WithFallback][RegEx]` balancers
 
 ## 3.6.1
 * Switched closing cluster after closing all sub-services
@@ -7,7 +8,7 @@
 
 ## 3.6.0
 * Added `config/balancer` package with popular balancers
-* Added new `PreferEndpoint[WithFallback][RegEx]` balancer
+* Added new `PreferEndpoints[WithFallback][RegEx]` balancers
 * Removed `config.BalancerConfig` struct
 * Refactored internal packages (tree to flat, split balancers to different packages)
 * Moved a taking conn to start of `conn.Invoke` /` conn.NewStream` for applying timeouts to alive conn instead lazy conn (previous logic applied timeouts to all request including dialing on lazy conn)
