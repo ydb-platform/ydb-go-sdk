@@ -1,5 +1,10 @@
 package trace
 
+import (
+	"sort"
+	"strings"
+)
+
 type Details uint64
 
 const (
@@ -32,3 +37,90 @@ const (
 		TablePoolAPIEvents // 15360
 	DetailsAll = ^Details(0) // 18446744073709551615
 )
+
+var (
+	detailsToString = map[Details]string{
+		DriverSystemEvents:              "DriverSystemEvents",
+		DriverClusterEvents:             "DriverClusterEvents",
+		DriverNetEvents:                 "DriverNetEvents",
+		DriverCoreEvents:                "DriverCoreEvents",
+		DriverCredentialsEvents:         "DriverCredentialsEvents",
+		DriverDiscoveryEvents:           "DriverDiscoveryEvents",
+		TableSessionLifeCycleEvents:     "TableSessionLifeCycleEvents",
+		TableSessionQueryInvokeEvents:   "TableSessionQueryInvokeEvents",
+		TableSessionQueryStreamEvents:   "TableSessionQueryStreamEvents",
+		TableSessionTransactionEvents:   "TableSessionTransactionEvents",
+		TablePoolLifeCycleEvents:        "TablePoolLifeCycleEvents",
+		TablePoolRetryEvents:            "TablePoolRetryEvents",
+		TablePoolSessionLifeCycleEvents: "TablePoolSessionLifeCycleEvents",
+		TablePoolAPIEvents:              "TablePoolAPIEvents",
+	}
+	stringToDetails = map[string]Details{
+		"DriverSystemEvents":              DriverSystemEvents,
+		"DriverClusterEvents":             DriverClusterEvents,
+		"DriverNetEvents":                 DriverNetEvents,
+		"DriverCoreEvents":                DriverCoreEvents,
+		"DriverCredentialsEvents":         DriverCredentialsEvents,
+		"DriverDiscoveryEvents":           DriverDiscoveryEvents,
+		"TableSessionLifeCycleEvents":     TableSessionLifeCycleEvents,
+		"TableSessionQueryInvokeEvents":   TableSessionQueryInvokeEvents,
+		"TableSessionQueryStreamEvents":   TableSessionQueryStreamEvents,
+		"TableSessionTransactionEvents":   TableSessionTransactionEvents,
+		"TablePoolLifeCycleEvents":        TablePoolLifeCycleEvents,
+		"TablePoolRetryEvents":            TablePoolRetryEvents,
+		"TablePoolSessionLifeCycleEvents": TablePoolSessionLifeCycleEvents,
+		"TablePoolAPIEvents":              TablePoolAPIEvents,
+		"DriverConnEvents":                DriverConnEvents,
+		"TableSessionQueryEvents":         TableSessionQueryEvents,
+		"TableSessionEvents":              TableSessionEvents,
+		"TablePoolEvents":                 TablePoolEvents,
+		"DetailsAll":                      DetailsAll,
+	}
+	maskDetails = DriverSystemEvents |
+		DriverClusterEvents |
+		DriverNetEvents |
+		DriverCoreEvents |
+		DriverCredentialsEvents |
+		DriverDiscoveryEvents |
+		TableSessionLifeCycleEvents |
+		TableSessionQueryInvokeEvents |
+		TableSessionQueryStreamEvents |
+		TableSessionTransactionEvents |
+		TablePoolLifeCycleEvents |
+		TablePoolRetryEvents |
+		TablePoolSessionLifeCycleEvents |
+		TablePoolAPIEvents
+)
+
+func DetailsFromString(s string) (d Details) {
+	return DetailsFromStrings(strings.Split(s, "|"))
+}
+
+func DetailsFromStrings(ss []string) (d Details) {
+	if len(ss) == 0 {
+		return 0
+	}
+	for _, sss := range ss {
+		if v, ok := stringToDetails[sss]; ok {
+			d |= v
+		}
+	}
+	return d
+}
+
+func (d Details) String() string {
+	if s, ok := detailsToString[d]; ok {
+		return s
+	}
+	return strings.Join(d.Strings(), "|")
+}
+
+func (d Details) Strings() (ss []string) {
+	for k, v := range detailsToString {
+		if d&k != 0 {
+			ss = append(ss, v)
+		}
+	}
+	sort.Strings(ss)
+	return
+}
