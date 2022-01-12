@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
@@ -62,14 +63,12 @@ func ContextTransactionSettings(ctx context.Context) *TransactionSettings {
 }
 
 type ClosableSession interface {
+	closer.Closer
 	Session
-
-	Close(ctx context.Context) (err error)
 }
 
 type Client interface {
-	// Close closes table client
-	Close(ctx context.Context) error
+	closer.Closer
 
 	// CreateSession returns session or error for manually control of session lifecycle
 	// CreateSession do not provide retry loop for failed create session requests.

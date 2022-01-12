@@ -14,7 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/icluster"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -290,7 +290,7 @@ func WithClose(onClose func(ctx context.Context) error) NewClusterOption {
 	}
 }
 
-func NewCluster(opts ...NewClusterOption) cluster.Cluster {
+func NewCluster(opts ...NewClusterOption) icluster.Cluster {
 	c := &db{}
 	for _, opt := range opts {
 		opt(c)

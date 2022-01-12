@@ -1,6 +1,6 @@
 package trace
 
-// go:generate gtrace
+//go:generate gtrace
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 )
 
 type (
-	// gtrace:gen
-	// gtrace:set Shortcut
+	//gtrace:gen
+	//gtrace:set Shortcut
 	Driver struct {
 		// Driver runtime events
 		OnInit  func(InitStartInfo) func(InitDoneInfo)
@@ -242,7 +242,6 @@ type (
 	}
 	PessimizeNodeDoneInfo struct {
 		State ConnState
-		Error error
 	}
 	GetCredentialsStartInfo struct {
 		// Context make available context in trace callback function.
@@ -264,6 +263,7 @@ type (
 		Address string
 	}
 	DiscoveryDoneInfo struct {
+		Location  string
 		Endpoints []string
 		Error     error
 	}
@@ -272,7 +272,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context  *context.Context
+		Endpoint string
+		Database string
+		Secure   bool
 	}
 	InitDoneInfo struct {
 		Error error

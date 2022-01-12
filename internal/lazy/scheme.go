@@ -1,17 +1,24 @@
-package ydb
+package lazy
 
 import (
 	"context"
 	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type lazyScheme struct {
-	db     DB
+	db     db.Connection
 	client scheme.Client
 	m      sync.Mutex
+}
+
+func Scheme(db db.Connection) *lazyScheme {
+	return &lazyScheme{
+		db: db,
+	}
 }
 
 func (s *lazyScheme) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {

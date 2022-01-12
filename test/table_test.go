@@ -16,9 +16,11 @@ import (
 	"text/template"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/config/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -131,11 +133,31 @@ func TestTablePoolHealth(t *testing.T) {
 			config.WithStreamTimeout(time.Second*5),
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
+			config.WithGrpcOptions(
+				grpc.WithUnaryInterceptor(func(
+					ctx context.Context,
+					method string,
+					req, reply interface{},
+					cc *grpc.ClientConn,
+					invoker grpc.UnaryInvoker,
+					opts ...grpc.CallOption,
+				) error {
+					return invoker(ctx, method, req, reply, cc, opts...)
+				}),
+				grpc.WithStreamInterceptor(func(
+					ctx context.Context,
+					desc *grpc.StreamDesc,
+					cc *grpc.ClientConn,
+					method string,
+					streamer grpc.Streamer,
+					opts ...grpc.CallOption,
+				) (grpc.ClientStream, error) {
+					return streamer(ctx, desc, cc, method, opts...)
+				}),
+			),
 		),
-		ydb.WithBalancer(balancer.PreferLocationsWithFallback( // for max tests coverage
+		ydb.WithBalancer(balancer.PreferLocalDCWithFallBack( // for max tests coverage
 			balancer.RandomChoice(),
-			balancer.RoundRobin(),
-			"MAN",
 		)),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
@@ -147,7 +169,7 @@ func TestTablePoolHealth(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.WARN),
+			ydb.WithMinLevel(ydb.ERROR),
 		),
 		ydb.WithTraceTable(trace.Table{
 			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
@@ -885,9 +907,9 @@ func TestTableTx(t *testing.T) {
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
 		),
-		ydb.WithBalancer(balancer.PreferLocalWithFallback( // for max tests coverage
-			balancer.RandomChoice(),
+		ydb.WithBalancer(balancer.PreferLocationsWithFallback( // for max tests coverage
 			balancer.RoundRobin(),
+			"MAN",
 		)),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),

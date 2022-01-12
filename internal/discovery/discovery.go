@@ -52,12 +52,13 @@ type client struct {
 
 func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	onDone := trace.DriverOnDiscovery(d.trace, &ctx, d.endpoint)
+	var location string
 	defer func() {
 		nodes := make([]string, 0)
 		for _, e := range endpoints {
 			nodes = append(nodes, e.Address())
 		}
-		onDone(nodes, err)
+		onDone(location, nodes, err)
 	}()
 	request := Ydb_Discovery.ListEndpointsRequest{
 		Database: d.database,
@@ -66,20 +67,21 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	if err != nil {
 		return nil, err
 	}
-	listEndpointsResult := Ydb_Discovery.ListEndpointsResult{}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &listEndpointsResult)
+	result := Ydb_Discovery.ListEndpointsResult{}
+	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return nil, err
 	}
-	endpoints = make([]endpoint.Endpoint, 0, len(listEndpointsResult.Endpoints))
-	for _, e := range listEndpointsResult.Endpoints {
+	location = result.GetSelfLocation()
+	endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
+	for _, e := range result.Endpoints {
 		if e.Ssl == d.ssl {
 			endpoints = append(endpoints, endpoint.New(
 				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
 				endpoint.WithLocation(e.GetLocation()),
 				endpoint.WithID(e.GetNodeId()),
 				endpoint.WithLoadFactor(e.GetLoadFactor()),
-				endpoint.WithLocalDC(e.GetLocation() == listEndpointsResult.GetSelfLocation()),
+				endpoint.WithLocalDC(e.GetLocation() == location),
 			))
 		}
 	}

@@ -49,25 +49,34 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if !has {
 		md = metadata.MD{}
 	}
-	md.Set(metaDatabase, m.database)
-	md.Set(metaVersion, Version)
-	if m.requestsType != "" {
-		md.Set(metaRequestType, m.requestsType)
+	if len(md.Get(metaDatabase)) == 0 {
+		md.Set(metaDatabase, m.database)
 	}
-	if m.credentials != nil {
-		var token string
-		t := trace.ContextDriver(ctx).Compose(m.trace)
-		getCredentialsDone := trace.DriverOnGetCredentials(t, &ctx)
-		defer func() {
-			getCredentialsDone(token != "", err)
-		}()
-		token, err = m.credentials.Token(ctx)
-		if err != nil {
-			if stringer, ok := m.credentials.(fmt.Stringer); ok {
-				return nil, fmt.Errorf("%s: %w", stringer.String(), err)
-			}
-			return nil, err
+	if len(md.Get(metaVersion)) == 0 {
+		md.Set(metaVersion, Version)
+	}
+	if m.requestsType != "" {
+		if len(md.Get(metaRequestType)) == 0 {
+			md.Set(metaRequestType, m.requestsType)
 		}
+	}
+	if m.credentials == nil {
+		return md, nil
+	}
+	var token string
+	t := trace.ContextDriver(ctx).Compose(m.trace)
+	getCredentialsDone := trace.DriverOnGetCredentials(t, &ctx)
+	defer func() {
+		getCredentialsDone(token != "", err)
+	}()
+	token, err = m.credentials.Token(ctx)
+	if err != nil {
+		if stringer, ok := m.credentials.(fmt.Stringer); ok {
+			return nil, fmt.Errorf("%s: %w", stringer.String(), err)
+		}
+		return nil, err
+	}
+	if len(md.Get(metaTicket)) == 0 {
 		md.Set(metaTicket, token)
 	}
 	return md, nil

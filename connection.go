@@ -3,128 +3,99 @@ package ydb
 import (
 	"context"
 	"os"
+	"sync"
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dial"
+	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/proxy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type DB interface {
-	cluster.Cluster
-
-	// Endpoint returns initial endpoint
-	Endpoint() string
-
-	// Name returns database name
-	Name() string
-
-	// Secure returns true if database connection is secure
-	Secure() bool
-}
-
 type Connection interface {
-	DB
+	db.Connection
 
 	// Table returns table client with options from Connection instance.
 	// Options provide options replacement for requested table client
 	// such as endpoint, database, secure connection flag and credentials
 	// Options replacement feature not implements now
-	Table(opts ...Option) table.Client
+	Table(opts ...CustomOption) table.Client
 
 	// Scheme returns scheme client with options from Connection instance.
 	// Options provide options replacement for requested scheme client
 	// such as endpoint, database, secure connection flag and credentials
 	// Options replacement feature not implements now
-	Scheme(opts ...Option) scheme.Client
+	Scheme(opts ...CustomOption) scheme.Client
 
 	// Coordination returns coordination client with options from Connection instance.
 	// Options provide options replacement for requested coordination client
 	// such as endpoint, database, secure connection flag and credentials
 	// Options replacement feature not implements now
-	Coordination(opts ...Option) coordination.Client
+	Coordination(opts ...CustomOption) coordination.Client
 
-	// RateLimiter returns rate limiter client with options from Connection instance.
+	// Ratelimiter returns rate limiter client with options from Connection instance.
 	// Options provide options replacement for requested rate limiter client
 	// such as endpoint, database, secure connection flag and credentials
 	// Options replacement feature not implements now
-	RateLimiter(opts ...Option) ratelimiter.Client
+	Ratelimiter(opts ...CustomOption) ratelimiter.Client
 
 	// Discovery returns discovery client with options from Connection instance.
 	// Options provide options replacement for requested discovery client
 	// such as endpoint, database, secure connection flag and credentials
 	// Options replacement feature not implements now
-	Discovery(opts ...Option) discovery.Client
+	Discovery(opts ...CustomOption) discovery.Client
+
+	// Close clears resources and close all connections to YDB
+	Close(ctx context.Context) error
 }
 
-type db struct {
+type connection struct {
 	config       config.Config
 	options      []config.Option
-	cluster      cluster.Cluster
-	table        lazyTable
-	scheme       lazyScheme
-	coordination lazyCoordination
-	ratelimiter  lazyRatelimiter
-	discovery    lazyDiscovery
+	tableOptions []tableConfig.Option
+	conns        conn.Pool
+	mtx          sync.Mutex
+	db           db.Connection
+	table        table.Client
+	scheme       scheme.Client
+	discovery    discovery.Client
+	coordination coordination.Client
+	rateLimiter  ratelimiter.Client
 }
 
-func (db *db) Discovery(opts ...Option) discovery.Client {
-	return &db.discovery
-}
-
-func (db *db) Endpoint() string {
-	return db.config.Endpoint()
-}
-
-func (db *db) Name() string {
-	return db.config.Database()
-}
-
-func (db *db) Secure() bool {
-	return db.config.Secure()
-}
-
-func (db *db) Invoke(
-	ctx context.Context,
-	method string,
-	args interface{},
-	reply interface{},
-	opts ...grpc.CallOption,
-) error {
-	return db.cluster.Invoke(ctx, method, args, reply, opts...)
-}
-
-func (db *db) NewStream(
-	ctx context.Context,
-	desc *grpc.StreamDesc,
-	method string,
-	opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	return db.cluster.NewStream(ctx, desc, method, opts...)
-}
-
-func (db *db) Close(ctx context.Context) error {
-	issues := make([]error, 0, 4)
-	if err := db.Table().Close(ctx); err != nil {
+func (c *connection) Close(ctx context.Context) error {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+	var issues []error
+	if err := c.discovery.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
-	if err := db.Scheme().Close(ctx); err != nil {
+	if err := c.rateLimiter.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
-	if err := db.Coordination().Close(ctx); err != nil {
+	if err := c.coordination.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
-	if err := db.cluster.Close(ctx); err != nil {
+	if err := c.scheme.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := c.table.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := c.db.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 	if len(issues) > 0 {
@@ -133,25 +104,94 @@ func (db *db) Close(ctx context.Context) error {
 	return nil
 }
 
-func (db *db) Table(opts ...Option) table.Client {
-	return &db.table
+func (c *connection) Invoke(
+	ctx context.Context,
+	method string,
+	args interface{},
+	reply interface{},
+	opts ...grpc.CallOption,
+) error {
+	return c.db.Invoke(ctx, method, args, reply, opts...)
 }
 
-func (db *db) Scheme(opts ...Option) scheme.Client {
-	return &db.scheme
+func (c *connection) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	return c.db.NewStream(ctx, desc, method, opts...)
 }
 
-func (db *db) Coordination(opts ...Option) coordination.Client {
-	return &db.coordination
+func (c *connection) Endpoint() string {
+	return c.config.Endpoint()
 }
 
-func (db *db) RateLimiter(opts ...Option) ratelimiter.Client {
-	return &db.ratelimiter
+func (c *connection) Name() string {
+	return c.config.Database()
+}
+
+func (c *connection) Secure() bool {
+	return c.config.Secure()
+}
+
+func (c *connection) Table(opts ...CustomOption) table.Client {
+	if len(opts) == 0 {
+		return c.table
+	}
+	return proxy.Table(c.table, c.meta(opts...))
+}
+
+func (c *connection) Scheme(opts ...CustomOption) scheme.Client {
+	if len(opts) == 0 {
+		return c.scheme
+	}
+	return proxy.Scheme(c.scheme, c.meta(opts...))
+}
+
+func (c *connection) Coordination(opts ...CustomOption) coordination.Client {
+	if len(opts) == 0 {
+		return c.coordination
+	}
+	return proxy.Coordination(c.coordination, c.meta(opts...))
+}
+
+func (c *connection) Ratelimiter(opts ...CustomOption) ratelimiter.Client {
+	if len(opts) == 0 {
+		return c.rateLimiter
+	}
+	return proxy.Ratelimiter(c.rateLimiter, c.meta(opts...))
+}
+
+func (c *connection) Discovery(opts ...CustomOption) discovery.Client {
+	if len(opts) == 0 {
+		return c.discovery
+	}
+	return proxy.Discovery(c.discovery, c.meta(opts...))
+}
+
+func (c *connection) meta(opts ...CustomOption) meta.Meta {
+	if len(opts) == 0 {
+		return c.config.Meta()
+	}
+	options := customOptions{
+		database:    c.config.Database(),
+		credentials: c.config.Credentials(),
+	}
+	for _, o := range opts {
+		o(&options)
+	}
+	return meta.New(
+		options.database,
+		options.credentials,
+		c.config.Trace(),
+		c.config.RequestsType(),
+	)
 }
 
 // New connects to name and return name runtime holder
 func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
-	db := &db{}
+	c := &connection{}
 	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
 		opts = append([]Option{WithCertificatesFromFile(caFile)}, opts...)
 	}
@@ -172,25 +212,21 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		}
 	}
 	for _, opt := range opts {
-		err = opt(ctx, db)
+		err = opt(ctx, c)
 		if err != nil {
 			return nil, err
 		}
 	}
-	db.config = config.New(db.options...)
-	onDone := trace.DriverOnInit(db.config.Trace(), &ctx)
-	defer func() {
-		onDone(err)
-	}()
-	db.cluster, err = dial.Dial(ctx, db.config)
+	c.config = config.New(c.options...)
+	c.conns = conn.NewPool(ctx, c.config)
+	c.db, err = db.New(ctx, c.config, c.conns)
 	if err != nil {
 		return nil, err
 	}
-	db.table.db = db
-	db.coordination.db = db
-	db.ratelimiter.db = db
-	db.discovery.db = db
-	db.scheme.db = db
-	db.discovery.trace = db.config.Trace()
-	return db, nil
+	c.table = lazy.Table(c.db, c.tableOptions)
+	c.scheme = lazy.Scheme(c.db)
+	c.discovery = lazy.Discovery(c.db, c.config.Trace())
+	c.coordination = lazy.Coordination(c.db)
+	c.rateLimiter = lazy.Ratelimiter(c.db)
+	return c, nil
 }

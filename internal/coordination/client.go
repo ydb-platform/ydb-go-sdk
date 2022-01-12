@@ -3,31 +3,23 @@ package coordination
 import (
 	"context"
 
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
-
-type Client interface {
-	CreateNode(ctx context.Context, path string, config coordination.Config) (err error)
-	AlterNode(ctx context.Context, path string, config coordination.Config) (err error)
-	DropNode(ctx context.Context, path string) (err error)
-	DescribeNode(ctx context.Context, path string) (_ *scheme.Entry, _ *coordination.Config, err error)
-	Close(ctx context.Context) error
-}
 
 type client struct {
 	service Ydb_Coordination_V1.CoordinationServiceClient
 }
 
-func New(c cluster.Cluster) Client {
+func New(cc grpc.ClientConnInterface) coordination.Client {
 	return &client{
-		service: Ydb_Coordination_V1.NewCoordinationServiceClient(c),
+		service: Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
 	}
 }
 
@@ -40,7 +32,7 @@ func (c *client) CreateNode(ctx context.Context, path string, config coordinatio
 			SessionGracePeriodMillis: config.SessionGracePeriodMillis,
 			ReadConsistencyMode:      config.ReadConsistencyMode.To(),
 			AttachConsistencyMode:    config.AttachConsistencyMode.To(),
-			RateLimiterCountersMode:  config.RateLimiterCountersMode.To(),
+			RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
 		},
 	})
 	return
@@ -55,7 +47,7 @@ func (c *client) AlterNode(ctx context.Context, path string, config coordination
 			SessionGracePeriodMillis: config.SessionGracePeriodMillis,
 			ReadConsistencyMode:      config.ReadConsistencyMode.To(),
 			AttachConsistencyMode:    config.AttachConsistencyMode.To(),
-			RateLimiterCountersMode:  config.RateLimiterCountersMode.To(),
+			RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
 		},
 	})
 	return
@@ -90,11 +82,11 @@ func (c *client) DescribeNode(ctx context.Context, path string) (_ *scheme.Entry
 		SessionGracePeriodMillis: result.GetConfig().GetSessionGracePeriodMillis(),
 		ReadConsistencyMode:      consistencyMode(result.GetConfig().GetReadConsistencyMode()),
 		AttachConsistencyMode:    consistencyMode(result.GetConfig().GetAttachConsistencyMode()),
-		RateLimiterCountersMode:  rateLimiterCountersMode(result.GetConfig().GetRateLimiterCountersMode()),
+		RatelimiterCountersMode:  rateLimiterCountersMode(result.GetConfig().GetRateLimiterCountersMode()),
 	}, nil
 }
 
-func (c *client) Close(ctx context.Context) error {
+func (c *client) Close(context.Context) error {
 	return nil
 }
 
@@ -109,13 +101,13 @@ func consistencyMode(t Ydb_Coordination.ConsistencyMode) coordination.Consistenc
 	}
 }
 
-func rateLimiterCountersMode(t Ydb_Coordination.RateLimiterCountersMode) coordination.RateLimiterCountersMode {
+func rateLimiterCountersMode(t Ydb_Coordination.RateLimiterCountersMode) coordination.RatelimiterCountersMode {
 	switch t {
 	case Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_AGGREGATED:
-		return coordination.RateLimiterCountersModeAggregated
+		return coordination.RatelimiterCountersModeAggregated
 	case Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_DETAILED:
-		return coordination.RateLimiterCountersModeDetailed
+		return coordination.RatelimiterCountersModeDetailed
 	default:
-		return coordination.RateLimiterCountersModeUnset
+		return coordination.RatelimiterCountersModeUnset
 	}
 }

@@ -7,7 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -48,31 +49,31 @@ type Client interface {
 	CloseSession(ctx context.Context, s Session) (err error)
 }
 
-func New(ctx context.Context, cluster cluster.Cluster, opts ...config.Option) Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, opts ...config.Option) Client {
 	config := config.New(opts...)
-	return newClient(ctx, cluster, nil, config)
+	return newClient(ctx, cc, nil, config)
 }
 
 func newClient(
 	ctx context.Context,
-	cluster cluster.Cluster,
+	cc grpc.ClientConnInterface,
 	builder SessionBuilder,
 	config config.Config,
 ) *client {
 	onDone := trace.TableOnPoolInit(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
 	if builder == nil {
 		builder = func(ctx context.Context) (s Session, err error) {
-			return newSession(ctx, cluster, config.Trace().Compose(trace.ContextTable(ctx)))
+			return newSession(ctx, cc, config.Trace().Compose(trace.ContextTable(ctx)))
 		}
 	}
 	c := &client{
-		config:  config,
-		cluster: cluster,
-		build:   builder,
-		index:   make(map[Session]sessionInfo),
-		idle:    list.New(),
-		waitq:   list.New(),
-		limit:   config.SizeLimit(),
+		config: config,
+		cc:     cc,
+		build:  builder,
+		index:  make(map[Session]sessionInfo),
+		idle:   list.New(),
+		waitq:  list.New(),
+		limit:  config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan Session)
@@ -95,7 +96,7 @@ type client struct {
 	// build holds an object capable for creating sessions.
 	// It must not be nil.
 	build             SessionBuilder
-	cluster           cluster.Cluster
+	cc                grpc.ClientConnInterface
 	config            config.Config
 	index             map[Session]sessionInfo
 	createInProgress  int           // KIKIMR-9163: in-create-process counter

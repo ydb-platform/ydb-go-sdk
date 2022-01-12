@@ -4,17 +4,17 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -22,9 +22,11 @@ type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
-	GetState() state.State
-	SetState(context.Context, state.State) state.State
+	GetState() State
+	SetState(context.Context, State) State
 	Close(ctx context.Context) error
+	Park(ctx context.Context) error
+	TTL() <-chan time.Time
 }
 
 func (c *conn) Address() string {
@@ -34,13 +36,17 @@ func (c *conn) Address() string {
 type conn struct {
 	sync.Mutex
 	config   Config // ro access
-	dial     func(context.Context, string) (*grpc.ClientConn, error)
 	cc       *grpc.ClientConn
 	done     chan struct{}
 	endpoint endpoint.Endpoint // ro access
 	closed   bool
-	state    state.State
+	state    State
 	locks    int32
+	ttl      timeutil.Timer
+}
+
+func (c *conn) Park(ctx context.Context) error {
+	return c.close(ctx)
 }
 
 func (c *conn) NodeID() uint32 {
@@ -57,27 +63,49 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	return endpoint.Endpoint{}
 }
 
-func (c *conn) SetState(ctx context.Context, s state.State) state.State {
+func (c *conn) SetState(ctx context.Context, s State) State {
 	c.Lock()
 	defer c.Unlock()
 	return c.setState(ctx, s)
 }
 
-func (c *conn) setState(ctx context.Context, s state.State) state.State {
-	onDone := trace.DriverOnConnStateChange(c.config.Trace(ctx), &ctx, c.endpoint, c.state)
+func (c *conn) setState(ctx context.Context, s State) State {
+	onDone := trace.DriverOnConnStateChange(
+		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+		&ctx,
+		c.endpoint,
+		c.state,
+	)
 	c.state = s
 	onDone(c.state)
 	return c.state
 }
 
-func (c *conn) GetState() (s state.State) {
+func (c *conn) GetState() (s State) {
 	c.Lock()
 	defer c.Unlock()
 	return c.state
 }
 
+func (c *conn) TTL() <-chan time.Time {
+	if c.config.ConnectionTTL() == 0 {
+		return nil
+	}
+	if c.isClosed() {
+		return nil
+	}
+	if atomic.LoadInt32(&c.locks) > 0 {
+		return nil
+	}
+	return c.ttl.C()
+}
+
 func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
-	onDone := trace.DriverOnConnTake(c.config.Trace(ctx), &ctx, c.endpoint)
+	onDone := trace.DriverOnConnTake(
+		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+		&ctx,
+		c.endpoint,
+	)
 	defer func() {
 		onDone(int(atomic.LoadInt32(&c.locks)), err)
 	}()
@@ -93,12 +121,12 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 			ctx, cancel = context.WithTimeout(ctx, dialTimeout)
 			defer cancel()
 		}
-		cc, err = c.dial(ctx, c.endpoint.Address())
+		cc, err = grpc.DialContext(ctx, c.endpoint.Address(), c.config.GrpcDialOptions()...)
 		if err != nil {
 			return nil, err
 		}
 		c.cc = cc
-		c.setState(ctx, state.Online)
+		c.setState(ctx, Online)
 	}
 	atomic.AddInt32(&c.locks, 1)
 	return c.cc, nil
@@ -107,7 +135,14 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 func (c *conn) release(ctx context.Context) {
 	c.Lock()
 	defer c.Unlock()
-	onDone := trace.DriverOnConnRelease(c.config.Trace(ctx), &ctx, c.endpoint)
+	if ttl := c.config.ConnectionTTL(); ttl > 0 {
+		c.ttl.Reset(ttl)
+	}
+	onDone := trace.DriverOnConnRelease(
+		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+		&ctx,
+		c.endpoint,
+	)
 	atomic.AddInt32(&c.locks, -1)
 	onDone(int(atomic.LoadInt32(&c.locks)))
 }
@@ -126,7 +161,7 @@ func (c *conn) close(ctx context.Context) (err error) {
 	}
 	err = c.cc.Close()
 	c.cc = nil
-	c.setState(ctx, state.Offline)
+	c.setState(ctx, Offline)
 	return err
 }
 
@@ -144,7 +179,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	}
 	c.closed = true
 	err = c.close(ctx)
-	c.setState(ctx, state.Destroyed)
+	c.setState(ctx, Destroyed)
 	return err
 }
 
@@ -152,18 +187,13 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	if c.isClosed() {
 		return
 	}
-	onDone := trace.DriverOnPessimizeNode(
-		c.config.Trace(ctx),
+	trace.DriverOnPessimizeNode(
+		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
 		c.endpoint,
 		c.GetState(),
 		err,
-	)
-	err = c.config.Pessimize(ctx, c.endpoint)
-	onDone(
-		c.GetState(),
-		err,
-	)
+	)(c.SetState(ctx, Banned))
 }
 
 func (c *conn) Invoke(
@@ -212,12 +242,12 @@ func (c *conn) Invoke(
 		operation.SetOperationParams(req, params)
 	}
 
-	ctx, err = c.config.Meta(ctx)
-	if err != nil {
-		return err
-	}
-
-	onDone := trace.DriverOnConnInvoke(c.config.Trace(ctx), &ctx, c.endpoint, trace.Method(method))
+	onDone := trace.DriverOnConnInvoke(
+		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+		&ctx,
+		c.endpoint,
+		trace.Method(method),
+	)
 	defer func() {
 		onDone(err, issues, opID, c.GetState())
 	}()
@@ -288,12 +318,12 @@ func (c *conn) NewStream(
 		}
 	}()
 
-	ctx, err = c.config.Meta(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	streamRecv := trace.DriverOnConnNewStream(c.config.Trace(ctx), &ctx, c.endpoint, trace.Method(method))
+	streamRecv := trace.DriverOnConnNewStream(
+		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+		&ctx,
+		c.endpoint,
+		trace.Method(method),
+	)
 	defer func() {
 		if err != nil {
 			streamRecv(err)(c.GetState(), err)
@@ -321,12 +351,14 @@ func (c *conn) NewStream(
 	}, nil
 }
 
-func New(endpoint endpoint.Endpoint, dial func(context.Context, string) (*grpc.ClientConn, error), config Config) Conn {
+func New(endpoint endpoint.Endpoint, config Config) Conn {
 	c := &conn{
 		endpoint: endpoint,
-		dial:     dial,
 		config:   config,
 		done:     make(chan struct{}),
+	}
+	if ttl := config.ConnectionTTL(); ttl > 0 {
+		c.ttl = timeutil.NewTimer(ttl)
 	}
 	return c
 }

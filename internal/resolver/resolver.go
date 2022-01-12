@@ -1,4 +1,4 @@
-package dial
+package resolver
 
 import "google.golang.org/grpc/resolver"
 
@@ -19,7 +19,7 @@ func (d *dnsResolver) Scheme() string {
 	return d.scheme
 }
 
-func newResolver(scheme string) resolver.Builder {
+func New(scheme string) resolver.Builder {
 	return &dnsResolver{
 		builder: resolver.Get("dns"),
 		scheme:  scheme,

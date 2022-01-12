@@ -1,4 +1,4 @@
-package state
+package conn
 
 type State int8
 

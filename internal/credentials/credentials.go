@@ -5,10 +5,10 @@ import (
 	"errors"
 )
 
-// ErrCredentialsNoCredentials may be returned by Credentials implementations to
-// make driver act as if there no Credentials at all. That is, driver will
+// ErrNoCredentials may be returned by Credentials implementations to
+// make driver act as if there are no Credentials at all. That is, driver will
 // not send any token meta information during request.
-var ErrCredentialsNoCredentials = errors.New("ydb: credentials: no credentials")
+var ErrNoCredentials = errors.New("ydb: credentials: no credentials")
 
 // Credentials is an interface that contains options used to authorize a
 // client.
@@ -16,70 +16,39 @@ type Credentials interface {
 	Token(context.Context) (string, error)
 }
 
-// Func is an adapter to allow the use of ordinary functions as
-// Credentials.
-type Func func(context.Context) (string, error)
-
-// Token implements Credentials.
-func (f Func) Token(ctx context.Context) (string, error) {
-	return f(ctx)
-}
-
-// Token implements Credentials.
-func (f Func) String() string {
-	return "Func"
-}
-
-// AccessTokenCredentials implements Credentials interface with static
+// accessToken implements Credentials interface with static
 // authorization parameters.
-type AccessTokenCredentials struct {
-	AccessToken string
-
+type accessToken struct {
+	token      string
 	sourceInfo string
 }
 
-func NewAccessTokenCredentials(accessToken string, sourceInfo string) *AccessTokenCredentials {
-	return &AccessTokenCredentials{
-		AccessToken: accessToken,
-		sourceInfo:  sourceInfo,
-	}
-}
-
-// Token implements Credentials.
-func (a AccessTokenCredentials) Token(_ context.Context) (string, error) {
-	return a.AccessToken, nil
-}
-
-// Token implements Credentials.
-func (a AccessTokenCredentials) String() string {
-	if a.sourceInfo == "" {
-		return "AccessTokenCredentials"
-	}
-	return "AccessTokenCredentials created from " + a.sourceInfo
-}
-
-// anonymousCredentials implements Credentials interface with anonymous access
-type anonymousCredentials struct {
-	sourceInfo string
-}
-
-func NewAnonymousCredentials(sourceInfo string) *anonymousCredentials {
-	return &anonymousCredentials{
+func NewAccessTokenCredentials(token string, sourceInfo string) Credentials {
+	return &accessToken{
+		token:      token,
 		sourceInfo: sourceInfo,
 	}
 }
 
 // Token implements Credentials.
-func (a anonymousCredentials) Token(_ context.Context) (string, error) {
-	return "", nil
+func (a accessToken) Token(_ context.Context) (string, error) {
+	return a.token, nil
+}
+
+// anonymous implements Credentials interface with anonymous access
+type anonymous struct {
+	sourceInfo string
+}
+
+func NewAnonymousCredentials(sourceInfo string) Credentials {
+	return &anonymous{
+		sourceInfo: sourceInfo,
+	}
 }
 
 // Token implements Credentials.
-func (a anonymousCredentials) String() string {
-	if a.sourceInfo == "" {
-		return "anonymousCredentials"
-	}
-	return "anonymousCredentials created from " + a.sourceInfo
+func (a anonymous) Token(_ context.Context) (string, error) {
+	return "", nil
 }
 
 type multiCredentials struct {
@@ -94,7 +63,7 @@ func (m *multiCredentials) Token(ctx context.Context) (token string, err error) 
 		}
 	}
 	if err == nil {
-		err = ErrCredentialsNoCredentials
+		err = ErrNoCredentials
 	}
 	return
 }

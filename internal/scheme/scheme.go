@@ -3,17 +3,16 @@ package scheme
 import (
 	"context"
 
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type client struct {
-	cluster cluster.Cluster
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
@@ -21,10 +20,9 @@ func (c *client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(c cluster.Cluster) scheme.Client {
+func New(cc grpc.ClientConnInterface) scheme.Client {
 	return &client{
-		cluster: c,
-		service: Ydb_Scheme_V1.NewSchemeServiceClient(c),
+		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
 	}
 }
 

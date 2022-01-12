@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 )
@@ -27,17 +26,33 @@ type roundRobin struct {
 	conns list.List
 }
 
-func RoundRobin() ibalancer.Balancer {
+func (r *roundRobin) Create() ibalancer.Balancer {
+	return &roundRobin{
+		min:   r.min,
+		max:   r.max,
+		belt:  r.belt,
+		next:  r.next,
+		conns: r.conns,
+	}
+}
+
+func RoundRobin() ibalancer.CreatorBalancer {
 	return &roundRobin{}
 }
 
-func RandomChoice() ibalancer.Balancer {
+func RandomChoice() ibalancer.CreatorBalancer {
 	return &randomChoice{}
 }
 
 type randomChoice struct {
 	roundRobin
 	m sync.Mutex
+}
+
+func (r *randomChoice) Create() ibalancer.Balancer {
+	return &randomChoice{
+		roundRobin: *(r.roundRobin.Create().(*roundRobin)),
+	}
 }
 
 func (r *roundRobin) Next() conn.Conn {
@@ -138,7 +153,7 @@ func (r *roundRobin) spread(f func(float32) int32) []int {
 		dist  = make([]int32, 0, len(r.conns))
 		index = make([]int, 0, len(r.conns))
 	)
-	fill := func(state state.State) (filled bool) {
+	fill := func(state conn.State) (filled bool) {
 		for _, x := range r.conns {
 			if x.Conn.GetState() == state {
 				d := f(x.Info.LoadFactor)
@@ -149,12 +164,12 @@ func (r *roundRobin) spread(f func(float32) int32) []int {
 		}
 		return filled
 	}
-	for _, s := range [...]state.State{
-		state.Created,
-		state.Online,
-		state.Banned,
-		state.Offline,
-		state.Destroyed,
+	for _, s := range [...]conn.State{
+		conn.Created,
+		conn.Online,
+		conn.Banned,
+		conn.Offline,
+		conn.Destroyed,
 	} {
 		if fill(s) {
 			return genBelt(index, dist)
@@ -236,4 +251,14 @@ func (h *distItemsHeap) Pop() interface{} {
 	x := p[n-1]
 	*h = p[:n-1]
 	return x
+}
+
+func IsRoundRobin(i interface{}) bool {
+	_, ok := i.(*roundRobin)
+	return ok
+}
+
+func IsRandomChoice(i interface{}) bool {
+	_, ok := i.(*randomChoice)
+	return ok
 }

@@ -116,17 +116,31 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 			panic(fmt.Sprintf("%T.WithName() returns interface which not casted to Logger interface", log))
 		}
 		t.OnInit = func(info trace.InitStartInfo) func(trace.InitDoneInfo) {
-			log.Infof(`init start`)
+			endpoint := info.Endpoint
+			database := info.Database
+			secure := info.Secure
+			log.Infof(
+				`init start {endpoint:"%s",database:"%s",endpoint:%v}`,
+				endpoint,
+				database,
+				secure,
+			)
 			start := time.Now()
 			return func(info trace.InitDoneInfo) {
 				if info.Error == nil {
 					log.Infof(
-						`init done {latency:"%s"}`,
+						`init done {{endpoint:"%s",database:"%s",endpoint:%v,latency:"%s"}`,
+						endpoint,
+						database,
+						secure,
 						time.Since(start),
 					)
 				} else {
 					log.Warnf(
-						`init failed {latency:"%s",error:"%s"}`,
+						`init failed {{endpoint:"%s",database:"%s",endpoint:%v,latency:"%s",error:"%s"}`,
+						endpoint,
+						database,
+						secure,
 						time.Since(start),
 						info.Error,
 					)
@@ -398,12 +412,11 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 			)
 			start := time.Now()
 			return func(info trace.PessimizeNodeDoneInfo) {
-				log.Warnf(`pessimize done {latency:"%s",address:"%s",local:%t,state:"%s",error:"%s"}`,
+				log.Warnf(`pessimize done {latency:"%s",address:"%s",local:%t,state:"%s"}`,
 					time.Since(start),
 					address,
 					local,
 					info.State,
-					info.Error,
 				)
 			}
 		}

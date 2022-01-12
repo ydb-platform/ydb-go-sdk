@@ -1,15 +1,21 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"net"
 	"time"
 
 	"google.golang.org/grpc"
+	grpcCredentials "google.golang.org/grpc/credentials"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/config/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
+	ydbCredentials "github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/resolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -30,7 +36,7 @@ type Config interface {
 
 	// Credentials is an ydb client credentials.
 	// In most cases Credentials are required.
-	Credentials() credentials.Credentials
+	Credentials() ydbCredentials.Credentials
 
 	// Trace contains driver tracing options.
 	Trace() trace.Driver
@@ -65,17 +71,13 @@ type Config interface {
 	// If DiscoveryInterval is negative, then no background discovery prepared.
 	DiscoveryInterval() time.Duration
 
-	// Balancer is an optional configuration related to selected ibalancer.
+	// Balancer is an optional configuration related to selected balancer.
 	// That is, some balancing methods allow to be configured.
 	Balancer() ibalancer.Balancer
 
 	// RequestsType set an additional types hint to all requests.
 	// It is needed only for debug purposes and advanced cases.
 	RequestsType() string
-
-	// FastDial will make dialer return Driver as soon as 1st connection succeeds.
-	// NB: it may be not the fastest node to serve requests.
-	FastDial() bool
 
 	// DialTimeout is the maximum amount of time a dial will wait for a connect to
 	// complete.
@@ -89,6 +91,13 @@ type Config interface {
 	// GrpcDialOptions is an custom client grpc dial options which will appends to
 	// default grpc dial options
 	GrpcDialOptions() []grpc.DialOption
+
+	// ConnectionTTL is a time to live of a connection
+	// If ConnectionTTL is zero then TTL is not used.
+	ConnectionTTL() time.Duration
+
+	// Meta is an option which contains meta information about database connection
+	Meta() meta.Meta
 }
 
 // Config contains driver configuration options.
@@ -100,19 +109,54 @@ type config struct {
 	operationCancelAfter time.Duration
 	discoveryInterval    time.Duration
 	dialTimeout          time.Duration
+	connectionTTL        time.Duration
 	balancer             ibalancer.Balancer
 	secure               bool
-	fastDial             bool
 	endpoint             string
 	database             string
 	requestsType         string
 	grpcOptions          []grpc.DialOption
 	credentials          credentials.Credentials
 	tlsConfig            *tls.Config
+	meta                 meta.Meta
 }
 
-func (c *config) GrpcDialOptions() []grpc.DialOption {
-	return c.grpcOptions
+func (c *config) Meta() meta.Meta {
+	return c.meta
+}
+
+func (c *config) ConnectionTTL() time.Duration {
+	return c.connectionTTL
+}
+
+func (c *config) GrpcDialOptions() (opts []grpc.DialOption) {
+	// nolint: gocritic
+	opts = append(
+		c.grpcOptions,
+		grpc.WithContextDialer(func(ctx context.Context, address string) (net.Conn, error) {
+			return newConn(ctx, address, trace.ContextDriver(ctx).Compose(c.trace))
+		}),
+		grpc.WithKeepaliveParams(DefaultGrpcConnectionPolicy),
+		grpc.WithResolvers(
+			resolver.New(""), // for use this resolver by default
+			resolver.New("grpc"),
+			resolver.New("grpcs"),
+		),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
+			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
+		),
+		grpc.WithBlock(),
+	)
+	if c.secure {
+		opts = append(opts, grpc.WithTransportCredentials(
+			grpcCredentials.NewTLS(c.tlsConfig),
+		))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
+	}
+	return
 }
 
 func (c *config) Secure() bool {
@@ -171,10 +215,6 @@ func (c *config) RequestsType() string {
 	return c.requestsType
 }
 
-func (c *config) FastDial() bool {
-	return c.fastDial
-}
-
 type Option func(c *config)
 
 func WithEndpoint(endpoint string) Option {
@@ -204,6 +244,12 @@ func WithCertificate(certificate *x509.Certificate) Option {
 func WithTrace(trace trace.Driver) Option {
 	return func(c *config) {
 		c.trace = c.trace.Compose(trace)
+	}
+}
+
+func WithConnectionTTL(ttl time.Duration) Option {
+	return func(c *config) {
+		c.connectionTTL = ttl
 	}
 }
 
@@ -261,12 +307,6 @@ func WithRequestsType(requestsType string) Option {
 	}
 }
 
-func WithFastDial(fastDial bool) Option {
-	return func(c *config) {
-		c.fastDial = fastDial
-	}
-}
-
 func WithGrpcOptions(option ...grpc.DialOption) Option {
 	return func(c *config) {
 		c.grpcOptions = append(c.grpcOptions, option...)
@@ -281,6 +321,10 @@ func New(opts ...Option) Config {
 	if !c.secure {
 		c.tlsConfig = nil
 	}
+	if c.discoveryInterval == 0 {
+		c.balancer = balancer.SingleConn()
+	}
+	c.meta = meta.New(c.database, c.credentials, c.trace, c.requestsType)
 	return c
 }
 

@@ -1,19 +1,29 @@
-package ydb
+package lazy
 
 import (
 	"context"
 	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type lazyDiscovery struct {
-	db     DB
+	db     db.Connection
 	trace  trace.Driver
 	client discovery.Client
 	m      sync.Mutex
+}
+
+func Discovery(db db.Connection, trace trace.Driver) *lazyDiscovery {
+	return &lazyDiscovery{
+		db:     db,
+		trace:  trace,
+		client: nil,
+		m:      sync.Mutex{},
+	}
 }
 
 func (d *lazyDiscovery) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {

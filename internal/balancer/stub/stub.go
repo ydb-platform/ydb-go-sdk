@@ -6,7 +6,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
@@ -45,7 +44,7 @@ func Balancer() (*list.List, ibalancer.Balancer) {
 		},
 		OnPessimize: func(ctx context.Context, x ibalancer.Element) error {
 			e := x.(*list.Element)
-			e.Conn.SetState(ctx, state.Banned)
+			e.Conn.SetState(ctx, conn.Banned)
 			return nil
 		},
 		OnContains: func(x ibalancer.Element) bool {

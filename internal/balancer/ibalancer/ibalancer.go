@@ -31,3 +31,12 @@ type Balancer interface {
 	// Contains returns true if Balancer contains requested element.
 	Contains(Element) bool
 }
+
+type Creator interface {
+	Create() Balancer
+}
+
+type CreatorBalancer interface {
+	Balancer
+	Creator
+}

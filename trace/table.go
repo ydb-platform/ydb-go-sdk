@@ -4,12 +4,12 @@ import (
 	"context"
 )
 
-// go:generate gtrace
+//go:generate gtrace
 
 type (
 	// Table contains options for tracing table client activity.
-	// gtrace:gen
-	// gtrace:set Shortcut
+	//gtrace:gen
+	//gtrace:set Shortcut
 	Table struct {
 		// Session events
 		OnSessionNew       func(SessionNewStartInfo) func(SessionNewDoneInfo)

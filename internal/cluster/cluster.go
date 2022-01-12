@@ -11,15 +11,12 @@ import (
 
 	"google.golang.org/grpc"
 
-	public "github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -46,6 +43,7 @@ var (
 )
 
 type cluster struct {
+	pool     conn.Pool
 	trace    trace.Driver
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
 	balancer ibalancer.Balancer
@@ -78,15 +76,15 @@ type Cluster interface {
 }
 
 func New(
+	pool conn.Pool,
 	trace trace.Driver,
-	dial func(context.Context, string) (*grpc.ClientConn, error),
 	balancer ibalancer.Balancer,
 ) Cluster {
 	return &cluster{
+		pool:      pool,
 		trace:     trace,
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
-		dial:      dial,
 		balancer:  balancer,
 	}
 }
@@ -139,7 +137,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 			onDone(conn.Endpoint(), nil)
 		}
 	}()
-	if e, ok := public.ContextEndpoint(ctx); ok {
+	if e, ok := ContextEndpoint(ctx); ok {
 		if conn, ok = c.endpoints[e.NodeID()]; ok {
 			return conn, nil
 		}
@@ -154,13 +152,13 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 }
 
 type optionsHolder struct {
-	wg         wg.WG
+	wg         *sync.WaitGroup
 	connConfig conn.Config
 }
 
 type option func(options *optionsHolder)
 
-func WithWG(wg wg.WG) option {
+func WithWG(wg *sync.WaitGroup) option {
 	return func(options *optionsHolder) {
 		options.wg = wg
 	}
@@ -189,9 +187,10 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	conn := conn.New(e, c.dial, holder.connConfig)
-
 	onDone := trace.DriverOnClusterInsert(c.trace, &ctx, e)
+
+	conn := c.pool.Get(e)
+
 	defer func() {
 		onDone(conn.GetState())
 	}()
@@ -310,12 +309,12 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 	if !c.balancer.Contains(entry.Handle) {
 		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownBalancerElement)
 	}
-	entry.Conn.SetState(ctx, state.Banned)
+	entry.Conn.SetState(ctx, conn.Banned)
 	if c.explorer != nil {
 		// count ratio (banned/all)
 		online := 0
 		for _, entry := range c.index {
-			if entry.Conn != nil && entry.Conn.GetState() == state.Online {
+			if entry.Conn != nil && entry.Conn.GetState() == conn.Online {
 				online++
 			}
 		}

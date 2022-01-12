@@ -1,3 +1,11 @@
+## 3.7.0
+* Replaced `Option` to `CustomOption` on `Connection` interface methods 
+* Implements `WithCustom[Token,Database]` options for redefine database and token
+* Removed experimental `balancer.PreferEndpoints[WithFallback][RegEx]` balancers
+* Implements `balancer.PreferLocations[WithFallback]` balancers
+* Supported connections `TTL` with `Option` `WithConnectionTTL`
+* Remove unnecessary `WithFastDial` option (lazy connections always fast inserts into cluster)
+
 ## 3.6.2
 * Refactored table retry helpers
 * Added new `PreferLocations[WithFallback][RegEx]` balancers

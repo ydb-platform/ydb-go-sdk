@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/config/balancer"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -24,7 +24,7 @@ const (
 	testResource             = "test_res"
 )
 
-func TestRateLimiter(t *testing.T) {
+func TestRatelimiter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
 
@@ -38,7 +38,7 @@ func TestRateLimiter(t *testing.T) {
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
 		),
-		ydb.WithBalancer(balancer.PreferLocal( // for max tests coverage
+		ydb.WithBalancer(balancer.PreferLocalDC( // for max tests coverage
 			balancer.RandomChoice(),
 		)),
 	)
@@ -67,7 +67,7 @@ func TestRateLimiter(t *testing.T) {
 		SessionGracePeriodMillis: 1000,
 		ReadConsistencyMode:      cfg.ConsistencyModeRelaxed,
 		AttachConsistencyMode:    cfg.ConsistencyModeRelaxed,
-		RateLimiterCountersMode:  cfg.RateLimiterCountersModeDetailed,
+		RatelimiterCountersMode:  cfg.RatelimiterCountersModeDetailed,
 	})
 	if err != nil {
 		t.Fatal(err)

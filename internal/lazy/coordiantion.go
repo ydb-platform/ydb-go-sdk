@@ -1,4 +1,4 @@
-package ydb
+package lazy
 
 import (
 	"context"
@@ -6,13 +6,20 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type lazyCoordination struct {
-	db     DB
-	client internal.Client
+	db     db.Connection
+	client coordination.Client
 	m      sync.Mutex
+}
+
+func Coordination(db db.Connection) *lazyCoordination {
+	return &lazyCoordination{
+		db: db,
+	}
 }
 
 func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config coordination.Config) (err error) {

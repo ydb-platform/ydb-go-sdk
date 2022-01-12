@@ -1,93 +1,103 @@
-package ydb
+package proxy
 
 import (
 	"context"
-	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
-
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 )
 
-type lazyRatelimiter struct {
-	db     DB
-	client internal.Client
-	m      sync.Mutex
+type proxyRatelimiter struct {
+	client ratelimiter.Client
+	meta   meta.Meta
 }
 
-func (r *lazyRatelimiter) Close(ctx context.Context) error {
-	r.m.Lock()
-	defer r.m.Unlock()
-	if r.client == nil {
-		return nil
+func Ratelimiter(client ratelimiter.Client, meta meta.Meta) *proxyRatelimiter {
+	return &proxyRatelimiter{
+		client: client,
+		meta:   meta,
 	}
-	defer func() {
-		r.client = nil
-	}()
+}
+
+func (r *proxyRatelimiter) Close(ctx context.Context) (err error) {
+	ctx, err = r.meta.Meta(ctx)
+	if err != nil {
+		return err
+	}
 	return r.client.Close(ctx)
 }
 
-func (r *lazyRatelimiter) CreateResource(
+func (r *proxyRatelimiter) CreateResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	r.init()
+	ctx, err = r.meta.Meta(ctx)
+	if err != nil {
+		return err
+	}
 	return r.client.CreateResource(ctx, coordinationNodePath, resource)
 }
 
-func (r *lazyRatelimiter) AlterResource(
+func (r *proxyRatelimiter) AlterResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	r.init()
+	ctx, err = r.meta.Meta(ctx)
+	if err != nil {
+		return err
+	}
 	return r.client.AlterResource(ctx, coordinationNodePath, resource)
 }
 
-func (r *lazyRatelimiter) DropResource(
+func (r *proxyRatelimiter) DropResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
 ) (err error) {
-	r.init()
+	ctx, err = r.meta.Meta(ctx)
+	if err != nil {
+		return err
+	}
 	return r.client.DropResource(ctx, coordinationNodePath, resourcePath)
 }
 
-func (r *lazyRatelimiter) ListResource(
+func (r *proxyRatelimiter) ListResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
 	recursive bool,
 ) (_ []string, err error) {
-	r.init()
+	ctx, err = r.meta.Meta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
 }
 
-func (r *lazyRatelimiter) DescribeResource(
+func (r *proxyRatelimiter) DescribeResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
 ) (_ *ratelimiter.Resource, err error) {
-	r.init()
+	ctx, err = r.meta.Meta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
 }
 
-func (r *lazyRatelimiter) AcquireResource(
+func (r *proxyRatelimiter) AcquireResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
 	amount uint64,
 	isUsedAmount bool,
 ) (err error) {
-	r.init()
-	return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
-}
-
-func (r *lazyRatelimiter) init() {
-	r.m.Lock()
-	if r.client == nil {
-		r.client = internal.New(r.db)
+	ctx, err = r.meta.Meta(ctx)
+	if err != nil {
+		return err
 	}
-	r.m.Unlock()
+	return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
 }
