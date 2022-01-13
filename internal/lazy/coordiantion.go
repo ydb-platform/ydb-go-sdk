@@ -16,7 +16,7 @@ type lazyCoordination struct {
 	m      sync.Mutex
 }
 
-func Coordination(db db.Connection) *lazyCoordination {
+func Coordination(db db.Connection) coordination.Client {
 	return &lazyCoordination{
 		db: db,
 	}

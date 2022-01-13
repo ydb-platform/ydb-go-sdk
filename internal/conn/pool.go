@@ -8,13 +8,16 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
 type Pool interface {
+	closer.Closer
+
 	Get(endpoint endpoint.Endpoint) Conn
 	Pessimize(ctx context.Context, e endpoint.Endpoint) error
-	Close()
 }
 
 type PoolConfig interface {
@@ -51,19 +54,24 @@ func (p *pool) Get(endpoint endpoint.Endpoint) Conn {
 	return cc
 }
 
-func (p *pool) Close() {
+func (p *pool) Close(ctx context.Context) error {
 	close(p.done)
+	var issues []error
+	p.mtx.Lock()
+	defer p.mtx.Unlock()
+	for a, c := range p.conns {
+		if err := c.Close(ctx); err != nil {
+			issues = append(issues, err)
+		}
+		delete(p.conns, a)
+	}
+	if len(issues) == 0 {
+		return nil
+	}
+	return errors.NewWithIssues("connection pool close failed", issues...)
 }
 
 func (p *pool) connCloser(ctx context.Context, interval time.Duration) {
-	defer func() {
-		p.mtx.RLock()
-		for a, c := range p.conns {
-			c.Close(ctx)
-			delete(p.conns, a)
-		}
-		p.mtx.RUnlock()
-	}()
 	for {
 		select {
 		case <-p.done:

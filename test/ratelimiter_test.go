@@ -13,9 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	public "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
@@ -49,10 +47,7 @@ func TestRatelimiter(t *testing.T) {
 		_ = db.Close(ctx)
 	}()
 
-	client := internal.New(db)
-	coordinationClient := coordination.New(db)
-
-	err = coordinationClient.DropNode(ctx, testCoordinationNodePath)
+	err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
 	if err != nil {
 		if d := ydb.TransportErrorDescription(err); d != nil && d.Code() == int32(errors.TransportErrorUnimplemented) {
 			return
@@ -61,7 +56,7 @@ func TestRatelimiter(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	err = coordinationClient.CreateNode(ctx, testCoordinationNodePath, cfg.Config{
+	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, cfg.Config{
 		Path:                     "",
 		SelfCheckPeriodMillis:    1000,
 		SessionGracePeriodMillis: 1000,
@@ -73,13 +68,13 @@ func TestRatelimiter(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		err = coordinationClient.DropNode(ctx, testCoordinationNodePath)
+		err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	err = client.CreateResource(ctx, testCoordinationNodePath, public.Resource{
+	err = db.Ratelimiter().CreateResource(ctx, testCoordinationNodePath, public.Resource{
 		ResourcePath: testResource,
 		HierarchicalDrr: public.HierarchicalDrrSettings{
 			MaxUnitsPerSecond:       1,
@@ -91,13 +86,13 @@ func TestRatelimiter(t *testing.T) {
 	}
 
 	defer func() {
-		err = client.DropResource(ctx, testCoordinationNodePath, testResource)
+		err = db.Ratelimiter().DropResource(ctx, testCoordinationNodePath, testResource)
 		if err != nil {
 			t.Fatal("Cannot drop resource")
 		}
 	}()
 
-	described, err := client.DescribeResource(ctx, testCoordinationNodePath, testResource)
+	described, err := db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +103,7 @@ func TestRatelimiter(t *testing.T) {
 		t.Fatal("Resource invalid")
 	}
 
-	err = client.AlterResource(ctx, testCoordinationNodePath, public.Resource{
+	err = db.Ratelimiter().AlterResource(ctx, testCoordinationNodePath, public.Resource{
 		ResourcePath: testResource,
 		HierarchicalDrr: public.HierarchicalDrrSettings{
 			MaxUnitsPerSecond:       3,
@@ -119,7 +114,7 @@ func TestRatelimiter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	described, err = client.DescribeResource(ctx, testCoordinationNodePath, testResource)
+	described, err = db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +125,7 @@ func TestRatelimiter(t *testing.T) {
 		t.Fatal("Resource invalid")
 	}
 
-	list, err := client.ListResource(ctx, testCoordinationNodePath, testResource, true)
+	list, err := db.Ratelimiter().ListResource(ctx, testCoordinationNodePath, testResource, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,15 +133,15 @@ func TestRatelimiter(t *testing.T) {
 		t.Fatal("ListResource error")
 	}
 
-	err = client.AcquireResource(ctx, testCoordinationNodePath, testResource, 1, false)
+	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = client.AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, true)
+	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = client.AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, false)
+	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, false)
 	if err == nil {
 		t.Fatal("Resource must not be acquired")
 	}

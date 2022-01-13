@@ -15,7 +15,7 @@ type lazyRatelimiter struct {
 	m      sync.Mutex
 }
 
-func Ratelimiter(db db.Connection) *lazyRatelimiter {
+func Ratelimiter(db db.Connection) ratelimiter.Client {
 	return &lazyRatelimiter{
 		db: db,
 	}

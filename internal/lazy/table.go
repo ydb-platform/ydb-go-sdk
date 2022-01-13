@@ -17,7 +17,7 @@ type lazyTable struct {
 	m       sync.Mutex
 }
 
-func Table(db db.Connection, options []config.Option) *lazyTable {
+func Table(db db.Connection, options []config.Option) table.Client {
 	return &lazyTable{
 		db:      db,
 		options: options,

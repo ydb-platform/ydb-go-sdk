@@ -15,7 +15,7 @@ type lazyScheme struct {
 	m      sync.Mutex
 }
 
-func Scheme(db db.Connection) *lazyScheme {
+func Scheme(db db.Connection) scheme.Client {
 	return &lazyScheme{
 		db: db,
 	}

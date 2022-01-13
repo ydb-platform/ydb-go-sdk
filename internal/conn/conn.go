@@ -46,6 +46,8 @@ type conn struct {
 }
 
 func (c *conn) Park(ctx context.Context) error {
+	c.Lock()
+	defer c.Unlock()
 	return c.close(ctx)
 }
 
@@ -155,6 +157,7 @@ func isBroken(raw *grpc.ClientConn) bool {
 	return s == connectivity.Shutdown || s == connectivity.TransientFailure
 }
 
+// conn must be locked
 func (c *conn) close(ctx context.Context) (err error) {
 	if c.cc == nil {
 		return nil

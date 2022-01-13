@@ -17,7 +17,7 @@ type lazyDiscovery struct {
 	m      sync.Mutex
 }
 
-func Discovery(db db.Connection, trace trace.Driver) *lazyDiscovery {
+func Discovery(db db.Connection, trace trace.Driver) discovery.Client {
 	return &lazyDiscovery{
 		db:     db,
 		trace:  trace,

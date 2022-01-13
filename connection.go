@@ -20,46 +20,46 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// Connection interface provide access to YDB service clients
+// Interface and list of clients may be changed in the future
 type Connection interface {
 	db.Connection
 
 	// Table returns table client with options from Connection instance.
 	// Options provide options replacement for requested table client
-	// such as endpoint, database, secure connection flag and credentials
-	// Options replacement feature not implements now
+	// such as database and access token
 	Table(opts ...CustomOption) table.Client
 
 	// Scheme returns scheme client with options from Connection instance.
 	// Options provide options replacement for requested scheme client
-	// such as endpoint, database, secure connection flag and credentials
-	// Options replacement feature not implements now
+	// such as database and access token
 	Scheme(opts ...CustomOption) scheme.Client
 
 	// Coordination returns coordination client with options from Connection instance.
 	// Options provide options replacement for requested coordination client
-	// such as endpoint, database, secure connection flag and credentials
-	// Options replacement feature not implements now
+	// such as database and access token
 	Coordination(opts ...CustomOption) coordination.Client
 
 	// Ratelimiter returns rate limiter client with options from Connection instance.
 	// Options provide options replacement for requested rate limiter client
-	// such as endpoint, database, secure connection flag and credentials
-	// Options replacement feature not implements now
+	// such as database and access token
 	Ratelimiter(opts ...CustomOption) ratelimiter.Client
 
 	// Discovery returns discovery client with options from Connection instance.
 	// Options provide options replacement for requested discovery client
-	// such as endpoint, database, secure connection flag and credentials
-	// Options replacement feature not implements now
+	// such as database and access token
 	Discovery(opts ...CustomOption) discovery.Client
 
-	// Close clears resources and close all connections to YDB
-	Close(ctx context.Context) error
+	// Scripting returns scripting client with options from Connection instance.
+	// Options provide options replacement for requested discovery client
+	// such as database and access token
+	Scripting(opts ...CustomOption) scripting.Client
 }
 
 type connection struct {
@@ -71,6 +71,7 @@ type connection struct {
 	db           db.Connection
 	table        table.Client
 	scheme       scheme.Client
+	scripting    scripting.Client
 	discovery    discovery.Client
 	coordination coordination.Client
 	rateLimiter  ratelimiter.Client
@@ -95,7 +96,13 @@ func (c *connection) Close(ctx context.Context) error {
 	if err := c.table.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
+	if err := c.scripting.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
 	if err := c.db.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := c.conns.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 	if len(issues) > 0 {
@@ -170,6 +177,13 @@ func (c *connection) Discovery(opts ...CustomOption) discovery.Client {
 	return proxy.Discovery(c.discovery, c.meta(opts...))
 }
 
+func (c *connection) Scripting(opts ...CustomOption) scripting.Client {
+	if len(opts) == 0 {
+		return c.scripting
+	}
+	return proxy.Scripting(c.scripting, c.meta(opts...))
+}
+
 func (c *connection) meta(opts ...CustomOption) meta.Meta {
 	if len(opts) == 0 {
 		return c.config.Meta()
@@ -225,6 +239,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}
 	c.table = lazy.Table(c.db, c.tableOptions)
 	c.scheme = lazy.Scheme(c.db)
+	c.scripting = lazy.Scripting(c.db)
 	c.discovery = lazy.Discovery(c.db, c.config.Trace())
 	c.coordination = lazy.Coordination(c.db)
 	c.rateLimiter = lazy.Ratelimiter(c.db)

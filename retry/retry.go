@@ -31,6 +31,36 @@ var (
 // retryOperation is the interface that holds an operation for retry.
 type retryOperation func(context.Context) (err error)
 
+type retryableErrorOption func(e *errors.RetryableError)
+
+const (
+	BackoffTypeNoBackoff   = errors.BackoffTypeNoBackoff
+	BackoffTypeFastBackoff = errors.BackoffTypeFastBackoff
+	BackoffTypeSlowBackoff = errors.BackoffTypeSlowBackoff
+)
+
+func WithBackoff(t errors.BackoffType) retryableErrorOption {
+	return func(e *errors.RetryableError) {
+		e.BackoffType = t
+	}
+}
+
+func WithDeleteSession() retryableErrorOption {
+	return func(e *errors.RetryableError) {
+		e.MustDeleteSession = true
+	}
+}
+
+func RetryableError(msg string, opts ...retryableErrorOption) error {
+	re := &errors.RetryableError{
+		Msg: msg,
+	}
+	for _, o := range opts {
+		o(re)
+	}
+	return re
+}
+
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
 // - deadline was canceled or deadlined
@@ -79,6 +109,7 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 func Check(err error) (m retryMode) {
 	var te *errors.TransportError
 	var oe *errors.OpError
+	var re *errors.RetryableError
 	switch {
 	case errors.As(err, &te):
 		return retryMode{
@@ -93,6 +124,13 @@ func Check(err error) (m retryMode) {
 			operationCompleted: oe.Reason.OperationCompleted(),
 			backoff:            oe.Reason.BackoffType(),
 			deleteSession:      oe.Reason.MustDeleteSession(),
+		}
+	case errors.As(err, &re):
+		return retryMode{
+			statusCode:         -1,
+			operationCompleted: errors.OperationCompletedFalse,
+			backoff:            re.BackoffType,
+			deleteSession:      re.MustDeleteSession,
 		}
 	default:
 		return retryMode{
