@@ -17,15 +17,18 @@ const (
 )
 
 // MakeRecursive creates path inside database
-func MakeRecursive(ctx context.Context, db ydb.Connection, folder string) error {
-	folder = path.Join(db.Name(), folder)
-	for i := len(db.Name()) + 1; i < len(folder); i++ {
-		x := strings.IndexByte(folder[i:], '/')
+// folder is a database root relative path
+// MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
+// where `~` - is a root of database
+func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) error {
+	pathToCreate = path.Join(db.Name(), pathToCreate)
+	for i := len(db.Name()) + 1; i < len(pathToCreate); i++ {
+		x := strings.IndexByte(pathToCreate[i:], '/')
 		if x == -1 {
-			x = len(folder[i:]) - 1
+			x = len(pathToCreate[i:]) - 1
 		}
 		i += x
-		sub := folder[:i+1]
+		sub := pathToCreate[:i+1]
 		info, err := db.Scheme().DescribePath(ctx, sub)
 		var opErr *errors.OpError
 		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
@@ -54,9 +57,11 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, folder string) error 
 }
 
 // RemoveRecursive remove selected directory or table names in database.
+// pathToRemove is a database root relative path
 // All database entities in prefix path will remove if names list is empty.
 // Empty prefix means than use root of database.
-// RemoveRecursive method equal bash command `rm -rf ./path/to/remove`
+// RemoveRecursive method equal bash command `rm -rf ~/path/to/remove`
+// where `~` - is a root of database
 func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string) error {
 	fullSysTablePath := path.Join(db.Name(), sysTable)
 	var list func(int, string) error
