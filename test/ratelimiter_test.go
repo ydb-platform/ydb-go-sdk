@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"

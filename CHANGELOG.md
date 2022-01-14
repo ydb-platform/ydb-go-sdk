@@ -7,6 +7,8 @@
 * Added `Scripting` service client with API methods `Execute()`, `StreamExecute()` and `Explain()`
 * Added `String()` method to `table.types.Type` interface
 * Added `With[Custom]UserAgent()` `Option` and `CustomOption` constructors
+* Refactored `log.Logger` interface and internal implementation
+* Added `retry.RetryableError()` for returns user-defined error which must be retryed 
 
 ## 3.6.2
 * Refactored table retry helpers
