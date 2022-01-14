@@ -4,7 +4,9 @@
 * Removed experimental `balancer.PreferEndpoints[WithFallback][RegEx]` balancers
 * Supported connections `TTL` with `Option` `WithConnectionTTL`
 * Remove unnecessary `WithFastDial` option (lazy connections are always fast inserts into cluster)
-* Added `ScriptingYQL` service client
+* Added `Scripting` service client with API methods `Execute()`, `StreamExecute()` and `Explain()`
+* Added `String()` method to `table.types.Type` interface
+* Added `With[Custom]UserAgent()` `Option` and `CustomOption` constructors
 
 ## 3.6.2
 * Refactored table retry helpers

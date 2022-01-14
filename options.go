@@ -31,6 +31,13 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+func WithUserAgent(userAgent string) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithUserAgent(userAgent))
+		return nil
+	}
+}
+
 func WithConnectionString(dsn string) Option {
 	return func(ctx context.Context, c *connection) error {
 		params, err := ConnectionString(dsn)

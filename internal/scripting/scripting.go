@@ -12,16 +12,18 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type client struct {
 	service Ydb_Scripting_V1.ScriptingServiceClient
 }
 
-func (c *client) ExecuteYql(
+func (c *client) Execute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
@@ -53,11 +55,11 @@ func mode2mode(mode scripting.ExplainMode) Ydb_Scripting.ExplainYqlRequest_Mode 
 	}
 }
 
-func (c *client) ExplainYql(
+func (c *client) Explain(
 	ctx context.Context,
 	query string,
 	mode scripting.ExplainMode,
-) (_ table.ScriptingYQLExplanation, err error) {
+) (e table.ScriptingYQLExplanation, err error) {
 	var (
 		request = &Ydb_Scripting.ExplainYqlRequest{
 			Script: query,
@@ -74,14 +76,20 @@ func (c *client) ExplainYql(
 	if err != nil {
 		return
 	}
-	return table.ScriptingYQLExplanation{
+	result.GetParametersTypes()
+	e = table.ScriptingYQLExplanation{
 		Explanation: table.Explanation{
 			Plan: result.GetPlan(),
 		},
-	}, nil
+		ParameterTypes: make(map[string]types.Type, len(result.GetParametersTypes())),
+	}
+	for k, v := range result.GetParametersTypes() {
+		e.ParameterTypes[k] = value.TypeFromYDB(v)
+	}
+	return e, nil
 }
 
-func (c *client) StreamExecuteYql(
+func (c *client) StreamExecute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,

@@ -17,31 +17,31 @@ type lazyScripting struct {
 	m      sync.Mutex
 }
 
-func (s *lazyScripting) ExecuteYql(
+func (s *lazyScripting) Execute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
 ) (result.Result, error) {
 	s.init()
-	return s.client.ExecuteYql(ctx, query, params)
+	return s.client.Execute(ctx, query, params)
 }
 
-func (s *lazyScripting) ExplainYql(
+func (s *lazyScripting) Explain(
 	ctx context.Context,
 	query string,
 	mode scripting.ExplainMode,
 ) (table.ScriptingYQLExplanation, error) {
 	s.init()
-	return s.client.ExplainYql(ctx, query, mode)
+	return s.client.Explain(ctx, query, mode)
 }
 
-func (s *lazyScripting) StreamExecuteYql(
+func (s *lazyScripting) StreamExecute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
 ) (result.StreamResult, error) {
 	s.init()
-	return s.client.StreamExecuteYql(ctx, query, params)
+	return s.client.StreamExecute(ctx, query, params)
 }
 
 func (s *lazyScripting) Close(ctx context.Context) error {

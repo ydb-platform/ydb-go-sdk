@@ -21,17 +21,17 @@ const (
 type Client interface {
 	closer.Closer
 
-	ExecuteYql(
+	Execute(
 		ctx context.Context,
 		query string,
 		params *table.QueryParameters,
 	) (result.Result, error)
-	ExplainYql(
+	Explain(
 		ctx context.Context,
 		query string,
 		mode ExplainMode,
 	) (table.ScriptingYQLExplanation, error)
-	StreamExecuteYql(
+	StreamExecute(
 		ctx context.Context,
 		query string,
 		params *table.QueryParameters,

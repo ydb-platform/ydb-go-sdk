@@ -188,19 +188,11 @@ func (c *connection) meta(opts ...CustomOption) meta.Meta {
 	if len(opts) == 0 {
 		return c.config.Meta()
 	}
-	options := customOptions{
-		database:    c.config.Database(),
-		credentials: c.config.Credentials(),
+	options := &customOptions{meta: c.config.Meta()}
+	for _, opt := range opts {
+		opt(options)
 	}
-	for _, o := range opts {
-		o(&options)
-	}
-	return meta.New(
-		options.database,
-		options.credentials,
-		c.config.Trace(),
-		c.config.RequestsType(),
-	)
+	return options.meta
 }
 
 // New connects to name and return name runtime holder

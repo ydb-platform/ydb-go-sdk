@@ -14,7 +14,7 @@ type proxyScripting struct {
 	meta   meta.Meta
 }
 
-func (d *proxyScripting) ExecuteYql(
+func (d *proxyScripting) Execute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
@@ -23,10 +23,10 @@ func (d *proxyScripting) ExecuteYql(
 	if err != nil {
 		return nil, err
 	}
-	return d.client.ExecuteYql(ctx, query, params)
+	return d.client.Execute(ctx, query, params)
 }
 
-func (d *proxyScripting) ExplainYql(
+func (d *proxyScripting) Explain(
 	ctx context.Context,
 	query string,
 	mode scripting.ExplainMode,
@@ -35,10 +35,10 @@ func (d *proxyScripting) ExplainYql(
 	if err != nil {
 		return e, err
 	}
-	return d.client.ExplainYql(ctx, query, mode)
+	return d.client.Explain(ctx, query, mode)
 }
 
-func (d *proxyScripting) StreamExecuteYql(
+func (d *proxyScripting) StreamExecute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
@@ -47,7 +47,7 @@ func (d *proxyScripting) StreamExecuteYql(
 	if err != nil {
 		return nil, err
 	}
-	return d.client.StreamExecuteYql(ctx, query, params)
+	return d.client.StreamExecute(ctx, query, params)
 }
 
 func Scripting(client scripting.Client, meta meta.Meta) scripting.Client {

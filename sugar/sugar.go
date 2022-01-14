@@ -17,7 +17,7 @@ const (
 )
 
 // MakeRecursive creates path inside database
-// folder is a database root relative path
+// pathToCreate is a database root relative path
 // MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
 // where `~` - is a root of database
 func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) error {

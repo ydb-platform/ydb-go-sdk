@@ -115,6 +115,7 @@ type config struct {
 	endpoint             string
 	database             string
 	requestsType         string
+	userAgent            string
 	grpcOptions          []grpc.DialOption
 	credentials          credentials.Credentials
 	tlsConfig            *tls.Config
@@ -247,6 +248,12 @@ func WithTrace(trace trace.Driver) Option {
 	}
 }
 
+func WithUserAgent(userAgent string) Option {
+	return func(c *config) {
+		c.userAgent = userAgent
+	}
+}
+
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(c *config) {
 		c.connectionTTL = ttl
@@ -324,7 +331,13 @@ func New(opts ...Option) Config {
 	if c.discoveryInterval == 0 {
 		c.balancer = balancer.SingleConn()
 	}
-	c.meta = meta.New(c.database, c.credentials, c.trace, c.requestsType)
+	c.meta = meta.New(
+		c.database,
+		c.credentials,
+		c.trace,
+		c.requestsType,
+		c.userAgent,
+	)
 	return c
 }
 

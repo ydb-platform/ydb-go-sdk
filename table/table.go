@@ -109,9 +109,11 @@ type Explanation struct {
 	Plan string
 }
 
-// ScriptingYQLExplanation is a result of ExplainYql calls.
+// ScriptingYQLExplanation is a result of Explain calls.
 type ScriptingYQLExplanation struct {
 	Explanation
+
+	ParameterTypes map[string]types.Type
 }
 
 // DataQueryExplanation is a result of ExplainDataQuery call.
