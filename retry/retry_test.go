@@ -119,13 +119,13 @@ func TestRetryModes(t *testing.T) {
 	}
 	type Case struct {
 		err           error              // given error
-		backoff       errors.BackoffType // no backoff (=== no operationCompleted), fast backoff, slow backoff
+		backoff       errors.BackoffType // no backoff (=== no operationStatus), fast backoff, slow backoff
 		deleteSession bool               // close session and delete from pool
 		canRetry      CanRetry
 	}
 	errs := []Case{
 		{
-			// retryer given unknown error - we will not operationCompleted and will close session
+			// retryer given unknown error - we will not operationStatus and will close session
 			err:           fmt.Errorf("unknown error"),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,

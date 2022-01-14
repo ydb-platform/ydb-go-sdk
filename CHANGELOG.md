@@ -9,6 +9,8 @@
 * Added `With[Custom]UserAgent()` `Option` and `CustomOption` constructors
 * Refactored `log.Logger` interface and internal implementation
 * Added `retry.RetryableError()` for returns user-defined error which must be retryed 
+* Renamed internal type `internal.errors.OperationCompleted` to `internal.errors.OperationStatus`
+* Added `String()` method to `table.KeyRange` and `table.Value` types
 
 ## 3.6.2
 * Refactored table retry helpers

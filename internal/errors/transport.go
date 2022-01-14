@@ -206,19 +206,19 @@ func (t TransportErrorCode) String() string {
 	return transportErrorString(t)
 }
 
-func (t TransportErrorCode) OperationCompleted() OperationCompleted {
+func (t TransportErrorCode) OperationStatus() OperationStatus {
 	switch t {
 	case
 		TransportErrorAborted,
 		TransportErrorResourceExhausted:
-		return OperationCompletedFalse
+		return OperationNotFinished
 	case
 		TransportErrorInternal,
 		TransportErrorCanceled,
 		TransportErrorUnavailable:
-		return OperationCompletedUndefined
+		return OperationStatusUndefined
 	default:
-		return OperationCompletedTrue
+		return OperationFinished
 	}
 }
 

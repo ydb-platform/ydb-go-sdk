@@ -1,11 +1,11 @@
 package errors
 
 type RetryableError struct {
-	Msg               string
+	Err               error
 	BackoffType       BackoffType
 	MustDeleteSession bool
 }
 
 func (e *RetryableError) Error() string {
-	return e.Msg
+	return e.Err.Error()
 }

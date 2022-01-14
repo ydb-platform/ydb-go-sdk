@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestScriptingService(t *testing.T) {
+func TestScripting(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	var (
@@ -72,13 +72,13 @@ func TestScriptingService(t *testing.T) {
 			}()
 			if !res.NextResultSet(ctx) {
 				return retry.RetryableError(
-					"no result sets",
+					fmt.Errorf("no result sets"),
 					retry.WithBackoff(retry.BackoffTypeNoBackoff),
 				)
 			}
 			if !res.NextRow() {
 				return retry.RetryableError(
-					"no rows",
+					fmt.Errorf("no rows"),
 					retry.WithBackoff(retry.BackoffTypeSlowBackoff),
 				)
 			}
@@ -109,14 +109,14 @@ func TestScriptingService(t *testing.T) {
 			}()
 			if !res.NextResultSet(ctx) {
 				return retry.RetryableError(
-					"no result sets",
+					fmt.Errorf("no result sets"),
 					retry.WithBackoff(retry.BackoffTypeNoBackoff),
 					retry.WithDeleteSession(),
 				)
 			}
 			if !res.NextRow() {
 				return retry.RetryableError(
-					"no rows",
+					fmt.Errorf("no rows"),
 					retry.WithBackoff(retry.BackoffTypeFastBackoff),
 				)
 			}
