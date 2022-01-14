@@ -11,6 +11,7 @@ import (
 
 type V interface {
 	ToYDB() *Ydb.TypedValue
+	String() string
 	toString(*bytes.Buffer)
 }
 

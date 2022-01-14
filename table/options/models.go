@@ -1,6 +1,7 @@
 package options
 
 import (
+	"bytes"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
@@ -413,6 +414,24 @@ type (
 type KeyRange struct {
 	From types.Value
 	To   types.Value
+}
+
+func (kr KeyRange) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("[")
+	if kr.From == nil {
+		buf.WriteString("NULL")
+	} else {
+		buf.WriteString(kr.From.String())
+	}
+	buf.WriteString(",")
+	if kr.To == nil {
+		buf.WriteString("NULL")
+	} else {
+		buf.WriteString(kr.To.String())
+	}
+	buf.WriteString("]")
+	return buf.String()
 }
 
 // Deprecated: use TimeToLiveSettings instead.

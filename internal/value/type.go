@@ -8,6 +8,7 @@ import (
 )
 
 type T interface {
+	String() string
 	toYDB() *Ydb.Type
 	toString(*bytes.Buffer)
 	equal(T) bool

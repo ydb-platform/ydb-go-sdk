@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -67,14 +66,6 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			cancel()
 		})
 	}
-}
-
-func _newSession(t *testing.T, c cluster.Cluster) Session {
-	s, err := newSession(context.Background(), c, trace.Table{})
-	if err != nil {
-		t.Fatalf("newSession unexpected error: %v", err)
-	}
-	return s
 }
 
 func TestRetryerBadSession(t *testing.T) {
@@ -266,7 +257,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		errors.NewOpError(errors.WithOEReason(errors.StatusSessionBusy)),
 	}
 	client := &client{
-		cluster: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
+		cc: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	p := SessionProviderFunc{
 		OnGet: client.createSession,

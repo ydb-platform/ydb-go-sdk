@@ -104,10 +104,23 @@ func (t *TransactionSettings) Settings() *Ydb_Table.TransactionSettings {
 	return &t.settings
 }
 
+// Explanation is a result of Explain calls.
+type Explanation struct {
+	Plan string
+}
+
+// ScriptingYQLExplanation is a result of Explain calls.
+type ScriptingYQLExplanation struct {
+	Explanation
+
+	ParameterTypes map[string]types.Type
+}
+
 // DataQueryExplanation is a result of ExplainDataQuery call.
 type DataQueryExplanation struct {
-	AST  string
-	Plan string
+	Explanation
+
+	AST string
 }
 
 // DataQuery only for tracers

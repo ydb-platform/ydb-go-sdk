@@ -21,6 +21,10 @@ const (
 
 type Meta interface {
 	Meta(ctx context.Context) (context.Context, error)
+
+	WithDatabase(database string) Meta
+	WithCredentials(creds credentials.Credentials) Meta
+	WithUserAgent(userAgent string) Meta
 }
 
 func New(
@@ -28,12 +32,14 @@ func New(
 	credentials credentials.Credentials,
 	trace trace.Driver,
 	requestsType string,
+	userAgent string,
 ) Meta {
 	return &meta{
 		trace:        trace,
 		credentials:  credentials,
 		database:     database,
 		requestsType: requestsType,
+		userAgent:    userAgent,
 	}
 }
 
@@ -42,6 +48,25 @@ type meta struct {
 	credentials  credentials.Credentials
 	database     string
 	requestsType string
+	userAgent    string
+}
+
+func (m *meta) WithDatabase(database string) Meta {
+	mm := *m
+	mm.database = database
+	return &mm
+}
+
+func (m *meta) WithCredentials(creds credentials.Credentials) Meta {
+	mm := *m
+	mm.credentials = creds
+	return &mm
+}
+
+func (m *meta) WithUserAgent(userAgent string) Meta {
+	mm := *m
+	mm.userAgent = userAgent
+	return &mm
 }
 
 func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
@@ -49,25 +74,39 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if !has {
 		md = metadata.MD{}
 	}
-	md.Set(metaDatabase, m.database)
-	md.Set(metaVersion, Version)
-	if m.requestsType != "" {
-		md.Set(metaRequestType, m.requestsType)
+	if len(md.Get(metaDatabase)) == 0 {
+		md.Set(metaDatabase, m.database)
 	}
-	if m.credentials != nil {
-		var token string
-		t := trace.ContextDriver(ctx).Compose(m.trace)
-		getCredentialsDone := trace.DriverOnGetCredentials(t, &ctx)
-		defer func() {
-			getCredentialsDone(token != "", err)
-		}()
-		token, err = m.credentials.Token(ctx)
-		if err != nil {
-			if stringer, ok := m.credentials.(fmt.Stringer); ok {
-				return nil, fmt.Errorf("%s: %w", stringer.String(), err)
-			}
-			return nil, err
+	if len(md.Get(metaVersion)) == 0 {
+		md.Set(metaVersion, Version)
+	}
+	if m.requestsType != "" {
+		if len(md.Get(metaRequestType)) == 0 {
+			md.Set(metaRequestType, m.requestsType)
 		}
+	}
+	if m.userAgent != "" {
+		if len(md.Get(metaUserAgent)) == 0 {
+			md.Set(metaUserAgent, m.userAgent)
+		}
+	}
+	if m.credentials == nil {
+		return md, nil
+	}
+	var token string
+	t := trace.ContextDriver(ctx).Compose(m.trace)
+	getCredentialsDone := trace.DriverOnGetCredentials(t, &ctx)
+	defer func() {
+		getCredentialsDone(token != "", err)
+	}()
+	token, err = m.credentials.Token(ctx)
+	if err != nil {
+		if stringer, ok := m.credentials.(fmt.Stringer); ok {
+			return nil, fmt.Errorf("%s: %w", stringer.String(), err)
+		}
+		return nil, err
+	}
+	if len(md.Get(metaTicket)) == 0 {
 		md.Set(metaTicket, token)
 	}
 	return md, nil

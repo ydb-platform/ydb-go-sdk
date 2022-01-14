@@ -6,8 +6,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
-func Balancer(opts ...Option) ibalancer.Balancer {
-	m := new(multiBalancer)
+func Balancer(opts ...Option) ibalancer.CreatorBalancer {
+	m := new(balancer)
 	for _, opt := range opts {
 		opt(m)
 	}
@@ -18,34 +18,45 @@ type multiHandle struct {
 	elements []ibalancer.Element
 }
 
-type multiBalancer struct {
+type balancer struct {
 	balancer []ibalancer.Balancer
 	filter   []func(conn.Conn) bool
 }
 
+func (b *balancer) Create() ibalancer.Balancer {
+	bb := b.balancer
+	for i := range bb {
+		bb[i] = bb[i].(ibalancer.CreatorBalancer).Create()
+	}
+	return &balancer{
+		balancer: bb,
+		filter:   b.filter,
+	}
+}
+
 func WithBalancer(b ibalancer.Balancer, filter func(cc conn.Conn) bool) Option {
-	return func(m *multiBalancer) {
+	return func(m *balancer) {
 		m.balancer = append(m.balancer, b)
 		m.filter = append(m.filter, filter)
 	}
 }
 
-type Option func(*multiBalancer)
+type Option func(*balancer)
 
-func (m *multiBalancer) Contains(x ibalancer.Element) bool {
+func (b *balancer) Contains(x ibalancer.Element) bool {
 	for i, x := range x.(multiHandle).elements {
 		if x == nil {
 			continue
 		}
-		if m.balancer[i].Contains(x) {
+		if b.balancer[i].Contains(x) {
 			return true
 		}
 	}
 	return false
 }
 
-func (m *multiBalancer) Next() conn.Conn {
-	for _, b := range m.balancer {
+func (b *balancer) Next() conn.Conn {
+	for _, b := range b.balancer {
 		if c := b.Next(); c != nil {
 			return c
 		}
@@ -53,32 +64,32 @@ func (m *multiBalancer) Next() conn.Conn {
 	return nil
 }
 
-func (m *multiBalancer) Insert(conn conn.Conn) ibalancer.Element {
-	n := len(m.filter)
+func (b *balancer) Insert(conn conn.Conn) ibalancer.Element {
+	n := len(b.filter)
 	h := multiHandle{
 		elements: make([]ibalancer.Element, n),
 	}
-	for i, f := range m.filter {
+	for i, f := range b.filter {
 		if f(conn) {
-			x := m.balancer[i].Insert(conn)
+			x := b.balancer[i].Insert(conn)
 			h.elements[i] = x
 		}
 	}
 	return h
 }
 
-func (m *multiBalancer) Update(x ibalancer.Element, info info.Info) {
+func (b *balancer) Update(x ibalancer.Element, info info.Info) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
-			m.balancer[i].Update(x, info)
+			b.balancer[i].Update(x, info)
 		}
 	}
 }
 
-func (m *multiBalancer) Remove(x ibalancer.Element) {
+func (b *balancer) Remove(x ibalancer.Element) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
-			m.balancer[i].Remove(x)
+			b.balancer[i].Remove(x)
 		}
 	}
 }

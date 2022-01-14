@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
@@ -1431,28 +1431,37 @@ var simpleCluster = testutil.NewCluster(
 )
 
 func simpleSession(t *testing.T) Session {
-	return _newSession(t, simpleCluster)
+	s, err := newSession(context.Background(), simpleCluster, trace.Table{})
+	if err != nil {
+		t.Fatalf("newSession unexpected error: %v", err)
+	}
+	return s
 }
 
 type StubBuilder struct {
 	OnCreateSession func(ctx context.Context) (Session, error)
 
-	Cluster cluster.Cluster
-	Limit   int
-	T       *testing.T
+	cc    grpc.ClientConnInterface
+	Limit int
+	T     *testing.T
 
 	mu     sync.Mutex
 	actual int
 }
 
-func newClientWithStubBuilder(t *testing.T, cluster cluster.Cluster, stubLimit int, options ...config.Option) *client {
+func newClientWithStubBuilder(
+	t *testing.T,
+	cc grpc.ClientConnInterface,
+	stubLimit int,
+	options ...config.Option,
+) *client {
 	return newClient(
 		context.Background(),
-		cluster,
+		cc,
 		(&StubBuilder{
-			T:       t,
-			Limit:   stubLimit,
-			Cluster: cluster,
+			T:     t,
+			Limit: stubLimit,
+			cc:    cc,
 		}).createSession,
 		config.New(options...),
 	)
@@ -1477,7 +1486,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session Session, err e
 		return f(ctx)
 	}
 
-	return newSession(ctx, s.Cluster, trace.ContextTable(ctx))
+	return newSession(ctx, s.cc, trace.ContextTable(ctx))
 }
 
 func (c *client) debug() {

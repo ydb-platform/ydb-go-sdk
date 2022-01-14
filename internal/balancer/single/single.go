@@ -6,38 +6,47 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
-func Balancer() ibalancer.Balancer {
-	return &singleConnBalancer{}
+func Balancer() ibalancer.CreatorBalancer {
+	return &balancer{}
 }
 
-type singleConnBalancer struct {
+type balancer struct {
 	conn conn.Conn
 }
 
-func (s *singleConnBalancer) Next() conn.Conn {
-	return s.conn
+func (b *balancer) Create() ibalancer.Balancer {
+	return &balancer{conn: b.conn}
 }
 
-func (s *singleConnBalancer) Insert(conn conn.Conn) ibalancer.Element {
-	if s.conn != nil {
+func (b *balancer) Next() conn.Conn {
+	return b.conn
+}
+
+func (b *balancer) Insert(conn conn.Conn) ibalancer.Element {
+	if b.conn != nil {
 		panic("ydb: single Conn Balancer: double Insert()")
 	}
-	s.conn = conn
+	b.conn = conn
 	return conn
 }
 
-func (s *singleConnBalancer) Remove(x ibalancer.Element) {
-	if s.conn != x.(conn.Conn) {
+func (b *balancer) Remove(x ibalancer.Element) {
+	if b.conn != x.(conn.Conn) {
 		panic("ydb: single Conn Balancer: Remove() unknown Conn")
 	}
-	s.conn = nil
+	b.conn = nil
 }
 
-func (s *singleConnBalancer) Update(ibalancer.Element, info.Info) {}
+func (b *balancer) Update(ibalancer.Element, info.Info) {}
 
-func (s *singleConnBalancer) Contains(x ibalancer.Element) bool {
+func (b *balancer) Contains(x ibalancer.Element) bool {
 	if x == nil {
 		return false
 	}
-	return s.conn != x.(conn.Conn)
+	return b.conn != x.(conn.Conn)
+}
+
+func IsSingle(i interface{}) bool {
+	_, ok := i.(*balancer)
+	return ok
 }

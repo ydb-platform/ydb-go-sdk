@@ -13,8 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/rr"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	connConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/state"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
@@ -59,7 +57,7 @@ func TestMulti(t *testing.T) {
 		el = make(map[conn.Conn]ibalancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), nil, connConfig.Config(config.New()))
+		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), config.New())
 		e := m.Insert(c)
 		es[i] = e
 		el[c] = e
@@ -148,8 +146,7 @@ func TestPreferLocal(t *testing.T) {
 				strconv.Itoa(i)+":0",
 				endpoint.WithLocalDC(i%2 == 0),
 			),
-			nil,
-			connConfig.Config(config.New()),
+			config.New(),
 		)
 		e := m.Insert(c)
 		es[i] = e
@@ -218,8 +215,7 @@ func TestPreferEndpoint(t *testing.T) {
 				strconv.Itoa(i)+":0",
 				endpoint.WithLocalDC(i%2 == 0),
 			),
-			nil,
-			connConfig.Config(config.New()),
+			config.New(),
 		)
 		e := m.Insert(c)
 		es[i] = e
@@ -485,18 +481,15 @@ func TestRoundRobin(t *testing.T) {
 			for _, e := range test.add {
 				c := conn.New(
 					e,
-					nil,
-					connConfig.Config(
-						config.New(
-							config.WithDatabase("test"),
-							config.WithEndpoint("test"),
-						),
+					config.New(
+						config.WithDatabase("test"),
+						config.WithEndpoint("test"),
 					),
 				)
-				c.SetState(ctx, state.Online)
+				c.SetState(ctx, conn.Online)
 				if test.banned != nil {
 					if _, ok := test.banned[e.Address()]; ok {
-						c.SetState(ctx, state.Banned)
+						c.SetState(ctx, conn.Banned)
 					}
 				}
 				mconn[c] = e.Address()
@@ -548,12 +541,11 @@ func TestRandomChoice(t *testing.T) {
 			for _, e := range test.add {
 				c := conn.New(
 					e,
-					nil,
-					connConfig.Config(config.New()),
+					config.New(),
 				)
-				c.SetState(ctx, state.Online)
+				c.SetState(ctx, conn.Online)
 				if _, ok := test.banned[e.Address()]; ok {
-					c.SetState(ctx, state.Banned)
+					c.SetState(ctx, conn.Banned)
 				}
 				mconn[c] = e.Address()
 				maddr[e.Address()] = c

@@ -1,3 +1,17 @@
+## 3.7.0
+* Replaced `Option` to `CustomOption` on `Connection` interface methods
+* Implements `WithCustom[Token,Database]` options for redefine database and token
+* Removed experimental `balancer.PreferEndpoints[WithFallback][RegEx]` balancers
+* Supported connections `TTL` with `Option` `WithConnectionTTL`
+* Remove unnecessary `WithFastDial` option (lazy connections are always fast inserts into cluster)
+* Added `Scripting` service client with API methods `Execute()`, `StreamExecute()` and `Explain()`
+* Added `String()` method to `table.types.Type` interface
+* Added `With[Custom]UserAgent()` `Option` and `CustomOption` constructors
+* Refactored `log.Logger` interface and internal implementation
+* Added `retry.RetryableError()` for returns user-defined error which must be retryed 
+* Renamed internal type `internal.errors.OperationCompleted` to `internal.errors.OperationStatus`
+* Added `String()` method to `table.KeyRange` and `table.Value` types
+
 ## 3.6.2
 * Refactored table retry helpers
 * Added new `PreferLocations[WithFallback][RegEx]` balancers

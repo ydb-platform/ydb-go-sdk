@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	connConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
@@ -38,6 +37,7 @@ func TestClusterFastRedial(t *testing.T) {
 		balancer:  b,
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
+		pool:      conn.NewPool(ctx, config.New()),
 	}
 
 	pingConnects := func(size int) chan struct{} {
@@ -59,7 +59,7 @@ func TestClusterFastRedial(t *testing.T) {
 		endpoint.New("foo:0"),
 		endpoint.New("bad:0"),
 	}
-	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(connConfig.Config(config.New())))
+	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(config.New()))
 	select {
 	case <-pingConnects(len(ne)):
 
@@ -88,6 +88,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		}(),
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
+		pool:      conn.NewPool(ctx, config.New()),
 	}
 
 	assert := func(t *testing.T, exp []endpoint.Endpoint) {
@@ -139,7 +140,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			[]endpoint.Endpoint{},
 			ne,
-			WithConnConfig(connConfig.Config(config.New())),
+			WithConnConfig(config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -154,7 +155,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			append(endpoints, badEndpoints...),
 			ne,
-			WithConnConfig(connConfig.Config(config.New())),
+			WithConnConfig(config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -179,7 +180,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			nextBadEndpoints,
 			ne,
-			WithConnConfig(connConfig.Config(config.New())),
+			WithConnConfig(config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)

@@ -14,10 +14,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Option func(ctx context.Context, db *db) error
+type Option func(ctx context.Context, c *connection) error
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
@@ -30,26 +31,47 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
-func WithConnectionString(connection string) Option {
-	return func(ctx context.Context, db *db) error {
-		params, err := ConnectionString(connection)
+func WithUserAgent(userAgent string) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithUserAgent(userAgent))
+		return nil
+	}
+}
+
+func WithConnectionString(dsn string) Option {
+	return func(ctx context.Context, c *connection) error {
+		params, err := ConnectionString(dsn)
 		if err != nil {
 			return err
 		}
-		return WithConnectParams(params)(ctx, db)
+		return WithConnectParams(params)(ctx, c)
+	}
+}
+
+func WithConnectionTTL(ttl time.Duration) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithConnectionTTL(ttl))
+		return nil
 	}
 }
 
 func WithEndpoint(endpoint string) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithEndpoint(endpoint))
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithEndpoint(endpoint))
 		return nil
 	}
 }
 
 func WithDatabase(database string) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithDatabase(database))
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithDatabase(database))
+		return nil
+	}
+}
+
+func WithSecure(secure bool) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithSecure(secure))
 		return nil
 	}
 }
@@ -93,27 +115,30 @@ func WithErrWriter(err io.Writer) LoggerOption {
 }
 
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {
-	return func(ctx context.Context, db *db) error {
+	return func(ctx context.Context, c *connection) error {
 		nativeOpts := make([]logger.Option, 0, len(opts))
 		for _, o := range opts {
 			nativeOpts = append(nativeOpts, logger.Option(o))
 		}
 		l := logger.New(nativeOpts...)
-		if err := WithTraceDriver(log.Driver(l, details))(ctx, db); err != nil {
+		if err := WithTraceDriver(log.Driver(l, details))(ctx, c); err != nil {
 			return err
 		}
-		return WithTraceTable(log.Table(l, details))(ctx, db)
+		return WithTraceTable(log.Table(l, details))(ctx, c)
 	}
 }
 
 func WithConnectParams(params ConnectParams) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithEndpoint(params.Endpoint()))
-		db.options = append(db.options, config.WithDatabase(params.Database()))
-		db.options = append(db.options, config.WithSecure(params.Secure()))
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(
+			c.options,
+			config.WithEndpoint(params.Endpoint()),
+			config.WithDatabase(params.Database()),
+			config.WithSecure(params.Secure()),
+		)
 		if params.Token() != "" {
-			db.options = append(
-				db.options,
+			c.options = append(
+				c.options,
 				config.WithCredentials(
 					credentials.NewAccessTokenCredentials(
 						params.Token(),
@@ -133,12 +158,12 @@ func WithAnonymousCredentials() Option {
 }
 
 func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (credentials.Credentials, error)) Option {
-	return func(ctx context.Context, db *db) error {
+	return func(ctx context.Context, c *connection) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
 			return err
 		}
-		db.options = append(db.options, config.WithCredentials(credentials))
+		c.options = append(c.options, config.WithCredentials(credentials))
 		return nil
 	}
 }
@@ -150,30 +175,30 @@ func WithCredentials(c credentials.Credentials) Option {
 }
 
 func WithBalancer(balancer ibalancer.Balancer) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithBalancer(balancer))
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithBalancer(balancer))
 		return nil
 	}
 }
 
 func WithDialTimeout(timeout time.Duration) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithDialTimeout(timeout))
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithDialTimeout(timeout))
 		return nil
 	}
 }
 
 func With(options ...config.Option) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, options...)
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, options...)
 		return nil
 	}
 }
 
 func MergeOptions(options ...Option) Option {
-	return func(ctx context.Context, db *db) error {
+	return func(ctx context.Context, c *connection) error {
 		for _, o := range options {
-			if err := o(ctx, db); err != nil {
+			if err := o(ctx, c); err != nil {
 				return err
 			}
 		}
@@ -182,29 +207,29 @@ func MergeOptions(options ...Option) Option {
 }
 
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithDiscoveryInterval(discoveryInterval))
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithDiscoveryInterval(discoveryInterval))
 		return nil
 	}
 }
 
 // WithTraceDriver returns deadline which has associated Driver with it.
 func WithTraceDriver(trace trace.Driver) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithTrace(trace))
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithTrace(trace))
 		return nil
 	}
 }
 
 func WithCertificate(cert *x509.Certificate) Option {
-	return func(ctx context.Context, db *db) error {
-		db.options = append(db.options, config.WithCertificate(cert))
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithCertificate(cert))
 		return nil
 	}
 }
 
 func WithCertificatesFromFile(caFile string) Option {
-	return func(ctx context.Context, db *db) error {
+	return func(ctx context.Context, c *connection) error {
 		if len(caFile) > 0 && caFile[0] == '~' {
 			home, err := os.UserHomeDir()
 			if err != nil {
@@ -216,12 +241,12 @@ func WithCertificatesFromFile(caFile string) Option {
 		if err != nil {
 			return err
 		}
-		return WithCertificatesFromPem(bytes)(ctx, db)
+		return WithCertificatesFromPem(bytes)(ctx, c)
 	}
 }
 
 func WithCertificatesFromPem(bytes []byte) Option {
-	return func(ctx context.Context, db *db) error {
+	return func(ctx context.Context, c *connection) error {
 		if ok, err := func(bytes []byte) (ok bool, err error) {
 			var cert *x509.Certificate
 			for len(bytes) > 0 {
@@ -238,13 +263,70 @@ func WithCertificatesFromPem(bytes []byte) Option {
 				if err != nil {
 					continue
 				}
-				_ = WithCertificate(cert)(ctx, db)
+				_ = WithCertificate(cert)(ctx, c)
 				ok = true
 			}
 			return
 		}(bytes); !ok {
 			return err
 		}
+		return nil
+	}
+}
+
+func WithTableConfigOption(option tableConfig.Option) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, option)
+		return nil
+	}
+}
+
+func WithSessionPoolSizeLimit(sizeLimit int) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+		return nil
+	}
+}
+
+func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveMinSize(keepAliveMinSize))
+		return nil
+	}
+}
+
+func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
+		return nil
+	}
+}
+
+func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveTimeout(keepAliveTimeout))
+		return nil
+	}
+}
+
+func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
+		return nil
+	}
+}
+
+func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
+		return nil
+	}
+}
+
+// WithTraceTable returns deadline which has associated Driver with it.
+func WithTraceTable(trace trace.Table) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithTrace(trace))
 		return nil
 	}
 }

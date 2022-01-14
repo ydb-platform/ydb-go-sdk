@@ -18,19 +18,19 @@ func TestCredentialsString(t *testing.T) {
 		},
 		{
 			NewAnonymousCredentials(""),
-			"anonymousCredentials",
+			"anonymous",
 		},
 		{
 			NewAnonymousCredentials("test"),
-			"anonymousCredentials created from test",
+			"anonymous created from test",
 		},
 		{
 			NewAccessTokenCredentials("", ""),
-			"AccessTokenCredentials",
+			"accessToken",
 		},
 		{
 			NewAccessTokenCredentials("", "test"),
-			"AccessTokenCredentials created from test",
+			"accessToken created from test",
 		},
 	} {
 		t.Run(test.s, func(t *testing.T) {

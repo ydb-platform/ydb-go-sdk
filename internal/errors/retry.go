@@ -5,23 +5,23 @@ import "fmt"
 // RetryType reports which operations need to retry
 type RetryType uint8
 
-// OperationCompleted reports which status of operation: completed or none
-type OperationCompleted uint8
+// OperationStatus reports which status of operation: completed or none
+type OperationStatus uint8
 
-// Binary flags that used as OperationCompleted
+// Binary flags that used as OperationStatus
 const (
-	OperationCompletedTrue      = OperationCompleted(1 << iota >> 1)
-	OperationCompletedUndefined // may be true or may be false
-	OperationCompletedFalse
+	OperationFinished        = OperationStatus(1 << iota >> 1)
+	OperationStatusUndefined // may be true or may be false
+	OperationNotFinished
 )
 
-func (t OperationCompleted) String() string {
+func (t OperationStatus) String() string {
 	switch t {
-	case OperationCompletedTrue:
+	case OperationFinished:
 		return "operation was completed, no need retries"
-	case OperationCompletedFalse:
+	case OperationNotFinished:
 		return "operation was not completed, need retries"
-	case OperationCompletedUndefined:
+	case OperationStatusUndefined:
 		return "operation completed status undefined, no need retries"
 	default:
 		return fmt.Sprintf("unknown operation completed code: %d", t)

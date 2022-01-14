@@ -1,10 +1,10 @@
 package conn
 
 import (
-	"context"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -14,7 +14,7 @@ type Config interface {
 	OperationTimeout() time.Duration
 	OperationCancelAfter() time.Duration
 	StreamTimeout() time.Duration
-	Meta(ctx context.Context) (context.Context, error)
-	Trace(ctx context.Context) trace.Driver
-	Pessimize(ctx context.Context, endpoint endpoint.Endpoint) error
+	Trace() trace.Driver
+	ConnectionTTL() time.Duration
+	GrpcDialOptions() []grpc.DialOption
 }

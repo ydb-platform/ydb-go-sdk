@@ -3,11 +3,12 @@ package ratelimiter
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_RateLimiter_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_RateLimiter_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
@@ -56,9 +57,9 @@ func (c *client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(c cluster.Cluster) Client {
+func New(cc grpc.ClientConnInterface) Client {
 	return &client{
-		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(c),
+		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
 	}
 }
 

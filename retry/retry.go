@@ -31,11 +31,42 @@ var (
 // retryOperation is the interface that holds an operation for retry.
 type retryOperation func(context.Context) (err error)
 
+type retryableErrorOption func(e *errors.RetryableError)
+
+const (
+	BackoffTypeNoBackoff   = errors.BackoffTypeNoBackoff
+	BackoffTypeFastBackoff = errors.BackoffTypeFastBackoff
+	BackoffTypeSlowBackoff = errors.BackoffTypeSlowBackoff
+)
+
+func WithBackoff(t errors.BackoffType) retryableErrorOption {
+	return func(e *errors.RetryableError) {
+		e.BackoffType = t
+	}
+}
+
+func WithDeleteSession() retryableErrorOption {
+	return func(e *errors.RetryableError) {
+		e.MustDeleteSession = true
+	}
+}
+
+func RetryableError(err error, opts ...retryableErrorOption) error {
+	re := &errors.RetryableError{
+		Err: err,
+	}
+	for _, o := range opts {
+		o(re)
+	}
+	return re
+}
+
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
+// If you need to retry your op func on some logic errors - you must returns from op func RetryableError()
 func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (err error) {
 	var (
 		i        int
@@ -79,27 +110,35 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 func Check(err error) (m retryMode) {
 	var te *errors.TransportError
 	var oe *errors.OpError
+	var re *errors.RetryableError
 	switch {
 	case errors.As(err, &te):
 		return retryMode{
-			statusCode:         int32(te.Reason),
-			operationCompleted: te.Reason.OperationCompleted(),
-			backoff:            te.Reason.BackoffType(),
-			deleteSession:      te.Reason.MustDeleteSession(),
+			statusCode:      int32(te.Reason),
+			operationStatus: te.Reason.OperationStatus(),
+			backoff:         te.Reason.BackoffType(),
+			deleteSession:   te.Reason.MustDeleteSession(),
 		}
 	case errors.As(err, &oe):
 		return retryMode{
-			statusCode:         int32(oe.Reason),
-			operationCompleted: oe.Reason.OperationCompleted(),
-			backoff:            oe.Reason.BackoffType(),
-			deleteSession:      oe.Reason.MustDeleteSession(),
+			statusCode:      int32(oe.Reason),
+			operationStatus: oe.Reason.OperationStatus(),
+			backoff:         oe.Reason.BackoffType(),
+			deleteSession:   oe.Reason.MustDeleteSession(),
+		}
+	case errors.As(err, &re):
+		return retryMode{
+			statusCode:      -1,
+			operationStatus: errors.OperationNotFinished,
+			backoff:         re.BackoffType,
+			deleteSession:   re.MustDeleteSession,
 		}
 	default:
 		return retryMode{
-			statusCode:         -1,
-			operationCompleted: errors.OperationCompletedTrue, // it's finish, not need any retry attempts
-			backoff:            errors.BackoffTypeNoBackoff,
-			deleteSession:      false,
+			statusCode:      -1,
+			operationStatus: errors.OperationFinished, // it's finish, not need any retry attempts
+			backoff:         errors.BackoffTypeNoBackoff,
+			deleteSession:   false,
 		}
 	}
 }
@@ -174,17 +213,17 @@ func max(a, b uint) uint {
 
 // retryMode reports whether operation is able retried and with which properties.
 type retryMode struct {
-	statusCode         int32
-	operationCompleted errors.OperationCompleted
-	backoff            errors.BackoffType
-	deleteSession      bool
+	statusCode      int32
+	operationStatus errors.OperationStatus
+	backoff         errors.BackoffType
+	deleteSession   bool
 }
 
 func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
-	switch m.operationCompleted {
-	case errors.OperationCompletedTrue:
+	switch m.operationStatus {
+	case errors.OperationFinished:
 		return false
-	case errors.OperationCompletedUndefined:
+	case errors.OperationStatusUndefined:
 		return isOperationIdempotent
 	default:
 		return true

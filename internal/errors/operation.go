@@ -103,7 +103,7 @@ func IsOpError(err error, code StatusCode) bool {
 	return op.Reason == code
 }
 
-func (e StatusCode) OperationCompleted() OperationCompleted {
+func (e StatusCode) OperationStatus() OperationStatus {
 	switch e {
 	case
 		StatusAborted,
@@ -111,12 +111,12 @@ func (e StatusCode) OperationCompleted() OperationCompleted {
 		StatusOverloaded,
 		StatusBadSession,
 		StatusSessionBusy:
-		return OperationCompletedFalse
+		return OperationNotFinished
 	case
 		StatusUndetermined:
-		return OperationCompletedUndefined
+		return OperationStatusUndefined
 	default:
-		return OperationCompletedTrue
+		return OperationFinished
 	}
 }
 

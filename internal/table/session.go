@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
@@ -379,8 +379,10 @@ func (s *session) Explain(ctx context.Context, query string) (exp table.DataQuer
 		return
 	}
 	return table.DataQueryExplanation{
-		AST:  result.QueryAst,
-		Plan: result.QueryPlan,
+		Explanation: table.Explanation{
+			Plan: result.GetQueryPlan(),
+		},
+		AST: result.QueryAst,
 	}, nil
 }
 
@@ -685,7 +687,7 @@ func (s *session) StreamReadTable(
 			SessionId: s.id,
 			Path:      path,
 		}
-		c Ydb_Table_V1.TableService_StreamReadTableClient
+		stream Ydb_Table_V1.TableService_StreamReadTableClient
 	)
 	for _, opt := range opts {
 		opt((*options.ReadTableDesc)(&request))
@@ -693,7 +695,7 @@ func (s *session) StreamReadTable(
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	c, err = s.tableService.StreamReadTable(cluster.WithEndpoint(ctx, s), &request)
+	stream, err = s.tableService.StreamReadTable(cluster.WithEndpoint(ctx, s), &request)
 
 	onDone := trace.TableOnSessionQueryStreamRead(s.trace, &ctx, s)
 	if err != nil {
@@ -705,7 +707,7 @@ func (s *session) StreamReadTable(
 	r := scanner.NewStream()
 	go func() {
 		var (
-			response Ydb_Table.ReadTableResponse
+			response *Ydb_Table.ReadTableResponse
 			err      error
 		)
 		defer func() {
@@ -720,8 +722,7 @@ func (s *session) StreamReadTable(
 				r.SetErr(err)
 				return
 			default:
-				err = c.RecvMsg(&response)
-				if err != nil {
+				if response, err = stream.Recv(); err != nil {
 					if !errors.Is(err, io.EOF) {
 						r.SetErr(err)
 					}
@@ -757,7 +758,7 @@ func (s *session) StreamExecuteScanQuery(
 			Parameters: params.Params(),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
-		c Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
+		stream Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 	)
 	for _, opt := range opts {
 		opt((*options.ExecuteScanQueryDesc)(&request))
@@ -765,7 +766,7 @@ func (s *session) StreamExecuteScanQuery(
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	c, err = s.tableService.StreamExecuteScanQuery(cluster.WithEndpoint(ctx, s), &request)
+	stream, err = s.tableService.StreamExecuteScanQuery(cluster.WithEndpoint(ctx, s), &request)
 
 	onDone := trace.TableOnSessionQueryStreamExecute(s.trace, &ctx, s, q, params)
 	if err != nil {
@@ -777,7 +778,7 @@ func (s *session) StreamExecuteScanQuery(
 	r := scanner.NewStream()
 	go func() {
 		var (
-			response Ydb_Table.ExecuteScanQueryPartialResponse
+			response *Ydb_Table.ExecuteScanQueryPartialResponse
 			err      error
 		)
 		defer func() {
@@ -792,7 +793,7 @@ func (s *session) StreamExecuteScanQuery(
 				r.SetErr(err)
 				return
 			default:
-				if err = c.RecvMsg(&response); err != nil {
+				if response, err = stream.Recv(); err != nil {
 					if !errors.Is(err, io.EOF) {
 						r.SetErr(err)
 						err = nil

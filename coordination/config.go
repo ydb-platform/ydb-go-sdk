@@ -30,23 +30,23 @@ func (t ConsistencyMode) String() string {
 	}
 }
 
-type RateLimiterCountersMode uint
+type RatelimiterCountersMode uint
 
 const (
-	RateLimiterCountersModeUnset RateLimiterCountersMode = iota
-	RateLimiterCountersModeAggregated
-	RateLimiterCountersModeDetailed
+	RatelimiterCountersModeUnset RatelimiterCountersMode = iota
+	RatelimiterCountersModeAggregated
+	RatelimiterCountersModeDetailed
 )
 
-func (t RateLimiterCountersMode) String() string {
+func (t RatelimiterCountersMode) String() string {
 	switch t {
 	default:
 		return consistencyUnknown
-	case RateLimiterCountersModeUnset:
+	case RatelimiterCountersModeUnset:
 		return consistencyUnset
-	case RateLimiterCountersModeAggregated:
+	case RatelimiterCountersModeAggregated:
 		return consistencyAggregated
-	case RateLimiterCountersModeDetailed:
+	case RatelimiterCountersModeDetailed:
 		return consistencyDetailed
 	}
 }
@@ -57,7 +57,7 @@ type Config struct {
 	SessionGracePeriodMillis uint32
 	ReadConsistencyMode      ConsistencyMode
 	AttachConsistencyMode    ConsistencyMode
-	RateLimiterCountersMode  RateLimiterCountersMode
+	RatelimiterCountersMode  RatelimiterCountersMode
 }
 
 func (t ConsistencyMode) To() Ydb_Coordination.ConsistencyMode {
@@ -71,11 +71,11 @@ func (t ConsistencyMode) To() Ydb_Coordination.ConsistencyMode {
 	}
 }
 
-func (t RateLimiterCountersMode) To() Ydb_Coordination.RateLimiterCountersMode {
+func (t RatelimiterCountersMode) To() Ydb_Coordination.RateLimiterCountersMode {
 	switch t {
-	case RateLimiterCountersModeAggregated:
+	case RatelimiterCountersModeAggregated:
 		return Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_AGGREGATED
-	case RateLimiterCountersModeDetailed:
+	case RatelimiterCountersModeDetailed:
 		return Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_DETAILED
 	default:
 		return Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_UNSET

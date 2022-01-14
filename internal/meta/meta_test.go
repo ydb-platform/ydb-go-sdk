@@ -14,9 +14,7 @@ func TestMetaRequiredHeaders(t *testing.T) {
 	m := &meta{
 		database:     "database",
 		requestsType: "requestType",
-		credentials: credentials.Func(func(context.Context) (string, error) {
-			return "token", nil
-		}),
+		credentials:  credentials.NewAccessTokenCredentials("token", "TestMetaRequiredHeaders"),
 	}
 
 	ctx := context.Background()

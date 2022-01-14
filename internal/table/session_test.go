@@ -35,7 +35,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewCluster(
+		cc: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					// nolint: unparam
@@ -92,7 +92,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewCluster(
+		cc: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					// nolint: unparam
@@ -234,7 +234,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExecuteDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
 				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
 				testutil.NoError(t, err)
@@ -244,7 +244,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExplainDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
 				_, err := s.Explain(ctx, "")
 				testutil.NoError(t, err)
@@ -254,7 +254,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TablePrepareDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
 				_, err := s.Prepare(ctx, "")
 				testutil.NoError(t, err)
@@ -271,7 +271,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableDeleteSession,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
 				testutil.NoError(t, s.Close(ctx))
 			},
@@ -280,7 +280,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableBeginTransaction,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
 				_, err := s.BeginTransaction(ctx, table.TxSettings())
 				testutil.NoError(t, err)
@@ -291,7 +291,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				tx := &Transaction{
 					s: &session{
-						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+						tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 					},
 				}
 				_, err := tx.CommitTx(ctx)
@@ -303,7 +303,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				tx := &Transaction{
 					s: &session{
-						tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+						tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 					},
 				}
 				err := tx.Rollback(ctx)
@@ -314,7 +314,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableKeepAlive,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cluster),
+					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
 				testutil.NoError(t, s.KeepAlive(ctx))
 			},
@@ -412,7 +412,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := StubBuilder{
 				T: t,
-				Cluster: testutil.NewCluster(
+				cc: testutil.NewCluster(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
 							// nolint: unparam
@@ -476,7 +476,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		Cluster: testutil.NewCluster(
+		cc: testutil.NewCluster(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableBeginTransaction: func(request interface{}) (proto.Message, error) {

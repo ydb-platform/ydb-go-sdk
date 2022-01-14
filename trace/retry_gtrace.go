@@ -36,7 +36,6 @@ func (t Retry) Compose(x Retry) (ret Retry) {
 	}
 	return ret
 }
-
 func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
 	fn := t.OnRetry
 	if fn == nil {
@@ -52,7 +51,6 @@ func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
 	}
 	return res
 }
-
 func RetryOnRetry(t Retry, c context.Context) func(_ context.Context, latency time.Duration, err error) {
 	var p RetryLoopStartInfo
 	p.Context = c
