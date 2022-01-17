@@ -11,6 +11,7 @@
 * Added `retry.RetryableError()` for returns user-defined error which must be retryed 
 * Renamed internal type `internal.errors.OperationCompleted` to `internal.errors.OperationStatus`
 * Added `String()` method to `table.KeyRange` and `table.Value` types
+* Replaced creation of goroutine on each stream call to explicit call stream.Recv() on NextResultSet()
 
 ## 3.6.2
 * Refactored table retry helpers

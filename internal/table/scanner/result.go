@@ -2,12 +2,14 @@ package scanner
 
 import (
 	"context"
+	"io"
 	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
@@ -15,7 +17,8 @@ import (
 type result struct {
 	scanner
 
-	stats *Ydb_TableStats.QueryStats
+	statsMtx sync.RWMutex
+	stats    *Ydb_TableStats.QueryStats
 
 	closedMtx sync.RWMutex
 	closed    bool
@@ -24,7 +27,8 @@ type result struct {
 type streamResult struct {
 	result
 
-	ch chan *Ydb.ResultSet
+	recv  func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error)
+	close func(error) error
 }
 
 type unaryResult struct {
@@ -55,19 +59,6 @@ func (r *result) isClosed() bool {
 	return r.closed
 }
 
-func (r *result) UpdateStats(stats *Ydb_TableStats.QueryStats) {
-	r.stats = stats
-}
-
-func (r *streamResult) Append(set *Ydb.ResultSet) {
-	r.closedMtx.RLock()
-	defer r.closedMtx.RUnlock()
-	if r.closed {
-		return
-	}
-	r.ch <- set
-}
-
 type resultWithError interface {
 	SetErr(err error)
 }
@@ -80,14 +71,15 @@ type UnaryResult interface {
 type StreamResult interface {
 	public.StreamResult
 	resultWithError
-
-	Append(set *Ydb.ResultSet)
-	UpdateStats(stats *Ydb_TableStats.QueryStats)
 }
 
-func NewStream() StreamResult {
+func NewStream(
+	recv func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error),
+	onClose func(error) error,
+) StreamResult {
 	r := &streamResult{
-		ch: make(chan *Ydb.ResultSet, 1),
+		recv:  recv,
+		close: onClose,
 	}
 	return r
 }
@@ -128,15 +120,11 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 	if r.inactive() {
 		return false
 	}
-	select {
-	case s, ok := <-r.ch:
-		if !ok || s == nil {
-			return false
-		}
-		r.Reset(s, columns...)
-		return true
-
-	case <-ctx.Done():
+	s, stats, err := r.recv(ctx)
+	if errors.Is(err, io.EOF) {
+		return false
+	}
+	if err != nil {
 		r.errMtx.Lock()
 		if r.err == nil {
 			r.err = ctx.Err()
@@ -145,6 +133,13 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 		r.Reset(nil)
 		return false
 	}
+	r.Reset(s, columns...)
+	if stats != nil {
+		r.statsMtx.Lock()
+		r.stats = stats
+		r.statsMtx.Unlock()
+	}
+	return true
 }
 
 // CurrentResultSet get current result set
@@ -155,8 +150,10 @@ func (r *result) CurrentResultSet() public.Set {
 // Stats returns query execution queryStats.
 func (r *result) Stats() stats.QueryStats {
 	var s queryStats
+	r.statsMtx.RLock()
 	s.stats = r.stats
-	s.processCPUTime = time.Microsecond * time.Duration(r.stats.GetProcessCpuTimeUs())
+	r.statsMtx.RUnlock()
+	s.processCPUTime = time.Microsecond * time.Duration(s.stats.GetProcessCpuTimeUs())
 	s.pos = 0
 	return &s
 }
@@ -169,8 +166,7 @@ func (r *streamResult) Close() (err error) {
 		return nil
 	}
 	r.closed = true
-	close(r.ch)
-	return nil
+	return r.close(r.Err())
 }
 
 func (r *result) inactive() bool {

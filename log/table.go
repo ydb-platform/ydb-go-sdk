@@ -215,13 +215,12 @@ func Table(log Logger, details trace.Details) trace.Table {
 					start := time.Now()
 					return func(info trace.SessionQueryStreamExecuteDoneInfo) {
 						if info.Error == nil {
-							log.Debugf(`execute done {latency:"%s",id:"%s",status:"%s",query:"%s",params:"%s",result:{err:"%s"}}`,
+							log.Debugf(`execute done {latency:"%s",id:"%s",status:"%s",query:"%s",params:"%s"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
 								query,
 								params,
-								info.Result.Err(),
 							)
 						} else {
 							log.Errorf(`execute failed {latency:"%s",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v"}`,
@@ -245,11 +244,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 					start := time.Now()
 					return func(info trace.SessionQueryStreamReadDoneInfo) {
 						if info.Error == nil {
-							log.Debugf(`read done {latency:"%s",id:"%s",status:"%s",result:{err:"%s"}}`,
+							log.Debugf(`read done {latency:"%s",id:"%s",status:"%s"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
-								info.Result.Err(),
 							)
 						} else {
 							log.Errorf(`read failed {latency:"%s",id:"%s",status:"%s",error:"%v"}`,
