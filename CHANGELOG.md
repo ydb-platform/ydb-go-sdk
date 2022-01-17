@@ -1,3 +1,6 @@
+## 3.7.2
+* Retry remove directory in sugar.RemoveRecursive for retriable error
+
 ## 3.7.1
 * Fixed panic on `result.Reset(nil)`
 

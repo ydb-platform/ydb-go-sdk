@@ -8,6 +8,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
@@ -84,7 +85,10 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 				if err = list(i+1, pt); err != nil {
 					return err
 				}
-				if err = db.Scheme().RemoveDirectory(ctx, pt); err != nil {
+				err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+					return db.Scheme().RemoveDirectory(ctx, pt)
+				})
+				if err != nil {
 					return err
 				}
 
