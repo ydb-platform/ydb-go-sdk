@@ -1,3 +1,6 @@
+## 3.7.1
+* Fixed panic on `result.Reset(nil)`
+
 ## 3.7.0
 * Replaced `Option` to `CustomOption` on `Connection` interface methods
 * Implements `WithCustom[Token,Database]` options for redefine database and token
