@@ -67,7 +67,12 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 	fullSysTablePath := path.Join(db.Name(), sysTable)
 	var list func(int, string) error
 	list = func(i int, p string) error {
-		dir, err := db.Scheme().ListDirectory(ctx, p)
+		var dir scheme.Directory
+		var err error
+		err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+			dir, err = db.Scheme().ListDirectory(ctx, p)
+			return err
+		})
 		var opErr *errors.OpError
 		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
 			return nil
@@ -75,6 +80,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 		if err != nil {
 			return err
 		}
+
 		for _, child := range dir.Children {
 			pt := path.Join(p, child.Name)
 			if pt == fullSysTablePath {
