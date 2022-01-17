@@ -127,7 +127,7 @@ func (c *client) StreamExecute(
 				if response, err = stream.Recv(); err != nil {
 					if !errors.Is(err, io.EOF) {
 						r.SetErr(err)
-						// nolint: ineffassign
+						// nolint:ineffassign
 						err = nil
 					}
 					return

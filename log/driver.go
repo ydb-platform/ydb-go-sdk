@@ -10,9 +10,10 @@ import (
 func Driver(log Logger, details trace.Details) trace.Driver {
 	log = log.WithName(`driver`)
 	t := trace.Driver{}
-	// nolint: nestif
+	// nolint:nestif
 	if details&trace.DriverNetEvents != 0 {
-		log = log.WithName(`net`)
+		// nolint:govet
+		log := log.WithName(`net`)
 		t.OnNetRead = func(info trace.NetReadStartInfo) func(trace.NetReadDoneInfo) {
 			address := info.Address
 			log.Tracef(`read start {address:"%s"}`,
@@ -100,9 +101,10 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 			}
 		}
 	}
-	// nolint: nestif
+	// nolint:nestif
 	if details&trace.DriverCoreEvents != 0 {
-		log = log.WithName(`core`)
+		// nolint:govet
+		log := log.WithName(`core`)
 		t.OnInit = func(info trace.InitStartInfo) func(trace.InitDoneInfo) {
 			endpoint := info.Endpoint
 			database := info.Database
@@ -242,7 +244,7 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 				}
 			}
 		}
-		// nolint: lll
+		// nolint:lll
 		t.OnConnNewStream = func(info trace.ConnNewStreamStartInfo) func(trace.ConnNewStreamRecvInfo) func(trace.ConnNewStreamDoneInfo) {
 			address := info.Endpoint.Address()
 			local := info.Endpoint.LocalDC()
@@ -292,7 +294,8 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 		}
 	}
 	if details&trace.DriverDiscoveryEvents != 0 {
-		log = log.WithName(`discovery`)
+		// nolint:govet
+		log := log.WithName(`discovery`)
 		t.OnDiscovery = func(info trace.DiscoveryStartInfo) func(trace.DiscoveryDoneInfo) {
 			log.Debugf(`discover start`)
 			start := time.Now()
@@ -312,7 +315,8 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 		}
 	}
 	if details&trace.DriverClusterEvents != 0 {
-		log = log.WithName(`cluster`)
+		// nolint:govet
+		log := log.WithName(`cluster`)
 		t.OnClusterGet = func(info trace.ClusterGetStartInfo) func(trace.ClusterGetDoneInfo) {
 			log.Tracef(`get start`)
 			start := time.Now()
@@ -402,7 +406,8 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 		}
 	}
 	if details&trace.DriverCredentialsEvents != 0 {
-		log = log.WithName(`credentials`)
+		// nolint:govet
+		log := log.WithName(`credentials`)
 		t.OnGetCredentials = func(info trace.GetCredentialsStartInfo) func(trace.GetCredentialsDoneInfo) {
 			log.Tracef(`get start`)
 			start := time.Now()

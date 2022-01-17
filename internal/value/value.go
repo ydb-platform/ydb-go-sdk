@@ -178,7 +178,7 @@ func (v Value) ToYDB() *Ydb.TypedValue {
 	// TODO: may be optimized -1 allocation: make all *Value() methods return
 	// *Value, put TypedValue, Value and Type on Value and then use pointer to
 	// already heap-allocated bytes.
-	// nolint: godox
+	// nolint:godox
 	return &Ydb.TypedValue{
 		Type:  v.t.toYDB(),
 		Value: v.v,

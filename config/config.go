@@ -131,7 +131,7 @@ func (c *config) ConnectionTTL() time.Duration {
 }
 
 func (c *config) GrpcDialOptions() (opts []grpc.DialOption) {
-	// nolint: gocritic
+	// nolint:gocritic
 	opts = append(
 		c.grpcOptions,
 		grpc.WithContextDialer(func(ctx context.Context, address string) (net.Conn, error) {

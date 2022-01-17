@@ -244,7 +244,7 @@ func (s *scanner) setColumnIndexes(columns []string) {
 //   string
 //   [16]byte
 //
-// nolint: gocyclo
+// nolint:gocyclo
 func (s *scanner) any() interface{} {
 	x := s.stack.current()
 	if s.Err() != nil || x.isEmpty() {
@@ -702,7 +702,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	}
 }
 
-// nolint: gocyclo
+// nolint:gocyclo
 func (s *scanner) scanOptional(value interface{}) {
 	if s.defaultValueForOptional {
 		if s.isNull() {

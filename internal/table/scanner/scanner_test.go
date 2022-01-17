@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
-// nolint: gocyclo
+// nolint:gocyclo
 func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 	rv := rand.Int64(math.MaxInt16)
 	switch c.typeID {
