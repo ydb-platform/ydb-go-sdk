@@ -96,7 +96,9 @@ func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats) UnaryResu
 
 func (r *result) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	r.reset(set)
-	r.setColumnIndexes(columnNames)
+	if set != nil {
+		r.setColumnIndexes(columnNames)
+	}
 }
 
 // NextResultSet selects next result set in the result.
