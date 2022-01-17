@@ -860,28 +860,26 @@ func TableOnSessionQueryExecute(t Table, c *context.Context, session sessionInfo
 		res(p)
 	}
 }
-func TableOnSessionQueryStreamExecute(t Table, c *context.Context, session sessionInfo, query dataQuery, parameters queryParameters) func(result streamResult, _ error) {
+func TableOnSessionQueryStreamExecute(t Table, c *context.Context, session sessionInfo, query dataQuery, parameters queryParameters) func(error) {
 	var p SessionQueryStreamExecuteStartInfo
 	p.Context = c
 	p.Session = session
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onSessionQueryStreamExecute(p)
-	return func(result streamResult, e error) {
+	return func(e error) {
 		var p SessionQueryStreamExecuteDoneInfo
-		p.Result = result
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnSessionQueryStreamRead(t Table, c *context.Context, session sessionInfo) func(result streamResult, _ error) {
+func TableOnSessionQueryStreamRead(t Table, c *context.Context, session sessionInfo) func(error) {
 	var p SessionQueryStreamReadStartInfo
 	p.Context = c
 	p.Session = session
 	res := t.onSessionQueryStreamRead(p)
-	return func(result streamResult, e error) {
+	return func(e error) {
 		var p SessionQueryStreamReadDoneInfo
-		p.Result = result
 		p.Error = e
 		res(p)
 	}

@@ -2,7 +2,6 @@ package table
 
 import (
 	"context"
-	"io"
 	"net/url"
 	"strconv"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -700,43 +700,34 @@ func (s *session) StreamReadTable(
 	onDone := trace.TableOnSessionQueryStreamRead(s.trace, &ctx, s)
 	if err != nil {
 		cancel()
-		onDone(nil, err)
+		onDone(err)
 		return nil, err
 	}
 
-	r := scanner.NewStream()
-	go func() {
-		var (
-			response *Ydb_Table.ReadTableResponse
-			err      error
-		)
-		defer func() {
-			cancel()
-			onDone(r, errors.HideEOF(err))
-			r.Close()
-		}()
-		for {
+	return scanner.NewStream(
+		func(ctx context.Context) (
+			set *Ydb.ResultSet,
+			stats *Ydb_TableStats.QueryStats,
+			err error,
+		) {
 			select {
 			case <-ctx.Done():
-				err = ctx.Err()
-				r.SetErr(err)
-				return
+				return nil, nil, ctx.Err()
 			default:
-				if response, err = stream.Recv(); err != nil {
-					if !errors.Is(err, io.EOF) {
-						r.SetErr(err)
-					}
-					return
+				response, err := stream.Recv()
+				result := response.GetResult()
+				if result == nil || err != nil {
+					return nil, nil, err
 				}
-				if result := response.GetResult(); result != nil {
-					if resultSet := result.GetResultSet(); resultSet != nil {
-						r.Append(resultSet)
-					}
-				}
+				return result.GetResultSet(), nil, nil
 			}
-		}
-	}()
-	return r, nil
+		},
+		func(err error) error {
+			cancel()
+			onDone(err)
+			return err
+		},
+	), nil
 }
 
 // StreamExecuteScanQuery scan-reads table at given path with given options.
@@ -771,47 +762,34 @@ func (s *session) StreamExecuteScanQuery(
 	onDone := trace.TableOnSessionQueryStreamExecute(s.trace, &ctx, s, q, params)
 	if err != nil {
 		cancel()
-		onDone(nil, err)
+		onDone(err)
 		return nil, err
 	}
 
-	r := scanner.NewStream()
-	go func() {
-		var (
-			response *Ydb_Table.ExecuteScanQueryPartialResponse
-			err      error
-		)
-		defer func() {
-			cancel()
-			onDone(r, errors.HideEOF(err))
-			r.Close()
-		}()
-		for {
+	return scanner.NewStream(
+		func(ctx context.Context) (
+			set *Ydb.ResultSet,
+			stats *Ydb_TableStats.QueryStats,
+			err error,
+		) {
 			select {
 			case <-ctx.Done():
-				err = ctx.Err()
-				r.SetErr(err)
-				return
+				return nil, nil, ctx.Err()
 			default:
-				if response, err = stream.Recv(); err != nil {
-					if !errors.Is(err, io.EOF) {
-						r.SetErr(err)
-						err = nil
-					}
-					return
+				response, err := stream.Recv()
+				result := response.GetResult()
+				if result == nil || err != nil {
+					return nil, nil, err
 				}
-				if result := response.GetResult(); result != nil {
-					if resultSet := result.GetResultSet(); resultSet != nil {
-						r.Append(resultSet)
-					}
-					if stats := result.GetQueryStats(); stats != nil {
-						r.UpdateStats(stats)
-					}
-				}
+				return result.GetResultSet(), result.GetQueryStats(), nil
 			}
-		}
-	}()
-	return r, nil
+		},
+		func(err error) error {
+			cancel()
+			onDone(err)
+			return err
+		},
+	), nil
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.

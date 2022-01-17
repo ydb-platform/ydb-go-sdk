@@ -335,12 +335,12 @@ func (c *conn) NewStream(
 
 	var s grpc.ClientStream
 	s, err = cc.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
-	c.release(ctx)
 	if err != nil {
 		err = errors.MapGRPCError(err)
 		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
 		}
+		c.release(ctx)
 		return nil, err
 	}
 
@@ -349,6 +349,7 @@ func (c *conn) NewStream(
 		s: s,
 		onDone: func(ctx context.Context) {
 			cancel()
+			c.release(ctx)
 		},
 		recv: streamRecv,
 	}, nil

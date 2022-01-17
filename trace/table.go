@@ -61,9 +61,6 @@ type (
 	resultErr interface {
 		Err() error
 	}
-	streamResult interface {
-		resultErr
-	}
 	result interface {
 		resultErr
 		ResultSetCount() int
@@ -139,8 +136,7 @@ type (
 		Session sessionInfo
 	}
 	SessionQueryStreamReadDoneInfo struct {
-		Result streamResult
-		Error  error
+		Error error
 	}
 	SessionQueryStreamExecuteStartInfo struct {
 		// Context make available context in trace callback function.
@@ -153,8 +149,7 @@ type (
 		Parameters queryParameters
 	}
 	SessionQueryStreamExecuteDoneInfo struct {
-		Result streamResult
-		Error  error
+		Error error
 	}
 	SessionTransactionBeginStartInfo struct {
 		// Context make available context in trace callback function.

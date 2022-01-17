@@ -2,15 +2,15 @@ package scheme
 
 import (
 	"context"
-	"io"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scripting_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -107,43 +107,29 @@ func (c *client) StreamExecute(
 		return nil, err
 	}
 
-	r := scanner.NewStream()
-	go func() {
-		var (
-			response *Ydb_Scripting.ExecuteYqlPartialResponse
-			err      error
-		)
-		defer func() {
-			cancel()
-			r.Close()
-		}()
-		for {
+	return scanner.NewStream(
+		func(ctx context.Context) (
+			set *Ydb.ResultSet,
+			stats *Ydb_TableStats.QueryStats,
+			err error,
+		) {
 			select {
 			case <-ctx.Done():
-				err = ctx.Err()
-				r.SetErr(err)
-				return
+				return nil, nil, ctx.Err()
 			default:
-				if response, err = stream.Recv(); err != nil {
-					if !errors.Is(err, io.EOF) {
-						r.SetErr(err)
-						// nolint:ineffassign
-						err = nil
-					}
-					return
+				response, err := stream.Recv()
+				result := response.GetResult()
+				if result == nil || err != nil {
+					return nil, nil, err
 				}
-				if result := response.GetResult(); result != nil {
-					if resultSet := result.GetResultSet(); resultSet != nil {
-						r.Append(resultSet)
-					}
-					if stats := result.GetQueryStats(); stats != nil {
-						r.UpdateStats(stats)
-					}
-				}
+				return result.GetResultSet(), result.GetQueryStats(), nil
 			}
-		}
-	}()
-	return r, nil
+		},
+		func(err error) error {
+			cancel()
+			return err
+		},
+	), nil
 }
 
 func (c *client) Close(context.Context) error {
