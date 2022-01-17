@@ -91,7 +91,7 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 	s.Unlock()
 }
 
-// nolint: gocyclo
+// nolint:gocyclo
 func TestTable(t *testing.T) {
 	folder := "pool_health"
 

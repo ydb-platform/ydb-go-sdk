@@ -157,7 +157,7 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) T {
 
 // ListType wraps proto message List
 // TODO prepare toYDB() calls in constructors as an optimization.
-// nolint: godox
+// nolint:godox
 type ListType struct {
 	T T
 }
