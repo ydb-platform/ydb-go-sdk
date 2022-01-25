@@ -1,5 +1,6 @@
 ## 3.8.0
 * Added `table.result.Result.ScanNamed()` scan function
+* Changed connection secure to true by default
 
 ## 3.7.2
 * Retry remove directory in `sugar.RemoveRecursive()` for retryable error

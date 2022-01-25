@@ -415,6 +415,116 @@ func TestTable(t *testing.T) {
 			t.Fatalf("tx failed: %v\n", err)
 		}
 	})
+	t.Run("multiple result sets", func(t *testing.T) {
+		t.Run("create table", func(t *testing.T) {
+			if err := db.Table().Do(
+				ctx,
+				func(ctx context.Context, s table.Session) (err error) {
+					return s.ExecuteSchemeQuery(
+						ctx,
+						`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
+					)
+				},
+			); err != nil {
+				t.Fatalf("create table failed: %v\n", err)
+			}
+		})
+		var (
+			upsertRowsCount = 20000
+			sum             uint64
+		)
+		t.Run("upsert data", func(t *testing.T) {
+			values := make([]types.Value, 0, upsertRowsCount)
+			for i := 0; i < upsertRowsCount; i++ {
+				sum += uint64(i)
+				values = append(
+					values,
+					types.StructValue(
+						types.StructFieldValue("val", types.Int32Value(int32(i))),
+					),
+				)
+			}
+			if err := db.Table().Do(
+				ctx,
+				func(ctx context.Context, s table.Session) (err error) {
+					_, _, err = s.Execute(
+						ctx,
+						table.TxControl(
+							table.BeginTx(
+								table.WithSerializableReadWrite(),
+							),
+							table.CommitTx(),
+						),
+						`
+						DECLARE $values AS List<Struct<
+							val: Int32,
+						> >;
+						UPSERT INTO stream_query
+						SELECT
+							val 
+						FROM
+							AS_TABLE($values);            
+						`,
+						table.NewQueryParameters(
+							table.ValueParam(
+								"$values",
+								types.ListValue(values...),
+							),
+						),
+					)
+					return err
+				},
+			); err != nil {
+				t.Fatalf("upsert failed: %v\n", err)
+			}
+		})
+		t.Run("scan select", func(t *testing.T) {
+			if err := db.Table().Do(
+				ctx,
+				func(ctx context.Context, s table.Session) (err error) {
+					res, err := s.StreamExecuteScanQuery(
+						ctx,
+						`
+							SELECT val FROM stream_query;
+						`,
+						table.NewQueryParameters(),
+					)
+					if err != nil {
+						return err
+					}
+					var (
+						resultSetsCount = 0
+						rowsCount       = 0
+						checkSum        uint64
+					)
+					for res.NextResultSet(ctx, "val") {
+						resultSetsCount++
+						for res.NextRow() {
+							rowsCount++
+							var val *int32
+							err = res.Scan(&val)
+							if err != nil {
+								return err
+							}
+							checkSum += uint64(*val)
+						}
+					}
+					if rowsCount != upsertRowsCount {
+						return fmt.Errorf("wrong rows count: %v", rowsCount)
+					}
+					if sum != checkSum {
+						return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
+					}
+					if resultSetsCount <= 1 {
+						return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
+					}
+					return nil
+				},
+			); err != nil {
+				t.Fatalf("scan select failed: %v\n", err)
+			}
+		})
+	})
 	t.Run("select concurrently", func(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < limit; i++ {
