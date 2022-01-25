@@ -36,11 +36,20 @@ type result interface {
 	// Note that it does not work with sets from stream.
 	HasNextResultSet() bool
 
-	// NextResultSet selects next result set in the result.
+	// NextResultSetBool selects next result set in the result.
 	// columns - names of columns in the resultSet that will be scanned
 	// It returns false if there are no more result sets.
 	// Stream sets are supported.
-	NextResultSet(ctx context.Context, columns ...string) bool
+	// After iterate over result sets should be checked Err()
+	// Deprecated: use NextResultSet instead because false result of NextResultSetBool may be
+	// also on error happens on stream requests
+	NextResultSetBool(ctx context.Context, columns ...string) bool
+
+	// NextResultSet selects next result set in the result.
+	// columns - names of columns in the resultSet that will be scanned
+	// It returns io.EOF if there are no more result sets.
+	// Stream sets are supported.
+	NextResultSet(ctx context.Context, columns ...string) error
 
 	// CurrentResultSet get current result set to use ColumnCount(), RowCount() and other methods
 	CurrentResultSet() Set

@@ -1,5 +1,7 @@
 ## 3.8.0
 * Added `table.result.Result.ScanNamed()` scan function
+* Changed signature of `table.{Result,StreamResult}` - replace type of result of `NextResultSet` from `bool` to `error`
+* Added `table.{Result,StreamResult}.NextResultSetBool()` method for use with `bool` result
 
 ## 3.7.2
 * Retry remove directory in `sugar.RemoveRecursive()` for retryable error

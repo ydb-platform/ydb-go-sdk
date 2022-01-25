@@ -1,6 +1,7 @@
 package trace
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -171,10 +172,21 @@ func TestDetailsFromString(t *testing.T) {
 }
 
 func TestDetailsToStringToDetails(t *testing.T) {
-	for i := 0; i < int(maskDetails); i++ {
-		d := Details(i)
+	for i, d := range []Details{
+		DriverConnEvents,
+		TableSessionQueryEvents,
+		TableSessionEvents,
+		TablePoolEvents,
+		DriverSystemEvents | DriverConnEvents,
+		DriverSystemEvents | TableSessionQueryEvents,
+		DriverSystemEvents | TableSessionEvents,
+		DriverSystemEvents | TablePoolEvents,
+		TableSessionQueryEvents | DriverConnEvents,
+		TableSessionQueryEvents | TableSessionEvents,
+		TableSessionQueryEvents | TablePoolEvents,
+	} {
 		s := d.String()
-		t.Run(s, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d. %s", i, s), func(t *testing.T) {
 			dd := DetailsFromString(s)
 			if dd != d {
 				t.Fatalf("unexpected serialize-deserialize, act %d, exp %d, intermediate string %s", dd, d, s)

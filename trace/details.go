@@ -76,20 +76,6 @@ var (
 		"TablePoolEvents":                 TablePoolEvents,
 		"DetailsAll":                      DetailsAll,
 	}
-	maskDetails = DriverSystemEvents |
-		DriverClusterEvents |
-		DriverNetEvents |
-		DriverCoreEvents |
-		DriverCredentialsEvents |
-		DriverDiscoveryEvents |
-		TableSessionLifeCycleEvents |
-		TableSessionQueryInvokeEvents |
-		TableSessionQueryStreamEvents |
-		TableSessionTransactionEvents |
-		TablePoolLifeCycleEvents |
-		TablePoolRetryEvents |
-		TablePoolSessionLifeCycleEvents |
-		TablePoolAPIEvents
 )
 
 func DetailsFromString(s string) (d Details) {

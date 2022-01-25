@@ -2,7 +2,9 @@ package scanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"testing"
 
@@ -48,11 +50,14 @@ func TestResultAny(t *testing.T) {
 				},
 				nil,
 			)
-			var i int
-			var act interface{}
-			for res.NextResultSet(context.Background()) {
+			var (
+				i   int
+				act interface{}
+				err error
+			)
+			for ; err == nil; err = res.NextResultSet(context.Background()) {
 				for res.NextRow() {
-					err := res.ScanWithDefaults(&act)
+					err = res.ScanWithDefaults(&act)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -65,7 +70,7 @@ func TestResultAny(t *testing.T) {
 					i++
 				}
 			}
-			if err := res.Err(); err != nil {
+			if !errors.Is(err, io.EOF) {
 				t.Fatal(err)
 			}
 		})
@@ -112,9 +117,12 @@ func TestResultOUint32(t *testing.T) {
 				},
 				nil,
 			)
-			var i int
-			var act uint32
-			for res.NextResultSet(context.Background()) {
+			var (
+				i   int
+				act interface{}
+				err error
+			)
+			for ; err == nil; err = res.NextResultSet(context.Background()) {
 				for res.NextRow() {
 					_ = res.ScanWithDefaults(&act)
 					if exp := test.exp[i]; !reflect.DeepEqual(act, exp) {
@@ -126,7 +134,7 @@ func TestResultOUint32(t *testing.T) {
 					i++
 				}
 			}
-			if err := res.Err(); err != nil {
+			if !errors.Is(err, io.EOF) {
 				t.Fatal(err)
 			}
 		})

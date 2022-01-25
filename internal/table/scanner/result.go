@@ -101,39 +101,39 @@ func (r *result) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	}
 }
 
-// NextResultSet selects next result set in the result.
-// columns - names of columns in the resultSet that will be scanned
-// It returns false if there are no more result sets.
-// Stream sets are supported.
-func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
+func (r *unaryResult) NextResultSetBool(ctx context.Context, columns ...string) bool {
+	return r.NextResultSet(ctx, columns...) == nil
+}
+
+func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) error {
 	if !r.HasNextResultSet() {
-		return false
+		return io.EOF
 	}
 	r.Reset(r.sets[r.nextSet], columns...)
 	r.nextSet++
-	return true
+	return nil
 }
 
-// NextResultSet selects next result set in the result.
-// columns - names of columns in the resultSet that will be scanned
-// It returns false if there are no more result sets.
-// Stream sets are supported.
-func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
+func (r *streamResult) NextResultSetBool(ctx context.Context, columns ...string) bool {
+	return r.NextResultSet(ctx, columns...) == nil
+}
+
+func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) error {
 	if r.inactive() {
-		return false
+		return r.Err()
 	}
 	s, stats, err := r.recv(ctx)
 	if errors.Is(err, io.EOF) {
-		return false
+		return io.EOF
 	}
 	if err != nil {
 		r.errMtx.Lock()
 		if r.err == nil {
-			r.err = ctx.Err()
+			r.err = err
 		}
 		r.errMtx.Unlock()
 		r.Reset(nil)
-		return false
+		return err
 	}
 	r.Reset(s, columns...)
 	if stats != nil {
@@ -141,7 +141,7 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 		r.stats = stats
 		r.statsMtx.Unlock()
 	}
-	return true
+	return nil
 }
 
 // CurrentResultSet get current result set

@@ -5,7 +5,9 @@ package test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -70,7 +72,7 @@ func TestScripting(t *testing.T) {
 			defer func() {
 				_ = res.Close()
 			}()
-			if !res.NextResultSet(ctx) {
+			if err = res.NextResultSet(ctx); errors.Is(err, io.EOF) {
 				return retry.RetryableError(
 					fmt.Errorf("no result sets"),
 					retry.WithBackoff(retry.BackoffTypeNoBackoff),
@@ -107,7 +109,7 @@ func TestScripting(t *testing.T) {
 			defer func() {
 				_ = res.Close()
 			}()
-			if !res.NextResultSet(ctx) {
+			if err = res.NextResultSet(ctx); errors.Is(err, io.EOF) {
 				return retry.RetryableError(
 					fmt.Errorf("no result sets"),
 					retry.WithBackoff(retry.BackoffTypeNoBackoff),

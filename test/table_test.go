@@ -6,7 +6,9 @@ package test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -303,7 +305,7 @@ func TestTable(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if !res.NextResultSet(ctx) {
+				if err = res.NextResultSet(ctx); errors.Is(err, io.EOF) {
 					return fmt.Errorf("nothing result sets")
 				}
 				if !res.NextRow() {
@@ -391,7 +393,7 @@ func TestTable(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if !res.NextResultSet(ctx, "views") {
+				if err = res.NextResultSet(ctx, "views"); errors.Is(err, io.EOF) {
 					return fmt.Errorf("nothing result sets")
 				}
 				if !res.NextRow() {
@@ -492,7 +494,7 @@ func selectReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 				_ = res.Close()
 			}()
 			log.Printf("> read_table:\n")
-			for res.NextResultSet(ctx, "series_id", "title", "release_date") {
+			for ; err == nil; err = res.NextResultSet(ctx, "series_id", "title", "release_date") {
 				for res.NextRow() {
 					err = res.Scan(&id, &title, &date)
 					if err != nil {
@@ -584,7 +586,7 @@ func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, f
 				_ = res.Close()
 			}()
 			log.Printf("> select_simple_transaction:\n")
-			for res.NextResultSet(ctx) {
+			for ; err == nil; err = res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanNamed(
 						named.Optional("series_id", &id),
@@ -650,7 +652,7 @@ func selectExecuteScanQuery(ctx context.Context, t *testing.T, c table.Client, f
 				_ = res.Close()
 			}()
 			log.Printf("> scan_query_select:\n")
-			for res.NextResultSet(ctx) {
+			for ; err == nil; err = res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
 					if err != nil {
