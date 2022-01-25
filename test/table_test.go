@@ -431,10 +431,14 @@ func TestTable(t *testing.T) {
 				t.Fatalf("create table failed: %v\n", err)
 			}
 		})
-		upsertRowsCount := 20000
+		var (
+			upsertRowsCount = 20000
+			sum             uint64
+		)
 		t.Run("upsert data", func(t *testing.T) {
 			values := make([]types.Value, 0, upsertRowsCount)
 			for i := 0; i < upsertRowsCount; i++ {
+				sum += uint64(i)
 				values = append(
 					values,
 					types.StructValue(
@@ -490,9 +494,12 @@ func TestTable(t *testing.T) {
 					if err != nil {
 						return err
 					}
-					resultSetsCount := 0
-					rowsCount := 0
-					for ; err == nil; err = res.NextResultSet(ctx, "val") {
+					var (
+						resultSetsCount = 0
+						rowsCount       = 0
+						checkSum        uint64
+					)
+					for err = res.NextResultSet(ctx, "val"); err == nil; err = res.NextResultSet(ctx, "val") {
 						resultSetsCount++
 						for res.NextRow() {
 							rowsCount++
@@ -501,6 +508,7 @@ func TestTable(t *testing.T) {
 							if err != nil {
 								return err
 							}
+							checkSum += uint64(*val)
 						}
 					}
 					if !errors.Is(err, io.EOF) {
@@ -508,6 +516,9 @@ func TestTable(t *testing.T) {
 					}
 					if rowsCount != upsertRowsCount {
 						return fmt.Errorf("wrong rows count: %v", rowsCount)
+					}
+					if sum != checkSum {
+						return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
 					}
 					if resultSetsCount <= 1 {
 						return fmt.Errorf("wrong result sets count: %v", resultSetsCount)

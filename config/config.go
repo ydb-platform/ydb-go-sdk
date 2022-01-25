@@ -360,6 +360,7 @@ func defaultConfig() (c *config) {
 	return &config{
 		discoveryInterval: DefaultDiscoveryInterval,
 		balancer:          balancer.Default(),
+		secure:            true,
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			RootCAs:    certPool(),
