@@ -6,6 +6,40 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
+type NamedValue struct {
+	// Name is a name of column
+	// Name must be not empty
+	Name string
+
+	// Value is a destination to apply value from row
+	Value interface{}
+
+	// UnwrapOptional is a flag for auto unwrapping optional value from row
+	// If UnwrapOptional is true and value is nil - applied default type value
+	UnwrapOptional bool
+}
+
+func Named(key string, value interface{}) *NamedValue {
+	if key == "" {
+		panic("key must be not empty")
+	}
+	return &NamedValue{
+		Name:  key,
+		Value: value,
+	}
+}
+
+func NamedOptional(key string, value interface{}) *NamedValue {
+	if key == "" {
+		panic("key must be not empty")
+	}
+	return &NamedValue{
+		Name:           key,
+		Value:          value,
+		UnwrapOptional: true,
+	}
+}
+
 // Result is a result of a query.
 //
 // Use NextResultSet(), NextRow() and Scan() to advance through the result sets,
@@ -90,6 +124,9 @@ type result interface {
 	// See examples for more detailed information.
 	// Output param - Scanner error
 	Scan(values ...interface{}) error
+
+	// ScanNamed scans row with column names defined in namedValues
+	ScanNamed(namedValues ...*NamedValue) error
 
 	// Stats returns query execution QueryStats.
 	Stats() (s stats.QueryStats)

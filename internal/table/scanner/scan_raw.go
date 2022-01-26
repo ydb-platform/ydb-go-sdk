@@ -8,11 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 

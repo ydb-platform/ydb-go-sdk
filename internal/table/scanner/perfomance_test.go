@@ -2,6 +2,8 @@ package scanner
 
 import (
 	"testing"
+
+	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 )
 
 var testSize = 10000
@@ -31,10 +33,27 @@ func BenchmarkTestScan(b *testing.B) {
 	}
 }
 
+func BenchmarkTestScanNamed(b *testing.B) {
+	b.ReportAllocs()
+	res := PrepareScannerPerformanceTest(b.N)
+	row := series{}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for res.NextRow() {
+			_ = res.ScanNamed(
+				public.Named("series_id", &row.id),
+				public.Named("title", &row.title),
+				public.Named("release_date", &row.date),
+			)
+		}
+	}
+}
+
 func TestOverallApproaches(t *testing.T) {
 	for k, f := range map[string]func(b *testing.B){
-		"BenchmarkTestScanWithColumns": BenchmarkTestScanWithColumns,
 		"BenchmarkTestScan":            BenchmarkTestScan,
+		"BenchmarkTestScanNamed":       BenchmarkTestScanNamed,
+		"BenchmarkTestScanWithColumns": BenchmarkTestScanWithColumns,
 	} {
 		r := testing.Benchmark(f)
 		t.Log(k, r.String(), r.MemString())

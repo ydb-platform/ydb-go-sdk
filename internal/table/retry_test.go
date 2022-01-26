@@ -7,13 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
