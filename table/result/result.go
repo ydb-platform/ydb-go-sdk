@@ -14,9 +14,9 @@ type NamedValue struct {
 	// Value is a destination to apply value from row
 	Value interface{}
 
-	// UnwrapOptional is a flag for auto unwrapping optional value from row
-	// If UnwrapOptional is true and value is nil - applied default type value
-	UnwrapOptional bool
+	// Optional is a flag for auto unwrapping optional value from row
+	// If Optional is true and value is nil - applied default type value
+	Optional bool
 }
 
 func Named(key string, value interface{}) *NamedValue {
@@ -24,8 +24,9 @@ func Named(key string, value interface{}) *NamedValue {
 		panic("key must be not empty")
 	}
 	return &NamedValue{
-		Name:  key,
-		Value: value,
+		Name:     key,
+		Value:    value,
+		Optional: false,
 	}
 }
 
@@ -34,9 +35,20 @@ func NamedOptional(key string, value interface{}) *NamedValue {
 		panic("key must be not empty")
 	}
 	return &NamedValue{
-		Name:           key,
-		Value:          value,
-		UnwrapOptional: true,
+		Name:     key,
+		Value:    value,
+		Optional: true,
+	}
+}
+
+func NamedDefault(key string, value interface{}) *NamedValue {
+	if key == "" {
+		panic("key must be not empty")
+	}
+	return &NamedValue{
+		Name:     key,
+		Value:    value,
+		Optional: true,
 	}
 }
 

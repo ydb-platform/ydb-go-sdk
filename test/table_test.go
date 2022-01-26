@@ -583,7 +583,7 @@ func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, f
 			log.Printf("> select_simple_transaction:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
-					err = res.Scan(
+					err = res.ScanNamed(
 						result.Named("series_id", &id),
 						result.Named("title", &title),
 						result.Named("release_date", &date),

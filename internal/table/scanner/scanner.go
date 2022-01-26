@@ -118,7 +118,7 @@ func (s *scanner) ScanNamed(namedValues ...*public.NamedValue) (err error) {
 			return
 		}
 		if s.isCurrentTypeOptional() {
-			s.scanOptional(v.Value, v.UnwrapOptional)
+			s.scanOptional(v.Value, v.Optional)
 		} else {
 			s.scanRequired(v.Value)
 		}
