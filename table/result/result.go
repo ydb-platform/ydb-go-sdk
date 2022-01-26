@@ -6,6 +6,40 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
+type NamedValue struct {
+	Name       string
+	Value      interface{}
+	UseDefault bool
+}
+
+// Named returns namedValue with key as column name and value as destination
+// If column in results row is non-optional - value must be single-pointed data destination
+// If column in results row is optional - value must be double-pointed data destination
+func Named(key string, value interface{}) NamedValue {
+	if key == "" {
+		panic("key must be not empty")
+	}
+	return NamedValue{
+		Name:       key,
+		Value:      value,
+		UseDefault: false,
+	}
+}
+
+// NamedWithDefault returns namedValue with key as column name and value as destination
+// value must be single-pointed data destination.
+// If column in results row is optional and NULL - applied default type value
+func NamedWithDefault(key string, value interface{}) NamedValue {
+	if key == "" {
+		panic("key must be not empty")
+	}
+	return NamedValue{
+		Name:       key,
+		Value:      value,
+		UseDefault: true,
+	}
+}
+
 // Result is a result of a query.
 //
 // Use NextResultSet(), NextRow() and Scan() to advance through the result sets,
@@ -90,6 +124,9 @@ type result interface {
 	// See examples for more detailed information.
 	// Output param - Scanner error
 	Scan(values ...interface{}) error
+
+	// ScanNamed scans row with column names defined in namedValues
+	ScanNamed(namedValues ...NamedValue) error
 
 	// Stats returns query execution QueryStats.
 	Stats() (s stats.QueryStats)

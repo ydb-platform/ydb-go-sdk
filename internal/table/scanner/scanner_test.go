@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
@@ -497,6 +498,60 @@ func TestScanSqlTypes(t *testing.T) {
 					}
 				} else {
 					if err := s.Scan(test.values...); err != nil {
+						t.Fatalf("test: %s; error: %s", test.name, err)
+					}
+				}
+				if test.setColumnIndexes != nil {
+					for i, v := range test.setColumnIndexes {
+						testutil.Equal(t, expected[0][v], test.values[i])
+					}
+				} else {
+					testutil.Equal(t, expected[0], test.values)
+				}
+				expected = expected[1:]
+			}
+		})
+	}
+}
+
+func TestScanNamed(t *testing.T) {
+	s := initScanner()
+	or := func(columns []string, i int, defaultValue string) string {
+		if columns == nil {
+			return defaultValue
+		}
+		return columns[i]
+	}
+	for _, test := range scannerData {
+		t.Run(test.name, func(t *testing.T) {
+			set, expected := getResultSet(test.count, test.columns)
+			s.reset(set)
+			for s.NextRow() {
+				values := make([]public.NamedValue, 0, len(test.values))
+				if test.columns[0].testDefault {
+					for i := range test.values {
+						values = append(
+							values,
+							public.NamedWithDefault(
+								or(test.setColumns, i, test.columns[i].name),
+								test.values[i],
+							),
+						)
+					}
+					if err := s.ScanNamed(values...); err != nil {
+						t.Fatalf("test: %s; error: %s", test.name, err)
+					}
+				} else {
+					for i := range test.values {
+						values = append(
+							values,
+							public.Named(
+								or(test.setColumns, i, test.columns[i].name),
+								test.values[i],
+							),
+						)
+					}
+					if err := s.ScanNamed(values...); err != nil {
 						t.Fatalf("test: %s; error: %s", test.name, err)
 					}
 				}

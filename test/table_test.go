@@ -171,7 +171,7 @@ func TestTable(t *testing.T) {
 				ydb.WithNamespace("ydb"),
 				ydb.WithOutWriter(os.Stdout),
 				ydb.WithErrWriter(os.Stderr),
-				ydb.WithMinLevel(ydb.TRACE),
+				ydb.WithMinLevel(ydb.INFO),
 			),
 			ydb.WithTraceTable(trace.Table{
 				OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
@@ -302,13 +302,15 @@ func TestTable(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if !res.NextResultSet(ctx, "views") {
+				if !res.NextResultSet(ctx) {
 					return fmt.Errorf("nothing result sets")
 				}
 				if !res.NextRow() {
 					return fmt.Errorf("nothing result rows")
 				}
-				if err = res.ScanWithDefaults(&views); err != nil {
+				if err = res.ScanNamed(
+					result.NamedWithDefault("views", &views),
+				); err != nil {
 					return err
 				}
 				if err = res.Err(); err != nil {
@@ -581,9 +583,13 @@ func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, f
 				_ = res.Close()
 			}()
 			log.Printf("> select_simple_transaction:\n")
-			for res.NextResultSet(ctx, "series_id", "title", "release_date") {
+			for res.NextResultSet(ctx) {
 				for res.NextRow() {
-					err = res.Scan(&id, &title, &date)
+					err = res.ScanNamed(
+						result.Named("series_id", &id),
+						result.Named("title", &title),
+						result.Named("release_date", &date),
+					)
 					if err != nil {
 						return err
 					}

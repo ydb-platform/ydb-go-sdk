@@ -10,13 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -93,44 +92,49 @@ func (s *scanner) NextRow() bool {
 	return true
 }
 
-// ScanWithDefaults scan with default types values.
-// Nil values applied as default value types
-// Input params - pointers to types.
 func (s *scanner) ScanWithDefaults(values ...interface{}) error {
+	for _, v := range values {
+		if _, ok := v.(public.NamedValue); ok {
+			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
+		}
+	}
 	s.defaultValueForOptional = true
 	return s.scan(values)
 }
 
-// Scan values.
-// Input params - pointers to types:
-//   bool
-//   int8
-//   uint8
-//   int16
-//   uint16
-//   int32
-//   uint32
-//   int64
-//   uint64
-//   float32
-//   float64
-//   []byte
-//   [16]byte
-//   string
-//   time.Time
-//   time.Duration
-//   ydb.Value
-// For custom types implement sql.Scanner interface.
-// For optional types use double pointer construction.
-// For unknown types use interface types.
-// Supported scanning byte arrays of various length.
-// For complex yql types: Dict, List, Tuple and own specific scanning logic implement
-// ydb.Scanner with UnmarshalYDB method
-// See examples for more detailed information.
-// Output param - Scanner error
 func (s *scanner) Scan(values ...interface{}) error {
+	for _, v := range values {
+		if _, ok := v.(public.NamedValue); ok {
+			panic("dont use NamedValue with Scan. Use ScanNamed instead")
+		}
+	}
 	s.defaultValueForOptional = false
 	return s.scan(values)
+}
+
+func (s *scanner) ScanNamed(namedValues ...public.NamedValue) (err error) {
+	if err = s.Err(); err != nil {
+		return
+	}
+	if s.ColumnCount() < len(namedValues) {
+		s.errorf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), len(namedValues))
+	}
+	if s.nextItem != 0 {
+		panic("scan row failed: double scan per row")
+	}
+	for _, v := range namedValues {
+		s.seekItemByName(v.Name)
+		if err = s.Err(); err != nil {
+			return
+		}
+		if s.isCurrentTypeOptional() {
+			s.scanOptional(v.Value, v.UseDefault)
+		} else {
+			s.scanRequired(v.Value)
+		}
+	}
+	s.nextItem += len(namedValues)
+	return s.Err()
 }
 
 // Truncated returns true if current result set has been truncated by server
@@ -202,6 +206,22 @@ func (s *scanner) seekItemByID(id int) {
 	s.stack.scanItem.name = col.Name
 	s.stack.scanItem.t = col.Type
 	s.stack.scanItem.v = s.row.Items[id]
+}
+
+func (s *scanner) seekItemByName(name string) {
+	if !s.hasItems() {
+		s.noValueError()
+		return
+	}
+	for i, c := range s.set.Columns {
+		if name == c.Name {
+			s.stack.scanItem.name = c.Name
+			s.stack.scanItem.t = c.Type
+			s.stack.scanItem.v = s.row.Items[i]
+			return
+		}
+	}
+	s.noValueError()
 }
 
 func (s *scanner) setColumnIndexes(columns []string) {
@@ -697,14 +717,14 @@ func (s *scanner) scanRequired(value interface{}) {
 	default:
 		ok := s.trySetByteArray(v, false, false)
 		if !ok {
-			s.errorf("scan row failed: types %T is unknown", v)
+			s.errorf("scan row failed: type %T is unknown", v)
 		}
 	}
 }
 
 // nolint:gocyclo
-func (s *scanner) scanOptional(value interface{}) {
-	if s.defaultValueForOptional {
+func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) {
+	if defaultValueForOptional {
 		if s.isNull() {
 			s.setDefaultValue(value)
 		} else {
@@ -878,9 +898,9 @@ func (s *scanner) scanOptional(value interface{}) {
 		if !ok {
 			rv := reflect.TypeOf(v)
 			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Ptr {
-				s.errorf("scan row failed: types %T is unknown", v)
+				s.errorf("scan row failed: type %T is unknown", v)
 			} else {
-				s.errorf("scan row failed: types %T is not optional! use double pointer or sql.Scanner.", v)
+				s.errorf("scan row failed: type %T is not optional! use double pointer or sql.Scanner.", v)
 			}
 		}
 	}
@@ -939,7 +959,7 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 	default:
 		ok := s.trySetByteArray(v, false, true)
 		if !ok {
-			s.errorf("scan row failed: types %T is unknown", v)
+			s.errorf("scan row failed: type %T is unknown", v)
 		}
 	}
 }
@@ -969,7 +989,7 @@ func (s *scanner) scan(values []interface{}) (err error) {
 			return
 		}
 		if s.isCurrentTypeOptional() {
-			s.scanOptional(values[i])
+			s.scanOptional(values[i], s.defaultValueForOptional)
 		} else {
 			s.scanRequired(values[i])
 		}
