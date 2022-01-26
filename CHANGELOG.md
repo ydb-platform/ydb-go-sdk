@@ -1,3 +1,6 @@
+## 3.8.0
+* Added `table.result.Result.ScanNamed()` scan function
+
 ## 3.7.2
 * Retry remove directory in `sugar.RemoveRecursive()` for retryable error
 
