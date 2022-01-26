@@ -171,7 +171,7 @@ func TestTable(t *testing.T) {
 				ydb.WithNamespace("ydb"),
 				ydb.WithOutWriter(os.Stdout),
 				ydb.WithErrWriter(os.Stderr),
-				ydb.WithMinLevel(ydb.TRACE),
+				ydb.WithMinLevel(ydb.INFO),
 			),
 			ydb.WithTraceTable(trace.Table{
 				OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
