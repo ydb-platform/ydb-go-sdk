@@ -93,16 +93,26 @@ func (s *scanner) NextRow() bool {
 }
 
 func (s *scanner) ScanWithDefaults(values ...interface{}) error {
+	for _, v := range values {
+		if _, ok := v.(public.NamedValue); ok {
+			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
+		}
+	}
 	s.defaultValueForOptional = true
 	return s.scan(values)
 }
 
 func (s *scanner) Scan(values ...interface{}) error {
+	for _, v := range values {
+		if _, ok := v.(public.NamedValue); ok {
+			panic("dont use NamedValue with Scan. Use ScanNamed instead")
+		}
+	}
 	s.defaultValueForOptional = false
 	return s.scan(values)
 }
 
-func (s *scanner) ScanNamed(namedValues ...*public.NamedValue) (err error) {
+func (s *scanner) ScanNamed(namedValues ...public.NamedValue) (err error) {
 	if err = s.Err(); err != nil {
 		return
 	}
@@ -118,7 +128,7 @@ func (s *scanner) ScanNamed(namedValues ...*public.NamedValue) (err error) {
 			return
 		}
 		if s.isCurrentTypeOptional() {
-			s.scanOptional(v.Value, v.Optional)
+			s.scanOptional(v.Value, v.UseDefault)
 		} else {
 			s.scanRequired(v.Value)
 		}
@@ -707,7 +717,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	default:
 		ok := s.trySetByteArray(v, false, false)
 		if !ok {
-			s.errorf("scan row failed: types %T is unknown", v)
+			s.errorf("scan row failed: type %T is unknown", v)
 		}
 	}
 }
@@ -888,9 +898,9 @@ func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) 
 		if !ok {
 			rv := reflect.TypeOf(v)
 			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Ptr {
-				s.errorf("scan row failed: types %T is unknown", v)
+				s.errorf("scan row failed: type %T is unknown", v)
 			} else {
-				s.errorf("scan row failed: types %T is not optional! use double pointer or sql.Scanner.", v)
+				s.errorf("scan row failed: type %T is not optional! use double pointer or sql.Scanner.", v)
 			}
 		}
 	}
@@ -949,7 +959,7 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 	default:
 		ok := s.trySetByteArray(v, false, true)
 		if !ok {
-			s.errorf("scan row failed: types %T is unknown", v)
+			s.errorf("scan row failed: type %T is unknown", v)
 		}
 	}
 }

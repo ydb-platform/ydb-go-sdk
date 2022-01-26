@@ -527,12 +527,12 @@ func TestScanNamed(t *testing.T) {
 			set, expected := getResultSet(test.count, test.columns)
 			s.reset(set)
 			for s.NextRow() {
-				values := make([]*public.NamedValue, 0, len(test.values))
+				values := make([]public.NamedValue, 0, len(test.values))
 				if test.columns[0].testDefault {
 					for i := range test.values {
 						values = append(
 							values,
-							public.NamedOptional(
+							public.NamedWithDefault(
 								or(test.setColumns, i, test.columns[i].name),
 								test.values[i],
 							),

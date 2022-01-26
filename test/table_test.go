@@ -302,13 +302,15 @@ func TestTable(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if !res.NextResultSet(ctx, "views") {
+				if !res.NextResultSet(ctx) {
 					return fmt.Errorf("nothing result sets")
 				}
 				if !res.NextRow() {
 					return fmt.Errorf("nothing result rows")
 				}
-				if err = res.ScanWithDefaults(&views); err != nil {
+				if err = res.ScanNamed(
+					result.NamedWithDefault("views", &views),
+				); err != nil {
 					return err
 				}
 				if err = res.Err(); err != nil {

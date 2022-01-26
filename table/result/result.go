@@ -7,48 +7,36 @@ import (
 )
 
 type NamedValue struct {
-	// Name is a name of column
-	// Name must be not empty
-	Name string
-
-	// Value is a destination to apply value from row
-	Value interface{}
-
-	// Optional is a flag for auto unwrapping optional value from row
-	// If Optional is true and value is nil - applied default type value
-	Optional bool
+	Name       string
+	Value      interface{}
+	UseDefault bool
 }
 
-func Named(key string, value interface{}) *NamedValue {
+// Named returns namedValue with key as column name and value as destination
+// If column in results row is non-optional - value must be single-pointed data destination
+// If column in results row is optional - value must be double-pointed data destination
+func Named(key string, value interface{}) NamedValue {
 	if key == "" {
 		panic("key must be not empty")
 	}
-	return &NamedValue{
-		Name:     key,
-		Value:    value,
-		Optional: false,
+	return NamedValue{
+		Name:       key,
+		Value:      value,
+		UseDefault: false,
 	}
 }
 
-func NamedOptional(key string, value interface{}) *NamedValue {
+// NamedWithDefault returns namedValue with key as column name and value as destination
+// value must be single-pointed data destination.
+// If column in results row is optional and NULL - applied default type value
+func NamedWithDefault(key string, value interface{}) NamedValue {
 	if key == "" {
 		panic("key must be not empty")
 	}
-	return &NamedValue{
-		Name:     key,
-		Value:    value,
-		Optional: true,
-	}
-}
-
-func NamedDefault(key string, value interface{}) *NamedValue {
-	if key == "" {
-		panic("key must be not empty")
-	}
-	return &NamedValue{
-		Name:     key,
-		Value:    value,
-		Optional: true,
+	return NamedValue{
+		Name:       key,
+		Value:      value,
+		UseDefault: true,
 	}
 }
 
@@ -138,7 +126,7 @@ type result interface {
 	Scan(values ...interface{}) error
 
 	// ScanNamed scans row with column names defined in namedValues
-	ScanNamed(namedValues ...*NamedValue) error
+	ScanNamed(namedValues ...NamedValue) error
 
 	// Stats returns query execution QueryStats.
 	Stats() (s stats.QueryStats)
