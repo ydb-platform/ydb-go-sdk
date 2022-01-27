@@ -2,8 +2,9 @@ package scanner
 
 import (
 	"testing"
+	"time"
 
-	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 )
 
 var testSize = 10000
@@ -11,12 +12,18 @@ var testSize = 10000
 func BenchmarkTestScanWithColumns(b *testing.B) {
 	b.ReportAllocs()
 	res := PrepareScannerPerformanceTest(b.N)
-	row := series{}
+	var (
+		id    uint64     // for requied scan
+		title *string    // for optional scan
+		date  *time.Time // for optional scan with default type value
+	)
 	res.setColumnIndexes([]string{"series_id", "title", "release_date"})
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for res.NextRow() {
-			_ = res.Scan(&row.id, &row.title, &row.date)
+			if err := res.Scan(&id, &title, &date); err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
 }
@@ -24,11 +31,17 @@ func BenchmarkTestScanWithColumns(b *testing.B) {
 func BenchmarkTestScan(b *testing.B) {
 	b.ReportAllocs()
 	res := PrepareScannerPerformanceTest(b.N)
-	row := series{}
+	var (
+		id    uint64     // for requied scan
+		title *string    // for optional scan
+		date  *time.Time // for optional scan with default type value
+	)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if res.NextRow() {
-			_ = res.Scan(&row.id, &row.title, &row.date)
+			if err := res.Scan(&id, &title, &date); err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
 }
@@ -36,15 +49,21 @@ func BenchmarkTestScan(b *testing.B) {
 func BenchmarkTestScanNamed(b *testing.B) {
 	b.ReportAllocs()
 	res := PrepareScannerPerformanceTest(b.N)
-	row := series{}
+	var (
+		id    uint64    // for requied scan
+		title *string   // for optional scan
+		date  time.Time // for optional scan with default type value
+	)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for res.NextRow() {
-			_ = res.ScanNamed(
-				public.Named("series_id", &row.id),
-				public.Named("title", &row.title),
-				public.Named("release_date", &row.date),
-			)
+			if err := res.ScanNamed(
+				named.Required("series_id", &id),
+				named.Optional("title", &title),
+				named.OptionalWithDefault("release_date", &date),
+			); err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
 }
@@ -52,8 +71,8 @@ func BenchmarkTestScanNamed(b *testing.B) {
 func TestOverallApproaches(t *testing.T) {
 	for k, f := range map[string]func(b *testing.B){
 		"BenchmarkTestScan":            BenchmarkTestScan,
-		"BenchmarkTestScanNamed":       BenchmarkTestScanNamed,
 		"BenchmarkTestScanWithColumns": BenchmarkTestScanWithColumns,
+		"BenchmarkTestScanNamed":       BenchmarkTestScanNamed,
 	} {
 		r := testing.Benchmark(f)
 		t.Log(k, r.String(), r.MemString())

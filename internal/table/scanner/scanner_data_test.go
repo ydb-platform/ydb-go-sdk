@@ -496,15 +496,27 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 	}, {
 		Name: "title",
 		Type: &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_UTF8,
+			Type: &Ydb.Type_OptionalType{
+				OptionalType: &Ydb.OptionalType{
+					Item: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UTF8,
+						},
+					},
+				},
 			},
 		},
 	}, {
 		Name: "release_date",
 		Type: &Ydb.Type{
-			Type: &Ydb.Type_TypeId{
-				TypeId: Ydb.Type_DATETIME,
+			Type: &Ydb.Type_OptionalType{
+				OptionalType: &Ydb.OptionalType{
+					Item: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_DATETIME,
+						},
+					},
+				},
 			},
 		},
 	}}
@@ -528,12 +540,4 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 	}
 	res.converter = &rawConverter{res}
 	return res
-}
-
-type series struct {
-	id    uint64
-	title string
-	date  time.Time
-	ID    uint64
-	Title string
 }

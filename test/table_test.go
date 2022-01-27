@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -309,7 +310,7 @@ func TestTable(t *testing.T) {
 					return fmt.Errorf("nothing result rows")
 				}
 				if err = res.ScanNamed(
-					result.NamedWithDefault("views", &views),
+					named.OptionalWithDefault("views", &views),
 				); err != nil {
 					return err
 				}
@@ -586,9 +587,9 @@ func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, f
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanNamed(
-						result.Named("series_id", &id),
-						result.Named("title", &title),
-						result.Named("release_date", &date),
+						named.Optional("series_id", &id),
+						named.Optional("title", &title),
+						named.Optional("release_date", &date),
 					)
 					if err != nil {
 						return err

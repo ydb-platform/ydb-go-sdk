@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -94,7 +94,7 @@ func (s *scanner) NextRow() bool {
 
 func (s *scanner) ScanWithDefaults(values ...interface{}) error {
 	for _, v := range values {
-		if _, ok := v.(public.NamedValue); ok {
+		if _, ok := v.(named.Value); ok {
 			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
 		}
 	}
@@ -104,7 +104,7 @@ func (s *scanner) ScanWithDefaults(values ...interface{}) error {
 
 func (s *scanner) Scan(values ...interface{}) error {
 	for _, v := range values {
-		if _, ok := v.(public.NamedValue); ok {
+		if _, ok := v.(named.Value); ok {
 			panic("dont use NamedValue with Scan. Use ScanNamed instead")
 		}
 	}
@@ -112,25 +112,29 @@ func (s *scanner) Scan(values ...interface{}) error {
 	return s.scan(values)
 }
 
-func (s *scanner) ScanNamed(namedValues ...public.NamedValue) (err error) {
+func (s *scanner) ScanNamed(namedValues ...named.Value) (err error) {
 	if err = s.Err(); err != nil {
 		return
 	}
 	if s.ColumnCount() < len(namedValues) {
-		s.errorf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), len(namedValues))
+		panic(fmt.Sprintf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), len(namedValues)))
 	}
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
 	}
 	for _, v := range namedValues {
-		s.seekItemByName(v.Name)
-		if err = s.Err(); err != nil {
+		if err = s.seekItemByName(v.Name); err != nil {
 			return
 		}
-		if s.isCurrentTypeOptional() {
-			s.scanOptional(v.Value, v.UseDefault)
-		} else {
+		switch t := v.Type; t {
+		case named.TypeRequired:
 			s.scanRequired(v.Value)
+		case named.TypeOptional:
+			s.scanOptional(v.Value, false)
+		case named.TypeOptionalWithUseDefault:
+			s.scanOptional(v.Value, true)
+		default:
+			panic(fmt.Sprintf("unknown type of named.Value: %d", t))
 		}
 	}
 	s.nextItem += len(namedValues)
@@ -140,7 +144,7 @@ func (s *scanner) ScanNamed(namedValues ...public.NamedValue) (err error) {
 // Truncated returns true if current result set has been truncated by server
 func (s *scanner) Truncated() bool {
 	if s.set == nil {
-		s.errorf("there are no sets in the scanner")
+		_ = s.errorf("there are no sets in the scanner")
 		return false
 	}
 	return s.set.Truncated
@@ -197,31 +201,30 @@ func (s *scanner) hasItems() bool {
 	return s.err == nil && s.set != nil && s.row != nil
 }
 
-func (s *scanner) seekItemByID(id int) {
+func (s *scanner) seekItemByID(id int) error {
 	if !s.hasItems() || id >= len(s.set.Columns) {
-		s.noValueError()
-		return
+		return s.noValueError()
 	}
 	col := s.set.Columns[id]
 	s.stack.scanItem.name = col.Name
 	s.stack.scanItem.t = col.Type
 	s.stack.scanItem.v = s.row.Items[id]
+	return nil
 }
 
-func (s *scanner) seekItemByName(name string) {
+func (s *scanner) seekItemByName(name string) error {
 	if !s.hasItems() {
-		s.noValueError()
-		return
+		return s.noValueError()
 	}
 	for i, c := range s.set.Columns {
 		if name == c.Name {
 			s.stack.scanItem.name = c.Name
 			s.stack.scanItem.t = c.Type
 			s.stack.scanItem.v = s.row.Items[i]
-			return
+			return s.Err()
 		}
 	}
-	s.noValueError()
+	return s.noValueError()
 }
 
 func (s *scanner) setColumnIndexes(columns []string) {
@@ -240,7 +243,7 @@ func (s *scanner) setColumnIndexes(columns []string) {
 			}
 		}
 		if !found {
-			s.noColumnError(col)
+			_ = s.noColumnError(col)
 			return
 		}
 	}
@@ -324,19 +327,19 @@ func (s *scanner) any() interface{} {
 	case value.TypeTzDate:
 		src, err := timeutil.UnmarshalTzDate(s.text())
 		if err != nil {
-			s.errorf("scan row failed: %w", err)
+			_ = s.errorf("scan row failed: %w", err)
 		}
 		return src
 	case value.TypeTzDatetime:
 		src, err := timeutil.UnmarshalTzDatetime(s.text())
 		if err != nil {
-			s.errorf("scan row failed: %w", err)
+			_ = s.errorf("scan row failed: %w", err)
 		}
 		return src
 	case value.TypeTzTimestamp:
 		src, err := timeutil.UnmarshalTzTimestamp(s.text())
 		if err != nil {
-			s.errorf("scan row failed: %w", err)
+			_ = s.errorf("scan row failed: %w", err)
 		}
 		return src
 	case value.TypeUTF8, value.TypeDyNumber:
@@ -347,7 +350,7 @@ func (s *scanner) any() interface{} {
 		value.TypeJSONDocument:
 		return []byte(s.text())
 	default:
-		s.errorf("ydb/table: unknown primitive types")
+		_ = s.errorf("ydb/table: unknown primitive types")
 		return nil
 	}
 }
@@ -431,7 +434,7 @@ func (s *scanner) bool() (v bool) {
 func (s *scanner) int8() (v int8) {
 	d := s.int32()
 	if d < math.MinInt8 || math.MaxInt8 < d {
-		s.overflowError(d, v)
+		_ = s.overflowError(d, v)
 		return
 	}
 	return int8(d)
@@ -440,7 +443,7 @@ func (s *scanner) int8() (v int8) {
 func (s *scanner) uint8() (v uint8) {
 	d := s.uint32()
 	if d > math.MaxUint8 {
-		s.overflowError(d, v)
+		_ = s.overflowError(d, v)
 		return
 	}
 	return uint8(d)
@@ -449,7 +452,7 @@ func (s *scanner) uint8() (v uint8) {
 func (s *scanner) int16() (v int16) {
 	d := s.int32()
 	if d < math.MinInt16 || math.MaxInt16 < d {
-		s.overflowError(d, v)
+		_ = s.overflowError(d, v)
 		return
 	}
 	return int16(d)
@@ -458,7 +461,7 @@ func (s *scanner) int16() (v int16) {
 func (s *scanner) uint16() (v uint16) {
 	d := s.uint32()
 	if d > math.MaxUint16 {
-		s.overflowError(d, v)
+		_ = s.overflowError(d, v)
 		return
 	}
 	return uint16(d)
@@ -548,7 +551,7 @@ func (s *scanner) low128() (v uint64) {
 func (s *scanner) uint128() (v [16]byte) {
 	c := s.stack.current()
 	if c.isEmpty() {
-		s.errorf("TODO")
+		_ = s.errorf("TODO")
 		return
 	}
 	lo := s.low128()
@@ -574,23 +577,23 @@ func (s *scanner) setTime(dst *time.Time) {
 	case Ydb.Type_TZ_DATE:
 		src, err := timeutil.UnmarshalTzDate(s.text())
 		if err != nil {
-			s.errorf("scan row failed: %w", err)
+			_ = s.errorf("scan row failed: %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_DATETIME:
 		src, err := timeutil.UnmarshalTzDatetime(s.text())
 		if err != nil {
-			s.errorf("scan row failed: %w", err)
+			_ = s.errorf("scan row failed: %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_TIMESTAMP:
 		src, err := timeutil.UnmarshalTzTimestamp(s.text())
 		if err != nil {
-			s.errorf("scan row failed: %w", err)
+			_ = s.errorf("scan row failed: %w", err)
 		}
 		*dst = src
 	default:
-		s.errorf("scan row failed: incorrect source types %s", t)
+		_ = s.errorf("scan row failed: incorrect source types %s", t)
 	}
 }
 
@@ -604,7 +607,7 @@ func (s *scanner) setString(dst *string) {
 	case Ydb.Type_STRING:
 		*dst = string(s.bytes())
 	default:
-		s.errorf("scan row failed: incorrect source types %s", t)
+		_ = s.errorf("scan row failed: incorrect source types %s", t)
 	}
 }
 
@@ -618,7 +621,7 @@ func (s *scanner) setByte(dst *[]byte) {
 	case Ydb.Type_STRING:
 		*dst = s.bytes()
 	default:
-		s.errorf("scan row failed: incorrect source types %s", t)
+		_ = s.errorf("scan row failed: incorrect source types %s", t)
 	}
 }
 
@@ -707,17 +710,17 @@ func (s *scanner) scanRequired(value interface{}) {
 	case types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
-			s.errorf("ydb.Scanner error: %w", err)
+			_ = s.errorf("ydb.Scanner error: %w", err)
 		}
 	case sql.Scanner:
 		err := v.Scan(s.any())
 		if err != nil {
-			s.errorf("sql.Scanner error: %w", err)
+			_ = s.errorf("sql.Scanner error: %w", err)
 		}
 	default:
 		ok := s.trySetByteArray(v, false, false)
 		if !ok {
-			s.errorf("scan row failed: type %T is unknown", v)
+			_ = s.errorf("scan row failed: type %T is unknown", v)
 		}
 	}
 }
@@ -885,12 +888,12 @@ func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) 
 	case types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
-			s.errorf("ydb.Scanner error: %w", err)
+			_ = s.errorf("ydb.Scanner error: %w", err)
 		}
 	case sql.Scanner:
 		err := v.Scan(s.any())
 		if err != nil {
-			s.errorf("sql.Scanner error: %w", err)
+			_ = s.errorf("sql.Scanner error: %w", err)
 		}
 	default:
 		s.unwrap()
@@ -898,9 +901,9 @@ func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) 
 		if !ok {
 			rv := reflect.TypeOf(v)
 			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Ptr {
-				s.errorf("scan row failed: type %T is unknown", v)
+				_ = s.errorf("scan row failed: type %T is unknown", v)
 			} else {
-				s.errorf("scan row failed: type %T is not optional! use double pointer or sql.Scanner.", v)
+				_ = s.errorf("scan row failed: type %T is not optional! use double pointer or sql.Scanner.", v)
 			}
 		}
 	}
@@ -949,17 +952,17 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 	case sql.Scanner:
 		err := v.Scan(nil)
 		if err != nil {
-			s.errorf("sql.Scanner error: %w", err)
+			_ = s.errorf("sql.Scanner error: %w", err)
 		}
 	case types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
-			s.errorf("ydb.Scanner error: %w", err)
+			_ = s.errorf("ydb.Scanner error: %w", err)
 		}
 	default:
 		ok := s.trySetByteArray(v, false, true)
 		if !ok {
-			s.errorf("scan row failed: type %T is unknown", v)
+			_ = s.errorf("scan row failed: type %T is unknown", v)
 		}
 	}
 }
@@ -970,23 +973,32 @@ func (s *scanner) scan(values []interface{}) (err error) {
 	}
 	if s.columnIndexes != nil {
 		if len(s.columnIndexes) != len(values) {
-			s.errorf("scan row failed: count of values and column are different (%d != %d)", len(s.columnIndexes), len(values))
+			return s.errorf(
+				"scan row failed: count of values and column are different (%d != %d)",
+				len(s.columnIndexes),
+				len(values),
+			)
 		}
 	}
 	if s.ColumnCount() < len(values) {
-		s.errorf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), len(values))
+		return s.errorf(
+			"scan row failed: count of columns less then values (%d < %d)",
+			s.ColumnCount(),
+			len(values),
+		)
 	}
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
 	}
 	for i := range values {
 		if s.columnIndexes == nil {
-			s.seekItemByID(i)
+			if err = s.seekItemByID(i); err != nil {
+				return
+			}
 		} else {
-			s.seekItemByID(s.columnIndexes[i])
-		}
-		if err = s.Err(); err != nil {
-			return
+			if err = s.seekItemByID(s.columnIndexes[i]); err != nil {
+				return
+			}
 		}
 		if s.isCurrentTypeOptional() {
 			s.scanOptional(values[i], s.defaultValueForOptional)
@@ -1004,39 +1016,40 @@ func (r *result) SetErr(err error) {
 	r.errMtx.Unlock()
 }
 
-func (s *scanner) errorf(f string, args ...interface{}) {
+func (s *scanner) errorf(f string, args ...interface{}) error {
 	s.errMtx.Lock()
 	defer s.errMtx.Unlock()
 	if s.err != nil {
-		return
+		return s.err
 	}
 	s.err = fmt.Errorf(f, args...)
+	return s.err
 }
 
 func (s *scanner) typeError(act, exp interface{}) {
-	s.errorf(
+	_ = s.errorf(
 		"unexpected types during scan at %q %s: %s; want %s",
 		s.path(), s.getType(), nameIface(act), nameIface(exp),
 	)
 }
 
 func (s *scanner) valueTypeError(act, exp interface{}) {
-	s.errorf(
+	_ = s.errorf(
 		"unexpected value during scan at %q %s: %s; want %s",
 		s.path(), s.getType(), nameIface(act), nameIface(exp),
 	)
 }
 
-func (s *scanner) noValueError() {
-	s.errorf("no value at %q", s.path())
+func (s *scanner) noValueError() error {
+	return s.errorf("no value at %q", s.path())
 }
 
-func (s *scanner) noColumnError(name string) {
-	s.errorf("no column %q", name)
+func (s *scanner) noColumnError(name string) error {
+	return s.errorf("no column %q", name)
 }
 
-func (s *scanner) overflowError(i, n interface{}) {
-	s.errorf("overflow error: %d overflows capacity of %t", i, n)
+func (s *scanner) overflowError(i, n interface{}) error {
+	return s.errorf("overflow error: %d overflows capacity of %t", i, n)
 }
 
 var emptyItem item
