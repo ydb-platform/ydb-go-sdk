@@ -11,7 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
@@ -527,12 +527,13 @@ func TestScanNamed(t *testing.T) {
 			set, expected := getResultSet(test.count, test.columns)
 			s.reset(set)
 			for s.NextRow() {
-				values := make([]public.NamedValue, 0, len(test.values))
+				values := make([]named.Value, 0, len(test.values))
+				// nolint:nestif
 				if test.columns[0].testDefault {
 					for i := range test.values {
 						values = append(
 							values,
-							public.NamedWithDefault(
+							named.OptionalWithDefault(
 								or(test.setColumns, i, test.columns[i].name),
 								test.values[i],
 							),
@@ -543,13 +544,33 @@ func TestScanNamed(t *testing.T) {
 					}
 				} else {
 					for i := range test.values {
-						values = append(
-							values,
-							public.Named(
-								or(test.setColumns, i, test.columns[i].name),
-								test.values[i],
-							),
-						)
+						if test.columns[i].optional {
+							if test.columns[i].testDefault {
+								values = append(
+									values,
+									named.OptionalWithDefault(
+										or(test.setColumns, i, test.columns[i].name),
+										test.values[i],
+									),
+								)
+							} else {
+								values = append(
+									values,
+									named.Optional(
+										or(test.setColumns, i, test.columns[i].name),
+										test.values[i],
+									),
+								)
+							}
+						} else {
+							values = append(
+								values,
+								named.Required(
+									or(test.setColumns, i, test.columns[i].name),
+									test.values[i],
+								),
+							)
+						}
 					}
 					if err := s.ScanNamed(values...); err != nil {
 						t.Fatalf("test: %s; error: %s", test.name, err)
