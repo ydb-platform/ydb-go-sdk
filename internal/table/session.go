@@ -101,12 +101,11 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 	if err != nil {
 		return nil, err
 	}
-	s = &session{
+	return &session{
 		id:           result.GetSessionId(),
 		tableService: c,
 		trace:        t,
-	}
-	return
+	}, ctx.Err()
 }
 
 func (s *session) ID() string {
