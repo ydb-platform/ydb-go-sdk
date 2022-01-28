@@ -1,6 +1,6 @@
 module github.com/ydb-platform/ydb-go-sdk/v3
 
-go 1.16
+go 1.13
 
 require (
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20211103074319-526e57659e16

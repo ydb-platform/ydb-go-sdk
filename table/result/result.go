@@ -40,6 +40,7 @@ type result interface {
 	// columns - names of columns in the resultSet that will be scanned
 	// It returns false if there are no more result sets.
 	// Stream sets are supported.
+	// After iterate over result sets should be checked Err()
 	NextResultSet(ctx context.Context, columns ...string) bool
 
 	// CurrentResultSet get current result set to use ColumnCount(), RowCount() and other methods

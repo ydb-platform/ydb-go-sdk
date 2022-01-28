@@ -196,7 +196,7 @@ func retryBackoff(
 			if s == nil {
 				s, err = p.Get(ctx)
 				if s == nil && err == nil {
-					panic("only one of pair <session, error> must be not nil")
+					panic("both of session and error are nil")
 				}
 				if err != nil {
 					return

@@ -117,106 +117,100 @@ func TestTable(t *testing.T) {
 		}
 	})
 
-	var (
-		err   error
-		db    ydb.Connection
-		limit = 50
-	)
-	t.Run("connect", func(t *testing.T) {
-		db, err = ydb.New(
-			ctx,
-			ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-			ydb.WithAnonymousCredentials(),
-			ydb.WithUserAgent("tx"),
-			ydb.With(
-				config.WithRequestTimeout(time.Second*5),
-				config.WithStreamTimeout(time.Second*5),
-				config.WithOperationTimeout(time.Second*5),
-				config.WithOperationCancelAfter(time.Second*5),
-				config.WithGrpcOptions(
-					grpc.WithUnaryInterceptor(func(
-						ctx context.Context,
-						method string,
-						req, reply interface{},
-						cc *grpc.ClientConn,
-						invoker grpc.UnaryInvoker,
-						opts ...grpc.CallOption,
-					) error {
-						return invoker(ctx, method, req, reply, cc, opts...)
-					}),
-					grpc.WithStreamInterceptor(func(
-						ctx context.Context,
-						desc *grpc.StreamDesc,
-						cc *grpc.ClientConn,
-						method string,
-						streamer grpc.Streamer,
-						opts ...grpc.CallOption,
-					) (grpc.ClientStream, error) {
-						return streamer(ctx, desc, cc, method, opts...)
-					}),
-				),
+	limit := 50
+	db, err := ydb.New(
+		ctx,
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		ydb.WithAnonymousCredentials(),
+		ydb.WithUserAgent("tx"),
+		ydb.With(
+			config.WithRequestTimeout(time.Second*5),
+			config.WithStreamTimeout(time.Second*5),
+			config.WithOperationTimeout(time.Second*5),
+			config.WithOperationCancelAfter(time.Second*5),
+			config.WithGrpcOptions(
+				grpc.WithUnaryInterceptor(func(
+					ctx context.Context,
+					method string,
+					req, reply interface{},
+					cc *grpc.ClientConn,
+					invoker grpc.UnaryInvoker,
+					opts ...grpc.CallOption,
+				) error {
+					return invoker(ctx, method, req, reply, cc, opts...)
+				}),
+				grpc.WithStreamInterceptor(func(
+					ctx context.Context,
+					desc *grpc.StreamDesc,
+					cc *grpc.ClientConn,
+					method string,
+					streamer grpc.Streamer,
+					opts ...grpc.CallOption,
+				) (grpc.ClientStream, error) {
+					return streamer(ctx, desc, cc, method, opts...)
+				}),
 			),
-			ydb.WithBalancer(balancer.PreferLocalDCWithFallBack( // for max tests coverage
-				balancer.PreferLocationsWithFallback( // for max tests coverage
-					balancer.RoundRobin(),
-					"MAN",
-				),
-			)),
-			ydb.WithDialTimeout(5*time.Second),
-			ydb.WithSessionPoolIdleThreshold(time.Second*5),
-			ydb.WithSessionPoolSizeLimit(limit),
-			ydb.WithSessionPoolKeepAliveMinSize(-1),
-			ydb.WithDiscoveryInterval(5*time.Second),
-			ydb.WithLogger(
-				trace.DetailsAll,
-				ydb.WithNamespace("ydb"),
-				ydb.WithOutWriter(os.Stdout),
-				ydb.WithErrWriter(os.Stderr),
-				ydb.WithMinLevel(ydb.INFO),
+		),
+		ydb.WithBalancer(balancer.PreferLocalDCWithFallBack( // for max tests coverage
+			balancer.PreferLocationsWithFallback( // for max tests coverage
+				balancer.RoundRobin(),
+				"MAN",
 			),
-			ydb.WithTraceTable(trace.Table{
-				OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
-					return func(info trace.SessionNewDoneInfo) {
-						if info.Error == nil {
-							s.addBalance(t, 1)
-						}
+		)),
+		ydb.WithDialTimeout(5*time.Second),
+		ydb.WithSessionPoolIdleThreshold(time.Second*5),
+		ydb.WithSessionPoolSizeLimit(limit),
+		ydb.WithSessionPoolKeepAliveMinSize(-1),
+		ydb.WithDiscoveryInterval(5*time.Second),
+		ydb.WithLogger(
+			trace.DetailsAll,
+			ydb.WithNamespace("ydb"),
+			ydb.WithOutWriter(os.Stdout),
+			ydb.WithErrWriter(os.Stderr),
+			ydb.WithMinLevel(ydb.INFO),
+		),
+		ydb.WithTraceTable(trace.Table{
+			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
+				return func(info trace.SessionNewDoneInfo) {
+					if info.Error == nil {
+						s.addBalance(t, 1)
 					}
-				},
-				OnSessionDelete: func(info trace.SessionDeleteStartInfo) func(trace.SessionDeleteDoneInfo) {
-					return func(info trace.SessionDeleteDoneInfo) {
-						s.addBalance(t, -1)
+				}
+			},
+			OnSessionDelete: func(info trace.SessionDeleteStartInfo) func(trace.SessionDeleteDoneInfo) {
+				return func(info trace.SessionDeleteDoneInfo) {
+					s.addBalance(t, -1)
+				}
+			},
+			OnPoolInit: func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
+				return func(info trace.PoolInitDoneInfo) {
+					s.Lock()
+					s.keepAliveMinSize = info.KeepAliveMinSize
+					s.limit = info.Limit
+					s.Unlock()
+				}
+			},
+			OnPoolGet: func(info trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
+				return func(info trace.PoolGetDoneInfo) {
+					if info.Error == nil {
+						s.addInFlight(t, 1)
 					}
-				},
-				OnPoolInit: func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
-					return func(info trace.PoolInitDoneInfo) {
-						s.Lock()
-						s.keepAliveMinSize = info.KeepAliveMinSize
-						s.limit = info.Limit
-						s.Unlock()
-					}
-				},
-				OnPoolGet: func(info trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
-					return func(info trace.PoolGetDoneInfo) {
-						if info.Error == nil {
-							s.addInFlight(t, 1)
-						}
-					}
-				},
-				OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
+				}
+			},
+			OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
+				s.addInFlight(t, -1)
+				return nil
+			},
+			OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
+				return func(info trace.PoolSessionCloseDoneInfo) {
 					s.addInFlight(t, -1)
-					return nil
-				},
-				OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
-					return func(info trace.PoolSessionCloseDoneInfo) {
-						s.addInFlight(t, -1)
-					}
-				},
-			}),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
+				}
+			},
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer t.Run("cleanup", func(t *testing.T) {
 		if e := db.Close(ctx); e != nil {
 			t.Fatalf("db close failed: %+v", e)
@@ -236,7 +230,7 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("prepare scheme", func(t *testing.T) {
-		err := sugar.RemoveRecursive(ctx, db, folder)
+		err = sugar.RemoveRecursive(ctx, db, folder)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -270,12 +264,12 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("fill data", func(t *testing.T) {
-		if err := fill(ctx, db, folder); err != nil {
+		if err = fill(ctx, db, folder); err != nil {
 			t.Fatalf("fillQuery failed: %v\n", err)
 		}
 	})
 	t.Run("upsert with tx", func(t *testing.T) {
-		if err := db.Table().DoTx(
+		if err = db.Table().DoTx(
 			ctx,
 			func(ctx context.Context, tx table.TransactionActor) (err error) {
 				var (
@@ -357,7 +351,7 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("select upserted data", func(t *testing.T) {
-		if err := db.Table().Do(
+		if err = db.Table().Do(
 			ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				var (
@@ -414,6 +408,116 @@ func TestTable(t *testing.T) {
 		); err != nil {
 			t.Fatalf("tx failed: %v\n", err)
 		}
+	})
+	t.Run("multiple result sets", func(t *testing.T) {
+		t.Run("create table", func(t *testing.T) {
+			if err = db.Table().Do(
+				ctx,
+				func(ctx context.Context, s table.Session) (err error) {
+					return s.ExecuteSchemeQuery(
+						ctx,
+						`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
+					)
+				},
+			); err != nil {
+				t.Fatalf("create table failed: %v\n", err)
+			}
+		})
+		var (
+			upsertRowsCount = 40000
+			sum             uint64
+		)
+		t.Run("upsert data", func(t *testing.T) {
+			values := make([]types.Value, 0, upsertRowsCount)
+			for i := 0; i < upsertRowsCount; i++ {
+				sum += uint64(i)
+				values = append(
+					values,
+					types.StructValue(
+						types.StructFieldValue("val", types.Int32Value(int32(i))),
+					),
+				)
+			}
+			if err = db.Table().Do(
+				ctx,
+				func(ctx context.Context, s table.Session) (err error) {
+					_, _, err = s.Execute(
+						ctx,
+						table.TxControl(
+							table.BeginTx(
+								table.WithSerializableReadWrite(),
+							),
+							table.CommitTx(),
+						),
+						`
+						DECLARE $values AS List<Struct<
+							val: Int32,
+						> >;
+						UPSERT INTO stream_query
+						SELECT
+							val 
+						FROM
+							AS_TABLE($values);            
+						`,
+						table.NewQueryParameters(
+							table.ValueParam(
+								"$values",
+								types.ListValue(values...),
+							),
+						),
+					)
+					return err
+				},
+			); err != nil {
+				t.Fatalf("upsert failed: %v\n", err)
+			}
+		})
+		t.Run("scan select", func(t *testing.T) {
+			if err = db.Table().Do(
+				ctx,
+				func(ctx context.Context, s table.Session) (err error) {
+					res, err := s.StreamExecuteScanQuery(
+						ctx,
+						`
+							SELECT val FROM stream_query;
+						`,
+						table.NewQueryParameters(),
+					)
+					if err != nil {
+						return err
+					}
+					var (
+						resultSetsCount = 0
+						rowsCount       = 0
+						checkSum        uint64
+					)
+					for res.NextResultSet(ctx, "val") {
+						resultSetsCount++
+						for res.NextRow() {
+							rowsCount++
+							var val *int32
+							err = res.Scan(&val)
+							if err != nil {
+								return err
+							}
+							checkSum += uint64(*val)
+						}
+					}
+					if rowsCount != upsertRowsCount {
+						return fmt.Errorf("wrong rows count: %v", rowsCount)
+					}
+					if sum != checkSum {
+						return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
+					}
+					if resultSetsCount <= 1 {
+						return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
+					}
+					return nil
+				},
+			); err != nil {
+				t.Fatalf("scan select failed: %v\n", err)
+			}
+		})
 	})
 	t.Run("select concurrently", func(t *testing.T) {
 		wg := sync.WaitGroup{}
