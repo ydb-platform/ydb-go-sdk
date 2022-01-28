@@ -217,6 +217,9 @@ func TestTable(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	if db == nil {
+		return
+	}
 	defer t.Run("cleanup", func(t *testing.T) {
 		if e := db.Close(ctx); e != nil {
 			t.Fatalf("db close failed: %+v", e)
@@ -236,7 +239,7 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("prepare scheme", func(t *testing.T) {
-		err := sugar.RemoveRecursive(ctx, db, folder)
+		err = sugar.RemoveRecursive(ctx, db, folder)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -270,12 +273,12 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("fill data", func(t *testing.T) {
-		if err := fill(ctx, db, folder); err != nil {
+		if err = fill(ctx, db, folder); err != nil {
 			t.Fatalf("fillQuery failed: %v\n", err)
 		}
 	})
 	t.Run("upsert with tx", func(t *testing.T) {
-		if err := db.Table().DoTx(
+		if err = db.Table().DoTx(
 			ctx,
 			func(ctx context.Context, tx table.TransactionActor) (err error) {
 				var (
@@ -357,7 +360,7 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("select upserted data", func(t *testing.T) {
-		if err := db.Table().Do(
+		if err = db.Table().Do(
 			ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				var (
@@ -417,7 +420,7 @@ func TestTable(t *testing.T) {
 	})
 	t.Run("multiple result sets", func(t *testing.T) {
 		t.Run("create table", func(t *testing.T) {
-			if err := db.Table().Do(
+			if err = db.Table().Do(
 				ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					return s.ExecuteSchemeQuery(
@@ -444,7 +447,7 @@ func TestTable(t *testing.T) {
 					),
 				)
 			}
-			if err := db.Table().Do(
+			if err = db.Table().Do(
 				ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					_, _, err = s.Execute(
@@ -479,7 +482,7 @@ func TestTable(t *testing.T) {
 			}
 		})
 		t.Run("scan select", func(t *testing.T) {
-			if err := db.Table().Do(
+			if err = db.Table().Do(
 				ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					res, err := s.StreamExecuteScanQuery(

@@ -52,6 +52,9 @@ func TestScripting(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	if db == nil {
+		return
+	}
 	defer t.Run("cleanup connection", func(t *testing.T) {
 		if e := db.Close(ctx); e != nil {
 			t.Fatalf("db close failed: %+v", e)

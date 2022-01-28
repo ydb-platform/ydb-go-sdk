@@ -105,7 +105,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 		id:           result.GetSessionId(),
 		tableService: c,
 		trace:        t,
-	}, ctx.Err()
+	}, nil
 }
 
 func (s *session) ID() string {
