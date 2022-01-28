@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/file"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
@@ -237,7 +238,7 @@ func WithCertificatesFromFile(caFile string) Option {
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
-		bytes, err := os.ReadFile(filepath.Clean(caFile))
+		bytes, err := file.Read(filepath.Clean(caFile))
 		if err != nil {
 			return err
 		}
