@@ -25,29 +25,22 @@ const (
 func TestRatelimiter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 	defer cancel()
-	var db ydb.Connection
-	t.Run("connect", func(t *testing.T) {
-		var err error
-		db, err = ydb.New(
-			ctx,
-			ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-			ydb.WithAnonymousCredentials(),
-			ydb.With(
-				config.WithRequestTimeout(time.Second*2),
-				config.WithStreamTimeout(time.Second*2),
-				config.WithOperationTimeout(time.Second*2),
-				config.WithOperationCancelAfter(time.Second*2),
-			),
-			ydb.WithBalancer(balancer.PreferLocalDC( // for max tests coverage
-				balancer.RandomChoice(),
-			)),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	if db == nil {
-		return
+	db, err := ydb.New(
+		ctx,
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		ydb.WithAnonymousCredentials(),
+		ydb.With(
+			config.WithRequestTimeout(time.Second*2),
+			config.WithStreamTimeout(time.Second*2),
+			config.WithOperationTimeout(time.Second*2),
+			config.WithOperationCancelAfter(time.Second*2),
+		),
+		ydb.WithBalancer(balancer.PreferLocalDC( // for max tests coverage
+			balancer.RandomChoice(),
+		)),
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 	defer t.Run("cleanup connection", func(t *testing.T) {
 		if e := db.Close(ctx); e != nil {

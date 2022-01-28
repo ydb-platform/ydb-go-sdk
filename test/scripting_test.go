@@ -22,38 +22,29 @@ import (
 func TestScripting(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	var (
-		err error
-		db  ydb.Connection
+	db, err := ydb.New(
+		ctx,
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		ydb.WithAnonymousCredentials(),
+		ydb.With(
+			config.WithRequestTimeout(time.Second*2),
+			config.WithStreamTimeout(time.Second*2),
+			config.WithOperationTimeout(time.Second*2),
+			config.WithOperationCancelAfter(time.Second*2),
+		),
+		ydb.WithBalancer(balancer.SingleConn()),
+		ydb.WithConnectionTTL(time.Millisecond*10000),
+		ydb.WithLogger(
+			trace.DriverConnEvents,
+			ydb.WithNamespace("ydb"),
+			ydb.WithOutWriter(os.Stdout),
+			ydb.WithErrWriter(os.Stderr),
+			ydb.WithMinLevel(ydb.TRACE),
+		),
+		ydb.WithUserAgent("scripting"),
 	)
-	t.Run("connect", func(t *testing.T) {
-		db, err = ydb.New(
-			ctx,
-			ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-			ydb.WithAnonymousCredentials(),
-			ydb.With(
-				config.WithRequestTimeout(time.Second*2),
-				config.WithStreamTimeout(time.Second*2),
-				config.WithOperationTimeout(time.Second*2),
-				config.WithOperationCancelAfter(time.Second*2),
-			),
-			ydb.WithBalancer(balancer.SingleConn()),
-			ydb.WithConnectionTTL(time.Millisecond*10000),
-			ydb.WithLogger(
-				trace.DriverConnEvents,
-				ydb.WithNamespace("ydb"),
-				ydb.WithOutWriter(os.Stdout),
-				ydb.WithErrWriter(os.Stderr),
-				ydb.WithMinLevel(ydb.TRACE),
-			),
-			ydb.WithUserAgent("scripting"),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	if db == nil {
-		return
+	if err != nil {
+		t.Fatal(err)
 	}
 	defer t.Run("cleanup connection", func(t *testing.T) {
 		if e := db.Close(ctx); e != nil {
