@@ -1,12 +1,11 @@
-package ibalancer
+package balancer
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
-// Element is an empty interface that holds some Balancer specific
-// data.
+// Element is an empty interface that holds some Balancer specific data.
 type Element interface{}
 
 // Balancer is an interface that implements particular load-balancing
@@ -34,9 +33,4 @@ type Balancer interface {
 
 type Creator interface {
 	Create() Balancer
-}
-
-type CreatorBalancer interface {
-	Balancer
-	Creator
 }

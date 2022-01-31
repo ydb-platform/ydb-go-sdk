@@ -1,30 +1,30 @@
-package balancer
+package balancers
 
 import (
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/multi"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/rr"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
-func RoundRobin() ibalancer.Balancer {
+func RoundRobin() balancer.Balancer {
 	return rr.RoundRobin()
 }
 
-func RandomChoice() ibalancer.Balancer {
+func RandomChoice() balancer.Balancer {
 	return rr.RandomChoice()
 }
 
-func SingleConn() ibalancer.Balancer {
+func SingleConn() balancer.Balancer {
 	return single.Balancer()
 }
 
 // PreferLocalDC creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-func PreferLocalDC(balancer ibalancer.Balancer) ibalancer.Balancer {
+func PreferLocalDC(balancer balancer.Balancer) balancer.Balancer {
 	return multi.Balancer(
 		multi.WithBalancer(
 			balancer,
@@ -38,16 +38,16 @@ func PreferLocalDC(balancer ibalancer.Balancer) ibalancer.Balancer {
 // PreferLocalDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocalDCWithFallBack(balancer ibalancer.Balancer) ibalancer.Balancer {
+func PreferLocalDCWithFallBack(b balancer.Balancer) balancer.Balancer {
 	return multi.Balancer(
 		multi.WithBalancer(
-			balancer,
+			b,
 			func(cc conn.Conn) bool {
 				return cc.Endpoint().LocalDC()
 			},
 		),
 		multi.WithBalancer(
-			balancer.(ibalancer.Creator).Create(),
+			b.(balancer.Creator).Create(),
 			func(cc conn.Conn) bool {
 				return !cc.Endpoint().LocalDC()
 			},
@@ -57,7 +57,7 @@ func PreferLocalDCWithFallBack(balancer ibalancer.Balancer) ibalancer.Balancer {
 
 // PreferLocations creates balancer which use endpoints only in selected locations (such as "MAN", "VLA", etc.)
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-func PreferLocations(balancer ibalancer.Balancer, locations ...string) ibalancer.Balancer {
+func PreferLocations(balancer balancer.Balancer, locations ...string) balancer.Balancer {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -80,7 +80,7 @@ func PreferLocations(balancer ibalancer.Balancer, locations ...string) ibalancer
 // PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocationsWithFallback(balancer ibalancer.Balancer, locations ...string) ibalancer.Balancer {
+func PreferLocationsWithFallback(b balancer.Balancer, locations ...string) balancer.Balancer {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -88,7 +88,7 @@ func PreferLocationsWithFallback(balancer ibalancer.Balancer, locations ...strin
 		locations[i] = strings.ToUpper(locations[i])
 	}
 	return multi.Balancer(
-		multi.WithBalancer(balancer, func(cc conn.Conn) bool {
+		multi.WithBalancer(b, func(cc conn.Conn) bool {
 			location := strings.ToUpper(cc.Endpoint().Location())
 			for _, l := range locations {
 				if location == l {
@@ -97,7 +97,7 @@ func PreferLocationsWithFallback(balancer ibalancer.Balancer, locations ...strin
 			}
 			return false
 		}),
-		multi.WithBalancer(balancer.(ibalancer.Creator).Create(), func(cc conn.Conn) bool {
+		multi.WithBalancer(b.(balancer.Creator).Create(), func(cc conn.Conn) bool {
 			location := strings.ToUpper(cc.Endpoint().Location())
 			for _, l := range locations {
 				if location == l {
@@ -109,6 +109,6 @@ func PreferLocationsWithFallback(balancer ibalancer.Balancer, locations ...strin
 	)
 }
 
-func Default() ibalancer.Balancer {
+func Default() balancer.Balancer {
 	return PreferLocalDCWithFallBack(RandomChoice())
 }

@@ -1,12 +1,12 @@
 package single
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	balancer2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
-func Balancer() ibalancer.CreatorBalancer {
+func Balancer() balancer2.Balancer {
 	return &balancer{}
 }
 
@@ -14,7 +14,7 @@ type balancer struct {
 	conn conn.Conn
 }
 
-func (b *balancer) Create() ibalancer.Balancer {
+func (b *balancer) Create() balancer2.Balancer {
 	return &balancer{conn: b.conn}
 }
 
@@ -22,7 +22,7 @@ func (b *balancer) Next() conn.Conn {
 	return b.conn
 }
 
-func (b *balancer) Insert(conn conn.Conn) ibalancer.Element {
+func (b *balancer) Insert(conn conn.Conn) balancer2.Element {
 	if b.conn != nil {
 		panic("ydb: single Conn Balancer: double Insert()")
 	}
@@ -30,16 +30,16 @@ func (b *balancer) Insert(conn conn.Conn) ibalancer.Element {
 	return conn
 }
 
-func (b *balancer) Remove(x ibalancer.Element) {
+func (b *balancer) Remove(x balancer2.Element) {
 	if b.conn != x.(conn.Conn) {
 		panic("ydb: single Conn Balancer: Remove() unknown Conn")
 	}
 	b.conn = nil
 }
 
-func (b *balancer) Update(ibalancer.Element, info.Info) {}
+func (b *balancer) Update(balancer2.Element, info.Info) {}
 
-func (b *balancer) Contains(x ibalancer.Element) bool {
+func (b *balancer) Contains(x balancer2.Element) bool {
 	if x == nil {
 		return false
 	}

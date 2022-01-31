@@ -11,7 +11,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -46,7 +46,7 @@ type cluster struct {
 	pool     conn.Pool
 	trace    trace.Driver
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
-	balancer ibalancer.Balancer
+	balancer balancer.Balancer
 	explorer repeater.Repeater
 
 	index     map[string]entry.Entry
@@ -78,7 +78,7 @@ type Cluster interface {
 func New(
 	pool conn.Pool,
 	trace trace.Driver,
-	balancer ibalancer.Balancer,
+	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
 		pool:      pool,

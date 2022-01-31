@@ -1,4 +1,4 @@
-package balancer
+package test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/multi"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/rr"
@@ -53,8 +53,8 @@ func TestMulti(t *testing.T) {
 	)
 	const n = 100
 	var (
-		es = make([]ibalancer.Element, n)
-		el = make(map[conn.Conn]ibalancer.Element, n)
+		es = make([]balancer.Element, n)
+		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
 		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), config.New())
@@ -93,7 +93,7 @@ func TestMulti(t *testing.T) {
 			t.Fatalf("Next() returned unexpected Conn")
 		}
 	}
-	// Now remove all connections from first ibalancer.
+	// Now remove all connections from first iface.
 	for i := 0; i < n/2; i++ {
 		c := m.Next()
 		if isOddConn(c) {
@@ -101,14 +101,14 @@ func TestMulti(t *testing.T) {
 		}
 	}
 	// And check that balancer returns connections from the second
-	// ibalancer.
+	// iface.
 	for i := 0; i < n; i++ {
 		c := m.Next()
 		if !isEvenConn(c) {
 			t.Fatalf("Next() returned unexpected Conn")
 		}
 	}
-	// Now remove all connections from second ibalancer.
+	// Now remove all connections from second iface.
 	for i := 0; i < n/2; i++ {
 		c := m.Next()
 		if isEvenConn(c) {
@@ -137,8 +137,8 @@ func TestPreferLocal(t *testing.T) {
 	)
 	const n = 100
 	var (
-		es = make([]ibalancer.Element, n)
-		el = make(map[conn.Conn]ibalancer.Element, n)
+		es = make([]balancer.Element, n)
+		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
 		c := conn.New(
@@ -162,21 +162,21 @@ func TestPreferLocal(t *testing.T) {
 			t.Fatalf("Next() returned unexpected Conn")
 		}
 	}
-	// Now remove all connections from first ibalancer.
+	// Now remove all connections from first iface.
 	for i := 0; i < n/2; i++ {
 		c := m.Next()
 		if c.Endpoint().LocalDC() {
 			m.Remove(el[c])
 		}
 	}
-	// And check that balancer returns connections from the second ibalancer.
+	// And check that balancer returns connections from the second iface.
 	for i := 0; i < n; i++ {
 		c := m.Next()
 		if c.Endpoint().LocalDC() {
 			t.Fatalf("Next() returned unexpected Conn")
 		}
 	}
-	// Now remove all connections from second ibalancer.
+	// Now remove all connections from second iface.
 	for i := 0; i < n/2; i++ {
 		c := m.Next()
 		if !c.Endpoint().LocalDC() {
@@ -206,8 +206,8 @@ func TestPreferEndpoint(t *testing.T) {
 	)
 	const n = 100
 	var (
-		es = make([]ibalancer.Element, n)
-		el = make(map[conn.Conn]ibalancer.Element, n)
+		es = make([]balancer.Element, n)
+		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
 		c := conn.New(
@@ -231,21 +231,21 @@ func TestPreferEndpoint(t *testing.T) {
 			t.Fatalf("Next() returned unexpected Conn")
 		}
 	}
-	// Now remove all connections from first ibalancer.
+	// Now remove all connections from first iface.
 	for i := 0; i < 1; i++ {
 		c := m.Next()
 		if c.Endpoint().Address() == preferredEndpoint {
 			m.Remove(el[c])
 		}
 	}
-	// And check that balancer returns connections from the second ibalancer.
+	// And check that balancer returns connections from the second iface.
 	for i := 0; i < n; i++ {
 		c := m.Next()
 		if c.Endpoint().Address() == preferredEndpoint {
 			t.Fatalf("Next() returned unexpected Conn")
 		}
 	}
-	// Now remove all connections from second ibalancer.
+	// Now remove all connections from second iface.
 	for i := 0; i < n-1; i++ {
 		c := m.Next()
 		if c.Endpoint().Address() != preferredEndpoint {
@@ -474,7 +474,7 @@ func TestRoundRobin(t *testing.T) {
 			var (
 				mconn = map[conn.Conn]string{} // Conn to addr mapping for easy matching.
 				maddr = map[string]conn.Conn{} // addr to Conn mapping.
-				melem = map[string]ibalancer.Element{}
+				melem = map[string]balancer.Element{}
 				mdist = map[string]int{}
 			)
 			r := rr.RoundRobin()
@@ -534,7 +534,7 @@ func TestRandomChoice(t *testing.T) {
 			var (
 				mconn = map[conn.Conn]string{} // Conn to addr mapping for easy matching.
 				maddr = map[string]conn.Conn{} // addr to Conn mapping.
-				melem = map[string]ibalancer.Element{}
+				melem = map[string]balancer.Element{}
 				mdist = map[string]int{}
 			)
 			r := rr.RandomChoice()

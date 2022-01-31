@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
@@ -26,7 +26,7 @@ type roundRobin struct {
 	conns list.List
 }
 
-func (r *roundRobin) Create() ibalancer.Balancer {
+func (r *roundRobin) Create() balancer.Balancer {
 	return &roundRobin{
 		min:   r.min,
 		max:   r.max,
@@ -36,11 +36,11 @@ func (r *roundRobin) Create() ibalancer.Balancer {
 	}
 }
 
-func RoundRobin() ibalancer.CreatorBalancer {
+func RoundRobin() balancer.Balancer {
 	return &roundRobin{}
 }
 
-func RandomChoice() ibalancer.CreatorBalancer {
+func RandomChoice() balancer.Balancer {
 	return &randomChoice{}
 }
 
@@ -49,7 +49,7 @@ type randomChoice struct {
 	m sync.Mutex
 }
 
-func (r *randomChoice) Create() ibalancer.Balancer {
+func (r *randomChoice) Create() balancer.Balancer {
 	return &randomChoice{
 		roundRobin: *(r.roundRobin.Create().(*roundRobin)),
 	}
@@ -74,28 +74,28 @@ func (r *randomChoice) Next() conn.Conn {
 	return r.conns[i].Conn
 }
 
-func (r *roundRobin) Insert(conn conn.Conn) ibalancer.Element {
+func (r *roundRobin) Insert(conn conn.Conn) balancer.Element {
 	e := r.conns.Insert(conn)
 	r.updateMinMax(e.Conn)
 	r.belt = r.distribute()
 	return e
 }
 
-func (r *roundRobin) Update(el ibalancer.Element, info info.Info) {
+func (r *roundRobin) Update(el balancer.Element, info info.Info) {
 	e := el.(*list.Element)
 	e.Info = info
 	r.updateMinMax(e.Conn)
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Remove(x ibalancer.Element) {
+func (r *roundRobin) Remove(x balancer.Element) {
 	el := x.(*list.Element)
 	r.conns.Remove(el)
 	r.inspectMinMax(el.Info)
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Contains(x ibalancer.Element) bool {
+func (r *roundRobin) Contains(x balancer.Element) bool {
 	if x == nil {
 		return false
 	}

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -35,8 +35,8 @@ func TestRatelimiter(t *testing.T) {
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
 		),
-		ydb.WithBalancer(balancer.PreferLocalDC( // for max tests coverage
-			balancer.RandomChoice(),
+		ydb.WithBalancer(balancers.PreferLocalDC( // for max tests coverage
+			balancers.RandomChoice(),
 		)),
 	)
 	if err != nil {

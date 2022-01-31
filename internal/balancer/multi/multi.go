@@ -1,13 +1,13 @@
 package multi
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
-func Balancer(opts ...Option) ibalancer.CreatorBalancer {
-	m := new(balancer)
+func Balancer(opts ...Option) balancer.Balancer {
+	m := new(multi)
 	for _, opt := range opts {
 		opt(m)
 	}
@@ -15,35 +15,35 @@ func Balancer(opts ...Option) ibalancer.CreatorBalancer {
 }
 
 type multiHandle struct {
-	elements []ibalancer.Element
+	elements []balancer.Element
 }
 
-type balancer struct {
-	balancer []ibalancer.Balancer
+type multi struct {
+	balancer []balancer.Balancer
 	filter   []func(conn.Conn) bool
 }
 
-func (b *balancer) Create() ibalancer.Balancer {
+func (b *multi) Create() balancer.Balancer {
 	bb := b.balancer
 	for i := range bb {
-		bb[i] = bb[i].(ibalancer.CreatorBalancer).Create()
+		bb[i] = bb[i].(balancer.Creator).Create()
 	}
-	return &balancer{
+	return &multi{
 		balancer: bb,
 		filter:   b.filter,
 	}
 }
 
-func WithBalancer(b ibalancer.Balancer, filter func(cc conn.Conn) bool) Option {
-	return func(m *balancer) {
+func WithBalancer(b balancer.Balancer, filter func(cc conn.Conn) bool) Option {
+	return func(m *multi) {
 		m.balancer = append(m.balancer, b)
 		m.filter = append(m.filter, filter)
 	}
 }
 
-type Option func(*balancer)
+type Option func(*multi)
 
-func (b *balancer) Contains(x ibalancer.Element) bool {
+func (b *multi) Contains(x balancer.Element) bool {
 	for i, x := range x.(multiHandle).elements {
 		if x == nil {
 			continue
@@ -55,7 +55,7 @@ func (b *balancer) Contains(x ibalancer.Element) bool {
 	return false
 }
 
-func (b *balancer) Next() conn.Conn {
+func (b *multi) Next() conn.Conn {
 	for _, b := range b.balancer {
 		if c := b.Next(); c != nil {
 			return c
@@ -64,10 +64,10 @@ func (b *balancer) Next() conn.Conn {
 	return nil
 }
 
-func (b *balancer) Insert(conn conn.Conn) ibalancer.Element {
+func (b *multi) Insert(conn conn.Conn) balancer.Element {
 	n := len(b.filter)
 	h := multiHandle{
-		elements: make([]ibalancer.Element, n),
+		elements: make([]balancer.Element, n),
 	}
 	for i, f := range b.filter {
 		if f(conn) {
@@ -78,7 +78,7 @@ func (b *balancer) Insert(conn conn.Conn) ibalancer.Element {
 	return h
 }
 
-func (b *balancer) Update(x ibalancer.Element, info info.Info) {
+func (b *multi) Update(x balancer.Element, info info.Info) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
 			b.balancer[i].Update(x, info)
@@ -86,7 +86,7 @@ func (b *balancer) Update(x ibalancer.Element, info info.Info) {
 	}
 }
 
-func (b *balancer) Remove(x ibalancer.Element) {
+func (b *multi) Remove(x balancer.Element) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
 			b.balancer[i].Remove(x)

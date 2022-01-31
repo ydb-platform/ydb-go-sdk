@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -151,9 +151,9 @@ func TestTable(t *testing.T) {
 				}),
 			),
 		),
-		ydb.WithBalancer(balancer.PreferLocalDCWithFallBack( // for max tests coverage
-			balancer.PreferLocationsWithFallback( // for max tests coverage
-				balancer.RoundRobin(),
+		ydb.WithBalancer(balancers.PreferLocalDCWithFallBack( // for max tests coverage
+			balancers.PreferLocationsWithFallback( // for max tests coverage
+				balancers.RoundRobin(),
 				"MAN",
 			),
 		)),
