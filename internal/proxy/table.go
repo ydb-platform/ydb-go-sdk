@@ -8,18 +8,18 @@ import (
 )
 
 type proxyTable struct {
-	client table.Client
+	client ydb_table.Client
 	meta   meta.Meta
 }
 
-func Table(client table.Client, meta meta.Meta) table.Client {
+func Table(client ydb_table.Client, meta meta.Meta) ydb_table.Client {
 	return &proxyTable{
 		client: client,
 		meta:   meta,
 	}
 }
 
-func (t *proxyTable) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
+func (t *proxyTable) CreateSession(ctx context.Context) (s ydb_table.ClosableSession, err error) {
 	ctx, err = t.meta.Meta(ctx)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func (t *proxyTable) CreateSession(ctx context.Context) (s table.ClosableSession
 	return t.client.CreateSession(ctx)
 }
 
-func (t *proxyTable) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+func (t *proxyTable) Do(ctx context.Context, op ydb_table.Operation, opts ...ydb_table.Option) (err error) {
 	ctx, err = t.meta.Meta(ctx)
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func (t *proxyTable) Do(ctx context.Context, op table.Operation, opts ...table.O
 	return t.client.Do(ctx, op, opts...)
 }
 
-func (t *proxyTable) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
+func (t *proxyTable) DoTx(ctx context.Context, op ydb_table.TxOperation, opts ...ydb_table.Option) (err error) {
 	ctx, err = t.meta.Meta(ctx)
 	if err != nil {
 		return err

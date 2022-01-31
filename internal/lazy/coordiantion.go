@@ -4,30 +4,31 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type lazyCoordination struct {
 	db     db.Connection
-	client coordination.Client
+	client ydb_coordination.Client
 	m      sync.Mutex
 }
 
-func Coordination(db db.Connection) coordination.Client {
+func Coordination(db db.Connection) ydb_coordination.Client {
 	return &lazyCoordination{
 		db: db,
 	}
 }
 
-func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config coordination.Config) (err error) {
+func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config ydb_coordination.Config) (err error) {
 	c.init()
 	return c.client.CreateNode(ctx, path, config)
 }
 
-func (c *lazyCoordination) AlterNode(ctx context.Context, path string, config coordination.Config) (err error) {
+func (c *lazyCoordination) AlterNode(ctx context.Context, path string, config ydb_coordination.Config) (err error) {
 	c.init()
 	return c.client.AlterNode(ctx, path, config)
 }
@@ -41,8 +42,8 @@ func (c *lazyCoordination) DescribeNode(
 	ctx context.Context,
 	path string,
 ) (
-	_ *scheme.Entry,
-	_ *coordination.Config,
+	_ *ydb_scheme.Entry,
+	_ *ydb_coordination.Config,
 	err error,
 ) {
 	c.init()
@@ -64,7 +65,7 @@ func (c *lazyCoordination) Close(ctx context.Context) error {
 func (c *lazyCoordination) init() {
 	c.m.Lock()
 	if c.client == nil {
-		c.client = internal.New(c.db)
+		c.client = coordination.New(c.db)
 	}
 	c.m.Unlock()
 }

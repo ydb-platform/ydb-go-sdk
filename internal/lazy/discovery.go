@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -12,12 +13,12 @@ import (
 
 type lazyDiscovery struct {
 	db     db.Connection
-	trace  trace.Driver
-	client discovery.Client
+	trace  ydb_trace.Driver
+	client ydb_discovery.Client
 	m      sync.Mutex
 }
 
-func Discovery(db db.Connection, trace trace.Driver) discovery.Client {
+func Discovery(db db.Connection, trace ydb_trace.Driver) ydb_discovery.Client {
 	return &lazyDiscovery{
 		db:     db,
 		trace:  trace,
@@ -31,7 +32,7 @@ func (d *lazyDiscovery) Discover(ctx context.Context) ([]endpoint.Endpoint, erro
 	return d.client.Discover(ctx)
 }
 
-func (d *lazyDiscovery) WhoAmI(ctx context.Context) (*discovery.WhoAmI, error) {
+func (d *lazyDiscovery) WhoAmI(ctx context.Context) (*ydb_discovery.WhoAmI, error) {
 	d.init()
 	return d.client.WhoAmI(ctx)
 }

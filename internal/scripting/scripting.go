@@ -1,4 +1,4 @@
-package scheme
+package scripting
 
 import (
 	"context"
@@ -26,8 +26,8 @@ type client struct {
 func (c *client) Execute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
-) (result.Result, error) {
+	params *ydb_table.QueryParameters,
+) (ydb_table_result.Result, error) {
 	request := &Ydb_Scripting.ExecuteYqlRequest{
 		Script:     query,
 		Parameters: params.Params(),
@@ -44,11 +44,11 @@ func (c *client) Execute(
 	return scanner.NewUnary(result.GetResultSets(), result.GetQueryStats()), nil
 }
 
-func mode2mode(mode scripting.ExplainMode) Ydb_Scripting.ExplainYqlRequest_Mode {
+func mode2mode(mode ydb_scripting.ExplainMode) Ydb_Scripting.ExplainYqlRequest_Mode {
 	switch mode {
-	case scripting.ExplainModePlan:
+	case ydb_scripting.ExplainModePlan:
 		return Ydb_Scripting.ExplainYqlRequest_PLAN
-	case scripting.ExplainModeValidate:
+	case ydb_scripting.ExplainModeValidate:
 		return Ydb_Scripting.ExplainYqlRequest_VALIDATE
 	default:
 		return Ydb_Scripting.ExplainYqlRequest_MODE_UNSPECIFIED
@@ -58,8 +58,8 @@ func mode2mode(mode scripting.ExplainMode) Ydb_Scripting.ExplainYqlRequest_Mode 
 func (c *client) Explain(
 	ctx context.Context,
 	query string,
-	mode scripting.ExplainMode,
-) (e table.ScriptingYQLExplanation, err error) {
+	mode ydb_scripting.ExplainMode,
+) (e ydb_table.ScriptingYQLExplanation, err error) {
 	var (
 		request = &Ydb_Scripting.ExplainYqlRequest{
 			Script: query,
@@ -77,11 +77,11 @@ func (c *client) Explain(
 		return
 	}
 	result.GetParametersTypes()
-	e = table.ScriptingYQLExplanation{
-		Explanation: table.Explanation{
+	e = ydb_table.ScriptingYQLExplanation{
+		Explanation: ydb_table.Explanation{
 			Plan: result.GetPlan(),
 		},
-		ParameterTypes: make(map[string]types.Type, len(result.GetParametersTypes())),
+		ParameterTypes: make(map[string]ydb_table_types.Type, len(result.GetParametersTypes())),
 	}
 	for k, v := range result.GetParametersTypes() {
 		e.ParameterTypes[k] = value.TypeFromYDB(v)
@@ -92,8 +92,8 @@ func (c *client) Explain(
 func (c *client) StreamExecute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
-) (result.StreamResult, error) {
+	params *ydb_table.QueryParameters,
+) (ydb_table_result.StreamResult, error) {
 	request := &Ydb_Scripting.ExecuteYqlRequest{
 		Script:     query,
 		Parameters: params.Params(),
@@ -136,7 +136,7 @@ func (c *client) Close(context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface) scripting.Client {
+func New(cc grpc.ClientConnInterface) ydb_scripting.Client {
 	return &client{
 		service: Ydb_Scripting_V1.NewScriptingServiceClient(cc),
 	}

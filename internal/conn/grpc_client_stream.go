@@ -17,7 +17,7 @@ type grpcClientStream struct {
 	c      *conn
 	s      grpc.ClientStream
 	onDone func(ctx context.Context)
-	recv   func(error) func(trace.ConnState, error)
+	recv   func(error) func(ydb_trace.ConnState, error)
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {

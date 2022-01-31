@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
@@ -64,12 +64,12 @@ type resultWithError interface {
 }
 
 type UnaryResult interface {
-	public.Result
+	ydb_table_result.Result
 	resultWithError
 }
 
 type StreamResult interface {
-	public.StreamResult
+	ydb_table_result.StreamResult
 	resultWithError
 }
 
@@ -145,12 +145,12 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 }
 
 // CurrentResultSet get current result set
-func (r *result) CurrentResultSet() public.Set {
+func (r *result) CurrentResultSet() ydb_table_result.Set {
 	return r
 }
 
 // Stats returns query execution queryStats.
-func (r *result) Stats() stats.QueryStats {
+func (r *result) Stats() ydb_table_stats.QueryStats {
 	var s queryStats
 	r.statsMtx.RLock()
 	s.stats = r.stats

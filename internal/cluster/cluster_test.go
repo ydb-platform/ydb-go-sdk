@@ -37,7 +37,7 @@ func TestClusterFastRedial(t *testing.T) {
 		balancer:  b,
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
-		pool:      conn.NewPool(ctx, config.New()),
+		pool:      conn.NewPool(ctx, ydb_config.New()),
 	}
 
 	pingConnects := func(size int) chan struct{} {
@@ -59,7 +59,7 @@ func TestClusterFastRedial(t *testing.T) {
 		endpoint.New("foo:0"),
 		endpoint.New("bad:0"),
 	}
-	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(config.New()))
+	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(ydb_config.New()))
 	select {
 	case <-pingConnects(len(ne)):
 
@@ -88,7 +88,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		}(),
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
-		pool:      conn.NewPool(ctx, config.New()),
+		pool:      conn.NewPool(ctx, ydb_config.New()),
 	}
 
 	assert := func(t *testing.T, exp []endpoint.Endpoint) {
@@ -140,7 +140,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			[]endpoint.Endpoint{},
 			ne,
-			WithConnConfig(config.New()),
+			WithConnConfig(ydb_config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -155,7 +155,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			append(endpoints, badEndpoints...),
 			ne,
-			WithConnConfig(config.New()),
+			WithConnConfig(ydb_config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -180,7 +180,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			nextBadEndpoints,
 			ne,
-			WithConnConfig(config.New()),
+			WithConnConfig(ydb_config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)

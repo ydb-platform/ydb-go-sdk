@@ -1,4 +1,5 @@
-package options
+// nolint:revive
+package ydb_table_options
 
 import (
 	"testing"
@@ -65,7 +66,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 	{
 		opt := WithProfile(
 			WithPartitioningPolicy(
-				WithPartitioningPolicyExplicitPartitions(types.Int64Value(1)),
+				WithPartitioningPolicyExplicitPartitions(ydb_table_types.Int64Value(1)),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -76,7 +77,11 @@ func TestSessionOptionsProfile(t *testing.T) {
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
-			testutil.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{value.ToYDB(types.Int64Value(1))})
+			ydb_testutil.Equal(
+				t,
+				pp.ExplicitPartitions.SplitPoints,
+				[]*Ydb.TypedValue{value.ToYDB(ydb_table_types.Int64Value(1))},
+			)
 		}
 	}
 	{
@@ -148,7 +153,7 @@ func TestStoragePolicyOptions(t *testing.T) {
 
 func TestAlterTableOptions(t *testing.T) {
 	{
-		opt := WithAddColumn("a", types.TypeBool)
+		opt := WithAddColumn("a", ydb_table_types.TypeBool)
 		req := Ydb_Table.AlterTableRequest{}
 		opt((*AlterTableDesc)(&req))
 		if len(req.AddColumns) != 1 ||
@@ -159,7 +164,7 @@ func TestAlterTableOptions(t *testing.T) {
 	{
 		column := Column{
 			Name:   "a",
-			Type:   types.TypeBool,
+			Type:   ydb_table_types.TypeBool,
 			Family: "b",
 		}
 		opt := WithAddColumnMeta(column)

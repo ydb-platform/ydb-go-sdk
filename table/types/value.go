@@ -1,4 +1,5 @@
-package types
+// nolint:revive
+package ydb_table_types
 
 import (
 	"math/big"

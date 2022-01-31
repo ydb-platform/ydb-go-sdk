@@ -15,10 +15,10 @@ import (
 
 func TestRepeater(t *testing.T) {
 	timerC := make(chan time.Time, 1)
-	timer := timetest.Timer{
+	timer := ydb_testutil_timeutil_timetest.Timer{
 		Ch: timerC,
 	}
-	cleanup := timeutil.StubTestHookNewTimer(func(time.Duration) timeutil.Timer {
+	cleanup := ydb_testutil_timeutil.StubTestHookNewTimer(func(time.Duration) ydb_testutil_timeutil.Timer {
 		return timer
 	})
 	defer cleanup()
@@ -47,10 +47,10 @@ func TestRepeaterCancellation(t *testing.T) {
 		enter  = make(chan struct{}, 2)
 		exit   = make(chan struct{}, 2)
 	)
-	timer := timetest.Timer{
+	timer := ydb_testutil_timeutil_timetest.Timer{
 		Ch: timerC,
 	}
-	cleanup := timeutil.StubTestHookNewTimer(func(time.Duration) timeutil.Timer {
+	cleanup := ydb_testutil_timeutil.StubTestHookNewTimer(func(time.Duration) ydb_testutil_timeutil.Timer {
 		return timer
 	})
 	defer cleanup()
@@ -105,12 +105,12 @@ func noRecv(ch interface{}, timeout time.Duration) error {
 
 func assertRecv(t *testing.T, timeout time.Duration, ch interface{}) {
 	if err := recv(ch, timeout); err != nil {
-		t.Fatalf("%s: %v", testutil.FileLine(2), err)
+		t.Fatalf("%s: %v", ydb_testutil.FileLine(2), err)
 	}
 }
 
 func assertNoRecv(t *testing.T, timeout time.Duration, ch interface{}) {
 	if err := noRecv(ch, timeout); err != nil {
-		t.Fatalf("%s: %v", testutil.FileLine(2), err)
+		t.Fatalf("%s: %v", ydb_testutil.FileLine(2), err)
 	}
 }

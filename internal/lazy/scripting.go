@@ -4,24 +4,25 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 )
 
 type lazyScripting struct {
 	db     db.Connection
-	client scripting.Client
+	client ydb_scripting.Client
 	m      sync.Mutex
 }
 
 func (s *lazyScripting) Execute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
-) (result.Result, error) {
+	params *ydb_table.QueryParameters,
+) (ydb_table_result.Result, error) {
 	s.init()
 	return s.client.Execute(ctx, query, params)
 }
@@ -29,8 +30,8 @@ func (s *lazyScripting) Execute(
 func (s *lazyScripting) Explain(
 	ctx context.Context,
 	query string,
-	mode scripting.ExplainMode,
-) (table.ScriptingYQLExplanation, error) {
+	mode ydb_scripting.ExplainMode,
+) (ydb_table.ScriptingYQLExplanation, error) {
 	s.init()
 	return s.client.Explain(ctx, query, mode)
 }
@@ -38,8 +39,8 @@ func (s *lazyScripting) Explain(
 func (s *lazyScripting) StreamExecute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
-) (result.StreamResult, error) {
+	params *ydb_table.QueryParameters,
+) (ydb_table_result.StreamResult, error) {
 	s.init()
 	return s.client.StreamExecute(ctx, query, params)
 }
@@ -56,7 +57,7 @@ func (s *lazyScripting) Close(ctx context.Context) error {
 	return s.client.Close(ctx)
 }
 
-func Scripting(db db.Connection) scripting.Client {
+func Scripting(db db.Connection) ydb_scripting.Client {
 	return &lazyScripting{
 		db: db,
 	}
@@ -65,7 +66,7 @@ func Scripting(db db.Connection) scripting.Client {
 func (s *lazyScripting) init() {
 	s.m.Lock()
 	if s.client == nil {
-		s.client = internal.New(s.db)
+		s.client = scripting.New(s.db)
 	}
 	s.m.Unlock()
 }

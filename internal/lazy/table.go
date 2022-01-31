@@ -5,36 +5,36 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 )
 
 type lazyTable struct {
 	db      db.Connection
-	options []config.Option
-	client  table.Client
+	options []ydb_table_config.Option
+	client  ydb_table.Client
 	m       sync.Mutex
 }
 
-func Table(db db.Connection, options []config.Option) table.Client {
+func Table(db db.Connection, options []ydb_table_config.Option) ydb_table.Client {
 	return &lazyTable{
 		db:      db,
 		options: options,
 	}
 }
 
-func (t *lazyTable) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
+func (t *lazyTable) CreateSession(ctx context.Context) (s ydb_table.ClosableSession, err error) {
 	t.init(ctx)
 	return t.client.CreateSession(ctx)
 }
 
-func (t *lazyTable) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+func (t *lazyTable) Do(ctx context.Context, op ydb_table.Operation, opts ...ydb_table.Option) (err error) {
 	t.init(ctx)
 	return t.client.Do(ctx, op, opts...)
 }
 
-func (t *lazyTable) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
+func (t *lazyTable) DoTx(ctx context.Context, op ydb_table.TxOperation, opts ...ydb_table.Option) (err error) {
 	t.init(ctx)
 	return t.client.DoTx(ctx, op, opts...)
 }
@@ -54,7 +54,7 @@ func (t *lazyTable) Close(ctx context.Context) error {
 func (t *lazyTable) init(ctx context.Context) {
 	t.m.Lock()
 	if t.client == nil {
-		t.client = internal.New(ctx, t.db, t.options...)
+		t.client = table.New(ctx, t.db, t.options...)
 	}
 	t.m.Unlock()
 }

@@ -1,4 +1,5 @@
-package types
+// nolint:revive
+package ydb_table_types
 
 import (
 	"strings"
@@ -19,7 +20,7 @@ import (
 // shorter tuple (list) are all equal to corresponding elements of the other tuple (list), than the shorter tuple (list)
 // is considered less than the longer one.
 func Compare(l, r Value) (int, error) {
-	return testutil.Compare(l, r)
+	return ydb_testutil.Compare(l, r)
 }
 
 func TestUint8(t *testing.T) {

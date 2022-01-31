@@ -1,4 +1,5 @@
-package trace
+// nolint:revive
+package ydb_trace
 
 import (
 	"sort"

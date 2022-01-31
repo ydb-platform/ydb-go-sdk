@@ -221,7 +221,11 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_JSON,
 			ydbvalue: true,
 		}},
-		values: []interface{}{new(types.Value), new(types.Value), new(types.Value)},
+		values: []interface{}{
+			new(ydb_table_types.Value),
+			new(ydb_table_types.Value),
+			new(ydb_table_types.Value),
+		},
 	},
 	{
 		name:  "Scan table with single column",

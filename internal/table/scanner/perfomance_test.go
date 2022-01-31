@@ -58,9 +58,9 @@ func BenchmarkTestScanNamed(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for res.NextRow() {
 			if err := res.ScanNamed(
-				named.Required("series_id", &id),
-				named.Optional("title", &title),
-				named.OptionalWithDefault("release_date", &date),
+				ydb_table_result_named.Required("series_id", &id),
+				ydb_table_result_named.Optional("title", &title),
+				ydb_table_result_named.OptionalWithDefault("release_date", &date),
 			); err != nil {
 				b.Fatal(err)
 			}

@@ -18,7 +18,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -124,11 +124,11 @@ func TestTable(t *testing.T) {
 		ydb.WithAnonymousCredentials(),
 		ydb.WithUserAgent("tx"),
 		ydb.With(
-			config.WithRequestTimeout(time.Second*5),
-			config.WithStreamTimeout(time.Second*5),
-			config.WithOperationTimeout(time.Second*5),
-			config.WithOperationCancelAfter(time.Second*5),
-			config.WithGrpcOptions(
+			ydb_config.WithRequestTimeout(time.Second*5),
+			ydb_config.WithStreamTimeout(time.Second*5),
+			ydb_config.WithOperationTimeout(time.Second*5),
+			ydb_config.WithOperationCancelAfter(time.Second*5),
+			ydb_config.WithGrpcOptions(
 				grpc.WithUnaryInterceptor(func(
 					ctx context.Context,
 					method string,
@@ -151,9 +151,9 @@ func TestTable(t *testing.T) {
 				}),
 			),
 		),
-		ydb.WithBalancer(balancers.PreferLocalDCWithFallBack( // for max tests coverage
-			balancers.PreferLocationsWithFallback( // for max tests coverage
-				balancers.RoundRobin(),
+		ydb.WithBalancer(ydb_balancers.PreferLocalDCWithFallBack( // for max tests coverage
+			ydb_balancers.PreferLocationsWithFallback( // for max tests coverage
+				ydb_balancers.RoundRobin(),
 				"MAN",
 			),
 		)),
@@ -163,46 +163,46 @@ func TestTable(t *testing.T) {
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithLogger(
-			trace.DetailsAll,
+			ydb_trace.DetailsAll,
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
 			ydb.WithMinLevel(ydb.INFO),
 		),
-		ydb.WithTraceTable(trace.Table{
-			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
-				return func(info trace.SessionNewDoneInfo) {
+		ydb.WithTraceTable(ydb_trace.Table{
+			OnSessionNew: func(info ydb_trace.SessionNewStartInfo) func(ydb_trace.SessionNewDoneInfo) {
+				return func(info ydb_trace.SessionNewDoneInfo) {
 					if info.Error == nil {
 						s.addBalance(t, 1)
 					}
 				}
 			},
-			OnSessionDelete: func(info trace.SessionDeleteStartInfo) func(trace.SessionDeleteDoneInfo) {
-				return func(info trace.SessionDeleteDoneInfo) {
+			OnSessionDelete: func(info ydb_trace.SessionDeleteStartInfo) func(ydb_trace.SessionDeleteDoneInfo) {
+				return func(info ydb_trace.SessionDeleteDoneInfo) {
 					s.addBalance(t, -1)
 				}
 			},
-			OnPoolInit: func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
-				return func(info trace.PoolInitDoneInfo) {
+			OnPoolInit: func(info ydb_trace.PoolInitStartInfo) func(ydb_trace.PoolInitDoneInfo) {
+				return func(info ydb_trace.PoolInitDoneInfo) {
 					s.Lock()
 					s.keepAliveMinSize = info.KeepAliveMinSize
 					s.limit = info.Limit
 					s.Unlock()
 				}
 			},
-			OnPoolGet: func(info trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
-				return func(info trace.PoolGetDoneInfo) {
+			OnPoolGet: func(info ydb_trace.PoolGetStartInfo) func(ydb_trace.PoolGetDoneInfo) {
+				return func(info ydb_trace.PoolGetDoneInfo) {
 					if info.Error == nil {
 						s.addInFlight(t, 1)
 					}
 				}
 			},
-			OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
+			OnPoolPut: func(info ydb_trace.PoolPutStartInfo) func(ydb_trace.PoolPutDoneInfo) {
 				s.addInFlight(t, -1)
 				return nil
 			},
-			OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
-				return func(info trace.PoolSessionCloseDoneInfo) {
+			OnPoolSessionClose: func(info ydb_trace.PoolSessionCloseStartInfo) func(ydb_trace.PoolSessionCloseDoneInfo) {
+				return func(info ydb_trace.PoolSessionCloseDoneInfo) {
 					s.addInFlight(t, -1)
 				}
 			},
@@ -217,7 +217,7 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("Ping", func(t *testing.T) {
-		if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
+		if err = db.Table().Do(ctx, func(ctx context.Context, _ ydb_table.Session) error {
 			// hack for wait pool initializing
 			return nil
 		}); err != nil {
@@ -230,11 +230,11 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("PrepareScheme", func(t *testing.T) {
-		err = sugar.RemoveRecursive(ctx, db, folder)
+		err = ydb_sugar.RemoveRecursive(ctx, db, folder)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = sugar.MakeRecursive(ctx, db, folder)
+		err = ydb_sugar.MakeRecursive(ctx, db, folder)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -271,9 +271,9 @@ func TestTable(t *testing.T) {
 	t.Run("UpsertWithTx", func(t *testing.T) {
 		if err = db.Table().DoTx(
 			ctx,
-			func(ctx context.Context, tx table.TransactionActor) (err error) {
+			func(ctx context.Context, tx ydb_table.TransactionActor) (err error) {
 				var (
-					res   result.Result
+					res   ydb_table_result.Result
 					views uint64
 				)
 				// select current value of `views`
@@ -285,13 +285,13 @@ func TestTable(t *testing.T) {
 							TablePathPrefix: path.Join(db.Name(), folder),
 						},
 					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
+					ydb_table.NewQueryParameters(
+						ydb_table.ValueParam("$seriesID", ydb_table_types.Uint64Value(1)),
+						ydb_table.ValueParam("$seasonID", ydb_table_types.Uint64Value(1)),
+						ydb_table.ValueParam("$episodeID", ydb_table_types.Uint64Value(1)),
 					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
+					ydb_table_options.WithQueryCachePolicy(
+						ydb_table_options.WithQueryCachePolicyKeepInCache(),
 					),
 				)
 				if err != nil {
@@ -304,7 +304,7 @@ func TestTable(t *testing.T) {
 					return fmt.Errorf("nothing result rows")
 				}
 				if err = res.ScanNamed(
-					named.OptionalWithDefault("views", &views),
+					ydb_table_result_named.OptionalWithDefault("views", &views),
 				); err != nil {
 					return err
 				}
@@ -323,14 +323,14 @@ func TestTable(t *testing.T) {
 							TablePathPrefix: path.Join(db.Name(), folder),
 						},
 					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
-						table.ValueParam("$views", types.Uint64Value(views+1)), // increment views
+					ydb_table.NewQueryParameters(
+						ydb_table.ValueParam("$seriesID", ydb_table_types.Uint64Value(1)),
+						ydb_table.ValueParam("$seasonID", ydb_table_types.Uint64Value(1)),
+						ydb_table.ValueParam("$episodeID", ydb_table_types.Uint64Value(1)),
+						ydb_table.ValueParam("$views", ydb_table_types.Uint64Value(views+1)), // increment views
 					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
+					ydb_table_options.WithQueryCachePolicy(
+						ydb_table_options.WithQueryCachePolicyKeepInCache(),
 					),
 				)
 				if err != nil {
@@ -341,9 +341,9 @@ func TestTable(t *testing.T) {
 				}
 				return res.Close()
 			},
-			table.WithTxSettings(
-				table.TxSettings(
-					table.WithSerializableReadWrite(),
+			ydb_table.WithTxSettings(
+				ydb_table.TxSettings(
+					ydb_table.WithSerializableReadWrite(),
 				),
 			),
 		); err != nil {
@@ -353,19 +353,19 @@ func TestTable(t *testing.T) {
 	t.Run("SelectUpsertedData", func(t *testing.T) {
 		if err = db.Table().Do(
 			ctx,
-			func(ctx context.Context, s table.Session) (err error) {
+			func(ctx context.Context, s ydb_table.Session) (err error) {
 				var (
-					res   result.Result
+					res   ydb_table_result.Result
 					views uint64
 				)
 				// select current value of `views`
 				_, res, err = s.Execute(
 					ctx,
-					table.TxControl(
-						table.BeginTx(
-							table.WithOnlineReadOnly(),
+					ydb_table.TxControl(
+						ydb_table.BeginTx(
+							ydb_table.WithOnlineReadOnly(),
 						),
-						table.CommitTx(),
+						ydb_table.CommitTx(),
 					),
 					render(
 						querySelect,
@@ -373,13 +373,13 @@ func TestTable(t *testing.T) {
 							TablePathPrefix: path.Join(db.Name(), folder),
 						},
 					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
+					ydb_table.NewQueryParameters(
+						ydb_table.ValueParam("$seriesID", ydb_table_types.Uint64Value(1)),
+						ydb_table.ValueParam("$seasonID", ydb_table_types.Uint64Value(1)),
+						ydb_table.ValueParam("$episodeID", ydb_table_types.Uint64Value(1)),
 					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
+					ydb_table_options.WithQueryCachePolicy(
+						ydb_table_options.WithQueryCachePolicyKeepInCache(),
 					),
 				)
 				if err != nil {
@@ -413,7 +413,7 @@ func TestTable(t *testing.T) {
 		t.Run("CreateTable", func(t *testing.T) {
 			if err = db.Table().Do(
 				ctx,
-				func(ctx context.Context, s table.Session) (err error) {
+				func(ctx context.Context, s ydb_table.Session) (err error) {
 					return s.ExecuteSchemeQuery(
 						ctx,
 						`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
@@ -428,26 +428,26 @@ func TestTable(t *testing.T) {
 			sum             uint64
 		)
 		t.Run("UpsertData", func(t *testing.T) {
-			values := make([]types.Value, 0, upsertRowsCount)
+			values := make([]ydb_table_types.Value, 0, upsertRowsCount)
 			for i := 0; i < upsertRowsCount; i++ {
 				sum += uint64(i)
 				values = append(
 					values,
-					types.StructValue(
-						types.StructFieldValue("val", types.Int32Value(int32(i))),
+					ydb_table_types.StructValue(
+						ydb_table_types.StructFieldValue("val", ydb_table_types.Int32Value(int32(i))),
 					),
 				)
 			}
 			if err = db.Table().Do(
 				ctx,
-				func(ctx context.Context, s table.Session) (err error) {
+				func(ctx context.Context, s ydb_table.Session) (err error) {
 					_, _, err = s.Execute(
 						ctx,
-						table.TxControl(
-							table.BeginTx(
-								table.WithSerializableReadWrite(),
+						ydb_table.TxControl(
+							ydb_table.BeginTx(
+								ydb_table.WithSerializableReadWrite(),
 							),
-							table.CommitTx(),
+							ydb_table.CommitTx(),
 						),
 						`
 						DECLARE $values AS List<Struct<
@@ -459,10 +459,10 @@ func TestTable(t *testing.T) {
 						FROM
 							AS_TABLE($values);            
 						`,
-						table.NewQueryParameters(
-							table.ValueParam(
+						ydb_table.NewQueryParameters(
+							ydb_table.ValueParam(
 								"$values",
-								types.ListValue(values...),
+								ydb_table_types.ListValue(values...),
 							),
 						),
 					)
@@ -475,13 +475,13 @@ func TestTable(t *testing.T) {
 		t.Run("ScanSelect", func(t *testing.T) {
 			if err = db.Table().Do(
 				ctx,
-				func(ctx context.Context, s table.Session) (err error) {
+				func(ctx context.Context, s ydb_table.Session) (err error) {
 					res, err := s.StreamExecuteScanQuery(
 						ctx,
 						`
 							SELECT val FROM stream_query;
 						`,
-						table.NewQueryParameters(),
+						ydb_table.NewQueryParameters(),
 					)
 					if err != nil {
 						return err
@@ -573,21 +573,21 @@ func TestTable(t *testing.T) {
 	})
 }
 
-func selectReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
+func selectReadTable(ctx context.Context, t *testing.T, c ydb_table.Client, tableAbsPath string) {
 	err := c.Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			var (
-				res   result.StreamResult
+				res   ydb_table_result.StreamResult
 				id    *uint64
 				title *string
 				date  *time.Time
 			)
 			res, err = s.StreamReadTable(ctx, tableAbsPath,
-				options.ReadOrdered(),
-				options.ReadColumn("series_id"),
-				options.ReadColumn("title"),
-				options.ReadColumn("release_date"),
+				ydb_table_options.ReadOrdered(),
+				ydb_table_options.ReadColumn("series_id"),
+				ydb_table_options.ReadColumn("title"),
+				ydb_table_options.ReadColumn("release_date"),
 			)
 			if err != nil {
 				return err
@@ -637,7 +637,7 @@ func selectReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 	}
 }
 
-func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, folderAbsPath string) {
+func selectExecuteDataQuery(ctx context.Context, t *testing.T, c ydb_table.Client, folderAbsPath string) {
 	var (
 		query = render(
 			template.Must(template.New("").Parse(`
@@ -656,30 +656,30 @@ func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, f
 				TablePathPrefix: folderAbsPath,
 			},
 		)
-		readTx = table.TxControl(
-			table.BeginTx(
-				table.WithOnlineReadOnly(),
+		readTx = ydb_table.TxControl(
+			ydb_table.BeginTx(
+				ydb_table.WithOnlineReadOnly(),
 			),
-			table.CommitTx(),
+			ydb_table.CommitTx(),
 		)
 	)
 	err := c.Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			var (
-				res   result.Result
+				res   ydb_table_result.Result
 				id    *uint64
 				title *string
 				date  *time.Time
 			)
 			_, res, err = s.Execute(ctx, readTx, query,
-				table.NewQueryParameters(
-					table.ValueParam("$seriesID", types.Uint64Value(1)),
+				ydb_table.NewQueryParameters(
+					ydb_table.ValueParam("$seriesID", ydb_table_types.Uint64Value(1)),
 				),
-				options.WithQueryCachePolicy(
-					options.WithQueryCachePolicyKeepInCache(),
+				ydb_table_options.WithQueryCachePolicy(
+					ydb_table_options.WithQueryCachePolicyKeepInCache(),
 				),
-				options.WithCollectStatsModeBasic(),
+				ydb_table_options.WithCollectStatsModeBasic(),
 			)
 			if err != nil {
 				return err
@@ -691,9 +691,9 @@ func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, f
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanNamed(
-						named.Optional("series_id", &id),
-						named.Optional("title", &title),
-						named.Optional("release_date", &date),
+						ydb_table_result_named.Optional("series_id", &id),
+						ydb_table_result_named.Optional("title", &title),
+						ydb_table_result_named.Optional("release_date", &date),
 					)
 					if err != nil {
 						return err
@@ -712,7 +712,7 @@ func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, f
 	}
 }
 
-func selectExecuteScanQuery(ctx context.Context, t *testing.T, c table.Client, folderAbsPath string) {
+func selectExecuteScanQuery(ctx context.Context, t *testing.T, c ydb_table.Client, folderAbsPath string) {
 	query := render(
 		template.Must(template.New("").Parse(`
 				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -729,20 +729,20 @@ func selectExecuteScanQuery(ctx context.Context, t *testing.T, c table.Client, f
 	)
 	err := c.Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			var (
-				res      result.StreamResult
+				res      ydb_table_result.StreamResult
 				seriesID uint64
 				seasonID uint64
 				title    string
 				date     time.Time
 			)
 			res, err = s.StreamExecuteScanQuery(ctx, query,
-				table.NewQueryParameters(
-					table.ValueParam("$series",
-						types.ListValue(
-							types.Uint64Value(1),
-							types.Uint64Value(10),
+				ydb_table.NewQueryParameters(
+					ydb_table.ValueParam("$series",
+						ydb_table_types.ListValue(
+							ydb_table_types.Uint64Value(1),
+							ydb_table_types.Uint64Value(10),
 						),
 					),
 				),
@@ -771,44 +771,44 @@ func selectExecuteScanQuery(ctx context.Context, t *testing.T, c table.Client, f
 	}
 }
 
-func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
-	var commentv types.Value
+func seriesData(id uint64, released time.Time, title, info, comment string) ydb_table_types.Value {
+	var commentv ydb_table_types.Value
 	if comment == "" {
-		commentv = types.NullValue(types.TypeUTF8)
+		commentv = ydb_table_types.NullValue(ydb_table_types.TypeUTF8)
 	} else {
-		commentv = types.OptionalValue(types.UTF8Value(comment))
+		commentv = ydb_table_types.OptionalValue(ydb_table_types.UTF8Value(comment))
 	}
-	return types.StructValue(
-		types.StructFieldValue("series_id", types.Uint64Value(id)),
-		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
-		types.StructFieldValue("series_info", types.UTF8Value(info)),
-		types.StructFieldValue("comment", commentv),
+	return ydb_table_types.StructValue(
+		ydb_table_types.StructFieldValue("series_id", ydb_table_types.Uint64Value(id)),
+		ydb_table_types.StructFieldValue("release_date", ydb_table_types.DateValueFromTime(released)),
+		ydb_table_types.StructFieldValue("title", ydb_table_types.UTF8Value(title)),
+		ydb_table_types.StructFieldValue("series_info", ydb_table_types.UTF8Value(info)),
+		ydb_table_types.StructFieldValue("comment", commentv),
 	)
 }
 
-func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) types.Value {
-	return types.StructValue(
-		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
-		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
-		types.StructFieldValue("first_aired", types.DateValueFromTime(first)),
-		types.StructFieldValue("last_aired", types.DateValueFromTime(last)),
+func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) ydb_table_types.Value {
+	return ydb_table_types.StructValue(
+		ydb_table_types.StructFieldValue("series_id", ydb_table_types.Uint64Value(seriesID)),
+		ydb_table_types.StructFieldValue("season_id", ydb_table_types.Uint64Value(seasonID)),
+		ydb_table_types.StructFieldValue("title", ydb_table_types.UTF8Value(title)),
+		ydb_table_types.StructFieldValue("first_aired", ydb_table_types.DateValueFromTime(first)),
+		ydb_table_types.StructFieldValue("last_aired", ydb_table_types.DateValueFromTime(last)),
 	)
 }
 
-func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.Time) types.Value {
-	return types.StructValue(
-		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
-		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
-		types.StructFieldValue("episode_id", types.Uint64Value(episodeID)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
-		types.StructFieldValue("air_date", types.DateValueFromTime(date)),
+func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.Time) ydb_table_types.Value {
+	return ydb_table_types.StructValue(
+		ydb_table_types.StructFieldValue("series_id", ydb_table_types.Uint64Value(seriesID)),
+		ydb_table_types.StructFieldValue("season_id", ydb_table_types.Uint64Value(seasonID)),
+		ydb_table_types.StructFieldValue("episode_id", ydb_table_types.Uint64Value(episodeID)),
+		ydb_table_types.StructFieldValue("title", ydb_table_types.UTF8Value(title)),
+		ydb_table_types.StructFieldValue("air_date", ydb_table_types.DateValueFromTime(date)),
 	)
 }
 
-func getSeriesData() types.Value {
-	return types.ListValue(
+func getSeriesData() ydb_table_types.Value {
+	return ydb_table_types.ListValue(
 		seriesData(
 			1, days("2006-02-03"), "IT Crowd", ""+
 				"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
@@ -824,8 +824,8 @@ func getSeriesData() types.Value {
 	)
 }
 
-func getSeasonsData() types.Value {
-	return types.ListValue(
+func getSeasonsData() ydb_table_types.Value {
+	return ydb_table_types.ListValue(
 		seasonData(1, 1, "Season 1", days("2006-02-03"), days("2006-03-03")),
 		seasonData(1, 2, "Season 2", days("2007-08-24"), days("2007-09-28")),
 		seasonData(1, 3, "Season 3", days("2008-11-21"), days("2008-12-26")),
@@ -838,8 +838,8 @@ func getSeasonsData() types.Value {
 	)
 }
 
-func getEpisodesData() types.Value {
-	return types.ListValue(
+func getEpisodesData() ydb_table_types.Value {
+	return ydb_table_types.ListValue(
 		episodeData(1, 1, 1, "Yesterday's Jam", days("2006-02-03")),
 		episodeData(1, 1, 2, "Calamity Jen", days("2006-02-03")),
 		episodeData(1, 1, 3, "Fifty-Fifty", days("2006-02-10")),
@@ -1006,11 +1006,11 @@ var (
 	`))
 )
 
-func describeTableOptions(ctx context.Context, c table.Client) error {
-	var desc options.TableOptionsDescription
+func describeTableOptions(ctx context.Context, c ydb_table.Client) error {
+	var desc ydb_table_options.TableOptionsDescription
 	err := c.Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
 			return
 		},
@@ -1047,42 +1047,42 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 
 func fill(ctx context.Context, db ydb.Connection, folder string) error {
 	// prepare write transaction.
-	writeTx := table.TxControl(
-		table.BeginTx(
-			table.WithSerializableReadWrite(),
+	writeTx := ydb_table.TxControl(
+		ydb_table.BeginTx(
+			ydb_table.WithSerializableReadWrite(),
 		),
-		table.CommitTx(),
+		ydb_table.CommitTx(),
 	)
 	return db.Table().Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			stmt, err := s.Prepare(ctx, render(fillQuery, templateConfig{
 				TablePathPrefix: path.Join(db.Name(), folder),
 			}))
 			if err != nil {
 				return
 			}
-			_, _, err = stmt.Execute(ctx, writeTx, table.NewQueryParameters(
-				table.ValueParam("$seriesData", getSeriesData()),
-				table.ValueParam("$seasonsData", getSeasonsData()),
-				table.ValueParam("$episodesData", getEpisodesData()),
+			_, _, err = stmt.Execute(ctx, writeTx, ydb_table.NewQueryParameters(
+				ydb_table.ValueParam("$seriesData", getSeriesData()),
+				ydb_table.ValueParam("$seasonsData", getSeasonsData()),
+				ydb_table.ValueParam("$episodesData", getEpisodesData()),
 			))
 			return
 		},
 	)
 }
 
-func createTables(ctx context.Context, c table.Client, folder string) error {
+func createTables(ctx context.Context, c ydb_table.Client, folder string) error {
 	err := c.Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(folder, "series"),
-				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
-				options.WithColumn("release_date", types.Optional(types.TypeDate)),
-				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
-				options.WithPrimaryKeyColumn("series_id"),
+				ydb_table_options.WithColumn("series_id", ydb_table_types.Optional(ydb_table_types.TypeUint64)),
+				ydb_table_options.WithColumn("title", ydb_table_types.Optional(ydb_table_types.TypeUTF8)),
+				ydb_table_options.WithColumn("series_info", ydb_table_types.Optional(ydb_table_types.TypeUTF8)),
+				ydb_table_options.WithColumn("release_date", ydb_table_types.Optional(ydb_table_types.TypeDate)),
+				ydb_table_options.WithColumn("comment", ydb_table_types.Optional(ydb_table_types.TypeUTF8)),
+				ydb_table_options.WithPrimaryKeyColumn("series_id"),
 			)
 		},
 	)
@@ -1092,14 +1092,14 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 
 	err = c.Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(folder, "seasons"),
-				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options.WithColumn("first_aired", types.Optional(types.TypeDate)),
-				options.WithColumn("last_aired", types.Optional(types.TypeDate)),
-				options.WithPrimaryKeyColumn("series_id", "season_id"),
+				ydb_table_options.WithColumn("series_id", ydb_table_types.Optional(ydb_table_types.TypeUint64)),
+				ydb_table_options.WithColumn("season_id", ydb_table_types.Optional(ydb_table_types.TypeUint64)),
+				ydb_table_options.WithColumn("title", ydb_table_types.Optional(ydb_table_types.TypeUTF8)),
+				ydb_table_options.WithColumn("first_aired", ydb_table_types.Optional(ydb_table_types.TypeDate)),
+				ydb_table_options.WithColumn("last_aired", ydb_table_types.Optional(ydb_table_types.TypeDate)),
+				ydb_table_options.WithPrimaryKeyColumn("series_id", "season_id"),
 			)
 		},
 	)
@@ -1109,25 +1109,25 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 
 	err = c.Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(folder, "episodes"),
-				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options.WithColumn("air_date", types.Optional(types.TypeDate)),
-				options.WithColumn("views", types.Optional(types.TypeUint64)),
-				options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
+				ydb_table_options.WithColumn("series_id", ydb_table_types.Optional(ydb_table_types.TypeUint64)),
+				ydb_table_options.WithColumn("season_id", ydb_table_types.Optional(ydb_table_types.TypeUint64)),
+				ydb_table_options.WithColumn("episode_id", ydb_table_types.Optional(ydb_table_types.TypeUint64)),
+				ydb_table_options.WithColumn("title", ydb_table_types.Optional(ydb_table_types.TypeUTF8)),
+				ydb_table_options.WithColumn("air_date", ydb_table_types.Optional(ydb_table_types.TypeDate)),
+				ydb_table_options.WithColumn("views", ydb_table_types.Optional(ydb_table_types.TypeUint64)),
+				ydb_table_options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			)
 		},
 	)
 	return err
 }
 
-func describeTable(ctx context.Context, c table.Client, path string) (err error) {
+func describeTable(ctx context.Context, c ydb_table.Client, path string) (err error) {
 	err = c.Do(
 		ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
 			if err != nil {
 				return

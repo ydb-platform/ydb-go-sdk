@@ -1,4 +1,5 @@
-package table
+// nolint:revive
+package ydb_table
 
 import (
 	"bytes"
@@ -23,27 +24,27 @@ type Session interface {
 	CreateTable(
 		ctx context.Context,
 		path string,
-		opts ...options.CreateTableOption,
+		opts ...ydb_table_options.CreateTableOption,
 	) (err error)
 	DescribeTable(
 		ctx context.Context,
 		path string,
-		opts ...options.DescribeTableOption,
-	) (desc options.Description, err error)
+		opts ...ydb_table_options.DescribeTableOption,
+	) (desc ydb_table_options.Description, err error)
 	DropTable(
 		ctx context.Context,
 		path string,
-		opts ...options.DropTableOption,
+		opts ...ydb_table_options.DropTableOption,
 	) (err error)
 	AlterTable(
 		ctx context.Context,
 		path string,
-		opts ...options.AlterTableOption,
+		opts ...ydb_table_options.AlterTableOption,
 	) (err error)
 	CopyTable(
 		ctx context.Context,
 		dst, src string,
-		opts ...options.CopyTableOption,
+		opts ...ydb_table_options.CopyTableOption,
 	) (err error)
 	Explain(
 		ctx context.Context,
@@ -58,31 +59,31 @@ type Session interface {
 		tx *TransactionControl,
 		query string,
 		params *QueryParameters,
-		opts ...options.ExecuteDataQueryOption,
-	) (txr Transaction, r result.Result, err error)
+		opts ...ydb_table_options.ExecuteDataQueryOption,
+	) (txr Transaction, r ydb_table_result.Result, err error)
 	ExecuteSchemeQuery(
 		ctx context.Context,
 		query string,
-		opts ...options.ExecuteSchemeQueryOption,
+		opts ...ydb_table_options.ExecuteSchemeQueryOption,
 	) (err error)
 	DescribeTableOptions(
 		ctx context.Context,
-	) (desc options.TableOptionsDescription, err error)
+	) (desc ydb_table_options.TableOptionsDescription, err error)
 	StreamReadTable(
 		ctx context.Context,
 		path string,
-		opts ...options.ReadTableOption,
-	) (r result.StreamResult, err error)
+		opts ...ydb_table_options.ReadTableOption,
+	) (r ydb_table_result.StreamResult, err error)
 	StreamExecuteScanQuery(
 		ctx context.Context,
 		query string,
 		params *QueryParameters,
-		opts ...options.ExecuteScanQueryOption,
-	) (_ result.StreamResult, err error)
+		opts ...ydb_table_options.ExecuteScanQueryOption,
+	) (_ ydb_table_result.StreamResult, err error)
 	BulkUpsert(
 		ctx context.Context,
 		table string,
-		rows types.Value,
+		rows ydb_table_types.Value,
 	) (err error)
 	BeginTransaction(
 		ctx context.Context,
@@ -113,7 +114,7 @@ type Explanation struct {
 type ScriptingYQLExplanation struct {
 	Explanation
 
-	ParameterTypes map[string]types.Type
+	ParameterTypes map[string]ydb_table_types.Type
 }
 
 // DataQueryExplanation is a result of ExplainDataQuery call.
@@ -141,14 +142,14 @@ type TransactionActor interface {
 		ctx context.Context,
 		query string,
 		params *QueryParameters,
-		opts ...options.ExecuteDataQueryOption,
-	) (result.Result, error)
+		opts ...ydb_table_options.ExecuteDataQueryOption,
+	) (ydb_table_result.Result, error)
 	ExecuteStatement(
 		ctx context.Context,
 		stmt Statement,
 		params *QueryParameters,
-		opts ...options.ExecuteDataQueryOption,
-	) (result.Result, error)
+		opts ...ydb_table_options.ExecuteDataQueryOption,
+	) (ydb_table_result.Result, error)
 }
 
 type Transaction interface {
@@ -156,8 +157,8 @@ type Transaction interface {
 
 	CommitTx(
 		ctx context.Context,
-		opts ...options.CommitTransactionOption,
-	) (r result.Result, err error)
+		opts ...ydb_table_options.CommitTransactionOption,
+	) (r ydb_table_result.Result, err error)
 	Rollback(
 		ctx context.Context,
 	) (err error)
@@ -168,8 +169,8 @@ type Statement interface {
 		ctx context.Context,
 		tx *TransactionControl,
 		params *QueryParameters,
-		opts ...options.ExecuteDataQueryOption,
-	) (txr Transaction, r result.Result, err error)
+		opts ...ydb_table_options.ExecuteDataQueryOption,
+	) (txr Transaction, r ydb_table_result.Result, err error)
 	NumInput() int
 	Text() string
 }
@@ -296,7 +297,7 @@ func (q *QueryParameters) Params() queryParams {
 	return q.m
 }
 
-func (q *QueryParameters) Each(it func(name string, v types.Value)) {
+func (q *QueryParameters) Each(it func(name string, v ydb_table_types.Value)) {
 	if q == nil {
 		return
 	}
@@ -311,7 +312,7 @@ func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 func (q *QueryParameters) String() string {
 	var buf bytes.Buffer
 	buf.WriteByte('(')
-	q.Each(func(name string, v types.Value) {
+	q.Each(func(name string, v ydb_table_types.Value) {
 		buf.WriteString("((")
 		buf.WriteString(name)
 		buf.WriteByte(')')
@@ -337,7 +338,7 @@ func (q *QueryParameters) Add(opts ...ParameterOption) {
 	}
 }
 
-func ValueParam(name string, v types.Value) ParameterOption {
+func ValueParam(name string, v ydb_table_types.Value) ParameterOption {
 	return func(q queryParams) {
 		q[name] = value.ToYDB(v)
 	}

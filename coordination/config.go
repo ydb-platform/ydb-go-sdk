@@ -1,4 +1,5 @@
-package coordination
+// nolint:revive
+package ydb_coordination
 
 import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
 

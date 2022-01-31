@@ -1,4 +1,5 @@
-package stats
+// nolint:revive
+package ydb_table_stats
 
 import "time"
 

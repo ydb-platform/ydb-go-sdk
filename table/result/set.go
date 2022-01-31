@@ -1,4 +1,5 @@
-package result
+// nolint:revive
+package ydb_table_result
 
 import "github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 
@@ -7,7 +8,7 @@ type Set interface {
 	ColumnCount() int
 
 	// Columns allows to iterate over all columns of the current result set.
-	Columns(it func(options.Column))
+	Columns(it func(ydb_table_options.Column))
 
 	// RowCount returns number of rows in the result set.
 	RowCount() int

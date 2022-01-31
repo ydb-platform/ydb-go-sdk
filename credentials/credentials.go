@@ -1,4 +1,5 @@
-package credentials
+// nolint:revive
+package ydb_credentials
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"

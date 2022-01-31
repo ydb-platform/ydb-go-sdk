@@ -20,7 +20,7 @@ func (c *client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface) scheme.Client {
+func New(cc grpc.ClientConnInterface) ydb_scheme.Client {
 	return &client{
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
 	}
@@ -40,9 +40,9 @@ func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	return err
 }
 
-func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directory, error) {
+func (c *client) ListDirectory(ctx context.Context, path string) (ydb_scheme.Directory, error) {
 	var (
-		d        scheme.Directory
+		d        ydb_scheme.Directory
 		err      error
 		response *Ydb_Scheme.ListDirectoryResponse
 		result   Ydb_Scheme.ListDirectoryResult
@@ -58,12 +58,12 @@ func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directo
 		return d, err
 	}
 	d.From(result.Self)
-	d.Children = make([]scheme.Entry, len(result.Children))
+	d.Children = make([]ydb_scheme.Entry, len(result.Children))
 	putEntry(d.Children, result.Children)
 	return d, nil
 }
 
-func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
+func (c *client) DescribePath(ctx context.Context, path string) (e ydb_scheme.Entry, err error) {
 	var (
 		response *Ydb_Scheme.DescribePathResponse
 		result   Ydb_Scheme.DescribePathResult
@@ -82,7 +82,7 @@ func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 	return e, nil
 }
 
-func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
+func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...ydb_scheme.PermissionsOption) (err error) {
 	var desc permissionsDesc
 	for _, o := range opts {
 		o(&desc)
@@ -95,7 +95,7 @@ func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...sch
 	return err
 }
 
-func putEntry(dst []scheme.Entry, src []*Ydb_Scheme.Entry) {
+func putEntry(dst []ydb_scheme.Entry, src []*Ydb_Scheme.Entry) {
 	for i, e := range src {
 		(dst[i]).From(e)
 	}

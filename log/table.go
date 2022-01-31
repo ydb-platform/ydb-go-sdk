@@ -1,4 +1,5 @@
-package log
+// nolint:revive
+package ydb_log
 
 import (
 	"time"
@@ -6,22 +7,27 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Table makes trace.Table with internal logging
+// Table makes ydb_trace.Table with internal logging
 // nolint:gocyclo
-func Table(log Logger, details trace.Details) trace.Table {
+func Table(log Logger, details ydb_trace.Details) ydb_trace.Table {
 	log = log.WithName(`table`)
-	t := trace.Table{}
-	if details&trace.TablePoolRetryEvents != 0 {
+	t := ydb_trace.Table{}
+	if details&ydb_trace.TablePoolRetryEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`retry`)
-		// nolint:lll
-		t.OnPoolRetry = func(info trace.PoolRetryStartInfo) func(info trace.PoolRetryInternalInfo) func(trace.PoolRetryDoneInfo) {
+		t.OnPoolRetry = func(
+			info ydb_trace.PoolRetryStartInfo,
+		) func(
+			info ydb_trace.PoolRetryInternalInfo,
+		) func(
+			ydb_trace.PoolRetryDoneInfo,
+		) {
 			idempotent := info.Idempotent
 			log.Tracef(`retry start {idempotent:%t}`,
 				idempotent,
 			)
 			start := time.Now()
-			return func(info trace.PoolRetryInternalInfo) func(trace.PoolRetryDoneInfo) {
+			return func(info ydb_trace.PoolRetryInternalInfo) func(ydb_trace.PoolRetryDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`retry intermediate {latency:"%s",idempotent:%t}`,
 						time.Since(start),
@@ -34,7 +40,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 						info.Error,
 					)
 				}
-				return func(info trace.PoolRetryDoneInfo) {
+				return func(info ydb_trace.PoolRetryDoneInfo) {
 					if info.Error == nil {
 						log.Tracef(`retry done {latency:"%s",idempotent:%t,attempts:%d}`,
 							time.Since(start),
@@ -54,14 +60,14 @@ func Table(log Logger, details trace.Details) trace.Table {
 		}
 	}
 	// nolint:nestif
-	if details&trace.TableSessionEvents != 0 {
+	if details&ydb_trace.TableSessionEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`session`)
-		if details&trace.TableSessionLifeCycleEvents != 0 {
-			t.OnSessionNew = func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
+		if details&ydb_trace.TableSessionLifeCycleEvents != 0 {
+			t.OnSessionNew = func(info ydb_trace.SessionNewStartInfo) func(ydb_trace.SessionNewDoneInfo) {
 				log.Tracef(`create start`)
 				start := time.Now()
-				return func(info trace.SessionNewDoneInfo) {
+				return func(info ydb_trace.SessionNewDoneInfo) {
 					if info.Error == nil {
 						log.Tracef(`create done {latency:"%s",id:%d}`,
 							time.Since(start),
@@ -75,14 +81,14 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			t.OnSessionDelete = func(info trace.SessionDeleteStartInfo) func(trace.SessionDeleteDoneInfo) {
+			t.OnSessionDelete = func(info ydb_trace.SessionDeleteStartInfo) func(ydb_trace.SessionDeleteDoneInfo) {
 				session := info.Session
 				log.Tracef(`delete start {id:"%s",status:"%s"}`,
 					session.ID(),
 					session.Status(),
 				)
 				start := time.Now()
-				return func(info trace.SessionDeleteDoneInfo) {
+				return func(info ydb_trace.SessionDeleteDoneInfo) {
 					if info.Error == nil {
 						log.Tracef(`delete done {latency:"%s",id:"%s",status:"%s"}`,
 							time.Since(start),
@@ -99,14 +105,14 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			t.OnSessionKeepAlive = func(info trace.KeepAliveStartInfo) func(trace.KeepAliveDoneInfo) {
+			t.OnSessionKeepAlive = func(info ydb_trace.KeepAliveStartInfo) func(ydb_trace.KeepAliveDoneInfo) {
 				session := info.Session
 				log.Tracef(`keep-alive start {id:"%s",status:"%s"}`,
 					session.ID(),
 					session.Status(),
 				)
 				start := time.Now()
-				return func(info trace.KeepAliveDoneInfo) {
+				return func(info ydb_trace.KeepAliveDoneInfo) {
 					if info.Error == nil {
 						log.Tracef(`keep-alive done {latency:"%s",id:"%s",status:"%s"}`,
 							time.Since(start),
@@ -124,13 +130,17 @@ func Table(log Logger, details trace.Details) trace.Table {
 				}
 			}
 		}
-		if details&trace.TableSessionQueryEvents != 0 {
+		if details&ydb_trace.TableSessionQueryEvents != 0 {
 			// nolint:govet
 			log := log.WithName(`query`)
-			if details&trace.TableSessionQueryInvokeEvents != 0 {
+			if details&ydb_trace.TableSessionQueryInvokeEvents != 0 {
 				// nolint:govet
 				log := log.WithName(`invoke`)
-				t.OnSessionQueryPrepare = func(info trace.SessionQueryPrepareStartInfo) func(trace.PrepareDataQueryDoneInfo) {
+				t.OnSessionQueryPrepare = func(
+					info ydb_trace.SessionQueryPrepareStartInfo,
+				) func(
+					ydb_trace.PrepareDataQueryDoneInfo,
+				) {
 					session := info.Session
 					query := info.Query
 					log.Tracef(`prepare start {id:"%s",status:"%s",query:"%s"}`,
@@ -139,7 +149,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 						query,
 					)
 					start := time.Now()
-					return func(info trace.PrepareDataQueryDoneInfo) {
+					return func(info ydb_trace.PrepareDataQueryDoneInfo) {
 						if info.Error == nil {
 							log.Debugf(`prepare done {latency:"%s",id:"%s",status:"%s",query:"%s",result:"%s"}`,
 								time.Since(start),
@@ -159,7 +169,11 @@ func Table(log Logger, details trace.Details) trace.Table {
 						}
 					}
 				}
-				t.OnSessionQueryExecute = func(info trace.ExecuteDataQueryStartInfo) func(trace.SessionQueryPrepareDoneInfo) {
+				t.OnSessionQueryExecute = func(
+					info ydb_trace.ExecuteDataQueryStartInfo,
+				) func(
+					ydb_trace.SessionQueryPrepareDoneInfo,
+				) {
 					session := info.Session
 					query := info.Query
 					params := info.Parameters
@@ -170,7 +184,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 						params,
 					)
 					start := time.Now()
-					return func(info trace.SessionQueryPrepareDoneInfo) {
+					return func(info ydb_trace.SessionQueryPrepareDoneInfo) {
 						if info.Error == nil {
 							tx := info.Tx
 							log.Debugf(
@@ -198,11 +212,14 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			if details&trace.TableSessionQueryStreamEvents != 0 {
+			if details&ydb_trace.TableSessionQueryStreamEvents != 0 {
 				// nolint:govet
 				log := log.WithName(`stream`)
-				// nolint:lll
-				t.OnSessionQueryStreamExecute = func(info trace.SessionQueryStreamExecuteStartInfo) func(trace.SessionQueryStreamExecuteDoneInfo) {
+				t.OnSessionQueryStreamExecute = func(
+					info ydb_trace.SessionQueryStreamExecuteStartInfo,
+				) func(
+					ydb_trace.SessionQueryStreamExecuteDoneInfo,
+				) {
 					session := info.Session
 					query := info.Query
 					params := info.Parameters
@@ -213,7 +230,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 						params,
 					)
 					start := time.Now()
-					return func(info trace.SessionQueryStreamExecuteDoneInfo) {
+					return func(info ydb_trace.SessionQueryStreamExecuteDoneInfo) {
 						if info.Error == nil {
 							log.Debugf(`execute done {latency:"%s",id:"%s",status:"%s",query:"%s",params:"%s"}`,
 								time.Since(start),
@@ -234,15 +251,18 @@ func Table(log Logger, details trace.Details) trace.Table {
 						}
 					}
 				}
-				// nolint:lll
-				t.OnSessionQueryStreamRead = func(info trace.SessionQueryStreamReadStartInfo) func(trace.SessionQueryStreamReadDoneInfo) {
+				t.OnSessionQueryStreamRead = func(
+					info ydb_trace.SessionQueryStreamReadStartInfo,
+				) func(
+					ydb_trace.SessionQueryStreamReadDoneInfo,
+				) {
 					session := info.Session
 					log.Tracef(`read start {id:"%s",status:"%s"}`,
 						session.ID(),
 						session.Status(),
 					)
 					start := time.Now()
-					return func(info trace.SessionQueryStreamReadDoneInfo) {
+					return func(info ydb_trace.SessionQueryStreamReadDoneInfo) {
 						if info.Error == nil {
 							log.Debugf(`read done {latency:"%s",id:"%s",status:"%s"}`,
 								time.Since(start),
@@ -261,18 +281,21 @@ func Table(log Logger, details trace.Details) trace.Table {
 				}
 			}
 		}
-		if details&trace.TableSessionTransactionEvents != 0 {
+		if details&ydb_trace.TableSessionTransactionEvents != 0 {
 			// nolint:govet
 			log := log.WithName(`transaction`)
-			// nolint:lll
-			t.OnSessionTransactionBegin = func(info trace.SessionTransactionBeginStartInfo) func(trace.SessionTransactionBeginDoneInfo) {
+			t.OnSessionTransactionBegin = func(
+				info ydb_trace.SessionTransactionBeginStartInfo,
+			) func(
+				ydb_trace.SessionTransactionBeginDoneInfo,
+			) {
 				session := info.Session
 				log.Tracef(`begin start {id:"%s",status:"%s"}`,
 					session.ID(),
 					session.Status(),
 				)
 				start := time.Now()
-				return func(info trace.SessionTransactionBeginDoneInfo) {
+				return func(info ydb_trace.SessionTransactionBeginDoneInfo) {
 					if info.Error == nil {
 						log.Debugf(`begin done {latency:"%s",id:"%s",status:"%s",tx:"%s"}`,
 							time.Since(start),
@@ -290,8 +313,11 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			// nolint:lll
-			t.OnSessionTransactionCommit = func(info trace.SessionTransactionCommitStartInfo) func(trace.SessionTransactionCommitDoneInfo) {
+			t.OnSessionTransactionCommit = func(
+				info ydb_trace.SessionTransactionCommitStartInfo,
+			) func(
+				ydb_trace.SessionTransactionCommitDoneInfo,
+			) {
 				session := info.Session
 				tx := info.Tx
 				log.Tracef(`commit start {id:"%s",status:"%s",tx:"%s"}`,
@@ -300,7 +326,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 					tx.ID(),
 				)
 				start := time.Now()
-				return func(info trace.SessionTransactionCommitDoneInfo) {
+				return func(info ydb_trace.SessionTransactionCommitDoneInfo) {
 					if info.Error == nil {
 						log.Debugf(`commit done {latency:"%s",id:"%s",status:"%s",tx:"%s"}`,
 							time.Since(start),
@@ -319,8 +345,11 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			// nolint:lll
-			t.OnSessionTransactionRollback = func(info trace.SessionTransactionRollbackStartInfo) func(trace.SessionTransactionRollbackDoneInfo) {
+			t.OnSessionTransactionRollback = func(
+				info ydb_trace.SessionTransactionRollbackStartInfo,
+			) func(
+				ydb_trace.SessionTransactionRollbackDoneInfo,
+			) {
 				session := info.Session
 				tx := info.Tx
 				log.Tracef(`rollback start {id:"%s",status:"%s",tx:"%s"}`,
@@ -329,7 +358,7 @@ func Table(log Logger, details trace.Details) trace.Table {
 					tx.ID(),
 				)
 				start := time.Now()
-				return func(info trace.SessionTransactionRollbackDoneInfo) {
+				return func(info ydb_trace.SessionTransactionRollbackDoneInfo) {
 					if info.Error == nil {
 						log.Debugf(`rollback done {latency:"%s",id:"%s",status:"%s",tx:"%s"}`,
 							time.Since(start),
@@ -351,14 +380,14 @@ func Table(log Logger, details trace.Details) trace.Table {
 		}
 	}
 	// nolint:nestif
-	if details&trace.TablePoolEvents != 0 {
+	if details&ydb_trace.TablePoolEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`pool`)
-		if details&trace.TablePoolLifeCycleEvents != 0 {
-			t.OnPoolInit = func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
+		if details&ydb_trace.TablePoolLifeCycleEvents != 0 {
+			t.OnPoolInit = func(info ydb_trace.PoolInitStartInfo) func(ydb_trace.PoolInitDoneInfo) {
 				log.Infof(`initialize start`)
 				start := time.Now()
-				return func(info trace.PoolInitDoneInfo) {
+				return func(info ydb_trace.PoolInitDoneInfo) {
 					log.Infof(`initialize done {latency:"%s",size:{min:%d,max:%d}}`,
 						time.Since(start),
 						info.KeepAliveMinSize,
@@ -366,10 +395,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 					)
 				}
 			}
-			t.OnPoolClose = func(info trace.PoolCloseStartInfo) func(trace.PoolCloseDoneInfo) {
+			t.OnPoolClose = func(info ydb_trace.PoolCloseStartInfo) func(ydb_trace.PoolCloseDoneInfo) {
 				log.Infof(`close start`)
 				start := time.Now()
-				return func(info trace.PoolCloseDoneInfo) {
+				return func(info ydb_trace.PoolCloseDoneInfo) {
 					if info.Error == nil {
 						log.Infof(`close done {latency:"%s"}`,
 							time.Since(start),
@@ -383,13 +412,13 @@ func Table(log Logger, details trace.Details) trace.Table {
 				}
 			}
 		}
-		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
+		if details&ydb_trace.TablePoolSessionLifeCycleEvents != 0 {
 			// nolint:govet
 			log := log.WithName(`session`)
-			t.OnPoolSessionNew = func(info trace.PoolSessionNewStartInfo) func(trace.PoolSessionNewDoneInfo) {
+			t.OnPoolSessionNew = func(info ydb_trace.PoolSessionNewStartInfo) func(ydb_trace.PoolSessionNewDoneInfo) {
 				log.Tracef(`create start`)
 				start := time.Now()
-				return func(info trace.PoolSessionNewDoneInfo) {
+				return func(info ydb_trace.PoolSessionNewDoneInfo) {
 					if info.Error == nil {
 						session := info.Session
 						log.Debugf(`create done {latency:"%s",id:"%s",status:"%s"}`,
@@ -405,14 +434,14 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			t.OnPoolSessionClose = func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
+			t.OnPoolSessionClose = func(info ydb_trace.PoolSessionCloseStartInfo) func(ydb_trace.PoolSessionCloseDoneInfo) {
 				session := info.Session
 				log.Tracef(`close start {id:"%s",status:"%s"}`,
 					session.ID(),
 					session.Status(),
 				)
 				start := time.Now()
-				return func(info trace.PoolSessionCloseDoneInfo) {
+				return func(info ydb_trace.PoolSessionCloseDoneInfo) {
 					log.Debugf(`close done {latency:"%s",id:"%s",status:"%s"}`,
 						time.Since(start),
 						session.ID(),
@@ -421,15 +450,15 @@ func Table(log Logger, details trace.Details) trace.Table {
 				}
 			}
 		}
-		if details&trace.TablePoolAPIEvents != 0 {
-			t.OnPoolPut = func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
+		if details&ydb_trace.TablePoolAPIEvents != 0 {
+			t.OnPoolPut = func(info ydb_trace.PoolPutStartInfo) func(ydb_trace.PoolPutDoneInfo) {
 				session := info.Session
 				log.Tracef(`put start {id:"%s",status:"%s"}`,
 					session.ID(),
 					session.Status(),
 				)
 				start := time.Now()
-				return func(info trace.PoolPutDoneInfo) {
+				return func(info ydb_trace.PoolPutDoneInfo) {
 					if info.Error == nil {
 						log.Tracef(`put done {latency:"%s",id:"%s",status:"%s"}`,
 							time.Since(start),
@@ -446,10 +475,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			t.OnPoolGet = func(info trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
+			t.OnPoolGet = func(info ydb_trace.PoolGetStartInfo) func(ydb_trace.PoolGetDoneInfo) {
 				log.Tracef(`get start`)
 				start := time.Now()
-				return func(info trace.PoolGetDoneInfo) {
+				return func(info ydb_trace.PoolGetDoneInfo) {
 					if info.Error == nil {
 						session := info.Session
 						log.Tracef(`get done {latency:"%s",id:"%s",status:"%s",attempts:%d}`,
@@ -467,10 +496,10 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			t.OnPoolWait = func(info trace.PoolWaitStartInfo) func(trace.PoolWaitDoneInfo) {
+			t.OnPoolWait = func(info ydb_trace.PoolWaitStartInfo) func(ydb_trace.PoolWaitDoneInfo) {
 				log.Tracef(`wait start`)
 				start := time.Now()
-				return func(info trace.PoolWaitDoneInfo) {
+				return func(info ydb_trace.PoolWaitDoneInfo) {
 					if info.Error == nil {
 						if info.Session == nil {
 							log.Tracef(`wait done without any significant result {latency:"%s"}`,
@@ -500,21 +529,26 @@ func Table(log Logger, details trace.Details) trace.Table {
 					}
 				}
 			}
-			// nolint:lll
-			t.OnPoolTake = func(info trace.PoolTakeStartInfo) func(doneInfo trace.PoolTakeWaitInfo) func(doneInfo trace.PoolTakeDoneInfo) {
+			t.OnPoolTake = func(
+				info ydb_trace.PoolTakeStartInfo,
+			) func(
+				doneInfo ydb_trace.PoolTakeWaitInfo,
+			) func(
+				doneInfo ydb_trace.PoolTakeDoneInfo,
+			) {
 				session := info.Session
 				log.Tracef(`take start {id:"%s",status:"%s"}`,
 					session.ID(),
 					session.Status(),
 				)
 				start := time.Now()
-				return func(info trace.PoolTakeWaitInfo) func(info trace.PoolTakeDoneInfo) {
+				return func(info ydb_trace.PoolTakeWaitInfo) func(info ydb_trace.PoolTakeDoneInfo) {
 					log.Tracef(`take intermediate {latency:"%s",id:"%s",status:"%s"}`,
 						time.Since(start),
 						session.ID(),
 						session.Status(),
 					)
-					return func(info trace.PoolTakeDoneInfo) {
+					return func(info ydb_trace.PoolTakeDoneInfo) {
 						if info.Error == nil {
 							log.Tracef(`take done {latency:"%s",id:"%s",status:"%s",took:%t}`,
 								time.Since(start),

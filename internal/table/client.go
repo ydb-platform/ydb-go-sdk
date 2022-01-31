@@ -42,15 +42,15 @@ func ErrNoProgress(attempts int) error {
 type SessionBuilder func(context.Context) (Session, error)
 
 type Client interface {
-	table.Client
+	ydb_table.Client
 
 	Get(ctx context.Context) (s Session, err error)
 	Put(ctx context.Context, s Session) (err error)
 	CloseSession(ctx context.Context, s Session) (err error)
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, opts ...config.Option) Client {
-	config := config.New(opts...)
+func New(ctx context.Context, cc grpc.ClientConnInterface, opts ...ydb_table_config.Option) Client {
+	config := ydb_table_config.New(opts...)
 	return newClient(ctx, cc, nil, config)
 }
 
@@ -58,12 +58,12 @@ func newClient(
 	ctx context.Context,
 	cc grpc.ClientConnInterface,
 	builder SessionBuilder,
-	config config.Config,
+	config ydb_table_config.Config,
 ) *client {
-	onDone := trace.TableOnPoolInit(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+	onDone := ydb_trace.TableOnPoolInit(config.Trace().Compose(ydb_trace.ContextTable(ctx)), &ctx)
 	if builder == nil {
 		builder = func(ctx context.Context) (s Session, err error) {
-			return newSession(ctx, cc, config.Trace().Compose(trace.ContextTable(ctx)))
+			return newSession(ctx, cc, config.Trace().Compose(ydb_trace.ContextTable(ctx)))
 		}
 	}
 	c := &client{
@@ -97,12 +97,12 @@ type client struct {
 	// It must not be nil.
 	build             SessionBuilder
 	cc                grpc.ClientConnInterface
-	config            config.Config
+	config            ydb_table_config.Config
 	index             map[Session]sessionInfo
 	createInProgress  int           // KIKIMR-9163: in-create-process counter
 	limit             int           // Upper bound for client size.
-	idle              *list.List    // list<table.session>
-	waitq             *list.List    // list<*chan table.session>
+	idle              *list.List    // list<ydb_table.session>
+	waitq             *list.List    // list<*chan ydb_table.session>
 	keeperWake        chan struct{} // Set by keeper.
 	keeperStop        chan struct{}
 	keeperDone        chan struct{}
@@ -115,7 +115,7 @@ type client struct {
 	closed            bool
 }
 
-func (c *client) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
+func (c *client) CreateSession(ctx context.Context) (s ydb_table.ClosableSession, err error) {
 	return c.build(ctx)
 }
 
@@ -141,7 +141,7 @@ func isCreateSessionErrorRetriable(err error) bool {
 }
 
 type Session interface {
-	table.ClosableSession
+	ydb_table.ClosableSession
 
 	IsClosed() bool
 	Status() string
@@ -172,10 +172,10 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 	go func() {
 		var (
 			r createSessionResult
-			t = c.config.Trace().Compose(trace.ContextTable(ctx))
+			t = c.config.Trace().Compose(ydb_trace.ContextTable(ctx))
 		)
 
-		onDone := trace.TableOnPoolSessionNew(t, &ctx)
+		onDone := ydb_trace.TableOnPoolSessionNew(t, &ctx)
 		defer func() {
 			onDone(r.s, r.err)
 		}()
@@ -251,10 +251,10 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 func (c *client) Get(ctx context.Context) (s Session, err error) {
 	var (
 		i = 0
-		t = c.config.Trace().Compose(trace.ContextTable(ctx))
+		t = c.config.Trace().Compose(ydb_trace.ContextTable(ctx))
 	)
 
-	onDone := trace.TableOnPoolGet(t, &ctx)
+	onDone := ydb_trace.TableOnPoolGet(t, &ctx)
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -298,7 +298,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 	return s, err
 }
 
-func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err error) {
+func (c *client) waitFromCh(ctx context.Context, t ydb_trace.Table) (s Session, err error) {
 	var (
 		ch *chan Session
 		el *list.Element // Element in the wait queue.
@@ -310,7 +310,7 @@ func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 	el = c.waitq.PushBack(ch)
 	c.mu.Unlock()
 
-	waitDone := trace.TableOnPoolWait(t, &ctx)
+	waitDone := ydb_trace.TableOnPoolWait(t, &ctx)
 
 	defer func() {
 		waitDone(s, err)
@@ -356,7 +356,7 @@ func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
 func (c *client) Put(ctx context.Context, s Session) (err error) {
-	onDone := trace.TableOnPoolPut(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
+	onDone := ydb_trace.TableOnPoolPut(c.config.Trace().Compose(ydb_trace.ContextTable(ctx)), &ctx, s)
 	defer func() {
 		onDone(err)
 	}()
@@ -371,7 +371,7 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 
 	default:
 		if !c.notify(s) {
-			c.pushIdle(s, timeutil.Now())
+			c.pushIdle(s, ydb_testutil_timeutil.Now())
 		}
 	}
 	c.mu.Unlock()
@@ -397,7 +397,7 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 //
 // It is assumed that Take() callers never call Get() method.
 func (c *client) Take(ctx context.Context, s Session) (took bool, err error) {
-	onWait := trace.TableOnPoolTake(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
+	onWait := ydb_trace.TableOnPoolTake(c.config.Trace().Compose(ydb_trace.ContextTable(ctx)), &ctx, s)
 	var onDone func(took bool, _ error)
 	defer func() {
 		if onDone == nil {
@@ -477,7 +477,7 @@ func (c *client) Create(ctx context.Context) (s Session, err error) {
 // It returns first error occurred during stale sessions' deletion.
 // Note that even on error it calls Close() on each session.
 func (c *client) Close(ctx context.Context) (err error) {
-	onDone := trace.TableOnPoolClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+	onDone := ydb_trace.TableOnPoolClose(c.config.Trace().Compose(ydb_trace.ContextTable(ctx)), &ctx)
 	defer func() {
 		onDone(err)
 	}()
@@ -529,7 +529,7 @@ func (c *client) Close(ctx context.Context) (err error) {
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+func (c *client) Do(ctx context.Context, op ydb_table.Operation, opts ...ydb_table.Option) (err error) {
 	if c.isClosed() {
 		return ErrSessionPoolClosed
 	}
@@ -547,13 +547,13 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
+func (c *client) DoTx(ctx context.Context, op ydb_table.TxOperation, opts ...ydb_table.Option) (err error) {
 	if c.isClosed() {
 		return ErrSessionPoolClosed
 	}
-	options := table.Options{
-		Idempotent: table.ContextIdempotentOperation(ctx),
-		TxSettings: table.ContextTransactionSettings(ctx),
+	options := ydb_table.Options{
+		Idempotent: ydb_table.ContextIdempotentOperation(ctx),
+		TxSettings: ydb_table.ContextTransactionSettings(ctx),
 	}
 	for _, o := range opts {
 		o(&options)
@@ -561,10 +561,10 @@ func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 	return retryBackoff(
 		ctx,
 		c,
-		retry.FastBackoff,
-		retry.SlowBackoff,
+		ydb_retry.FastBackoff,
+		ydb_retry.SlowBackoff,
 		options.Idempotent,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s ydb_table.Session) (err error) {
 			tx, err := s.BeginTransaction(ctx, options.TxSettings)
 			if err != nil {
 				return err
@@ -614,7 +614,7 @@ func (c *client) keeper() {
 		toTryAgain []Session // Cached for reuse.
 
 		wake  = make(chan struct{})
-		timer = timeutil.NewTimer(c.config.IdleThreshold())
+		timer = ydb_testutil_timeutil.NewTimer(c.config.IdleThreshold())
 	)
 
 	for {
@@ -864,7 +864,7 @@ func (c *client) notify(s Session) (notified bool) {
 // CloseSession must be fast. If necessary, can be async.
 func (c *client) CloseSession(ctx context.Context, s Session) error {
 	c.wgClosed.Add(1)
-	onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
+	onDone := ydb_trace.TableOnPoolSessionClose(c.config.Trace().Compose(ydb_trace.ContextTable(ctx)), &ctx, s)
 	defer onDone()
 	fn := func() {
 		defer c.wgClosed.Done()

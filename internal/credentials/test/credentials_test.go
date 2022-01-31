@@ -36,7 +36,7 @@ func TestCredentialsString(t *testing.T) {
 	} {
 		t.Run(test.s, func(t *testing.T) {
 			if stringer, ok := test.c.(fmt.Stringer); ok {
-				testutil.Equal(t, test.s, stringer.String())
+				ydb_testutil.Equal(t, test.s, stringer.String())
 			}
 		})
 	}

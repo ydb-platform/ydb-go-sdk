@@ -1,4 +1,5 @@
-package timetest
+// nolint:revive
+package ydb_testutil_timeutil_timetest
 
 import (
 	"runtime"
@@ -62,7 +63,7 @@ func StubTimers(t *testing.T, callers ...string) (ts TimerStubs, cleanup func())
 			Reset:   make(chan time.Duration),
 		}
 	}
-	cleanup = timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
+	cleanup = ydb_testutil_timeutil.StubTestHookNewTimer(func(d time.Duration) (r ydb_testutil_timeutil.Timer) {
 		var (
 			s     *TimerStub
 			chain string
@@ -104,7 +105,7 @@ func StubSingleTimer(t *testing.T) *SingleTimerStub {
 			Reset:   make(chan time.Duration),
 		},
 	}
-	s.Cleanup = timeutil.StubTestHookNewTimer(func(d time.Duration) (r timeutil.Timer) {
+	s.Cleanup = ydb_testutil_timeutil.StubTestHookNewTimer(func(d time.Duration) (r ydb_testutil_timeutil.Timer) {
 		if !s.Init() {
 			t.Fatalf("timeutil.NewTimer() is called more than once")
 			return nil

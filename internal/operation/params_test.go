@@ -84,7 +84,7 @@ func TestOperationParams(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			_, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
+			_, cleanupNow := ydb_testutil_timeutil.StubTestHookTimeNow(time.Unix(0, 0))
 			defer cleanupNow()
 
 			ctx := context.Background()
@@ -99,7 +99,7 @@ func TestOperationParams(t *testing.T) {
 			}
 			if t := test.ctxTimeout; t > 0 {
 				var cancel context.CancelFunc
-				ctx, cancel = context.WithDeadline(ctx, timeutil.Now().Add(t))
+				ctx, cancel = context.WithDeadline(ctx, ydb_testutil_timeutil.Now().Add(t))
 				defer cancel()
 			}
 

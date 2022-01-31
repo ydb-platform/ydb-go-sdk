@@ -1,4 +1,5 @@
-package named
+// nolint:revive
+package ydb_table_result_named
 
 type Type uint8
 

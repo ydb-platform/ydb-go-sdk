@@ -61,7 +61,7 @@ func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
 	return n, nil
 }
 
-func (s *rawConverter) Type() types.Type {
+func (s *rawConverter) Type() ydb_table_types.Type {
 	return s.getType()
 }
 
@@ -252,8 +252,8 @@ func (s *rawConverter) Any() interface{} {
 	return s.any()
 }
 
-// Value returns current item under scan as ydb.Value types.
-func (s *rawConverter) Value() types.Value {
+// Value returns current item under scan as ydb.Value ydb_table_types.
+func (s *rawConverter) Value() ydb_table_types.Value {
 	if s.Err() != nil {
 		return nil
 	}
@@ -261,7 +261,7 @@ func (s *rawConverter) Value() types.Value {
 	return s.value()
 }
 
-func (s *rawConverter) AssertType(t types.Type) bool {
+func (s *rawConverter) AssertType(t ydb_table_types.Type) bool {
 	return s.assertCurrentTypeIs(t)
 }
 
@@ -506,7 +506,7 @@ func (s *rawConverter) Unwrap() {
 	})
 }
 
-func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
+func (s *rawConverter) Decimal(t ydb_table_types.Type) (v [16]byte) {
 	if s.Err() != nil {
 		return
 	}
@@ -517,7 +517,7 @@ func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
 	return s.uint128()
 }
 
-func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
+func (s *rawConverter) UnwrapDecimal() (v ydb_table_types.Decimal) {
 	if s.Err() != nil {
 		return
 	}
@@ -526,7 +526,7 @@ func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
 	if d == nil {
 		return
 	}
-	return types.Decimal{
+	return ydb_table_types.Decimal{
 		Bytes:     s.uint128(),
 		Precision: d.DecimalType.Precision,
 		Scale:     d.DecimalType.Scale,
@@ -540,7 +540,7 @@ func (s *rawConverter) IsDecimal() bool {
 	return s.isCurrentTypeDecimal()
 }
 
-func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
+func isEqualDecimal(d *Ydb.DecimalType, t ydb_table_types.Type) bool {
 	w := t.(value.DecimalType)
 	return d.Precision == w.Precision && d.Scale == w.Scale
 }
@@ -647,7 +647,7 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 	return false
 }
 
-func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
+func (s *rawConverter) assertCurrentTypeIs(t ydb_table_types.Type) bool {
 	c := s.stack.current()
 	act := value.TypeFromYDB(c.t)
 	if !value.TypesEqual(act, t) {
@@ -660,7 +660,7 @@ func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	return true
 }
 
-func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
+func (s *rawConverter) assertCurrentTypeDecimal(t ydb_table_types.Type) bool {
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
 		return false
@@ -727,7 +727,7 @@ func (s *rawConverter) boundsError(n, i int) {
 	)
 }
 
-func (s *rawConverter) decimalTypeError(t types.Type) {
+func (s *rawConverter) decimalTypeError(t ydb_table_types.Type) {
 	_ = s.errorf(
 		"unexpected decimal types at %q %s: want %s",
 		s.Path(), s.getType(), t,

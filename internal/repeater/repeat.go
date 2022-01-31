@@ -22,7 +22,7 @@ type repeater struct {
 	// Task is a function that must be executed periodically.
 	task func(context.Context)
 
-	timer    timeutil.Timer
+	timer    ydb_testutil_timeutil.Timer
 	stopOnce sync.Once
 	stop     chan struct{}
 	done     chan struct{}
@@ -40,7 +40,7 @@ func NewRepeater(ctx context.Context, interval time.Duration, task func(ctx cont
 	r := &repeater{
 		interval: interval,
 		task:     task,
-		timer:    timeutil.NewTimer(interval),
+		timer:    ydb_testutil_timeutil.NewTimer(interval),
 		stopOnce: sync.Once{},
 		stop:     make(chan struct{}),
 		done:     make(chan struct{}),

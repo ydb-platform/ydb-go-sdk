@@ -1,4 +1,5 @@
-package scheme
+// nolint:revive
+package ydb_scheme
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"

@@ -13,9 +13,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -23,9 +24,9 @@ type Option func(ctx context.Context, c *connection) error
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
-		credentials.NewAccessTokenCredentials(
+		ydb_credentials.NewAccessTokenCredentials(
 			accessToken,
-			credentials.WithSourceInfo(
+			ydb_credentials.WithSourceInfo(
 				"ydb.WithAccessTokenCredentials(accessToken)", // hide access token for logs
 			),
 		),
@@ -34,7 +35,7 @@ func WithAccessTokenCredentials(accessToken string) Option {
 
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithUserAgent(userAgent))
+		c.options = append(c.options, ydb_config.WithUserAgent(userAgent))
 		return nil
 	}
 }
@@ -51,28 +52,28 @@ func WithConnectionString(dsn string) Option {
 
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithConnectionTTL(ttl))
+		c.options = append(c.options, ydb_config.WithConnectionTTL(ttl))
 		return nil
 	}
 }
 
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithEndpoint(endpoint))
+		c.options = append(c.options, ydb_config.WithEndpoint(endpoint))
 		return nil
 	}
 }
 
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithDatabase(database))
+		c.options = append(c.options, ydb_config.WithDatabase(database))
 		return nil
 	}
 }
 
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithSecure(secure))
+		c.options = append(c.options, ydb_config.WithSecure(secure))
 		return nil
 	}
 }
@@ -103,7 +104,7 @@ func WithNoColor(b bool) LoggerOption {
 	return LoggerOption(logger.WithNoColor(b))
 }
 
-func WithExternalLogger(external log.Logger) LoggerOption {
+func WithExternalLogger(external ydb_log.Logger) LoggerOption {
 	return LoggerOption(logger.WithExternalLogger(external))
 }
 
@@ -115,17 +116,17 @@ func WithErrWriter(err io.Writer) LoggerOption {
 	return LoggerOption(logger.WithErrWriter(err))
 }
 
-func WithLogger(details trace.Details, opts ...LoggerOption) Option {
+func WithLogger(details ydb_trace.Details, opts ...LoggerOption) Option {
 	return func(ctx context.Context, c *connection) error {
 		nativeOpts := make([]logger.Option, 0, len(opts))
 		for _, o := range opts {
 			nativeOpts = append(nativeOpts, logger.Option(o))
 		}
 		l := logger.New(nativeOpts...)
-		if err := WithTraceDriver(log.Driver(l, details))(ctx, c); err != nil {
+		if err := WithTraceDriver(ydb_log.Driver(l, details))(ctx, c); err != nil {
 			return err
 		}
-		return WithTraceTable(log.Table(l, details))(ctx, c)
+		return WithTraceTable(ydb_log.Table(l, details))(ctx, c)
 	}
 }
 
@@ -133,17 +134,17 @@ func WithConnectParams(params ConnectParams) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(
 			c.options,
-			config.WithEndpoint(params.Endpoint()),
-			config.WithDatabase(params.Database()),
-			config.WithSecure(params.Secure()),
+			ydb_config.WithEndpoint(params.Endpoint()),
+			ydb_config.WithDatabase(params.Database()),
+			ydb_config.WithSecure(params.Secure()),
 		)
 		if params.Token() != "" {
 			c.options = append(
 				c.options,
-				config.WithCredentials(
-					credentials.NewAccessTokenCredentials(
+				ydb_config.WithCredentials(
+					ydb_credentials.NewAccessTokenCredentials(
 						params.Token(),
-						credentials.WithSourceInfo("config.WithConnectParams()"),
+						ydb_credentials.WithSourceInfo("ydb_config.WithConnectParams()"),
 					),
 				),
 			)
@@ -154,7 +155,7 @@ func WithConnectParams(params ConnectParams) Option {
 
 func WithAnonymousCredentials() Option {
 	return WithCredentials(
-		credentials.NewAnonymousCredentials(credentials.WithSourceInfo("ydb.WithAnonymousCredentials()")),
+		ydb_credentials.NewAnonymousCredentials(ydb_credentials.WithSourceInfo("ydb.WithAnonymousCredentials()")),
 	)
 }
 
@@ -164,7 +165,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 		if err != nil {
 			return err
 		}
-		c.options = append(c.options, config.WithCredentials(credentials))
+		c.options = append(c.options, ydb_config.WithCredentials(credentials))
 		return nil
 	}
 }
@@ -177,19 +178,19 @@ func WithCredentials(c credentials.Credentials) Option {
 
 func WithBalancer(balancer balancer.Balancer) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithBalancer(balancer))
+		c.options = append(c.options, ydb_config.WithBalancer(balancer))
 		return nil
 	}
 }
 
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithDialTimeout(timeout))
+		c.options = append(c.options, ydb_config.WithDialTimeout(timeout))
 		return nil
 	}
 }
 
-func With(options ...config.Option) Option {
+func With(options ...ydb_config.Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, options...)
 		return nil
@@ -209,22 +210,22 @@ func MergeOptions(options ...Option) Option {
 
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithDiscoveryInterval(discoveryInterval))
+		c.options = append(c.options, ydb_config.WithDiscoveryInterval(discoveryInterval))
 		return nil
 	}
 }
 
 // WithTraceDriver returns deadline which has associated Driver with it.
-func WithTraceDriver(trace trace.Driver) Option {
+func WithTraceDriver(trace ydb_trace.Driver) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithTrace(trace))
+		c.options = append(c.options, ydb_config.WithTrace(trace))
 		return nil
 	}
 }
 
 func WithCertificate(cert *x509.Certificate) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithCertificate(cert))
+		c.options = append(c.options, ydb_config.WithCertificate(cert))
 		return nil
 	}
 }
@@ -275,7 +276,7 @@ func WithCertificatesFromPem(bytes []byte) Option {
 	}
 }
 
-func WithTableConfigOption(option tableConfig.Option) Option {
+func WithTableConfigOption(option ydb_table_config.Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, option)
 		return nil
@@ -284,50 +285,50 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+		c.tableOptions = append(c.tableOptions, ydb_table_config.WithSizeLimit(sizeLimit))
 		return nil
 	}
 }
 
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveMinSize(keepAliveMinSize))
+		c.tableOptions = append(c.tableOptions, ydb_table_config.WithKeepAliveMinSize(keepAliveMinSize))
 		return nil
 	}
 }
 
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
+		c.tableOptions = append(c.tableOptions, ydb_table_config.WithIdleThreshold(idleThreshold))
 		return nil
 	}
 }
 
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveTimeout(keepAliveTimeout))
+		c.tableOptions = append(c.tableOptions, ydb_table_config.WithKeepAliveTimeout(keepAliveTimeout))
 		return nil
 	}
 }
 
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
+		c.tableOptions = append(c.tableOptions, ydb_table_config.WithCreateSessionTimeout(createSessionTimeout))
 		return nil
 	}
 }
 
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
+		c.tableOptions = append(c.tableOptions, ydb_table_config.WithDeleteTimeout(deleteTimeout))
 		return nil
 	}
 }
 
 // WithTraceTable returns deadline which has associated Driver with it.
-func WithTraceTable(trace trace.Table) Option {
+func WithTraceTable(trace ydb_trace.Table) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithTrace(trace))
+		c.tableOptions = append(c.tableOptions, ydb_table_config.WithTrace(trace))
 		return nil
 	}
 }

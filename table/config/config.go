@@ -1,4 +1,5 @@
-package config
+// nolint:revive
+package ydb_table_config
 
 import (
 	"time"
@@ -18,7 +19,7 @@ const (
 
 type Config interface {
 	// Trace is an optional session lifetime tracing options.
-	Trace() trace.Table
+	Trace() ydb_trace.Table
 
 	// SizeLimit is an upper bound of pooled sessions.
 	// If SizeLimit is less than or equal to zero then the
@@ -136,7 +137,7 @@ func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-func WithTrace(trace trace.Table) Option {
+func WithTrace(trace ydb_trace.Table) Option {
 	return func(c *config) {
 		c.trace = c.trace.Compose(trace)
 	}
@@ -150,10 +151,10 @@ type config struct {
 	keepAliveTimeout       time.Duration
 	createSessionTimeout   time.Duration
 	deleteTimeout          time.Duration
-	trace                  trace.Table
+	trace                  ydb_trace.Table
 }
 
-func (c *config) Trace() trace.Table {
+func (c *config) Trace() ydb_trace.Table {
 	return c.trace
 }
 

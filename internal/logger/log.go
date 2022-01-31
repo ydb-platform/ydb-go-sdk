@@ -130,7 +130,7 @@ func FromString(l string) Level {
 }
 
 type logger struct {
-	external  log.Logger
+	external  ydb_log.Logger
 	namespace string
 	minLevel  Level
 	noColor   bool
@@ -158,7 +158,7 @@ func WithNamespace(namespace string) Option {
 	}
 }
 
-func WithExternalLogger(external log.Logger) Option {
+func WithExternalLogger(external ydb_log.Logger) Option {
 	return func(l *logger) {
 		l.external = external
 	}
@@ -288,7 +288,7 @@ func join(a, b string) string {
 	return a + "." + b
 }
 
-func (l *logger) WithName(name string) log.Logger {
+func (l *logger) WithName(name string) ydb_log.Logger {
 	return &logger{
 		external:  l.external,
 		out:       l.out,

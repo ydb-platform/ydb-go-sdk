@@ -43,12 +43,12 @@ func (s *scanner) ColumnCount() int {
 }
 
 // Columns allows to iterate over all columns of the current result set.
-func (s *scanner) Columns(it func(options.Column)) {
+func (s *scanner) Columns(it func(ydb_table_options.Column)) {
 	if s.set == nil {
 		return
 	}
 	for _, m := range s.set.Columns {
-		it(options.Column{
+		it(ydb_table_options.Column{
 			Name: m.Name,
 			Type: value.TypeFromYDB(m.Type),
 		})
@@ -94,7 +94,7 @@ func (s *scanner) NextRow() bool {
 
 func (s *scanner) ScanWithDefaults(values ...interface{}) error {
 	for _, v := range values {
-		if _, ok := v.(named.Value); ok {
+		if _, ok := v.(ydb_table_result_named.Value); ok {
 			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
 		}
 	}
@@ -104,7 +104,7 @@ func (s *scanner) ScanWithDefaults(values ...interface{}) error {
 
 func (s *scanner) Scan(values ...interface{}) error {
 	for _, v := range values {
-		if _, ok := v.(named.Value); ok {
+		if _, ok := v.(ydb_table_result_named.Value); ok {
 			panic("dont use NamedValue with Scan. Use ScanNamed instead")
 		}
 	}
@@ -112,7 +112,7 @@ func (s *scanner) Scan(values ...interface{}) error {
 	return s.scan(values)
 }
 
-func (s *scanner) ScanNamed(namedValues ...named.Value) (err error) {
+func (s *scanner) ScanNamed(namedValues ...ydb_table_result_named.Value) (err error) {
 	if err = s.Err(); err != nil {
 		return
 	}
@@ -127,14 +127,14 @@ func (s *scanner) ScanNamed(namedValues ...named.Value) (err error) {
 			return
 		}
 		switch t := v.Type; t {
-		case named.TypeRequired:
+		case ydb_table_result_named.TypeRequired:
 			s.scanRequired(v.Value)
-		case named.TypeOptional:
+		case ydb_table_result_named.TypeOptional:
 			s.scanOptional(v.Value, false)
-		case named.TypeOptionalWithUseDefault:
+		case ydb_table_result_named.TypeOptionalWithUseDefault:
 			s.scanOptional(v.Value, true)
 		default:
-			panic(fmt.Sprintf("unknown type of named.Value: %d", t))
+			panic(fmt.Sprintf("unknown type of ydb_table_result_named.Value: %d", t))
 		}
 	}
 	s.nextItem += len(namedValues)
@@ -189,7 +189,7 @@ func (s *scanner) writePathTo(w io.Writer) (n int64, err error) {
 	return n, nil
 }
 
-func (s *scanner) getType() types.Type {
+func (s *scanner) getType() ydb_table_types.Type {
 	x := s.stack.current()
 	if x.isEmpty() {
 		return nil
@@ -355,8 +355,8 @@ func (s *scanner) any() interface{} {
 	}
 }
 
-// Value returns current item under scan as ydb.Value types.
-func (s *scanner) value() types.Value {
+// Value returns current item under scan as ydb.Value ydb_table_types.
+func (s *scanner) value() ydb_table_types.Value {
 	x := s.stack.current()
 	return value.FromYDB(x.t, x.v)
 }
@@ -371,7 +371,7 @@ func (s *scanner) isNull() bool {
 	return yes
 }
 
-// unwrap current item under scan interpreting it as Optional<T> types.
+// unwrap current item under scan interpreting it as Optional<T> ydb_table_types.
 // ignores if type is not optional
 func (s *scanner) unwrap() {
 	if s.Err() != nil {
@@ -398,7 +398,7 @@ func (s *scanner) unwrapValue() (v *Ydb.Value) {
 	return x.NestedValue
 }
 
-func (s *scanner) unwrapDecimal() (v types.Decimal) {
+func (s *scanner) unwrapDecimal() (v ydb_table_types.Decimal) {
 	if s.Err() != nil {
 		return
 	}
@@ -407,7 +407,7 @@ func (s *scanner) unwrapDecimal() (v types.Decimal) {
 	if d == nil {
 		return
 	}
-	return types.Decimal{
+	return ydb_table_types.Decimal{
 		Bytes:     s.uint128(),
 		Precision: d.DecimalType.Precision,
 		Scale:     d.DecimalType.Scale,
@@ -703,11 +703,11 @@ func (s *scanner) scanRequired(value interface{}) {
 		*v = s.uint128()
 	case *interface{}:
 		*v = s.any()
-	case *types.Value:
+	case *ydb_table_types.Value:
 		*v = s.value()
-	case *types.Decimal:
+	case *ydb_table_types.Decimal:
 		*v = s.unwrapDecimal()
-	case types.Scanner:
+	case ydb_table_types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf("ydb.Scanner error: %w", err)
@@ -876,16 +876,16 @@ func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) 
 			src := s.any()
 			*v = &src
 		}
-	case *types.Value:
+	case *ydb_table_types.Value:
 		*v = s.value()
-	case **types.Decimal:
+	case **ydb_table_types.Decimal:
 		if s.isNull() {
 			*v = nil
 		} else {
 			src := s.unwrapDecimal()
 			*v = &src
 		}
-	case types.Scanner:
+	case ydb_table_types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf("ydb.Scanner error: %w", err)
@@ -945,16 +945,16 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 		*v = [16]byte{}
 	case *interface{}:
 		*v = nil
-	case *types.Value:
+	case *ydb_table_types.Value:
 		*v = s.value()
-	case *types.Decimal:
-		*v = types.Decimal{}
+	case *ydb_table_types.Decimal:
+		*v = ydb_table_types.Decimal{}
 	case sql.Scanner:
 		err := v.Scan(nil)
 		if err != nil {
 			_ = s.errorf("sql.Scanner error: %w", err)
 		}
-	case types.Scanner:
+	case ydb_table_types.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf("ydb.Scanner error: %w", err)
@@ -1056,7 +1056,7 @@ var emptyItem item
 
 type item struct {
 	name string
-	i    int // Index in listing types.
+	i    int // Index in listing ydb_table_types.
 	t    *Ydb.Type
 	v    *Ydb.Value
 }

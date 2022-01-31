@@ -1,21 +1,18 @@
-package config
+// nolint:revive
+package ydb_config
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"net"
 	"time"
 
 	"google.golang.org/grpc"
-	grpcCredentials "google.golang.org/grpc/credentials"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
-	ydbCredentials "github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/resolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -36,10 +33,10 @@ type Config interface {
 
 	// Credentials is an ydb client credentials.
 	// In most cases Credentials are required.
-	Credentials() ydbCredentials.Credentials
+	Credentials() ydb_credentials.Credentials
 
 	// Trace contains driver tracing options.
-	Trace() trace.Driver
+	Trace() ydb_trace.Driver
 
 	// RequestTimeout is the maximum amount of time a Call() will wait for an
 	// operation to complete.
@@ -102,7 +99,7 @@ type Config interface {
 
 // Config contains driver configuration options.
 type config struct {
-	trace                trace.Driver
+	trace                ydb_trace.Driver
 	requestTimeout       time.Duration
 	streamTimeout        time.Duration
 	operationTimeout     time.Duration
@@ -130,36 +127,6 @@ func (c *config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
 
-func (c *config) GrpcDialOptions() (opts []grpc.DialOption) {
-	// nolint:gocritic
-	opts = append(
-		c.grpcOptions,
-		grpc.WithContextDialer(func(ctx context.Context, address string) (net.Conn, error) {
-			return newConn(ctx, address, trace.ContextDriver(ctx).Compose(c.trace))
-		}),
-		grpc.WithKeepaliveParams(DefaultGrpcConnectionPolicy),
-		grpc.WithResolvers(
-			resolver.New(""), // for use this resolver by default
-			resolver.New("grpc"),
-			resolver.New("grpcs"),
-		),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
-			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
-		),
-		grpc.WithBlock(),
-	)
-	if c.secure {
-		opts = append(opts, grpc.WithTransportCredentials(
-			grpcCredentials.NewTLS(c.tlsConfig),
-		))
-	} else {
-		opts = append(opts, grpc.WithInsecure())
-	}
-	return
-}
-
 func (c *config) Secure() bool {
 	return c.secure
 }
@@ -184,7 +151,7 @@ func (c *config) Credentials() credentials.Credentials {
 	return c.credentials
 }
 
-func (c *config) Trace() trace.Driver {
+func (c *config) Trace() ydb_trace.Driver {
 	return c.trace
 }
 
@@ -242,7 +209,7 @@ func WithCertificate(certificate *x509.Certificate) Option {
 	}
 }
 
-func WithTrace(trace trace.Driver) Option {
+func WithTrace(trace ydb_trace.Driver) Option {
 	return func(c *config) {
 		c.trace = c.trace.Compose(trace)
 	}
@@ -329,7 +296,7 @@ func New(opts ...Option) Config {
 		c.tlsConfig = nil
 	}
 	if c.discoveryInterval == 0 {
-		c.balancer = balancers.SingleConn()
+		c.balancer = ydb_balancers.SingleConn()
 	}
 	c.meta = meta.New(
 		c.database,
@@ -359,7 +326,7 @@ func certPool() (certPool *x509.CertPool) {
 func defaultConfig() (c *config) {
 	return &config{
 		discoveryInterval: DefaultDiscoveryInterval,
-		balancer:          balancers.Default(),
+		balancer:          ydb_balancers.Default(),
 		secure:            true,
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,

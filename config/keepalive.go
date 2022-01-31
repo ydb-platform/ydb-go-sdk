@@ -1,4 +1,5 @@
-package config
+// nolint:revive
+package ydb_config
 
 import (
 	"time"

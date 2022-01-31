@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
@@ -38,15 +39,15 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 				err := do(
 					ctx,
 					p,
-					func(ctx context.Context, _ table.Session) error {
+					func(ctx context.Context, _ ydb_table.Session) error {
 						return testErr
 					},
-					withFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+					withFastBackoff(ydb_testutil.BackoffFunc(func(n int) <-chan time.Time {
 						ch := make(chan time.Time)
 						backoff <- ch
 						return ch
 					})),
-					withSlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+					withSlowBackoff(ydb_testutil.BackoffFunc(func(n int) <-chan time.Time {
 						ch := make(chan time.Time)
 						backoff <- ch
 						return ch
@@ -67,7 +68,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 }
 
 func TestRetryerBadSession(t *testing.T) {
-	closed := make(map[table.Session]bool)
+	closed := make(map[ydb_table.Session]bool)
 	p := SessionProviderFunc{
 		OnGet: func(ctx context.Context) (Session, error) {
 			s := simpleSession(t)
@@ -81,13 +82,13 @@ func TestRetryerBadSession(t *testing.T) {
 	var (
 		maxRetryes = 100
 		i          int
-		sessions   []table.Session
+		sessions   []ydb_table.Session
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	err := do(
 		ctx,
 		p,
-		func(ctx context.Context, s table.Session) error {
+		func(ctx context.Context, s ydb_table.Session) error {
 			sessions = append(sessions, s)
 			i++
 			if i > maxRetryes {
@@ -99,7 +100,7 @@ func TestRetryerBadSession(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("unexpected error: %v", err)
 	}
-	seen := make(map[table.Session]bool, len(sessions))
+	seen := make(map[ydb_table.Session]bool, len(sessions))
 	for _, s := range sessions {
 		if seen[s] {
 			t.Errorf("session used twice")
@@ -140,13 +141,13 @@ func TestRetryerImmediateReturn(t *testing.T) {
 			err := do(
 				context.Background(),
 				p,
-				func(ctx context.Context, _ table.Session) error {
+				func(ctx context.Context, _ ydb_table.Session) error {
 					return testErr
 				},
-				withFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+				withFastBackoff(ydb_testutil.BackoffFunc(func(n int) <-chan time.Time {
 					panic("this code will not be called")
 				})),
-				withSlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+				withSlowBackoff(ydb_testutil.BackoffFunc(func(n int) <-chan time.Time {
 					panic("this code will not be called")
 				})),
 			)
@@ -255,7 +256,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		errors.NewOpError(errors.WithOEReason(errors.StatusSessionBusy)),
 	}
 	client := &client{
-		cc: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
+		cc: ydb_testutil.NewDB(ydb_testutil.WithInvokeHandlers(ydb_testutil.InvokeHandlers{})),
 	}
 	p := SessionProviderFunc{
 		OnGet: client.createSession,
@@ -268,11 +269,11 @@ func TestRetryContextDeadline(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 				_ = do(
-					trace.WithRetry(
+					ydb_trace.WithRetry(
 						ctx,
-						trace.Retry{
-							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-								return func(info trace.RetryLoopDoneInfo) {
+						ydb_trace.Retry{
+							OnRetry: func(info ydb_trace.RetryLoopStartInfo) func(ydb_trace.RetryLoopDoneInfo) {
+								return func(info ydb_trace.RetryLoopDoneInfo) {
 									if info.Latency-timeouts[i] > tolerance {
 										t.Errorf("unexpected latency: %v", info.Latency)
 									}
@@ -281,7 +282,7 @@ func TestRetryContextDeadline(t *testing.T) {
 						},
 					),
 					p,
-					func(ctx context.Context, _ table.Session) error {
+					func(ctx context.Context, _ ydb_table.Session) error {
 						select {
 						case <-ctx.Done():
 							return ctx.Err()

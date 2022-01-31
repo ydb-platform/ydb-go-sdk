@@ -44,7 +44,7 @@ var (
 
 type cluster struct {
 	pool     conn.Pool
-	trace    trace.Driver
+	trace    ydb_trace.Driver
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
 	balancer balancer.Balancer
 	explorer repeater.Repeater
@@ -77,7 +77,7 @@ type Cluster interface {
 
 func New(
 	pool conn.Pool,
-	trace trace.Driver,
+	trace ydb_trace.Driver,
 	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
@@ -129,7 +129,7 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 		return nil, ErrClusterClosed
 	}
 
-	onDone := trace.DriverOnClusterGet(c.trace, &ctx)
+	onDone := ydb_trace.DriverOnClusterGet(c.trace, &ctx)
 	defer func() {
 		if err != nil {
 			onDone(nil, err)
@@ -187,7 +187,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		return
 	}
 
-	onDone := trace.DriverOnClusterInsert(c.trace, &ctx, e)
+	onDone := ydb_trace.DriverOnClusterInsert(c.trace, &ctx, e)
 
 	conn := c.pool.Get(e)
 
@@ -217,7 +217,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 
 // Update updates existing connection's runtime stats such that load factor and others.
 func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...option) {
-	onDone := trace.DriverOnClusterUpdate(c.trace, &ctx, e)
+	onDone := ydb_trace.DriverOnClusterUpdate(c.trace, &ctx, e)
 	holder := optionsHolder{}
 	for _, o := range opts {
 		o(&holder)
@@ -277,7 +277,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterRemove(c.trace, &ctx, e)
+	onDone := ydb_trace.DriverOnClusterRemove(c.trace, &ctx, e)
 
 	entry.RemoveFrom(c.balancer)
 	delete(c.index, e.Address())

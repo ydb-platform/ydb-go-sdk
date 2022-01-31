@@ -4,18 +4,19 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 )
 
 type lazyRatelimiter struct {
 	db     db.Connection
-	client ratelimiter.Client
+	client ydb_ratelimiter.Client
 	m      sync.Mutex
 }
 
-func Ratelimiter(db db.Connection) ratelimiter.Client {
+func Ratelimiter(db db.Connection) ydb_ratelimiter.Client {
 	return &lazyRatelimiter{
 		db: db,
 	}
@@ -36,7 +37,7 @@ func (r *lazyRatelimiter) Close(ctx context.Context) error {
 func (r *lazyRatelimiter) CreateResource(
 	ctx context.Context,
 	coordinationNodePath string,
-	resource ratelimiter.Resource,
+	resource ydb_ratelimiter.Resource,
 ) (err error) {
 	r.init()
 	return r.client.CreateResource(ctx, coordinationNodePath, resource)
@@ -45,7 +46,7 @@ func (r *lazyRatelimiter) CreateResource(
 func (r *lazyRatelimiter) AlterResource(
 	ctx context.Context,
 	coordinationNodePath string,
-	resource ratelimiter.Resource,
+	resource ydb_ratelimiter.Resource,
 ) (err error) {
 	r.init()
 	return r.client.AlterResource(ctx, coordinationNodePath, resource)
@@ -74,7 +75,7 @@ func (r *lazyRatelimiter) DescribeResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
-) (_ *ratelimiter.Resource, err error) {
+) (_ *ydb_ratelimiter.Resource, err error) {
 	r.init()
 	return r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
 }
@@ -93,7 +94,7 @@ func (r *lazyRatelimiter) AcquireResource(
 func (r *lazyRatelimiter) init() {
 	r.m.Lock()
 	if r.client == nil {
-		r.client = internal.New(r.db)
+		r.client = ratelimiter.New(r.db)
 	}
 	r.m.Unlock()
 }

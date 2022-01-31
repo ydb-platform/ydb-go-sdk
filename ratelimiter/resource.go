@@ -1,4 +1,5 @@
-package ratelimiter
+// nolint:revive
+package ydb_ratelimiter
 
 type Resource struct {
 	ResourcePath    string

@@ -59,10 +59,10 @@ func TestParseConnectionString(t *testing.T) {
 			if !errors.Is(err, test.error) {
 				t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
 			}
-			testutil.Equal(t, test.schema, schema)
-			testutil.Equal(t, test.endpoint, endpoint)
-			testutil.Equal(t, test.database, database)
-			testutil.Equal(t, test.token, token)
+			ydb_testutil.Equal(t, test.schema, schema)
+			ydb_testutil.Equal(t, test.endpoint, endpoint)
+			ydb_testutil.Equal(t, test.database, database)
+			ydb_testutil.Equal(t, test.token, token)
 		})
 	}
 }

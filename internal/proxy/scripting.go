@@ -10,15 +10,15 @@ import (
 )
 
 type proxyScripting struct {
-	client scripting.Client
+	client ydb_scripting.Client
 	meta   meta.Meta
 }
 
 func (d *proxyScripting) Execute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
-) (_ result.Result, err error) {
+	params *ydb_table.QueryParameters,
+) (_ ydb_table_result.Result, err error) {
 	ctx, err = d.meta.Meta(ctx)
 	if err != nil {
 		return nil, err
@@ -29,8 +29,8 @@ func (d *proxyScripting) Execute(
 func (d *proxyScripting) Explain(
 	ctx context.Context,
 	query string,
-	mode scripting.ExplainMode,
-) (e table.ScriptingYQLExplanation, err error) {
+	mode ydb_scripting.ExplainMode,
+) (e ydb_table.ScriptingYQLExplanation, err error) {
 	ctx, err = d.meta.Meta(ctx)
 	if err != nil {
 		return e, err
@@ -41,8 +41,8 @@ func (d *proxyScripting) Explain(
 func (d *proxyScripting) StreamExecute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
-) (_ result.StreamResult, err error) {
+	params *ydb_table.QueryParameters,
+) (_ ydb_table_result.StreamResult, err error) {
 	ctx, err = d.meta.Meta(ctx)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (d *proxyScripting) StreamExecute(
 	return d.client.StreamExecute(ctx, query, params)
 }
 
-func Scripting(client scripting.Client, meta meta.Meta) scripting.Client {
+func Scripting(client ydb_scripting.Client, meta meta.Meta) ydb_scripting.Client {
 	return &proxyScripting{
 		client: client,
 		meta:   meta,

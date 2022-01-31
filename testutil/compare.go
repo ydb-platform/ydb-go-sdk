@@ -1,4 +1,5 @@
-package testutil
+// nolint:revive
+package ydb_testutil
 
 import (
 	"bytes"

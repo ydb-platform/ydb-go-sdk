@@ -1,4 +1,5 @@
-package timeutil
+// nolint:revive
+package ydb_testutil_timeutil
 
 import (
 	"math"

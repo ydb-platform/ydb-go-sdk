@@ -1,4 +1,5 @@
-package log
+// nolint:revive
+package ydb_log
 
 type Logger interface {
 	// Tracef logs at Trace logger level using fmt formatter

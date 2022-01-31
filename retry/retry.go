@@ -1,4 +1,5 @@
-package retry
+// nolint:revive
+package ydb_retry
 
 import (
 	"context"
@@ -74,7 +75,7 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 
 		code   = int32(0)
 		start  = time.Now()
-		onDone = trace.RetryOnRetry(trace.ContextRetry(ctx), ctx)
+		onDone = ydb_trace.RetryOnRetry(ydb_trace.ContextRetry(ctx), ctx)
 	)
 	defer func() {
 		onDone(ctx, time.Since(start), err)

@@ -15,13 +15,14 @@
 ## Table of contents
 1. [Overview](#Overview)
 2. [About semantic versioning](#SemVer)
-3. [Prerequisites](#Prerequisites)
-4. [Installation](#Install)
-5. [Usage](#Usage)
-6. [Credentials](#Credentials)
-7. [Environment variables](#Environ)
-8. [Ecosystem of debug tools](#Debug)
-9. [Examples](#Examples)
+3. [About public package naming](#PackageNames)
+4. [Prerequisites](#Prerequisites)
+5. [Installation](#Install)
+6. [Usage](#Usage)
+7. [Credentials](#Credentials)
+8. [Environment variables](#Environ)
+9. [Ecosystem of debug tools](#Debug)
+10. [Examples](#Examples)
 
 ## Overview <a name="Overview"></a>
 
@@ -43,6 +44,10 @@ Internal interfaces outside from `internal` directory are marked with comment su
 We publish the planned breaking `MAJOR` changes:
 * via the comment `Deprecated` in the code indicating what should be used instead
 * through the file [`NEXT_MAJOR_RELEASE.md`](#NEXT_MAJOR_RELEASE.md)
+
+## About public package naming <a name="PackageNames"></a>
+
+All public packages of `ydb-go-sdk` are named with prefix `ydb`. For example, package `./table/result` have name `ydb_table_result`. It helps with IDE-driven development. Just begin type `ydb`... and IDE will offer a few package names started with `ydb`. 
 
 ## Prerequisites <a name="Prerequisites"></a>
 

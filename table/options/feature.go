@@ -1,4 +1,5 @@
-package options
+// nolint:revive
+package ydb_table_options
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"

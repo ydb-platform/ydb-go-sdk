@@ -1,4 +1,5 @@
-package balancers
+// nolint:revive
+package ydb_balancers
 
 import (
 	"strings"

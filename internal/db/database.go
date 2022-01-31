@@ -19,7 +19,7 @@ import (
 )
 
 type database struct {
-	config  config.Config
+	config  ydb_config.Config
 	cluster cluster.Cluster
 }
 
@@ -29,7 +29,7 @@ func (db *database) Close(ctx context.Context) error {
 
 func New(
 	ctx context.Context,
-	cfg config.Config,
+	cfg ydb_config.Config,
 	pool conn.Pool,
 ) (_ Connection, err error) {
 	if cfg.Endpoint() == "" {
@@ -42,8 +42,8 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	t := trace.ContextDriver(ctx).Compose(cfg.Trace())
-	onDone := trace.DriverOnInit(t, &ctx, cfg.Endpoint(), cfg.Database(), cfg.Secure())
+	t := ydb_trace.ContextDriver(ctx).Compose(cfg.Trace())
+	onDone := ydb_trace.DriverOnInit(t, &ctx, cfg.Endpoint(), cfg.Database(), cfg.Secure())
 	defer func() {
 		onDone(err)
 	}()
@@ -74,9 +74,9 @@ func New(
 	return db, nil
 }
 
-func discover(ctx context.Context, cfg config.Config, pool conn.Pool, c cluster.Cluster) error {
+func discover(ctx context.Context, cfg ydb_config.Config, pool conn.Pool, c cluster.Cluster) error {
 	cc := pool.Get(endpoint.New(cfg.Endpoint()))
-	t := trace.ContextDriver(ctx).Compose(cfg.Trace())
+	t := ydb_trace.ContextDriver(ctx).Compose(cfg.Trace())
 	client := discovery.New(cc, cfg.Endpoint(), cfg.Database(), cfg.Secure(), t)
 	curr, err := client.Discover(ctx)
 	if err != nil {

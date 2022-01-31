@@ -30,13 +30,13 @@ func TestRatelimiter(t *testing.T) {
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
-			config.WithRequestTimeout(time.Second*2),
-			config.WithStreamTimeout(time.Second*2),
-			config.WithOperationTimeout(time.Second*2),
-			config.WithOperationCancelAfter(time.Second*2),
+			ydb_config.WithRequestTimeout(time.Second*2),
+			ydb_config.WithStreamTimeout(time.Second*2),
+			ydb_config.WithOperationTimeout(time.Second*2),
+			ydb_config.WithOperationCancelAfter(time.Second*2),
 		),
-		ydb.WithBalancer(balancers.PreferLocalDC( // for max tests coverage
-			balancers.RandomChoice(),
+		ydb.WithBalancer(ydb_balancers.PreferLocalDC( // for max tests coverage
+			ydb_balancers.RandomChoice(),
 		)),
 	)
 	if err != nil {

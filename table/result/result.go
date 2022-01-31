@@ -1,4 +1,5 @@
-package result
+// nolint:revive
+package ydb_table_result
 
 import (
 	"context"
@@ -94,10 +95,10 @@ type result interface {
 	Scan(values ...interface{}) error
 
 	// ScanNamed scans row with column names defined in namedValues
-	ScanNamed(namedValues ...named.Value) error
+	ScanNamed(namedValues ...ydb_table_result_named.Value) error
 
 	// Stats returns query execution QueryStats.
-	Stats() (s stats.QueryStats)
+	Stats() (s ydb_table_stats.QueryStats)
 
 	// Err return scanner error
 	// To handle errors, do not need to check after scanning each row

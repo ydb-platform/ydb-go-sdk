@@ -16,21 +16,21 @@ import (
 func TestResultAny(t *testing.T) {
 	for _, test := range []struct {
 		name    string
-		columns []options.Column
-		values  []types.Value
+		columns []ydb_table_options.Column
+		values  []ydb_table_types.Value
 		exp     []interface{}
 	}{
 		{
-			columns: []options.Column{
+			columns: []ydb_table_options.Column{
 				{
 					Name:   "column0",
-					Type:   types.Optional(types.TypeUint32),
+					Type:   ydb_table_types.Optional(ydb_table_types.TypeUint32),
 					Family: "family0",
 				},
 			},
-			values: []types.Value{
-				types.OptionalValue(types.Uint32Value(43)),
-				types.NullValue(types.TypeUint32),
+			values: []ydb_table_types.Value{
+				ydb_table_types.OptionalValue(ydb_table_types.Uint32Value(43)),
+				ydb_table_types.NullValue(ydb_table_types.TypeUint32),
 			},
 			exp: []interface{}{
 				uint32(43),
@@ -75,26 +75,26 @@ func TestResultAny(t *testing.T) {
 func TestResultOUint32(t *testing.T) {
 	for _, test := range []struct {
 		name    string
-		columns []options.Column
-		values  []types.Value
+		columns []ydb_table_options.Column
+		values  []ydb_table_types.Value
 		exp     []uint32
 	}{
 		{
-			columns: []options.Column{
+			columns: []ydb_table_options.Column{
 				{
 					Name:   "column0",
-					Type:   types.Optional(types.TypeUint32),
+					Type:   ydb_table_types.Optional(ydb_table_types.TypeUint32),
 					Family: "family0",
 				},
 				{
 					Name:   "column1",
-					Type:   types.TypeUint32,
+					Type:   ydb_table_types.TypeUint32,
 					Family: "family0",
 				},
 			},
-			values: []types.Value{
-				types.OptionalValue(types.Uint32Value(43)),
-				types.Uint32Value(43),
+			values: []ydb_table_types.Value{
+				ydb_table_types.OptionalValue(ydb_table_types.Uint32Value(43)),
+				ydb_table_types.Uint32Value(43),
 			},
 			exp: []uint32{
 				43,
@@ -137,7 +137,7 @@ type resultSetDesc Ydb.ResultSet
 
 type ResultSetOption func(*resultSetDesc)
 
-func WithColumns(cs ...options.Column) ResultSetOption {
+func WithColumns(cs ...ydb_table_options.Column) ResultSetOption {
 	return func(r *resultSetDesc) {
 		for _, c := range cs {
 			r.Columns = append(r.Columns, &Ydb.Column{
@@ -148,7 +148,7 @@ func WithColumns(cs ...options.Column) ResultSetOption {
 	}
 }
 
-func WithValues(vs ...types.Value) ResultSetOption {
+func WithValues(vs ...ydb_table_types.Value) ResultSetOption {
 	return func(r *resultSetDesc) {
 		n := len(r.Columns)
 		if n == 0 {

@@ -1,4 +1,5 @@
-package retry
+// nolint:revive
+package ydb_retry
 
 import (
 	"context"

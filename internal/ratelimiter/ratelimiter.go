@@ -16,12 +16,12 @@ type Client interface {
 	CreateResource(
 		ctx context.Context,
 		coordinationNodePath string,
-		resource ratelimiter.Resource,
+		resource ydb_ratelimiter.Resource,
 	) (err error)
 	AlterResource(
 		ctx context.Context,
 		coordinationNodePath string,
-		resource ratelimiter.Resource,
+		resource ydb_ratelimiter.Resource,
 	) (err error)
 	DropResource(
 		ctx context.Context,
@@ -38,7 +38,7 @@ type Client interface {
 		ctx context.Context,
 		coordinationNodePath string,
 		resourcePath string,
-	) (_ *ratelimiter.Resource, err error)
+	) (_ *ydb_ratelimiter.Resource, err error)
 	AcquireResource(
 		ctx context.Context,
 		coordinationNodePath string,
@@ -66,7 +66,7 @@ func New(cc grpc.ClientConnInterface) Client {
 func (c *client) CreateResource(
 	ctx context.Context,
 	coordinationNodePath string,
-	resource ratelimiter.Resource,
+	resource ydb_ratelimiter.Resource,
 ) (err error) {
 	_, err = c.service.CreateResource(ctx, &Ydb_RateLimiter.CreateResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
@@ -86,7 +86,7 @@ func (c *client) CreateResource(
 func (c *client) AlterResource(
 	ctx context.Context,
 	coordinationNodePath string,
-	resource ratelimiter.Resource,
+	resource ydb_ratelimiter.Resource,
 ) (err error) {
 	_, err = c.service.AlterResource(ctx, &Ydb_RateLimiter.AlterResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
@@ -144,7 +144,7 @@ func (c *client) DescribeResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
-) (_ *ratelimiter.Resource, err error) {
+) (_ *ydb_ratelimiter.Resource, err error) {
 	var (
 		response *Ydb_RateLimiter.DescribeResourceResponse
 		result   Ydb_RateLimiter.DescribeResourceResult
@@ -161,12 +161,12 @@ func (c *client) DescribeResource(
 		return nil, err
 	}
 
-	resource := &ratelimiter.Resource{
+	resource := &ydb_ratelimiter.Resource{
 		ResourcePath: result.GetResource().GetResourcePath(),
 	}
 
 	if result.GetResource().GetHierarchicalDrr() != nil {
-		resource.HierarchicalDrr = ratelimiter.HierarchicalDrrSettings{
+		resource.HierarchicalDrr = ydb_ratelimiter.HierarchicalDrrSettings{
 			MaxUnitsPerSecond:       result.GetResource().GetHierarchicalDrr().GetMaxUnitsPerSecond(),
 			MaxBurstSizeCoefficient: result.GetResource().GetHierarchicalDrr().GetMaxBurstSizeCoefficient(),
 			PrefetchCoefficient:     result.GetResource().GetHierarchicalDrr().GetPrefetchCoefficient(),

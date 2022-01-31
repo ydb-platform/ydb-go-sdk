@@ -22,7 +22,7 @@ func (s *queryStats) ProcessCPUTime() time.Duration {
 	return s.processCPUTime
 }
 
-func (s *queryStats) Compilation() (c *stats.CompilationStats) {
+func (s *queryStats) Compilation() (c *ydb_table_stats.CompilationStats) {
 	if s == nil || s.stats == nil || s.stats.Compilation == nil {
 		return nil
 	}
@@ -30,7 +30,7 @@ func (s *queryStats) Compilation() (c *stats.CompilationStats) {
 	if x == nil {
 		return
 	}
-	return &stats.CompilationStats{
+	return &ydb_table_stats.CompilationStats{
 		FromCache: x.FromCache,
 		Duration:  time.Microsecond * time.Duration(x.DurationUs),
 		CPUTime:   time.Microsecond * time.Duration(x.CpuTimeUs),
@@ -39,7 +39,7 @@ func (s *queryStats) Compilation() (c *stats.CompilationStats) {
 
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
-func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {
+func (s *queryStats) NextPhase() (p ydb_table_stats.QueryPhase, ok bool) {
 	if s.stats == nil || s.pos >= len(s.stats.QueryPhases) {
 		return
 	}
@@ -70,13 +70,13 @@ type queryPhase struct {
 //
 // If ok flag is false, then there are no more accessed tables and t is
 // invalid.
-func (q *queryPhase) NextTableAccess() (t *stats.TableAccess, ok bool) {
+func (q *queryPhase) NextTableAccess() (t *ydb_table_stats.TableAccess, ok bool) {
 	if q.pos >= len(q.tables) {
 		return
 	}
 	x := q.tables[q.pos]
 	q.pos++
-	return &stats.TableAccess{
+	return &ydb_table_stats.TableAccess{
 		Name:    x.Name,
 		Reads:   initOperationStats(x.Reads),
 		Updates: initOperationStats(x.Updates),
@@ -96,11 +96,11 @@ func (q *queryPhase) AffectedShards() uint64 {
 	return q.affectedShards
 }
 
-func initOperationStats(x *Ydb_TableStats.OperationStats) stats.OperationStats {
+func initOperationStats(x *Ydb_TableStats.OperationStats) ydb_table_stats.OperationStats {
 	if x == nil {
-		return stats.OperationStats{}
+		return ydb_table_stats.OperationStats{}
 	}
-	return stats.OperationStats{
+	return ydb_table_stats.OperationStats{
 		Rows:  x.Rows,
 		Bytes: x.Bytes,
 	}

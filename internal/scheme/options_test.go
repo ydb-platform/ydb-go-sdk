@@ -10,18 +10,18 @@ import (
 
 func TestSchemeOptions(t *testing.T) {
 	{
-		opts := []scheme.PermissionsOption{
-			scheme.WithClearPermissions(),
-			scheme.WithChangeOwner("ow"),
-			scheme.WithGrantPermissions(scheme.Permissions{
+		opts := []ydb_scheme.PermissionsOption{
+			ydb_scheme.WithClearPermissions(),
+			ydb_scheme.WithChangeOwner("ow"),
+			ydb_scheme.WithGrantPermissions(ydb_scheme.Permissions{
 				Subject:         "grant",
 				PermissionNames: []string{"a", "b", "c"},
 			}),
-			scheme.WithSetPermissions(scheme.Permissions{
+			ydb_scheme.WithSetPermissions(ydb_scheme.Permissions{
 				Subject:         "set",
 				PermissionNames: []string{"d"},
 			}),
-			scheme.WithRevokePermissions(scheme.Permissions{
+			ydb_scheme.WithRevokePermissions(ydb_scheme.Permissions{
 				Subject:         "revoke",
 				PermissionNames: []string{"e"},
 			}),

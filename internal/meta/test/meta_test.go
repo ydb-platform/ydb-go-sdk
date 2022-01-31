@@ -16,7 +16,7 @@ func TestMetaRequiredHeaders(t *testing.T) {
 	m := meta.New(
 		"database",
 		credentials.NewAccessTokenCredentials("token", "TestMetaRequiredHeaders"),
-		trace.Driver{},
+		ydb_trace.Driver{},
 		"requestType",
 		"user-agent",
 	)
@@ -38,11 +38,11 @@ func TestMetaRequiredHeaders(t *testing.T) {
 		t.Fatal("no outgoing metadata")
 	}
 
-	testutil.Equal(t, []string{"database"}, md.Get(meta.MetaDatabase))
-	testutil.Equal(t, []string{"requestType"}, md.Get(meta.MetaRequestType))
-	testutil.Equal(t, []string{"token"}, md.Get(meta.MetaTicket))
-	testutil.Equal(t, []string{"userAgent"}, md.Get(meta.MetaUserAgent))
-	testutil.Equal(t, []string{"traceID"}, md.Get(meta.MetaTraceID))
-	testutil.Equal(t, []string{meta.Version}, md.Get(meta.MetaVersion))
-	testutil.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
+	ydb_testutil.Equal(t, []string{"database"}, md.Get(meta.MetaDatabase))
+	ydb_testutil.Equal(t, []string{"requestType"}, md.Get(meta.MetaRequestType))
+	ydb_testutil.Equal(t, []string{"token"}, md.Get(meta.MetaTicket))
+	ydb_testutil.Equal(t, []string{"userAgent"}, md.Get(meta.MetaUserAgent))
+	ydb_testutil.Equal(t, []string{"traceID"}, md.Get(meta.MetaTraceID))
+	ydb_testutil.Equal(t, []string{meta.Version}, md.Get(meta.MetaVersion))
+	ydb_testutil.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
 }

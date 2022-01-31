@@ -14,7 +14,7 @@ type Config interface {
 	OperationTimeout() time.Duration
 	OperationCancelAfter() time.Duration
 	StreamTimeout() time.Duration
-	Trace() trace.Driver
+	Trace() ydb_trace.Driver
 	ConnectionTTL() time.Duration
 	GrpcDialOptions() []grpc.DialOption
 }

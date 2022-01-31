@@ -1,4 +1,5 @@
-package table
+// nolint:revive
+package ydb_table
 
 import (
 	"context"
@@ -18,7 +19,7 @@ type Option func(o *Options)
 type Options struct {
 	Idempotent      bool
 	TxSettings      *TransactionSettings
-	TxCommitOptions []options.CommitTransactionOption
+	TxCommitOptions []ydb_table_options.CommitTransactionOption
 }
 
 func WithIdempotent() Option {
@@ -33,7 +34,7 @@ func WithTxSettings(tx *TransactionSettings) Option {
 	}
 }
 
-func WithTxCommitOptions(opts ...options.CommitTransactionOption) Option {
+func WithTxCommitOptions(opts ...ydb_table_options.CommitTransactionOption) Option {
 	return func(o *Options) {
 		o.TxCommitOptions = append(o.TxCommitOptions, opts...)
 	}

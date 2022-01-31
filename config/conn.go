@@ -1,4 +1,5 @@
-package config
+// nolint:revive
+package ydb_config
 
 import (
 	"context"
@@ -10,12 +11,12 @@ import (
 
 type netConn struct {
 	address string
-	trace   trace.Driver
+	trace   ydb_trace.Driver
 	cc      net.Conn
 }
 
-func newConn(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err error) {
-	onDone := trace.DriverOnNetDial(t, &ctx, address)
+func newConn(ctx context.Context, address string, t ydb_trace.Driver) (_ net.Conn, err error) {
+	onDone := ydb_trace.DriverOnNetDial(t, &ctx, address)
 	defer func() {
 		onDone(err)
 	}()
@@ -31,7 +32,7 @@ func newConn(ctx context.Context, address string, t trace.Driver) (_ net.Conn, e
 }
 
 func (c *netConn) Read(b []byte) (n int, err error) {
-	onDone := trace.DriverOnNetRead(c.trace, c.address, len(b))
+	onDone := ydb_trace.DriverOnNetRead(c.trace, c.address, len(b))
 	defer func() {
 		onDone(n, err)
 	}()
@@ -39,7 +40,7 @@ func (c *netConn) Read(b []byte) (n int, err error) {
 }
 
 func (c *netConn) Write(b []byte) (n int, err error) {
-	onDone := trace.DriverOnNetWrite(c.trace, c.address, len(b))
+	onDone := ydb_trace.DriverOnNetWrite(c.trace, c.address, len(b))
 	defer func() {
 		onDone(n, err)
 	}()
@@ -47,7 +48,7 @@ func (c *netConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *netConn) Close() (err error) {
-	onDone := trace.DriverOnNetClose(c.trace, c.address)
+	onDone := ydb_trace.DriverOnNetClose(c.trace, c.address)
 	defer func() {
 		onDone(err)
 	}()

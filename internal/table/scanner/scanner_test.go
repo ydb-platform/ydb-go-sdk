@@ -134,7 +134,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			},
 		}
 		if c.ydbvalue {
-			vp := types.Int64Value(v)
+			vp := ydb_table_types.Int64Value(v)
 			return ydbval, &vp
 		}
 		if c.scanner {
@@ -166,7 +166,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			},
 		}
 		if c.ydbvalue {
-			vp := types.FloatValue(v)
+			vp := ydb_table_types.FloatValue(v)
 			return ydbval, &vp
 		}
 		if c.optional && !c.testDefault {
@@ -377,7 +377,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 			},
 		}
 		if c.ydbvalue {
-			vp := types.JSONValue(v)
+			vp := ydb_table_types.JSONValue(v)
 			return ydbval, &vp
 		}
 		src := []byte(v)
@@ -503,10 +503,10 @@ func TestScanSqlTypes(t *testing.T) {
 				}
 				if test.setColumnIndexes != nil {
 					for i, v := range test.setColumnIndexes {
-						testutil.Equal(t, expected[0][v], test.values[i])
+						ydb_testutil.Equal(t, expected[0][v], test.values[i])
 					}
 				} else {
-					testutil.Equal(t, expected[0], test.values)
+					ydb_testutil.Equal(t, expected[0], test.values)
 				}
 				expected = expected[1:]
 			}
@@ -527,13 +527,13 @@ func TestScanNamed(t *testing.T) {
 			set, expected := getResultSet(test.count, test.columns)
 			s.reset(set)
 			for s.NextRow() {
-				values := make([]named.Value, 0, len(test.values))
+				values := make([]ydb_table_result_named.Value, 0, len(test.values))
 				// nolint:nestif
 				if test.columns[0].testDefault {
 					for i := range test.values {
 						values = append(
 							values,
-							named.OptionalWithDefault(
+							ydb_table_result_named.OptionalWithDefault(
 								or(test.setColumns, i, test.columns[i].name),
 								test.values[i],
 							),
@@ -548,7 +548,7 @@ func TestScanNamed(t *testing.T) {
 							if test.columns[i].testDefault {
 								values = append(
 									values,
-									named.OptionalWithDefault(
+									ydb_table_result_named.OptionalWithDefault(
 										or(test.setColumns, i, test.columns[i].name),
 										test.values[i],
 									),
@@ -556,7 +556,7 @@ func TestScanNamed(t *testing.T) {
 							} else {
 								values = append(
 									values,
-									named.Optional(
+									ydb_table_result_named.Optional(
 										or(test.setColumns, i, test.columns[i].name),
 										test.values[i],
 									),
@@ -565,7 +565,7 @@ func TestScanNamed(t *testing.T) {
 						} else {
 							values = append(
 								values,
-								named.Required(
+								ydb_table_result_named.Required(
 									or(test.setColumns, i, test.columns[i].name),
 									test.values[i],
 								),
@@ -578,10 +578,10 @@ func TestScanNamed(t *testing.T) {
 				}
 				if test.setColumnIndexes != nil {
 					for i, v := range test.setColumnIndexes {
-						testutil.Equal(t, expected[0][v], test.values[i])
+						ydb_testutil.Equal(t, expected[0][v], test.values[i])
 					}
 				} else {
-					testutil.Equal(t, expected[0], test.values)
+					ydb_testutil.Equal(t, expected[0], test.values)
 				}
 				expected = expected[1:]
 			}

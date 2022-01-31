@@ -27,15 +27,15 @@ type SessionProvider interface {
 }
 
 type retryOptions struct {
-	options     table.Options
-	fastBackoff retry.Backoff
-	slowBackoff retry.Backoff
-	trace       trace.Table
+	options     ydb_table.Options
+	fastBackoff ydb_retry.Backoff
+	slowBackoff ydb_retry.Backoff
+	trace       ydb_trace.Table
 }
 
 type retryOption func(o *retryOptions)
 
-func withOptions(opts ...table.Option) retryOption {
+func withOptions(opts ...ydb_table.Option) retryOption {
 	return func(options *retryOptions) {
 		for _, o := range opts {
 			o(&options.options)
@@ -43,32 +43,32 @@ func withOptions(opts ...table.Option) retryOption {
 	}
 }
 
-func withTrace(t trace.Table) retryOption {
+func withTrace(t ydb_trace.Table) retryOption {
 	return func(options *retryOptions) {
 		options.trace = options.trace.Compose(t)
 	}
 }
 
-func withFastBackoff(fastBackoff retry.Backoff) retryOption {
+func withFastBackoff(fastBackoff ydb_retry.Backoff) retryOption {
 	return func(options *retryOptions) {
 		options.fastBackoff = fastBackoff
 	}
 }
 
-func withSlowBackoff(slowBackoff retry.Backoff) retryOption {
+func withSlowBackoff(slowBackoff ydb_retry.Backoff) retryOption {
 	return func(options *retryOptions) {
 		options.slowBackoff = slowBackoff
 	}
 }
 
-func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retryOption) (err error) {
+func do(ctx context.Context, c SessionProvider, op ydb_table.Operation, opts ...retryOption) (err error) {
 	options := retryOptions{
-		options: table.Options{
-			Idempotent: table.ContextIdempotentOperation(ctx),
+		options: ydb_table.Options{
+			Idempotent: ydb_table.ContextIdempotentOperation(ctx),
 		},
-		fastBackoff: retry.FastBackoff,
-		slowBackoff: retry.SlowBackoff,
-		trace:       trace.Table{},
+		fastBackoff: ydb_retry.FastBackoff,
+		slowBackoff: ydb_retry.SlowBackoff,
+		trace:       ydb_trace.Table{},
 	}
 	for _, o := range opts {
 		o(&options)
@@ -100,7 +100,7 @@ func (f SessionProviderFunc) Get(ctx context.Context) (Session, error) {
 
 func (f SessionProviderFunc) Put(ctx context.Context, s Session) error {
 	if f.OnPut == nil {
-		return testutil.ErrNotImplemented
+		return ydb_testutil.ErrNotImplemented
 	}
 	return f.OnPut(ctx, s)
 }
@@ -163,18 +163,18 @@ func (s *singleSession) CloseSession(ctx context.Context, x Session) error {
 func retryBackoff(
 	ctx context.Context,
 	p SessionProvider,
-	fastBackoff retry.Backoff,
-	slowBackoff retry.Backoff,
+	fastBackoff ydb_retry.Backoff,
+	slowBackoff ydb_retry.Backoff,
 	isOperationIdempotent bool,
-	op table.Operation,
-	t trace.Table,
+	op ydb_table.Operation,
+	t ydb_trace.Table,
 ) (err error) {
 	var (
 		s              Session
 		i              int
 		attempts       int
 		code           = int32(0)
-		onIntermediate = trace.TableOnPoolRetry(t, &ctx, isOperationIdempotent)
+		onIntermediate = ydb_trace.TableOnPoolRetry(t, &ctx, isOperationIdempotent)
 	)
 	defer func() {
 		if s != nil {
@@ -206,7 +206,7 @@ func retryBackoff(
 			if err = op(ctx, s); err == nil {
 				return
 			}
-			m := retry.Check(err)
+			m := ydb_retry.Check(err)
 			if m.StatusCode() != code {
 				i = 0
 			}
@@ -217,7 +217,7 @@ func retryBackoff(
 			if !m.MustRetry(isOperationIdempotent) {
 				return
 			}
-			if err = retry.Wait(ctx, fastBackoff, slowBackoff, m, i); err != nil {
+			if err = ydb_retry.Wait(ctx, fastBackoff, slowBackoff, m, i); err != nil {
 				return
 			}
 			code = m.StatusCode()

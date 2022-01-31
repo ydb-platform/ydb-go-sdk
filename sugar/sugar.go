@@ -1,4 +1,5 @@
-package sugar
+// nolint:revive
+package ydb_sugar
 
 import (
 	"context"
@@ -6,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -44,8 +45,8 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 		}
 		switch info.Type {
 		case
-			scheme.EntryDatabase,
-			scheme.EntryDirectory:
+			ydb_scheme.EntryDatabase,
+			ydb_scheme.EntryDirectory:
 			// OK
 		default:
 			return fmt.Errorf(
@@ -67,9 +68,9 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 	fullSysTablePath := path.Join(db.Name(), sysTable)
 	var list func(int, string) error
 	list = func(i int, p string) error {
-		var dir scheme.Directory
+		var dir ydb_scheme.Directory
 		var err error
-		err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		err = ydb_retry.Retry(ctx, true, func(ctx context.Context) (err error) {
 			dir, err = db.Scheme().ListDirectory(ctx, p)
 			return err
 		})
@@ -87,19 +88,19 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 				continue
 			}
 			switch child.Type {
-			case scheme.EntryDirectory:
+			case ydb_scheme.EntryDirectory:
 				if err = list(i+1, pt); err != nil {
 					return err
 				}
-				err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+				err = ydb_retry.Retry(ctx, true, func(ctx context.Context) (err error) {
 					return db.Scheme().RemoveDirectory(ctx, pt)
 				})
 				if err != nil {
 					return err
 				}
 
-			case scheme.EntryTable:
-				err = db.Table().Do(ctx, func(ctx context.Context, session table.Session) (err error) {
+			case ydb_scheme.EntryTable:
+				err = db.Table().Do(ctx, func(ctx context.Context, session ydb_table.Session) (err error) {
 					return session.DropTable(ctx, pt)
 				})
 				if err != nil {

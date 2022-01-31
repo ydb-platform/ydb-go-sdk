@@ -27,15 +27,15 @@ func TestScripting(t *testing.T) {
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
-			config.WithRequestTimeout(time.Second*2),
-			config.WithStreamTimeout(time.Second*2),
-			config.WithOperationTimeout(time.Second*2),
-			config.WithOperationCancelAfter(time.Second*2),
+			ydb_config.WithRequestTimeout(time.Second*2),
+			ydb_config.WithStreamTimeout(time.Second*2),
+			ydb_config.WithOperationTimeout(time.Second*2),
+			ydb_config.WithOperationCancelAfter(time.Second*2),
 		),
-		ydb.WithBalancer(balancers.SingleConn()),
+		ydb.WithBalancer(ydb_balancers.SingleConn()),
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithLogger(
-			trace.DriverConnEvents,
+			ydb_trace.DriverConnEvents,
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
@@ -52,11 +52,11 @@ func TestScripting(t *testing.T) {
 		}
 	})
 	t.Run("Execute", func(t *testing.T) {
-		if err := retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		if err := ydb_retry.Retry(ctx, true, func(ctx context.Context) (err error) {
 			res, err := db.Scripting().Execute(
 				ctx,
 				"SELECT 1+1",
-				table.NewQueryParameters(),
+				ydb_table.NewQueryParameters(),
 			)
 			if err != nil {
 				return err
@@ -65,15 +65,15 @@ func TestScripting(t *testing.T) {
 				_ = res.Close()
 			}()
 			if !res.NextResultSet(ctx) {
-				return retry.RetryableError(
+				return ydb_retry.RetryableError(
 					fmt.Errorf("no result sets"),
-					retry.WithBackoff(retry.BackoffTypeNoBackoff),
+					ydb_retry.WithBackoff(ydb_retry.BackoffTypeNoBackoff),
 				)
 			}
 			if !res.NextRow() {
-				return retry.RetryableError(
+				return ydb_retry.RetryableError(
 					fmt.Errorf("no rows"),
-					retry.WithBackoff(retry.BackoffTypeSlowBackoff),
+					ydb_retry.WithBackoff(ydb_retry.BackoffTypeSlowBackoff),
 				)
 			}
 			var sum int32
@@ -89,11 +89,11 @@ func TestScripting(t *testing.T) {
 		}
 	})
 	t.Run("StreamExecute", func(t *testing.T) {
-		if err := retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		if err := ydb_retry.Retry(ctx, true, func(ctx context.Context) (err error) {
 			res, err := db.Scripting().StreamExecute(
 				ctx,
 				"SELECT 1+1",
-				table.NewQueryParameters(),
+				ydb_table.NewQueryParameters(),
 			)
 			if err != nil {
 				return err
@@ -102,16 +102,16 @@ func TestScripting(t *testing.T) {
 				_ = res.Close()
 			}()
 			if !res.NextResultSet(ctx) {
-				return retry.RetryableError(
+				return ydb_retry.RetryableError(
 					fmt.Errorf("no result sets"),
-					retry.WithBackoff(retry.BackoffTypeNoBackoff),
-					retry.WithDeleteSession(),
+					ydb_retry.WithBackoff(ydb_retry.BackoffTypeNoBackoff),
+					ydb_retry.WithDeleteSession(),
 				)
 			}
 			if !res.NextRow() {
-				return retry.RetryableError(
+				return ydb_retry.RetryableError(
 					fmt.Errorf("no rows"),
-					retry.WithBackoff(retry.BackoffTypeFastBackoff),
+					ydb_retry.WithBackoff(ydb_retry.BackoffTypeFastBackoff),
 				)
 			}
 			var sum int32
@@ -127,11 +127,11 @@ func TestScripting(t *testing.T) {
 		}
 	})
 	t.Run("ExplainPlan", func(t *testing.T) {
-		if err := retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		if err := ydb_retry.Retry(ctx, true, func(ctx context.Context) (err error) {
 			res, err := db.Scripting().Explain(
 				ctx,
 				"SELECT 1+1",
-				scripting.ExplainModePlan,
+				ydb_scripting.ExplainModePlan,
 			)
 			if err != nil {
 				return err
@@ -145,11 +145,11 @@ func TestScripting(t *testing.T) {
 		}
 	})
 	t.Run("ExplainValidate", func(t *testing.T) {
-		if err := retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		if err := ydb_retry.Retry(ctx, true, func(ctx context.Context) (err error) {
 			res, err := db.Scripting().Explain(
 				ctx,
 				"SELECT 1+1",
-				scripting.ExplainModeValidate,
+				ydb_scripting.ExplainModeValidate,
 			)
 			if err != nil {
 				return err

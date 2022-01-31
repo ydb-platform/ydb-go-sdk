@@ -6,8 +6,9 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 )
 
 const (
@@ -30,7 +31,7 @@ type Meta interface {
 func New(
 	database string,
 	credentials credentials.Credentials,
-	trace trace.Driver,
+	trace ydb_trace.Driver,
 	requestsType string,
 	userAgent string,
 ) Meta {
@@ -44,7 +45,7 @@ func New(
 }
 
 type meta struct {
-	trace        trace.Driver
+	trace        ydb_trace.Driver
 	credentials  credentials.Credentials
 	database     string
 	requestsType string
@@ -94,8 +95,8 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		return md, nil
 	}
 	var token string
-	t := trace.ContextDriver(ctx).Compose(m.trace)
-	getCredentialsDone := trace.DriverOnGetCredentials(t, &ctx)
+	t := ydb_trace.ContextDriver(ctx).Compose(m.trace)
+	getCredentialsDone := ydb_trace.DriverOnGetCredentials(t, &ctx)
 	defer func() {
 		getCredentialsDone(token != "", err)
 	}()

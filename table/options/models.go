@@ -1,14 +1,14 @@
-package options
+// nolint:revive
+package ydb_table_options
 
 import (
 	"bytes"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -35,7 +35,7 @@ func (s SessionStatus) String() string {
 
 type Column struct {
 	Name   string
-	Type   types.Type
+	Type   ydb_table_types.Type
 	Family string
 }
 
@@ -47,7 +47,7 @@ func (c Column) toYDB() *Ydb_Table.ColumnMeta {
 	}
 }
 
-func NewTableColumn(name string, typ types.Type, family string) Column {
+func NewTableColumn(name string, typ ydb_table_types.Type, family string) Column {
 	return Column{
 		Name:   name,
 		Type:   typ,
@@ -412,8 +412,8 @@ type (
 )
 
 type KeyRange struct {
-	From types.Value
-	To   types.Value
+	From ydb_table_types.Value
+	To   ydb_table_types.Value
 }
 
 func (kr KeyRange) String() string {

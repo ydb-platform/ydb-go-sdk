@@ -3,16 +3,17 @@ package proxy
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 )
 
 type proxyRatelimiter struct {
-	client ratelimiter.Client
+	client ydb_ratelimiter.Client
 	meta   meta.Meta
 }
 
-func Ratelimiter(client ratelimiter.Client, meta meta.Meta) *proxyRatelimiter {
+func Ratelimiter(client ydb_ratelimiter.Client, meta meta.Meta) *proxyRatelimiter {
 	return &proxyRatelimiter{
 		client: client,
 		meta:   meta,
@@ -30,7 +31,7 @@ func (r *proxyRatelimiter) Close(ctx context.Context) (err error) {
 func (r *proxyRatelimiter) CreateResource(
 	ctx context.Context,
 	coordinationNodePath string,
-	resource ratelimiter.Resource,
+	resource ydb_ratelimiter.Resource,
 ) (err error) {
 	ctx, err = r.meta.Meta(ctx)
 	if err != nil {
@@ -42,7 +43,7 @@ func (r *proxyRatelimiter) CreateResource(
 func (r *proxyRatelimiter) AlterResource(
 	ctx context.Context,
 	coordinationNodePath string,
-	resource ratelimiter.Resource,
+	resource ydb_ratelimiter.Resource,
 ) (err error) {
 	ctx, err = r.meta.Meta(ctx)
 	if err != nil {
@@ -80,7 +81,7 @@ func (r *proxyRatelimiter) DescribeResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
-) (_ *ratelimiter.Resource, err error) {
+) (_ *ydb_ratelimiter.Resource, err error) {
 	ctx, err = r.meta.Meta(ctx)
 	if err != nil {
 		return nil, err

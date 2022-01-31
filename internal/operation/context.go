@@ -36,7 +36,7 @@ func ContextParams(ctx context.Context) (p Params) {
 func contextUntilDeadline(ctx context.Context) (time.Duration, bool) {
 	deadline, ok := ctx.Deadline()
 	if ok {
-		return timeutil.Until(deadline), true
+		return ydb_testutil_timeutil.Until(deadline), true
 	}
 	return 0, false
 }

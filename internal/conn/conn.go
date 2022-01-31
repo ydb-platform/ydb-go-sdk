@@ -6,9 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -42,7 +43,7 @@ type conn struct {
 	closed   bool
 	state    State
 	locks    int32
-	ttl      timeutil.Timer
+	ttl      ydb_testutil_timeutil.Timer
 }
 
 func (c *conn) Park(ctx context.Context) error {
@@ -72,8 +73,8 @@ func (c *conn) SetState(ctx context.Context, s State) State {
 }
 
 func (c *conn) setState(ctx context.Context, s State) State {
-	onDone := trace.DriverOnConnStateChange(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+	onDone := ydb_trace.DriverOnConnStateChange(
+		ydb_trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
 		c.endpoint,
 		c.state,
@@ -103,8 +104,8 @@ func (c *conn) TTL() <-chan time.Time {
 }
 
 func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
-	onDone := trace.DriverOnConnTake(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+	onDone := ydb_trace.DriverOnConnTake(
+		ydb_trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
 		c.endpoint,
 	)
@@ -140,8 +141,8 @@ func (c *conn) release(ctx context.Context) {
 	if ttl := c.config.ConnectionTTL(); ttl > 0 {
 		c.ttl.Reset(ttl)
 	}
-	onDone := trace.DriverOnConnRelease(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+	onDone := ydb_trace.DriverOnConnRelease(
+		ydb_trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
 		c.endpoint,
 	)
@@ -190,8 +191,8 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	if c.isClosed() {
 		return
 	}
-	trace.DriverOnPessimizeNode(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+	ydb_trace.DriverOnPessimizeNode(
+		ydb_trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
 		c.endpoint,
 		c.GetState(),
@@ -223,7 +224,7 @@ func (c *conn) Invoke(
 	var (
 		cancel context.CancelFunc
 		opID   string
-		issues []trace.Issue
+		issues []ydb_trace.Issue
 	)
 	if t := c.config.RequestTimeout(); t > 0 {
 		ctx, cancel = context.WithTimeout(ctx, t)
@@ -245,11 +246,11 @@ func (c *conn) Invoke(
 		operation.SetOperationParams(req, params)
 	}
 
-	onDone := trace.DriverOnConnInvoke(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+	onDone := ydb_trace.DriverOnConnInvoke(
+		ydb_trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
 		c.endpoint,
-		trace.Method(method),
+		ydb_trace.Method(method),
 	)
 	defer func() {
 		onDone(err, issues, opID, c.GetState())
@@ -321,11 +322,11 @@ func (c *conn) NewStream(
 		}
 	}()
 
-	streamRecv := trace.DriverOnConnNewStream(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+	streamRecv := ydb_trace.DriverOnConnNewStream(
+		ydb_trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
 		c.endpoint,
-		trace.Method(method),
+		ydb_trace.Method(method),
 	)
 	defer func() {
 		if err != nil {
@@ -362,7 +363,7 @@ func New(endpoint endpoint.Endpoint, config Config) Conn {
 		done:     make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		c.ttl = timeutil.NewTimer(ttl)
+		c.ttl = ydb_testutil_timeutil.NewTimer(ttl)
 	}
 	return c
 }

@@ -35,18 +35,18 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewDB(
-			testutil.WithInvokeHandlers(
-				testutil.InvokeHandlers{
+		cc: ydb_testutil.NewDB(
+			ydb_testutil.WithInvokeHandlers(
+				ydb_testutil.InvokeHandlers{
 					// nolint:unparam
 					// nolint:nolintlint
-					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
+					ydb_testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
 					},
 					// nolint:unparam
-					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					ydb_testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
-							SessionId: testutil.SessionID(),
+							SessionId: ydb_testutil.SessionID(),
 						}, nil
 					},
 				},
@@ -68,8 +68,8 @@ func TestSessionKeepAlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Status() != options.SessionReady.String() {
-		t.Fatalf("Result %v differ from, expectd %v", s.Status(), options.SessionReady.String())
+	if s.Status() != ydb_table_options.SessionReady.String() {
+		t.Fatalf("Result %v differ from, expectd %v", s.Status(), ydb_table_options.SessionReady.String())
 	}
 
 	status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY, nil
@@ -77,8 +77,8 @@ func TestSessionKeepAlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Status() != options.SessionBusy.String() {
-		t.Fatalf("Result %v differ from, expectd %v", s.Status(), options.SessionBusy.String())
+	if s.Status() != ydb_table_options.SessionBusy.String() {
+		t.Fatalf("Result %v differ from, expectd %v", s.Status(), ydb_table_options.SessionBusy.String())
 	}
 }
 
@@ -92,16 +92,16 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewDB(
-			testutil.WithInvokeHandlers(
-				testutil.InvokeHandlers{
+		cc: ydb_testutil.NewDB(
+			ydb_testutil.WithInvokeHandlers(
+				ydb_testutil.InvokeHandlers{
 					// nolint:unparam
-					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					ydb_testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
-							SessionId: testutil.SessionID(),
+							SessionId: ydb_testutil.SessionID(),
 						}, nil
 					},
-					testutil.TableDescribeTable: func(interface{}) (proto.Message, error) {
+					ydb_testutil.TableDescribeTable: func(interface{}) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)
 						return r, e
@@ -124,46 +124,46 @@ func TestSessionDescribeTable(t *testing.T) {
 	}
 	{
 		e = nil
-		expect := options.Description{
+		expect := ydb_table_options.Description{
 			Name:       "testName",
 			PrimaryKey: []string{"testKey"},
-			Columns: []options.Column{
+			Columns: []ydb_table_options.Column{
 				{
 					Name:   "testColumn",
-					Type:   types.Void(),
+					Type:   ydb_table_types.Void(),
 					Family: "testFamily",
 				},
 			},
-			KeyRanges: []options.KeyRange{
+			KeyRanges: []ydb_table_options.KeyRange{
 				{
 					From: nil,
-					To:   types.Int64Value(100500),
+					To:   ydb_table_types.Int64Value(100500),
 				},
 				{
-					From: types.Int64Value(100500),
+					From: ydb_table_types.Int64Value(100500),
 					To:   nil,
 				},
 			},
-			ColumnFamilies: []options.ColumnFamily{
+			ColumnFamilies: []ydb_table_options.ColumnFamily{
 				{
 					Name:         "testFamily",
-					Data:         options.StoragePool{},
-					Compression:  options.ColumnFamilyCompressionLZ4,
-					KeepInMemory: options.FeatureEnabled,
+					Data:         ydb_table_options.StoragePool{},
+					Compression:  ydb_table_options.ColumnFamilyCompressionLZ4,
+					KeepInMemory: ydb_table_options.FeatureEnabled,
 				},
 			},
 			Attributes: map[string]string{},
-			ReadReplicaSettings: options.ReadReplicasSettings{
-				Type:  options.ReadReplicasAnyAzReadReplicas,
+			ReadReplicaSettings: ydb_table_options.ReadReplicasSettings{
+				Type:  ydb_table_options.ReadReplicasAnyAzReadReplicas,
 				Count: 42,
 			},
-			StorageSettings: options.StorageSettings{
-				TableCommitLog0:    options.StoragePool{Media: "m1"},
-				TableCommitLog1:    options.StoragePool{Media: "m2"},
-				External:           options.StoragePool{Media: "m3"},
-				StoreExternalBlobs: options.FeatureEnabled,
+			StorageSettings: ydb_table_options.StorageSettings{
+				TableCommitLog0:    ydb_table_options.StoragePool{Media: "m1"},
+				TableCommitLog1:    ydb_table_options.StoragePool{Media: "m2"},
+				External:           ydb_table_options.StoragePool{Media: "m3"},
+				StoreExternalBlobs: ydb_table_options.FeatureEnabled,
 			},
-			Indexes: []options.IndexDescription{},
+			Indexes: []ydb_table_options.IndexDescription{},
 		}
 		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{
@@ -227,67 +227,67 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 		},
 	}
 	for _, test := range []struct {
-		method testutil.MethodCode
+		method ydb_testutil.MethodCode
 		do     func(t *testing.T, ctx context.Context, c *client)
 	}{
 		{
-			method: testutil.TableExecuteDataQuery,
+			method: ydb_testutil.TableExecuteDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
-				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
-				testutil.NoError(t, err)
+				_, _, err := s.Execute(ctx, ydb_table.TxControl(), "", ydb_table.NewQueryParameters())
+				ydb_testutil.NoError(t, err)
 			},
 		},
 		{
-			method: testutil.TableExplainDataQuery,
+			method: ydb_testutil.TableExplainDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
 				_, err := s.Explain(ctx, "")
-				testutil.NoError(t, err)
+				ydb_testutil.NoError(t, err)
 			},
 		},
 		{
-			method: testutil.TablePrepareDataQuery,
+			method: ydb_testutil.TablePrepareDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
 				_, err := s.Prepare(ctx, "")
-				testutil.NoError(t, err)
+				ydb_testutil.NoError(t, err)
 			},
 		},
 		{
-			method: testutil.TableCreateSession,
+			method: ydb_testutil.TableCreateSession,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				_, err := c.createSession(ctx)
-				testutil.NoError(t, err)
+				ydb_testutil.NoError(t, err)
 			},
 		},
 		{
-			method: testutil.TableDeleteSession,
+			method: ydb_testutil.TableDeleteSession,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
-				testutil.NoError(t, s.Close(ctx))
+				ydb_testutil.NoError(t, s.Close(ctx))
 			},
 		},
 		{
-			method: testutil.TableBeginTransaction,
+			method: ydb_testutil.TableBeginTransaction,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
-				_, err := s.BeginTransaction(ctx, table.TxSettings())
-				testutil.NoError(t, err)
+				_, err := s.BeginTransaction(ctx, ydb_table.TxSettings())
+				ydb_testutil.NoError(t, err)
 			},
 		},
 		{
-			method: testutil.TableCommitTransaction,
+			method: ydb_testutil.TableCommitTransaction,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				tx := &Transaction{
 					s: &session{
@@ -295,11 +295,11 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					},
 				}
 				_, err := tx.CommitTx(ctx)
-				testutil.NoError(t, err)
+				ydb_testutil.NoError(t, err)
 			},
 		},
 		{
-			method: testutil.TableRollbackTransaction,
+			method: ydb_testutil.TableRollbackTransaction,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				tx := &Transaction{
 					s: &session{
@@ -307,16 +307,16 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					},
 				}
 				err := tx.Rollback(ctx)
-				testutil.NoError(t, err)
+				ydb_testutil.NoError(t, err)
 			},
 		},
 		{
-			method: testutil.TableKeepAlive,
+			method: ydb_testutil.TableKeepAlive,
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 				}
-				testutil.NoError(t, s.KeepAlive(ctx))
+				ydb_testutil.NoError(t, s.KeepAlive(ctx))
 			},
 		},
 	} {
@@ -327,11 +327,11 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := newClient(
 							context.Background(),
-							testutil.NewDB(
-								testutil.WithInvokeHandlers(
-									testutil.InvokeHandlers{
+							ydb_testutil.NewDB(
+								ydb_testutil.WithInvokeHandlers(
+									ydb_testutil.InvokeHandlers{
 										// nolint:unparam
-										testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
+										ydb_testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.ExecuteQueryResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
 													Id: "",
@@ -339,42 +339,42 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 											}, nil
 										},
 										// nolint:unparam
-										testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
+										ydb_testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.BeginTransactionResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
 													Id: "",
 												},
 											}, nil
 										},
-										testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+										ydb_testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.ExecuteQueryResult{}, nil
 										},
-										testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+										ydb_testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.PrepareQueryResult{}, nil
 										},
 										// nolint:unparam
-										testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+										ydb_testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.CreateSessionResult{
-												SessionId: testutil.SessionID(),
+												SessionId: ydb_testutil.SessionID(),
 											}, nil
 										},
-										testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+										ydb_testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.DeleteSessionResponse{}, nil
 										},
-										testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+										ydb_testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.CommitTransactionResponse{}, nil
 										},
-										testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+										ydb_testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.RollbackTransactionResponse{}, nil
 										},
-										testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+										ydb_testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.KeepAliveResult{}, nil
 										},
 									},
 								),
 							),
 							nil,
-							config.New(),
+							ydb_table_config.New(),
 						)
 						ctx, cancel := context.WithTimeout(
 							context.Background(),
@@ -398,25 +398,27 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 func TestQueryCachePolicyKeepInCache(t *testing.T) {
 	for _, test := range [...]struct {
 		name                   string
-		queryCachePolicyOption []options.QueryCachePolicyOption
+		queryCachePolicyOption []ydb_table_options.QueryCachePolicyOption
 	}{
 		{
-			name:                   "with server cache",
-			queryCachePolicyOption: []options.QueryCachePolicyOption{options.WithQueryCachePolicyKeepInCache()},
+			name: "with server cache",
+			queryCachePolicyOption: []ydb_table_options.QueryCachePolicyOption{
+				ydb_table_options.WithQueryCachePolicyKeepInCache(),
+			},
 		},
 		{
 			name:                   "no server cache",
-			queryCachePolicyOption: []options.QueryCachePolicyOption{},
+			queryCachePolicyOption: []ydb_table_options.QueryCachePolicyOption{},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			b := StubBuilder{
 				T: t,
-				cc: testutil.NewDB(
-					testutil.WithInvokeHandlers(
-						testutil.InvokeHandlers{
+				cc: ydb_testutil.NewDB(
+					ydb_testutil.WithInvokeHandlers(
+						ydb_testutil.InvokeHandlers{
 							// nolint:unparam
-							testutil.TableExecuteDataQuery: func(request interface{}) (proto.Message, error) {
+							ydb_testutil.TableExecuteDataQuery: func(request interface{}) (proto.Message, error) {
 								r, ok := request.(*Ydb_Table.ExecuteDataQueryRequest)
 								if !ok {
 									t.Fatalf("cannot cast request '%T' to *Ydb_Table.ExecuteDataQueryRequest", request)
@@ -437,9 +439,9 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 								}, nil
 							},
 							// nolint:unparam
-							testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+							ydb_testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 								return &Ydb_Table.CreateSessionResult{
-									SessionId: testutil.SessionID(),
+									SessionId: ydb_testutil.SessionID(),
 								}, nil
 							},
 						},
@@ -451,15 +453,15 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, _, err = s.Execute(
-				context.Background(), table.TxControl(
-					table.BeginTx(
-						table.WithOnlineReadOnly(),
+				context.Background(), ydb_table.TxControl(
+					ydb_table.BeginTx(
+						ydb_table.WithOnlineReadOnly(),
 					),
-					table.CommitTx(),
+					ydb_table.CommitTx(),
 				),
 				"SELECT 1",
-				table.NewQueryParameters(),
-				options.WithQueryCachePolicy(test.queryCachePolicyOption...),
+				ydb_table.NewQueryParameters(),
+				ydb_table_options.WithQueryCachePolicy(test.queryCachePolicyOption...),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -476,10 +478,10 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewDB(
-			testutil.WithInvokeHandlers(
-				testutil.InvokeHandlers{
-					testutil.TableBeginTransaction: func(request interface{}) (proto.Message, error) {
+		cc: ydb_testutil.NewDB(
+			ydb_testutil.WithInvokeHandlers(
+				ydb_testutil.InvokeHandlers{
+					ydb_testutil.TableBeginTransaction: func(request interface{}) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.BeginTransactionRequest)
 						if !ok {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.BeginTransactionRequest", request)
@@ -503,7 +505,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							},
 						}, nil
 					},
-					testutil.TableCommitTransaction: func(request interface{}) (proto.Message, error) {
+					ydb_testutil.TableCommitTransaction: func(request interface{}) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.CommitTransactionRequest)
 						if !ok {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.CommitTransactionRequest", request)
@@ -524,7 +526,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 						}, nil
 					},
 					// nolint:unparam
-					testutil.TableRollbackTransaction: func(request interface{}) (proto.Message, error) {
+					ydb_testutil.TableRollbackTransaction: func(request interface{}) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.RollbackTransactionRequest)
 						if !ok {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.RollbackTransactionRequest", request)
@@ -538,9 +540,9 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 						}, nil
 					},
 					// nolint:unparam
-					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					ydb_testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
-							SessionId: testutil.SessionID(),
+							SessionId: ydb_testutil.SessionID(),
 						}, nil
 					},
 				},
@@ -552,7 +554,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 		t.Fatal(err)
 	}
 	{
-		x, err := s.BeginTransaction(context.Background(), table.TxSettings())
+		x, err := s.BeginTransaction(context.Background(), ydb_table.TxSettings())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -579,7 +581,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 		}
 	}
 	{
-		x, err := s.BeginTransaction(context.Background(), table.TxSettings())
+		x, err := s.BeginTransaction(context.Background(), ydb_table.TxSettings())
 		if err != nil {
 			t.Fatal(err)
 		}

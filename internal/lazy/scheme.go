@@ -5,23 +5,27 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type lazyScheme struct {
 	db     db.Connection
-	client scheme.Client
+	client ydb_scheme.Client
 	m      sync.Mutex
 }
 
-func Scheme(db db.Connection) scheme.Client {
+func Scheme(db db.Connection) ydb_scheme.Client {
 	return &lazyScheme{
 		db: db,
 	}
 }
 
-func (s *lazyScheme) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
+func (s *lazyScheme) ModifyPermissions(
+	ctx context.Context,
+	path string,
+	opts ...ydb_scheme.PermissionsOption,
+) (err error) {
 	s.init()
 	return s.client.ModifyPermissions(ctx, path, opts...)
 }
@@ -41,12 +45,12 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 func (s *lazyScheme) init() {
 	s.m.Lock()
 	if s.client == nil {
-		s.client = internal.New(s.db)
+		s.client = scheme.New(s.db)
 	}
 	s.m.Unlock()
 }
 
-func (s *lazyScheme) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
+func (s *lazyScheme) DescribePath(ctx context.Context, path string) (e ydb_scheme.Entry, err error) {
 	s.init()
 	return s.client.DescribePath(ctx, path)
 }
@@ -56,7 +60,7 @@ func (s *lazyScheme) MakeDirectory(ctx context.Context, path string) (err error)
 	return s.client.MakeDirectory(ctx, path)
 }
 
-func (s *lazyScheme) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
+func (s *lazyScheme) ListDirectory(ctx context.Context, path string) (d ydb_scheme.Directory, err error) {
 	s.init()
 	return s.client.ListDirectory(ctx, path)
 }

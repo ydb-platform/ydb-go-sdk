@@ -8,11 +8,11 @@ import (
 )
 
 type proxyScheme struct {
-	client scheme.Client
+	client ydb_scheme.Client
 	meta   meta.Meta
 }
 
-func Scheme(client scheme.Client, meta meta.Meta) scheme.Client {
+func Scheme(client ydb_scheme.Client, meta meta.Meta) ydb_scheme.Client {
 	return &proxyScheme{
 		client: client,
 		meta:   meta,
@@ -22,7 +22,7 @@ func Scheme(client scheme.Client, meta meta.Meta) scheme.Client {
 func (s *proxyScheme) ModifyPermissions(
 	ctx context.Context,
 	path string,
-	opts ...scheme.PermissionsOption,
+	opts ...ydb_scheme.PermissionsOption,
 ) (err error) {
 	ctx, err = s.meta.Meta(ctx)
 	if err != nil {
@@ -39,7 +39,7 @@ func (s *proxyScheme) Close(ctx context.Context) (err error) {
 	return s.client.Close(ctx)
 }
 
-func (s *proxyScheme) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
+func (s *proxyScheme) DescribePath(ctx context.Context, path string) (e ydb_scheme.Entry, err error) {
 	ctx, err = s.meta.Meta(ctx)
 	if err != nil {
 		return e, err
@@ -55,7 +55,7 @@ func (s *proxyScheme) MakeDirectory(ctx context.Context, path string) (err error
 	return s.client.MakeDirectory(ctx, path)
 }
 
-func (s *proxyScheme) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
+func (s *proxyScheme) ListDirectory(ctx context.Context, path string) (d ydb_scheme.Directory, err error) {
 	ctx, err = s.meta.Meta(ctx)
 	if err != nil {
 		return d, err

@@ -57,7 +57,7 @@ func TestMulti(t *testing.T) {
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
 	for i := 0; i < n; i++ {
-		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), config.New())
+		c := conn.New(endpoint.New(strconv.Itoa(i)+":0"), ydb_config.New())
 		e := m.Insert(c)
 		es[i] = e
 		el[c] = e
@@ -146,7 +146,7 @@ func TestPreferLocal(t *testing.T) {
 				strconv.Itoa(i)+":0",
 				endpoint.WithLocalDC(i%2 == 0),
 			),
-			config.New(),
+			ydb_config.New(),
 		)
 		e := m.Insert(c)
 		es[i] = e
@@ -215,7 +215,7 @@ func TestPreferEndpoint(t *testing.T) {
 				strconv.Itoa(i)+":0",
 				endpoint.WithLocalDC(i%2 == 0),
 			),
-			config.New(),
+			ydb_config.New(),
 		)
 		e := m.Insert(c)
 		es[i] = e
@@ -481,9 +481,9 @@ func TestRoundRobin(t *testing.T) {
 			for _, e := range test.add {
 				c := conn.New(
 					e,
-					config.New(
-						config.WithDatabase("test"),
-						config.WithEndpoint("test"),
+					ydb_config.New(
+						ydb_config.WithDatabase("test"),
+						ydb_config.WithEndpoint("test"),
 					),
 				)
 				c.SetState(ctx, conn.Online)
@@ -541,7 +541,7 @@ func TestRandomChoice(t *testing.T) {
 			for _, e := range test.add {
 				c := conn.New(
 					e,
-					config.New(),
+					ydb_config.New(),
 				)
 				c.SetState(ctx, conn.Online)
 				if _, ok := test.banned[e.Address()]; ok {

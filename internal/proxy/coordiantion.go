@@ -9,18 +9,18 @@ import (
 )
 
 type proxyCoordination struct {
-	client coordination.Client
+	client ydb_coordination.Client
 	meta   meta.Meta
 }
 
-func Coordination(client coordination.Client, meta meta.Meta) coordination.Client {
+func Coordination(client ydb_coordination.Client, meta meta.Meta) ydb_coordination.Client {
 	return &proxyCoordination{
 		client: client,
 		meta:   meta,
 	}
 }
 
-func (c *proxyCoordination) CreateNode(ctx context.Context, path string, config coordination.Config) (err error) {
+func (c *proxyCoordination) CreateNode(ctx context.Context, path string, config ydb_coordination.Config) (err error) {
 	ctx, err = c.meta.Meta(ctx)
 	if err != nil {
 		return err
@@ -28,7 +28,7 @@ func (c *proxyCoordination) CreateNode(ctx context.Context, path string, config 
 	return c.client.CreateNode(ctx, path, config)
 }
 
-func (c *proxyCoordination) AlterNode(ctx context.Context, path string, config coordination.Config) (err error) {
+func (c *proxyCoordination) AlterNode(ctx context.Context, path string, config ydb_coordination.Config) (err error) {
 	ctx, err = c.meta.Meta(ctx)
 	if err != nil {
 		return err
@@ -48,8 +48,8 @@ func (c *proxyCoordination) DescribeNode(
 	ctx context.Context,
 	path string,
 ) (
-	_ *scheme.Entry,
-	_ *coordination.Config,
+	_ *ydb_scheme.Entry,
+	_ *ydb_coordination.Config,
 	err error,
 ) {
 	ctx, err = c.meta.Meta(ctx)
