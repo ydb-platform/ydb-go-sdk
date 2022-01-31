@@ -3,6 +3,7 @@
 * Changed connection secure to true by default
 * Renamed public package `balancer` tp `balancers` (this package contains only constructors of balancers)
 * Moved interfaces from package `internal/balancer/ibalancer` to `internal/balancer`
+* Added prefix `ydb` to all public packages
 
 ## 3.7.2
 * Retry remove directory in `sugar.RemoveRecursive()` for retryable error
