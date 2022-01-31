@@ -264,7 +264,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		for j := range sleeps {
 			timeout := timeouts[i]
 			sleep := sleeps[j]
-			t.Run(fmt.Sprintf("timeout %v, sleep %v", timeout, sleep), func(t *testing.T) {
+			t.Run(fmt.Sprintf("Timeout=%v,Sleep=%v", timeout, sleep), func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 				_ = do(
