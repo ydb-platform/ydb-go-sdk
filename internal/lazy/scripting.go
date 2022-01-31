@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -65,7 +65,7 @@ func Scripting(db db.Connection) scripting.Client {
 func (s *lazyScripting) init() {
 	s.m.Lock()
 	if s.client == nil {
-		s.client = internal.New(s.db)
+		s.client = builder.New(s.db)
 	}
 	s.m.Unlock()
 }

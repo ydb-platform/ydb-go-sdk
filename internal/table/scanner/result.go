@@ -10,11 +10,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-type result struct {
+type baseResult struct {
 	scanner
 
 	statsMtx sync.RWMutex
@@ -25,14 +25,14 @@ type result struct {
 }
 
 type streamResult struct {
-	result
+	baseResult
 
 	recv  func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error)
 	close func(error) error
 }
 
 type unaryResult struct {
-	result
+	baseResult
 
 	sets    []*Ydb.ResultSet
 	nextSet int
@@ -53,7 +53,7 @@ func (r *unaryResult) ResultSetCount() int {
 	return len(r.sets)
 }
 
-func (r *result) isClosed() bool {
+func (r *baseResult) isClosed() bool {
 	r.closedMtx.RLock()
 	defer r.closedMtx.RUnlock()
 	return r.closed
@@ -64,12 +64,12 @@ type resultWithError interface {
 }
 
 type UnaryResult interface {
-	public.Result
+	result.Result
 	resultWithError
 }
 
 type StreamResult interface {
-	public.StreamResult
+	result.StreamResult
 	resultWithError
 }
 
@@ -86,7 +86,7 @@ func NewStream(
 
 func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats) UnaryResult {
 	r := &unaryResult{
-		result: result{
+		baseResult: baseResult{
 			stats: stats,
 		},
 		sets: sets,
@@ -94,7 +94,7 @@ func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats) UnaryResu
 	return r
 }
 
-func (r *result) Reset(set *Ydb.ResultSet, columnNames ...string) {
+func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	r.reset(set)
 	if set != nil {
 		r.setColumnIndexes(columnNames)
@@ -145,12 +145,12 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 }
 
 // CurrentResultSet get current result set
-func (r *result) CurrentResultSet() public.Set {
+func (r *baseResult) CurrentResultSet() result.Set {
 	return r
 }
 
 // Stats returns query execution queryStats.
-func (r *result) Stats() stats.QueryStats {
+func (r *baseResult) Stats() stats.QueryStats {
 	var s queryStats
 	r.statsMtx.RLock()
 	s.stats = r.stats
@@ -171,7 +171,7 @@ func (r *streamResult) Close() (err error) {
 	return r.close(r.Err())
 }
 
-func (r *result) inactive() bool {
+func (r *baseResult) inactive() bool {
 	return r.isClosed() || r.Err() != nil
 }
 

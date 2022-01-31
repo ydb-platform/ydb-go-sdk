@@ -18,7 +18,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -1018,7 +1018,7 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	if err != nil {
 		return err
 	}
-	log.Println("> describe_table_options:")
+	log.Println("> describe_options:")
 
 	for i, p := range desc.TableProfilePresets {
 		log.Printf("  > TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)

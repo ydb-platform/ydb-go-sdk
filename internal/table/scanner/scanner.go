@@ -1010,7 +1010,7 @@ func (s *scanner) scan(values []interface{}) (err error) {
 	return s.Err()
 }
 
-func (r *result) SetErr(err error) {
+func (r *baseResult) SetErr(err error) {
 	r.errMtx.Lock()
 	r.err = err
 	r.errMtx.Unlock()

@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
+	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -374,7 +374,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								),
 							),
 							nil,
-							config.New(),
+							tableConfig.New(),
 						)
 						ctx, cancel := context.WithTimeout(
 							context.Background(),
@@ -401,8 +401,10 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		queryCachePolicyOption []options.QueryCachePolicyOption
 	}{
 		{
-			name:                   "with server cache",
-			queryCachePolicyOption: []options.QueryCachePolicyOption{options.WithQueryCachePolicyKeepInCache()},
+			name: "with server cache",
+			queryCachePolicyOption: []options.QueryCachePolicyOption{
+				options.WithQueryCachePolicyKeepInCache(),
+			},
 		},
 		{
 			name:                   "no server cache",

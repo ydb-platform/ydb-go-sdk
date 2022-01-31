@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 )
@@ -54,7 +54,7 @@ func (t *lazyTable) Close(ctx context.Context) error {
 func (t *lazyTable) init(ctx context.Context) {
 	t.m.Lock()
 	if t.client == nil {
-		t.client = internal.New(ctx, t.db, t.options...)
+		t.client = builder.New(ctx, t.db, t.options...)
 	}
 	t.m.Unlock()
 }

@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
@@ -64,7 +64,7 @@ func (c *lazyCoordination) Close(ctx context.Context) error {
 func (c *lazyCoordination) init() {
 	c.m.Lock()
 	if c.client == nil {
-		c.client = internal.New(c.db)
+		c.client = builder.New(c.db)
 	}
 	c.m.Unlock()
 }
