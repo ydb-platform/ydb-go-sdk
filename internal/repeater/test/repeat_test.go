@@ -1,4 +1,4 @@
-package repeater
+package test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil/timetest"
@@ -26,7 +27,7 @@ func TestRepeater(t *testing.T) {
 	defer cancel()
 
 	exec := make(chan struct{})
-	r := NewRepeater(ctx, 42*time.Second,
+	r := repeater.NewRepeater(ctx, 42*time.Second,
 		func(_ context.Context) {
 			exec <- struct{}{}
 		}, nil)
@@ -57,7 +58,7 @@ func TestRepeaterCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	r := NewRepeater(ctx, 42*time.Second,
+	r := repeater.NewRepeater(ctx, 42*time.Second,
 		func(ctx context.Context) {
 			enter <- struct{}{}
 			<-ctx.Done()

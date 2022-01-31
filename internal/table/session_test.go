@@ -35,7 +35,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewCluster(
+		cc: testutil.NewDB(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					// nolint:unparam
@@ -92,7 +92,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewCluster(
+		cc: testutil.NewDB(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					// nolint:unparam
@@ -327,7 +327,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := newClient(
 							context.Background(),
-							testutil.NewCluster(
+							testutil.NewDB(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
 										// nolint:unparam
@@ -412,7 +412,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := StubBuilder{
 				T: t,
-				cc: testutil.NewCluster(
+				cc: testutil.NewDB(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
 							// nolint:unparam
@@ -476,7 +476,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewCluster(
+		cc: testutil.NewDB(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableBeginTransaction: func(request interface{}) (proto.Message, error) {
