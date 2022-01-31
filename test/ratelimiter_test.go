@@ -42,12 +42,12 @@ func TestRatelimiter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer t.Run("cleanup connection", func(t *testing.T) {
+	defer t.Run("CleanupConnection", func(t *testing.T) {
 		if e := db.Close(ctx); e != nil {
 			t.Fatalf("db close failed: %+v", e)
 		}
 	})
-	t.Run("drop node", func(t *testing.T) {
+	t.Run("DropNode", func(t *testing.T) {
 		err := db.Coordination().DropNode(ctx, testCoordinationNodePath)
 		if err != nil {
 			if d := ydb.TransportErrorDescription(err); d != nil && d.Code() == int32(errors.TransportErrorUnimplemented) {
@@ -58,7 +58,7 @@ func TestRatelimiter(t *testing.T) {
 			}
 		}
 	})
-	t.Run("create node", func(t *testing.T) {
+	t.Run("CreateNode", func(t *testing.T) {
 		err := db.Coordination().CreateNode(ctx, testCoordinationNodePath, cfg.Config{
 			Path:                     "",
 			SelfCheckPeriodMillis:    1000,
@@ -71,13 +71,13 @@ func TestRatelimiter(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	defer t.Run("cleanup node", func(t *testing.T) {
+	defer t.Run("CleanupNode", func(t *testing.T) {
 		err := db.Coordination().DropNode(ctx, testCoordinationNodePath)
 		if err != nil {
 			t.Fatal(err)
 		}
 	})
-	t.Run("create resource", func(t *testing.T) {
+	t.Run("CreateResource", func(t *testing.T) {
 		err := db.Ratelimiter().CreateResource(ctx, testCoordinationNodePath, public.Resource{
 			ResourcePath: testResource,
 			HierarchicalDrr: public.HierarchicalDrrSettings{
@@ -89,13 +89,13 @@ func TestRatelimiter(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	defer t.Run("cleanup resource", func(t *testing.T) {
+	defer t.Run("CleanupResource", func(t *testing.T) {
 		err := db.Ratelimiter().DropResource(ctx, testCoordinationNodePath, testResource)
 		if err != nil {
 			t.Fatal("Cannot drop resource")
 		}
 	})
-	t.Run("describe resource", func(t *testing.T) {
+	t.Run("DescribeResource", func(t *testing.T) {
 		described, err := db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
 		if err != nil {
 			t.Fatal(err)
@@ -107,7 +107,7 @@ func TestRatelimiter(t *testing.T) {
 			t.Fatal("Resource invalid")
 		}
 	})
-	t.Run("alter resource", func(t *testing.T) {
+	t.Run("AlterResource", func(t *testing.T) {
 		err := db.Ratelimiter().AlterResource(ctx, testCoordinationNodePath, public.Resource{
 			ResourcePath: testResource,
 			HierarchicalDrr: public.HierarchicalDrrSettings{
@@ -119,7 +119,7 @@ func TestRatelimiter(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("check altered resource", func(t *testing.T) {
+	t.Run("CheckAlteredResource", func(t *testing.T) {
 		described, err := db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
 		if err != nil {
 			t.Fatal(err)
@@ -131,7 +131,7 @@ func TestRatelimiter(t *testing.T) {
 			t.Fatal("Resource invalid")
 		}
 	})
-	t.Run("list resource", func(t *testing.T) {
+	t.Run("ListResource", func(t *testing.T) {
 		list, err := db.Ratelimiter().ListResource(ctx, testCoordinationNodePath, testResource, true)
 		if err != nil {
 			t.Fatal(err)
@@ -140,19 +140,19 @@ func TestRatelimiter(t *testing.T) {
 			t.Fatal("ListResource error")
 		}
 	})
-	t.Run("acquire resource amount <1, false>", func(t *testing.T) {
+	t.Run("AcquireResourceAmount=<1,false>", func(t *testing.T) {
 		err := db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 1, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 	})
-	t.Run("acquire resource amount <10000, true>", func(t *testing.T) {
+	t.Run("AcquireResourceAmount=<10000,true>", func(t *testing.T) {
 		err := db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, true)
 		if err != nil {
 			t.Fatal(err)
 		}
 	})
-	t.Run("acquire resource amount <10000, false>", func(t *testing.T) {
+	t.Run("AcquireResourceAmount=<10000,false>", func(t *testing.T) {
 		err := db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, false)
 		if err == nil {
 			t.Fatal("Resource must not be acquired")

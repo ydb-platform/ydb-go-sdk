@@ -130,7 +130,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	nextBadEndpoints := []endpoint.Endpoint{
 		endpoint.New("bad:23"),
 	}
-	t.Run("initial fill", func(t *testing.T) {
+	t.Run("InitialFill", func(t *testing.T) {
 		// nolint:gocritic
 		// nolint:nolintlint
 		ne := append(endpoints, badEndpoints...)
@@ -145,7 +145,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
 	})
-	t.Run("update with another endpoints", func(t *testing.T) {
+	t.Run("UpdateWithAnotherEndpoints", func(t *testing.T) {
 		// nolint:gocritic
 		// nolint:nolintlint
 		ne := append(nextEndpoints, nextBadEndpoints...)
@@ -160,7 +160,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
 	})
-	t.Run("left only bad", func(t *testing.T) {
+	t.Run("LeftOnlyBad", func(t *testing.T) {
 		ne := nextBadEndpoints
 		// merge new endpoints into balancer
 		mergeEndpointIntoCluster(
@@ -172,7 +172,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
 	})
-	t.Run("left only good", func(t *testing.T) {
+	t.Run("LeftOnlyGood", func(t *testing.T) {
 		ne := nextEndpoints
 		// merge new endpoints into balancer
 		mergeEndpointIntoCluster(

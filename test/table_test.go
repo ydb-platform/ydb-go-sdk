@@ -103,7 +103,7 @@ func TestTable(t *testing.T) {
 		keepAliveMinSize: math.MinInt32,
 		limit:            math.MaxInt32,
 	}
-	defer t.Run("check stats", func(t *testing.T) {
+	defer t.Run("CheckStats", func(t *testing.T) {
 		s.Lock()
 		defer s.Unlock()
 		if s.inFlight != 0 {
@@ -211,12 +211,12 @@ func TestTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer t.Run("cleanup", func(t *testing.T) {
+	defer t.Run("Cleanup", func(t *testing.T) {
 		if e := db.Close(ctx); e != nil {
 			t.Fatalf("db close failed: %+v", e)
 		}
 	})
-	t.Run("ping", func(t *testing.T) {
+	t.Run("Ping", func(t *testing.T) {
 		if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
 			// hack for wait pool initializing
 			return nil
@@ -224,12 +224,12 @@ func TestTable(t *testing.T) {
 			t.Fatalf("pool not initialized: %+v", err)
 		}
 	})
-	t.Run("pool init check", func(t *testing.T) {
+	t.Run("PoolInitCheck", func(t *testing.T) {
 		if s.min() < 0 || s.max() != limit {
 			t.Fatalf("pool sizes not applied: %+v", s)
 		}
 	})
-	t.Run("prepare scheme", func(t *testing.T) {
+	t.Run("PrepareScheme", func(t *testing.T) {
 		err = sugar.RemoveRecursive(ctx, db, folder)
 		if err != nil {
 			t.Fatal(err)
@@ -263,12 +263,12 @@ func TestTable(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("fill data", func(t *testing.T) {
+	t.Run("FillData", func(t *testing.T) {
 		if err = fill(ctx, db, folder); err != nil {
 			t.Fatalf("fillQuery failed: %v\n", err)
 		}
 	})
-	t.Run("upsert with tx", func(t *testing.T) {
+	t.Run("UpsertWithTx", func(t *testing.T) {
 		if err = db.Table().DoTx(
 			ctx,
 			func(ctx context.Context, tx table.TransactionActor) (err error) {
@@ -350,7 +350,7 @@ func TestTable(t *testing.T) {
 			t.Fatalf("tx failed: %v\n", err)
 		}
 	})
-	t.Run("select upserted data", func(t *testing.T) {
+	t.Run("SelectUpsertedData", func(t *testing.T) {
 		if err = db.Table().Do(
 			ctx,
 			func(ctx context.Context, s table.Session) (err error) {
@@ -409,8 +409,8 @@ func TestTable(t *testing.T) {
 			t.Fatalf("tx failed: %v\n", err)
 		}
 	})
-	t.Run("multiple result sets", func(t *testing.T) {
-		t.Run("create table", func(t *testing.T) {
+	t.Run("MultipleResultSets", func(t *testing.T) {
+		t.Run("CreateTable", func(t *testing.T) {
 			if err = db.Table().Do(
 				ctx,
 				func(ctx context.Context, s table.Session) (err error) {
@@ -427,7 +427,7 @@ func TestTable(t *testing.T) {
 			upsertRowsCount = 40000
 			sum             uint64
 		)
-		t.Run("upsert data", func(t *testing.T) {
+		t.Run("UpsertData", func(t *testing.T) {
 			values := make([]types.Value, 0, upsertRowsCount)
 			for i := 0; i < upsertRowsCount; i++ {
 				sum += uint64(i)
@@ -472,7 +472,7 @@ func TestTable(t *testing.T) {
 				t.Fatalf("upsert failed: %v\n", err)
 			}
 		})
-		t.Run("scan select", func(t *testing.T) {
+		t.Run("ScanSelect", func(t *testing.T) {
 			if err = db.Table().Do(
 				ctx,
 				func(ctx context.Context, s table.Session) (err error) {
@@ -519,7 +519,7 @@ func TestTable(t *testing.T) {
 			}
 		})
 	})
-	t.Run("select concurrently", func(t *testing.T) {
+	t.Run("SelectConcurrently", func(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < limit; i++ {
 			wg.Add(3)

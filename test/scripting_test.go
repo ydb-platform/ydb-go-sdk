@@ -46,7 +46,7 @@ func TestScripting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer t.Run("cleanup connection", func(t *testing.T) {
+	defer t.Run("CleanupConnection", func(t *testing.T) {
 		if e := db.Close(ctx); e != nil {
 			t.Fatalf("db close failed: %+v", e)
 		}
@@ -126,7 +126,7 @@ func TestScripting(t *testing.T) {
 			t.Fatalf("StreamExecute failed: %v", err)
 		}
 	})
-	t.Run("Explain plan", func(t *testing.T) {
+	t.Run("ExplainPlan", func(t *testing.T) {
 		if err := retry.Retry(ctx, true, func(ctx context.Context) (err error) {
 			res, err := db.Scripting().Explain(
 				ctx,
@@ -144,7 +144,7 @@ func TestScripting(t *testing.T) {
 			t.Fatalf("Explain failed: %v", err)
 		}
 	})
-	t.Run("Explain validate", func(t *testing.T) {
+	t.Run("ExplainValidate", func(t *testing.T) {
 		if err := retry.Retry(ctx, true, func(ctx context.Context) (err error) {
 			res, err := db.Scripting().Explain(
 				ctx,
