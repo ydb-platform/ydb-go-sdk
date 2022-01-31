@@ -14,7 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/icluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 )
 
 var ErrNotImplemented = errors.New("testutil: not implemented")
@@ -158,7 +158,7 @@ func getField(name string, src, dst interface{}) bool {
 	return fn(reflect.ValueOf(src).Elem(), strings.Split(name, ".")...)
 }
 
-type db struct {
+type database struct {
 	onInvoke func(
 		ctx context.Context,
 		method string,
@@ -177,15 +177,7 @@ type db struct {
 	) error
 }
 
-func (db *db) Address() string {
-	return ""
-}
-
-func (db *db) Secure() bool {
-	return true
-}
-
-func (db *db) Invoke(
+func (db *database) Invoke(
 	ctx context.Context,
 	method string,
 	args interface{},
@@ -193,24 +185,24 @@ func (db *db) Invoke(
 	opts ...grpc.CallOption,
 ) (err error) {
 	if db.onInvoke == nil {
-		return fmt.Errorf("db.onInvoke() not implemented")
+		return fmt.Errorf("database.onInvoke() not implemented")
 	}
 	return db.onInvoke(ctx, method, args, reply, opts...)
 }
 
-func (db *db) NewStream(
+func (db *database) NewStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
 	if db.onNewStream == nil {
-		return nil, fmt.Errorf("db.onNewStream() not implemented")
+		return nil, fmt.Errorf("database.onNewStream() not implemented")
 	}
 	return db.onNewStream(ctx, desc, method, opts...)
 }
 
-func (db *db) Get(context.Context) (conn grpc.ClientConnInterface, err error) {
+func (db *database) Get(context.Context) (conn grpc.ClientConnInterface, err error) {
 	cc := &clientConn{
 		onInvoke:    db.onInvoke,
 		onNewStream: db.onNewStream,
@@ -218,13 +210,13 @@ func (db *db) Get(context.Context) (conn grpc.ClientConnInterface, err error) {
 	return cc, nil
 }
 
-func (db *db) Name() string {
-	return "testutil.db"
+func (db *database) Name() string {
+	return "testutil.database"
 }
 
-func (db *db) Close(ctx context.Context) error {
+func (db *database) Close(ctx context.Context) error {
 	if db.onClose == nil {
-		return fmt.Errorf("db.Close() not implemented")
+		return fmt.Errorf("database.Close() not implemented")
 	}
 	return db.onClose(ctx)
 }
@@ -234,10 +226,10 @@ type (
 	NewStreamHandlers map[MethodCode]func(desc *grpc.StreamDesc) (grpc.ClientStream, error)
 )
 
-type NewClusterOption func(c *db)
+type dbOption func(c *database)
 
-func WithInvokeHandlers(invokeHandlers InvokeHandlers) NewClusterOption {
-	return func(db *db) {
+func WithInvokeHandlers(invokeHandlers InvokeHandlers) dbOption {
+	return func(db *database) {
 		db.onInvoke = func(
 			ctx context.Context,
 			method string,
@@ -268,8 +260,8 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) NewClusterOption {
 	}
 }
 
-func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) NewClusterOption {
-	return func(db *db) {
+func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) dbOption {
+	return func(db *database) {
 		db.onNewStream = func(
 			ctx context.Context,
 			desc *grpc.StreamDesc,
@@ -284,14 +276,14 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) NewClusterOption
 	}
 }
 
-func WithClose(onClose func(ctx context.Context) error) NewClusterOption {
-	return func(c *db) {
+func WithClose(onClose func(ctx context.Context) error) dbOption {
+	return func(c *database) {
 		c.onClose = onClose
 	}
 }
 
-func NewCluster(opts ...NewClusterOption) icluster.Cluster {
-	c := &db{}
+func NewDB(opts ...dbOption) db.Cluster {
+	c := &database{}
 	for _, opt := range opts {
 		opt(c)
 	}

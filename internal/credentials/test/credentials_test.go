@@ -1,15 +1,16 @@
-package credentials
+package test
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestCredentialsString(t *testing.T) {
 	for _, test := range []struct {
-		c Credentials
+		c credentials.Credentials
 		s string
 	}{
 		{
@@ -17,19 +18,19 @@ func TestCredentialsString(t *testing.T) {
 			"without credentials",
 		},
 		{
-			NewAnonymousCredentials(""),
+			credentials.NewAnonymousCredentials(""),
 			"anonymous",
 		},
 		{
-			NewAnonymousCredentials("test"),
+			credentials.NewAnonymousCredentials("test"),
 			"anonymous created from test",
 		},
 		{
-			NewAccessTokenCredentials("", ""),
+			credentials.NewAccessTokenCredentials("", ""),
 			"accessToken",
 		},
 		{
-			NewAccessTokenCredentials("", "test"),
+			credentials.NewAccessTokenCredentials("", "test"),
 			"accessToken created from test",
 		},
 	} {

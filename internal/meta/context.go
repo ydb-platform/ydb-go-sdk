@@ -8,10 +8,10 @@ import (
 
 // WithTraceID returns a copy of parent deadline with traceID
 func WithTraceID(ctx context.Context, traceID string) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, metaTraceID, traceID)
+	return metadata.AppendToOutgoingContext(ctx, MetaTraceID, traceID)
 }
 
 // WithUserAgent returns a copy of parent deadline with custom user-agent info
 func WithUserAgent(ctx context.Context, userAgent string) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, metaUserAgent, userAgent)
+	return metadata.AppendToOutgoingContext(ctx, MetaUserAgent, userAgent)
 }

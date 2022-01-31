@@ -11,12 +11,12 @@ import (
 )
 
 const (
-	metaDatabase    = "x-ydb-database"
-	metaTicket      = "x-ydb-auth-ticket"
-	metaVersion     = "x-ydb-sdk-build-info"
-	metaRequestType = "x-ydb-request-types"
-	metaTraceID     = "x-ydb-trace-id"
-	metaUserAgent   = "x-ydb-user-agent"
+	MetaDatabase    = "x-ydb-database"
+	MetaTicket      = "x-ydb-auth-ticket"
+	MetaVersion     = "x-ydb-sdk-build-info"
+	MetaRequestType = "x-ydb-request-types"
+	MetaTraceID     = "x-ydb-trace-id"
+	MetaUserAgent   = "x-ydb-user-agent"
 )
 
 type Meta interface {
@@ -74,20 +74,20 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if !has {
 		md = metadata.MD{}
 	}
-	if len(md.Get(metaDatabase)) == 0 {
-		md.Set(metaDatabase, m.database)
+	if len(md.Get(MetaDatabase)) == 0 {
+		md.Set(MetaDatabase, m.database)
 	}
-	if len(md.Get(metaVersion)) == 0 {
-		md.Set(metaVersion, Version)
+	if len(md.Get(MetaVersion)) == 0 {
+		md.Set(MetaVersion, Version)
 	}
 	if m.requestsType != "" {
-		if len(md.Get(metaRequestType)) == 0 {
-			md.Set(metaRequestType, m.requestsType)
+		if len(md.Get(MetaRequestType)) == 0 {
+			md.Set(MetaRequestType, m.requestsType)
 		}
 	}
 	if m.userAgent != "" {
-		if len(md.Get(metaUserAgent)) == 0 {
-			md.Set(metaUserAgent, m.userAgent)
+		if len(md.Get(MetaUserAgent)) == 0 {
+			md.Set(MetaUserAgent, m.userAgent)
 		}
 	}
 	if m.credentials == nil {
@@ -106,8 +106,8 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		}
 		return nil, err
 	}
-	if len(md.Get(metaTicket)) == 0 {
-		md.Set(metaTicket, token)
+	if len(md.Get(MetaTicket)) == 0 {
+		md.Set(MetaTicket, token)
 	}
 	return md, nil
 }

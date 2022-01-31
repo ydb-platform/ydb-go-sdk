@@ -10,9 +10,9 @@ import (
 	"google.golang.org/grpc"
 	grpcCredentials "google.golang.org/grpc/credentials"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	ydbCredentials "github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/resolver"
@@ -73,7 +73,7 @@ type Config interface {
 
 	// Balancer is an optional configuration related to selected balancer.
 	// That is, some balancing methods allow to be configured.
-	Balancer() ibalancer.Balancer
+	Balancer() balancer.Balancer
 
 	// RequestsType set an additional types hint to all requests.
 	// It is needed only for debug purposes and advanced cases.
@@ -110,7 +110,7 @@ type config struct {
 	discoveryInterval    time.Duration
 	dialTimeout          time.Duration
 	connectionTTL        time.Duration
-	balancer             ibalancer.Balancer
+	balancer             balancer.Balancer
 	secure               bool
 	endpoint             string
 	database             string
@@ -208,7 +208,7 @@ func (c *config) DiscoveryInterval() time.Duration {
 	return c.discoveryInterval
 }
 
-func (c *config) Balancer() ibalancer.Balancer {
+func (c *config) Balancer() balancer.Balancer {
 	return c.balancer
 }
 
@@ -302,7 +302,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
-func WithBalancer(balancer ibalancer.Balancer) Option {
+func WithBalancer(balancer balancer.Balancer) Option {
 	return func(c *config) {
 		c.balancer = balancer
 	}
@@ -329,7 +329,7 @@ func New(opts ...Option) Config {
 		c.tlsConfig = nil
 	}
 	if c.discoveryInterval == 0 {
-		c.balancer = balancer.SingleConn()
+		c.balancer = balancers.SingleConn()
 	}
 	c.meta = meta.New(
 		c.database,
@@ -359,7 +359,7 @@ func certPool() (certPool *x509.CertPool) {
 func defaultConfig() (c *config) {
 	return &config{
 		discoveryInterval: DefaultDiscoveryInterval,
-		balancer:          balancer.Default(),
+		balancer:          balancers.Default(),
 		secure:            true,
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,

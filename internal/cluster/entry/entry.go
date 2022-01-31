@@ -1,17 +1,17 @@
 package entry
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
 // Entry represents inserted into the cluster connection.
 type Entry struct {
 	Conn   conn.Conn
-	Handle ibalancer.Element
+	Handle balancer.Element
 }
 
-func (c *Entry) InsertInto(b ibalancer.Balancer) {
+func (c *Entry) InsertInto(b balancer.Balancer) {
 	if c.Handle != nil {
 		panic("ydb: Handle already exists")
 	}
@@ -24,7 +24,7 @@ func (c *Entry) InsertInto(b ibalancer.Balancer) {
 	}
 }
 
-func (c *Entry) RemoveFrom(b ibalancer.Balancer) {
+func (c *Entry) RemoveFrom(b balancer.Balancer) {
 	if c.Handle == nil {
 		panic("ydb: no Handle to remove from balancer")
 	}

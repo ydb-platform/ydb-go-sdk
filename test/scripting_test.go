@@ -11,7 +11,7 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -32,7 +32,7 @@ func TestScripting(t *testing.T) {
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
 		),
-		ydb.WithBalancer(balancer.SingleConn()),
+		ydb.WithBalancer(balancers.SingleConn()),
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithLogger(
 			trace.DriverConnEvents,

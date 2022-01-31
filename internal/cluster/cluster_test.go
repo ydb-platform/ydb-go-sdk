@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ibalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -82,7 +82,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return ln.Dial(ctx)
 		},
-		balancer: func() ibalancer.Balancer {
+		balancer: func() balancer.Balancer {
 			_, b := stub.Balancer()
 			return b
 		}(),

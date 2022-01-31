@@ -255,7 +255,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		errors.NewOpError(errors.WithOEReason(errors.StatusSessionBusy)),
 	}
 	client := &client{
-		cc: testutil.NewCluster(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
+		cc: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	p := SessionProviderFunc{
 		OnGet: client.createSession,
