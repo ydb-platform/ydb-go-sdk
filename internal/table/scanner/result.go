@@ -107,7 +107,7 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 	}
 	r.Reset(r.sets[r.nextSet], columns...)
 	r.nextSet++
-	return nil
+	return ctx.Err()
 }
 
 func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
@@ -132,7 +132,7 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 		r.stats = stats
 		r.statsMtx.Unlock()
 	}
-	return nil
+	return ctx.Err()
 }
 
 func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
