@@ -4,8 +4,9 @@
 * Renamed public package `balancer` tp `balancers` (this package contains only constructors of balancers)
 * Moved interfaces from package `internal/balancer/ibalancer` to `internal/balancer`
 * Added `NextResultSetErr()` func for select next result set and return error
-* Added package `table/result/indexed` with interface `indexed.Value`
-* Replaced abstract `interface{}` in `Scan` and `ScanWithDefaults` to `indexed.Value`
+* Added package `table/result/indexed` with interfaces `indexed.Required`, `indexed.Optional`, `indexed.RequiredAndOptional`
+* Replaced abstract `interface{}` in `Scan` to `indexed.RequiredAndOptional`
+* Replaced abstract `interface{}` in `ScanWithDefaults` to `indexed.Required`
 * Replaced `trace.Table.OnPoolRetry` callback to `trace.Table.OnPoolDo` and `trace.Table.OnPoolDoTx` callbacks
 
 ## 3.7.2
