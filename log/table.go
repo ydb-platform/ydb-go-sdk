@@ -11,45 +11,82 @@ import (
 func Table(log Logger, details trace.Details) trace.Table {
 	log = log.WithName(`table`)
 	t := trace.Table{}
+	// nolint:nestif
 	if details&trace.TablePoolRetryEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`retry`)
-		t.OnPoolRetry = func(
-			info trace.PoolRetryStartInfo,
+		t.OnPoolDo = func(
+			info trace.PoolDoStartInfo,
 		) func(
-			info trace.PoolRetryInternalInfo,
+			info trace.PoolDoInternalInfo,
 		) func(
-			trace.PoolRetryDoneInfo,
+			trace.PoolDoDoneInfo,
 		) {
 			idempotent := info.Idempotent
-			log.Tracef(`retry start {idempotent:%t}`,
+			log.Tracef(`do start {idempotent:%t}`,
 				idempotent,
 			)
 			start := time.Now()
-			return func(info trace.PoolRetryInternalInfo) func(trace.PoolRetryDoneInfo) {
+			return func(info trace.PoolDoInternalInfo) func(trace.PoolDoDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`retry intermediate {latency:"%s",idempotent:%t}`,
+					log.Tracef(`do intermediate {latency:"%s",idempotent:%t}`,
 						time.Since(start),
 						idempotent,
 					)
 				} else {
-					log.Debugf(`retry intermediate {latency:"%s",idempotent:%t,error:"%v"}`,
+					log.Debugf(`do intermediate {latency:"%s",idempotent:%t,error:"%v"}`,
 						time.Since(start),
 						idempotent,
 						info.Error,
 					)
 				}
-				return func(info trace.PoolRetryDoneInfo) {
+				return func(info trace.PoolDoDoneInfo) {
 					if info.Error == nil {
-						log.Tracef(`retry done {latency:"%s",idempotent:%t,attempts:%d}`,
+						log.Tracef(`do done {latency:"%s",idempotent:%t,attempts:%d}`,
 							time.Since(start),
 							idempotent,
 							info.Attempts,
 						)
 					} else {
-						log.Errorf(`retry failed {latency:"%s",idempotent:%t,attempts:%d,error:"%v"}`,
+						log.Errorf(`do failed {latency:"%s",idempotent:%t,attempts:%d,error:"%v"}`,
 							time.Since(start),
 							idempotent,
+							info.Attempts,
+							info.Error,
+						)
+					}
+				}
+			}
+		}
+		t.OnPoolDoTx = func(
+			info trace.PoolDoTxStartInfo,
+		) func(
+			info trace.PoolDoTxInternalInfo,
+		) func(
+			trace.PoolDoTxDoneInfo,
+		) {
+			log.Tracef(`doTx start`)
+			start := time.Now()
+			return func(info trace.PoolDoTxInternalInfo) func(trace.PoolDoTxDoneInfo) {
+				if info.Error == nil {
+					log.Tracef(`doTx intermediate {latency:"%s"}`,
+						time.Since(start),
+					)
+				} else {
+					log.Debugf(`doTx intermediate {latency:"%s",error:"%v"}`,
+						time.Since(start),
+						info.Error,
+					)
+				}
+				return func(info trace.PoolDoTxDoneInfo) {
+					if info.Error == nil {
+						log.Tracef(`doTx done {latency:"%s",attempts:%d}`,
+							time.Since(start),
+							info.Attempts,
+						)
+					} else {
+						log.Errorf(`doTx failed {latency:"%s",attempts:%d,error:"%v"}`,
+							time.Since(start),
 							info.Attempts,
 							info.Error,
 						)

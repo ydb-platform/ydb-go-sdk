@@ -6,6 +6,7 @@
 * Added `NextResultSetErr()` func for select next result set and return error
 * Added package `table/result/indexed` with interface `indexed.Value`
 * Replaced abstract `interface{}` in `Scan` and `ScanWithDefaults` to `indexed.Value`
+* Splitted `trace.Table.OnPoolRetry` callback to `trace.Table.OnPoolDo` and `trace.Table.OnPoolDoTx` callbacks
 
 ## 3.7.2
 * Retry remove directory in `sugar.RemoveRecursive()` for retryable error
