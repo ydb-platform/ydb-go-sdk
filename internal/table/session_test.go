@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -374,7 +374,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								),
 							),
 							nil,
-							tableConfig.New(),
+							config.New(),
 						)
 						ctx, cancel := context.WithTimeout(
 							context.Background(),
