@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"encoding/binary"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"math"
 	"strconv"
 	"testing"
@@ -442,7 +443,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 	}
 }
 
-func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]interface{}) {
+func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]indexed.Value) {
 	r = &Ydb.ResultSet{}
 	for _, c := range col {
 		t := &Ydb.Type{
@@ -468,10 +469,10 @@ func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]in
 		)
 	}
 
-	testValues = make([][]interface{}, count)
+	testValues = make([][]indexed.Value, count)
 	for i := 0; i < count; i++ {
 		var items []*Ydb.Value
-		var vals []interface{}
+		var vals []indexed.Value
 		for j := range r.Columns {
 			v, val := valueFromPrimitiveTypeID(col[j])
 			vals = append(vals, val)

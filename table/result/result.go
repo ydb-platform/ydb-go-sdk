@@ -3,6 +3,7 @@ package result
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
@@ -71,7 +72,7 @@ type result interface {
 	// value.(ydb.table.types.Scanner).UnmarshalYDB(raw) where raw may be null.
 	// In this case client-side implementation UnmarshalYDB must check raw.IsNull() and
 	// applied default value or nothing to do
-	ScanWithDefaults(values ...interface{}) error
+	ScanWithDefaults(values ...indexed.Value) error
 
 	// Scan values.
 	// Input params - pointers to types:
@@ -100,7 +101,7 @@ type result interface {
 	// implement ydb.Scanner with UnmarshalYDB method
 	// See examples for more detailed information.
 	// Output param - Scanner error
-	Scan(values ...interface{}) error
+	Scan(values ...indexed.Value) error
 
 	// ScanNamed scans row with column names defined in namedValues
 	ScanNamed(namedValues ...named.Value) error
