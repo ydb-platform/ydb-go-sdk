@@ -111,7 +111,7 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 }
 
 func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
-	return errors.Is(r.NextResultSetErr(ctx, columns...), io.EOF)
+	return r.NextResultSetErr(ctx, columns...) == nil
 }
 
 func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
@@ -124,7 +124,10 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 	s, stats, err := r.recv(ctx)
 	if err != nil {
 		r.Reset(nil)
-		return r.errorf("failed to receive next result set: %w", err)
+		if errors.Is(err, io.EOF) {
+			return err
+		}
+		return r.errorf("receive next result set failed: %w", err)
 	}
 	r.Reset(s, columns...)
 	if stats != nil {
@@ -136,7 +139,7 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 }
 
 func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
-	return errors.Is(r.NextResultSetErr(ctx, columns...), io.EOF)
+	return r.NextResultSetErr(ctx, columns...) == nil
 }
 
 // CurrentResultSet get current result set
