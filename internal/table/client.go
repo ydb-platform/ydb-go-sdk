@@ -142,9 +142,11 @@ func isCreateSessionErrorRetriable(err error) bool {
 type Session interface {
 	table.ClosableSession
 
-	IsClosed() bool
 	Status() string
 	OnClose(f func(ctx context.Context))
+
+	isClosed() bool
+	isClosing() bool
 }
 
 type createSessionResult struct {

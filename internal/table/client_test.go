@@ -1143,7 +1143,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	<-c1
 	<-c2
 
-	if s3.IsClosed() {
+	if s3.isClosed() {
 		t.Fatalf("lower bound for sessions in the client is not equal KeepAliveMinSize")
 	}
 

@@ -17,6 +17,7 @@ const (
 	SessionStatusUnknown SessionStatus = iota
 	SessionReady
 	SessionBusy
+	SessionClosing
 
 	statusUnknown = "unknown"
 )
@@ -27,6 +28,8 @@ func (s SessionStatus) String() string {
 		return "ready"
 	case SessionBusy:
 		return "busy"
+	case SessionClosing:
+		return "closing"
 	default:
 		return statusUnknown
 	}

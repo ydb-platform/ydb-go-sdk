@@ -2,12 +2,14 @@ package table
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -74,10 +76,16 @@ func (s *session) SetStatus(status options.SessionStatus) {
 	s.statusMtx.Unlock()
 }
 
-func (s *session) IsClosed() bool {
+func (s *session) isClosed() bool {
 	s.closedMtx.RLock()
 	defer s.closedMtx.RUnlock()
 	return s.closed
+}
+
+func (s *session) isClosing() bool {
+	s.statusMtx.RLock()
+	defer s.statusMtx.RUnlock()
+	return s.status == options.SessionClosing
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table) (s Session, err error) {
@@ -93,19 +101,35 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	c := Ydb_Table_V1.NewTableServiceClient(cc)
-	response, err = c.CreateSession(ctx, &Ydb_Table.CreateSessionRequest{})
+	response, err = c.CreateSession(
+		ctx,
+		&Ydb_Table.CreateSessionRequest{},
+	)
 	if err != nil {
+		fmt.Println("exit 1")
 		return nil, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = proto.Unmarshal(
+		response.GetOperation().GetResult().GetValue(),
+		&result,
+	)
 	if err != nil {
+		fmt.Println("exit 2")
 		return nil, err
 	}
+	fmt.Println("exit 3")
 	return &session{
 		id:           result.GetSessionId(),
 		tableService: c,
 		trace:        t,
 	}, nil
+}
+
+func (s *session) trailer() *trailer {
+	return &trailer{
+		s:  s,
+		md: metadata.MD{},
+	}
 }
 
 func (s *session) ID() string {
@@ -116,7 +140,7 @@ func (s *session) ID() string {
 }
 
 func (s *session) OnClose(cb func(ctx context.Context)) {
-	if s.IsClosed() {
+	if s.isClosed() {
 		return
 	}
 	s.onCloseMtx.Lock()
@@ -133,7 +157,11 @@ func (s *session) Close(ctx context.Context) (err error) {
 	s.closed = true
 	s.closedMtx.Unlock()
 
-	onDone := trace.TableOnSessionDelete(s.trace, &ctx, s)
+	onDone := trace.TableOnSessionDelete(
+		s.trace,
+		&ctx,
+		s,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -149,18 +177,25 @@ func (s *session) Close(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
+	t := s.trailer()
+	defer t.Check()
 	_, err = s.tableService.DeleteSession(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.DeleteSessionRequest{
 			SessionId: s.id,
 		},
+		t.Trailer(),
 	)
 	return err
 }
 
 // KeepAlive keeps idle session alive.
 func (s *session) KeepAlive(ctx context.Context) (err error) {
-	onDone := trace.TableOnSessionKeepAlive(s.trace, &ctx, s)
+	onDone := trace.TableOnSessionKeepAlive(
+		s.trace,
+		&ctx,
+		s,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -168,13 +203,22 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	resp, err := s.tableService.KeepAlive(cluster.WithEndpoint(ctx, s), &Ydb_Table.KeepAliveRequest{
-		SessionId: s.id,
-	})
+	t := s.trailer()
+	defer t.Check()
+	resp, err := s.tableService.KeepAlive(
+		cluster.WithEndpoint(ctx, s),
+		&Ydb_Table.KeepAliveRequest{
+			SessionId: s.id,
+		},
+		t.Trailer(),
+	)
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(resp.GetOperation().GetResult().GetValue(), &result)
+	err = proto.Unmarshal(
+		resp.GetOperation().GetResult().GetValue(),
+		&result,
+	)
 	if err != nil {
 		return
 	}
@@ -184,7 +228,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
 		s.SetStatus(options.SessionBusy)
 	}
-	return
+	return nil
 }
 
 // CreateTable creates table at given path with given options.
@@ -200,7 +244,13 @@ func (s *session) CreateTable(
 	for _, opt := range opts {
 		opt((*options.CreateTableDesc)(&request))
 	}
-	_, err = s.tableService.CreateTable(cluster.WithEndpoint(ctx, s), &request)
+	t := s.trailer()
+	defer t.Check()
+	_, err = s.tableService.CreateTable(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+		t.Trailer(),
+	)
 	return err
 }
 
@@ -221,16 +271,25 @@ func (s *session) DescribeTable(
 	for _, opt := range opts {
 		opt((*options.DescribeTableDesc)(&request))
 	}
-	response, err = s.tableService.DescribeTable(cluster.WithEndpoint(ctx, s), &request)
+	response, err = s.tableService.DescribeTable(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+	)
 	if err != nil {
 		return desc, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = proto.Unmarshal(
+		response.GetOperation().GetResult().GetValue(),
+		&result,
+	)
 	if err != nil {
 		return
 	}
 
-	cs := make([]options.Column, len(result.GetColumns()))
+	cs := make(
+		[]options.Column,
+		len(result.GetColumns()),
+	)
 	for i, c := range result.Columns {
 		cs[i] = options.Column{
 			Name:   c.GetName(),
@@ -239,7 +298,10 @@ func (s *session) DescribeTable(
 		}
 	}
 
-	rs := make([]options.KeyRange, len(result.GetShardKeyBounds())+1)
+	rs := make(
+		[]options.KeyRange,
+		len(result.GetShardKeyBounds())+1,
+	)
 	var last types.Value
 	for i, b := range result.GetShardKeyBounds() {
 		if last != nil {
@@ -259,14 +321,20 @@ func (s *session) DescribeTable(
 	var stats *options.TableStats
 	if result.GetTableStats() != nil {
 		resStats := result.GetTableStats()
-		partStats := make([]options.PartitionStats, len(result.GetTableStats().GetPartitionStats()))
+		partStats := make(
+			[]options.PartitionStats,
+			len(result.GetTableStats().GetPartitionStats()),
+		)
 		for i, v := range result.TableStats.PartitionStats {
 			partStats[i].RowsEstimate = v.GetRowsEstimate()
 			partStats[i].StoreSize = v.GetStoreSize()
 		}
 		var creationTime, modificationTime time.Time
 		if resStats.CreationTime.GetSeconds() != 0 {
-			creationTime = time.Unix(resStats.GetCreationTime().GetSeconds(), int64(resStats.GetCreationTime().GetNanos()))
+			creationTime = time.Unix(
+				resStats.GetCreationTime().GetSeconds(),
+				int64(resStats.GetCreationTime().GetNanos()),
+			)
 		}
 		if resStats.ModificationTime.GetSeconds() != 0 {
 			modificationTime = time.Unix(
@@ -322,7 +390,11 @@ func (s *session) DescribeTable(
 }
 
 // DropTable drops table at given path with given options.
-func (s *session) DropTable(ctx context.Context, path string, opts ...options.DropTableOption) (err error) {
+func (s *session) DropTable(
+	ctx context.Context,
+	path string,
+	opts ...options.DropTableOption,
+) (err error) {
 	request := Ydb_Table.DropTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -330,12 +402,22 @@ func (s *session) DropTable(ctx context.Context, path string, opts ...options.Dr
 	for _, opt := range opts {
 		opt((*options.DropTableDesc)(&request))
 	}
-	_, err = s.tableService.DropTable(cluster.WithEndpoint(ctx, s), &request)
+	t := s.trailer()
+	defer t.Check()
+	_, err = s.tableService.DropTable(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+		t.Trailer(),
+	)
 	return err
 }
 
 // AlterTable modifies schema of table at given path with given options.
-func (s *session) AlterTable(ctx context.Context, path string, opts ...options.AlterTableOption) (err error) {
+func (s *session) AlterTable(
+	ctx context.Context,
+	path string,
+	opts ...options.AlterTableOption,
+) (err error) {
 	request := Ydb_Table.AlterTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -343,7 +425,13 @@ func (s *session) AlterTable(ctx context.Context, path string, opts ...options.A
 	for _, opt := range opts {
 		opt((*options.AlterTableDesc)(&request))
 	}
-	_, err = s.tableService.AlterTable(cluster.WithEndpoint(ctx, s), &request)
+	t := s.trailer()
+	defer t.Check()
+	_, err = s.tableService.AlterTable(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+		t.Trailer(),
+	)
 	return err
 }
 
@@ -361,12 +449,24 @@ func (s *session) CopyTable(
 	for _, opt := range opts {
 		opt((*options.CopyTableDesc)(&request))
 	}
-	_, err = s.tableService.CopyTable(cluster.WithEndpoint(ctx, s), &request)
+	t := s.trailer()
+	defer t.Check()
+	_, err = s.tableService.CopyTable(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+		t.Trailer(),
+	)
 	return err
 }
 
 // Explain explains data query represented by text.
-func (s *session) Explain(ctx context.Context, query string) (exp table.DataQueryExplanation, err error) {
+func (s *session) Explain(
+	ctx context.Context,
+	query string,
+) (
+	exp table.DataQueryExplanation,
+	err error,
+) {
 	var (
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
@@ -374,14 +474,23 @@ func (s *session) Explain(ctx context.Context, query string) (exp table.DataQuer
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.ExplainDataQuery(cluster.WithEndpoint(ctx, s), &Ydb_Table.ExplainDataQueryRequest{
-		SessionId: s.id,
-		YqlText:   query,
-	})
+	t := s.trailer()
+	defer t.Check()
+	response, err = s.tableService.ExplainDataQuery(
+		cluster.WithEndpoint(ctx, s),
+		&Ydb_Table.ExplainDataQueryRequest{
+			SessionId: s.id,
+			YqlText:   query,
+		},
+		t.Trailer(),
+	)
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = proto.Unmarshal(
+		response.GetOperation().GetResult().GetValue(),
+		&result,
+	)
 	if err != nil {
 		return
 	}
@@ -409,7 +518,13 @@ func (s *Statement) Execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	onDone := trace.TableOnSessionQueryExecute(s.session.trace, &ctx, s.session, s.query, params)
+	onDone := trace.TableOnSessionQueryExecute(
+		s.session.trace,
+		&ctx,
+		s.session,
+		s.query,
+		params,
+	)
 	defer func() {
 		onDone(txr, true, r, err)
 	}()
@@ -424,7 +539,13 @@ func (s *Statement) execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	_, res, err := s.session.executeDataQuery(ctx, tx, s.query, params, opts...)
+	_, res, err := s.session.executeDataQuery(
+		ctx,
+		tx,
+		s.query,
+		params,
+		opts...,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -446,7 +567,12 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 	)
-	onDone := trace.TableOnSessionQueryPrepare(s.trace, &ctx, s, query)
+	onDone := trace.TableOnSessionQueryPrepare(
+		s.trace,
+		&ctx,
+		s,
+		query,
+	)
 	defer func() {
 		onDone(q, err)
 	}()
@@ -454,14 +580,23 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.PrepareDataQuery(cluster.WithEndpoint(ctx, s), &Ydb_Table.PrepareDataQueryRequest{
-		SessionId: s.id,
-		YqlText:   query,
-	})
+	t := s.trailer()
+	defer t.Check()
+	response, err = s.tableService.PrepareDataQuery(
+		cluster.WithEndpoint(ctx, s),
+		&Ydb_Table.PrepareDataQueryRequest{
+			SessionId: s.id,
+			YqlText:   query,
+		},
+		t.Trailer(),
+	)
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = proto.Unmarshal(
+		response.GetOperation().GetResult().GetValue(),
+		&result,
+	)
 	if err != nil {
 		return
 	}
@@ -528,7 +663,10 @@ func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
 		id: res.GetTxMeta().GetId(),
 		s:  s,
 	}
-	r := scanner.NewUnary(res.GetResultSets(), res.GetQueryStats())
+	r := scanner.NewUnary(
+		res.GetResultSets(),
+		res.GetQueryStats(),
+	)
 	return t, r, nil
 }
 
@@ -556,12 +694,21 @@ func (s *session) executeDataQuery(
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.ExecuteDataQuery(cluster.WithEndpoint(ctx, s), request)
+	t := s.trailer()
+	defer t.Check()
+	response, err = s.tableService.ExecuteDataQuery(
+		cluster.WithEndpoint(ctx, s),
+		request,
+		t.Trailer(),
+	)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), result)
-	return
+	err = proto.Unmarshal(
+		response.GetOperation().GetResult().GetValue(),
+		result,
+	)
+	return request, result, err
 }
 
 // ExecuteSchemeQuery executes scheme query.
@@ -577,7 +724,13 @@ func (s *session) ExecuteSchemeQuery(
 	for _, opt := range opts {
 		opt((*options.ExecuteSchemeQueryDesc)(&request))
 	}
-	_, err = s.tableService.ExecuteSchemeQuery(cluster.WithEndpoint(ctx, s), &request)
+	t := s.trailer()
+	defer t.Check()
+	_, err = s.tableService.ExecuteSchemeQuery(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+		t.Trailer(),
+	)
 	return err
 }
 
@@ -591,11 +744,20 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		result   Ydb_Table.DescribeTableOptionsResult
 	)
 	request := Ydb_Table.DescribeTableOptionsRequest{}
-	response, err = s.tableService.DescribeTableOptions(cluster.WithEndpoint(ctx, s), &request)
+	t := s.trailer()
+	defer t.Check()
+	response, err = s.tableService.DescribeTableOptions(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+		t.Trailer(),
+	)
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = proto.Unmarshal(
+		response.GetOperation().GetResult().GetValue(),
+		&result,
+	)
 	if err != nil {
 		return
 	}
@@ -624,7 +786,10 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		desc.TableProfilePresets = xs
 	}
 	{
-		xs := make([]options.StoragePolicyDescription, len(result.GetStoragePolicyPresets()))
+		xs := make(
+			[]options.StoragePolicyDescription,
+			len(result.GetStoragePolicyPresets()),
+		)
 		for i, p := range result.GetStoragePolicyPresets() {
 			xs[i] = options.StoragePolicyDescription{
 				Name:   p.GetName(),
@@ -634,7 +799,10 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		desc.StoragePolicyPresets = xs
 	}
 	{
-		xs := make([]options.CompactionPolicyDescription, len(result.GetCompactionPolicyPresets()))
+		xs := make(
+			[]options.CompactionPolicyDescription,
+			len(result.GetCompactionPolicyPresets()),
+		)
 		for i, p := range result.GetCompactionPolicyPresets() {
 			xs[i] = options.CompactionPolicyDescription{
 				Name:   p.GetName(),
@@ -644,7 +812,10 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		desc.CompactionPolicyPresets = xs
 	}
 	{
-		xs := make([]options.PartitioningPolicyDescription, len(result.GetPartitioningPolicyPresets()))
+		xs := make(
+			[]options.PartitioningPolicyDescription,
+			len(result.GetPartitioningPolicyPresets()),
+		)
 		for i, p := range result.GetPartitioningPolicyPresets() {
 			xs[i] = options.PartitioningPolicyDescription{
 				Name:   p.GetName(),
@@ -654,7 +825,10 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		desc.PartitioningPolicyPresets = xs
 	}
 	{
-		xs := make([]options.ExecutionPolicyDescription, len(result.GetExecutionPolicyPresets()))
+		xs := make(
+			[]options.ExecutionPolicyDescription,
+			len(result.GetExecutionPolicyPresets()),
+		)
 		for i, p := range result.GetExecutionPolicyPresets() {
 			xs[i] = options.ExecutionPolicyDescription{
 				Name:   p.GetName(),
@@ -664,7 +838,10 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		desc.ExecutionPolicyPresets = xs
 	}
 	{
-		xs := make([]options.ReplicationPolicyDescription, len(result.GetReplicationPolicyPresets()))
+		xs := make(
+			[]options.ReplicationPolicyDescription,
+			len(result.GetReplicationPolicyPresets()),
+		)
 		for i, p := range result.GetReplicationPolicyPresets() {
 			xs[i] = options.ReplicationPolicyDescription{
 				Name:   p.GetName(),
@@ -674,7 +851,10 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		desc.ReplicationPolicyPresets = xs
 	}
 	{
-		xs := make([]options.CachingPolicyDescription, len(result.GetCachingPolicyPresets()))
+		xs := make(
+			[]options.CachingPolicyDescription,
+			len(result.GetCachingPolicyPresets()),
+		)
 		for i, p := range result.GetCachingPolicyPresets() {
 			xs[i] = options.CachingPolicyDescription{
 				Name:   p.GetName(),
@@ -709,7 +889,10 @@ func (s *session) StreamReadTable(
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	stream, err = s.tableService.StreamReadTable(cluster.WithEndpoint(ctx, s), &request)
+	stream, err = s.tableService.StreamReadTable(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+	)
 
 	onDone := trace.TableOnSessionQueryStreamRead(s.trace, &ctx, s)
 	if err != nil {
@@ -739,6 +922,9 @@ func (s *session) StreamReadTable(
 		func(err error) error {
 			cancel()
 			onDone(err)
+			if checkHintSessionClose(stream.Trailer()) {
+				s.SetStatus(options.SessionClosing)
+			}
 			return err
 		},
 	), nil
@@ -771,9 +957,18 @@ func (s *session) StreamExecuteScanQuery(
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	stream, err = s.tableService.StreamExecuteScanQuery(cluster.WithEndpoint(ctx, s), &request)
+	stream, err = s.tableService.StreamExecuteScanQuery(
+		cluster.WithEndpoint(ctx, s),
+		&request,
+	)
 
-	onDone := trace.TableOnSessionQueryStreamExecute(s.trace, &ctx, s, q, params)
+	onDone := trace.TableOnSessionQueryStreamExecute(
+		s.trace,
+		&ctx,
+		s,
+		q,
+		params,
+	)
 	if err != nil {
 		cancel()
 		onDone(err)
@@ -801,6 +996,9 @@ func (s *session) StreamExecuteScanQuery(
 		func(err error) error {
 			cancel()
 			onDone(err)
+			if checkHintSessionClose(stream.Trailer()) {
+				s.SetStatus(options.SessionClosing)
+			}
 			return err
 		},
 	), nil
@@ -808,10 +1006,16 @@ func (s *session) StreamExecuteScanQuery(
 
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
-	_, err = s.tableService.BulkUpsert(cluster.WithEndpoint(ctx, s), &Ydb_Table.BulkUpsertRequest{
-		Table: table,
-		Rows:  value.ToYDB(rows),
-	})
+	t := s.trailer()
+	defer t.Check()
+	_, err = s.tableService.BulkUpsert(
+		cluster.WithEndpoint(ctx, s),
+		&Ydb_Table.BulkUpsertRequest{
+			Table: table,
+			Rows:  value.ToYDB(rows),
+		},
+		t.Trailer(),
+	)
 	return err
 }
 
@@ -821,7 +1025,11 @@ func (s *session) BeginTransaction(
 	ctx context.Context,
 	tx *table.TransactionSettings,
 ) (x table.Transaction, err error) {
-	onDone := trace.TableOnSessionTransactionBegin(s.trace, &ctx, s)
+	onDone := trace.TableOnSessionTransactionBegin(
+		s.trace,
+		&ctx,
+		s,
+	)
 	defer func() {
 		onDone(x, err)
 	}()
@@ -832,14 +1040,23 @@ func (s *session) BeginTransaction(
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = s.tableService.BeginTransaction(cluster.WithEndpoint(ctx, s), &Ydb_Table.BeginTransactionRequest{
-		SessionId:  s.id,
-		TxSettings: tx.Settings(),
-	})
+	t := s.trailer()
+	defer t.Check()
+	response, err = s.tableService.BeginTransaction(
+		cluster.WithEndpoint(ctx, s),
+		&Ydb_Table.BeginTransactionRequest{
+			SessionId:  s.id,
+			TxSettings: tx.Settings(),
+		},
+		t.Trailer(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = proto.Unmarshal(
+		response.GetOperation().GetResult().GetValue(),
+		&result,
+	)
 	if err != nil {
 		return
 	}
@@ -901,7 +1118,12 @@ func (tx *Transaction) CommitTx(
 			tx.committed = true
 		}
 	}()
-	onDone := trace.TableOnSessionTransactionCommit(tx.s.trace, &ctx, tx.s, tx)
+	onDone := trace.TableOnSessionTransactionCommit(
+		tx.s.trace,
+		&ctx,
+		tx.s,
+		tx,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -919,15 +1141,27 @@ func (tx *Transaction) CommitTx(
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	response, err = tx.s.tableService.CommitTransaction(cluster.WithEndpoint(ctx, tx.s), request)
+	t := tx.s.trailer()
+	defer t.Check()
+	response, err = tx.s.tableService.CommitTransaction(
+		cluster.WithEndpoint(ctx, tx.s),
+		request,
+		t.Trailer(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), result)
+	err = proto.Unmarshal(
+		response.GetOperation().GetResult().GetValue(),
+		result,
+	)
 	if err != nil {
 		return nil, err
 	}
-	return scanner.NewUnary(nil, result.GetQueryStats()), nil
+	return scanner.NewUnary(
+		nil,
+		result.GetQueryStats(),
+	), nil
 }
 
 // Rollback performs a rollback of the specified active transaction.
@@ -935,17 +1169,28 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 	if tx.committed {
 		return nil
 	}
-	onDone := trace.TableOnSessionTransactionRollback(tx.s.trace, &ctx, tx.s, tx)
+	onDone := trace.TableOnSessionTransactionRollback(
+		tx.s.trace,
+		&ctx,
+		tx.s,
+		tx,
+	)
 	defer func() {
 		onDone(err)
 	}()
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	_, err = tx.s.tableService.RollbackTransaction(cluster.WithEndpoint(ctx, tx.s), &Ydb_Table.RollbackTransactionRequest{
-		SessionId: tx.s.id,
-		TxId:      tx.id,
-	})
+	t := tx.s.trailer()
+	defer t.Check()
+	_, err = tx.s.tableService.RollbackTransaction(
+		cluster.WithEndpoint(ctx, tx.s),
+		&Ydb_Table.RollbackTransactionRequest{
+			SessionId: tx.s.id,
+			TxId:      tx.id,
+		},
+		t.Trailer(),
+	)
 	return err
 }
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net/http"
 	"os"
 	"path"
 	"sync"
@@ -96,7 +97,13 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 func TestTable(t *testing.T) {
 	folder := "pool_health"
 
-	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
+	go func() {
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			panic(err)
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	s := &stats{
@@ -116,8 +123,7 @@ func TestTable(t *testing.T) {
 			t.Fatalf("waited not a zero after closing pool: %d", s.waited)
 		}
 	})
-
-	limit := 50
+	limit := 5
 	db, err := ydb.New(
 		ctx,
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
@@ -167,7 +173,7 @@ func TestTable(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.WARN),
+			ydb.WithMinLevel(ydb.TRACE),
 		),
 		ydb.WithTraceTable(trace.Table{
 			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
@@ -217,7 +223,7 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("Ping", func(t *testing.T) {
-		if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
+		if err := db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
 			// hack for wait pool initializing
 			return nil
 		}); err != nil {
@@ -230,7 +236,7 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("PrepareScheme", func(t *testing.T) {
-		err = sugar.RemoveRecursive(ctx, db, folder)
+		err := sugar.RemoveRecursive(ctx, db, folder)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -264,12 +270,12 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("FillData", func(t *testing.T) {
-		if err = fill(ctx, db, folder); err != nil {
+		if err := fill(ctx, db, folder); err != nil {
 			t.Fatalf("fillQuery failed: %v\n", err)
 		}
 	})
 	t.Run("UpsertWithTx", func(t *testing.T) {
-		if err = db.Table().DoTx(
+		if err := db.Table().DoTx(
 			ctx,
 			func(ctx context.Context, tx table.TransactionActor) (err error) {
 				var (
@@ -351,7 +357,7 @@ func TestTable(t *testing.T) {
 		}
 	})
 	t.Run("SelectUpsertedData", func(t *testing.T) {
-		if err = db.Table().Do(
+		if err := db.Table().Do(
 			ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				var (
@@ -409,9 +415,15 @@ func TestTable(t *testing.T) {
 			t.Fatalf("tx failed: %v\n", err)
 		}
 	})
+	t.Run("SessionsShutdown", func(t *testing.T) {
+		url := os.Getenv("YDB_SHUTDOWN_URL")
+		// nolint:gosec
+		_, err := http.Get(url)
+		t.Fatalf("failed to send request: %v", err)
+	})
 	t.Run("MultipleResultSets", func(t *testing.T) {
 		t.Run("CreateTable", func(t *testing.T) {
-			if err = db.Table().Do(
+			if err := db.Table().Do(
 				ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					return s.ExecuteSchemeQuery(
@@ -438,7 +450,7 @@ func TestTable(t *testing.T) {
 					),
 				)
 			}
-			if err = db.Table().Do(
+			if err := db.Table().Do(
 				ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					_, _, err = s.Execute(
@@ -473,7 +485,7 @@ func TestTable(t *testing.T) {
 			}
 		})
 		t.Run("ScanSelect", func(t *testing.T) {
-			if err = db.Table().Do(
+			if err := db.Table().Do(
 				ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					res, err := s.StreamExecuteScanQuery(

@@ -69,6 +69,7 @@ jobs:
       YDB_CONNECTION_STRING: grpcs://localhost:2135/?database=/local
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_ANONYMOUS_CREDENTIALS: 1
+      YDB_SHUTDOWN_URL: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install Go

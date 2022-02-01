@@ -11,12 +11,19 @@ import (
 )
 
 const (
+	// outgoing headers
 	MetaDatabase    = "x-ydb-database"
 	MetaTicket      = "x-ydb-auth-ticket"
 	MetaVersion     = "x-ydb-sdk-build-info"
 	MetaRequestType = "x-ydb-request-types"
 	MetaTraceID     = "x-ydb-trace-id"
 	MetaUserAgent   = "x-ydb-user-agent"
+
+	// incomming headers
+	MetaServerHints = "x-ydb-server-hints"
+
+	// hints
+	MetaSessionClose = "session-close"
 )
 
 type Meta interface {
