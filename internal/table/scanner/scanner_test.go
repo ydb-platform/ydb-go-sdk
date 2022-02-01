@@ -443,7 +443,7 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 	}
 }
 
-func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]indexed.Value) {
+func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]indexed.RequiredOrOptional) {
 	r = &Ydb.ResultSet{}
 	for _, c := range col {
 		t := &Ydb.Type{
@@ -469,10 +469,10 @@ func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]in
 		)
 	}
 
-	testValues = make([][]indexed.Value, count)
+	testValues = make([][]indexed.RequiredOrOptional, count)
 	for i := 0; i < count; i++ {
 		var items []*Ydb.Value
-		var vals []indexed.Value
+		var vals []indexed.RequiredOrOptional
 		for j := range r.Columns {
 			v, val := valueFromPrimitiveTypeID(col[j])
 			vals = append(vals, val)
@@ -494,7 +494,12 @@ func TestScanSqlTypes(t *testing.T) {
 			s.reset(set, test.setColumns...)
 			for s.NextRow() {
 				if test.columns[0].testDefault {
-					if err := s.ScanWithDefaults(test.values...); err != nil {
+					if err := s.ScanWithDefaults(func() (values []indexed.Required) {
+						for _, v := range test.values {
+							values = append(values, v)
+						}
+						return values
+					}()...); err != nil {
 						t.Fatalf("test: %s; error: %s", test.name, err)
 					}
 				} else {

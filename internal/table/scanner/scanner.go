@@ -28,8 +28,7 @@ type scanner struct {
 	nextRow   int
 	nextItem  int
 
-	columnIndexes           []int
-	defaultValueForOptional bool
+	columnIndexes []int
 
 	errMtx sync.RWMutex
 	err    error
@@ -93,24 +92,77 @@ func (s *scanner) NextRow() bool {
 	return true
 }
 
-func (s *scanner) ScanWithDefaults(values ...indexed.Value) error {
-	for _, v := range values {
-		if _, ok := v.(named.Value); ok {
-			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
+func (s *scanner) preScanChecks(lenValues int) (err error) {
+	if s.columnIndexes != nil {
+		if len(s.columnIndexes) != lenValues {
+			return s.errorf(
+				"scan row failed: count of values and column are different (%d != %d)",
+				len(s.columnIndexes),
+				lenValues,
+			)
 		}
 	}
-	s.defaultValueForOptional = true
-	return s.scan(values)
+	if s.ColumnCount() < lenValues {
+		panic(fmt.Sprintf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), lenValues))
+	}
+	if s.nextItem != 0 {
+		panic("scan row failed: double scan per row")
+	}
+	return s.Err()
 }
 
-func (s *scanner) Scan(values ...indexed.Value) error {
-	for _, v := range values {
-		if _, ok := v.(named.Value); ok {
-			panic("dont use NamedValue with Scan. Use ScanNamed instead")
+func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
+	if err = s.preScanChecks(len(values)); err != nil {
+		return
+	}
+	for i := range values {
+		if _, ok := values[i].(named.Value); ok {
+			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
+		}
+		if s.columnIndexes == nil {
+			if err = s.seekItemByID(i); err != nil {
+				return
+			}
+		} else {
+			if err = s.seekItemByID(s.columnIndexes[i]); err != nil {
+				return
+			}
+		}
+		if s.isCurrentTypeOptional() {
+			s.scanOptional(values[i], true)
+		} else {
+			s.scanRequired(values[i])
 		}
 	}
-	s.defaultValueForOptional = false
-	return s.scan(values)
+	s.nextItem += len(values)
+	return s.Err()
+}
+
+func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
+	if err = s.preScanChecks(len(values)); err != nil {
+		return
+	}
+	for i := range values {
+		if _, ok := values[i].(named.Value); ok {
+			panic("dont use NamedValue with Scan. Use ScanNamed instead")
+		}
+		if s.columnIndexes == nil {
+			if err = s.seekItemByID(i); err != nil {
+				return
+			}
+		} else {
+			if err = s.seekItemByID(s.columnIndexes[i]); err != nil {
+				return
+			}
+		}
+		if s.isCurrentTypeOptional() {
+			s.scanOptional(values[i], false)
+		} else {
+			s.scanRequired(values[i])
+		}
+	}
+	s.nextItem += len(values)
+	return s.Err()
 }
 
 func (s *scanner) ScanNamed(namedValues ...named.Value) (err error) {
@@ -165,7 +217,6 @@ func (s *scanner) reset(set *Ydb.ResultSet, columnNames ...string) {
 	s.nextRow = 0
 	s.nextItem = 0
 	s.columnIndexes = nil
-	s.defaultValueForOptional = true
 	s.setColumnIndexes(columnNames)
 	s.stack.reset()
 	s.converter = &rawConverter{
@@ -966,49 +1017,6 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 			_ = s.errorf("scan row failed: type %T is unknown", v)
 		}
 	}
-}
-
-func (s *scanner) scan(values []indexed.Value) (err error) {
-	if err = s.Err(); err != nil {
-		return
-	}
-	if s.columnIndexes != nil {
-		if len(s.columnIndexes) != len(values) {
-			return s.errorf(
-				"scan row failed: count of values and column are different (%d != %d)",
-				len(s.columnIndexes),
-				len(values),
-			)
-		}
-	}
-	if s.ColumnCount() < len(values) {
-		return s.errorf(
-			"scan row failed: count of columns less then values (%d < %d)",
-			s.ColumnCount(),
-			len(values),
-		)
-	}
-	if s.nextItem != 0 {
-		panic("scan row failed: double scan per row")
-	}
-	for i := range values {
-		if s.columnIndexes == nil {
-			if err = s.seekItemByID(i); err != nil {
-				return
-			}
-		} else {
-			if err = s.seekItemByID(s.columnIndexes[i]); err != nil {
-				return
-			}
-		}
-		if s.isCurrentTypeOptional() {
-			s.scanOptional(values[i], s.defaultValueForOptional)
-		} else {
-			s.scanRequired(values[i])
-		}
-	}
-	s.nextItem += len(values)
-	return s.Err()
 }
 
 func (r *baseResult) SetErr(err error) {

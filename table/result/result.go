@@ -72,7 +72,7 @@ type result interface {
 	// value.(ydb.table.types.Scanner).UnmarshalYDB(raw) where raw may be null.
 	// In this case client-side implementation UnmarshalYDB must check raw.IsNull() and
 	// applied default value or nothing to do
-	ScanWithDefaults(values ...indexed.Value) error
+	ScanWithDefaults(values ...indexed.Required) error
 
 	// Scan values.
 	// Input params - pointers to types:
@@ -101,7 +101,7 @@ type result interface {
 	// implement ydb.Scanner with UnmarshalYDB method
 	// See examples for more detailed information.
 	// Output param - Scanner error
-	Scan(values ...indexed.Value) error
+	Scan(values ...indexed.RequiredOrOptional) error
 
 	// ScanNamed scans row with column names defined in namedValues
 	ScanNamed(namedValues ...named.Value) error

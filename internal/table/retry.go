@@ -94,7 +94,9 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 				return err
 			}
 			defer func() {
-				_ = tx.Rollback(ctx)
+				if err != nil {
+					_ = tx.Rollback(ctx)
+				}
 			}()
 			err = op(ctx, tx)
 			if attempts > 0 {
