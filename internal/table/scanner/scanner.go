@@ -92,42 +92,28 @@ func (s *scanner) NextRow() bool {
 	return true
 }
 
-func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
-	if err = s.Err(); err != nil {
-		return
-	}
+func (s *scanner) preScanChecks(lenValues int) (err error) {
 	if s.columnIndexes != nil {
-		if len(s.columnIndexes) != len(values) {
+		if len(s.columnIndexes) != lenValues {
 			return s.errorf(
 				"scan row failed: count of values and column are different (%d != %d)",
 				len(s.columnIndexes),
-				len(values),
+				lenValues,
 			)
 		}
 	}
-	if s.ColumnCount() < len(values) {
-		panic(fmt.Sprintf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), len(values)))
+	if s.ColumnCount() < lenValues {
+		panic(fmt.Sprintf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), lenValues))
 	}
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
 	}
-	for _, v := range values {
-		if _, ok := v.(named.Value); ok {
-			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
-		}
-	}
-	if err = s.Err(); err != nil {
+	return s.Err()
+}
+
+func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
+	if err = s.preScanChecks(len(values)); err != nil {
 		return
-	}
-	if s.ColumnCount() < len(values) {
-		return s.errorf(
-			"scan row failed: count of columns less then values (%d < %d)",
-			s.ColumnCount(),
-			len(values),
-		)
-	}
-	if s.nextItem != 0 {
-		panic("scan row failed: double scan per row")
 	}
 	for i := range values {
 		if _, ok := values[i].(named.Value); ok {
@@ -153,41 +139,8 @@ func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
 }
 
 func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
-	if err = s.Err(); err != nil {
+	if err = s.preScanChecks(len(values)); err != nil {
 		return
-	}
-	if s.columnIndexes != nil {
-		if len(s.columnIndexes) != len(values) {
-			return s.errorf(
-				"scan row failed: count of values and column are different (%d != %d)",
-				len(s.columnIndexes),
-				len(values),
-			)
-		}
-	}
-	if s.ColumnCount() < len(values) {
-		panic(fmt.Sprintf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), len(values)))
-	}
-	if s.nextItem != 0 {
-		panic("scan row failed: double scan per row")
-	}
-	for _, v := range values {
-		if _, ok := v.(named.Value); ok {
-			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
-		}
-	}
-	if err = s.Err(); err != nil {
-		return
-	}
-	if s.ColumnCount() < len(values) {
-		return s.errorf(
-			"scan row failed: count of columns less then values (%d < %d)",
-			s.ColumnCount(),
-			len(values),
-		)
-	}
-	if s.nextItem != 0 {
-		panic("scan row failed: double scan per row")
 	}
 	for i := range values {
 		if _, ok := values[i].(named.Value); ok {
