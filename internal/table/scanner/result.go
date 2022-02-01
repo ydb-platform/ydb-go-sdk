@@ -110,12 +110,7 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 }
 
 func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
-	if !r.HasNextResultSet() {
-		return false
-	}
-	r.Reset(r.sets[r.nextSet], columns...)
-	r.nextSet++
-	return true
+	return r.NextResultSetErr(ctx, columns...) != io.EOF
 }
 
 func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
@@ -140,7 +135,7 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 }
 
 func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
-	return r.NextResultSetErr(ctx, columns...) == nil
+	return r.NextResultSetErr(ctx, columns...) != io.EOF
 }
 
 // CurrentResultSet get current result set
