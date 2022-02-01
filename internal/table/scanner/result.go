@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
@@ -110,7 +111,7 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 }
 
 func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
-	return r.NextResultSetErr(ctx, columns...) != io.EOF
+	return errors.Is(r.NextResultSetErr(ctx, columns...), io.EOF)
 }
 
 func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
@@ -135,7 +136,7 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 }
 
 func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
-	return r.NextResultSetErr(ctx, columns...) != io.EOF
+	return errors.Is(r.NextResultSetErr(ctx, columns...), io.EOF)
 }
 
 // CurrentResultSet get current result set

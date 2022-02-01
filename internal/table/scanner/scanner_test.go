@@ -2,7 +2,6 @@ package scanner
 
 import (
 	"encoding/binary"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"math"
 	"strconv"
 	"testing"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
