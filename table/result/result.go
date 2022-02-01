@@ -43,6 +43,15 @@ type result interface {
 	// After iterate over result sets should be checked Err()
 	NextResultSet(ctx context.Context, columns ...string) bool
 
+	// NextResultSetErr selects next result set in the result.
+	// columns - names of columns in the result set that will be scanned
+	// It returns:
+	// - nil if select next result set successful
+	// - io.EOF if no result sets
+	// - some error if an error has occurred
+	// NextResultSetErr func equal to sequential calls HasNextResultSet() and Err() after
+	NextResultSetErr(ctx context.Context, columns ...string) error
+
 	// CurrentResultSet get current result set to use ColumnCount(), RowCount() and other methods
 	CurrentResultSet() Set
 

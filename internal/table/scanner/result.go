@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
@@ -101,10 +100,15 @@ func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	}
 }
 
-// NextResultSet selects next result set in the result.
-// columns - names of columns in the resultSet that will be scanned
-// It returns false if there are no more result sets.
-// Stream sets are supported.
+func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
+	if !r.HasNextResultSet() {
+		return io.EOF
+	}
+	r.Reset(r.sets[r.nextSet], columns...)
+	r.nextSet++
+	return nil
+}
+
 func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
 	if !r.HasNextResultSet() {
 		return false
@@ -114,26 +118,17 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 	return true
 }
 
-// NextResultSet selects next result set in the result.
-// columns - names of columns in the resultSet that will be scanned
-// It returns false if there are no more result sets.
-// Stream sets are supported.
-func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
-	if r.inactive() {
-		return false
+func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
+	if r.isClosed() {
+		if err = r.Err(); err != nil {
+			return err
+		}
+		return io.EOF
 	}
 	s, stats, err := r.recv(ctx)
-	if errors.Is(err, io.EOF) {
-		return false
-	}
 	if err != nil {
-		r.errMtx.Lock()
-		if r.err == nil {
-			r.err = ctx.Err()
-		}
-		r.errMtx.Unlock()
 		r.Reset(nil)
-		return false
+		return r.errorf("failed to receive next result set: %w", err)
 	}
 	r.Reset(s, columns...)
 	if stats != nil {
@@ -141,7 +136,11 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 		r.stats = stats
 		r.statsMtx.Unlock()
 	}
-	return true
+	return nil
+}
+
+func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
+	return r.NextResultSetErr(ctx, columns...) == nil
 }
 
 // CurrentResultSet get current result set
