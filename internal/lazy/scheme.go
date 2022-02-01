@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
@@ -21,7 +21,11 @@ func Scheme(db db.Connection) scheme.Client {
 	}
 }
 
-func (s *lazyScheme) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
+func (s *lazyScheme) ModifyPermissions(
+	ctx context.Context,
+	path string,
+	opts ...scheme.PermissionsOption,
+) (err error) {
 	s.init()
 	return s.client.ModifyPermissions(ctx, path, opts...)
 }
@@ -41,7 +45,7 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 func (s *lazyScheme) init() {
 	s.m.Lock()
 	if s.client == nil {
-		s.client = internal.New(s.db)
+		s.client = builder.New(s.db)
 	}
 	s.m.Unlock()
 }

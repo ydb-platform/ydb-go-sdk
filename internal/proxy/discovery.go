@@ -3,7 +3,7 @@ package proxy
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 )

@@ -298,14 +298,14 @@ func (t Table) Compose(x Table) (ret Table) {
 		}
 	}
 	switch {
-	case t.OnPoolRetry == nil:
-		ret.OnPoolRetry = x.OnPoolRetry
-	case x.OnPoolRetry == nil:
-		ret.OnPoolRetry = t.OnPoolRetry
+	case t.OnPoolDo == nil:
+		ret.OnPoolDo = x.OnPoolDo
+	case x.OnPoolDo == nil:
+		ret.OnPoolDo = t.OnPoolDo
 	default:
-		h1 := t.OnPoolRetry
-		h2 := x.OnPoolRetry
-		ret.OnPoolRetry = func(p PoolRetryStartInfo) func(PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
+		h1 := t.OnPoolDo
+		h2 := x.OnPoolDo
+		ret.OnPoolDo = func(p PoolDoStartInfo) func(PoolDoInternalInfo) func(PoolDoDoneInfo) {
 			r1 := h1(p)
 			r2 := h2(p)
 			switch {
@@ -314,7 +314,7 @@ func (t Table) Compose(x Table) (ret Table) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(info PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
+				return func(info PoolDoInternalInfo) func(PoolDoDoneInfo) {
 					r11 := r1(info)
 					r21 := r2(info)
 					switch {
@@ -323,7 +323,42 @@ func (t Table) Compose(x Table) (ret Table) {
 					case r21 == nil:
 						return r11
 					default:
-						return func(p PoolRetryDoneInfo) {
+						return func(p PoolDoDoneInfo) {
+							r11(p)
+							r21(p)
+						}
+					}
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnPoolDoTx == nil:
+		ret.OnPoolDoTx = x.OnPoolDoTx
+	case x.OnPoolDoTx == nil:
+		ret.OnPoolDoTx = t.OnPoolDoTx
+	default:
+		h1 := t.OnPoolDoTx
+		h2 := x.OnPoolDoTx
+		ret.OnPoolDoTx = func(p PoolDoTxStartInfo) func(PoolDoTxInternalInfo) func(PoolDoTxDoneInfo) {
+			r1 := h1(p)
+			r2 := h2(p)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(info PoolDoTxInternalInfo) func(PoolDoTxDoneInfo) {
+					r11 := r1(info)
+					r21 := r2(info)
+					switch {
+					case r11 == nil:
+						return r21
+					case r21 == nil:
+						return r11
+					default:
+						return func(p PoolDoTxDoneInfo) {
 							r11(p)
 							r21(p)
 						}
@@ -669,27 +704,54 @@ func (t Table) onPoolClose(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
 	}
 	return res
 }
-func (t Table) onPoolRetry(p PoolRetryStartInfo) func(info PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
-	fn := t.OnPoolRetry
+func (t Table) onPoolDo(p PoolDoStartInfo) func(info PoolDoInternalInfo) func(PoolDoDoneInfo) {
+	fn := t.OnPoolDo
 	if fn == nil {
-		return func(PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
-			return func(PoolRetryDoneInfo) {
+		return func(PoolDoInternalInfo) func(PoolDoDoneInfo) {
+			return func(PoolDoDoneInfo) {
 				return
 			}
 		}
 	}
 	res := fn(p)
 	if res == nil {
-		return func(PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
-			return func(PoolRetryDoneInfo) {
+		return func(PoolDoInternalInfo) func(PoolDoDoneInfo) {
+			return func(PoolDoDoneInfo) {
 				return
 			}
 		}
 	}
-	return func(info PoolRetryInternalInfo) func(PoolRetryDoneInfo) {
+	return func(info PoolDoInternalInfo) func(PoolDoDoneInfo) {
 		res := res(info)
 		if res == nil {
-			return func(PoolRetryDoneInfo) {
+			return func(PoolDoDoneInfo) {
+				return
+			}
+		}
+		return res
+	}
+}
+func (t Table) onPoolDoTx(p PoolDoTxStartInfo) func(info PoolDoTxInternalInfo) func(PoolDoTxDoneInfo) {
+	fn := t.OnPoolDoTx
+	if fn == nil {
+		return func(PoolDoTxInternalInfo) func(PoolDoTxDoneInfo) {
+			return func(PoolDoTxDoneInfo) {
+				return
+			}
+		}
+	}
+	res := fn(p)
+	if res == nil {
+		return func(PoolDoTxInternalInfo) func(PoolDoTxDoneInfo) {
+			return func(PoolDoTxDoneInfo) {
+				return
+			}
+		}
+	}
+	return func(info PoolDoTxInternalInfo) func(PoolDoTxDoneInfo) {
+		res := res(info)
+		if res == nil {
+			return func(PoolDoTxDoneInfo) {
 				return
 			}
 		}
@@ -941,17 +1003,33 @@ func TableOnPoolClose(t Table, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func TableOnPoolRetry(t Table, c *context.Context, idempotent bool) func(error) func(attempts int, _ error) {
-	var p PoolRetryStartInfo
+func TableOnPoolDo(t Table, c *context.Context, idempotent bool) func(error) func(attempts int, _ error) {
+	var p PoolDoStartInfo
 	p.Context = c
 	p.Idempotent = idempotent
-	res := t.onPoolRetry(p)
+	res := t.onPoolDo(p)
 	return func(e error) func(int, error) {
-		var p PoolRetryInternalInfo
+		var p PoolDoInternalInfo
 		p.Error = e
 		res := res(p)
 		return func(attempts int, e error) {
-			var p PoolRetryDoneInfo
+			var p PoolDoDoneInfo
+			p.Attempts = attempts
+			p.Error = e
+			res(p)
+		}
+	}
+}
+func TableOnPoolDoTx(t Table, c *context.Context) func(error) func(attempts int, _ error) {
+	var p PoolDoTxStartInfo
+	p.Context = c
+	res := t.onPoolDoTx(p)
+	return func(e error) func(int, error) {
+		var p PoolDoTxInternalInfo
+		p.Error = e
+		res := res(p)
+		return func(attempts int, e error) {
+			var p PoolDoTxDoneInfo
 			p.Attempts = attempts
 			p.Error = e
 			res(p)

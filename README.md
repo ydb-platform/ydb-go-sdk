@@ -15,13 +15,14 @@
 ## Table of contents
 1. [Overview](#Overview)
 2. [About semantic versioning](#SemVer)
-3. [Prerequisites](#Prerequisites)
-4. [Installation](#Install)
-5. [Usage](#Usage)
-6. [Credentials](#Credentials)
-7. [Environment variables](#Environ)
-8. [Ecosystem of debug tools](#Debug)
-9. [Examples](#Examples)
+3. [About expected go1.18 changes](#go1.18)
+4. [Prerequisites](#Prerequisites)
+5. [Installation](#Install)
+6. [Usage](#Usage)
+7. [Credentials](#Credentials)
+8. [Environment variables](#Environ)
+9. [Ecosystem of debug tools](#Debug)
+10. [Examples](#Examples)
 
 ## Overview <a name="Overview"></a>
 
@@ -44,9 +45,20 @@ We publish the planned breaking `MAJOR` changes:
 * via the comment `Deprecated` in the code indicating what should be used instead
 * through the file [`NEXT_MAJOR_RELEASE.md`](#NEXT_MAJOR_RELEASE.md)
 
+## About expected `go1.18` changes <a name="go1.18"></a>
+
+Some changes from `go1.18` are expected and will be allowed to `ydb-go-sdk`:
+- type set constraints instead abstract `interface{}`. Firstly, this changes will be applied to scanner API (`Scan`, `ScanWithDefaults` and `ScanNamed`)
+- improve `log` package with parametrized types.
+
+That changes could break backward compatibility.
+We are tried to support `go1.18` features seamlessly. But now we was tested `go1.18-beta` implementation and detected some strong issues:
+- go version in `go.mod` must be forced up to 1.18,
+- interfaces with methods are not supported in type sets and other.
+
 ## Prerequisites <a name="Prerequisites"></a>
 
-Requires Go 1.13 or later.
+Requires `go1.13` or later.
 
 ## Installation <a name="Installation"></a>
 

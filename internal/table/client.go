@@ -11,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -542,44 +541,19 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	)
 }
 
-// DoTx provide the best effort for execute operation
-// DoTx implements internal busy loop until one of the following conditions is met:
-// - deadline was canceled or deadlined
-// - retry operation returned nil as error
-// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
 	if c.isClosed() {
 		return ErrSessionPoolClosed
 	}
-	options := table.Options{
-		Idempotent: table.ContextIdempotentOperation(ctx),
-		TxSettings: table.ContextTransactionSettings(ctx),
+	if c.isClosed() {
+		return ErrSessionPoolClosed
 	}
-	for _, o := range opts {
-		o(&options)
-	}
-	return retryBackoff(
+	return doTx(
 		ctx,
 		c,
-		retry.FastBackoff,
-		retry.SlowBackoff,
-		options.Idempotent,
-		func(ctx context.Context, s table.Session) (err error) {
-			tx, err := s.BeginTransaction(ctx, options.TxSettings)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = tx.Rollback(ctx)
-			}()
-			err = op(ctx, tx)
-			if err != nil {
-				return err
-			}
-			_, err = tx.CommitTx(ctx, options.TxCommitOptions...)
-			return err
-		},
-		c.config.Trace(),
+		op,
+		withOptions(opts...),
+		withTrace(c.config.Trace()),
 	)
 }
 

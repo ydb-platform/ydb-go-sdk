@@ -61,7 +61,14 @@ func (c *client) DropNode(ctx context.Context, path string) (err error) {
 }
 
 // DescribeNode describes a coordination node
-func (c *client) DescribeNode(ctx context.Context, path string) (_ *scheme.Entry, _ *coordination.Config, err error) {
+func (c *client) DescribeNode(
+	ctx context.Context,
+	path string,
+) (
+	_ *scheme.Entry,
+	_ *coordination.Config,
+	err error,
+) {
 	var (
 		response *Ydb_Coordination.DescribeNodeResponse
 		result   Ydb_Coordination.DescribeNodeResult

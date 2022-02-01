@@ -244,8 +244,13 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 				}
 			}
 		}
-		// nolint:lll
-		t.OnConnNewStream = func(info trace.ConnNewStreamStartInfo) func(trace.ConnNewStreamRecvInfo) func(trace.ConnNewStreamDoneInfo) {
+		t.OnConnNewStream = func(
+			info trace.ConnNewStreamStartInfo,
+		) func(
+			trace.ConnNewStreamRecvInfo,
+		) func(
+			trace.ConnNewStreamDoneInfo,
+		) {
 			address := info.Endpoint.Address()
 			local := info.Endpoint.LocalDC()
 			method := string(info.Method)

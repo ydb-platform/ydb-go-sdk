@@ -4,8 +4,9 @@ import (
 	"context"
 	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -51,7 +52,7 @@ func (d *lazyDiscovery) Close(ctx context.Context) error {
 func (d *lazyDiscovery) init() {
 	d.m.Lock()
 	if d.client == nil {
-		d.client = discovery.New(d.db, d.db.Endpoint(), d.db.Name(), d.db.Secure(), d.trace)
+		d.client = builder.New(d.db, d.db.Endpoint(), d.db.Name(), d.db.Secure(), d.trace)
 	}
 	d.m.Unlock()
 }

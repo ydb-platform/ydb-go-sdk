@@ -9,9 +9,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
@@ -66,15 +66,17 @@ type connection struct {
 	config       config.Config
 	options      []config.Option
 	tableOptions []tableConfig.Option
-	conns        conn.Pool
-	mtx          sync.Mutex
-	db           db.Connection
+	scripting    scripting.Client
+
 	table        table.Client
 	scheme       scheme.Client
-	scripting    scripting.Client
 	discovery    discovery.Client
 	coordination coordination.Client
 	rateLimiter  ratelimiter.Client
+
+	conns conn.Pool
+	mtx   sync.Mutex
+	db    db.Connection
 }
 
 func (c *connection) Close(ctx context.Context) error {

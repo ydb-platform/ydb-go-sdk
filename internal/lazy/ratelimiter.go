@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
@@ -93,7 +93,7 @@ func (r *lazyRatelimiter) AcquireResource(
 func (r *lazyRatelimiter) init() {
 	r.m.Lock()
 	if r.client == nil {
-		r.client = internal.New(r.db)
+		r.client = builder.New(r.db)
 	}
 	r.m.Unlock()
 }

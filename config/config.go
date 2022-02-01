@@ -1,21 +1,16 @@
 package config
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"net"
 	"time"
 
 	"google.golang.org/grpc"
-	grpcCredentials "google.golang.org/grpc/credentials"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
-	ydbCredentials "github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/resolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -36,7 +31,7 @@ type Config interface {
 
 	// Credentials is an ydb client credentials.
 	// In most cases Credentials are required.
-	Credentials() ydbCredentials.Credentials
+	Credentials() credentials.Credentials
 
 	// Trace contains driver tracing options.
 	Trace() trace.Driver
@@ -128,36 +123,6 @@ func (c *config) Meta() meta.Meta {
 
 func (c *config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
-}
-
-func (c *config) GrpcDialOptions() (opts []grpc.DialOption) {
-	// nolint:gocritic
-	opts = append(
-		c.grpcOptions,
-		grpc.WithContextDialer(func(ctx context.Context, address string) (net.Conn, error) {
-			return newConn(ctx, address, trace.ContextDriver(ctx).Compose(c.trace))
-		}),
-		grpc.WithKeepaliveParams(DefaultGrpcConnectionPolicy),
-		grpc.WithResolvers(
-			resolver.New(""), // for use this resolver by default
-			resolver.New("grpc"),
-			resolver.New("grpcs"),
-		),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
-		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
-			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
-		),
-		grpc.WithBlock(),
-	)
-	if c.secure {
-		opts = append(opts, grpc.WithTransportCredentials(
-			grpcCredentials.NewTLS(c.tlsConfig),
-		))
-	} else {
-		opts = append(opts, grpc.WithInsecure())
-	}
-	return
 }
 
 func (c *config) Secure() bool {

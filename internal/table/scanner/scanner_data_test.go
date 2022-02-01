@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -47,7 +48,7 @@ var scannerData = []struct {
 	name             string
 	count            int
 	columns          []*column
-	values           []interface{}
+	values           []indexed.Value
 	setColumns       []string
 	setColumnIndexes []int
 }{
@@ -61,7 +62,7 @@ var scannerData = []struct {
 			name:   "date",
 			typeID: Ydb.Type_DATE,
 		}},
-		values: []interface{}{new([16]byte), new(time.Time)},
+		values: []indexed.Value{new([16]byte), new(time.Time)},
 	},
 	{
 		name:  "Scan JSON, DOUBLE",
@@ -73,7 +74,7 @@ var scannerData = []struct {
 			name:   "double",
 			typeID: Ydb.Type_DOUBLE,
 		}},
-		values: []interface{}{new([]byte), new(float64)},
+		values: []indexed.Value{new([]byte), new(float64)},
 	},
 	{
 		name:  "Scan INT8, INT16, INT32",
@@ -88,7 +89,7 @@ var scannerData = []struct {
 			name:   "int32",
 			typeID: Ydb.Type_INT32,
 		}},
-		values:     []interface{}{new(int8), new(int16), new(int32)},
+		values:     []indexed.Value{new(int8), new(int16), new(int32)},
 		setColumns: []string{"int8", "int16", "int32"},
 	},
 	{
@@ -101,7 +102,7 @@ var scannerData = []struct {
 			name:   "double",
 			typeID: Ydb.Type_DOUBLE,
 		}},
-		values: []interface{}{new([]byte), new(float64)},
+		values: []indexed.Value{new([]byte), new(float64)},
 	},
 	{
 		name:  "Scan JSON, FLOAT",
@@ -113,7 +114,7 @@ var scannerData = []struct {
 			name:   "float",
 			typeID: Ydb.Type_FLOAT,
 		}},
-		values: []interface{}{new([]byte), new(float32)},
+		values: []indexed.Value{new([]byte), new(float32)},
 	},
 	{
 		name:  "Scan UINT8, UINT16, UINT32",
@@ -128,7 +129,7 @@ var scannerData = []struct {
 			name:   "uint32",
 			typeID: Ydb.Type_UINT32,
 		}},
-		values: []interface{}{new(uint8), new(uint16), new(uint32)},
+		values: []indexed.Value{new(uint8), new(uint16), new(uint32)},
 	},
 	{
 		name:  "Scan DYNUMBER, Type_UTF8, Type_STRING",
@@ -143,7 +144,7 @@ var scannerData = []struct {
 			name:   "string",
 			typeID: Ydb.Type_STRING,
 		}},
-		values: []interface{}{new(string), new(string), new([]byte)},
+		values: []indexed.Value{new(string), new(string), new([]byte)},
 	},
 	{
 		name:  "Scan float32, int64, uint64 and skip other columns",
@@ -164,7 +165,7 @@ var scannerData = []struct {
 			name:   "uint64",
 			typeID: Ydb.Type_UINT64,
 		}},
-		values:           []interface{}{new(float32), new(int64), new(uint64)},
+		values:           []indexed.Value{new(float32), new(int64), new(uint64)},
 		setColumns:       []string{"float32", "int64", "uint64"},
 		setColumnIndexes: []int{0, 2, 4},
 	},
@@ -181,7 +182,7 @@ var scannerData = []struct {
 			name:   "interval",
 			typeID: Ydb.Type_INTERVAL,
 		}},
-		values:           []interface{}{new(bool), new(time.Duration), new(time.Time)},
+		values:           []indexed.Value{new(bool), new(time.Duration), new(time.Time)},
 		setColumns:       []string{"bool", "interval", "timestamp"},
 		setColumnIndexes: []int{1, 2, 0},
 	},
@@ -201,7 +202,7 @@ var scannerData = []struct {
 			typeID:      Ydb.Type_TZ_DATETIME,
 			testDefault: true,
 		}},
-		values:           []interface{}{new(time.Time), new(time.Time), new(time.Time)},
+		values:           []indexed.Value{new(time.Time), new(time.Time), new(time.Time)},
 		setColumns:       []string{"tztimestamp", "tzdatetime", "tzdate"},
 		setColumnIndexes: []int{0, 2, 1},
 	},
@@ -221,7 +222,11 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_JSON,
 			ydbvalue: true,
 		}},
-		values: []interface{}{new(types.Value), new(types.Value), new(types.Value)},
+		values: []indexed.Value{
+			new(types.Value),
+			new(types.Value),
+			new(types.Value),
+		},
 	},
 	{
 		name:  "Scan table with single column",
@@ -230,7 +235,7 @@ var scannerData = []struct {
 			name:   "datetime",
 			typeID: Ydb.Type_DATETIME,
 		}},
-		values: []interface{}{new(time.Time)},
+		values: []indexed.Value{new(time.Time)},
 	},
 	{
 		name:  "Scan optional values",
@@ -248,7 +253,7 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_STRING,
 			optional: true,
 		}},
-		values: []interface{}{new(*time.Time), new(*uint16), new(*[]byte)},
+		values: []indexed.Value{new(*time.Time), new(*uint16), new(*[]byte)},
 	},
 	{
 		name:  "Scan optional values",
@@ -266,7 +271,7 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_DOUBLE,
 			optional: true,
 		}},
-		values: []interface{}{new(*time.Duration), new(*[16]byte), new(*float64)},
+		values: []indexed.Value{new(*time.Duration), new(*[16]byte), new(*float64)},
 	},
 	{
 		name:  "Scan int64, date, string as ydb.Scanner",
@@ -284,7 +289,7 @@ var scannerData = []struct {
 			typeID:  Ydb.Type_STRING,
 			scanner: true,
 		}},
-		values: []interface{}{new(intIncScanner), new(dateScanner), new([]byte)},
+		values: []indexed.Value{new(intIncScanner), new(dateScanner), new([]byte)},
 	},
 	{
 		name:  "Scan optional int64, date, string as ydb.Scanner",
@@ -304,7 +309,7 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_STRING,
 			optional: true,
 		}},
-		values: []interface{}{new(intIncScanner), new(dateScanner), new(*[]byte)},
+		values: []indexed.Value{new(intIncScanner), new(dateScanner), new(*[]byte)},
 	},
 	{
 		name:  "ScanWithDefaults optional int64, date, string with null values as ydb.Scanner",
@@ -326,7 +331,7 @@ var scannerData = []struct {
 			scanner:  true,
 			nilValue: true,
 		}},
-		values: []interface{}{new(intIncScanner), new(dateScanner), new(*[]byte)},
+		values: []indexed.Value{new(intIncScanner), new(dateScanner), new(*[]byte)},
 	},
 	{
 		name:  "ScanWithDefaults optional int32, time interval, string",
@@ -347,7 +352,7 @@ var scannerData = []struct {
 			optional:    true,
 			testDefault: true,
 		}},
-		values: []interface{}{new(int32), new(time.Duration), new([]byte)},
+		values: []indexed.Value{new(int32), new(time.Duration), new([]byte)},
 	},
 	{
 		name:  "ScanWithDefaults optional int32, time interval, string, nil values applied as default value types",
@@ -371,7 +376,7 @@ var scannerData = []struct {
 			testDefault: true,
 			nilValue:    true,
 		}},
-		values: []interface{}{new(int32), new(time.Duration), new([]byte)},
+		values: []indexed.Value{new(int32), new(time.Duration), new([]byte)},
 	},
 	{
 		name:  "Scan optional int32, time interval, string. All values are null",
@@ -392,7 +397,7 @@ var scannerData = []struct {
 			optional: true,
 			nilValue: true,
 		}},
-		values: []interface{}{new(*int32), new(*time.Duration), new(*[]byte)},
+		values: []indexed.Value{new(*int32), new(*time.Duration), new(*[]byte)},
 	},
 	{
 		name:  "Scan optional uint8, yson, tzdatetime, uuid. All values are null",
@@ -418,7 +423,7 @@ var scannerData = []struct {
 			optional: true,
 			nilValue: true,
 		}},
-		values: []interface{}{new(*uint8), new(*[]byte), new(*time.Time), new(*[16]byte)},
+		values: []indexed.Value{new(*uint8), new(*[]byte), new(*time.Time), new(*[16]byte)},
 	},
 	{
 		name:  "Scan string as byte array.",
@@ -427,7 +432,7 @@ var scannerData = []struct {
 			name:   "string",
 			typeID: Ydb.Type_STRING,
 		}},
-		values: []interface{}{new([]byte)},
+		values: []indexed.Value{new([]byte)},
 	},
 	{
 		name:  "Scan optional string as byte array.",
@@ -437,7 +442,7 @@ var scannerData = []struct {
 			typeID:   Ydb.Type_STRING,
 			optional: true,
 		}},
-		values: []interface{}{new(*[]byte)},
+		values: []indexed.Value{new(*[]byte)},
 	},
 	{
 		name:  "Scan optional null string as byte array.",
@@ -448,7 +453,7 @@ var scannerData = []struct {
 			optional: true,
 			nilValue: true,
 		}},
-		values: []interface{}{new(*[]byte)},
+		values: []indexed.Value{new(*[]byte)},
 	},
 	{
 		name:  "Scan optional default string as byte array.",
@@ -460,7 +465,7 @@ var scannerData = []struct {
 			nilValue:    true,
 			testDefault: true,
 		}},
-		values: []interface{}{new([]byte)},
+		values: []indexed.Value{new([]byte)},
 	},
 }
 

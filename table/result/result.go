@@ -3,6 +3,7 @@ package result
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
@@ -43,6 +44,15 @@ type result interface {
 	// After iterate over result sets should be checked Err()
 	NextResultSet(ctx context.Context, columns ...string) bool
 
+	// NextResultSetErr selects next result set in the result.
+	// columns - names of columns in the result set that will be scanned
+	// It returns:
+	// - nil if select next result set successful
+	// - io.EOF if no result sets
+	// - some error if an error has occurred
+	// NextResultSetErr func equal to sequential calls HasNextResultSet() and Err() after
+	NextResultSetErr(ctx context.Context, columns ...string) error
+
 	// CurrentResultSet get current result set to use ColumnCount(), RowCount() and other methods
 	CurrentResultSet() Set
 
@@ -62,7 +72,7 @@ type result interface {
 	// value.(ydb.table.types.Scanner).UnmarshalYDB(raw) where raw may be null.
 	// In this case client-side implementation UnmarshalYDB must check raw.IsNull() and
 	// applied default value or nothing to do
-	ScanWithDefaults(values ...interface{}) error
+	ScanWithDefaults(values ...indexed.Value) error
 
 	// Scan values.
 	// Input params - pointers to types:
@@ -91,7 +101,7 @@ type result interface {
 	// implement ydb.Scanner with UnmarshalYDB method
 	// See examples for more detailed information.
 	// Output param - Scanner error
-	Scan(values ...interface{}) error
+	Scan(values ...indexed.Value) error
 
 	// ScanNamed scans row with column names defined in namedValues
 	ScanNamed(namedValues ...named.Value) error

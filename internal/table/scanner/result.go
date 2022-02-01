@@ -10,11 +10,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	public "github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-type result struct {
+type baseResult struct {
 	scanner
 
 	statsMtx sync.RWMutex
@@ -25,14 +25,14 @@ type result struct {
 }
 
 type streamResult struct {
-	result
+	baseResult
 
 	recv  func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error)
 	close func(error) error
 }
 
 type unaryResult struct {
-	result
+	baseResult
 
 	sets    []*Ydb.ResultSet
 	nextSet int
@@ -53,7 +53,7 @@ func (r *unaryResult) ResultSetCount() int {
 	return len(r.sets)
 }
 
-func (r *result) isClosed() bool {
+func (r *baseResult) isClosed() bool {
 	r.closedMtx.RLock()
 	defer r.closedMtx.RUnlock()
 	return r.closed
@@ -64,12 +64,12 @@ type resultWithError interface {
 }
 
 type UnaryResult interface {
-	public.Result
+	result.Result
 	resultWithError
 }
 
 type StreamResult interface {
-	public.StreamResult
+	result.StreamResult
 	resultWithError
 }
 
@@ -86,7 +86,7 @@ func NewStream(
 
 func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats) UnaryResult {
 	r := &unaryResult{
-		result: result{
+		baseResult: baseResult{
 			stats: stats,
 		},
 		sets: sets,
@@ -94,46 +94,40 @@ func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats) UnaryResu
 	return r
 }
 
-func (r *result) Reset(set *Ydb.ResultSet, columnNames ...string) {
+func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	r.reset(set)
 	if set != nil {
 		r.setColumnIndexes(columnNames)
 	}
 }
 
-// NextResultSet selects next result set in the result.
-// columns - names of columns in the resultSet that will be scanned
-// It returns false if there are no more result sets.
-// Stream sets are supported.
-func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
+func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
 	if !r.HasNextResultSet() {
-		return false
+		return io.EOF
 	}
 	r.Reset(r.sets[r.nextSet], columns...)
 	r.nextSet++
-	return true
+	return ctx.Err()
 }
 
-// NextResultSet selects next result set in the result.
-// columns - names of columns in the resultSet that will be scanned
-// It returns false if there are no more result sets.
-// Stream sets are supported.
-func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
-	if r.inactive() {
-		return false
+func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
+	return r.NextResultSetErr(ctx, columns...) == nil
+}
+
+func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
+	if r.isClosed() {
+		if err = r.Err(); err != nil {
+			return err
+		}
+		return io.EOF
 	}
 	s, stats, err := r.recv(ctx)
-	if errors.Is(err, io.EOF) {
-		return false
-	}
 	if err != nil {
-		r.errMtx.Lock()
-		if r.err == nil {
-			r.err = ctx.Err()
-		}
-		r.errMtx.Unlock()
 		r.Reset(nil)
-		return false
+		if errors.Is(err, io.EOF) {
+			return err
+		}
+		return r.errorf("receive next result set failed: %w", err)
 	}
 	r.Reset(s, columns...)
 	if stats != nil {
@@ -141,16 +135,20 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 		r.stats = stats
 		r.statsMtx.Unlock()
 	}
-	return true
+	return ctx.Err()
+}
+
+func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {
+	return r.NextResultSetErr(ctx, columns...) == nil
 }
 
 // CurrentResultSet get current result set
-func (r *result) CurrentResultSet() public.Set {
+func (r *baseResult) CurrentResultSet() result.Set {
 	return r
 }
 
 // Stats returns query execution queryStats.
-func (r *result) Stats() stats.QueryStats {
+func (r *baseResult) Stats() stats.QueryStats {
 	var s queryStats
 	r.statsMtx.RLock()
 	s.stats = r.stats
@@ -171,7 +169,7 @@ func (r *streamResult) Close() (err error) {
 	return r.close(r.Err())
 }
 
-func (r *result) inactive() bool {
+func (r *baseResult) inactive() bool {
 	return r.isClosed() || r.Err() != nil
 }
 

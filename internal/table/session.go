@@ -188,7 +188,11 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 }
 
 // CreateTable creates table at given path with given options.
-func (s *session) CreateTable(ctx context.Context, path string, opts ...options.CreateTableOption) (err error) {
+func (s *session) CreateTable(
+	ctx context.Context,
+	path string,
+	opts ...options.CreateTableOption,
+) (err error) {
 	request := Ydb_Table.CreateTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -344,7 +348,11 @@ func (s *session) AlterTable(ctx context.Context, path string, opts ...options.A
 }
 
 // CopyTable creates copy of table at given path.
-func (s *session) CopyTable(ctx context.Context, dst, src string, opts ...options.CopyTableOption) (err error) {
+func (s *session) CopyTable(
+	ctx context.Context,
+	dst, src string,
+	opts ...options.CopyTableOption,
+) (err error) {
 	request := Ydb_Table.CopyTableRequest{
 		SessionId:       s.id,
 		SourcePath:      src,
@@ -511,7 +519,11 @@ func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
 
 // executeQueryResult returns Transaction and result built from received
 // result.
-func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (table.Transaction, result.Result, error) {
+func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
+	table.Transaction,
+	result.Result,
+	error,
+) {
 	t := &Transaction{
 		id: res.GetTxMeta().GetId(),
 		s:  s,
@@ -570,7 +582,10 @@ func (s *session) ExecuteSchemeQuery(
 }
 
 // DescribeTableOptions describes supported table options.
-func (s *session) DescribeTableOptions(ctx context.Context) (desc options.TableOptionsDescription, err error) {
+func (s *session) DescribeTableOptions(ctx context.Context) (
+	desc options.TableOptionsDescription,
+	err error,
+) {
 	var (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult

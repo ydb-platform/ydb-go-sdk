@@ -61,7 +61,7 @@ func withSlowBackoff(slowBackoff retry.Backoff) retryOption {
 	}
 }
 
-func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retryOption) (err error) {
+func parseOptions(ctx context.Context, opts ...retryOption) retryOptions {
 	options := retryOptions{
 		options: table.Options{
 			Idempotent: table.ContextIdempotentOperation(ctx),
@@ -73,13 +73,64 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 	for _, o := range opts {
 		o(&options)
 	}
+	return options
+}
+
+func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...retryOption) (err error) {
+	options := parseOptions(ctx, opts...)
+	attempts, onIntermediate := 0, trace.TableOnPoolDoTx(options.trace, &ctx)
+	defer func() {
+		onIntermediate(err)(attempts, err)
+	}()
+	return retryBackoff(
+		ctx,
+		c,
+		retry.FastBackoff,
+		retry.SlowBackoff,
+		options.options.Idempotent,
+		func(ctx context.Context, s table.Session) (err error) {
+			tx, err := s.BeginTransaction(ctx, options.options.TxSettings)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = tx.Rollback(ctx)
+			}()
+			err = op(ctx, tx)
+			if attempts > 0 {
+				onIntermediate(err)
+			}
+			attempts++
+			if err != nil {
+				return err
+			}
+			_, err = tx.CommitTx(ctx, options.options.TxCommitOptions...)
+			return err
+		},
+		options.trace,
+	)
+}
+
+func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retryOption) (err error) {
+	options := parseOptions(ctx, opts...)
+	attempts, onIntermediate := 0, trace.TableOnPoolDo(options.trace, &ctx, options.options.Idempotent)
+	defer func() {
+		onIntermediate(err)(attempts, err)
+	}()
 	return retryBackoff(
 		ctx,
 		c,
 		options.fastBackoff,
 		options.slowBackoff,
 		options.options.Idempotent,
-		op,
+		func(ctx context.Context, s table.Session) error {
+			err = op(ctx, s)
+			if attempts > 0 {
+				onIntermediate(err)
+			}
+			attempts++
+			return err
+		},
 		options.trace,
 	)
 }
@@ -174,7 +225,7 @@ func retryBackoff(
 		i              int
 		attempts       int
 		code           = int32(0)
-		onIntermediate = trace.TableOnPoolRetry(t, &ctx, isOperationIdempotent)
+		onIntermediate = trace.TableOnPoolDo(t, &ctx, isOperationIdempotent)
 	)
 	defer func() {
 		if s != nil {

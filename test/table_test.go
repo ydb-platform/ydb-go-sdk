@@ -18,7 +18,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -167,7 +167,7 @@ func TestTable(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.INFO),
+			ydb.WithMinLevel(ydb.WARN),
 		),
 		ydb.WithTraceTable(trace.Table{
 			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
@@ -297,11 +297,11 @@ func TestTable(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if !res.NextResultSet(ctx) {
-					return fmt.Errorf("nothing result sets")
+				if err = res.NextResultSetErr(ctx); err != nil {
+					return err
 				}
 				if !res.NextRow() {
-					return fmt.Errorf("nothing result rows")
+					return fmt.Errorf("nothing rows")
 				}
 				if err = res.ScanNamed(
 					named.OptionalWithDefault("views", &views),
@@ -523,39 +523,39 @@ func TestTable(t *testing.T) {
 		wg := sync.WaitGroup{}
 		for i := 0; i < limit; i++ {
 			wg.Add(3)
-			go func() {
+			go t.Run("ExecuteDataQuery", func(t *testing.T) {
 				defer wg.Done()
 				for {
 					select {
 					case <-ctx.Done():
 						return
 					default:
-						selectExecuteDataQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
+						executeDataQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
 					}
 				}
-			}()
-			go func() {
+			})
+			go t.Run("ExecuteScanQuery", func(t *testing.T) {
 				defer wg.Done()
 				for {
 					select {
 					case <-ctx.Done():
 						return
 					default:
-						selectExecuteScanQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
+						executeScanQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
 					}
 				}
-			}()
-			go func() {
+			})
+			go t.Run("StreamReadTable", func(t *testing.T) {
 				defer wg.Done()
 				for {
 					select {
 					case <-ctx.Done():
 						return
 					default:
-						selectReadTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
+						streamReadTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
 					}
 				}
-			}()
+			})
 		}
 		wg.Add(1)
 		go func() {
@@ -573,7 +573,7 @@ func TestTable(t *testing.T) {
 	})
 }
 
-func selectReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
+func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
 	err := c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -637,7 +637,7 @@ func selectReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 	}
 }
 
-func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, folderAbsPath string) {
+func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderAbsPath string) {
 	var (
 		query = render(
 			template.Must(template.New("").Parse(`
@@ -712,7 +712,7 @@ func selectExecuteDataQuery(ctx context.Context, t *testing.T, c table.Client, f
 	}
 }
 
-func selectExecuteScanQuery(ctx context.Context, t *testing.T, c table.Client, folderAbsPath string) {
+func executeScanQuery(ctx context.Context, t *testing.T, c table.Client, folderAbsPath string) {
 	query := render(
 		template.Must(template.New("").Parse(`
 				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -1018,7 +1018,7 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	if err != nil {
 		return err
 	}
-	log.Println("> describe_table_options:")
+	log.Println("> describe_options:")
 
 	for i, p := range desc.TableProfilePresets {
 		log.Printf("  > TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)

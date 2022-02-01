@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -92,7 +93,7 @@ func (s *scanner) NextRow() bool {
 	return true
 }
 
-func (s *scanner) ScanWithDefaults(values ...interface{}) error {
+func (s *scanner) ScanWithDefaults(values ...indexed.Value) error {
 	for _, v := range values {
 		if _, ok := v.(named.Value); ok {
 			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
@@ -102,7 +103,7 @@ func (s *scanner) ScanWithDefaults(values ...interface{}) error {
 	return s.scan(values)
 }
 
-func (s *scanner) Scan(values ...interface{}) error {
+func (s *scanner) Scan(values ...indexed.Value) error {
 	for _, v := range values {
 		if _, ok := v.(named.Value); ok {
 			panic("dont use NamedValue with Scan. Use ScanNamed instead")
@@ -967,7 +968,7 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 	}
 }
 
-func (s *scanner) scan(values []interface{}) (err error) {
+func (s *scanner) scan(values []indexed.Value) (err error) {
 	if err = s.Err(); err != nil {
 		return
 	}
@@ -1010,7 +1011,7 @@ func (s *scanner) scan(values []interface{}) (err error) {
 	return s.Err()
 }
 
-func (r *result) SetErr(err error) {
+func (r *baseResult) SetErr(err error) {
 	r.errMtx.Lock()
 	r.err = err
 	r.errMtx.Unlock()

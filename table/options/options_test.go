@@ -76,7 +76,11 @@ func TestSessionOptionsProfile(t *testing.T) {
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
-			testutil.Equal(t, pp.ExplicitPartitions.SplitPoints, []*Ydb.TypedValue{value.ToYDB(types.Int64Value(1))})
+			testutil.Equal(
+				t,
+				pp.ExplicitPartitions.SplitPoints,
+				[]*Ydb.TypedValue{value.ToYDB(types.Int64Value(1))},
+			)
 		}
 	}
 	{

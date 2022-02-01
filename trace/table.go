@@ -28,7 +28,8 @@ type (
 		// Pool events
 		OnPoolInit  func(PoolInitStartInfo) func(PoolInitDoneInfo)
 		OnPoolClose func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
-		OnPoolRetry func(PoolRetryStartInfo) func(info PoolRetryInternalInfo) func(PoolRetryDoneInfo)
+		OnPoolDo    func(PoolDoStartInfo) func(info PoolDoInternalInfo) func(PoolDoDoneInfo)
+		OnPoolDoTx  func(PoolDoTxStartInfo) func(info PoolDoTxInternalInfo) func(PoolDoTxDoneInfo)
 		// Pool session lifecycle events
 		OnPoolSessionNew   func(PoolSessionNewStartInfo) func(PoolSessionNewDoneInfo)
 		OnPoolSessionClose func(PoolSessionCloseStartInfo) func(PoolSessionCloseDoneInfo)
@@ -278,7 +279,7 @@ type (
 	PoolCloseDoneInfo struct {
 		Error error
 	}
-	PoolRetryStartInfo struct {
+	PoolDoStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -286,10 +287,24 @@ type (
 		Context    *context.Context
 		Idempotent bool
 	}
-	PoolRetryInternalInfo struct {
+	PoolDoInternalInfo struct {
 		Error error
 	}
-	PoolRetryDoneInfo struct {
+	PoolDoDoneInfo struct {
+		Attempts int
+		Error    error
+	}
+	PoolDoTxStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+	}
+	PoolDoTxInternalInfo struct {
+		Error error
+	}
+	PoolDoTxDoneInfo struct {
 		Attempts int
 		Error    error
 	}

@@ -2,10 +2,8 @@ package discovery
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"strconv"
-	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -13,26 +11,17 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type WhoAmI struct {
-	User   string
-	Groups []string
-}
-
-func (w WhoAmI) String() string {
-	return fmt.Sprintf("{User: %s, Groups: [%s]}", w.User, strings.Join(w.Groups, ","))
-}
-
-type Client interface {
-	Discover(ctx context.Context) ([]endpoint.Endpoint, error)
-	WhoAmI(ctx context.Context) (*WhoAmI, error)
-	Close(ctx context.Context) error
-}
-
-func New(conn grpc.ClientConnInterface, endpoint, database string, ssl bool, trace trace.Driver) Client {
+func New(
+	conn grpc.ClientConnInterface,
+	endpoint, database string,
+	ssl bool,
+	trace trace.Driver,
+) discovery.Client {
 	return &client{
 		trace:    trace,
 		endpoint: endpoint,
@@ -88,7 +77,7 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	return endpoints, nil
 }
 
-func (d *client) WhoAmI(ctx context.Context) (*WhoAmI, error) {
+func (d *client) WhoAmI(ctx context.Context) (*discovery.WhoAmI, error) {
 	request := Ydb_Discovery.WhoAmIRequest{}
 	response, err := d.service.WhoAmI(ctx, &request)
 	if err != nil {
@@ -99,7 +88,7 @@ func (d *client) WhoAmI(ctx context.Context) (*WhoAmI, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &WhoAmI{
+	return &discovery.WhoAmI{
 		User:   whoAmIResultResult.GetUser(),
 		Groups: whoAmIResultResult.GetGroups(),
 	}, nil
