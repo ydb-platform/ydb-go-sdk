@@ -5,7 +5,7 @@ package indexed
 //
 // This is a proxy type for preparing go1.18 type set constrains such as
 //   type Required interface {
-//     *~int8 | *~int64 | *~string
+//     *int8 | *int64 | *string | types.Scanner
 //   }
 type Required interface{}
 
@@ -14,7 +14,7 @@ type Required interface{}
 //
 // This is a proxy type for preparing go1.18 type set constrains such as
 //   type Optional interface {
-//     **~int8 | **~int64 | **~string
+//     **int8 | **int64 | **string | types.Scanner
 //   }
 // or alias such as
 //   type Optional *Required
