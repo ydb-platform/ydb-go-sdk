@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -77,10 +78,9 @@ func TestRetryerBadSession(t *testing.T) {
 			return s, nil
 		},
 	}
-
 	var (
-		maxRetryes = 100
 		i          int
+		maxRetryes = 100
 		sessions   []table.Session
 	)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -93,11 +93,52 @@ func TestRetryerBadSession(t *testing.T) {
 			if i > maxRetryes {
 				cancel()
 			}
-			return errors.NewOpError(errors.WithOEReason(errors.StatusBadSession))
+			return errors.NewOpError(
+				errors.WithOEReason(errors.StatusBadSession),
+			)
 		},
 	)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("unexpected error: %v", err)
+	}
+	seen := make(map[table.Session]bool, len(sessions))
+	for _, s := range sessions {
+		if seen[s] {
+			t.Errorf("session used twice")
+		} else {
+			seen[s] = true
+		}
+		if !closed[s] {
+			t.Errorf("bad session was not closed")
+		}
+	}
+}
+
+func TestRetryerSessionClosing(t *testing.T) {
+	closed := make(map[table.Session]bool)
+	p := SessionProviderFunc{
+		OnGet: func(ctx context.Context) (Session, error) {
+			s := simpleSession(t)
+			s.OnClose(func(context.Context) {
+				closed[s] = true
+			})
+			return s, nil
+		},
+	}
+	var sessions []table.Session
+	for i := 0; i < 1000; i++ {
+		err := do(
+			context.Background(),
+			p,
+			func(ctx context.Context, s table.Session) error {
+				sessions = append(sessions, s)
+				s.(*session).SetStatus(options.SessionClosing)
+				return nil
+			},
+		)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 	}
 	seen := make(map[table.Session]bool, len(sessions))
 	for _, s := range sessions {

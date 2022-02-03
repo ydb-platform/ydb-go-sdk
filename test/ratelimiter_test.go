@@ -141,6 +141,7 @@ func TestRatelimiter(t *testing.T) {
 		}
 	})
 	t.Run("AcquireResourceAmount=<1,false>", func(t *testing.T) {
+		time.Sleep(time.Second) // for accumulate
 		err := db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 1, false)
 		if err != nil {
 			t.Fatal(err)

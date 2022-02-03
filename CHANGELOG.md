@@ -8,6 +8,7 @@
 * Replaced abstract `interface{}` in `Scan` to `indexed.RequiredOrOptional`
 * Replaced abstract `interface{}` in `ScanWithDefaults` to `indexed.Required`
 * Replaced `trace.Table.OnPoolRetry` callback to `trace.Table.OnPoolDo` and `trace.Table.OnPoolDoTx` callbacks
+* Supports server hint `session-close` for gracefully shutdown session
 
 ## 3.7.2
 * Retry remove directory in `sugar.RemoveRecursive()` for retryable error

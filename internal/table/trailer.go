@@ -1,8 +1,6 @@
 package table
 
 import (
-	"sort"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -20,15 +18,12 @@ func (t *trailer) Trailer() grpc.CallOption {
 }
 
 func checkHintSessionClose(md metadata.MD) bool {
-	hints := md.Get(meta.MetaServerHints)
-	if len(hints) == 0 {
-		return false
+	for _, hint := range md.Get(meta.MetaServerHints) {
+		if hint == meta.MetaSessionClose {
+			return true
+		}
 	}
-	sort.Strings(hints)
-	return sort.SearchStrings(
-		md.Get(meta.MetaServerHints),
-		meta.MetaSessionClose,
-	) < len(hints)
+	return false
 }
 
 func (t *trailer) Check() {
