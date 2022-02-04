@@ -1,3 +1,9 @@
+## 3.8.5
+* Fixed version
+
+## 3.8.4
+* Fixed syntax error in `CHANGELOG.md`
+
 ## 3.8.3
 * Fixed `CHANGELOG.md`
 
