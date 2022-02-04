@@ -606,16 +606,19 @@ func TestTable(t *testing.T) {
 		})
 	})
 	t.Run("SessionsShutdown", func(t *testing.T) {
-		for _, url := range strings.Split(os.Getenv("YDB_SHUTDOWN_URLS"), ",") {
+		urls := strings.Split(os.Getenv("YDB_SHUTDOWN_URLS"), ",")
+		for _, url := range urls {
 			// nolint:gosec
 			_, err := http.Get(url)
 			if err != nil {
 				t.Fatalf("failed to send request: %v", err)
 			}
 		}
-		shutdownedMtx.Lock()
-		defer shutdownedMtx.Unlock()
-		shutdowned = true
+		if len(urls) > 0 {
+			shutdownedMtx.Lock()
+			defer shutdownedMtx.Unlock()
+			shutdowned = true
+		}
 	})
 	t.Run("SelectConcurrently", func(t *testing.T) {
 		wg := sync.WaitGroup{}
