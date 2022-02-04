@@ -29,12 +29,18 @@ var (
 	// ErrSessionUnknown is returned by a client instance to indicate that
 	// requested session does not exist within the client.
 	ErrSessionUnknown = errors.New("ydb: table: unknown session")
+
+	// ErrSessionShutdown is returned by a client instance to indicate that
+	// requested session is under shutdown.
+	ErrSessionShutdown = errors.New("ydb: table: session under shutdown")
+
+	// ErrNoProgress is returned by a client instance to indicate that
+	// operation could not be completed.
+	ErrNoProgress = errors.New("ydb: table: no progress")
 )
 
-// ErrNoProgress is returned by a client instance to indicate that
-// operation could not be completed.
-func ErrNoProgress(attempts int) error {
-	return fmt.Errorf("ydb: table: no progress (%d attempts)", attempts)
+func errNoProgress(attempts int) error {
+	return fmt.Errorf("ydb: table: no progress: %w (%d attempts)", ErrNoProgress, attempts)
 }
 
 // SessionBuilder is the interface that holds logic of creating sessions.
@@ -155,7 +161,7 @@ type createSessionResult struct {
 }
 
 // p.mu must NOT be held.
-func (c *client) createSession(ctx context.Context) (s Session, err error) {
+func (c *client) createSession(ctx context.Context) (Session, error) {
 	// pre-check the client size
 	c.mu.Lock()
 	enoughSpace := c.createInProgress+len(c.index) < c.limit
@@ -176,55 +182,40 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 			t = c.config.Trace().Compose(trace.ContextTable(ctx))
 		)
 
-		onDone := trace.TableOnPoolSessionNew(t, &ctx)
-		defer func() {
-			onDone(r.s, r.err)
-		}()
-
 		createSessionCtx, cancel := context.WithTimeout(
 			deadline.ContextWithoutDeadline(ctx),
 			c.config.CreateSessionTimeout(),
 		)
-
+		onDone := trace.TableOnPoolSessionNew(t, &ctx)
 		defer func() {
+			onDone(r.s, r.err)
 			cancel()
 			close(resCh)
 		}()
 
 		r.s, r.err = c.build(createSessionCtx)
-		// if session not nil - error must be nil and vice versa
 		if r.s == nil && r.err == nil {
 			panic("ydb: abnormal result of session build")
 		}
 
-		if r.err != nil {
-			c.mu.Lock()
-			c.createInProgress--
-			c.mu.Unlock()
-			resCh <- r
-			return
-		}
-
-		r.s.OnClose(func(ctx context.Context) {
-			c.mu.Lock()
-			defer c.mu.Unlock()
-			info, has := c.index[r.s]
-			if !has {
-				return
-			}
-
-			delete(c.index, r.s)
-			c.notify(nil)
-
-			if info.idle != nil {
-				panic("ydb: table: session closed while still in idle client")
-			}
-		})
-
-		// Slot for session already reserved early
 		c.mu.Lock()
-		c.index[r.s] = sessionInfo{}
 		c.createInProgress--
+		if r.s != nil {
+			r.s.OnClose(func(ctx context.Context) {
+				c.mu.Lock()
+				defer c.mu.Unlock()
+				info, has := c.index[r.s]
+				if !has {
+					return
+				}
+				delete(c.index, r.s)
+				c.notify(nil)
+				if info.idle != nil {
+					panic("ydb: table: session closed while still in idle client")
+				}
+			})
+			c.index[r.s] = sessionInfo{}
+		}
 		c.mu.Unlock()
 
 		resCh <- r
@@ -294,7 +285,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		s, err = c.waitFromCh(ctx, t)
 	}
 	if s == nil && err == nil {
-		err = ErrNoProgress(i)
+		err = errNoProgress(i)
 	}
 	return s, err
 }
@@ -370,6 +361,9 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 	case c.idle.Len() >= c.limit:
 		err = ErrSessionPoolOverflow
 
+	case s.isClosing():
+		err = ErrSessionShutdown
+
 	default:
 		if !c.notify(s) {
 			c.pushIdle(s, timeutil.Now())
@@ -378,10 +372,10 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 	c.mu.Unlock()
 
 	if err != nil {
-		_ = c.CloseSession(ctx, s)
+		_ = c.closeSession(ctx, s)
 	}
 
-	return
+	return err
 }
 
 // Take removes session from the client and ensures that s will not be returned
@@ -470,7 +464,7 @@ func (c *client) Create(ctx context.Context) (s Session, err error) {
 		return s, nil
 	}
 
-	return nil, ErrNoProgress(i)
+	return nil, errNoProgress(i)
 }
 
 // Close deletes all stored sessions inside client.
@@ -839,9 +833,13 @@ func (c *client) notify(s Session) (notified bool) {
 // instead of plain session.Close().
 // CloseSession must be fast. If necessary, can be async.
 func (c *client) CloseSession(ctx context.Context, s Session) error {
-	c.wgClosed.Add(1)
 	onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
 	defer onDone()
+	return c.closeSession(ctx, s)
+}
+
+func (c *client) closeSession(ctx context.Context, s Session) error {
+	c.wgClosed.Add(1)
 	fn := func() {
 		defer c.wgClosed.Done()
 		closeCtx, cancel := context.WithTimeout(

@@ -255,15 +255,17 @@ func retryBackoff(
 					return
 				}
 			}
-			if err = op(ctx, s); err == nil {
+			err = op(ctx, s)
+			if s.isClosing() {
+				_ = p.CloseSession(ctx, s)
+				s = nil
+			}
+			if err == nil {
 				return
 			}
 			m := retry.Check(err)
 			if m.StatusCode() != code {
 				i = 0
-			}
-			if s.isClosing() {
-				panic("azaza")
 			}
 			if m.MustDeleteSession() {
 				_ = p.CloseSession(ctx, s)

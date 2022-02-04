@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"testing"
 	"text/template"
@@ -123,7 +124,75 @@ func TestTable(t *testing.T) {
 			t.Fatalf("waited not a zero after closing pool: %d", s.waited)
 		}
 	})
-	limit := 5
+
+	var (
+		limit = 50
+
+		sessionsMtx sync.Mutex
+		sessions    = make(map[string]struct{}, limit)
+
+		shutdownedMtx sync.RWMutex
+		shutdowned    = false
+
+		shutdownTrace = trace.Table{
+			OnPoolSessionNew: func(
+				info trace.PoolSessionNewStartInfo,
+			) func(
+				trace.PoolSessionNewDoneInfo,
+			) {
+				return func(info trace.PoolSessionNewDoneInfo) {
+					shutdownedMtx.RLock()
+					defer shutdownedMtx.RUnlock()
+					if info.Session != nil && !shutdowned {
+						sessionsMtx.Lock()
+						defer sessionsMtx.Unlock()
+						sessions[info.Session.ID()] = struct{}{}
+					}
+				}
+			},
+			OnPoolSessionClose: func(
+				info trace.PoolSessionCloseStartInfo,
+			) func(
+				trace.PoolSessionCloseDoneInfo,
+			) {
+				sessionsMtx.Lock()
+				defer sessionsMtx.Unlock()
+				delete(sessions, info.Session.ID())
+				return nil
+			},
+			OnPoolGet: func(
+				info trace.PoolGetStartInfo,
+			) func(
+				trace.PoolGetDoneInfo,
+			) {
+				return func(info trace.PoolGetDoneInfo) {
+					if info.Session == nil {
+						return
+					}
+					shutdownedMtx.RLock()
+					defer shutdownedMtx.RUnlock()
+					if !shutdowned {
+						return
+					}
+					if info.Session.Status() != options.SessionClosing.String() {
+						return
+					}
+					sessionsMtx.Lock()
+					defer sessionsMtx.Unlock()
+					if _, has := sessions[info.Session.ID()]; !has {
+						return
+					}
+					t.Fatalf("old session returned from pool after shutdown")
+				}
+			},
+		}
+	)
+	defer func() {
+		if len(sessions) > 0 {
+			t.Fatalf("after close some shutdownd sessions are not removed from pool")
+		}
+	}()
+
 	db, err := ydb.New(
 		ctx,
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
@@ -175,44 +244,70 @@ func TestTable(t *testing.T) {
 			ydb.WithErrWriter(os.Stderr),
 			ydb.WithMinLevel(ydb.TRACE),
 		),
-		ydb.WithTraceTable(trace.Table{
-			OnSessionNew: func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
-				return func(info trace.SessionNewDoneInfo) {
-					if info.Error == nil {
-						s.addBalance(t, 1)
-					}
-				}
-			},
-			OnSessionDelete: func(info trace.SessionDeleteStartInfo) func(trace.SessionDeleteDoneInfo) {
-				return func(info trace.SessionDeleteDoneInfo) {
-					s.addBalance(t, -1)
-				}
-			},
-			OnPoolInit: func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
-				return func(info trace.PoolInitDoneInfo) {
-					s.Lock()
-					s.keepAliveMinSize = info.KeepAliveMinSize
-					s.limit = info.Limit
-					s.Unlock()
-				}
-			},
-			OnPoolGet: func(info trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
-				return func(info trace.PoolGetDoneInfo) {
-					if info.Error == nil {
-						s.addInFlight(t, 1)
-					}
-				}
-			},
-			OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
-				s.addInFlight(t, -1)
-				return nil
-			},
-			OnPoolSessionClose: func(info trace.PoolSessionCloseStartInfo) func(trace.PoolSessionCloseDoneInfo) {
-				return func(info trace.PoolSessionCloseDoneInfo) {
-					s.addInFlight(t, -1)
-				}
-			},
-		}),
+		ydb.WithTraceTable(
+			shutdownTrace.Compose(
+				trace.Table{
+					OnSessionNew: func(
+						info trace.SessionNewStartInfo,
+					) func(
+						trace.SessionNewDoneInfo,
+					) {
+						return func(info trace.SessionNewDoneInfo) {
+							if info.Error == nil {
+								s.addBalance(t, 1)
+							}
+						}
+					},
+					OnSessionDelete: func(
+						info trace.SessionDeleteStartInfo,
+					) func(
+						trace.SessionDeleteDoneInfo,
+					) {
+						s.addBalance(t, -1)
+						return nil
+					},
+					OnPoolInit: func(
+						info trace.PoolInitStartInfo,
+					) func(
+						trace.PoolInitDoneInfo,
+					) {
+						return func(info trace.PoolInitDoneInfo) {
+							s.Lock()
+							s.keepAliveMinSize = info.KeepAliveMinSize
+							s.limit = info.Limit
+							s.Unlock()
+						}
+					},
+					OnPoolGet: func(
+						info trace.PoolGetStartInfo,
+					) func(
+						trace.PoolGetDoneInfo,
+					) {
+						return func(info trace.PoolGetDoneInfo) {
+							if info.Error == nil {
+								s.addInFlight(t, 1)
+							}
+						}
+					},
+					OnPoolPut: func(
+						info trace.PoolPutStartInfo,
+					) func(
+						trace.PoolPutDoneInfo,
+					) {
+						s.addInFlight(t, -1)
+						return nil
+					},
+					OnPoolSessionClose: func(
+						info trace.PoolSessionCloseStartInfo,
+					) func(
+						trace.PoolSessionCloseDoneInfo,
+					) {
+						s.addInFlight(t, -1)
+						return nil
+					},
+				},
+			),
+		),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -415,12 +510,6 @@ func TestTable(t *testing.T) {
 			t.Fatalf("tx failed: %v\n", err)
 		}
 	})
-	t.Run("SessionsShutdown", func(t *testing.T) {
-		url := os.Getenv("YDB_SHUTDOWN_URL")
-		// nolint:gosec
-		_, err := http.Get(url)
-		t.Fatalf("failed to send request: %v", err)
-	})
 	t.Run("MultipleResultSets", func(t *testing.T) {
 		t.Run("CreateTable", func(t *testing.T) {
 			if err := db.Table().Do(
@@ -530,6 +619,18 @@ func TestTable(t *testing.T) {
 				t.Fatalf("scan select failed: %v\n", err)
 			}
 		})
+	})
+	t.Run("SessionsShutdown", func(t *testing.T) {
+		for _, url := range strings.Split(os.Getenv("YDB_SHUTDOWN_URLS"), ",") {
+			// nolint:gosec
+			_, err := http.Get(url)
+			if err != nil {
+				t.Fatalf("failed to send request: %v", err)
+			}
+		}
+		shutdownedMtx.Lock()
+		defer shutdownedMtx.Unlock()
+		shutdowned = true
 	})
 	t.Run("SelectConcurrently", func(t *testing.T) {
 		wg := sync.WaitGroup{}
