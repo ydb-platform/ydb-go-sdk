@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
@@ -499,64 +498,6 @@ func (s *session) Explain(
 	}, nil
 }
 
-// Statement is a prepared statement. Like a single session, it is not safe for
-// concurrent use by multiple goroutines.
-type Statement struct {
-	session *session
-	query   *dataQuery
-	params  map[string]*Ydb.Type
-}
-
-// Execute executes prepared data query.
-func (s *Statement) Execute(
-	ctx context.Context, tx *table.TransactionControl,
-	params *table.QueryParameters,
-	opts ...options.ExecuteDataQueryOption,
-) (
-	txr table.Transaction, r result.Result, err error,
-) {
-	onDone := trace.TableOnSessionQueryExecute(
-		s.session.trace,
-		&ctx,
-		s.session,
-		s.query,
-		params,
-	)
-	defer func() {
-		onDone(txr, true, r, err)
-	}()
-	return s.execute(ctx, tx, params, opts...)
-}
-
-// execute executes prepared query without any tracing.
-func (s *Statement) execute(
-	ctx context.Context, tx *table.TransactionControl,
-	params *table.QueryParameters,
-	opts ...options.ExecuteDataQueryOption,
-) (
-	txr table.Transaction, r result.Result, err error,
-) {
-	_, res, err := s.session.executeDataQuery(
-		ctx,
-		tx,
-		s.query,
-		params,
-		opts...,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	return s.session.executeQueryResult(res)
-}
-
-func (s *Statement) NumInput() int {
-	return len(s.params)
-}
-
-func (s *Statement) Text() string {
-	return s.query.YQL()
-}
-
 // Prepare prepares data query within session s.
 func (s *session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
 	var (
@@ -600,7 +541,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 
 	q = new(dataQuery)
 	q.initPrepared(result.QueryId)
-	stmt = &Statement{
+	stmt = &statement{
 		session: s,
 		query:   q,
 		params:  result.ParametersTypes,
@@ -644,11 +585,6 @@ func (s *session) Execute(
 	return s.executeQueryResult(result)
 }
 
-func keepInCache(req *Ydb_Table.ExecuteDataQueryRequest) bool {
-	p := req.QueryCachePolicy
-	return p != nil && p.KeepInCache
-}
-
 // executeQueryResult returns Transaction and result built from received
 // result.
 func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
@@ -656,7 +592,7 @@ func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
 	result.Result,
 	error,
 ) {
-	t := &Transaction{
+	t := &transaction{
 		id: res.GetTxMeta().GetId(),
 		s:  s,
 	}
@@ -1069,187 +1005,8 @@ func (s *session) BeginTransaction(
 	if err != nil {
 		return
 	}
-	return &Transaction{
+	return &transaction{
 		id: result.GetTxMeta().GetId(),
 		s:  s,
 	}, nil
-}
-
-// Transaction is a database transaction.
-// Hence session methods are not goroutine safe, Transaction is not goroutine
-// safe either.
-type Transaction struct {
-	id string
-	s  *session
-	c  *table.TransactionControl
-
-	committed bool
-}
-
-func (tx *Transaction) ID() string {
-	return tx.id
-}
-
-func (tx *Transaction) IsNil() bool {
-	return tx == nil
-}
-
-// Execute executes query represented by text within transaction tx.
-func (tx *Transaction) Execute(
-	ctx context.Context,
-	query string, params *table.QueryParameters,
-	opts ...options.ExecuteDataQueryOption,
-) (r result.Result, err error) {
-	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
-	return
-}
-
-// ExecuteStatement executes prepared statement stmt within transaction tx.
-func (tx *Transaction) ExecuteStatement(
-	ctx context.Context,
-	stmt table.Statement, params *table.QueryParameters,
-	opts ...options.ExecuteDataQueryOption,
-) (r result.Result, err error) {
-	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
-	return
-}
-
-// CommitTx commits specified active transaction.
-func (tx *Transaction) CommitTx(
-	ctx context.Context,
-	opts ...options.CommitTransactionOption,
-) (r result.Result, err error) {
-	if tx.committed {
-		return nil, errors.ErrAlreadyCommited
-	}
-	defer func() {
-		if err == nil {
-			tx.committed = true
-		}
-	}()
-	onDone := trace.TableOnSessionTransactionCommit(
-		tx.s.trace,
-		&ctx,
-		tx.s,
-		tx,
-	)
-	defer func() {
-		onDone(err)
-	}()
-	var (
-		request = &Ydb_Table.CommitTransactionRequest{
-			SessionId: tx.s.id,
-			TxId:      tx.id,
-		}
-		response *Ydb_Table.CommitTransactionResponse
-		result   = new(Ydb_Table.CommitTransactionResult)
-	)
-	for _, opt := range opts {
-		opt((*options.CommitTransactionDesc)(request))
-	}
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
-	t := tx.s.trailer()
-	defer t.processHints()
-	response, err = tx.s.tableService.CommitTransaction(
-		cluster.WithEndpoint(ctx, tx.s),
-		request,
-		t.Trailer(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		result,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return scanner.NewUnary(
-		nil,
-		result.GetQueryStats(),
-	), nil
-}
-
-// Rollback performs a rollback of the specified active transaction.
-func (tx *Transaction) Rollback(ctx context.Context) (err error) {
-	if tx.committed {
-		return nil
-	}
-	onDone := trace.TableOnSessionTransactionRollback(
-		tx.s.trace,
-		&ctx,
-		tx.s,
-		tx,
-	)
-	defer func() {
-		onDone(err)
-	}()
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
-	t := tx.s.trailer()
-	defer t.processHints()
-	_, err = tx.s.tableService.RollbackTransaction(
-		cluster.WithEndpoint(ctx, tx.s),
-		&Ydb_Table.RollbackTransactionRequest{
-			SessionId: tx.s.id,
-			TxId:      tx.id,
-		},
-		t.Trailer(),
-	)
-	return err
-}
-
-func (tx *Transaction) txc() *table.TransactionControl {
-	if tx.c == nil {
-		tx.c = table.TxControl(table.WithTx(tx))
-	}
-	return tx.c
-}
-
-type dataQuery struct {
-	query    Ydb_Table.Query
-	queryID  Ydb_Table.Query_Id
-	queryYQL Ydb_Table.Query_YqlText
-}
-
-func (q *dataQuery) String() string {
-	var emptyID Ydb_Table.Query_Id
-	if q.queryID == emptyID {
-		return q.queryYQL.YqlText
-	}
-	return q.queryID.Id
-}
-
-func (q *dataQuery) ID() string {
-	return q.queryID.Id
-}
-
-func (q *dataQuery) YQL() string {
-	return q.queryYQL.YqlText
-}
-
-func (q *dataQuery) initFromText(s string) {
-	q.queryID = Ydb_Table.Query_Id{} // Reset id field.
-	q.queryYQL.YqlText = s
-	q.query.Query = &q.queryYQL
-}
-
-func (q *dataQuery) initPrepared(id string) {
-	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
-	q.queryID.Id = id
-	q.query.Query = &q.queryID
-}
-
-func (q *dataQuery) initPreparedText(s, id string) {
-	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
-	q.queryYQL.YqlText = s
-
-	q.queryID = Ydb_Table.Query_Id{} // Reset id field.
-	q.queryID.Id = id
-
-	q.query.Query = &q.queryID // Prefer preared query.
 }
