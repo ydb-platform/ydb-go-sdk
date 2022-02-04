@@ -1020,9 +1020,10 @@ func TableOnPoolDo(t Table, c *context.Context, idempotent bool) func(error) fun
 		}
 	}
 }
-func TableOnPoolDoTx(t Table, c *context.Context) func(error) func(attempts int, _ error) {
+func TableOnPoolDoTx(t Table, c *context.Context, idempotent bool) func(error) func(attempts int, _ error) {
 	var p PoolDoTxStartInfo
 	p.Context = c
+	p.Idempotent = idempotent
 	res := t.onPoolDoTx(p)
 	return func(e error) func(int, error) {
 		var p PoolDoTxInternalInfo

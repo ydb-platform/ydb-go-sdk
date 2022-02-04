@@ -78,7 +78,7 @@ func parseOptions(ctx context.Context, opts ...retryOption) retryOptions {
 
 func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...retryOption) (err error) {
 	options := parseOptions(ctx, opts...)
-	attempts, onIntermediate := 0, trace.TableOnPoolDoTx(options.trace, &ctx)
+	attempts, onIntermediate := 0, trace.TableOnPoolDoTx(options.trace, &ctx, options.options.Idempotent)
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()

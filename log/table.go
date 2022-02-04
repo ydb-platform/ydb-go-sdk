@@ -65,28 +65,35 @@ func Table(log Logger, details trace.Details) trace.Table {
 		) func(
 			trace.PoolDoTxDoneInfo,
 		) {
-			log.Tracef(`doTx start`)
+			idempotent := info.Idempotent
+			log.Tracef(`doTx start {idempotent:%t}`,
+				idempotent,
+			)
 			start := time.Now()
 			return func(info trace.PoolDoTxInternalInfo) func(trace.PoolDoTxDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`doTx intermediate {latency:"%s"}`,
+					log.Tracef(`doTx intermediate {latency:"%s",idempotent:%t}`,
 						time.Since(start),
+						idempotent,
 					)
 				} else {
-					log.Debugf(`doTx intermediate {latency:"%s",error:"%v"}`,
+					log.Debugf(`doTx intermediate {latency:"%s",idempotent:%t,error:"%v"}`,
 						time.Since(start),
+						idempotent,
 						info.Error,
 					)
 				}
 				return func(info trace.PoolDoTxDoneInfo) {
 					if info.Error == nil {
-						log.Tracef(`doTx done {latency:"%s",attempts:%d}`,
+						log.Tracef(`doTx done {latency:"%s",idempotent:%t,attempts:%d}`,
 							time.Since(start),
+							idempotent,
 							info.Attempts,
 						)
 					} else {
-						log.Errorf(`doTx failed {latency:"%s",attempts:%d,error:"%v"}`,
+						log.Errorf(`doTx failed {latency:"%s",idempotent:%t,attempts:%d,error:"%v"}`,
 							time.Since(start),
+							idempotent,
 							info.Attempts,
 							info.Error,
 						)
