@@ -10,7 +10,7 @@
 ## 3.8.0
 * Added `table.result.Result.ScanNamed()` scan function
 * Changed connection secure to `true` by default
-* Renamed public package `balancer` tp `balancers` (this package contains only constructors of balancers)
+* Renamed public package `balancer` to `balancers` (this package contains only constructors of balancers)
 * Moved interfaces from package `internal/balancer/ibalancer` to `internal/balancer`
 * Added `NextResultSetErr()` func for select next result set and return error
 * Added package `table/result/indexed` with interfaces `indexed.Required`, `indexed.Optional`, `indexed.RequiredOrOptional`
