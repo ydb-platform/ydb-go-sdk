@@ -1,3 +1,6 @@
+## 3.8.8
+* Refactoring session shutdown test
+
 ## 3.8.7
 * Ignored session shutdown test if no defined `YDB_SHUTDOWN_URLS` environment variable
 

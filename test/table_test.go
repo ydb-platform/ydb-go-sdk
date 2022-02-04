@@ -606,22 +606,20 @@ func TestTable(t *testing.T) {
 		})
 	})
 	t.Run("SessionsShutdown", func(t *testing.T) {
-		urls := strings.Split(os.Getenv("YDB_SHUTDOWN_URLS"), ",")
-		for _, url := range urls {
-			url = strings.TrimSpace(url)
-			if len(url) > 0 {
-				// nolint:gosec
-				_, err := http.Get(url)
-				if err != nil {
-					t.Fatalf("failed to send request: %v", err)
-				}
+		urls := os.Getenv("YDB_SHUTDOWN_URLS")
+		if len(urls) == 0 {
+			t.Skip("skip test of session gracefull shutdown")
+		}
+		for _, url := range strings.Split(urls, ",") {
+			// nolint:gosec
+			_, err := http.Get(url)
+			if err != nil {
+				t.Fatalf("failed to send request: %v", err)
 			}
 		}
-		if len(urls) > 0 {
-			shutdownedMtx.Lock()
-			defer shutdownedMtx.Unlock()
-			shutdowned = true
-		}
+		shutdownedMtx.Lock()
+		defer shutdownedMtx.Unlock()
+		shutdowned = true
 	})
 	t.Run("SelectConcurrently", func(t *testing.T) {
 		wg := sync.WaitGroup{}
