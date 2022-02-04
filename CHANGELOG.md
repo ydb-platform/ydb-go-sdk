@@ -1,3 +1,12 @@
+## 3.8.3
+* Fixed `CHANGELOG.md`
+
+## 3.8.2
+* Updated `github.com/ydb-platform/ydb-go-genproto`
+
+## 3.8.1
+* Fixed `trace.Table.OnPoolDoTx` - added `Idempotent` flag to `trace.PoolDoTxStartInfo`
+
 ## 3.8.0
 * Added `table.result.Result.ScanNamed()` scan function
 * Changed connection secure to `true` by default
