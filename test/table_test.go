@@ -150,16 +150,6 @@ func TestTable(t *testing.T) {
 					}
 				}
 			},
-			OnPoolSessionClose: func(
-				info trace.PoolSessionCloseStartInfo,
-			) func(
-				trace.PoolSessionCloseDoneInfo,
-			) {
-				sessionsMtx.Lock()
-				defer sessionsMtx.Unlock()
-				delete(sessions, info.Session.ID())
-				return nil
-			},
 			OnPoolGet: func(
 				info trace.PoolGetStartInfo,
 			) func(
@@ -187,11 +177,6 @@ func TestTable(t *testing.T) {
 			},
 		}
 	)
-	defer func() {
-		if len(sessions) > 0 {
-			t.Fatalf("after close some shutdownd sessions are not removed from pool")
-		}
-	}()
 
 	db, err := ydb.New(
 		ctx,
