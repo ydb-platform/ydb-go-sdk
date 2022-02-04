@@ -177,14 +177,11 @@ func (s *session) Close(ctx context.Context) (err error) {
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
-	t := s.trailer()
-	defer t.Check()
 	_, err = s.tableService.DeleteSession(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.DeleteSessionRequest{
 			SessionId: s.id,
 		},
-		t.Trailer(),
 	)
 	return err
 }
@@ -204,7 +201,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	resp, err := s.tableService.KeepAlive(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.KeepAliveRequest{
@@ -245,7 +242,7 @@ func (s *session) CreateTable(
 		opt((*options.CreateTableDesc)(&request))
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	_, err = s.tableService.CreateTable(
 		cluster.WithEndpoint(ctx, s),
 		&request,
@@ -403,7 +400,7 @@ func (s *session) DropTable(
 		opt((*options.DropTableDesc)(&request))
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	_, err = s.tableService.DropTable(
 		cluster.WithEndpoint(ctx, s),
 		&request,
@@ -426,7 +423,7 @@ func (s *session) AlterTable(
 		opt((*options.AlterTableDesc)(&request))
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	_, err = s.tableService.AlterTable(
 		cluster.WithEndpoint(ctx, s),
 		&request,
@@ -450,7 +447,7 @@ func (s *session) CopyTable(
 		opt((*options.CopyTableDesc)(&request))
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	_, err = s.tableService.CopyTable(
 		cluster.WithEndpoint(ctx, s),
 		&request,
@@ -475,7 +472,7 @@ func (s *session) Explain(
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	response, err = s.tableService.ExplainDataQuery(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.ExplainDataQueryRequest{
@@ -581,7 +578,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	response, err = s.tableService.PrepareDataQuery(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.PrepareDataQueryRequest{
@@ -695,7 +692,7 @@ func (s *session) executeDataQuery(
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	response, err = s.tableService.ExecuteDataQuery(
 		cluster.WithEndpoint(ctx, s),
 		request,
@@ -725,7 +722,7 @@ func (s *session) ExecuteSchemeQuery(
 		opt((*options.ExecuteSchemeQueryDesc)(&request))
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	_, err = s.tableService.ExecuteSchemeQuery(
 		cluster.WithEndpoint(ctx, s),
 		&request,
@@ -745,7 +742,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 	)
 	request := Ydb_Table.DescribeTableOptionsRequest{}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	response, err = s.tableService.DescribeTableOptions(
 		cluster.WithEndpoint(ctx, s),
 		&request,
@@ -895,6 +892,12 @@ func (s *session) StreamReadTable(
 	)
 
 	onDone := trace.TableOnSessionQueryStreamRead(s.trace, &ctx, s)
+
+	if stream != nil && checkHintSessionClose(stream.Trailer()) {
+		s.SetStatus(options.SessionClosing)
+		err = ErrSessionShutdown
+	}
+
 	if err != nil {
 		cancel()
 		onDone(err)
@@ -969,6 +972,12 @@ func (s *session) StreamExecuteScanQuery(
 		q,
 		params,
 	)
+
+	if stream != nil && checkHintSessionClose(stream.Trailer()) {
+		s.SetStatus(options.SessionClosing)
+		err = ErrSessionShutdown
+	}
+
 	if err != nil {
 		cancel()
 		onDone(err)
@@ -1007,7 +1016,7 @@ func (s *session) StreamExecuteScanQuery(
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	_, err = s.tableService.BulkUpsert(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.BulkUpsertRequest{
@@ -1041,7 +1050,7 @@ func (s *session) BeginTransaction(
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	t := s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	response, err = s.tableService.BeginTransaction(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.BeginTransactionRequest{
@@ -1142,7 +1151,7 @@ func (tx *Transaction) CommitTx(
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	t := tx.s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	response, err = tx.s.tableService.CommitTransaction(
 		cluster.WithEndpoint(ctx, tx.s),
 		request,
@@ -1182,7 +1191,7 @@ func (tx *Transaction) Rollback(ctx context.Context) (err error) {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}
 	t := tx.s.trailer()
-	defer t.Check()
+	defer t.processHints()
 	_, err = tx.s.tableService.RollbackTransaction(
 		cluster.WithEndpoint(ctx, tx.s),
 		&Ydb_Table.RollbackTransactionRequest{

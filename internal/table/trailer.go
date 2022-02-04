@@ -26,8 +26,11 @@ func checkHintSessionClose(md metadata.MD) bool {
 	return false
 }
 
-func (t *trailer) Check() {
-	if checkHintSessionClose(t.md) {
+func (t *trailer) processHints() {
+	switch {
+	case checkHintSessionClose(t.md):
 		t.s.SetStatus(options.SessionClosing)
+	default:
+		// pass
 	}
 }
