@@ -1,3 +1,6 @@
+## 3.8.6
+* Added `ydb.WithInsecure()` option
+
 ## 3.8.5
 * Fixed version
 

@@ -77,6 +77,13 @@ func WithSecure(secure bool) Option {
 	}
 }
 
+func WithInsecure() Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithSecure(false))
+		return nil
+	}
+}
+
 type Level logger.Level
 
 const (
