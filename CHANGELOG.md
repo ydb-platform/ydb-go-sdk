@@ -1,3 +1,6 @@
+## 3.8.9
+* Removing debug print to log
+
 ## 3.8.8
 * Refactoring session shutdown test
 

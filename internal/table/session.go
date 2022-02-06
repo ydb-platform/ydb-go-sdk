@@ -2,7 +2,6 @@ package table
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"strconv"
 	"sync"
@@ -105,7 +104,6 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 		&Ydb_Table.CreateSessionRequest{},
 	)
 	if err != nil {
-		fmt.Println("exit 1")
 		return nil, err
 	}
 	err = proto.Unmarshal(
@@ -113,10 +111,8 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 		&result,
 	)
 	if err != nil {
-		fmt.Println("exit 2")
 		return nil, err
 	}
-	fmt.Println("exit 3")
 	return &session{
 		id:           result.GetSessionId(),
 		tableService: c,
