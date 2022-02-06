@@ -608,7 +608,7 @@ func TestTable(t *testing.T) {
 	t.Run("SessionsShutdown", func(t *testing.T) {
 		urls := os.Getenv("YDB_SHUTDOWN_URLS")
 		if len(urls) == 0 {
-			t.Skip("skip test of session gracefull shutdown")
+			t.Skip("skip test of session gracefully shutdown")
 		}
 		for _, url := range strings.Split(urls, ",") {
 			// nolint:gosec
