@@ -1,8 +1,14 @@
+## 3.8.11
+* Fixed version
+
+## 3.8.10
+* Fixed misspell linter issue
+
 ## 3.8.9
-* Removing debug print to log
+* Removed debug print to log
 
 ## 3.8.8
-* Refactoring session shutdown test
+* Refactored session shutdown test
 
 ## 3.8.7
 * Ignored session shutdown test if no defined `YDB_SHUTDOWN_URLS` environment variable
