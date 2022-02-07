@@ -1,3 +1,9 @@
+## 3.9.0
+* Removed `ydb.EndpointDatabase`, `ydb.ConnectionString` and `ydb.MustConnectionString` helpers
+* Removed `ydb.ConnectParams` struct and `ydb.WithConnectParams` option creator
+* Added internal package `dsn` for register external parsers and parse connection string
+* Added `ydb.RegisterParser` method for registering external parser of connection string
+
 ## 3.8.12
 * Unwrap sub-tests called as `t.Run(...)` in integration tests 
 * Updated `grpc` dependency (from `v1.38.0` to `v1.43.0`)

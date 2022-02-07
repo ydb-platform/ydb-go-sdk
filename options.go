@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
@@ -39,14 +40,20 @@ func WithUserAgent(userAgent string) Option {
 	}
 }
 
-func WithConnectionString(dsn string) Option {
+// WithConnectionString accept connection string like 'grpc[s]://{endpoint}/?database={database}'
+func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *connection) error {
-		params, err := ConnectionString(dsn)
+		options, err := dsn.Parse(connectionString)
 		if err != nil {
 			return err
 		}
-		return WithConnectParams(params)(ctx, c)
+		c.options = append(c.options, options...)
+		return nil
 	}
+}
+
+func RegisterParser(param string, parser func(value string) ([]config.Option, error)) error {
+	return dsn.Register(param, parser)
 }
 
 func WithConnectionTTL(ttl time.Duration) Option {
@@ -133,29 +140,6 @@ func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 			return err
 		}
 		return WithTraceTable(log.Table(l, details))(ctx, c)
-	}
-}
-
-func WithConnectParams(params ConnectParams) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.options = append(
-			c.options,
-			config.WithEndpoint(params.Endpoint()),
-			config.WithDatabase(params.Database()),
-			config.WithSecure(params.Secure()),
-		)
-		if params.Token() != "" {
-			c.options = append(
-				c.options,
-				config.WithCredentials(
-					credentials.NewAccessTokenCredentials(
-						params.Token(),
-						credentials.WithSourceInfo("config.WithConnectParams()"),
-					),
-				),
-			)
-		}
-		return nil
 	}
 }
 
