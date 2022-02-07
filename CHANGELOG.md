@@ -1,3 +1,8 @@
+## 3.8.12
+* Fixed `test.TestTable`
+* Updated `grpc` dependency (from `v1.38.0` to `v1.43.0`)
+* Updated `protobuf` dependency (from `v1.26.0` to `v1.27.1`)
+
 ## 3.8.11
 * Fixed version
 
