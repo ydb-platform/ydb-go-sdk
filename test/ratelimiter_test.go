@@ -67,11 +67,13 @@ func TestRatelimiter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// cleanup node
-	err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	defer func() {
+		// cleanup node
+		err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	// create resource
 	err = db.Ratelimiter().CreateResource(ctx, testCoordinationNodePath, public.Resource{
 		ResourcePath: testResource,
@@ -83,11 +85,13 @@ func TestRatelimiter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// cleanup resource
-	err = db.Ratelimiter().DropResource(ctx, testCoordinationNodePath, testResource)
-	if err != nil {
-		t.Fatal("Cannot drop resource")
-	}
+	defer func() {
+		// cleanup resource
+		err = db.Ratelimiter().DropResource(ctx, testCoordinationNodePath, testResource)
+		if err != nil {
+			t.Fatal("Cannot drop resource")
+		}
+	}()
 	// describe resource
 	described, err := db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
 	if err != nil {
