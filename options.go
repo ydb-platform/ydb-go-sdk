@@ -91,6 +91,13 @@ func WithInsecure() Option {
 	}
 }
 
+func WithMinTLSVersion(minVersion uint16) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithMinTLSVersion(minVersion))
+		return nil
+	}
+}
+
 type Level logger.Level
 
 const (

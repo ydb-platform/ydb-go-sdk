@@ -279,6 +279,12 @@ func WithRequestsType(requestsType string) Option {
 	}
 }
 
+func WithMinTLSVersion(minVersion uint16) Option {
+	return func(c *config) {
+		c.tlsConfig.MinVersion = minVersion
+	}
+}
+
 func WithGrpcOptions(option ...grpc.DialOption) Option {
 	return func(c *config) {
 		c.grpcOptions = append(c.grpcOptions, option...)
