@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 type lazyRatelimiter struct {
@@ -39,7 +40,9 @@ func (r *lazyRatelimiter) CreateResource(
 	resource ratelimiter.Resource,
 ) (err error) {
 	r.init()
-	return r.client.CreateResource(ctx, coordinationNodePath, resource)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return r.client.CreateResource(ctx, coordinationNodePath, resource)
+	})
 }
 
 func (r *lazyRatelimiter) AlterResource(
@@ -48,7 +51,9 @@ func (r *lazyRatelimiter) AlterResource(
 	resource ratelimiter.Resource,
 ) (err error) {
 	r.init()
-	return r.client.AlterResource(ctx, coordinationNodePath, resource)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return r.client.AlterResource(ctx, coordinationNodePath, resource)
+	})
 }
 
 func (r *lazyRatelimiter) DropResource(
@@ -57,7 +62,9 @@ func (r *lazyRatelimiter) DropResource(
 	resourcePath string,
 ) (err error) {
 	r.init()
-	return r.client.DropResource(ctx, coordinationNodePath, resourcePath)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return r.client.DropResource(ctx, coordinationNodePath, resourcePath)
+	})
 }
 
 func (r *lazyRatelimiter) ListResource(
@@ -65,18 +72,26 @@ func (r *lazyRatelimiter) ListResource(
 	coordinationNodePath string,
 	resourcePath string,
 	recursive bool,
-) (_ []string, err error) {
+) (paths []string, err error) {
 	r.init()
-	return r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
+	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		paths, err = r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
+		return err
+	})
+	return paths, err
 }
 
 func (r *lazyRatelimiter) DescribeResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
-) (_ *ratelimiter.Resource, err error) {
+) (resource *ratelimiter.Resource, err error) {
 	r.init()
-	return r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
+	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		resource, err = r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
+		return err
+	})
+	return resource, err
 }
 
 func (r *lazyRatelimiter) AcquireResource(
@@ -87,7 +102,9 @@ func (r *lazyRatelimiter) AcquireResource(
 	isUsedAmount bool,
 ) (err error) {
 	r.init()
-	return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
+	})
 }
 
 func (r *lazyRatelimiter) init() {
