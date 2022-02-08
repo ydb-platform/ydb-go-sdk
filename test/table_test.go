@@ -14,6 +14,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -30,6 +31,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+)
+
+const (
+	folder = "table_test"
 )
 
 type stats struct {
@@ -96,15 +101,7 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 
 // nolint:gocyclo
 func TestTable(t *testing.T) {
-	folder := "pool_health"
-
-	go func() {
-		if err := http.ListenAndServe(":8080", nil); err != nil {
-			panic(err)
-		}
-	}()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
 	defer cancel()
 
 	s := &stats{
@@ -131,8 +128,7 @@ func TestTable(t *testing.T) {
 		sessionsMtx sync.Mutex
 		sessions    = make(map[string]struct{}, limit)
 
-		shutdownedMtx sync.RWMutex
-		shutdowned    = false
+		shutdowned = uint32(0)
 
 		shutdownTrace = trace.Table{
 			OnPoolSessionNew: func(
@@ -141,9 +137,7 @@ func TestTable(t *testing.T) {
 				trace.PoolSessionNewDoneInfo,
 			) {
 				return func(info trace.PoolSessionNewDoneInfo) {
-					shutdownedMtx.RLock()
-					defer shutdownedMtx.RUnlock()
-					if info.Session != nil && !shutdowned {
+					if info.Session != nil && atomic.LoadUint32(&shutdowned) == 0 {
 						sessionsMtx.Lock()
 						defer sessionsMtx.Unlock()
 						sessions[info.Session.ID()] = struct{}{}
@@ -159,9 +153,7 @@ func TestTable(t *testing.T) {
 					if info.Session == nil {
 						return
 					}
-					shutdownedMtx.RLock()
-					defer shutdownedMtx.RUnlock()
-					if !shutdowned {
+					if atomic.LoadUint32(&shutdowned) == 0 {
 						return
 					}
 					if info.Session.Status() != options.SessionClosing.String() {
@@ -227,7 +219,7 @@ func TestTable(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.TRACE),
+			ydb.WithMinLevel(ydb.INFO),
 		),
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
@@ -297,245 +289,235 @@ func TestTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer t.Run("Cleanup", func(t *testing.T) {
+	defer func() {
+		// Cleanup
 		if e := db.Close(ctx); e != nil {
 			t.Fatalf("db close failed: %+v", e)
 		}
-	})
-	t.Run("Ping", func(t *testing.T) {
-		if err := db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
-			// hack for wait pool initializing
-			return nil
-		}); err != nil {
-			t.Fatalf("pool not initialized: %+v", err)
-		}
-	})
-	t.Run("PoolInitCheck", func(t *testing.T) {
-		if s.min() < 0 || s.max() != limit {
-			t.Fatalf("pool sizes not applied: %+v", s)
-		}
-	})
-	t.Run("PrepareScheme", func(t *testing.T) {
-		err := sugar.RemoveRecursive(ctx, db, folder)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = sugar.MakeRecursive(ctx, db, folder)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = describeTableOptions(ctx, db.Table())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = createTables(ctx, db.Table(), path.Join(db.Name(), folder))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "series"))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "seasons"))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "episodes"))
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("FillData", func(t *testing.T) {
-		if err := fill(ctx, db, folder); err != nil {
-			t.Fatalf("fillQuery failed: %v\n", err)
-		}
-	})
-	t.Run("UpsertWithTx", func(t *testing.T) {
-		if err := db.Table().DoTx(
-			ctx,
-			func(ctx context.Context, tx table.TransactionActor) (err error) {
-				var (
-					res   result.Result
-					views uint64
-				)
-				// select current value of `views`
-				res, err = tx.Execute(
-					ctx,
-					render(
-						querySelect,
-						templateConfig{
-							TablePathPrefix: path.Join(db.Name(), folder),
-						},
-					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
-					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
-					),
-				)
-				if err != nil {
-					return err
-				}
-				if err = res.NextResultSetErr(ctx); err != nil {
-					return err
-				}
-				if !res.NextRow() {
-					return fmt.Errorf("nothing rows")
-				}
-				if err = res.ScanNamed(
-					named.OptionalWithDefault("views", &views),
-				); err != nil {
-					return err
-				}
-				if err = res.Err(); err != nil {
-					return err
-				}
-				if err = res.Close(); err != nil {
-					return err
-				}
-				// increment `views`
-				res, err = tx.Execute(
-					ctx,
-					render(
-						queryUpsert,
-						templateConfig{
-							TablePathPrefix: path.Join(db.Name(), folder),
-						},
-					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
-						table.ValueParam("$views", types.Uint64Value(views+1)), // increment views
-					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
-					),
-				)
-				if err != nil {
-					return err
-				}
-				if err = res.Err(); err != nil {
-					return err
-				}
-				return res.Close()
-			},
-			table.WithTxSettings(
-				table.TxSettings(
-					table.WithSerializableReadWrite(),
+	}()
+	// Ping
+	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
+		// hack for wait pool initializing
+		return nil
+	}); err != nil {
+		t.Fatalf("pool not initialized: %+v", err)
+	}
+	// check pool init
+	if s.min() < 0 || s.max() != limit {
+		t.Fatalf("pool sizes not applied: %+v", s)
+	}
+	// prepare scheme
+	err = sugar.RemoveRecursive(ctx, db, folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = sugar.MakeRecursive(ctx, db, folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = describeTableOptions(ctx, db.Table())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = createTables(ctx, db.Table(), path.Join(db.Name(), folder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "series"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "seasons"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "episodes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// fill data
+	if err = fill(ctx, db, folder); err != nil {
+		t.Fatalf("fillQuery failed: %v\n", err)
+	}
+	// upsert with transaction
+	if err = db.Table().DoTx(
+		ctx,
+		func(ctx context.Context, tx table.TransactionActor) (err error) {
+			var (
+				res   result.Result
+				views uint64
+			)
+			// select current value of `views`
+			res, err = tx.Execute(
+				ctx,
+				render(
+					querySelect,
+					templateConfig{
+						TablePathPrefix: path.Join(db.Name(), folder),
+					},
 				),
-			),
-		); err != nil {
-			t.Fatalf("tx failed: %v\n", err)
-		}
-	})
-	t.Run("SelectUpsertedData", func(t *testing.T) {
-		if err := db.Table().Do(
-			ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				var (
-					res   result.Result
-					views uint64
-				)
-				// select current value of `views`
-				_, res, err = s.Execute(
-					ctx,
-					table.TxControl(
-						table.BeginTx(
-							table.WithOnlineReadOnly(),
-						),
-						table.CommitTx(),
-					),
-					render(
-						querySelect,
-						templateConfig{
-							TablePathPrefix: path.Join(db.Name(), folder),
-						},
-					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
-					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
-					),
-				)
-				if err != nil {
-					return err
-				}
-				if !res.NextResultSet(ctx, "views") {
-					return fmt.Errorf("nothing result sets")
-				}
-				if !res.NextRow() {
-					return fmt.Errorf("nothing result rows")
-				}
-				if err = res.ScanWithDefaults(&views); err != nil {
-					return err
-				}
-				if err = res.Err(); err != nil {
-					return err
-				}
-				if err = res.Close(); err != nil {
-					return err
-				}
-				if views != 1 {
-					return fmt.Errorf("unexpected views value: %d", views)
-				}
-				return nil
-			},
-		); err != nil {
-			t.Fatalf("tx failed: %v\n", err)
-		}
-	})
-	t.Run("MultipleResultSets", func(t *testing.T) {
-		t.Run("CreateTable", func(t *testing.T) {
-			if err := db.Table().Do(
-				ctx,
-				func(ctx context.Context, s table.Session) (err error) {
-					return s.ExecuteSchemeQuery(
-						ctx,
-						`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
-					)
-				},
+				table.NewQueryParameters(
+					table.ValueParam("$seriesID", types.Uint64Value(1)),
+					table.ValueParam("$seasonID", types.Uint64Value(1)),
+					table.ValueParam("$episodeID", types.Uint64Value(1)),
+				),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
+				),
+			)
+			if err != nil {
+				return err
+			}
+			if err = res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("nothing rows")
+			}
+			if err = res.ScanNamed(
+				named.OptionalWithDefault("views", &views),
 			); err != nil {
-				t.Fatalf("create table failed: %v\n", err)
+				return err
 			}
-		})
-		var (
-			upsertRowsCount = 40000
-			sum             uint64
-		)
-		t.Run("UpsertData", func(t *testing.T) {
-			values := make([]types.Value, 0, upsertRowsCount)
-			for i := 0; i < upsertRowsCount; i++ {
-				sum += uint64(i)
-				values = append(
-					values,
-					types.StructValue(
-						types.StructFieldValue("val", types.Int32Value(int32(i))),
-					),
-				)
+			if err = res.Err(); err != nil {
+				return err
 			}
-			if err := db.Table().Do(
+			if err = res.Close(); err != nil {
+				return err
+			}
+			// increment `views`
+			res, err = tx.Execute(
 				ctx,
-				func(ctx context.Context, s table.Session) (err error) {
-					_, _, err = s.Execute(
-						ctx,
-						table.TxControl(
-							table.BeginTx(
-								table.WithSerializableReadWrite(),
-							),
-							table.CommitTx(),
-						),
-						`
+				render(
+					queryUpsert,
+					templateConfig{
+						TablePathPrefix: path.Join(db.Name(), folder),
+					},
+				),
+				table.NewQueryParameters(
+					table.ValueParam("$seriesID", types.Uint64Value(1)),
+					table.ValueParam("$seasonID", types.Uint64Value(1)),
+					table.ValueParam("$episodeID", types.Uint64Value(1)),
+					table.ValueParam("$views", types.Uint64Value(views+1)), // increment views
+				),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
+				),
+			)
+			if err != nil {
+				return err
+			}
+			if err = res.Err(); err != nil {
+				return err
+			}
+			return res.Close()
+		},
+		table.WithTxSettings(
+			table.TxSettings(
+				table.WithSerializableReadWrite(),
+			),
+		),
+	); err != nil {
+		t.Fatalf("tx failed: %v\n", err)
+	}
+	// select upserted data
+	if err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			var (
+				res   result.Result
+				views uint64
+			)
+			// select current value of `views`
+			_, res, err = s.Execute(
+				ctx,
+				table.TxControl(
+					table.BeginTx(
+						table.WithOnlineReadOnly(),
+					),
+					table.CommitTx(),
+				),
+				render(
+					querySelect,
+					templateConfig{
+						TablePathPrefix: path.Join(db.Name(), folder),
+					},
+				),
+				table.NewQueryParameters(
+					table.ValueParam("$seriesID", types.Uint64Value(1)),
+					table.ValueParam("$seasonID", types.Uint64Value(1)),
+					table.ValueParam("$episodeID", types.Uint64Value(1)),
+				),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
+				),
+			)
+			if err != nil {
+				return err
+			}
+			if !res.NextResultSet(ctx, "views") {
+				return fmt.Errorf("nothing result sets")
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("nothing result rows")
+			}
+			if err = res.ScanWithDefaults(&views); err != nil {
+				return err
+			}
+			if err = res.Err(); err != nil {
+				return err
+			}
+			if err = res.Close(); err != nil {
+				return err
+			}
+			if views != 1 {
+				return fmt.Errorf("unexpected views value: %d", views)
+			}
+			return nil
+		},
+	); err != nil {
+		t.Fatalf("tx failed: %v\n", err)
+	}
+	// multiple result sets
+	// - create table
+	if err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			return s.ExecuteSchemeQuery(
+				ctx,
+				`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
+			)
+		},
+	); err != nil {
+		t.Fatalf("create table failed: %v\n", err)
+	}
+	var (
+		upsertRowsCount = 40000
+		sum             uint64
+	)
+	// - upsert data
+	values := make([]types.Value, 0, upsertRowsCount)
+	for i := 0; i < upsertRowsCount; i++ {
+		sum += uint64(i)
+		values = append(
+			values,
+			types.StructValue(
+				types.StructFieldValue("val", types.Int32Value(int32(i))),
+			),
+		)
+	}
+	if err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			_, _, err = s.Execute(
+				ctx,
+				table.TxControl(
+					table.BeginTx(
+						table.WithSerializableReadWrite(),
+					),
+					table.CommitTx(),
+				),
+				`
 						DECLARE $values AS List<Struct<
 							val: Int32,
 						> >;
@@ -545,121 +527,80 @@ func TestTable(t *testing.T) {
 						FROM
 							AS_TABLE($values);            
 						`,
-						table.NewQueryParameters(
-							table.ValueParam(
-								"$values",
-								types.ListValue(values...),
-							),
-						),
-					)
-					return err
-				},
-			); err != nil {
-				t.Fatalf("upsert failed: %v\n", err)
-			}
-		})
-		t.Run("ScanSelect", func(t *testing.T) {
-			if err := db.Table().Do(
+				table.NewQueryParameters(
+					table.ValueParam(
+						"$values",
+						types.ListValue(values...),
+					),
+				),
+			)
+			return err
+		},
+	); err != nil {
+		t.Fatalf("upsert failed: %v\n", err)
+	}
+	// - scan select
+	if err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			res, err := s.StreamExecuteScanQuery(
 				ctx,
-				func(ctx context.Context, s table.Session) (err error) {
-					res, err := s.StreamExecuteScanQuery(
-						ctx,
-						`
+				`
 							SELECT val FROM stream_query;
 						`,
-						table.NewQueryParameters(),
-					)
+				table.NewQueryParameters(),
+			)
+			if err != nil {
+				return err
+			}
+			var (
+				resultSetsCount = 0
+				rowsCount       = 0
+				checkSum        uint64
+			)
+			for res.NextResultSet(ctx, "val") {
+				resultSetsCount++
+				for res.NextRow() {
+					rowsCount++
+					var val *int32
+					err = res.Scan(&val)
 					if err != nil {
 						return err
 					}
-					var (
-						resultSetsCount = 0
-						rowsCount       = 0
-						checkSum        uint64
-					)
-					for res.NextResultSet(ctx, "val") {
-						resultSetsCount++
-						for res.NextRow() {
-							rowsCount++
-							var val *int32
-							err = res.Scan(&val)
-							if err != nil {
-								return err
-							}
-							checkSum += uint64(*val)
-						}
-					}
-					if rowsCount != upsertRowsCount {
-						return fmt.Errorf("wrong rows count: %v", rowsCount)
-					}
-					if sum != checkSum {
-						return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
-					}
-					if resultSetsCount <= 1 {
-						return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
-					}
-					return nil
-				},
-			); err != nil {
-				t.Fatalf("scan select failed: %v\n", err)
+					checkSum += uint64(*val)
+				}
 			}
-		})
-	})
-	t.Run("SessionsShutdown", func(t *testing.T) {
-		urls := os.Getenv("YDB_SHUTDOWN_URLS")
-		if len(urls) == 0 {
-			t.Skip("skip test of session gracefully shutdown")
-		}
+			if rowsCount != upsertRowsCount {
+				return fmt.Errorf("wrong rows count: %v", rowsCount)
+			}
+			if sum != checkSum {
+				return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
+			}
+			if resultSetsCount <= 1 {
+				return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
+			}
+			return nil
+		},
+	); err != nil {
+		t.Fatalf("scan select failed: %v\n", err)
+	}
+	// shutdown existing sessions
+	urls := os.Getenv("YDB_SHUTDOWN_URLS")
+	if len(urls) > 0 {
 		for _, url := range strings.Split(urls, ",") {
 			// nolint:gosec
-			_, err := http.Get(url)
+			_, err = http.Get(url)
 			if err != nil {
 				t.Fatalf("failed to send request: %v", err)
 			}
 		}
-		shutdownedMtx.Lock()
-		defer shutdownedMtx.Unlock()
-		shutdowned = true
-	})
-	t.Run("SelectConcurrently", func(t *testing.T) {
-		wg := sync.WaitGroup{}
-		for i := 0; i < limit; i++ {
-			wg.Add(3)
-			go t.Run("ExecuteDataQuery", func(t *testing.T) {
-				defer wg.Done()
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-						executeDataQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
-					}
-				}
-			})
-			go t.Run("ExecuteScanQuery", func(t *testing.T) {
-				defer wg.Done()
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-						executeScanQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
-					}
-				}
-			})
-			go t.Run("StreamReadTable", func(t *testing.T) {
-				defer wg.Done()
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-						streamReadTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
-					}
-				}
-			})
-		}
-		wg.Add(1)
+		atomic.StoreUint32(&shutdowned, 1)
+	}
+	// select concurrently
+	wg := sync.WaitGroup{}
+	for i := 0; i < limit; i++ {
+		wg.Add(3)
+		// ExecuteDataQuery
 		go func() {
 			defer wg.Done()
 			for {
@@ -667,12 +608,37 @@ func TestTable(t *testing.T) {
 				case <-ctx.Done():
 					return
 				default:
-					s.check(t)
+					executeDataQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
 				}
 			}
 		}()
-		wg.Wait()
-	})
+		// ExecuteScanQuery
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					executeScanQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
+				}
+			}
+		}()
+		// StreamReadTable
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					streamReadTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	s.check(t)
 }
 
 func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {

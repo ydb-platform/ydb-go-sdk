@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -241,7 +242,7 @@ func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
 				return nil, ctx.Err()
 			}
 		}),
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:    time.Second,

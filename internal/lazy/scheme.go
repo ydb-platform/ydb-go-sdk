@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
@@ -27,7 +28,9 @@ func (s *lazyScheme) ModifyPermissions(
 	opts ...scheme.PermissionsOption,
 ) (err error) {
 	s.init()
-	return s.client.ModifyPermissions(ctx, path, opts...)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return s.client.ModifyPermissions(ctx, path, opts...)
+	})
 }
 
 func (s *lazyScheme) Close(ctx context.Context) error {
@@ -52,20 +55,32 @@ func (s *lazyScheme) init() {
 
 func (s *lazyScheme) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
 	s.init()
-	return s.client.DescribePath(ctx, path)
+	err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		e, err = s.client.DescribePath(ctx, path)
+		return err
+	})
+	return e, err
 }
 
 func (s *lazyScheme) MakeDirectory(ctx context.Context, path string) (err error) {
 	s.init()
-	return s.client.MakeDirectory(ctx, path)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return s.client.MakeDirectory(ctx, path)
+	})
 }
 
 func (s *lazyScheme) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
 	s.init()
-	return s.client.ListDirectory(ctx, path)
+	err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		d, err = s.client.ListDirectory(ctx, path)
+		return err
+	})
+	return d, err
 }
 
 func (s *lazyScheme) RemoveDirectory(ctx context.Context, path string) (err error) {
 	s.init()
-	return s.client.RemoveDirectory(ctx, path)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return s.client.RemoveDirectory(ctx, path)
+	})
 }

@@ -1,3 +1,14 @@
+## 3.8.12
+* Unwrap sub-tests called as `t.Run(...)` in integration tests 
+* Updated `grpc` dependency (from `v1.38.0` to `v1.43.0`)
+* Updated `protobuf` dependency (from `v1.26.0` to `v1.27.1`)
+* Added internal retryers into `lazy.Ratelimiter`
+* Added internal retryers into `lazy.Coordination`
+* Added internal retryers into `lazy.Discovery`
+* Added internal retryers into `lazy.Scheme`
+* Added internal retryers into `lazy.Scripting`
+* Added internal retryer into `lazy.Table.CreateSession`
+
 ## 3.8.11
 * Fixed version
 

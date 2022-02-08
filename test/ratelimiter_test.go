@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	testCoordinationNodePath = "/local/test"
-	testResource             = "test_res"
+	testCoordinationNodePath = "/local/ratelimiter_test"
+	testResource             = "test_resource"
 )
 
 func TestRatelimiter(t *testing.T) {
@@ -42,121 +42,111 @@ func TestRatelimiter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer t.Run("CleanupConnection", func(t *testing.T) {
+	defer func() {
+		// cleanup connection
 		if e := db.Close(ctx); e != nil {
 			t.Fatalf("db close failed: %+v", e)
 		}
-	})
-	t.Run("DropNode", func(t *testing.T) {
-		err := db.Coordination().DropNode(ctx, testCoordinationNodePath)
-		if err != nil {
-			if d := ydb.TransportErrorDescription(err); d != nil && d.Code() == int32(errors.TransportErrorUnimplemented) {
-				return
-			}
-			if d := ydb.OperationErrorDescription(err); d != nil && d.Code() != int32(errors.StatusSchemeError) {
-				t.Fatal(err)
-			}
+	}()
+	// drop node
+	err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
+	if err != nil {
+		if d := ydb.OperationErrorDescription(err); d != nil && d.Code() != int32(errors.StatusSchemeError) {
+			t.Fatal(err)
 		}
+	}
+	// create node
+	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, cfg.Config{
+		Path:                     "",
+		SelfCheckPeriodMillis:    1000,
+		SessionGracePeriodMillis: 1000,
+		ReadConsistencyMode:      cfg.ConsistencyModeRelaxed,
+		AttachConsistencyMode:    cfg.ConsistencyModeRelaxed,
+		RatelimiterCountersMode:  cfg.RatelimiterCountersModeDetailed,
 	})
-	t.Run("CreateNode", func(t *testing.T) {
-		err := db.Coordination().CreateNode(ctx, testCoordinationNodePath, cfg.Config{
-			Path:                     "",
-			SelfCheckPeriodMillis:    1000,
-			SessionGracePeriodMillis: 1000,
-			ReadConsistencyMode:      cfg.ConsistencyModeRelaxed,
-			AttachConsistencyMode:    cfg.ConsistencyModeRelaxed,
-			RatelimiterCountersMode:  cfg.RatelimiterCountersModeDetailed,
-		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		// cleanup node
+		err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
 		if err != nil {
 			t.Fatal(err)
 		}
+	}()
+	// create resource
+	err = db.Ratelimiter().CreateResource(ctx, testCoordinationNodePath, public.Resource{
+		ResourcePath: testResource,
+		HierarchicalDrr: public.HierarchicalDrrSettings{
+			MaxUnitsPerSecond:       1,
+			MaxBurstSizeCoefficient: 2,
+		},
 	})
-	defer t.Run("CleanupNode", func(t *testing.T) {
-		err := db.Coordination().DropNode(ctx, testCoordinationNodePath)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("CreateResource", func(t *testing.T) {
-		err := db.Ratelimiter().CreateResource(ctx, testCoordinationNodePath, public.Resource{
-			ResourcePath: testResource,
-			HierarchicalDrr: public.HierarchicalDrrSettings{
-				MaxUnitsPerSecond:       1,
-				MaxBurstSizeCoefficient: 2,
-			},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	defer t.Run("CleanupResource", func(t *testing.T) {
-		err := db.Ratelimiter().DropResource(ctx, testCoordinationNodePath, testResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		// cleanup resource
+		err = db.Ratelimiter().DropResource(ctx, testCoordinationNodePath, testResource)
 		if err != nil {
 			t.Fatal("Cannot drop resource")
 		}
+	}()
+	// describe resource
+	described, err := db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if described == nil ||
+		described.ResourcePath != testResource ||
+		described.HierarchicalDrr.MaxUnitsPerSecond != 1.0 ||
+		described.HierarchicalDrr.MaxBurstSizeCoefficient != 2.0 {
+		t.Fatal("Resource invalid")
+	}
+	// alter resource
+	err = db.Ratelimiter().AlterResource(ctx, testCoordinationNodePath, public.Resource{
+		ResourcePath: testResource,
+		HierarchicalDrr: public.HierarchicalDrrSettings{
+			MaxUnitsPerSecond:       3,
+			MaxBurstSizeCoefficient: 4,
+		},
 	})
-	t.Run("DescribeResource", func(t *testing.T) {
-		described, err := db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if described == nil ||
-			described.ResourcePath != testResource ||
-			described.HierarchicalDrr.MaxUnitsPerSecond != 1.0 ||
-			described.HierarchicalDrr.MaxBurstSizeCoefficient != 2.0 {
-			t.Fatal("Resource invalid")
-		}
-	})
-	t.Run("AlterResource", func(t *testing.T) {
-		err := db.Ratelimiter().AlterResource(ctx, testCoordinationNodePath, public.Resource{
-			ResourcePath: testResource,
-			HierarchicalDrr: public.HierarchicalDrrSettings{
-				MaxUnitsPerSecond:       3,
-				MaxBurstSizeCoefficient: 4,
-			},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("CheckAlteredResource", func(t *testing.T) {
-		described, err := db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if described == nil ||
-			described.ResourcePath != testResource ||
-			described.HierarchicalDrr.MaxUnitsPerSecond != 3.0 ||
-			described.HierarchicalDrr.MaxBurstSizeCoefficient != 4.0 {
-			t.Fatal("Resource invalid")
-		}
-	})
-	t.Run("ListResource", func(t *testing.T) {
-		list, err := db.Ratelimiter().ListResource(ctx, testCoordinationNodePath, testResource, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(list) != 1 || list[0] != testResource {
-			t.Fatal("ListResource error")
-		}
-	})
-	t.Run("AcquireResourceAmount=<1,false>", func(t *testing.T) {
-		time.Sleep(time.Second) // for accumulate
-		err := db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 1, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("AcquireResourceAmount=<10000,true>", func(t *testing.T) {
-		err := db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-	t.Run("AcquireResourceAmount=<10000,false>", func(t *testing.T) {
-		err := db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, false)
-		if err == nil {
-			t.Fatal("Resource must not be acquired")
-		}
-	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// check altered resource
+	described, err = db.Ratelimiter().DescribeResource(ctx, testCoordinationNodePath, testResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if described == nil ||
+		described.ResourcePath != testResource ||
+		described.HierarchicalDrr.MaxUnitsPerSecond != 3.0 ||
+		described.HierarchicalDrr.MaxBurstSizeCoefficient != 4.0 {
+		t.Fatal("Resource invalid")
+	}
+	// list resource
+	list, err := db.Ratelimiter().ListResource(ctx, testCoordinationNodePath, testResource, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0] != testResource {
+		t.Fatal("ListResource error")
+	}
+	// acquire resource amount <1,false>
+	time.Sleep(time.Second) // for accumulate
+	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 1, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// acquire resource amount <10000,true>
+	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// acquire resource amount <10000,false>
+	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, false)
+	if err == nil {
+		t.Fatal("Resource must not be acquired")
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
@@ -24,29 +25,39 @@ func Coordination(db db.Connection) coordination.Client {
 
 func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config coordination.Config) (err error) {
 	c.init()
-	return c.client.CreateNode(ctx, path, config)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return c.client.CreateNode(ctx, path, config)
+	})
 }
 
 func (c *lazyCoordination) AlterNode(ctx context.Context, path string, config coordination.Config) (err error) {
 	c.init()
-	return c.client.AlterNode(ctx, path, config)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return c.client.AlterNode(ctx, path, config)
+	})
 }
 
 func (c *lazyCoordination) DropNode(ctx context.Context, path string) (err error) {
 	c.init()
-	return c.client.DropNode(ctx, path)
+	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		return c.client.DropNode(ctx, path)
+	})
 }
 
 func (c *lazyCoordination) DescribeNode(
 	ctx context.Context,
 	path string,
 ) (
-	_ *scheme.Entry,
-	_ *coordination.Config,
+	entry *scheme.Entry,
+	config *coordination.Config,
 	err error,
 ) {
 	c.init()
-	return c.client.DescribeNode(ctx, path)
+	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		entry, config, err = c.client.DescribeNode(ctx, path)
+		return err
+	})
+	return entry, config, err
 }
 
 func (c *lazyCoordination) Close(ctx context.Context) error {
