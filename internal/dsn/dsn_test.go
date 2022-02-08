@@ -1,17 +1,30 @@
-package ydb
+package dsn
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
+
+func init() {
+	_ = Register("token", func(token string) ([]config.Option, error) {
+		return []config.Option{
+			config.WithCredentials(
+				credentials.NewAccessTokenCredentials(token, ""),
+			),
+		}, nil
+	})
+}
 
 func TestParseConnectionString(t *testing.T) {
 	for _, test := range []struct {
 		connectionString string
-		schema           string
+		secure           bool
 		endpoint         string
 		database         string
 		token            string
@@ -20,7 +33,7 @@ func TestParseConnectionString(t *testing.T) {
 		{
 			"grpc://ydb-ru.yandex.net:2135/?" +
 				"database=/ru/home/gvit/mydb&token=123",
-			"grpc",
+			false,
 			"ydb-ru.yandex.net:2135",
 			"/ru/home/gvit/mydb",
 			"123",
@@ -29,7 +42,7 @@ func TestParseConnectionString(t *testing.T) {
 		{
 			"grpcs://ydb.serverless.yandexcloud.net:2135/?" +
 				"database=/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1&token=123",
-			"grpcs",
+			true,
 			"ydb.serverless.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
 			"123",
@@ -38,16 +51,15 @@ func TestParseConnectionString(t *testing.T) {
 		{
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/?" +
 				"database=/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv&token=123",
-			"grpcs",
+			true,
 			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 			"123",
 			nil,
 		},
 		{
-			"abcd://ydb-ru.yandex.net:2135/?" +
-				"database=/ru/home/gvit/mydb",
-			"",
+			"abcd://ydb-ru.yandex.net:2135/?database=/ru/home/gvit/mydb",
+			true,
 			"",
 			"",
 			"",
@@ -55,13 +67,23 @@ func TestParseConnectionString(t *testing.T) {
 		},
 	} {
 		t.Run(test.connectionString, func(t *testing.T) {
-			schema, endpoint, database, token, err := parseConnectionString(test.connectionString)
+			options, err := Parse(test.connectionString)
 			if !errors.Is(err, test.error) {
 				t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
 			}
-			testutil.Equal(t, test.schema, schema)
-			testutil.Equal(t, test.endpoint, endpoint)
-			testutil.Equal(t, test.database, database)
+			config := config.New(options...)
+			testutil.Equal(t, test.secure, config.Secure())
+			testutil.Equal(t, test.endpoint, config.Endpoint())
+			testutil.Equal(t, test.database, config.Database())
+			var token string
+			if credentials := config.Credentials(); credentials != nil {
+				token, err = credentials.Token(context.Background())
+				if err != nil {
+					t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
+				}
+			} else {
+				token = ""
+			}
 			testutil.Equal(t, test.token, token)
 		})
 	}
