@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -21,27 +22,39 @@ func (s *lazyScripting) Execute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
-) (result.Result, error) {
+) (res result.Result, err error) {
 	s.init()
-	return s.client.Execute(ctx, query, params)
+	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		res, err = s.client.Execute(ctx, query, params)
+		return err
+	})
+	return res, err
 }
 
 func (s *lazyScripting) Explain(
 	ctx context.Context,
 	query string,
 	mode scripting.ExplainMode,
-) (table.ScriptingYQLExplanation, error) {
+) (e table.ScriptingYQLExplanation, err error) {
 	s.init()
-	return s.client.Explain(ctx, query, mode)
+	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		e, err = s.client.Explain(ctx, query, mode)
+		return err
+	})
+	return e, err
 }
 
 func (s *lazyScripting) StreamExecute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
-) (result.StreamResult, error) {
+) (res result.StreamResult, err error) {
 	s.init()
-	return s.client.StreamExecute(ctx, query, params)
+	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+		res, err = s.client.StreamExecute(ctx, query, params)
+		return err
+	})
+	return res, err
 }
 
 func (s *lazyScripting) Close(ctx context.Context) error {

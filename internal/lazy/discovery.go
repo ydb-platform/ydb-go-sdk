@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -27,14 +28,22 @@ func Discovery(db db.Connection, trace trace.Driver) discovery.Client {
 	}
 }
 
-func (d *lazyDiscovery) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
+func (d *lazyDiscovery) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	d.init()
-	return d.client.Discover(ctx)
+	err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		endpoints, err = d.client.Discover(ctx)
+		return err
+	})
+	return endpoints, err
 }
 
-func (d *lazyDiscovery) WhoAmI(ctx context.Context) (*discovery.WhoAmI, error) {
+func (d *lazyDiscovery) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	d.init()
-	return d.client.WhoAmI(ctx)
+	err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		whoAmI, err = d.client.WhoAmI(ctx)
+		return err
+	})
+	return whoAmI, err
 }
 
 func (d *lazyDiscovery) Close(ctx context.Context) error {

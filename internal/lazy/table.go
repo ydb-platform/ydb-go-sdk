@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 )
@@ -26,7 +27,11 @@ func Table(db db.Connection, options []config.Option) table.Client {
 
 func (t *lazyTable) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
 	t.init(ctx)
-	return t.client.CreateSession(ctx)
+	err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		s, err = t.client.CreateSession(ctx)
+		return err
+	})
+	return s, err
 }
 
 func (t *lazyTable) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
