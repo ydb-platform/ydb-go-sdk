@@ -1,3 +1,6 @@
+## 3.9.1
+* Added `WithMinTLSVersion` option
+
 ## 3.9.0
 * Removed `ydb.EndpointDatabase`, `ydb.ConnectionString` and `ydb.MustConnectionString` helpers
 * Removed `ydb.ConnectParams` struct and `ydb.WithConnectParams` option creator

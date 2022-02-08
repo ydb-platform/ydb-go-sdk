@@ -5,6 +5,7 @@ package test
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"os"
 	"testing"
@@ -34,6 +35,7 @@ func TestScripting(t *testing.T) {
 		),
 		ydb.WithBalancer(balancers.SingleConn()),
 		ydb.WithConnectionTTL(time.Millisecond*10000),
+		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
 			trace.DriverConnEvents,
 			ydb.WithNamespace("ydb"),
