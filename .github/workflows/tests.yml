@@ -88,7 +88,7 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           file: ./e2e-table.txt
-          flags: e2e-table,integration,${{ matrix.os }},${{ matrix.go-version }}
+          flags: e2e-table,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
           name: e2e-table
   e2e-ratelimiter:
     strategy:
@@ -131,7 +131,7 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           file: ./e2e-ratelimiter.txt
-          flags: e2e-ratelimiter,integration,${{ matrix.os }},${{ matrix.go-version }}
+          flags: e2e-ratelimiter,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
           name: e2e-ratelimiter
   e2e-scripting:
     strategy:
@@ -174,5 +174,5 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           file: ./e2e-scripting.txt
-          flags: e2e-scripting,integration,${{ matrix.os }},${{ matrix.go-version }}
+          flags: e2e-scripting,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
           name: e2e-scripting
