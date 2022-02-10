@@ -209,6 +209,11 @@ func (c *client) createSession(ctx context.Context) (Session, error) {
 					return
 				}
 				delete(c.index, r.s)
+
+				if c.closed {
+					return
+				}
+
 				c.notify(nil)
 				if info.idle != nil {
 					panic("ydb: table: session closed while still in idle client")
@@ -354,6 +359,7 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 	}()
 
 	c.mu.Lock()
+
 	switch {
 	case c.closed:
 		err = ErrSessionPoolClosed
@@ -369,10 +375,18 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 			c.pushIdle(s, timeutil.Now())
 		}
 	}
+
 	c.mu.Unlock()
 
 	if err != nil {
-		_ = c.closeSession(ctx, s)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(
+			deadline.ContextWithoutDeadline(ctx),
+			c.config.DeleteTimeout(),
+		)
+		defer cancel()
+
+		_ = s.Close(ctx)
 	}
 
 	return err
@@ -482,39 +496,41 @@ func (c *client) Close(ctx context.Context) (err error) {
 	}
 
 	c.mu.Lock()
-	c.closed = true
+
 	keeperDone := c.keeperDone
 	if ch := c.keeperStop; ch != nil {
 		close(ch)
 	}
-	c.mu.Unlock()
 
 	if keeperDone != nil {
 		<-keeperDone
 	}
 
-	c.mu.Lock()
-	idle := c.idle
-	waitq := c.waitq
-	c.limit = 0
-	c.idle = list.New()
-	c.waitq = list.New()
-	c.index = make(map[Session]sessionInfo)
-	c.mu.Unlock()
-
-	for el := waitq.Front(); el != nil; el = el.Next() {
+	for el := c.waitq.Front(); el != nil; el = el.Next() {
 		ch := el.Value.(*chan Session)
 		close(*ch)
 	}
-	for e := idle.Front(); e != nil; e = e.Next() {
-		s := e.Value.(Session)
-		func() {
-			closeCtx, cancel := context.WithTimeout(deadline.ContextWithoutDeadline(ctx), c.config.DeleteTimeout())
-			_ = s.Close(closeCtx)
-			cancel()
-		}()
+
+	issues := make([]error, 0, len(c.index))
+
+	for e := c.idle.Front(); e != nil; e = e.Next() {
+		if err = c.closeSession(ctx, e.Value.(Session)); err != nil {
+			issues = append(issues, err)
+		}
 	}
+
+	c.closed = true
+
+	c.mu.Unlock()
+
 	c.wgClosed.Wait()
+
+	if len(issues) > 0 {
+		return errors.NewWithIssues(
+			"table client closed with issues",
+			issues...,
+		)
+	}
 
 	return nil
 }
@@ -835,25 +851,30 @@ func (c *client) notify(s Session) (notified bool) {
 func (c *client) CloseSession(ctx context.Context, s Session) error {
 	onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
 	defer onDone()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	return c.closeSession(ctx, s)
 }
 
+// closeSession is an async func which close session, but without `trace.OnPoolSessionClose` tracing
+// c.mu must be locked
 func (c *client) closeSession(ctx context.Context, s Session) error {
 	c.wgClosed.Add(1)
-	fn := func() {
+
+	go func() {
 		defer c.wgClosed.Done()
+
 		closeCtx, cancel := context.WithTimeout(
 			deadline.ContextWithoutDeadline(ctx),
 			c.config.DeleteTimeout(),
 		)
 		defer cancel()
+
 		_ = s.Close(closeCtx)
-	}
-	if c.isClosed() {
-		fn()
-	} else {
-		go fn()
-	}
+	}()
+
 	return nil
 }
 

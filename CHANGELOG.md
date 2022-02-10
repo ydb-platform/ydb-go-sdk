@@ -1,3 +1,6 @@
+## 3.9.4
+* Fixed data race on closing session pool
+
 ## 3.9.3
 * Fixed busy loop on call internal logger with external logger implementation of `log.Logger`
 
