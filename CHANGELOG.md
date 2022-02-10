@@ -1,3 +1,6 @@
+## 3.9.3
+* Fixed busy loop on call internal logger with external logger implementation of `log.Logger`
+
 ## 3.9.2
 * Fixed `WithDiscoveryInterval()` option with negative argument (must use `SingleConn` balancer)
 
