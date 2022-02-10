@@ -257,7 +257,11 @@ func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(c *config) {
-		c.discoveryInterval = discoveryInterval
+		if discoveryInterval <= 0 {
+			c.discoveryInterval = 0
+		} else {
+			c.discoveryInterval = discoveryInterval
+		}
 	}
 }
 

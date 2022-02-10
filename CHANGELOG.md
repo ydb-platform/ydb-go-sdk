@@ -1,3 +1,6 @@
+## 3.9.2
+* Fixed `WithDiscoveryInterval()` option with negative argument (must use `SingleConn` balancer)
+
 ## 3.9.1
 * Added `WithMinTLSVersion` option
 
