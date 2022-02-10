@@ -217,7 +217,7 @@ func (l *logger) Tracef(format string, args ...interface{}) {
 		return
 	}
 	if l.external != nil {
-		l.Tracef(l.format(format, TRACE), args...)
+		l.external.Tracef(l.format(format, TRACE), args...)
 	} else {
 		fmt.Fprintf(l.out, l.format(format, TRACE), args...)
 	}
@@ -228,7 +228,7 @@ func (l *logger) Debugf(format string, args ...interface{}) {
 		return
 	}
 	if l.external != nil {
-		l.Debugf(l.format(format, DEBUG), args...)
+		l.external.Debugf(l.format(format, DEBUG), args...)
 	} else {
 		fmt.Fprintf(l.out, l.format(format, DEBUG), args...)
 	}
@@ -239,7 +239,7 @@ func (l *logger) Infof(format string, args ...interface{}) {
 		return
 	}
 	if l.external != nil {
-		l.Infof(l.format(format, INFO), args...)
+		l.external.Infof(l.format(format, INFO), args...)
 	} else {
 		fmt.Fprintf(l.out, l.format(format, INFO), args...)
 	}
@@ -250,7 +250,7 @@ func (l *logger) Warnf(format string, args ...interface{}) {
 		return
 	}
 	if l.external != nil {
-		l.Warnf(l.format(format, WARN), args...)
+		l.external.Warnf(l.format(format, WARN), args...)
 	} else {
 		fmt.Fprintf(l.err, l.format(format, WARN), args...)
 	}
@@ -261,7 +261,7 @@ func (l *logger) Errorf(format string, args ...interface{}) {
 		return
 	}
 	if l.external != nil {
-		l.Errorf(l.format(format, ERROR), args...)
+		l.external.Errorf(l.format(format, ERROR), args...)
 	} else {
 		fmt.Fprintf(l.err, l.format(format, ERROR), args...)
 	}
@@ -272,7 +272,7 @@ func (l *logger) Fatalf(format string, args ...interface{}) {
 		return
 	}
 	if l.external != nil {
-		l.Fatalf(l.format(format, FATAL), args...)
+		l.external.Fatalf(l.format(format, FATAL), args...)
 	} else {
 		fmt.Fprintf(l.err, l.format(format, FATAL), args...)
 	}
