@@ -108,7 +108,7 @@ func TestTable(t *testing.T) {
 		keepAliveMinSize: math.MinInt32,
 		limit:            math.MaxInt32,
 	}
-	defer t.Run("CheckStats", func(t *testing.T) {
+	defer func() {
 		s.Lock()
 		defer s.Unlock()
 		if s.inFlight != 0 {
@@ -120,7 +120,7 @@ func TestTable(t *testing.T) {
 		if s.waited != 0 {
 			t.Fatalf("waited not a zero after closing pool: %d", s.waited)
 		}
-	})
+	}()
 
 	var (
 		limit = 50
@@ -289,23 +289,25 @@ func TestTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer func() {
-		// Cleanup
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("db close failed: %+v", e)
-		}
+		// cleanup
+		_ = db.Close(ctx)
 	}()
-	// Ping
+
+	// ping
 	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
 		// hack for wait pool initializing
 		return nil
 	}); err != nil {
 		t.Fatalf("pool not initialized: %+v", err)
 	}
+
 	// check pool init
 	if s.min() < 0 || s.max() != limit {
 		t.Fatalf("pool sizes not applied: %+v", s)
 	}
+
 	// prepare scheme
 	err = sugar.RemoveRecursive(ctx, db, folder)
 	if err != nil {
@@ -335,10 +337,12 @@ func TestTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	// fill data
 	if err = fill(ctx, db, folder); err != nil {
 		t.Fatalf("fillQuery failed: %v\n", err)
 	}
+
 	// upsert with transaction
 	if err = db.Table().DoTx(
 		ctx,
@@ -420,6 +424,7 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("tx failed: %v\n", err)
 	}
+
 	// select upserted data
 	if err = db.Table().Do(
 		ctx,
@@ -478,6 +483,7 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("tx failed: %v\n", err)
 	}
+
 	// multiple result sets
 	// - create table
 	if err = db.Table().Do(
@@ -495,6 +501,7 @@ func TestTable(t *testing.T) {
 		upsertRowsCount = 40000
 		sum             uint64
 	)
+
 	// - upsert data
 	values := make([]types.Value, 0, upsertRowsCount)
 	for i := 0; i < upsertRowsCount; i++ {
@@ -539,6 +546,7 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("upsert failed: %v\n", err)
 	}
+
 	// - scan select
 	if err = db.Table().Do(
 		ctx,
@@ -584,6 +592,7 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("scan select failed: %v\n", err)
 	}
+
 	// shutdown existing sessions
 	urls := os.Getenv("YDB_SHUTDOWN_URLS")
 	if len(urls) > 0 {
@@ -596,8 +605,10 @@ func TestTable(t *testing.T) {
 		}
 		atomic.StoreUint32(&shutdowned, 1)
 	}
+
 	// select concurrently
 	wg := sync.WaitGroup{}
+
 	for i := 0; i < limit; i++ {
 		wg.Add(3)
 		// ExecuteDataQuery
@@ -637,8 +648,8 @@ func TestTable(t *testing.T) {
 			}
 		}()
 	}
+
 	wg.Wait()
-	s.check(t)
 }
 
 func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
