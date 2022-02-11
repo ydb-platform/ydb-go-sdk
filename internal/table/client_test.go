@@ -17,6 +17,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -319,6 +320,62 @@ func TestSessionPoolClose(t *testing.T) {
 
 	if !closed3 {
 		t.Fatalf("session was not closed")
+	}
+}
+
+func TestRaceWgClosed(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
+	defer cancel()
+
+	defer func() {
+		if e := recover(); e != nil {
+			t.Fatal(e)
+		}
+	}()
+
+	limit := 100
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			t.Log("start")
+			wg := sync.WaitGroup{}
+			p := newClientWithStubBuilder(
+				t,
+				testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+					// nolint:unparam
+					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+						return &Ydb_Table.CreateSessionResult{
+							SessionId: testutil.SessionID(),
+						}, nil
+					},
+				})),
+				limit,
+				config.WithSizeLimit(limit),
+			)
+			for j := 0; j < limit*10; j++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for {
+						err := p.Do(
+							ctx,
+							func(ctx context.Context, s table.Session) error {
+								return nil
+							},
+						)
+						if errors.Is(err, ErrSessionPoolClosed) {
+							return
+						}
+					}
+				}()
+			}
+			_ = p.Close(context.Background())
+			wg.Wait()
+			t.Log("done")
+		}
 	}
 }
 
