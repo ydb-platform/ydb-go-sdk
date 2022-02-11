@@ -137,17 +137,15 @@ func WithErrWriter(err io.Writer) LoggerOption {
 }
 
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {
-	return func(ctx context.Context, c *connection) error {
-		nativeOpts := make([]logger.Option, 0, len(opts))
-		for _, o := range opts {
-			nativeOpts = append(nativeOpts, logger.Option(o))
-		}
-		l := logger.New(nativeOpts...)
-		if err := WithTraceDriver(log.Driver(l, details))(ctx, c); err != nil {
-			return err
-		}
-		return WithTraceTable(log.Table(l, details))(ctx, c)
+	loggerOpts := make([]logger.Option, 0, len(opts))
+	for _, o := range opts {
+		loggerOpts = append(loggerOpts, logger.Option(o))
 	}
+	l := logger.New(loggerOpts...)
+	return MergeOptions(
+		WithTraceDriver(log.Driver(l, details)),
+		WithTraceTable(log.Table(l, details)),
+	)
 }
 
 func WithAnonymousCredentials() Option {
