@@ -124,7 +124,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 			ctx, cancel = context.WithTimeout(ctx, dialTimeout)
 			defer cancel()
 		}
-		cc, err = grpc.DialContext(ctx, c.endpoint.Address(), c.config.GrpcDialOptions()...)
+		cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
 		if err != nil {
 			return nil, err
 		}
@@ -358,6 +358,7 @@ func (c *conn) NewStream(
 
 func New(endpoint endpoint.Endpoint, config Config) Conn {
 	c := &conn{
+		state:    Created,
 		endpoint: endpoint,
 		config:   config,
 		done:     make(chan struct{}),

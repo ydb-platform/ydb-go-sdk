@@ -13,7 +13,8 @@ const (
 	DriverNetEvents                             // 4
 	DriverCoreEvents                            // 8
 	DriverCredentialsEvents                     // 16
-	DriverDiscoveryEvents                       // 32
+
+	DiscoveryEvents // 32
 
 	TableSessionLifeCycleEvents     // 64
 	TableSessionQueryInvokeEvents   // 128
@@ -23,6 +24,16 @@ const (
 	TablePoolRetryEvents            // 2048
 	TablePoolSessionLifeCycleEvents // 4096
 	TablePoolAPIEvents              // 8192
+
+	SchemeEvents // 16384
+
+	ScriptingEvents // 32768
+
+	CoordinationEvents // 65536
+
+	RatelimiterEvents // 131072
+
+	RetryEvents // 65536
 
 	DriverConnEvents = DriverNetEvents |
 		DriverCoreEvents // 12
@@ -40,12 +51,14 @@ const (
 
 var (
 	detailsToString = map[Details]string{
-		DriverSystemEvents:              "DriverSystemEvents",
-		DriverClusterEvents:             "DriverClusterEvents",
-		DriverNetEvents:                 "DriverNetEvents",
-		DriverCoreEvents:                "DriverCoreEvents",
-		DriverCredentialsEvents:         "DriverCredentialsEvents",
-		DriverDiscoveryEvents:           "DriverDiscoveryEvents",
+		DriverSystemEvents:      "DriverSystemEvents",
+		DriverClusterEvents:     "DriverClusterEvents",
+		DriverNetEvents:         "DriverNetEvents",
+		DriverCoreEvents:        "DriverCoreEvents",
+		DriverCredentialsEvents: "DriverCredentialsEvents",
+
+		DiscoveryEvents: "DiscoveryEvents",
+
 		TableSessionLifeCycleEvents:     "TableSessionLifeCycleEvents",
 		TableSessionQueryInvokeEvents:   "TableSessionQueryInvokeEvents",
 		TableSessionQueryStreamEvents:   "TableSessionQueryStreamEvents",
@@ -56,12 +69,15 @@ var (
 		TablePoolAPIEvents:              "TablePoolAPIEvents",
 	}
 	stringToDetails = map[string]Details{
-		"DriverSystemEvents":              DriverSystemEvents,
-		"DriverClusterEvents":             DriverClusterEvents,
-		"DriverNetEvents":                 DriverNetEvents,
-		"DriverCoreEvents":                DriverCoreEvents,
-		"DriverCredentialsEvents":         DriverCredentialsEvents,
-		"DriverDiscoveryEvents":           DriverDiscoveryEvents,
+		"DriverSystemEvents":      DriverSystemEvents,
+		"DriverClusterEvents":     DriverClusterEvents,
+		"DriverNetEvents":         DriverNetEvents,
+		"DriverCoreEvents":        DriverCoreEvents,
+		"DriverCredentialsEvents": DriverCredentialsEvents,
+		"DriverConnEvents":        DriverConnEvents,
+
+		"DiscoveryEvents": DiscoveryEvents,
+
 		"TableSessionLifeCycleEvents":     TableSessionLifeCycleEvents,
 		"TableSessionQueryInvokeEvents":   TableSessionQueryInvokeEvents,
 		"TableSessionQueryStreamEvents":   TableSessionQueryStreamEvents,
@@ -70,11 +86,11 @@ var (
 		"TablePoolRetryEvents":            TablePoolRetryEvents,
 		"TablePoolSessionLifeCycleEvents": TablePoolSessionLifeCycleEvents,
 		"TablePoolAPIEvents":              TablePoolAPIEvents,
-		"DriverConnEvents":                DriverConnEvents,
 		"TableSessionQueryEvents":         TableSessionQueryEvents,
 		"TableSessionEvents":              TableSessionEvents,
 		"TablePoolEvents":                 TablePoolEvents,
-		"DetailsAll":                      DetailsAll,
+
+		"DetailsAll": DetailsAll,
 	}
 )
 

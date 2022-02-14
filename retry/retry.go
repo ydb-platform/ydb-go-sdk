@@ -61,23 +61,53 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 	return re
 }
 
+type retryOptionsHolder struct {
+	id    string
+	trace trace.Retry
+}
+
+type retryOption func(h *retryOptionsHolder)
+
+func WithID(id string) retryOption {
+	return func(h *retryOptionsHolder) {
+		h.id = id
+	}
+}
+
+// WithTrace returns discovery trace option
+func WithTrace(trace trace.Retry) retryOption {
+	return func(h *retryOptionsHolder) {
+		h.trace = trace
+	}
+}
+
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 // If you need to retry your op func on some logic errors - you must returns from op func RetryableError()
-func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (err error) {
+func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation, opts ...retryOption) (err error) {
+	h := &retryOptionsHolder{
+		trace: trace.ContextRetry(ctx),
+	}
+	for _, o := range opts {
+		o(h)
+	}
+
 	var (
 		i        int
 		attempts int
 
-		code   = int32(0)
-		start  = time.Now()
-		onDone = trace.RetryOnRetry(trace.ContextRetry(ctx), ctx)
+		code           = int32(0)
+		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id)
+		onDone         func(attempts int, _ error)
 	)
 	defer func() {
-		onDone(ctx, time.Since(start), err)
+		if onDone == nil {
+			onDone = onIntermediate(err)
+		}
+		onDone(attempts, err)
 	}()
 	for {
 		i++
@@ -88,6 +118,7 @@ func Retry(ctx context.Context, isIdempotentOperation bool, op retryOperation) (
 
 		default:
 			err = op(ctx)
+			onDone = onIntermediate(err)
 			if err == nil {
 				return
 			}

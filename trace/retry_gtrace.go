@@ -4,7 +4,6 @@ package trace
 
 import (
 	"context"
-	"time"
 )
 
 // Compose returns a new Retry which has functional fields composed
@@ -18,7 +17,7 @@ func (t Retry) Compose(x Retry) (ret Retry) {
 	default:
 		h1 := t.OnRetry
 		h2 := x.OnRetry
-		ret.OnRetry = func(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
+		ret.OnRetry = func(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
 			r1 := h1(r)
 			r2 := h2(r)
 			switch {
@@ -27,39 +26,67 @@ func (t Retry) Compose(x Retry) (ret Retry) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(r RetryLoopDoneInfo) {
-					r1(r)
-					r2(r)
+				return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
+					r11 := r1(r)
+					r21 := r2(r)
+					switch {
+					case r11 == nil:
+						return r21
+					case r21 == nil:
+						return r11
+					default:
+						return func(r RetryLoopDoneInfo) {
+							r11(r)
+							r21(r)
+						}
+					}
 				}
 			}
 		}
 	}
 	return ret
 }
-func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
+func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
 	fn := t.OnRetry
 	if fn == nil {
-		return func(RetryLoopDoneInfo) {
-			return
+		return func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
+			return func(RetryLoopDoneInfo) {
+				return
+			}
 		}
 	}
 	res := fn(r)
 	if res == nil {
-		return func(RetryLoopDoneInfo) {
-			return
+		return func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
+			return func(RetryLoopDoneInfo) {
+				return
+			}
 		}
 	}
-	return res
+	return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
+		res := res(r)
+		if res == nil {
+			return func(RetryLoopDoneInfo) {
+				return
+			}
+		}
+		return res
+	}
 }
-func RetryOnRetry(t Retry, c context.Context) func(_ context.Context, latency time.Duration, err error) {
+func RetryOnRetry(t Retry, c context.Context, iD string) func(error) func(attempts int, _ error) {
 	var p RetryLoopStartInfo
 	p.Context = c
+	p.ID = iD
 	res := t.onRetry(p)
-	return func(c context.Context, latency time.Duration, err error) {
-		var p RetryLoopDoneInfo
-		p.Context = c
-		p.Latency = latency
-		p.Err = err
-		res(p)
+	return func(e error) func(int, error) {
+		var p RetryLoopIntermediateInfo
+		p.Error = e
+		res := res(p)
+		return func(attempts int, e error) {
+			var p RetryLoopDoneInfo
+			p.Attempts = attempts
+			p.Error = e
+			res(p)
+		}
 	}
 }

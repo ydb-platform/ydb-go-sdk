@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 )
 
 type Client interface {
@@ -50,6 +51,7 @@ type Client interface {
 }
 
 type client struct {
+	config  config.Config
 	service Ydb_RateLimiter_V1.RateLimiterServiceClient
 }
 
@@ -57,8 +59,9 @@ func (c *client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface) Client {
+func New(cc grpc.ClientConnInterface, options []config.Option) Client {
 	return &client{
+		config:  config.New(options...),
 		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
 	}
 }

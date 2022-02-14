@@ -8,17 +8,20 @@ import (
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 )
 
 type lazyScheme struct {
-	db     db.Connection
-	client scheme.Client
-	m      sync.Mutex
+	db      db.Connection
+	options []config.Option
+	client  scheme.Client
+	m       sync.Mutex
 }
 
-func Scheme(db db.Connection) scheme.Client {
+func Scheme(db db.Connection, options []config.Option) scheme.Client {
 	return &lazyScheme{
-		db: db,
+		db:      db,
+		options: options,
 	}
 }
 
@@ -48,7 +51,7 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 func (s *lazyScheme) init() {
 	s.m.Lock()
 	if s.client == nil {
-		s.client = builder.New(s.db)
+		s.client = builder.New(s.db, s.options)
 	}
 	s.m.Unlock()
 }

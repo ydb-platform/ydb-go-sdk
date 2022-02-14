@@ -1,5 +1,7 @@
 package trace
 
+// tool gtrace used from repository github.com/asmyasnikov/cmd/gtrace
+
 //go:generate gtrace
 
 import (
@@ -37,9 +39,6 @@ type (
 
 		// Credentials events
 		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
-
-		// Discovery events
-		OnDiscovery func(DiscoveryStartInfo) func(DiscoveryDoneInfo)
 	}
 )
 
@@ -253,19 +252,6 @@ type (
 	GetCredentialsDoneInfo struct {
 		TokenOk bool
 		Error   error
-	}
-	DiscoveryStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Address string
-	}
-	DiscoveryDoneInfo struct {
-		Location  string
-		Endpoints []string
-		Error     error
 	}
 	InitStartInfo struct {
 		// Context make available context in trace callback function.

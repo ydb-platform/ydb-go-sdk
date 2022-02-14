@@ -4,6 +4,7 @@ type Endpoint struct {
 	id       uint32
 	address  string
 	location string
+	services []string
 
 	loadFactor float32
 	local      bool
@@ -13,7 +14,7 @@ func (e Endpoint) NodeID() uint32 {
 	return e.id
 }
 
-func (e Endpoint) Address() string {
+func (e Endpoint) Address() (address string) {
 	return e.address
 }
 
@@ -52,6 +53,12 @@ func WithLocalDC(local bool) option {
 func WithLoadFactor(loadFactor float32) option {
 	return func(e *Endpoint) {
 		e.loadFactor = loadFactor
+	}
+}
+
+func WithServices(services []string) option {
+	return func(e *Endpoint) {
+		e.services = append(e.services, services...)
 	}
 }
 

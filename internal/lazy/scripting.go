@@ -8,14 +8,16 @@ import (
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 )
 
 type lazyScripting struct {
-	db     db.Connection
-	client scripting.Client
-	m      sync.Mutex
+	db      db.Connection
+	options []config.Option
+	client  scripting.Client
+	m       sync.Mutex
 }
 
 func (s *lazyScripting) Execute(
@@ -69,16 +71,17 @@ func (s *lazyScripting) Close(ctx context.Context) error {
 	return s.client.Close(ctx)
 }
 
-func Scripting(db db.Connection) scripting.Client {
+func Scripting(db db.Connection, options []config.Option) scripting.Client {
 	return &lazyScripting{
-		db: db,
+		db:      db,
+		options: options,
 	}
 }
 
 func (s *lazyScripting) init() {
 	s.m.Lock()
 	if s.client == nil {
-		s.client = builder.New(s.db)
+		s.client = builder.New(s.db, s.options)
 	}
 	s.m.Unlock()
 }

@@ -15,9 +15,21 @@ import (
 
 type Pool interface {
 	closer.Closer
+	Pessimizer
+	PoolGetter
+}
 
-	Get(endpoint endpoint.Endpoint) Conn
+type PoolGetter interface {
+	GetConn(endpoint endpoint.Endpoint) Conn
+}
+
+type Pessimizer interface {
 	Pessimize(ctx context.Context, e endpoint.Endpoint) error
+}
+
+type PoolGetterCloser interface {
+	PoolGetter
+	closer.Closer
 }
 
 type PoolConfig interface {
@@ -29,28 +41,28 @@ type pool struct {
 	config Config
 	mtx    sync.RWMutex
 	opts   []grpc.DialOption
-	conns  map[endpoint.Endpoint]Conn
+	conns  map[string]Conn
 	done   chan struct{}
 }
 
 func (p *pool) Pessimize(ctx context.Context, e endpoint.Endpoint) error {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
-	if cc, ok := p.conns[e]; ok {
+	if cc, ok := p.conns[e.Address()]; ok {
 		cc.SetState(ctx, Banned)
 		return nil
 	}
 	panic(fmt.Sprintf("unknown endpoint %v", e))
 }
 
-func (p *pool) Get(endpoint endpoint.Endpoint) Conn {
+func (p *pool) GetConn(e endpoint.Endpoint) Conn {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
-	if cc, ok := p.conns[endpoint]; ok {
+	if cc, ok := p.conns[e.Address()]; ok {
 		return cc
 	}
-	cc := New(endpoint, p.config)
-	p.conns[endpoint] = cc
+	cc := New(e, p.config)
+	p.conns[e.Address()] = cc
 	return cc
 }
 
@@ -95,7 +107,7 @@ func NewPool(ctx context.Context, config Config) Pool {
 	p := &pool{
 		config: config,
 		opts:   config.GrpcDialOptions(),
-		conns:  make(map[endpoint.Endpoint]Conn),
+		conns:  make(map[string]Conn),
 		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {

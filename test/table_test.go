@@ -21,7 +21,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -486,6 +486,7 @@ func TestTable(t *testing.T) {
 
 	// multiple result sets
 	// - create table
+	log.Printf("> creating table stream_query...\n")
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -497,12 +498,15 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("create table failed: %v\n", err)
 	}
+	log.Printf("> table stream_query created\n")
+
 	var (
 		upsertRowsCount = 40000
 		sum             uint64
 	)
 
 	// - upsert data
+	log.Printf("> preparing values to upsert...\n")
 	values := make([]types.Value, 0, upsertRowsCount)
 	for i := 0; i < upsertRowsCount; i++ {
 		sum += uint64(i)
@@ -513,6 +517,9 @@ func TestTable(t *testing.T) {
 			),
 		)
 	}
+	log.Printf("> values to upsert prepared\n")
+
+	log.Printf("> upserting prepared values...\n")
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -546,8 +553,10 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("upsert failed: %v\n", err)
 	}
+	log.Printf("> prepared values upserted\n")
 
 	// - scan select
+	log.Printf("> scan-selecting values...\n")
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -581,21 +590,26 @@ func TestTable(t *testing.T) {
 			if rowsCount != upsertRowsCount {
 				return fmt.Errorf("wrong rows count: %v", rowsCount)
 			}
+
 			if sum != checkSum {
 				return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
 			}
+
 			if resultSetsCount <= 1 {
 				return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
 			}
-			return nil
+
+			return res.Err()
 		},
 	); err != nil {
 		t.Fatalf("scan select failed: %v\n", err)
 	}
+	log.Printf("> values selected\n")
 
 	// shutdown existing sessions
 	urls := os.Getenv("YDB_SHUTDOWN_URLS")
 	if len(urls) > 0 {
+		log.Printf("> shutdowning existing sessions...\n")
 		for _, url := range strings.Split(urls, ",") {
 			// nolint:gosec
 			_, err = http.Get(url)
@@ -604,9 +618,11 @@ func TestTable(t *testing.T) {
 			}
 		}
 		atomic.StoreUint32(&shutdowned, 1)
+		log.Printf("> existing sessions shutdowned\n")
 	}
 
 	// select concurrently
+	log.Printf("> concurrent quering...\n")
 	wg := sync.WaitGroup{}
 
 	for i := 0; i < limit; i++ {
@@ -650,6 +666,7 @@ func TestTable(t *testing.T) {
 	}
 
 	wg.Wait()
+	log.Printf("> concurrent quering done\n")
 }
 
 func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
@@ -684,7 +701,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 					log.Printf("  > %d %s %s", *id, *title, date.String())
 				}
 			}
-			if err := res.Err(); err != nil {
+			if err = res.Err(); err != nil {
 				return err
 			}
 			stats := res.Stats()
@@ -1125,6 +1142,10 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 }
 
 func fill(ctx context.Context, db ydb.Connection, folder string) error {
+	log.Printf("> filling tables\n")
+	defer func() {
+		log.Printf("> filling tables done\n")
+	}()
 	// prepare write transaction.
 	writeTx := table.TxControl(
 		table.BeginTx(

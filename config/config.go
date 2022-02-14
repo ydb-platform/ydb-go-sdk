@@ -14,10 +14,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-const (
-	DefaultDiscoveryInterval = time.Minute
-)
-
 // Config contains driver configuration options.
 type Config interface {
 	// Endpoint is a required starting endpoint for connect
@@ -60,12 +56,6 @@ type Config interface {
 	// If OperationCancelAfter is zero then no timeout is used.
 	OperationCancelAfter() time.Duration
 
-	// DiscoveryInterval is the frequency of background tasks of ydb endpoints
-	// discovery.
-	// If DiscoveryInterval is zero then the DefaultDiscoveryInterval is used.
-	// If DiscoveryInterval is negative, then no background discovery prepared.
-	DiscoveryInterval() time.Duration
-
 	// Balancer is an optional configuration related to selected balancer.
 	// That is, some balancing methods allow to be configured.
 	Balancer() balancer.Balancer
@@ -102,7 +92,6 @@ type config struct {
 	streamTimeout        time.Duration
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
-	discoveryInterval    time.Duration
 	dialTimeout          time.Duration
 	connectionTTL        time.Duration
 	balancer             balancer.Balancer
@@ -167,10 +156,6 @@ func (c *config) OperationTimeout() time.Duration {
 
 func (c *config) OperationCancelAfter() time.Duration {
 	return c.operationCancelAfter
-}
-
-func (c *config) DiscoveryInterval() time.Duration {
-	return c.discoveryInterval
 }
 
 func (c *config) Balancer() balancer.Balancer {
@@ -255,16 +240,6 @@ func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 	}
 }
 
-func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
-	return func(c *config) {
-		if discoveryInterval <= 0 {
-			c.discoveryInterval = 0
-		} else {
-			c.discoveryInterval = discoveryInterval
-		}
-	}
-}
-
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(c *config) {
 		c.dialTimeout = timeout
@@ -303,9 +278,6 @@ func New(opts ...Option) Config {
 	if !c.secure {
 		c.tlsConfig = nil
 	}
-	if c.discoveryInterval == 0 {
-		c.balancer = balancers.SingleConn()
-	}
 	c.meta = meta.New(
 		c.database,
 		c.credentials,
@@ -333,9 +305,8 @@ func certPool() (certPool *x509.CertPool) {
 
 func defaultConfig() (c *config) {
 	return &config{
-		discoveryInterval: DefaultDiscoveryInterval,
-		balancer:          balancers.Default(),
-		secure:            true,
+		balancer: balancers.Default(),
+		secure:   true,
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			RootCAs:    certPool(),

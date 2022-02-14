@@ -30,7 +30,7 @@ func TestRepeater(t *testing.T) {
 	r := repeater.NewRepeater(ctx, 42*time.Second,
 		func(_ context.Context) {
 			exec <- struct{}{}
-		}, nil)
+		})
 
 	timerC <- time.Now()
 	assertRecv(t, 500*time.Millisecond, exec)
@@ -63,7 +63,7 @@ func TestRepeaterCancellation(t *testing.T) {
 			enter <- struct{}{}
 			<-ctx.Done()
 			exit <- struct{}{}
-		}, nil)
+		})
 
 	// Run callback in a separate goroutine to avoid deadlock.
 	// That is, StubTimer run its function in the same goroutine as Emit

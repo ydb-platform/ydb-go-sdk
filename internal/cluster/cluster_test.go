@@ -32,6 +32,7 @@ func TestClusterFastRedial(t *testing.T) {
 
 	l, b := stub.Balancer()
 	c := &cluster{
+		config: config.New(),
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return listener.Dial(ctx)
 		},
@@ -60,7 +61,12 @@ func TestClusterFastRedial(t *testing.T) {
 		endpoint.New("foo:0"),
 		endpoint.New("bad:0"),
 	}
-	mergeEndpointIntoCluster(ctx, c, []endpoint.Endpoint{}, ne, WithConnConfig(config.New()))
+	mergeEndpointIntoCluster(
+		ctx,
+		c,
+		[]endpoint.Endpoint{},
+		ne,
+	)
 	select {
 	case <-pingConnects(len(ne)):
 
@@ -80,6 +86,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	}()
 
 	c := &cluster{
+		config: config.New(),
 		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
 			return ln.Dial(ctx)
 		},
@@ -141,7 +148,6 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			[]endpoint.Endpoint{},
 			ne,
-			WithConnConfig(config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -156,7 +162,6 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			append(endpoints, badEndpoints...),
 			ne,
-			WithConnConfig(config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -181,7 +186,6 @@ func TestClusterMergeEndpoints(t *testing.T) {
 			c,
 			nextBadEndpoints,
 			ne,
-			WithConnConfig(config.New()),
 		)
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
@@ -251,18 +255,18 @@ func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
 	)
 }
 
-func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []endpoint.Endpoint, opts ...option) {
+func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []endpoint.Endpoint) {
 	SortEndpoints(curr)
 	SortEndpoints(next)
 	DiffEndpoints(curr, next,
 		func(i, j int) {
-			c.Update(ctx, next[j], opts...)
+			c.Update(ctx, next[j])
 		},
 		func(i, j int) {
-			c.Insert(ctx, next[j], opts...)
+			c.Insert(ctx, next[j])
 		},
 		func(i, j int) {
-			c.Remove(ctx, curr[i], opts...)
+			c.Remove(ctx, curr[i])
 		},
 	)
 }

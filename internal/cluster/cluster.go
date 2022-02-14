@@ -11,7 +11,9 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -43,8 +45,8 @@ var (
 )
 
 type cluster struct {
-	pool     conn.Pool
-	trace    trace.Driver
+	config   config.Config
+	pool     conn.PoolGetterCloser
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
 	balancer balancer.Balancer
 	explorer repeater.Repeater
@@ -56,6 +58,10 @@ type cluster struct {
 	closed bool
 }
 
+func (c *cluster) GetConn(endpoint endpoint.Endpoint) conn.Conn {
+	return c.pool.GetConn(endpoint)
+}
+
 func (c *cluster) Force() {
 	c.explorer.Force()
 }
@@ -64,25 +70,43 @@ func (c *cluster) SetExplorer(repeater repeater.Repeater) {
 	c.explorer = repeater
 }
 
-type Cluster interface {
-	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...option)
-	Update(ctx context.Context, endpoint endpoint.Endpoint, opts ...option)
-	Get(ctx context.Context) (conn conn.Conn, err error)
+type CRUD interface {
+	Insert(ctx context.Context, endpoint endpoint.Endpoint) conn.Conn
+	Update(ctx context.Context, endpoint endpoint.Endpoint) conn.Conn
+	Remove(ctx context.Context, endpoint endpoint.Endpoint) conn.Conn
+	Get(ctx context.Context) (cc conn.Conn, err error)
+}
+
+type Pessimizer interface {
 	Pessimize(ctx context.Context, endpoint endpoint.Endpoint) error
-	Close(ctx context.Context) error
-	Remove(ctx context.Context, endpoint endpoint.Endpoint, wg ...option)
+}
+
+type Explorer interface {
 	SetExplorer(repeater repeater.Repeater)
 	Force()
 }
 
+type CRUDExplorer interface {
+	CRUD
+	Explorer
+}
+
+type Cluster interface {
+	closer.Closer
+	CRUD
+	Pessimizer
+	Explorer
+	conn.PoolGetter
+}
+
 func New(
-	pool conn.Pool,
-	trace trace.Driver,
+	ctx context.Context,
+	config config.Config,
 	balancer balancer.Balancer,
 ) Cluster {
 	return &cluster{
-		pool:      pool,
-		trace:     trace,
+		config:    config,
+		pool:      conn.NewPool(ctx, config),
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
 		balancer:  balancer,
@@ -112,12 +136,12 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 		}
 	}
 
-	return
+	return c.pool.Close(ctx)
 }
 
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
-func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
+func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
@@ -129,71 +153,48 @@ func (c *cluster) Get(ctx context.Context) (conn conn.Conn, err error) {
 		return nil, ErrClusterClosed
 	}
 
-	onDone := trace.DriverOnClusterGet(c.trace, &ctx)
+	onDone := trace.DriverOnClusterGet(c.config.Trace(), &ctx)
 	defer func() {
 		if err != nil {
 			onDone(nil, err)
 		} else {
-			onDone(conn.Endpoint(), nil)
+			onDone(cc.Endpoint(), nil)
 		}
 	}()
+
 	if e, ok := ContextEndpoint(ctx); ok {
-		if conn, ok = c.endpoints[e.NodeID()]; ok {
-			return conn, nil
+		if cc, ok = c.endpoints[e.NodeID()]; ok {
+			return cc, nil
 		}
 	}
 
-	conn = c.balancer.Next()
-	if conn == nil {
+	cc = c.balancer.Next()
+	if cc == nil {
 		return nil, ErrClusterEmpty
 	}
 
-	return conn, nil
-}
-
-type optionsHolder struct {
-	wg         *sync.WaitGroup
-	connConfig conn.Config
-}
-
-type option func(options *optionsHolder)
-
-func WithWG(wg *sync.WaitGroup) option {
-	return func(options *optionsHolder) {
-		options.wg = wg
-	}
-}
-
-func WithConnConfig(connConfig conn.Config) option {
-	return func(options *optionsHolder) {
-		options.connConfig = connConfig
-	}
+	return cc, nil
 }
 
 // Insert inserts new connection into the cluster.
-func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...option) {
-	holder := optionsHolder{}
-	for _, o := range opts {
-		o(&holder)
-	}
-	if holder.wg != nil {
-		defer holder.wg.Done()
-	}
+func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn) {
+	onDone := trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e)
+	defer func() {
+		if cc != nil {
+			onDone(cc.GetState())
+		} else {
+			onDone(conn.Unknown)
+		}
+	}()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.closed {
-		return
+		return nil
 	}
 
-	onDone := trace.DriverOnClusterInsert(c.trace, &ctx, e)
-
-	conn := c.pool.Get(e)
-
-	defer func() {
-		onDone(conn.GetState())
-	}()
+	cc = c.pool.GetConn(e)
 
 	_, has := c.index[e.Address()]
 	if has {
@@ -207,24 +208,26 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		}
 	}()
 
-	entry := entry.Entry{Conn: conn}
+	entry := entry.Entry{Conn: cc}
 	entry.InsertInto(c.balancer)
 	c.index[e.Address()] = entry
 	if e.NodeID() > 0 {
-		c.endpoints[e.NodeID()] = conn
+		c.endpoints[e.NodeID()] = cc
 	}
+
+	return cc
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
-func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...option) {
-	onDone := trace.DriverOnClusterUpdate(c.trace, &ctx, e)
-	holder := optionsHolder{}
-	for _, o := range opts {
-		o(&holder)
-	}
-	if holder.wg != nil {
-		defer holder.wg.Done()
-	}
+func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn) {
+	onDone := trace.DriverOnClusterUpdate(c.config.Trace(), &ctx, e)
+	defer func() {
+		if cc != nil {
+			onDone(cc.GetState())
+		} else {
+			onDone(conn.Unknown)
+		}
+	}()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -240,10 +243,6 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		panic("ydb: cluster entry with nil conn")
 	}
 
-	defer func() {
-		onDone(entry.Conn.GetState())
-	}()
-
 	delete(c.endpoints, e.NodeID())
 	c.index[e.Address()] = entry
 	if e.NodeID() > 0 {
@@ -253,17 +252,20 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, info.Info{})
 	}
+
+	return entry.Conn
 }
 
 // Remove removes and closes previously inserted connection.
-func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...option) {
-	holder := optionsHolder{}
-	for _, o := range opts {
-		o(&holder)
-	}
-	if holder.wg != nil {
-		defer holder.wg.Done()
-	}
+func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn) {
+	onDone := trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e)
+	defer func() {
+		if cc != nil {
+			onDone(cc.GetState())
+		} else {
+			onDone(conn.Unknown)
+		}
+	}()
 
 	c.mu.Lock()
 	if c.closed {
@@ -277,8 +279,6 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	onDone := trace.DriverOnClusterRemove(c.trace, &ctx, e)
-
 	entry.RemoveFrom(c.balancer)
 	delete(c.index, e.Address())
 	delete(c.endpoints, e.NodeID())
@@ -289,7 +289,8 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...optio
 		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
 		_ = entry.Conn.Close(ctx)
 	}
-	onDone(entry.Conn.GetState())
+
+	return entry.Conn
 }
 
 func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error) {

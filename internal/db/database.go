@@ -2,161 +2,92 @@ package db
 
 import (
 	"context"
-	"sync"
-	"time"
 
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
+	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type database struct {
-	config  config.Config
-	cluster cluster.Cluster
+	config    config.Config
+	cluster   cluster.Cluster
+	discovery discovery.Client
 }
 
-func (db *database) Close(ctx context.Context) error {
-	return db.cluster.Close(ctx)
+func (db *database) Discovery() discovery.Client {
+	return db.discovery
+}
+
+func (db *database) GetConn(endpoint endpoint.Endpoint) conn.Conn {
+	return db.cluster.GetConn(endpoint)
+}
+
+func (db *database) Close(ctx context.Context) (err error) {
+	issues := make([]error, 0, 2)
+
+	if err = db.discovery.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+
+	if err = db.cluster.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+
+	if len(issues) > 0 {
+		return errors.NewWithIssues("db close failed", issues...)
+	}
+
+	return nil
 }
 
 func New(
 	ctx context.Context,
-	cfg config.Config,
-	pool conn.Pool,
+	c config.Config,
+	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {
-	if cfg.Endpoint() == "" {
-		panic("empty dial address")
-	}
-	if cfg.Database() == "" {
-		panic("empty database")
-	}
-	ctx, err = cfg.Meta().Meta(ctx)
+	ctx, err = c.Meta().Meta(ctx)
 	if err != nil {
 		return nil, err
 	}
-	t := trace.ContextDriver(ctx).Compose(cfg.Trace())
-	onDone := trace.DriverOnInit(t, &ctx, cfg.Endpoint(), cfg.Database(), cfg.Secure())
+
+	t := trace.ContextDriver(ctx).Compose(c.Trace())
+	onDone := trace.DriverOnInit(t, &ctx, c.Endpoint(), c.Database(), c.Secure())
 	defer func() {
 		onDone(err)
 	}()
-	c := cluster.New(pool, t, cfg.Balancer())
+
+	db := &database{
+		config:  c,
+		cluster: cluster.New(ctx, c, c.Balancer()),
+	}
+
 	var cancel context.CancelFunc
-	if t := cfg.DialTimeout(); t > 0 {
-		ctx, cancel = context.WithTimeout(ctx, cfg.DialTimeout())
+	if t := c.DialTimeout(); t > 0 {
+		ctx, cancel = context.WithTimeout(ctx, c.DialTimeout())
 	} else {
 		ctx, cancel = context.WithCancel(ctx)
 	}
 	defer cancel()
-	if single.IsSingle(cfg.Balancer()) {
-		c.Insert(
-			ctx,
-			endpoint.New(cfg.Endpoint(), endpoint.WithLocalDC(true)),
-			cluster.WithConnConfig(cfg),
-		)
-	} else {
-		err = discover(ctx, cfg, pool, c)
-		if err != nil {
-			return nil, err
-		}
-	}
-	db := &database{
-		config:  cfg,
-		cluster: c,
-	}
-	return db, nil
-}
 
-func discover(ctx context.Context, cfg config.Config, pool conn.Pool, c cluster.Cluster) error {
-	cc := pool.Get(endpoint.New(cfg.Endpoint()))
-	t := trace.ContextDriver(ctx).Compose(cfg.Trace())
-	client := discovery.New(cc, cfg.Endpoint(), cfg.Database(), cfg.Secure(), t)
-	curr, err := client.Discover(ctx)
-	if err != nil {
-		_ = cc.Close(ctx)
-		return err
-	}
-	// Endpoints must be sorted to merge
-	cluster.SortEndpoints(curr)
-	wg := &sync.WaitGroup{}
-	wg.Add(len(curr))
-	for _, e := range curr {
-		go c.Insert(
-			ctx,
-			e,
-			cluster.WithWG(wg),
-			cluster.WithConnConfig(cfg),
-		)
-	}
-	wg.Wait()
-	c.SetExplorer(
-		repeater.NewRepeater(
-			deadline.ContextWithoutDeadline(ctx),
-			cfg.DiscoveryInterval(),
-			func(ctx context.Context) {
-				next, err := client.Discover(ctx)
-				// if nothing endpoint - re-discover after one second
-				// and use old endpoint list
-				if err != nil || len(next) == 0 {
-					go func() {
-						time.Sleep(time.Second)
-						c.Force()
-					}()
-					return
-				}
-				// NOTE: curr endpoints must be sorted here.
-				cluster.SortEndpoints(next)
-
-				waitGroup := new(sync.WaitGroup)
-				max := len(next) + len(curr)
-				waitGroup.Add(max) // set to max possible amount
-				actual := 0
-				cluster.DiffEndpoints(curr, next,
-					func(i, j int) {
-						actual++
-						// Endpoints are equal, but we still need to update meta
-						// data such that load factor and others.
-						go c.Update(
-							ctx,
-							next[j],
-							cluster.WithWG(waitGroup),
-						)
-					},
-					func(i, j int) {
-						actual++
-						go c.Insert(
-							ctx,
-							next[j],
-							cluster.WithWG(waitGroup),
-							cluster.WithConnConfig(cfg),
-						)
-					},
-					func(i, j int) {
-						actual++
-						go c.Remove(
-							ctx,
-							curr[i],
-							cluster.WithWG(waitGroup),
-						)
-					},
-				)
-				waitGroup.Add(actual - max) // adjust
-				waitGroup.Wait()
-				curr = next
-			},
-			func() {
-				_ = cc.Close(ctx)
-			},
-		),
+	db.discovery, err = builder.New(
+		ctx,
+		db.cluster.GetConn(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
+		db.cluster,
+		opts...,
 	)
-	return nil
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
 func (db *database) Endpoint() string {

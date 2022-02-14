@@ -462,7 +462,22 @@ func (s *session) Explain(
 	var (
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
+		onDone   = trace.TableOnSessionQueryExplain(
+			s.trace,
+			&ctx,
+			s,
+			query,
+		)
 	)
+
+	defer func() {
+		if err != nil {
+			onDone("", "", err)
+		} else {
+			onDone(exp.AST, exp.AST, nil)
+		}
+	}()
+
 	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
 		ctx = operation.WithMode(ctx, operation.ModeSync)
 	}

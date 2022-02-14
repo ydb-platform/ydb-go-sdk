@@ -7,18 +7,21 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 type lazyRatelimiter struct {
-	db     db.Connection
-	client ratelimiter.Client
-	m      sync.Mutex
+	db      db.Connection
+	options []config.Option
+	client  ratelimiter.Client
+	m       sync.Mutex
 }
 
-func Ratelimiter(db db.Connection) ratelimiter.Client {
+func Ratelimiter(db db.Connection, options []config.Option) ratelimiter.Client {
 	return &lazyRatelimiter{
-		db: db,
+		db:      db,
+		options: options,
 	}
 }
 
@@ -110,7 +113,7 @@ func (r *lazyRatelimiter) AcquireResource(
 func (r *lazyRatelimiter) init() {
 	r.m.Lock()
 	if r.client == nil {
-		r.client = builder.New(r.db)
+		r.client = builder.New(r.db, r.options)
 	}
 	r.m.Unlock()
 }

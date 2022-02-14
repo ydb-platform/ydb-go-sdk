@@ -10,9 +10,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 )
 
 type client struct {
+	config  config.Config
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
@@ -20,8 +22,9 @@ func (c *client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface) scheme.Client {
+func New(cc grpc.ClientConnInterface, options []config.Option) scheme.Client {
 	return &client{
+		config:  config.New(options...),
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
 	}
 }

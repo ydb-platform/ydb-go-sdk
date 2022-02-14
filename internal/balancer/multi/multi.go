@@ -23,14 +23,14 @@ type multi struct {
 	filter   []func(conn.Conn) bool
 }
 
-func (b *multi) Create() balancer.Balancer {
-	bb := b.balancer
+func (m *multi) Create() balancer.Balancer {
+	bb := m.balancer
 	for i := range bb {
 		bb[i] = bb[i].(balancer.Creator).Create()
 	}
 	return &multi{
 		balancer: bb,
-		filter:   b.filter,
+		filter:   m.filter,
 	}
 }
 
@@ -43,20 +43,20 @@ func WithBalancer(b balancer.Balancer, filter func(cc conn.Conn) bool) Option {
 
 type Option func(*multi)
 
-func (b *multi) Contains(x balancer.Element) bool {
+func (m *multi) Contains(x balancer.Element) bool {
 	for i, x := range x.(multiHandle).elements {
 		if x == nil {
 			continue
 		}
-		if b.balancer[i].Contains(x) {
+		if m.balancer[i].Contains(x) {
 			return true
 		}
 	}
 	return false
 }
 
-func (b *multi) Next() conn.Conn {
-	for _, b := range b.balancer {
+func (m *multi) Next() conn.Conn {
+	for _, b := range m.balancer {
 		if c := b.Next(); c != nil {
 			return c
 		}
@@ -64,32 +64,32 @@ func (b *multi) Next() conn.Conn {
 	return nil
 }
 
-func (b *multi) Insert(conn conn.Conn) balancer.Element {
-	n := len(b.filter)
+func (m *multi) Insert(conn conn.Conn) balancer.Element {
+	n := len(m.filter)
 	h := multiHandle{
 		elements: make([]balancer.Element, n),
 	}
-	for i, f := range b.filter {
+	for i, f := range m.filter {
 		if f(conn) {
-			x := b.balancer[i].Insert(conn)
+			x := m.balancer[i].Insert(conn)
 			h.elements[i] = x
 		}
 	}
 	return h
 }
 
-func (b *multi) Update(x balancer.Element, info info.Info) {
+func (m *multi) Update(x balancer.Element, info info.Info) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
-			b.balancer[i].Update(x, info)
+			m.balancer[i].Update(x, info)
 		}
 	}
 }
 
-func (b *multi) Remove(x balancer.Element) {
+func (m *multi) Remove(x balancer.Element) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
-			b.balancer[i].Remove(x)
+			m.balancer[i].Remove(x)
 		}
 	}
 }

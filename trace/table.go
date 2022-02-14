@@ -4,6 +4,8 @@ import (
 	"context"
 )
 
+// tool gtrace used from repository github.com/asmyasnikov/cmd/gtrace
+
 //go:generate gtrace
 
 type (
@@ -16,11 +18,24 @@ type (
 		OnSessionDelete    func(SessionDeleteStartInfo) func(SessionDeleteDoneInfo)
 		OnSessionKeepAlive func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
 		// Query events
-		OnSessionQueryPrepare func(SessionQueryPrepareStartInfo) func(PrepareDataQueryDoneInfo)
-		OnSessionQueryExecute func(ExecuteDataQueryStartInfo) func(SessionQueryPrepareDoneInfo)
+		OnSessionQueryPrepare func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo)
+		OnSessionQueryExecute func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo)
+		OnSessionQueryExplain func(ExplainQueryStartInfo) func(ExplainQueryDoneInfo)
 		// Stream events
-		OnSessionQueryStreamExecute func(SessionQueryStreamExecuteStartInfo) func(SessionQueryStreamExecuteDoneInfo)
-		OnSessionQueryStreamRead    func(SessionQueryStreamReadStartInfo) func(SessionQueryStreamReadDoneInfo)
+		OnSessionQueryStreamExecute func(
+			SessionQueryStreamExecuteStartInfo,
+		) func(
+			SessionQueryStreamExecuteIntermediateInfo,
+		) func(
+			SessionQueryStreamExecuteDoneInfo,
+		)
+		OnSessionQueryStreamRead func(
+			SessionQueryStreamReadStartInfo,
+		) func(
+			SessionQueryStreamReadIntermediateInfo,
+		) func(
+			SessionQueryStreamReadDoneInfo,
+		)
 		// Transaction events
 		OnSessionTransactionBegin    func(SessionTransactionBeginStartInfo) func(SessionTransactionBeginDoneInfo)
 		OnSessionTransactionCommit   func(SessionTransactionCommitStartInfo) func(SessionTransactionCommitDoneInfo)
@@ -28,8 +43,8 @@ type (
 		// Pool events
 		OnPoolInit  func(PoolInitStartInfo) func(PoolInitDoneInfo)
 		OnPoolClose func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
-		OnPoolDo    func(PoolDoStartInfo) func(info PoolDoInternalInfo) func(PoolDoDoneInfo)
-		OnPoolDoTx  func(PoolDoTxStartInfo) func(info PoolDoTxInternalInfo) func(PoolDoTxDoneInfo)
+		OnPoolDo    func(PoolDoStartInfo) func(info PoolDoIntermediateInfo) func(PoolDoDoneInfo)
+		OnPoolDoTx  func(PoolDoTxStartInfo) func(info PoolDoTxIntermediateInfo) func(PoolDoTxDoneInfo)
 		// Pool session lifecycle events
 		OnPoolSessionNew   func(PoolSessionNewStartInfo) func(PoolSessionNewDoneInfo)
 		OnPoolSessionClose func(PoolSessionCloseStartInfo) func(PoolSessionCloseDoneInfo)
@@ -99,7 +114,7 @@ type (
 	SessionDeleteDoneInfo struct {
 		Error error
 	}
-	SessionQueryPrepareStartInfo struct {
+	PrepareDataQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -122,7 +137,17 @@ type (
 		Query      dataQuery
 		Parameters queryParameters
 	}
-	SessionQueryPrepareDoneInfo struct {
+	ExplainQueryStartInfo struct {
+		Context *context.Context
+		Session sessionInfo
+		Query   string
+	}
+	ExplainQueryDoneInfo struct {
+		AST   string
+		Plan  string
+		Error error
+	}
+	ExecuteDataQueryDoneInfo struct {
 		Tx       transactionInfo
 		Prepared bool
 		Result   result
@@ -136,6 +161,9 @@ type (
 		Context *context.Context
 		Session sessionInfo
 	}
+	SessionQueryStreamReadIntermediateInfo struct {
+		Error error
+	}
 	SessionQueryStreamReadDoneInfo struct {
 		Error error
 	}
@@ -148,6 +176,9 @@ type (
 		Session    sessionInfo
 		Query      dataQuery
 		Parameters queryParameters
+	}
+	SessionQueryStreamExecuteIntermediateInfo struct {
+		Error error
 	}
 	SessionQueryStreamExecuteDoneInfo struct {
 		Error error
@@ -287,7 +318,7 @@ type (
 		Context    *context.Context
 		Idempotent bool
 	}
-	PoolDoInternalInfo struct {
+	PoolDoIntermediateInfo struct {
 		Error error
 	}
 	PoolDoDoneInfo struct {
@@ -302,7 +333,7 @@ type (
 		Context    *context.Context
 		Idempotent bool
 	}
-	PoolDoTxInternalInfo struct {
+	PoolDoTxIntermediateInfo struct {
 		Error error
 	}
 	PoolDoTxDoneInfo struct {

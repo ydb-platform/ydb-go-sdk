@@ -9,18 +9,23 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/proxy"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
+	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -29,7 +34,8 @@ import (
 // Connection interface provide access to YDB service clients
 // Interface and list of clients may be changed in the future
 type Connection interface {
-	db.Connection
+	closer.Closer
+	db.ConnectionInfo
 
 	// Table returns table client with options from Connection instance.
 	// Options provide options replacement for requested table client
@@ -63,30 +69,35 @@ type Connection interface {
 }
 
 type connection struct {
-	config       config.Config
-	options      []config.Option
-	tableOptions []tableConfig.Option
-	scripting    scripting.Client
+	config  config.Config
+	options []config.Option
 
 	table        table.Client
-	scheme       scheme.Client
-	discovery    discovery.Client
-	coordination coordination.Client
-	rateLimiter  ratelimiter.Client
+	tableOptions []tableConfig.Option
 
-	conns conn.Pool
-	mtx   sync.Mutex
-	db    db.Connection
+	scripting        scripting.Client
+	scriptingOptions []scriptingConfig.Option
+
+	scheme        scheme.Client
+	schemeOptions []schemeConfig.Option
+
+	discoveryOptions []discoveryConfig.Option
+
+	coordination        coordination.Client
+	coordinationOptions []coordinationConfig.Option
+
+	ratelimiter        ratelimiter.Client
+	ratelimiterOptions []ratelimiterConfig.Option
+
+	mtx sync.Mutex
+	db  db.Connection
 }
 
 func (c *connection) Close(ctx context.Context) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 	var issues []error
-	if err := c.discovery.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-	if err := c.rateLimiter.Close(ctx); err != nil {
+	if err := c.ratelimiter.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 	if err := c.coordination.Close(ctx); err != nil {
@@ -102,9 +113,6 @@ func (c *connection) Close(ctx context.Context) error {
 		issues = append(issues, err)
 	}
 	if err := c.db.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-	if err := c.conns.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 	if len(issues) > 0 {
@@ -167,16 +175,16 @@ func (c *connection) Coordination(opts ...CustomOption) coordination.Client {
 
 func (c *connection) Ratelimiter(opts ...CustomOption) ratelimiter.Client {
 	if len(opts) == 0 {
-		return c.rateLimiter
+		return c.ratelimiter
 	}
-	return proxy.Ratelimiter(c.rateLimiter, c.meta(opts...))
+	return proxy.Ratelimiter(c.ratelimiter, c.meta(opts...))
 }
 
 func (c *connection) Discovery(opts ...CustomOption) discovery.Client {
 	if len(opts) == 0 {
-		return c.discovery
+		return c.db.Discovery()
 	}
-	return proxy.Discovery(c.discovery, c.meta(opts...))
+	return proxy.Discovery(c.db.Discovery(), c.meta(opts...))
 }
 
 func (c *connection) Scripting(opts ...CustomOption) scripting.Client {
@@ -205,17 +213,14 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}
 	if logLevel, has := os.LookupEnv("YDB_LOG_SEVERITY_LEVEL"); has {
 		if l := logger.FromString(logLevel); l < logger.QUIET {
-			logger := logger.New(
-				logger.WithNamespace("ydb"),
-				logger.WithMinLevel(logger.FromString(logLevel)),
-				logger.WithNoColor(os.Getenv("YDB_LOG_NO_COLOR") != ""),
-			)
 			opts = append(
-				[]Option{
-					WithTraceDriver(log.Driver(logger, trace.DetailsAll)),
-					WithTraceTable(log.Table(logger, trace.DetailsAll)),
-				},
-				opts...,
+				opts,
+				WithLogger(
+					trace.DetailsAll,
+					WithNamespace("ydb"),
+					WithMinLevel(Level(logger.FromString(logLevel))),
+					WithNoColor(os.Getenv("YDB_LOG_NO_COLOR") != ""),
+				),
 			)
 		}
 	}
@@ -226,16 +231,42 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		}
 	}
 	c.config = config.New(c.options...)
-	c.conns = conn.NewPool(ctx, c.config)
-	c.db, err = db.New(ctx, c.config, c.conns)
+	if c.config.Endpoint() == "" {
+		panic("empty dial address")
+	}
+	if c.config.Database() == "" {
+		panic("empty database")
+	}
+
+	if single.IsSingle(c.config.Balancer()) {
+		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithInterval(0))
+	}
+
+	c.db, err = db.New(
+		ctx,
+		c.config,
+		append(
+			[]discoveryConfig.Option{
+				discoveryConfig.WithEndpoint(c.Endpoint()),
+				discoveryConfig.WithDatabase(c.Name()),
+				discoveryConfig.WithSecure(c.Secure()),
+			},
+			c.discoveryOptions...,
+		)...,
+	)
 	if err != nil {
 		return nil, err
 	}
+
 	c.table = lazy.Table(c.db, c.tableOptions)
-	c.scheme = lazy.Scheme(c.db)
-	c.scripting = lazy.Scripting(c.db)
-	c.discovery = lazy.Discovery(c.db, c.config.Trace())
-	c.coordination = lazy.Coordination(c.db)
-	c.rateLimiter = lazy.Ratelimiter(c.db)
+
+	c.scheme = lazy.Scheme(c.db, c.schemeOptions)
+
+	c.scripting = lazy.Scripting(c.db, c.scriptingOptions)
+
+	c.coordination = lazy.Coordination(c.db, c.coordinationOptions)
+
+	c.ratelimiter = lazy.Ratelimiter(c.db, c.ratelimiterOptions)
+
 	return c, nil
 }

@@ -1,24 +1,28 @@
 package trace
 
+// tool gtrace used from repository github.com/asmyasnikov/cmd/gtrace
+
 //go:generate gtrace
 
 import (
 	"context"
-	"time"
 )
 
 type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Retry struct {
-		OnRetry func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
+		OnRetry func(RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
 	}
 	RetryLoopStartInfo struct {
 		Context context.Context
+		ID      string
+	}
+	RetryLoopIntermediateInfo struct {
+		Error error
 	}
 	RetryLoopDoneInfo struct {
-		Context context.Context
-		Latency time.Duration
-		Err     error
+		Attempts int
+		Error    error
 	}
 )

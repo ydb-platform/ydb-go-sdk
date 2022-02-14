@@ -308,14 +308,26 @@ func TestRetryContextDeadline(t *testing.T) {
 			t.Run(fmt.Sprintf("Timeout=%v,Sleep=%v", timeout, sleep), func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
+				start := time.Now()
 				_ = do(
 					trace.WithRetry(
 						ctx,
 						trace.Retry{
-							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-								return func(info trace.RetryLoopDoneInfo) {
-									if info.Latency-timeouts[i] > tolerance {
-										t.Errorf("unexpected latency: %v", info.Latency)
+							OnRetry: func(
+								info trace.RetryLoopStartInfo,
+							) func(
+								intermediateInfo trace.RetryLoopIntermediateInfo,
+							) func(
+								trace.RetryLoopDoneInfo,
+							) {
+								return func(
+									info trace.RetryLoopIntermediateInfo,
+								) func(trace.RetryLoopDoneInfo) {
+									return func(info trace.RetryLoopDoneInfo) {
+										latency := time.Since(start)
+										if latency-timeouts[i] > tolerance {
+											t.Errorf("unexpected latency: %v", latency)
+										}
 									}
 								}
 							},
