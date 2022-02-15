@@ -15,8 +15,9 @@ type (
 		OnRetry func(RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
 	}
 	RetryLoopStartInfo struct {
-		Context context.Context
-		ID      string
+		Context    context.Context
+		ID         string
+		Idempotent bool
 	}
 	RetryLoopIntermediateInfo struct {
 		Error error

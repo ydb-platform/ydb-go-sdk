@@ -43,7 +43,7 @@ func (r *lazyRatelimiter) CreateResource(
 	resource ratelimiter.Resource,
 ) (err error) {
 	r.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return r.client.CreateResource(ctx, coordinationNodePath, resource)
 	})
 }
@@ -54,7 +54,7 @@ func (r *lazyRatelimiter) AlterResource(
 	resource ratelimiter.Resource,
 ) (err error) {
 	r.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return r.client.AlterResource(ctx, coordinationNodePath, resource)
 	})
 }
@@ -65,7 +65,7 @@ func (r *lazyRatelimiter) DropResource(
 	resourcePath string,
 ) (err error) {
 	r.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return r.client.DropResource(ctx, coordinationNodePath, resourcePath)
 	})
 }
@@ -77,7 +77,7 @@ func (r *lazyRatelimiter) ListResource(
 	recursive bool,
 ) (paths []string, err error) {
 	r.init()
-	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		paths, err = r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
 		return err
 	})
@@ -90,7 +90,7 @@ func (r *lazyRatelimiter) DescribeResource(
 	resourcePath string,
 ) (resource *ratelimiter.Resource, err error) {
 	r.init()
-	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		resource, err = r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
 		return err
 	})
@@ -105,7 +105,7 @@ func (r *lazyRatelimiter) AcquireResource(
 	isUsedAmount bool,
 ) (err error) {
 	r.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
 	})
 }

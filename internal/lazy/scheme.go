@@ -31,7 +31,7 @@ func (s *lazyScheme) ModifyPermissions(
 	opts ...scheme.PermissionsOption,
 ) (err error) {
 	s.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return s.client.ModifyPermissions(ctx, path, opts...)
 	})
 }
@@ -58,32 +58,32 @@ func (s *lazyScheme) init() {
 
 func (s *lazyScheme) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
 	s.init()
-	err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = s.client.DescribePath(ctx, path)
 		return err
-	})
+	}, retry.WithIdempotent())
 	return e, err
 }
 
 func (s *lazyScheme) MakeDirectory(ctx context.Context, path string) (err error) {
 	s.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return s.client.MakeDirectory(ctx, path)
 	})
 }
 
 func (s *lazyScheme) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
 	s.init()
-	err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		d, err = s.client.ListDirectory(ctx, path)
 		return err
-	})
+	}, retry.WithIdempotent())
 	return d, err
 }
 
 func (s *lazyScheme) RemoveDirectory(ctx context.Context, path string) (err error) {
 	s.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return s.client.RemoveDirectory(ctx, path)
 	})
 }

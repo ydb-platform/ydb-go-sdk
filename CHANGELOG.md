@@ -1,17 +1,14 @@
 ## 3.10.0
-* Added `trace.Discovery`
-* Added `trace.Scripting` stub (will be implements in the future)
-* Added `trace.Scheme` stub (will be implements in the future)
-* Added `trace.Coordination` stub (will be implements in the future)
-* Added `trace.Ratelimiter` stub (will be implements in the future)
+* Extended `trace.Details` constants for support per-service events
+* Added `trace.Discovery` struct for traces discovery events
+* Added `trace.Ratelimiter`, `trace.Coordination`, `trace.Scripting`, `trace.Scheme` stubs (will be implements in the future)
+* Added `ratelimiter/config`, `coordination/config`, `scripting/config`, `scheme/config`, `discovery/config` packages for specify per-service configs
 * Removed `trace.Driver.OnDiscovery` callback (moved to `trace.Discovery`)
-* Added `discovery/config` package for specify discovery config
-* Added `scheme/config` package for specify scheme config
-* Added `scripting/config` package for specify scripting config
-* Added `coordination/config` package for specify coordination config
-* Added `ratelimiter/config` package for specify ratelimiter config
 * Refactored initialization step (firstly makes discovery client)
-* Refactored dns-balancing logic for grpc-go 1.43
+* Removed `internal/lazy.Discovery` (discovery client always initialized)
+* Fixed `trace.Table` event structs
+* Refactored grpc options for define dns-balancing configuration
+* Refactored `retry.Retry` signature (added `retry.WithID`, `retry.WithTrace` and `retry.WithIdempotent` opt-in args, required param `isIdempotentOperation` removed) 
 
 ## 3.9.4
 * Fixed data race on closing session pool

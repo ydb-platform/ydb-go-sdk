@@ -69,10 +69,10 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 	list = func(i int, p string) error {
 		var dir scheme.Directory
 		var err error
-		err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 			dir, err = db.Scheme().ListDirectory(ctx, p)
 			return err
-		})
+		}, retry.WithIdempotent())
 		var opErr *errors.OpError
 		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
 			return nil
@@ -91,9 +91,9 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 				if err = list(i+1, pt); err != nil {
 					return err
 				}
-				err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+				err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 					return db.Scheme().RemoveDirectory(ctx, pt)
-				})
+				}, retry.WithIdempotent())
 				if err != nil {
 					return err
 				}

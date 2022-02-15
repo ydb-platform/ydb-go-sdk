@@ -26,7 +26,7 @@ func (s *lazyScripting) Execute(
 	params *table.QueryParameters,
 ) (res result.Result, err error) {
 	s.init()
-	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err = s.client.Execute(ctx, query, params)
 		return err
 	})
@@ -39,7 +39,7 @@ func (s *lazyScripting) Explain(
 	mode scripting.ExplainMode,
 ) (e table.ScriptingYQLExplanation, err error) {
 	s.init()
-	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = s.client.Explain(ctx, query, mode)
 		return err
 	})
@@ -52,7 +52,7 @@ func (s *lazyScripting) StreamExecute(
 	params *table.QueryParameters,
 ) (res result.StreamResult, err error) {
 	s.init()
-	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err = s.client.StreamExecute(ctx, query, params)
 		return err
 	})

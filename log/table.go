@@ -266,7 +266,7 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 				t.OnSessionQueryStreamExecute = func(
 					info trace.SessionQueryStreamExecuteStartInfo,
 				) func(
-					intermediateInfo trace.SessionQueryStreamExecuteIntermediateInfo,
+					trace.SessionQueryStreamExecuteIntermediateInfo,
 				) func(
 					trace.SessionQueryStreamExecuteDoneInfo,
 				) {

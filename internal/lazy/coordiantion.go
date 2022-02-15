@@ -28,21 +28,21 @@ func Coordination(db db.Connection, options []config.Option) coordination.Client
 
 func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	c.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return c.client.CreateNode(ctx, path, config)
 	})
 }
 
 func (c *lazyCoordination) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	c.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return c.client.AlterNode(ctx, path, config)
 	})
 }
 
 func (c *lazyCoordination) DropNode(ctx context.Context, path string) (err error) {
 	c.init()
-	return retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return c.client.DropNode(ctx, path)
 	})
 }
@@ -56,7 +56,7 @@ func (c *lazyCoordination) DescribeNode(
 	err error,
 ) {
 	c.init()
-	err = retry.Retry(ctx, false, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		entry, config, err = c.client.DescribeNode(ctx, path)
 		return err
 	})

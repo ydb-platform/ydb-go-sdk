@@ -55,7 +55,7 @@ func TestScripting(t *testing.T) {
 		}
 	}()
 	// Execute
-	if err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().Execute(
 			ctx,
 			"SELECT 1+1",
@@ -87,11 +87,11 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
 		return res.Err()
-	}); err != nil {
+	}, retry.WithIdempotent()); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 	// StreamExecute
-	if err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().StreamExecute(
 			ctx,
 			"SELECT 1+1",
@@ -124,11 +124,11 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
 		return res.Err()
-	}); err != nil {
+	}, retry.WithIdempotent()); err != nil {
 		t.Fatalf("StreamExecute failed: %v", err)
 	}
 	// ExplainPlan
-	if err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().Explain(
 			ctx,
 			"SELECT 1+1",
@@ -141,11 +141,11 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("empty plan")
 		}
 		return nil
-	}); err != nil {
+	}, retry.WithIdempotent()); err != nil {
 		t.Fatalf("Explain failed: %v", err)
 	}
 	// ExplainValidate
-	if err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().Explain(
 			ctx,
 			"SELECT 1+1",
@@ -158,7 +158,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected parameter types")
 		}
 		return nil
-	}); err != nil {
+	}, retry.WithIdempotent()); err != nil {
 		t.Fatalf("Explain failed: %v", err)
 	}
 }

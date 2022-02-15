@@ -73,10 +73,11 @@ func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) fun
 		return res
 	}
 }
-func RetryOnRetry(t Retry, c context.Context, iD string) func(error) func(attempts int, _ error) {
+func RetryOnRetry(t Retry, c context.Context, iD string, idempotent bool) func(error) func(attempts int, _ error) {
 	var p RetryLoopStartInfo
 	p.Context = c
 	p.ID = iD
+	p.Idempotent = idempotent
 	res := t.onRetry(p)
 	return func(e error) func(int, error) {
 		var p RetryLoopIntermediateInfo
