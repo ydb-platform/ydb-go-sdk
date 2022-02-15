@@ -28,8 +28,9 @@ func TestRepeater(t *testing.T) {
 
 	exec := make(chan struct{})
 	r := repeater.NewRepeater(ctx, 42*time.Second,
-		func(_ context.Context) {
+		func(_ context.Context) error {
 			exec <- struct{}{}
+			return nil
 		})
 
 	timerC <- time.Now()
@@ -59,10 +60,11 @@ func TestRepeaterCancellation(t *testing.T) {
 	defer cancel()
 
 	r := repeater.NewRepeater(ctx, 42*time.Second,
-		func(ctx context.Context) {
+		func(ctx context.Context) error {
 			enter <- struct{}{}
 			<-ctx.Done()
 			exit <- struct{}{}
+			return nil
 		})
 
 	// Run callback in a separate goroutine to avoid deadlock.
@@ -104,12 +106,14 @@ func noRecv(ch interface{}, timeout time.Duration) error {
 }
 
 func assertRecv(t *testing.T, timeout time.Duration, ch interface{}) {
+	t.Helper()
 	if err := recv(ch, timeout); err != nil {
 		t.Fatalf("%s: %v", testutil.FileLine(2), err)
 	}
 }
 
 func assertNoRecv(t *testing.T, timeout time.Duration, ch interface{}) {
+	t.Helper()
 	if err := noRecv(ch, timeout); err != nil {
 		t.Fatalf("%s: %v", testutil.FileLine(2), err)
 	}

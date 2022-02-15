@@ -8,7 +8,8 @@
 * Removed `internal/lazy.Discovery` (discovery client always initialized)
 * Fixed `trace.Table` event structs
 * Refactored grpc options for define dns-balancing configuration
-* Refactored `retry.Retry` signature (added `retry.WithID`, `retry.WithTrace` and `retry.WithIdempotent` opt-in args, required param `isIdempotentOperation` removed) 
+* Refactored `retry.Retry` signature (added `retry.WithID`, `retry.WithTrace` and `retry.WithIdempotent` opt-in args, required param `isIdempotentOperation` removed)
+* Refactored package `internal/repeater`
 
 ## 3.9.4
 * Fixed data race on closing session pool

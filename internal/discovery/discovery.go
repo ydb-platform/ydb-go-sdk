@@ -4,7 +4,6 @@ import (
 	"context"
 	"net"
 	"strconv"
-	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -57,15 +56,14 @@ func New(
 		repeater.NewRepeater(
 			deadline.ContextWithoutDeadline(ctx),
 			c.config.Interval(),
-			func(ctx context.Context) {
+			func(ctx context.Context) (err error) {
 				next, err = c.Discover(ctx)
-				// if nothing endpoint - re-discover after one second
-				// and use old endpoint list
-				if err != nil || len(next) == 0 {
-					go func() {
-						time.Sleep(time.Second)
-						crudExplorer.Force()
-					}()
+				if err != nil {
+					return err
+				}
+
+				// if nothing endpoint - use old endpoint list
+				if len(next) == 0 {
 					return
 				}
 
@@ -94,7 +92,10 @@ func New(
 						)
 					},
 				)
+
 				curr = next
+
+				return nil
 			},
 		),
 	)

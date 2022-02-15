@@ -20,7 +20,7 @@ type repeater struct {
 	interval time.Duration
 
 	// Task is a function that must be executed periodically.
-	task func(context.Context)
+	task func(context.Context) error
 
 	timer    timeutil.Timer
 	stopOnce sync.Once
@@ -35,7 +35,7 @@ type repeater struct {
 func NewRepeater(
 	ctx context.Context,
 	interval time.Duration,
-	task func(ctx context.Context),
+	task func(ctx context.Context) (err error),
 ) Repeater {
 	if interval <= 0 {
 		return nil
@@ -72,22 +72,30 @@ func (r *repeater) Force() {
 	}
 }
 
+func (r *repeater) singleTask() {
+	if err := r.task(r.ctx); err != nil {
+		r.timer.Reset(time.Second)
+	} else {
+		r.timer.Reset(r.interval)
+	}
+}
+
 func (r *repeater) worker() {
 	defer func() {
 		close(r.done)
 	}()
-	r.task(r.ctx)
+	r.singleTask()
 	for {
 		select {
 		case <-r.stop:
 			return
 		case <-r.timer.C():
-			r.task(r.ctx)
+			r.singleTask()
 		case <-r.force:
 			if !r.timer.Stop() {
 				<-r.timer.C()
 			}
+			r.timer.Reset(r.interval)
 		}
-		r.timer.Reset(r.interval)
 	}
 }
