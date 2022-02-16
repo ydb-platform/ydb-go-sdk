@@ -6,7 +6,7 @@
 ![lint](https://github.com/ydb-platform/ydb-go-sdk/workflows/lint/badge.svg?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ydb-platform/ydb-go-sdk)](https://goreportcard.com/report/github.com/ydb-platform/ydb-go-sdk)
 [![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/branch/master/graph/badge.svg?flag=unit&precision=2)](https://app.codecov.io/gh/ydb-platform/ydb-go-sdk)
-[![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/branch/master/graph/badge.svg?flag=integration&precision=2)](https://app.codecov.io/gh/ydb-platform/ydb-go-sdk)
+[![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/branch/master/graph/badge.svg?flag=e2e&precision=2)](https://app.codecov.io/gh/ydb-platform/ydb-go-sdk)
 
 > YDB API client written in Go.
 
