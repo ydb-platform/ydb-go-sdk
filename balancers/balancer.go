@@ -55,7 +55,7 @@ func PreferLocalDCWithFallBack(b balancer.Balancer) balancer.Balancer {
 	)
 }
 
-// PreferLocations creates balancer which use endpoints only in selected locations (such as "MAN", "VLA", etc.)
+// PreferLocations creates balancer which use endpoints only in selected locations (such as "ABC", "DEF", etc.)
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 func PreferLocations(balancer balancer.Balancer, locations ...string) balancer.Balancer {
 	if len(locations) == 0 {
