@@ -20,11 +20,8 @@ func Ratelimiter(client ratelimiter.Client, meta meta.Meta) *proxyRatelimiter {
 }
 
 func (r *proxyRatelimiter) Close(ctx context.Context) (err error) {
-	ctx, err = r.meta.Meta(ctx)
-	if err != nil {
-		return err
-	}
-	return r.client.Close(ctx)
+	// nop
+	return nil
 }
 
 func (r *proxyRatelimiter) CreateResource(

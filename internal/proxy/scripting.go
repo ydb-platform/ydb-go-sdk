@@ -58,9 +58,6 @@ func Scripting(client scripting.Client, meta meta.Meta) scripting.Client {
 }
 
 func (d *proxyScripting) Close(ctx context.Context) (err error) {
-	ctx, err = d.meta.Meta(ctx)
-	if err != nil {
-		return err
-	}
-	return d.client.Close(ctx)
+	// nop
+	return nil
 }

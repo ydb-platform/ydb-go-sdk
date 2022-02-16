@@ -1,3 +1,6 @@
+## 3.10.1
+* Fixed closing proxy clients
+
 ## 3.10.0
 * Extended `trace.Details` constants for support per-service events
 * Added `trace.Discovery` struct for traces discovery events

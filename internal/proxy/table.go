@@ -44,9 +44,6 @@ func (t *proxyTable) DoTx(ctx context.Context, op table.TxOperation, opts ...tab
 }
 
 func (t *proxyTable) Close(ctx context.Context) (err error) {
-	ctx, err = t.meta.Meta(ctx)
-	if err != nil {
-		return err
-	}
-	return t.client.Close(ctx)
+	// nop
+	return nil
 }

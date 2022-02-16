@@ -32,11 +32,8 @@ func (s *proxyScheme) ModifyPermissions(
 }
 
 func (s *proxyScheme) Close(ctx context.Context) (err error) {
-	ctx, err = s.meta.Meta(ctx)
-	if err != nil {
-		return err
-	}
-	return s.client.Close(ctx)
+	// nop
+	return nil
 }
 
 func (s *proxyScheme) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
