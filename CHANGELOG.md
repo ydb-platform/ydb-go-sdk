@@ -1,6 +1,7 @@
 ## 3.11.0
 * Fixed closing proxy clients
 * Added `ydb.Connection.WithCustomOptions()`
+* Added `ydb.MetaRequestType` and `ydb.MetaTraceID` aliases to internal `meta` package constants
 
 ## 3.10.0
 * Extended `trace.Details` constants for support per-service events
