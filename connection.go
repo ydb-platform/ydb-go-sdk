@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/proxy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
@@ -63,9 +62,13 @@ type Connection interface {
 	Discovery(opts ...CustomOption) discovery.Client
 
 	// Scripting returns scripting client with options from Connection instance.
-	// Options provide options replacement for requested discovery client
+	// Options provide options replacement for requested scripting client
 	// such as database and access token
 	Scripting(opts ...CustomOption) scripting.Client
+
+	// WithCustomOptions returns Connection specified with custom options
+	// Options provide options replacement for all clients taked from new Connection
+	WithCustomOptions(opts ...CustomOption) Connection
 }
 
 type connection struct {
@@ -91,6 +94,10 @@ type connection struct {
 
 	mtx sync.Mutex
 	db  db.Connection
+}
+
+func (c *connection) WithCustomOptions(opts ...CustomOption) Connection {
+	return newProxy(c, newMeta(c.config.Meta(), opts...))
 }
 
 func (c *connection) Close(ctx context.Context) error {
@@ -156,53 +163,42 @@ func (c *connection) Table(opts ...CustomOption) table.Client {
 	if len(opts) == 0 {
 		return c.table
 	}
-	return proxy.Table(c.table, c.meta(opts...))
+	return proxy.Table(c.table, newMeta(c.config.Meta(), opts...))
 }
 
 func (c *connection) Scheme(opts ...CustomOption) scheme.Client {
 	if len(opts) == 0 {
 		return c.scheme
 	}
-	return proxy.Scheme(c.scheme, c.meta(opts...))
+	return proxy.Scheme(c.scheme, newMeta(c.config.Meta(), opts...))
 }
 
 func (c *connection) Coordination(opts ...CustomOption) coordination.Client {
 	if len(opts) == 0 {
 		return c.coordination
 	}
-	return proxy.Coordination(c.coordination, c.meta(opts...))
+	return proxy.Coordination(c.coordination, newMeta(c.config.Meta(), opts...))
 }
 
 func (c *connection) Ratelimiter(opts ...CustomOption) ratelimiter.Client {
 	if len(opts) == 0 {
 		return c.ratelimiter
 	}
-	return proxy.Ratelimiter(c.ratelimiter, c.meta(opts...))
+	return proxy.Ratelimiter(c.ratelimiter, newMeta(c.config.Meta(), opts...))
 }
 
 func (c *connection) Discovery(opts ...CustomOption) discovery.Client {
 	if len(opts) == 0 {
 		return c.db.Discovery()
 	}
-	return proxy.Discovery(c.db.Discovery(), c.meta(opts...))
+	return proxy.Discovery(c.db.Discovery(), newMeta(c.config.Meta(), opts...))
 }
 
 func (c *connection) Scripting(opts ...CustomOption) scripting.Client {
 	if len(opts) == 0 {
 		return c.scripting
 	}
-	return proxy.Scripting(c.scripting, c.meta(opts...))
-}
-
-func (c *connection) meta(opts ...CustomOption) meta.Meta {
-	if len(opts) == 0 {
-		return c.config.Meta()
-	}
-	options := &customOptions{meta: c.config.Meta()}
-	for _, opt := range opts {
-		opt(options)
-	}
-	return options.meta
+	return proxy.Scripting(c.scripting, newMeta(c.config.Meta(), opts...))
 }
 
 // New connects to name and return name runtime holder

@@ -32,6 +32,9 @@ type Meta interface {
 	WithDatabase(database string) Meta
 	WithCredentials(creds credentials.Credentials) Meta
 	WithUserAgent(userAgent string) Meta
+
+	Database() string
+	UserAgent() string
 }
 
 func New(
@@ -56,6 +59,14 @@ type meta struct {
 	database     string
 	requestsType string
 	userAgent    string
+}
+
+func (m *meta) Database() string {
+	return m.database
+}
+
+func (m *meta) UserAgent() string {
+	return m.userAgent
 }
 
 func (m *meta) WithDatabase(database string) Meta {

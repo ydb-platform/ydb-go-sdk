@@ -1,5 +1,6 @@
-## 3.10.1
+## 3.11.0
 * Fixed closing proxy clients
+* Added `ydb.Connection.WithCustomOptions()`
 
 ## 3.10.0
 * Extended `trace.Details` constants for support per-service events
