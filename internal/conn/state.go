@@ -3,7 +3,8 @@ package conn
 type State int8
 
 const (
-	Created = State(iota)
+	Unknown = State(iota)
+	Created
 	Online
 	Banned
 	Offline

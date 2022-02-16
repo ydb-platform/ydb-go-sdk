@@ -11,11 +11,17 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
+	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
+	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -43,12 +49,25 @@ func WithUserAgent(userAgent string) Option {
 // WithConnectionString accept connection string like 'grpc[s]://{endpoint}/?database={database}'
 func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *connection) error {
-		options, err := dsn.Parse(connectionString)
-		if err != nil {
-			return err
+		var (
+			urls = []string{
+				connectionString,
+				"grpcs://" + connectionString,
+			}
+			issues = make([]error, 0, len(urls))
+		)
+		for _, url := range urls {
+			options, err := dsn.Parse(url)
+			if err == nil {
+				c.options = append(c.options, options...)
+				return nil
+			}
+			issues = append(issues, err)
 		}
-		c.options = append(c.options, options...)
-		return nil
+		return errors.NewWithIssues(
+			"parse connection string '"+connectionString+"' failed:",
+			issues...,
+		)
 	}
 }
 
@@ -141,10 +160,16 @@ func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 	for _, o := range opts {
 		loggerOpts = append(loggerOpts, logger.Option(o))
 	}
+
 	l := logger.New(loggerOpts...)
 	return MergeOptions(
 		WithTraceDriver(log.Driver(l, details)),
 		WithTraceTable(log.Table(l, details)),
+		WithTraceScripting(log.Scripting(l, details)),
+		WithTraceScheme(log.Scheme(l, details)),
+		WithTraceCoordination(log.Coordination(l, details)),
+		WithTraceRatelimiter(log.Ratelimiter(l, details)),
+		WithTraceDiscovery(log.Discovery(l, details)),
 	)
 }
 
@@ -205,7 +230,7 @@ func MergeOptions(options ...Option) Option {
 
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithDiscoveryInterval(discoveryInterval))
+		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))
 		return nil
 	}
 }
@@ -320,10 +345,50 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithTraceTable returns deadline which has associated Driver with it.
+// WithTraceTable returns table trace option
 func WithTraceTable(trace trace.Table) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithTrace(trace))
+		return nil
+	}
+}
+
+// WithTraceScripting scripting trace option
+func WithTraceScripting(trace trace.Scripting) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.scriptingOptions = append(c.scriptingOptions, scriptingConfig.WithTrace(trace))
+		return nil
+	}
+}
+
+// WithTraceScheme returns scheme trace option
+func WithTraceScheme(trace trace.Scheme) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.schemeOptions = append(c.schemeOptions, schemeConfig.WithTrace(trace))
+		return nil
+	}
+}
+
+// WithTraceCoordination returns coordination trace option
+func WithTraceCoordination(trace trace.Coordination) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.coordinationOptions = append(c.coordinationOptions, coordinationConfig.WithTrace(trace))
+		return nil
+	}
+}
+
+// WithTraceRatelimiter returns ratelimiter trace option
+func WithTraceRatelimiter(trace trace.Ratelimiter) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.ratelimiterOptions = append(c.ratelimiterOptions, ratelimiterConfig.WithTrace(trace))
+		return nil
+	}
+}
+
+// WithTraceDiscovery returns discovery trace option
+func WithTraceDiscovery(trace trace.Discovery) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithTrace(trace))
 		return nil
 	}
 }

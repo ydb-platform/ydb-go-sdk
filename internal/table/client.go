@@ -161,7 +161,7 @@ type createSessionResult struct {
 }
 
 // p.mu must NOT be held.
-func (c *client) createSession(ctx context.Context) (Session, error) {
+func (c *client) createSession(ctx context.Context) (s Session, err error) {
 	// pre-check the client size
 	c.mu.Lock()
 	enoughSpace := c.createInProgress+len(c.index) < c.limit
@@ -178,37 +178,39 @@ func (c *client) createSession(ctx context.Context) (Session, error) {
 
 	go func() {
 		var (
-			r createSessionResult
-			t = c.config.Trace().Compose(trace.ContextTable(ctx))
+			s   Session
+			err error
 		)
 
 		createSessionCtx, cancel := context.WithTimeout(
 			deadline.ContextWithoutDeadline(ctx),
 			c.config.CreateSessionTimeout(),
 		)
-		onDone := trace.TableOnPoolSessionNew(t, &ctx)
+
+		onDone := trace.TableOnPoolSessionNew(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+
 		defer func() {
-			onDone(r.s, r.err)
+			onDone(s, err)
 			cancel()
 			close(resCh)
 		}()
 
-		r.s, r.err = c.build(createSessionCtx)
-		if r.s == nil && r.err == nil {
+		s, err = c.build(createSessionCtx)
+		if s == nil && err == nil {
 			panic("ydb: abnormal result of session build")
 		}
 
 		c.mu.Lock()
 		c.createInProgress--
-		if r.s != nil {
-			r.s.OnClose(func(ctx context.Context) {
+		if s != nil {
+			s.OnClose(func(ctx context.Context) {
 				c.mu.Lock()
 				defer c.mu.Unlock()
-				info, has := c.index[r.s]
+				info, has := c.index[s]
 				if !has {
 					return
 				}
-				delete(c.index, r.s)
+				delete(c.index, s)
 
 				if c.closed {
 					return
@@ -219,11 +221,14 @@ func (c *client) createSession(ctx context.Context) (Session, error) {
 					panic("ydb: table: session closed while still in idle client")
 				}
 			})
-			c.index[r.s] = sessionInfo{}
+			c.index[s] = sessionInfo{}
 		}
 		c.mu.Unlock()
 
-		resCh <- r
+		resCh <- createSessionResult{
+			s:   s,
+			err: err,
+		}
 	}()
 
 	select {

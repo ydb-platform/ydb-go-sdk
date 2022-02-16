@@ -428,30 +428,6 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 		}
 	}
-	switch {
-	case t.OnDiscovery == nil:
-		ret.OnDiscovery = x.OnDiscovery
-	case x.OnDiscovery == nil:
-		ret.OnDiscovery = t.OnDiscovery
-	default:
-		h1 := t.OnDiscovery
-		h2 := x.OnDiscovery
-		ret.OnDiscovery = func(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DiscoveryDoneInfo) {
-					r1(d)
-					r2(d)
-				}
-			}
-		}
-	}
 	return ret
 }
 func (t Driver) onInit(i InitStartInfo) func(InitDoneInfo) {
@@ -721,21 +697,6 @@ func (t Driver) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsD
 	}
 	return res
 }
-func (t Driver) onDiscovery(d DiscoveryStartInfo) func(DiscoveryDoneInfo) {
-	fn := t.OnDiscovery
-	if fn == nil {
-		return func(DiscoveryDoneInfo) {
-			return
-		}
-	}
-	res := fn(d)
-	if res == nil {
-		return func(DiscoveryDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func DriverOnInit(t Driver, c *context.Context, endpoint string, database string, secure bool) func(error) {
 	var p InitStartInfo
 	p.Context = c
@@ -936,19 +897,6 @@ func DriverOnGetCredentials(t Driver, c *context.Context) func(tokenOk bool, _ e
 	return func(tokenOk bool, e error) {
 		var p GetCredentialsDoneInfo
 		p.TokenOk = tokenOk
-		p.Error = e
-		res(p)
-	}
-}
-func DriverOnDiscovery(t Driver, c *context.Context, address string) func(location string, endpoints []string, _ error) {
-	var p DiscoveryStartInfo
-	p.Context = c
-	p.Address = address
-	res := t.onDiscovery(p)
-	return func(location string, endpoints []string, e error) {
-		var p DiscoveryDoneInfo
-		p.Location = location
-		p.Endpoints = endpoints
 		p.Error = e
 		res(p)
 	}

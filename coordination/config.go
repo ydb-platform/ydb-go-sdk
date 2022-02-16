@@ -51,7 +51,7 @@ func (t RatelimiterCountersMode) String() string {
 	}
 }
 
-type Config struct {
+type NodeConfig struct {
 	Path                     string
 	SelfCheckPeriodMillis    uint32
 	SessionGracePeriodMillis uint32

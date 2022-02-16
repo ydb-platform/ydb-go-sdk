@@ -14,12 +14,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type client struct {
+	config  config.Config
 	service Ydb_Scripting_V1.ScriptingServiceClient
 }
 
@@ -136,8 +138,9 @@ func (c *client) Close(context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface) scripting.Client {
+func New(cc grpc.ClientConnInterface, options []config.Option) scripting.Client {
 	return &client{
+		config:  config.New(options...),
 		service: Ydb_Scripting_V1.NewScriptingServiceClient(cc),
 	}
 }

@@ -1,3 +1,16 @@
+## 3.10.0
+* Extended `trace.Details` constants for support per-service events
+* Added `trace.Discovery` struct for traces discovery events
+* Added `trace.Ratelimiter`, `trace.Coordination`, `trace.Scripting`, `trace.Scheme` stubs (will be implements in the future)
+* Added `ratelimiter/config`, `coordination/config`, `scripting/config`, `scheme/config`, `discovery/config` packages for specify per-service configs
+* Removed `trace.Driver.OnDiscovery` callback (moved to `trace.Discovery`)
+* Refactored initialization step (firstly makes discovery client)
+* Removed `internal/lazy.Discovery` (discovery client always initialized)
+* Fixed `trace.Table` event structs
+* Refactored grpc options for define dns-balancing configuration
+* Refactored `retry.Retry` signature (added `retry.WithID`, `retry.WithTrace` and `retry.WithIdempotent` opt-in args, required param `isIdempotentOperation` removed)
+* Refactored package `internal/repeater`
+
 ## 3.9.4
 * Fixed data race on closing session pool
 

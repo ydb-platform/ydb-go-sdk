@@ -598,3 +598,83 @@ func TestRetryModes(t *testing.T) {
 		})
 	}
 }
+
+type CustomError struct {
+	Err error
+}
+
+func (e *CustomError) Error() string {
+	return fmt.Sprintf("custom error: %v", e.Err)
+}
+
+func (e *CustomError) Unwrap() error {
+	return e.Err
+}
+
+func TestRetryWithCustomErrors(t *testing.T) {
+	var (
+		limit = 10
+		ctx   = context.Background()
+	)
+	for _, test := range []struct {
+		error     error
+		retriable bool
+	}{
+		{
+			error: &CustomError{
+				Err: errors.NewOpError(
+					errors.WithOEReason(
+						errors.StatusBadSession,
+					),
+				),
+			},
+			retriable: true,
+		},
+		{
+			error: &CustomError{
+				Err: fmt.Errorf(
+					"wrapped error: %w",
+					errors.NewOpError(
+						errors.WithOEReason(
+							errors.StatusBadSession,
+						),
+					),
+				),
+			},
+			retriable: true,
+		},
+		{
+			error: &CustomError{
+				Err: fmt.Errorf(
+					"wrapped error: %w",
+					errors.NewOpError(
+						errors.WithOEReason(
+							errors.StatusUnauthorized,
+						),
+					),
+				),
+			},
+			retriable: false,
+		},
+	} {
+		t.Run(test.error.Error(), func(t *testing.T) {
+			i := 0
+			err := Retry(ctx, func(ctx context.Context) (err error) {
+				i++
+				if i < limit {
+					return test.error
+				}
+				return nil
+			})
+			if test.retriable {
+				if i != limit {
+					t.Fatalf("unexpected i: %d, err: %v", i, err)
+				}
+			} else {
+				if i != 1 {
+					t.Fatalf("unexpected i: %d, err: %v", i, err)
+				}
+			}
+		})
+	}
+}

@@ -20,7 +20,7 @@ func Coordination(client coordination.Client, meta meta.Meta) coordination.Clien
 	}
 }
 
-func (c *proxyCoordination) CreateNode(ctx context.Context, path string, config coordination.Config) (err error) {
+func (c *proxyCoordination) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	ctx, err = c.meta.Meta(ctx)
 	if err != nil {
 		return err
@@ -28,7 +28,7 @@ func (c *proxyCoordination) CreateNode(ctx context.Context, path string, config 
 	return c.client.CreateNode(ctx, path, config)
 }
 
-func (c *proxyCoordination) AlterNode(ctx context.Context, path string, config coordination.Config) (err error) {
+func (c *proxyCoordination) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	ctx, err = c.meta.Meta(ctx)
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func (c *proxyCoordination) DescribeNode(
 	path string,
 ) (
 	_ *scheme.Entry,
-	_ *coordination.Config,
+	_ *coordination.NodeConfig,
 	err error,
 ) {
 	ctx, err = c.meta.Meta(ctx)

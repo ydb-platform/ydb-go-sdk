@@ -308,14 +308,26 @@ func TestRetryContextDeadline(t *testing.T) {
 			t.Run(fmt.Sprintf("Timeout=%v,Sleep=%v", timeout, sleep), func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
+				start := time.Now()
 				_ = do(
 					trace.WithRetry(
 						ctx,
 						trace.Retry{
-							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-								return func(info trace.RetryLoopDoneInfo) {
-									if info.Latency-timeouts[i] > tolerance {
-										t.Errorf("unexpected latency: %v", info.Latency)
+							OnRetry: func(
+								info trace.RetryLoopStartInfo,
+							) func(
+								intermediateInfo trace.RetryLoopIntermediateInfo,
+							) func(
+								trace.RetryLoopDoneInfo,
+							) {
+								return func(
+									info trace.RetryLoopIntermediateInfo,
+								) func(trace.RetryLoopDoneInfo) {
+									return func(info trace.RetryLoopDoneInfo) {
+										latency := time.Since(start)
+										if latency-timeouts[i] > tolerance {
+											t.Errorf("unexpected latency: %v", latency)
+										}
 									}
 								}
 							},
@@ -333,5 +345,106 @@ func TestRetryContextDeadline(t *testing.T) {
 				)
 			})
 		}
+	}
+}
+
+type CustomError struct {
+	Err error
+}
+
+func (e *CustomError) Error() string {
+	return fmt.Sprintf("custom error: %v", e.Err)
+}
+
+func (e *CustomError) Unwrap() error {
+	return e.Err
+}
+
+func TestRetryWithCustomErrors(t *testing.T) {
+	var (
+		limit = 10
+		ctx   = context.Background()
+		p     = SessionProviderFunc{
+			OnGet: func(ctx context.Context) (Session, error) {
+				return simpleSession(t), nil
+			},
+		}
+	)
+	for _, test := range []struct {
+		error         error
+		retriable     bool
+		deleteSession bool
+	}{
+		{
+			error: &CustomError{
+				Err: errors.NewOpError(
+					errors.WithOEReason(
+						errors.StatusBadSession,
+					),
+				),
+			},
+			retriable:     true,
+			deleteSession: true,
+		},
+		{
+			error: &CustomError{
+				Err: fmt.Errorf(
+					"wrapped error: %w",
+					errors.NewOpError(
+						errors.WithOEReason(
+							errors.StatusBadSession,
+						),
+					),
+				),
+			},
+			retriable:     true,
+			deleteSession: true,
+		},
+		{
+			error: &CustomError{
+				Err: fmt.Errorf(
+					"wrapped error: %w",
+					errors.NewOpError(
+						errors.WithOEReason(
+							errors.StatusUnauthorized,
+						),
+					),
+				),
+			},
+			retriable:     false,
+			deleteSession: false,
+		},
+	} {
+		t.Run(test.error.Error(), func(t *testing.T) {
+			var (
+				i        = 0
+				sessions = make(map[table.Session]int)
+			)
+			err := do(ctx, p, func(ctx context.Context, s table.Session) (err error) {
+				if test.deleteSession {
+					if _, has := sessions[s]; has {
+						t.Fatalf("session already used: %s", s.ID())
+					}
+				}
+				sessions[s]++
+				i++
+				if i < limit {
+					return test.error
+				}
+				return nil
+			})
+			if test.retriable {
+				if i != limit {
+					t.Fatalf("unexpected i: %d, err: %v", i, err)
+				}
+			} else {
+				if i != 1 {
+					t.Fatalf("unexpected i: %d, err: %v", i, err)
+				}
+				if len(sessions) != 1 {
+					t.Fatalf("unexpected len(sessions): %d, err: %v", len(sessions), err)
+				}
+			}
+		})
 	}
 }

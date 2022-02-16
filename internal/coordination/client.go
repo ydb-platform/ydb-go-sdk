@@ -10,20 +10,23 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type client struct {
+	config  config.Config
 	service Ydb_Coordination_V1.CoordinationServiceClient
 }
 
-func New(cc grpc.ClientConnInterface) coordination.Client {
+func New(cc grpc.ClientConnInterface, options []config.Option) coordination.Client {
 	return &client{
+		config:  config.New(options...),
 		service: Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
 	}
 }
 
-func (c *client) CreateNode(ctx context.Context, path string, config coordination.Config) (err error) {
+func (c *client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	_, err = c.service.CreateNode(ctx, &Ydb_Coordination.CreateNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
@@ -38,7 +41,7 @@ func (c *client) CreateNode(ctx context.Context, path string, config coordinatio
 	return
 }
 
-func (c *client) AlterNode(ctx context.Context, path string, config coordination.Config) (err error) {
+func (c *client) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	_, err = c.service.AlterNode(ctx, &Ydb_Coordination.AlterNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
@@ -66,7 +69,7 @@ func (c *client) DescribeNode(
 	path string,
 ) (
 	_ *scheme.Entry,
-	_ *coordination.Config,
+	_ *coordination.NodeConfig,
 	err error,
 ) {
 	var (
@@ -83,13 +86,13 @@ func (c *client) DescribeNode(
 	if err != nil {
 		return nil, nil, err
 	}
-	return scheme.InnerConvertEntry(result.GetSelf()), &coordination.Config{
+	return scheme.InnerConvertEntry(result.GetSelf()), &coordination.NodeConfig{
 		Path:                     result.GetConfig().GetPath(),
 		SelfCheckPeriodMillis:    result.GetConfig().GetSelfCheckPeriodMillis(),
 		SessionGracePeriodMillis: result.GetConfig().GetSessionGracePeriodMillis(),
 		ReadConsistencyMode:      consistencyMode(result.GetConfig().GetReadConsistencyMode()),
 		AttachConsistencyMode:    consistencyMode(result.GetConfig().GetAttachConsistencyMode()),
-		RatelimiterCountersMode:  rateLimiterCountersMode(result.GetConfig().GetRateLimiterCountersMode()),
+		RatelimiterCountersMode:  ratelimiterCountersMode(result.GetConfig().GetRateLimiterCountersMode()),
 	}, nil
 }
 
@@ -108,7 +111,7 @@ func consistencyMode(t Ydb_Coordination.ConsistencyMode) coordination.Consistenc
 	}
 }
 
-func rateLimiterCountersMode(t Ydb_Coordination.RateLimiterCountersMode) coordination.RatelimiterCountersMode {
+func ratelimiterCountersMode(t Ydb_Coordination.RateLimiterCountersMode) coordination.RatelimiterCountersMode {
 	switch t {
 	case Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_AGGREGATED:
 		return coordination.RatelimiterCountersModeAggregated

@@ -15,6 +15,7 @@ import (
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	public "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 const (
@@ -35,9 +36,14 @@ func TestRatelimiter(t *testing.T) {
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
 		),
-		ydb.WithBalancer(balancers.PreferLocalDC( // for max tests coverage
-			balancers.RandomChoice(),
-		)),
+		ydb.WithBalancer(balancers.SingleConn()),
+		ydb.WithLogger(
+			trace.DetailsAll,
+			ydb.WithNamespace("ydb"),
+			ydb.WithOutWriter(os.Stdout),
+			ydb.WithErrWriter(os.Stderr),
+			ydb.WithMinLevel(ydb.TRACE),
+		),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +62,7 @@ func TestRatelimiter(t *testing.T) {
 		}
 	}
 	// create node
-	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, cfg.Config{
+	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, cfg.NodeConfig{
 		Path:                     "",
 		SelfCheckPeriodMillis:    1000,
 		SessionGracePeriodMillis: 1000,

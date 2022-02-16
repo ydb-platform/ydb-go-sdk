@@ -31,8 +31,8 @@ func TestDetailsString(t *testing.T) {
 			exp:     "DriverCredentialsEvents",
 		},
 		{
-			details: DriverDiscoveryEvents,
-			exp:     "DriverDiscoveryEvents",
+			details: DiscoveryEvents,
+			exp:     "DiscoveryEvents",
 		},
 		{
 			details: TableSessionLifeCycleEvents,
@@ -114,8 +114,8 @@ func TestDetailsFromString(t *testing.T) {
 			exp: DriverCredentialsEvents,
 		},
 		{
-			s:   "DriverDiscoveryEvents",
-			exp: DriverDiscoveryEvents,
+			s:   "DiscoveryEvents",
+			exp: DiscoveryEvents,
 		},
 		{
 			s:   "TableSessionLifeCycleEvents",

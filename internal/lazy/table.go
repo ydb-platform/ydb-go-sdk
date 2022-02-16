@@ -27,10 +27,10 @@ func Table(db db.Connection, options []config.Option) table.Client {
 
 func (t *lazyTable) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
 	t.init(ctx)
-	err = retry.Retry(ctx, true, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		s, err = t.client.CreateSession(ctx)
 		return err
-	})
+	}, retry.WithIdempotent())
 	return s, err
 }
 

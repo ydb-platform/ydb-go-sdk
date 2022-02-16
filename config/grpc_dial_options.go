@@ -21,11 +21,9 @@ func (c *config) GrpcDialOptions() (opts []grpc.DialOption) {
 		}),
 		grpc.WithKeepaliveParams(DefaultGrpcConnectionPolicy),
 		grpc.WithResolvers(
-			resolver.New(""), // for use this resolver by default
-			resolver.New("grpc"),
-			resolver.New("grpcs"),
+			resolver.New("ydb"),
 		),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy": "round_robin"}`),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
 			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),

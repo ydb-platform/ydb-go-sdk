@@ -7,9 +7,8 @@ import (
 )
 
 // Driver makes trace.Driver with internal logging
-func Driver(log Logger, details trace.Details) trace.Driver {
+func Driver(log Logger, details trace.Details) (t trace.Driver) {
 	log = log.WithName(`driver`)
-	t := trace.Driver{}
 	// nolint:nestif
 	if details&trace.DriverNetEvents != 0 {
 		// nolint:govet
@@ -294,27 +293,6 @@ func Driver(log Logger, details trace.Details) trace.Driver {
 							info.Error,
 						)
 					}
-				}
-			}
-		}
-	}
-	if details&trace.DriverDiscoveryEvents != 0 {
-		// nolint:govet
-		log := log.WithName(`discovery`)
-		t.OnDiscovery = func(info trace.DiscoveryStartInfo) func(trace.DiscoveryDoneInfo) {
-			log.Debugf(`discover start`)
-			start := time.Now()
-			return func(info trace.DiscoveryDoneInfo) {
-				if info.Error == nil {
-					log.Debugf(`discover done {latency:"%s",endpoints:%v}`,
-						time.Since(start),
-						info.Endpoints,
-					)
-				} else {
-					log.Errorf(`discover failed {latency:"%s",error:"%s"}`,
-						time.Since(start),
-						info.Error,
-					)
 				}
 			}
 		}
