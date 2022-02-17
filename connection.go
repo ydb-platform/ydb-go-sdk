@@ -262,7 +262,20 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 
 	c.coordination = lazy.Coordination(c.db, c.coordinationOptions)
 
-	c.ratelimiter = lazy.Ratelimiter(c.db, c.ratelimiterOptions)
+	c.ratelimiter = lazy.Ratelimiter(
+		c.db,
+		append(
+			[]ratelimiterConfig.Option{
+				ratelimiterConfig.WithOperationTimeout(
+					c.config.OperationTimeout(),
+				),
+				ratelimiterConfig.WithOperationCancelAfter(
+					c.config.OperationCancelAfter(),
+				),
+			},
+			c.ratelimiterOptions...,
+		),
+	)
 
 	return c, nil
 }
