@@ -28,7 +28,18 @@ type repeater struct {
 	done     chan struct{}
 	ctx      context.Context
 	cancel   context.CancelFunc
-	force    chan struct{}
+}
+
+type optionsHolder struct {
+	runTaskOnInit bool
+}
+
+type option func(h *optionsHolder)
+
+func WithRunTaskOnInit() option {
+	return func(h *optionsHolder) {
+		h.runTaskOnInit = true
+	}
 }
 
 // NewRepeater creates and begins to execute task periodically.
@@ -36,6 +47,7 @@ func NewRepeater(
 	ctx context.Context,
 	interval time.Duration,
 	task func(ctx context.Context) (err error),
+	opts ...option,
 ) Repeater {
 	if interval <= 0 {
 		return nil
@@ -50,9 +62,8 @@ func NewRepeater(
 		done:     make(chan struct{}),
 		ctx:      ctx,
 		cancel:   cancel,
-		force:    make(chan struct{}),
 	}
-	go r.worker()
+	go r.worker(opts...)
 	return r
 }
 
@@ -66,10 +77,10 @@ func (r *repeater) Stop() {
 }
 
 func (r *repeater) Force() {
-	select {
-	case r.force <- struct{}{}:
-	default:
+	if !r.timer.Stop() {
+		<-r.timer.C()
 	}
+	r.timer.Reset(0)
 }
 
 func (r *repeater) singleTask() {
@@ -80,22 +91,23 @@ func (r *repeater) singleTask() {
 	}
 }
 
-func (r *repeater) worker() {
+func (r *repeater) worker(opts ...option) {
 	defer func() {
 		close(r.done)
 	}()
-	r.singleTask()
+	h := &optionsHolder{}
+	for _, o := range opts {
+		o(h)
+	}
+	if h.runTaskOnInit {
+		r.singleTask()
+	}
 	for {
 		select {
 		case <-r.stop:
 			return
 		case <-r.timer.C():
 			r.singleTask()
-		case <-r.force:
-			if !r.timer.Stop() {
-				<-r.timer.C()
-			}
-			r.timer.Reset(r.interval)
 		}
 	}
 }

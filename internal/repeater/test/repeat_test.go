@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,11 +28,15 @@ func TestRepeater(t *testing.T) {
 	defer cancel()
 
 	exec := make(chan struct{})
-	r := repeater.NewRepeater(ctx, 42*time.Second,
+	r := repeater.NewRepeater(
+		ctx,
+		42*time.Second,
 		func(_ context.Context) error {
 			exec <- struct{}{}
 			return nil
-		})
+		},
+		repeater.WithRunTaskOnInit(),
+	)
 
 	timerC <- time.Now()
 	assertRecv(t, 500*time.Millisecond, exec)
@@ -40,6 +45,35 @@ func TestRepeater(t *testing.T) {
 	r.Stop()
 	timerC <- time.Now()
 	assertNoRecv(t, 50*time.Millisecond, exec)
+}
+
+func TestRepeaterForce(t *testing.T) {
+	var (
+		calls   = uint32(0)
+		enter   = make(chan struct{}, 100)
+		timeout = 100 * time.Millisecond
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
+	defer cancel()
+
+	r := repeater.NewRepeater(
+		ctx,
+		time.Hour,
+		func(ctx context.Context) error {
+			atomic.AddUint32(&calls, 1)
+			enter <- struct{}{}
+			return nil
+		},
+	)
+
+	for i := uint32(1); i < 100; i++ {
+		r.Force()
+		assertRecv(t, timeout, enter)
+		if c := atomic.LoadUint32(&calls); c != i {
+			t.Fatalf("Unexpected calls: %v, i: %v", c, i)
+		}
+	}
 }
 
 func TestRepeaterCancellation(t *testing.T) {
@@ -59,13 +93,16 @@ func TestRepeaterCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	r := repeater.NewRepeater(ctx, 42*time.Second,
+	r := repeater.NewRepeater(
+		ctx,
+		42*time.Second,
 		func(ctx context.Context) error {
 			enter <- struct{}{}
 			<-ctx.Done()
 			exit <- struct{}{}
 			return nil
-		})
+		},
+	)
 
 	// Run callback in a separate goroutine to avoid deadlock.
 	// That is, StubTimer run its function in the same goroutine as Emit
