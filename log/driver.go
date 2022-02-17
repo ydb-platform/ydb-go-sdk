@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -109,7 +110,8 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			database := info.Database
 			secure := info.Secure
 			log.Infof(
-				`init start {endpoint:"%s",database:"%s",endpoint:%v}`,
+				`init start {version:%s,endpoint:"%s",database:"%s",secure:%v}`,
+				meta.Version,
 				endpoint,
 				database,
 				secure,
