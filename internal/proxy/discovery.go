@@ -37,9 +37,6 @@ func (d *proxyDiscovery) WhoAmI(ctx context.Context) (_ *discovery.WhoAmI, err e
 }
 
 func (d *proxyDiscovery) Close(ctx context.Context) (err error) {
-	ctx, err = d.meta.Meta(ctx)
-	if err != nil {
-		return err
-	}
-	return d.client.Close(ctx)
+	// nop
+	return nil
 }

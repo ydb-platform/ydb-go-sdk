@@ -60,9 +60,6 @@ func (c *proxyCoordination) DescribeNode(
 }
 
 func (c *proxyCoordination) Close(ctx context.Context) (err error) {
-	ctx, err = c.meta.Meta(ctx)
-	if err != nil {
-		return err
-	}
-	return c.client.Close(ctx)
+	// nop
+	return nil
 }
