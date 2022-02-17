@@ -66,9 +66,9 @@ type Connection interface {
 	// such as database and access token
 	Scripting(opts ...CustomOption) scripting.Client
 
-	// WithCustomOptions returns Connection specified with custom options
+	// With returns Connection specified with custom options
 	// Options provide options replacement for all clients taked from new Connection
-	WithCustomOptions(opts ...CustomOption) Connection
+	With(opts ...CustomOption) Connection
 }
 
 type connection struct {
@@ -96,7 +96,7 @@ type connection struct {
 	db  db.Connection
 }
 
-func (c *connection) WithCustomOptions(opts ...CustomOption) Connection {
+func (c *connection) With(opts ...CustomOption) Connection {
 	return newProxy(c, newMeta(c.config.Meta(), opts...))
 }
 

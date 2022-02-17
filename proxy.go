@@ -85,6 +85,6 @@ func (c *proxyConnection) Scripting(opts ...CustomOption) scripting.Client {
 	return proxy.Scripting(c.scripting, newMeta(c.meta, opts...))
 }
 
-func (c *proxyConnection) WithCustomOptions(opts ...CustomOption) Connection {
+func (c *proxyConnection) With(opts ...CustomOption) Connection {
 	return newProxy(c, c.meta)
 }
