@@ -203,7 +203,7 @@ func (c *client) AcquireResource(
 	}
 
 	switch {
-	case errors.IsOpError(err, errors.StatusTimeout, errors.StatusTimeout):
+	case errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled):
 		return ratelimiter.AcquireError(amount, err)
 	default:
 		return err
