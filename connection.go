@@ -235,13 +235,19 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}
 
 	if single.IsSingle(c.config.Balancer()) {
-		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithInterval(0))
+		c.discoveryOptions = append(
+			c.discoveryOptions,
+			discoveryConfig.WithInterval(0),
+		)
 	}
 
 	c.db, err = db.New(
 		ctx,
 		c.config,
 		append(
+			// prepend endpoint, database name and secure options before custom discoveryOptions
+			// If custom discoveryOptions contains endpoint, database name or secure options
+			// - will apply custom values
 			[]discoveryConfig.Option{
 				discoveryConfig.WithEndpoint(c.Endpoint()),
 				discoveryConfig.WithDatabase(c.Name()),
@@ -262,7 +268,23 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 
 	c.coordination = lazy.Coordination(c.db, c.coordinationOptions)
 
-	c.ratelimiter = lazy.Ratelimiter(c.db, c.ratelimiterOptions)
+	c.ratelimiter = lazy.Ratelimiter(
+		c.db,
+		append(
+			// prepend operation timeout and cancelAfter options before custom ratelimiterOptions
+			// If custom ratelimiterOptions contains operation timeout or cancelAfter options
+			// - will apply custom values
+			[]ratelimiterConfig.Option{
+				ratelimiterConfig.WithOperationTimeout(
+					c.config.OperationTimeout(),
+				),
+				ratelimiterConfig.WithOperationCancelAfter(
+					c.config.OperationCancelAfter(),
+				),
+			},
+			c.ratelimiterOptions...,
+		),
+	)
 
 	return c, nil
 }

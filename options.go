@@ -385,6 +385,13 @@ func WithTraceRatelimiter(trace trace.Ratelimiter) Option {
 	}
 }
 
+func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.ratelimiterOptions = append(c.ratelimiterOptions, opts...)
+		return nil
+	}
+}
+
 // WithTraceDiscovery returns discovery trace option
 func WithTraceDiscovery(trace trace.Discovery) Option {
 	return func(ctx context.Context, c *connection) error {
