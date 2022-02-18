@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -102,11 +103,11 @@ func (r *lazyRatelimiter) AcquireResource(
 	coordinationNodePath string,
 	resourcePath string,
 	amount uint64,
-	isUsedAmount bool,
+	opts ...options.AcquireOption,
 ) (err error) {
 	r.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
+		return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...)
 	})
 }
 

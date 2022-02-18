@@ -95,12 +95,17 @@ func iterateIssues(issues []*Ydb_Issue.IssueMessage, it func(Issue)) {
 }
 
 // IsOpError reports whether err is OpError with given code as the Reason.
-func IsOpError(err error, code StatusCode) bool {
+func IsOpError(err error, codes ...StatusCode) bool {
 	var op *OpError
 	if !errors.As(err, &op) {
 		return false
 	}
-	return op.Reason == code
+	for _, code := range codes {
+		if op.Reason == code {
+			return true
+		}
+	}
+	return false
 }
 
 func (e StatusCode) OperationStatus() OperationStatus {

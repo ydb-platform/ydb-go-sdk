@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
@@ -90,11 +91,11 @@ func (r *proxyRatelimiter) AcquireResource(
 	coordinationNodePath string,
 	resourcePath string,
 	amount uint64,
-	isUsedAmount bool,
+	opts ...options.AcquireOption,
 ) (err error) {
 	ctx, err = r.meta.Meta(ctx)
 	if err != nil {
 		return err
 	}
-	return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, isUsedAmount)
+	return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...)
 }

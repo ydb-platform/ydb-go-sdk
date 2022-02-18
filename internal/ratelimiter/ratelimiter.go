@@ -9,47 +9,12 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_RateLimiter_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 )
-
-type Client interface {
-	CreateResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resource ratelimiter.Resource,
-	) (err error)
-	AlterResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resource ratelimiter.Resource,
-	) (err error)
-	DropResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resourcePath string,
-	) (err error)
-	ListResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resourcePath string,
-		recursive bool,
-	) (_ []string, err error)
-	DescribeResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resourcePath string,
-	) (_ *ratelimiter.Resource, err error)
-	AcquireResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resourcePath string,
-		amount uint64,
-		isUsedAmount bool,
-	) (err error)
-	Close(ctx context.Context) error
-}
 
 type client struct {
 	config  config.Config
@@ -60,21 +25,11 @@ func (c *client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, options []config.Option) Client {
+func New(cc grpc.ClientConnInterface, options []config.Option) *client {
 	return &client{
 		config:  config.New(options...),
 		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
 	}
-}
-
-func (c *client) ctx(ctx context.Context) context.Context {
-	return operation.WithCancelAfter(
-		operation.WithTimeout(
-			ctx,
-			c.config.OperationParams().Timeout,
-		),
-		c.config.OperationParams().CancelAfter,
-	)
 }
 
 func (c *client) CreateResource(
@@ -82,7 +37,7 @@ func (c *client) CreateResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	_, err = c.service.CreateResource(c.ctx(ctx), &Ydb_RateLimiter.CreateResourceRequest{
+	_, err = c.service.CreateResource(ctx, &Ydb_RateLimiter.CreateResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
 			ResourcePath: resource.ResourcePath,
@@ -102,7 +57,7 @@ func (c *client) AlterResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	_, err = c.service.AlterResource(c.ctx(ctx), &Ydb_RateLimiter.AlterResourceRequest{
+	_, err = c.service.AlterResource(ctx, &Ydb_RateLimiter.AlterResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
 			ResourcePath: resource.ResourcePath,
@@ -122,7 +77,7 @@ func (c *client) DropResource(
 	coordinationNodePath string,
 	resourcePath string,
 ) (err error) {
-	_, err = c.service.DropResource(c.ctx(ctx), &Ydb_RateLimiter.DropResourceRequest{
+	_, err = c.service.DropResource(ctx, &Ydb_RateLimiter.DropResourceRequest{
 		OperationParams:      nil,
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
@@ -140,7 +95,7 @@ func (c *client) ListResource(
 		response *Ydb_RateLimiter.ListResourcesResponse
 		result   Ydb_RateLimiter.ListResourcesResult
 	)
-	response, err = c.service.ListResources(c.ctx(ctx), &Ydb_RateLimiter.ListResourcesRequest{
+	response, err = c.service.ListResources(ctx, &Ydb_RateLimiter.ListResourcesRequest{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 	})
@@ -163,7 +118,7 @@ func (c *client) DescribeResource(
 		response *Ydb_RateLimiter.DescribeResourceResponse
 		result   Ydb_RateLimiter.DescribeResourceResult
 	)
-	response, err = c.service.DescribeResource(c.ctx(ctx), &Ydb_RateLimiter.DescribeResourceRequest{
+	response, err = c.service.DescribeResource(ctx, &Ydb_RateLimiter.DescribeResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 	})
@@ -196,22 +151,61 @@ func (c *client) AcquireResource(
 	coordinationNodePath string,
 	resourcePath string,
 	amount uint64,
-	isUsedAmount bool,
+	opts ...options.AcquireOption,
 ) (err error) {
-	var request Ydb_RateLimiter.AcquireResourceRequest
-	if isUsedAmount {
-		request = Ydb_RateLimiter.AcquireResourceRequest{
+	var (
+		acquireOptions = options.NewAcquire(opts...)
+		request        = Ydb_RateLimiter.AcquireResourceRequest{
 			CoordinationNodePath: coordinationNodePath,
 			ResourcePath:         resourcePath,
 			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Used{Used: amount},
 		}
-	} else {
-		request = Ydb_RateLimiter.AcquireResourceRequest{
-			CoordinationNodePath: coordinationNodePath,
-			ResourcePath:         resourcePath,
-			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Required{Required: amount},
+	)
+
+	switch acquireOptions.Type() {
+	case options.AcquireTypeAcquire:
+		request.Units = &Ydb_RateLimiter.AcquireResourceRequest_Required{
+			Required: amount,
+		}
+	default:
+		request.Units = &Ydb_RateLimiter.AcquireResourceRequest_Used{
+			Used: amount,
 		}
 	}
-	_, err = c.service.AcquireResource(c.ctx(ctx), &request)
-	return
+
+	switch acquireOptions.Type() {
+	case options.AcquireTypeAcquire:
+		if t := acquireOptions.Timeout(); t != nil {
+			ctx = operation.WithTimeout(ctx, *t)
+		}
+		_, err = c.service.AcquireResource(
+			ctx,
+			&request,
+		)
+	case options.AcquireTypeReportSync:
+		if t := acquireOptions.Timeout(); t != nil {
+			ctx = operation.WithTimeout(ctx, *t)
+		}
+		_, err = c.service.AcquireResource(
+			ctx,
+			&request,
+		)
+	case options.AcquireTypeReportAsync:
+		go func() {
+			if t := acquireOptions.Timeout(); t != nil {
+				ctx = operation.WithTimeout(ctx, *t)
+			}
+			_, _ = c.service.AcquireResource(
+				ctx,
+				&request,
+			)
+		}()
+	}
+
+	switch {
+	case errors.IsOpError(err, errors.StatusTimeout, errors.StatusTimeout):
+		return ratelimiter.AcquireError(amount, err)
+	default:
+		return err
+	}
 }
