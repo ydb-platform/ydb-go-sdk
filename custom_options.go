@@ -3,7 +3,7 @@ package ydb
 import (
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 )
 
@@ -18,8 +18,16 @@ func WithCustomToken(accessToken string) CustomOption {
 		opts.meta = opts.meta.WithCredentials(
 			credentials.NewAccessTokenCredentials(
 				accessToken,
-				fmt.Sprintf(`WithCustomToken("%s")`, accessToken),
+				credentials.WithSourceInfo(fmt.Sprintf(`WithCustomToken("%s")`, accessToken)),
 			),
+		)
+	}
+}
+
+func WithCustomCredentials(creds credentials.Credentials) CustomOption {
+	return func(opts *customOptions) {
+		opts.meta = opts.meta.WithCredentials(
+			creds,
 		)
 	}
 }
