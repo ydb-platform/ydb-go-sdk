@@ -7,7 +7,7 @@
 * Added `ydb.Connection.With(opts ...ydb.CustomOption)` for taking proxy `ydb.Connection` with some redefined options
 * Added `ydb.MetaRequestType` and `ydb.MetaTraceID` aliases to internal `meta` package constants
 * Added `ydb.WithCustomCredentials()` option
-* Refactored `ydb.Ratelimiter().AcquireResource()` method
+* Refactored `ydb.Ratelimiter().AcquireResource()` method (added options for defining type of acquire request)
 
 ## 3.10.0
 * Extended `trace.Details` constants for support per-service events

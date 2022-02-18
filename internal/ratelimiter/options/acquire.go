@@ -2,6 +2,10 @@ package options
 
 import "time"
 
+const (
+	DefaultDecrease = 100 * time.Millisecond
+)
+
 type AcquireType uint8
 
 const (
@@ -13,17 +17,20 @@ const (
 )
 
 type Acquire interface {
+	// Type defines type of acquire request
 	Type() AcquireType
-	Timeout() *time.Duration
+
+	// DecreaseTimeout defines value for decrease timeout from context
+	DecreaseTimeout() time.Duration
 }
 
 type acquireOptionsHolder struct {
-	acquireType AcquireType
-	timeout     *time.Duration
+	acquireType     AcquireType
+	decreaseTimeout time.Duration
 }
 
-func (h *acquireOptionsHolder) Timeout() *time.Duration {
-	return h.timeout
+func (h *acquireOptionsHolder) DecreaseTimeout() time.Duration {
+	return h.decreaseTimeout
 }
 
 func (h *acquireOptionsHolder) Type() AcquireType {
@@ -31,12 +38,6 @@ func (h *acquireOptionsHolder) Type() AcquireType {
 }
 
 type AcquireOption func(h *acquireOptionsHolder)
-
-func WithTimeout(timeout time.Duration) AcquireOption {
-	return func(h *acquireOptionsHolder) {
-		h.timeout = &timeout
-	}
-}
 
 func WithAcquire() AcquireOption {
 	return func(h *acquireOptionsHolder) {
@@ -56,9 +57,16 @@ func WithReportSync() AcquireOption {
 	}
 }
 
+func WithDecrease(decreaseTimeout time.Duration) AcquireOption {
+	return func(h *acquireOptionsHolder) {
+		h.decreaseTimeout = decreaseTimeout
+	}
+}
+
 func NewAcquire(opts ...AcquireOption) Acquire {
 	h := &acquireOptionsHolder{
-		acquireType: AcquireTypeDefault,
+		acquireType:     AcquireTypeDefault,
+		decreaseTimeout: DefaultDecrease,
 	}
 	for _, o := range opts {
 		o(h)

@@ -2,6 +2,8 @@ package ratelimiter
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -158,7 +160,6 @@ func (c *client) AcquireResource(
 		request        = Ydb_RateLimiter.AcquireResourceRequest{
 			CoordinationNodePath: coordinationNodePath,
 			ResourcePath:         resourcePath,
-			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Used{Used: amount},
 		}
 	)
 
@@ -167,45 +168,42 @@ func (c *client) AcquireResource(
 		request.Units = &Ydb_RateLimiter.AcquireResourceRequest_Required{
 			Required: amount,
 		}
-	default:
-		request.Units = &Ydb_RateLimiter.AcquireResourceRequest_Used{
-			Used: amount,
-		}
-	}
-
-	switch acquireOptions.Type() {
-	case options.AcquireTypeAcquire:
-		if t := acquireOptions.Timeout(); t != nil {
-			ctx = operation.WithTimeout(ctx, *t)
+		if d, ok := ctx.Deadline(); ok {
+			// use deadline as CancelAfter timeout
+			ctx = operation.WithCancelAfter(ctx, time.Until(d)-acquireOptions.DecreaseTimeout())
 		}
 		_, err = c.service.AcquireResource(
 			ctx,
 			&request,
 		)
 	case options.AcquireTypeReportSync:
-		if t := acquireOptions.Timeout(); t != nil {
-			ctx = operation.WithTimeout(ctx, *t)
+		request.Units = &Ydb_RateLimiter.AcquireResourceRequest_Used{
+			Used: amount,
+		}
+		if d, ok := ctx.Deadline(); ok {
+			ctx = operation.WithTimeout(ctx, time.Until(d)-acquireOptions.DecreaseTimeout())
 		}
 		_, err = c.service.AcquireResource(
 			ctx,
 			&request,
 		)
 	case options.AcquireTypeReportAsync:
+		request.Units = &Ydb_RateLimiter.AcquireResourceRequest_Used{
+			Used: amount,
+		}
 		go func() {
-			if t := acquireOptions.Timeout(); t != nil {
-				ctx = operation.WithTimeout(ctx, *t)
-			}
 			_, _ = c.service.AcquireResource(
 				ctx,
 				&request,
 			)
 		}()
+	default:
+		panic(fmt.Errorf("unknown acquire type: %d", acquireOptions.Type()))
 	}
 
-	switch {
-	case errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled):
+	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {
 		return ratelimiter.AcquireError(amount, err)
-	default:
-		return err
 	}
+
+	return err
 }
