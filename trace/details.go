@@ -11,10 +11,9 @@ const (
 	DriverSystemEvents      Details = 1 << iota // 1
 	DriverClusterEvents                         // 2
 	DriverNetEvents                             // 4
-	DriverCoreEvents                            // 8
-	DriverCredentialsEvents                     // 16
-
-	DiscoveryEvents // 32
+	DriverResolverEvents                        // 8
+	DriverCoreEvents                            // 16
+	DriverCredentialsEvents                     // 32
 
 	TableSessionLifeCycleEvents     // 64
 	TableSessionQueryInvokeEvents   // 128
@@ -25,15 +24,17 @@ const (
 	TablePoolSessionLifeCycleEvents // 4096
 	TablePoolAPIEvents              // 8192
 
-	SchemeEvents // 16384
+	DiscoveryEvents // 16384
 
-	ScriptingEvents // 32768
+	SchemeEvents // 32768
 
-	CoordinationEvents // 65536
+	ScriptingEvents // 65536
 
 	RatelimiterEvents // 131072
 
-	RetryEvents // 65536
+	CoordinationEvents // 262144
+
+	RetryEvents
 
 	DriverConnEvents = DriverNetEvents |
 		DriverCoreEvents // 12

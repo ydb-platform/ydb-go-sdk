@@ -1,4 +1,5 @@
 ## 3.11.0
+* Added resolver trace callback
 * Refactored initialization step of grpc dial options 
 * Added internal package `net` with `net.Conn` proxy object
 * Fixed closing proxy clients
