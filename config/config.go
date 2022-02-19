@@ -281,7 +281,13 @@ func New(opts ...Option) Config {
 	}
 	c.grpcOptions = append(
 		c.grpcOptions,
-		grpcCredentials(c.secure, c.tlsConfig),
+		grpcCredentials(
+			c.secure,
+			c.tlsConfig,
+		),
+		grpc.WithResolvers(
+			resolver.New("ydb", c.trace),
+		),
 	)
 	c.meta = meta.New(
 		c.database,
@@ -328,9 +334,6 @@ func defaultConfig() (c *config) {
 			),
 			grpc.WithKeepaliveParams(
 				DefaultGrpcConnectionPolicy,
-			),
-			grpc.WithResolvers(
-				resolver.New("ydb"),
 			),
 			grpc.WithDefaultServiceConfig(`{
 				"loadBalancingPolicy": "round_robin"

@@ -101,7 +101,7 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 
 // nolint:gocyclo
 func TestTable(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 555*time.Second)
 	defer cancel()
 
 	s := &stats{

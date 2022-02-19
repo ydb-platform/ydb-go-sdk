@@ -23,6 +23,9 @@ type (
 		OnNetDial  func(NetDialStartInfo) func(NetDialDoneInfo)
 		OnNetClose func(NetCloseStartInfo) func(NetCloseDoneInfo)
 
+		// Resolver events
+		OnResolve func(ResolveStartInfo) func(ResolveDoneInfo)
+
 		// Conn events
 		OnConnStateChange func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
 		OnConnInvoke      func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
@@ -130,6 +133,13 @@ type (
 	}
 	ConnStateChangeDoneInfo struct {
 		State ConnState
+	}
+	ResolveStartInfo struct {
+		Target   string
+		Resolved []string
+	}
+	ResolveDoneInfo struct {
+		Error error
 	}
 	NetReadStartInfo struct {
 		Address string

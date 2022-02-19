@@ -154,6 +154,30 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnResolve == nil:
+		ret.OnResolve = x.OnResolve
+	case x.OnResolve == nil:
+		ret.OnResolve = t.OnResolve
+	default:
+		h1 := t.OnResolve
+		h2 := x.OnResolve
+		ret.OnResolve = func(r ResolveStartInfo) func(ResolveDoneInfo) {
+			r1 := h1(r)
+			r2 := h2(r)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(r ResolveDoneInfo) {
+					r1(r)
+					r2(r)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnConnStateChange == nil:
 		ret.OnConnStateChange = x.OnConnStateChange
 	case x.OnConnStateChange == nil:
@@ -520,6 +544,21 @@ func (t Driver) onNetClose(n NetCloseStartInfo) func(NetCloseDoneInfo) {
 	}
 	return res
 }
+func (t Driver) onResolve(r ResolveStartInfo) func(ResolveDoneInfo) {
+	fn := t.OnResolve
+	if fn == nil {
+		return func(ResolveDoneInfo) {
+			return
+		}
+	}
+	res := fn(r)
+	if res == nil {
+		return func(ResolveDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onConnStateChange(c1 ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
 	fn := t.OnConnStateChange
 	if fn == nil {
@@ -761,6 +800,17 @@ func DriverOnNetClose(t Driver, address string) func(error) {
 	res := t.onNetClose(p)
 	return func(e error) {
 		var p NetCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnResolve(t Driver, target string, resolved []string) func(error) {
+	var p ResolveStartInfo
+	p.Target = target
+	p.Resolved = resolved
+	res := t.onResolve(p)
+	return func(e error) {
+		var p ResolveDoneInfo
 		p.Error = e
 		res(p)
 	}

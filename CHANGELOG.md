@@ -1,4 +1,6 @@
 ## 3.11.0
+* Refactored `trace.Details` matching by string pattern
+* Added resolver trace callback
 * Refactored initialization step of grpc dial options 
 * Added internal package `net` with `net.Conn` proxy object
 * Fixed closing proxy clients

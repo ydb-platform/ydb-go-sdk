@@ -10,6 +10,36 @@ import (
 // Driver makes trace.Driver with internal logging
 func Driver(log Logger, details trace.Details) (t trace.Driver) {
 	log = log.WithName(`driver`)
+	if details&trace.DriverResolverEvents != 0 {
+		// nolint:govet
+		log := log.WithName(`resolver`)
+		t.OnResolve = func(
+			info trace.ResolveStartInfo,
+		) func(
+			trace.ResolveDoneInfo,
+		) {
+			target := info.Target
+			addresses := info.Resolved
+			log.Tracef(`update start {target:"%s",resolved:%v}`,
+				target,
+				addresses,
+			)
+			return func(info trace.ResolveDoneInfo) {
+				if info.Error == nil {
+					log.Infof(`update done {target:"%s",resolved:%v}`,
+						target,
+						addresses,
+					)
+				} else {
+					log.Errorf(`update failed {target:"%s",resolved:%v,error:"%v"}`,
+						target,
+						addresses,
+						info.Error,
+					)
+				}
+			}
+		}
+	}
 	// nolint:nestif
 	if details&trace.DriverNetEvents != 0 {
 		// nolint:govet

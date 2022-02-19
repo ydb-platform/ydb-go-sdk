@@ -1,16 +1,15 @@
 package trace
 
 import (
-	"sort"
-	"strings"
+	"regexp"
 )
 
 type Details uint64
 
 const (
-	DriverSystemEvents      Details = 1 << iota // 1
-	DriverClusterEvents                         // 2
-	DriverNetEvents                             // 4
+	DriverNetEvents         Details = 1 << iota // 1
+	DriverResolverEvents                        // 2
+	DriverClusterEvents                         // 4
 	DriverCoreEvents                            // 8
 	DriverCredentialsEvents                     // 16
 
@@ -25,18 +24,35 @@ const (
 	TablePoolSessionLifeCycleEvents // 4096
 	TablePoolAPIEvents              // 8192
 
-	SchemeEvents // 16384
+	RetryEvents // 16384
 
-	ScriptingEvents // 32768
+	SchemeEvents // 32768
 
-	CoordinationEvents // 65536
+	ScriptingEvents // 65536
 
 	RatelimiterEvents // 131072
 
-	RetryEvents // 65536
+	CoordinationEvents // 262144
+
+	DriverEvents = DriverClusterEvents |
+		DriverNetEvents |
+		DriverResolverEvents |
+		DriverCoreEvents |
+		DriverCredentialsEvents // 63
+
+	TableEvents = TableSessionLifeCycleEvents |
+		TableSessionQueryInvokeEvents |
+		TableSessionQueryStreamEvents |
+		TableSessionTransactionEvents |
+		TablePoolLifeCycleEvents |
+		TablePoolRetryEvents |
+		TablePoolSessionLifeCycleEvents |
+		TablePoolAPIEvents // 16320
 
 	DriverConnEvents = DriverNetEvents |
-		DriverCoreEvents // 12
+		DriverResolverEvents |
+		DriverCoreEvents // 28
+
 	TableSessionQueryEvents = TableSessionQueryInvokeEvents |
 		TableSessionQueryStreamEvents // 384
 	TableSessionEvents = TableSessionLifeCycleEvents |
@@ -46,83 +62,90 @@ const (
 		TablePoolRetryEvents |
 		TablePoolSessionLifeCycleEvents |
 		TablePoolAPIEvents // 15360
+
 	DetailsAll = ^Details(0) // 18446744073709551615
 )
 
 var (
-	detailsToString = map[Details]string{
-		DriverSystemEvents:      "DriverSystemEvents",
-		DriverClusterEvents:     "DriverClusterEvents",
-		DriverNetEvents:         "DriverNetEvents",
-		DriverCoreEvents:        "DriverCoreEvents",
-		DriverCredentialsEvents: "DriverCredentialsEvents",
+	details = map[Details]string{
+		DriverEvents:            "ydb.driver",
+		DriverClusterEvents:     "ydb.driver.cluster",
+		DriverNetEvents:         "ydb.driver.net",
+		DriverResolverEvents:    "ydb.driver.resolver",
+		DriverCoreEvents:        "ydb.driver.core",
+		DriverCredentialsEvents: "ydb.driver.credentials",
 
-		DiscoveryEvents: "DiscoveryEvents",
+		DiscoveryEvents: "ydb.discovery",
 
-		TableSessionLifeCycleEvents:     "TableSessionLifeCycleEvents",
-		TableSessionQueryInvokeEvents:   "TableSessionQueryInvokeEvents",
-		TableSessionQueryStreamEvents:   "TableSessionQueryStreamEvents",
-		TableSessionTransactionEvents:   "TableSessionTransactionEvents",
-		TablePoolLifeCycleEvents:        "TablePoolLifeCycleEvents",
-		TablePoolRetryEvents:            "TablePoolRetryEvents",
-		TablePoolSessionLifeCycleEvents: "TablePoolSessionLifeCycleEvents",
-		TablePoolAPIEvents:              "TablePoolAPIEvents",
+		RetryEvents: "ydb.retry",
+
+		SchemeEvents: "ydb.scheme",
+
+		ScriptingEvents: "ydb.scripting",
+
+		CoordinationEvents: "ydb.coordination",
+
+		RatelimiterEvents: "ydb.ratelimiter",
+
+		TableEvents:                     "ydb.table",
+		TableSessionLifeCycleEvents:     "ydb.table.session",
+		TableSessionQueryInvokeEvents:   "ydb.table.session.query.invoke",
+		TableSessionQueryStreamEvents:   "ydb.table.session.query.stream",
+		TableSessionTransactionEvents:   "ydb.table.session.tx",
+		TablePoolLifeCycleEvents:        "ydb.table.pool",
+		TablePoolRetryEvents:            "ydb.table.pool.retry",
+		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
+		TablePoolAPIEvents:              "ydb.table.pool.api",
 	}
-	stringToDetails = map[string]Details{
-		"DriverSystemEvents":      DriverSystemEvents,
-		"DriverClusterEvents":     DriverClusterEvents,
-		"DriverNetEvents":         DriverNetEvents,
-		"DriverCoreEvents":        DriverCoreEvents,
-		"DriverCredentialsEvents": DriverCredentialsEvents,
-		"DriverConnEvents":        DriverConnEvents,
-
-		"DiscoveryEvents": DiscoveryEvents,
-
-		"TableSessionLifeCycleEvents":     TableSessionLifeCycleEvents,
-		"TableSessionQueryInvokeEvents":   TableSessionQueryInvokeEvents,
-		"TableSessionQueryStreamEvents":   TableSessionQueryStreamEvents,
-		"TableSessionTransactionEvents":   TableSessionTransactionEvents,
-		"TablePoolLifeCycleEvents":        TablePoolLifeCycleEvents,
-		"TablePoolRetryEvents":            TablePoolRetryEvents,
-		"TablePoolSessionLifeCycleEvents": TablePoolSessionLifeCycleEvents,
-		"TablePoolAPIEvents":              TablePoolAPIEvents,
-		"TableSessionQueryEvents":         TableSessionQueryEvents,
-		"TableSessionEvents":              TableSessionEvents,
-		"TablePoolEvents":                 TablePoolEvents,
-
-		"DetailsAll": DetailsAll,
-	}
+	defaultDetails = DetailsAll
 )
 
-func DetailsFromString(s string) (d Details) {
-	return DetailsFromStrings(strings.Split(s, "|"))
+type matchDetailsOptionsHolder struct {
+	defaultDetails Details
+	posixMatch     bool
 }
 
-func DetailsFromStrings(ss []string) (d Details) {
-	if len(ss) == 0 {
-		return 0
+type matchDetailsOption func(h *matchDetailsOptionsHolder)
+
+func WithDefaultDetails(defaultDetails Details) matchDetailsOption {
+	return func(h *matchDetailsOptionsHolder) {
+		h.defaultDetails = defaultDetails
 	}
-	for _, sss := range ss {
-		if v, ok := stringToDetails[sss]; ok {
-			d |= v
+}
+
+func WithPOSIXMatch() matchDetailsOption {
+	return func(h *matchDetailsOptionsHolder) {
+		h.posixMatch = true
+	}
+}
+
+func MatchDetails(pattern string, opts ...matchDetailsOption) (d Details) {
+	var (
+		h = &matchDetailsOptionsHolder{
+			defaultDetails: defaultDetails,
 		}
+		re  *regexp.Regexp
+		err error
+	)
+
+	for _, o := range opts {
+		o(h)
+	}
+	if h.posixMatch {
+		re, err = regexp.CompilePOSIX(pattern)
+	} else {
+		re, err = regexp.Compile(pattern)
+	}
+	if err != nil {
+		return h.defaultDetails
+	}
+	for k, v := range details {
+		if re.MatchString(v) {
+			d |= k
+		}
+	}
+	if d == 0 {
+		return h.defaultDetails
 	}
 	return d
-}
-
-func (d Details) String() string {
-	if s, ok := detailsToString[d]; ok {
-		return s
-	}
-	return strings.Join(d.Strings(), "|")
-}
-
-func (d Details) Strings() (ss []string) {
-	for k, v := range detailsToString {
-		if d&k != 0 {
-			ss = append(ss, v)
-		}
-	}
-	sort.Strings(ss)
-	return
 }
