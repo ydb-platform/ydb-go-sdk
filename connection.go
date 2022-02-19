@@ -227,6 +227,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		}
 	}
 	c.config = config.New(c.options...)
+
 	if c.config.Endpoint() == "" {
 		panic("empty dial address")
 	}
@@ -245,13 +246,13 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		ctx,
 		c.config,
 		append(
-			// prepend endpoint, database name and secure options before custom discoveryOptions
-			// If custom discoveryOptions contains endpoint, database name or secure options
-			// - will apply custom values
+			// prepend config params from root config
 			[]discoveryConfig.Option{
 				discoveryConfig.WithEndpoint(c.Endpoint()),
 				discoveryConfig.WithDatabase(c.Name()),
 				discoveryConfig.WithSecure(c.Secure()),
+				discoveryConfig.WithOperationTimeout(c.config.OperationTimeout()),
+				discoveryConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
 			},
 			c.discoveryOptions...,
 		)...,
@@ -260,15 +261,65 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		return nil, err
 	}
 
-	c.table = lazy.Table(c.db, c.tableOptions)
+	c.table = lazy.Table(
+		c.db,
+		append(
+			// prepend config params from root config
+			[]tableConfig.Option{
+				tableConfig.WithOperationTimeout(c.config.OperationTimeout()),
+				tableConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+			},
+			c.tableOptions...,
+		),
+	)
 
-	c.scheme = lazy.Scheme(c.db, c.schemeOptions)
+	c.scheme = lazy.Scheme(
+		c.db,
+		append(
+			// prepend config params from root config
+			[]schemeConfig.Option{
+				schemeConfig.WithOperationTimeout(c.config.OperationTimeout()),
+				schemeConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+			},
+			c.schemeOptions...,
+		),
+	)
 
-	c.scripting = lazy.Scripting(c.db, c.scriptingOptions)
+	c.scripting = lazy.Scripting(
+		c.db,
+		append(
+			// prepend config params from root config
+			[]scriptingConfig.Option{
+				scriptingConfig.WithOperationTimeout(c.config.OperationTimeout()),
+				scriptingConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+			},
+			c.scriptingOptions...,
+		),
+	)
 
-	c.coordination = lazy.Coordination(c.db, c.coordinationOptions)
+	c.coordination = lazy.Coordination(
+		c.db,
+		append(
+			// prepend config params from root config
+			[]coordinationConfig.Option{
+				coordinationConfig.WithOperationTimeout(c.config.OperationTimeout()),
+				coordinationConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+			},
+			c.coordinationOptions...,
+		),
+	)
 
-	c.ratelimiter = lazy.Ratelimiter(c.db, c.ratelimiterOptions)
+	c.ratelimiter = lazy.Ratelimiter(
+		c.db,
+		append(
+			// prepend config params from root config
+			[]ratelimiterConfig.Option{
+				ratelimiterConfig.WithOperationTimeout(c.config.OperationTimeout()),
+				ratelimiterConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+			},
+			c.ratelimiterOptions...,
+		),
+	)
 
 	return c, nil
 }

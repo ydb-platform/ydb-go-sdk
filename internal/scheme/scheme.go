@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 )
@@ -30,16 +31,32 @@ func New(cc grpc.ClientConnInterface, options []config.Option) scheme.Client {
 }
 
 func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
-	_, err = c.service.MakeDirectory(ctx, &Ydb_Scheme.MakeDirectoryRequest{
-		Path: path,
-	})
+	_, err = c.service.MakeDirectory(
+		ctx,
+		&Ydb_Scheme.MakeDirectoryRequest{
+			Path: path,
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		},
+	)
 	return err
 }
 
 func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
-	_, err = c.service.RemoveDirectory(ctx, &Ydb_Scheme.RemoveDirectoryRequest{
-		Path: path,
-	})
+	_, err = c.service.RemoveDirectory(
+		ctx,
+		&Ydb_Scheme.RemoveDirectoryRequest{
+			Path: path,
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		},
+	)
 	return err
 }
 
@@ -50,9 +67,17 @@ func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directo
 		response *Ydb_Scheme.ListDirectoryResponse
 		result   Ydb_Scheme.ListDirectoryResult
 	)
-	response, err = c.service.ListDirectory(ctx, &Ydb_Scheme.ListDirectoryRequest{
-		Path: path,
-	})
+	response, err = c.service.ListDirectory(
+		ctx,
+		&Ydb_Scheme.ListDirectoryRequest{
+			Path: path,
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		},
+	)
 	if err != nil {
 		return d, err
 	}
@@ -71,9 +96,17 @@ func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 		response *Ydb_Scheme.DescribePathResponse
 		result   Ydb_Scheme.DescribePathResult
 	)
-	response, err = c.service.DescribePath(ctx, &Ydb_Scheme.DescribePathRequest{
-		Path: path,
-	})
+	response, err = c.service.DescribePath(
+		ctx,
+		&Ydb_Scheme.DescribePathRequest{
+			Path: path,
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		},
+	)
 	if err != nil {
 		return e, err
 	}
@@ -90,11 +123,19 @@ func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...sch
 	for _, o := range opts {
 		o(&desc)
 	}
-	_, err = c.service.ModifyPermissions(ctx, &Ydb_Scheme.ModifyPermissionsRequest{
-		Path:             path,
-		Actions:          desc.actions,
-		ClearPermissions: desc.clear,
-	})
+	_, err = c.service.ModifyPermissions(
+		ctx,
+		&Ydb_Scheme.ModifyPermissionsRequest{
+			Path:             path,
+			Actions:          desc.actions,
+			ClearPermissions: desc.clear,
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		},
+	)
 	return err
 }
 

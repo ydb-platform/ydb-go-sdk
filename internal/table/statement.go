@@ -26,7 +26,7 @@ func (s *statement) Execute(
 	txr table.Transaction, r result.Result, err error,
 ) {
 	onDone := trace.TableOnSessionQueryExecute(
-		s.session.trace,
+		s.session.config.Trace(),
 		&ctx,
 		s.session,
 		s.query,

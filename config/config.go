@@ -36,16 +36,6 @@ type Config interface {
 	// Trace contains driver tracing options.
 	Trace() trace.Driver
 
-	// RequestTimeout is the maximum amount of time a Call() will wait for an
-	// operation to complete.
-	// If RequestTimeout is zero then no timeout is used.
-	RequestTimeout() time.Duration
-
-	// StreamTimeout is the maximum amount of time a StreamRead() will wait for
-	// an operation to complete.
-	// If StreamTimeout is zero then no timeout is used.
-	StreamTimeout() time.Duration
-
 	// OperationTimeout is the maximum amount of time a YDB server will process
 	// an operation. After timeout exceeds YDB will try to cancel operation and
 	// regardless of the cancellation appropriate error will be returned to
@@ -88,8 +78,6 @@ type Config interface {
 // Config contains driver configuration options.
 type config struct {
 	trace                trace.Driver
-	requestTimeout       time.Duration
-	streamTimeout        time.Duration
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
 	dialTimeout          time.Duration
@@ -144,14 +132,6 @@ func (c *config) Credentials() credentials.Credentials {
 
 func (c *config) Trace() trace.Driver {
 	return c.trace
-}
-
-func (c *config) RequestTimeout() time.Duration {
-	return c.requestTimeout
-}
-
-func (c *config) StreamTimeout() time.Duration {
-	return c.streamTimeout
 }
 
 func (c *config) OperationTimeout() time.Duration {
@@ -217,18 +197,6 @@ func WithConnectionTTL(ttl time.Duration) Option {
 func WithCredentials(credentials credentials.Credentials) Option {
 	return func(c *config) {
 		c.credentials = credentials
-	}
-}
-
-func WithRequestTimeout(requestTimeout time.Duration) Option {
-	return func(c *config) {
-		c.requestTimeout = requestTimeout
-	}
-}
-
-func WithStreamTimeout(streamTimeout time.Duration) Option {
-	return func(c *config) {
-		c.streamTimeout = streamTimeout
 	}
 }
 

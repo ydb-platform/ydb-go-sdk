@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
@@ -27,39 +28,63 @@ func New(cc grpc.ClientConnInterface, options []config.Option) coordination.Clie
 }
 
 func (c *client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
-	_, err = c.service.CreateNode(ctx, &Ydb_Coordination.CreateNodeRequest{
-		Path: path,
-		Config: &Ydb_Coordination.Config{
-			Path:                     config.Path,
-			SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
-			SessionGracePeriodMillis: config.SessionGracePeriodMillis,
-			ReadConsistencyMode:      config.ReadConsistencyMode.To(),
-			AttachConsistencyMode:    config.AttachConsistencyMode.To(),
-			RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
+	_, err = c.service.CreateNode(
+		ctx,
+		&Ydb_Coordination.CreateNodeRequest{
+			Path: path,
+			Config: &Ydb_Coordination.Config{
+				Path:                     config.Path,
+				SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
+				SessionGracePeriodMillis: config.SessionGracePeriodMillis,
+				ReadConsistencyMode:      config.ReadConsistencyMode.To(),
+				AttachConsistencyMode:    config.AttachConsistencyMode.To(),
+				RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
+			},
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
-	})
+	)
 	return
 }
 
 func (c *client) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
-	_, err = c.service.AlterNode(ctx, &Ydb_Coordination.AlterNodeRequest{
-		Path: path,
-		Config: &Ydb_Coordination.Config{
-			Path:                     config.Path,
-			SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
-			SessionGracePeriodMillis: config.SessionGracePeriodMillis,
-			ReadConsistencyMode:      config.ReadConsistencyMode.To(),
-			AttachConsistencyMode:    config.AttachConsistencyMode.To(),
-			RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
+	_, err = c.service.AlterNode(
+		ctx,
+		&Ydb_Coordination.AlterNodeRequest{
+			Path: path,
+			Config: &Ydb_Coordination.Config{
+				Path:                     config.Path,
+				SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
+				SessionGracePeriodMillis: config.SessionGracePeriodMillis,
+				ReadConsistencyMode:      config.ReadConsistencyMode.To(),
+				AttachConsistencyMode:    config.AttachConsistencyMode.To(),
+				RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
+			},
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
-	})
+	)
 	return
 }
 
 func (c *client) DropNode(ctx context.Context, path string) (err error) {
-	_, err = c.service.DropNode(ctx, &Ydb_Coordination.DropNodeRequest{
-		Path: path,
-	})
+	_, err = c.service.DropNode(
+		ctx,
+		&Ydb_Coordination.DropNodeRequest{
+			Path: path,
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		},
+	)
 	return
 }
 
@@ -76,9 +101,17 @@ func (c *client) DescribeNode(
 		response *Ydb_Coordination.DescribeNodeResponse
 		result   Ydb_Coordination.DescribeNodeResult
 	)
-	response, err = c.service.DescribeNode(ctx, &Ydb_Coordination.DescribeNodeRequest{
-		Path: path,
-	})
+	response, err = c.service.DescribeNode(
+		ctx,
+		&Ydb_Coordination.DescribeNodeRequest{
+			Path: path,
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		},
+	)
 	if err != nil {
 		return nil, nil, err
 	}

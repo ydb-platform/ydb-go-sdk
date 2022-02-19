@@ -8,6 +8,10 @@
 * Added `ydb.MetaRequestType` and `ydb.MetaTraceID` aliases to internal `meta` package constants
 * Added `ydb.WithCustomCredentials()` option
 * Refactored `ydb.Ratelimiter().AcquireResource()` method (added options for defining type of acquire request)
+* Removed single point to define operation mode params (each grpc-call with `OperationParams` must explicit define `OperationParams`)
+* Removed defining operation params over context
+* Removed `config.RequestTimeout` and `config.StreamTimeout` (each grpc-call must manage context instead define `config.RequestTimeout` or `config.StreamTimeout`)
+* Added internal `OperationTimeout` and `OperationCancelAfter` to each client (ratelimiter, coordination, table, scheme, scripting, discovery) config. `OperationTimeout` and `OperationCancelAfter` config params defined from root config
 
 ## 3.10.0
 * Extended `trace.Details` constants for support per-service events

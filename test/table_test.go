@@ -176,8 +176,6 @@ func TestTable(t *testing.T) {
 		ydb.WithAnonymousCredentials(),
 		ydb.WithUserAgent("tx"),
 		ydb.With(
-			config.WithRequestTimeout(time.Second*5),
-			config.WithStreamTimeout(time.Second*5),
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
 			config.WithGrpcOptions(

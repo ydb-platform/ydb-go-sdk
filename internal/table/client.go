@@ -68,7 +68,7 @@ func newClient(
 	onDone := trace.TableOnPoolInit(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
 	if builder == nil {
 		builder = func(ctx context.Context) (s Session, err error) {
-			return newSession(ctx, cc, config.Trace().Compose(trace.ContextTable(ctx)))
+			return newSession(ctx, cc, config)
 		}
 	}
 	c := &client{

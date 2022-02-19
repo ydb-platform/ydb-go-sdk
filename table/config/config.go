@@ -17,7 +17,21 @@ const (
 )
 
 type Config interface {
-	// Trace is an optional session lifetime tracing options.
+	// OperationTimeout is the maximum amount of time a YDB server will process
+	// an operation. After timeout exceeds YDB will try to cancel operation and
+	// regardless of the cancellation appropriate error will be returned to
+	// the client.
+	// If OperationTimeout is zero then no timeout is used.
+	OperationTimeout() time.Duration
+
+	// OperationCancelAfter is the maximum amount of time a YDB server will process an
+	// operation. After timeout exceeds YDB will try to cancel operation and if
+	// it succeeds appropriate error will be returned to the client; otherwise
+	// processing will be continued.
+	// If OperationCancelAfter is zero then no timeout is used.
+	OperationCancelAfter() time.Duration
+
+	// Trace defines trace over table client calls
 	Trace() trace.Table
 
 	// SizeLimit is an upper bound of pooled sessions.
@@ -142,7 +156,22 @@ func WithTrace(trace trace.Table) Option {
 	}
 }
 
+func WithOperationTimeout(operationTimeout time.Duration) Option {
+	return func(c *config) {
+		c.operationTimeout = operationTimeout
+	}
+}
+
+func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
+	return func(c *config) {
+		c.operationCancelAfter = operationCancelAfter
+	}
+}
+
 type config struct {
+	operationTimeout     time.Duration
+	operationCancelAfter time.Duration
+
 	sizeLimit              int
 	keepAliveMinSize       int
 	idleKeepAliveThreshold int
@@ -150,11 +179,20 @@ type config struct {
 	keepAliveTimeout       time.Duration
 	createSessionTimeout   time.Duration
 	deleteTimeout          time.Duration
-	trace                  trace.Table
+
+	trace trace.Table
 }
 
 func (c *config) Trace() trace.Table {
 	return c.trace
+}
+
+func (c *config) OperationTimeout() time.Duration {
+	return c.operationTimeout
+}
+
+func (c *config) OperationCancelAfter() time.Duration {
+	return c.operationCancelAfter
 }
 
 func (c *config) SizeLimit() int {

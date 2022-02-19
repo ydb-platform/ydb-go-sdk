@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -33,6 +34,11 @@ func (c *client) Execute(
 	request := &Ydb_Scripting.ExecuteYqlRequest{
 		Script:     query,
 		Parameters: params.Params(),
+		OperationParams: operation.Params(
+			c.config.OperationTimeout(),
+			c.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 	response, err := c.service.ExecuteYql(ctx, request)
 	if err != nil {
@@ -66,6 +72,11 @@ func (c *client) Explain(
 		request = &Ydb_Scripting.ExplainYqlRequest{
 			Script: query,
 			Mode:   mode2mode(mode),
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		}
 		response *Ydb_Scripting.ExplainYqlResponse
 		result   = Ydb_Scripting.ExplainYqlResult{}
@@ -99,6 +110,11 @@ func (c *client) StreamExecute(
 	request := &Ydb_Scripting.ExecuteYqlRequest{
 		Script:     query,
 		Parameters: params.Params(),
+		OperationParams: operation.Params(
+			c.config.OperationTimeout(),
+			c.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

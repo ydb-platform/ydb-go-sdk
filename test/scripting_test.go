@@ -28,8 +28,6 @@ func TestScripting(t *testing.T) {
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
-			config.WithRequestTimeout(time.Second*2),
-			config.WithStreamTimeout(time.Second*2),
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
 		),

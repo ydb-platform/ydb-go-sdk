@@ -232,6 +232,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config:       config.New(),
 				}
 				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
 				testutil.NoError(t, err)
@@ -242,6 +243,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config:       config.New(),
 				}
 				_, err := s.Explain(ctx, "")
 				testutil.NoError(t, err)
@@ -252,6 +254,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config:       config.New(),
 				}
 				_, err := s.Prepare(ctx, "")
 				testutil.NoError(t, err)
@@ -269,6 +272,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config:       config.New(),
 				}
 				testutil.NoError(t, s.Close(ctx))
 			},
@@ -278,6 +282,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config:       config.New(),
 				}
 				_, err := s.BeginTransaction(ctx, table.TxSettings())
 				testutil.NoError(t, err)
@@ -289,6 +294,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				tx := &transaction{
 					s: &session{
 						tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
+						config:       config.New(),
 					},
 				}
 				_, err := tx.CommitTx(ctx)
@@ -301,6 +307,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				tx := &transaction{
 					s: &session{
 						tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
+						config:       config.New(),
 					},
 				}
 				err := tx.Rollback(ctx)
@@ -312,6 +319,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *client) {
 				s := &session{
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config:       config.New(),
 				}
 				testutil.NoError(t, s.KeepAlive(ctx))
 			},
@@ -377,12 +385,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 							context.Background(),
 							time.Second,
 						)
-						if srcDst.srcMode != 0 {
-							ctx = operation.WithMode(
-								ctx,
-								srcDst.srcMode,
-							)
-						}
 						defer cancel()
 						test.do(t, ctx, client)
 					})
