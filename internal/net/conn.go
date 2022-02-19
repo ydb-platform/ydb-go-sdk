@@ -1,4 +1,4 @@
-package config
+package net
 
 import (
 	"context"
@@ -8,13 +8,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type netConn struct {
+type conn struct {
 	address string
 	trace   trace.Driver
 	cc      net.Conn
 }
 
-func newConn(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err error) {
+func New(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err error) {
 	onDone := trace.DriverOnNetDial(t, &ctx, address)
 	defer func() {
 		onDone(err)
@@ -23,14 +23,14 @@ func newConn(ctx context.Context, address string, t trace.Driver) (_ net.Conn, e
 	if err != nil {
 		return nil, err
 	}
-	return &netConn{
+	return &conn{
 		address: address,
 		cc:      cc,
 		trace:   t,
 	}, nil
 }
 
-func (c *netConn) Read(b []byte) (n int, err error) {
+func (c *conn) Read(b []byte) (n int, err error) {
 	onDone := trace.DriverOnNetRead(c.trace, c.address, len(b))
 	defer func() {
 		onDone(n, err)
@@ -38,7 +38,7 @@ func (c *netConn) Read(b []byte) (n int, err error) {
 	return c.cc.Read(b)
 }
 
-func (c *netConn) Write(b []byte) (n int, err error) {
+func (c *conn) Write(b []byte) (n int, err error) {
 	onDone := trace.DriverOnNetWrite(c.trace, c.address, len(b))
 	defer func() {
 		onDone(n, err)
@@ -46,7 +46,7 @@ func (c *netConn) Write(b []byte) (n int, err error) {
 	return c.cc.Write(b)
 }
 
-func (c *netConn) Close() (err error) {
+func (c *conn) Close() (err error) {
 	onDone := trace.DriverOnNetClose(c.trace, c.address)
 	defer func() {
 		onDone(err)
@@ -54,22 +54,22 @@ func (c *netConn) Close() (err error) {
 	return c.cc.Close()
 }
 
-func (c *netConn) LocalAddr() net.Addr {
+func (c *conn) LocalAddr() net.Addr {
 	return c.cc.LocalAddr()
 }
 
-func (c *netConn) RemoteAddr() net.Addr {
+func (c *conn) RemoteAddr() net.Addr {
 	return c.cc.RemoteAddr()
 }
 
-func (c *netConn) SetDeadline(t time.Time) error {
+func (c *conn) SetDeadline(t time.Time) error {
 	return c.cc.SetDeadline(t)
 }
 
-func (c *netConn) SetReadDeadline(t time.Time) error {
+func (c *conn) SetReadDeadline(t time.Time) error {
 	return c.cc.SetReadDeadline(t)
 }
 
-func (c *netConn) SetWriteDeadline(t time.Time) error {
+func (c *conn) SetWriteDeadline(t time.Time) error {
 	return c.cc.SetWriteDeadline(t)
 }

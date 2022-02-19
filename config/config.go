@@ -1,8 +1,10 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"net"
 	"time"
 
 	"google.golang.org/grpc"
@@ -11,6 +13,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/net"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/resolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -69,10 +73,6 @@ type Config interface {
 	// If DialTimeout is zero then no timeout is used.
 	DialTimeout() time.Duration
 
-	// TLSConfig specifies the TLS configuration to use for tls client.
-	// If TLSConfig is zero then connections are insecure.
-	TLSConfig() *tls.Config
-
 	// GrpcDialOptions is an custom client grpc dial options which will appends to
 	// default grpc dial options
 	GrpcDialOptions() []grpc.DialOption
@@ -104,6 +104,10 @@ type config struct {
 	credentials          credentials.Credentials
 	tlsConfig            *tls.Config
 	meta                 meta.Meta
+}
+
+func (c *config) GrpcDialOptions() []grpc.DialOption {
+	return c.grpcOptions
 }
 
 func (c *config) Meta() meta.Meta {
@@ -275,9 +279,10 @@ func New(opts ...Option) Config {
 	for _, o := range opts {
 		o(c)
 	}
-	if !c.secure {
-		c.tlsConfig = nil
-	}
+	c.grpcOptions = append(
+		c.grpcOptions,
+		grpcCredentials(c.secure, c.tlsConfig),
+	)
 	c.meta = meta.New(
 		c.database,
 		c.credentials,
@@ -310,6 +315,31 @@ func defaultConfig() (c *config) {
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			RootCAs:    certPool(),
+		},
+		grpcOptions: []grpc.DialOption{
+			grpc.WithContextDialer(
+				func(ctx context.Context, address string) (net.Conn, error) {
+					return builder.New(
+						ctx,
+						address,
+						trace.ContextDriver(ctx).Compose(c.trace),
+					)
+				},
+			),
+			grpc.WithKeepaliveParams(
+				DefaultGrpcConnectionPolicy,
+			),
+			grpc.WithResolvers(
+				resolver.New("ydb"),
+			),
+			grpc.WithDefaultServiceConfig(`{
+				"loadBalancingPolicy": "round_robin"
+			}`),
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
+				grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
+			),
+			grpc.WithBlock(),
 		},
 	}
 }

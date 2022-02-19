@@ -1,4 +1,6 @@
 ## 3.11.0
+* Refactored initialization step of grpc dial options 
+* Added internal package `net` with `net.Conn` proxy object
 * Fixed closing proxy clients
 * Added `ydb.Connection.With(opts ...ydb.CustomOption)` for taking proxy `ydb.Connection` with some redefined options
 * Added `ydb.MetaRequestType` and `ydb.MetaTraceID` aliases to internal `meta` package constants
