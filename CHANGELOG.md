@@ -1,4 +1,5 @@
 ## 3.11.0
+* Added SourceAddress and ResolvedAddress to all net events
 * Fixed closing proxy clients
 * Added `ydb.Connection.With(opts ...ydb.CustomOption)` for taking proxy `ydb.Connection` with some redefined options
 * Added `ydb.MetaRequestType` and `ydb.MetaTraceID` aliases to internal `meta` package constants

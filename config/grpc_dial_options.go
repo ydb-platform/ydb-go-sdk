@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/net"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/resolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -17,7 +18,11 @@ func (c *config) GrpcDialOptions() (opts []grpc.DialOption) {
 	opts = append(
 		c.grpcOptions,
 		grpc.WithContextDialer(func(ctx context.Context, address string) (net.Conn, error) {
-			return newConn(ctx, address, trace.ContextDriver(ctx).Compose(c.trace))
+			return builder.New(
+				ctx,
+				address,
+				trace.ContextDriver(ctx).Compose(c.trace),
+			)
 		}),
 		grpc.WithKeepaliveParams(DefaultGrpcConnectionPolicy),
 		grpc.WithResolvers(

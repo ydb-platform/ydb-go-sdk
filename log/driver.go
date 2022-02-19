@@ -15,22 +15,26 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 		// nolint:govet
 		log := log.WithName(`net`)
 		t.OnNetRead = func(info trace.NetReadStartInfo) func(trace.NetReadDoneInfo) {
-			address := info.Address
-			log.Tracef(`read start {address:"%s"}`,
-				address,
+			sourceAddress := info.SourceAddress
+			resolvedAddress := info.ResolvedAddress
+			log.Tracef(`read start {sourceAddress:"%s",resolvedAddress:"%s"}`,
+				sourceAddress,
+				resolvedAddress,
 			)
 			start := time.Now()
 			return func(info trace.NetReadDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`read done {latency:"%s",address:"%s",received:%d}`,
 						time.Since(start),
-						address,
+						sourceAddress,
+						resolvedAddress,
 						info.Received,
 					)
 				} else {
 					log.Warnf(`read failed {latency:"%s",address:"%s",received:%d,error:"%s"}`,
 						time.Since(start),
-						address,
+						sourceAddress,
+						resolvedAddress,
 						info.Received,
 						info.Error,
 					)
@@ -38,20 +42,26 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 		t.OnNetWrite = func(info trace.NetWriteStartInfo) func(trace.NetWriteDoneInfo) {
-			address := info.Address
-			log.Tracef(`write start {address:"%s"}`, address)
+			sourceAddress := info.SourceAddress
+			resolvedAddress := info.ResolvedAddress
+			log.Tracef(`write start {sourceAddress:"%s",resolvedAddress:"%s"}`,
+				sourceAddress,
+				resolvedAddress,
+			)
 			start := time.Now()
 			return func(info trace.NetWriteDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`write done {latency:"%s",address:"%s",sent:%d}`,
+					log.Tracef(`write done {latency:"%s",sourceAddress:"%s",resolvedAddress:"%s",sent:%d}`,
 						time.Since(start),
-						address,
+						sourceAddress,
+						resolvedAddress,
 						info.Sent,
 					)
 				} else {
-					log.Warnf(`write failed {latency:"%s",address:"%s",sent:%d,error:"%s"}`,
+					log.Warnf(`write failed {latency:"%s",sourceAddress:"%s",resolvedAddress:"%s",sent:%d,error:"%s"}`,
 						time.Since(start),
-						address,
+						sourceAddress,
+						resolvedAddress,
 						info.Sent,
 						info.Error,
 					)
@@ -59,42 +69,50 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 		t.OnNetDial = func(info trace.NetDialStartInfo) func(trace.NetDialDoneInfo) {
-			address := info.Address
-			log.Debugf(`dial start {address:"%s"}`,
-				address,
+			sourceAddress := info.SourceAddress
+			resolvedAddress := info.ResolvedAddress
+			log.Debugf(`dial start {sourceAddress:"%s",resolvedAddress:"%s"}`,
+				sourceAddress,
+				resolvedAddress,
 			)
 			start := time.Now()
 			return func(info trace.NetDialDoneInfo) {
 				if info.Error == nil {
-					log.Debugf(`dial done {latency:"%s",address:"%s"}`,
+					log.Debugf(`dial done {latency:"%s",sourceAddress:"%s",resolvedAddress:"%s"}`,
 						time.Since(start),
-						address,
+						sourceAddress,
+						resolvedAddress,
 					)
 				} else {
-					log.Errorf(`dial failed {latency:"%s",address:"%s",error:"%s"}`,
+					log.Errorf(`dial failed {latency:"%s",sourceAddress:"%s",resolvedAddress:"%s",error:"%s"}`,
 						time.Since(start),
-						address,
+						sourceAddress,
+						resolvedAddress,
 						info.Error,
 					)
 				}
 			}
 		}
 		t.OnNetClose = func(info trace.NetCloseStartInfo) func(trace.NetCloseDoneInfo) {
-			address := info.Address
+			sourceAddress := info.SourceAddress
+			resolvedAddress := info.ResolvedAddress
 			log.Debugf(`close start {address:"%s"}`,
-				address,
+				sourceAddress,
+				resolvedAddress,
 			)
 			start := time.Now()
 			return func(info trace.NetCloseDoneInfo) {
 				if info.Error == nil {
-					log.Debugf(`close done {latency:"%s",address:"%s"}`,
+					log.Debugf(`close done {latency:"%s",sourceAddress:"%s",resolvedAddress:"%s"}`,
 						time.Since(start),
-						address,
+						sourceAddress,
+						resolvedAddress,
 					)
 				} else {
-					log.Warnf(`close failed {latency:"%s",address:"%s",error:"%s"}`,
+					log.Warnf(`close failed {latency:"%s",sourceAddress:"%s",resolvedAddress:"%s",error:"%s"}`,
 						time.Since(start),
-						address,
+						sourceAddress,
+						resolvedAddress,
 						info.Error,
 					)
 				}

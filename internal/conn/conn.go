@@ -13,6 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/net"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -124,7 +125,11 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 			ctx, cancel = context.WithTimeout(ctx, dialTimeout)
 			defer cancel()
 		}
-		cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
+		cc, err = grpc.DialContext(
+			net.WithAddress(ctx, c.endpoint.Address()),
+			"ydb:///"+c.endpoint.Address(),
+			c.config.GrpcDialOptions()...,
+		)
 		if err != nil {
 			return nil, err
 		}

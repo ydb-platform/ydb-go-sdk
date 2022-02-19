@@ -720,9 +720,10 @@ func DriverOnClose(t Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ error) {
+func DriverOnNetRead(t Driver, sourceAddress string, resolvedAddress string, buffer int) func(received int, _ error) {
 	var p NetReadStartInfo
-	p.Address = address
+	p.SourceAddress = sourceAddress
+	p.ResolvedAddress = resolvedAddress
 	p.Buffer = buffer
 	res := t.onNetRead(p)
 	return func(received int, e error) {
@@ -732,9 +733,10 @@ func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ 
 		res(p)
 	}
 }
-func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ error) {
+func DriverOnNetWrite(t Driver, sourceAddress string, resolvedAddress string, bytes int) func(sent int, _ error) {
 	var p NetWriteStartInfo
-	p.Address = address
+	p.SourceAddress = sourceAddress
+	p.ResolvedAddress = resolvedAddress
 	p.Bytes = bytes
 	res := t.onNetWrite(p)
 	return func(sent int, e error) {
@@ -744,10 +746,11 @@ func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ erro
 		res(p)
 	}
 }
-func DriverOnNetDial(t Driver, c *context.Context, address string) func(error) {
+func DriverOnNetDial(t Driver, c *context.Context, sourceAddress string, resolvedAddress string) func(error) {
 	var p NetDialStartInfo
 	p.Context = c
-	p.Address = address
+	p.SourceAddress = sourceAddress
+	p.ResolvedAddress = resolvedAddress
 	res := t.onNetDial(p)
 	return func(e error) {
 		var p NetDialDoneInfo
@@ -755,9 +758,10 @@ func DriverOnNetDial(t Driver, c *context.Context, address string) func(error) {
 		res(p)
 	}
 }
-func DriverOnNetClose(t Driver, address string) func(error) {
+func DriverOnNetClose(t Driver, sourceAddress string, resolvedAddress string) func(error) {
 	var p NetCloseStartInfo
-	p.Address = address
+	p.SourceAddress = sourceAddress
+	p.ResolvedAddress = resolvedAddress
 	res := t.onNetClose(p)
 	return func(e error) {
 		var p NetCloseDoneInfo

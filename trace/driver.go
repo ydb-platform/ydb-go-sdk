@@ -132,16 +132,18 @@ type (
 		State ConnState
 	}
 	NetReadStartInfo struct {
-		Address string
-		Buffer  int
+		SourceAddress   string
+		ResolvedAddress string
+		Buffer          int
 	}
 	NetReadDoneInfo struct {
 		Received int
 		Error    error
 	}
 	NetWriteStartInfo struct {
-		Address string
-		Bytes   int
+		SourceAddress   string
+		ResolvedAddress string
+		Bytes           int
 	}
 	NetWriteDoneInfo struct {
 		Sent  int
@@ -152,14 +154,16 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Address string
+		Context         *context.Context
+		SourceAddress   string
+		ResolvedAddress string
 	}
 	NetDialDoneInfo struct {
 		Error error
 	}
 	NetCloseStartInfo struct {
-		Address string
+		SourceAddress   string
+		ResolvedAddress string
 	}
 	NetCloseDoneInfo struct {
 		Error error
