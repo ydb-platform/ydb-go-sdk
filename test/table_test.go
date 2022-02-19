@@ -101,7 +101,7 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 
 // nolint:gocyclo
 func TestTable(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 555*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
 	defer cancel()
 
 	s := &stats{
@@ -213,7 +213,7 @@ func TestTable(t *testing.T) {
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithLogger(
-			trace.DetailsAll,
+			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),

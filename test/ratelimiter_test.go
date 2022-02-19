@@ -24,7 +24,7 @@ const (
 )
 
 func TestRatelimiter(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*4)
 	defer cancel()
 	db, err := ydb.New(
 		ctx,
@@ -36,7 +36,7 @@ func TestRatelimiter(t *testing.T) {
 		),
 		ydb.WithBalancer(balancers.SingleConn()),
 		ydb.WithLogger(
-			trace.DetailsAll,
+			trace.MatchDetails(`ydb\.(driver|discovery|retry|ratelimiter|coordination).*`),
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
