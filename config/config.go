@@ -281,7 +281,10 @@ func New(opts ...Option) Config {
 	}
 	c.grpcOptions = append(
 		c.grpcOptions,
-		grpcCredentials(c.secure, c.tlsConfig),
+		grpcCredentials(
+			c.secure,
+			c.tlsConfig,
+		),
 		grpc.WithResolvers(
 			resolver.New("ydb", c.trace),
 		),

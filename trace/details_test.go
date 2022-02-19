@@ -1,195 +1,79 @@
 package trace
 
 import (
-	"fmt"
 	"testing"
 )
 
-func TestDetailsString(t *testing.T) {
+func TestDetailsMatch(t *testing.T) {
 	for _, test := range []struct {
+		pattern string
 		details Details
-		exp     string
 	}{
 		{
-			details: DriverSystemEvents,
-			exp:     "DriverSystemEvents",
+			pattern: `^ydb\.driver$`,
+			details: DriverEvents,
 		},
 		{
-			details: DriverClusterEvents,
-			exp:     "DriverClusterEvents",
+			pattern: `^ydb\.driver\..*$`,
+			details: DriverEvents,
 		},
 		{
-			details: DriverNetEvents,
-			exp:     "DriverNetEvents",
+			pattern: `^ydb\.driver\.resolver$`,
+			details: DriverResolverEvents,
 		},
 		{
-			details: DriverCoreEvents,
-			exp:     "DriverCoreEvents",
+			pattern: `^ydb\.driver\.(resolver|net)$`,
+			details: DriverResolverEvents | DriverNetEvents,
 		},
 		{
-			details: DriverCredentialsEvents,
-			exp:     "DriverCredentialsEvents",
+			pattern: `^ydb\.driver\.(core|credentials|resolver|net)$`,
+			details: DriverCoreEvents | DriverCredentialsEvents | DriverResolverEvents | DriverNetEvents,
 		},
 		{
+			pattern: `^ydb\.scheme$`,
+			details: SchemeEvents,
+		},
+		{
+			pattern: `^ydb\.table`,
+			details: TableEvents,
+		},
+		{
+			pattern: `^ydb\.scripting$`,
+			details: ScriptingEvents,
+		},
+		{
+			pattern: `^ydb\.coordination$`,
+			details: CoordinationEvents,
+		},
+		{
+			pattern: `^ydb\.ratelimiter$`,
+			details: RatelimiterEvents,
+		},
+		{
+			pattern: `^ydb\.retry$`,
+			details: RetryEvents,
+		},
+		{
+			pattern: `^ydb\.discovery$`,
 			details: DiscoveryEvents,
-			exp:     "DiscoveryEvents",
 		},
 		{
-			details: TableSessionLifeCycleEvents,
-			exp:     "TableSessionLifeCycleEvents",
+			pattern: `^ydb\.(driver|discovery|retry|table|scheme).*$`,
+			details: DriverEvents | DiscoveryEvents | RetryEvents | TableEvents | SchemeEvents,
 		},
 		{
-			details: TableSessionQueryInvokeEvents,
-			exp:     "TableSessionQueryInvokeEvents",
-		},
-		{
-			details: TableSessionQueryStreamEvents,
-			exp:     "TableSessionQueryStreamEvents",
-		},
-		{
-			details: TableSessionTransactionEvents,
-			exp:     "TableSessionTransactionEvents",
-		},
-		{
-			details: TablePoolLifeCycleEvents,
-			exp:     "TablePoolLifeCycleEvents",
-		},
-		{
-			details: TablePoolRetryEvents,
-			exp:     "TablePoolRetryEvents",
-		},
-		{
-			details: TablePoolSessionLifeCycleEvents,
-			exp:     "TablePoolSessionLifeCycleEvents",
-		},
-		{
-			details: TablePoolAPIEvents,
-			exp:     "TablePoolAPIEvents",
-		},
-		{
-			details: DriverSystemEvents | DriverCoreEvents,
-			exp:     "DriverCoreEvents|DriverSystemEvents",
-		},
-		{
-			details: DriverClusterEvents | TablePoolAPIEvents,
-			exp:     "DriverClusterEvents|TablePoolAPIEvents",
-		},
-		{
-			details: DriverSystemEvents | DriverClusterEvents | DriverCoreEvents | TablePoolEvents,
-			exp: "DriverClusterEvents|DriverCoreEvents|DriverSystemEvents|TablePoolAPIEvents|" +
-				"TablePoolLifeCycleEvents|TablePoolRetryEvents|TablePoolSessionLifeCycleEvents",
+			pattern: `^ydb\.table\.(pool\.(session|api)|session).*$`,
+			details: TablePoolSessionLifeCycleEvents | TablePoolAPIEvents | TableSessionEvents,
 		},
 	} {
-		t.Run(test.exp, func(t *testing.T) {
-			if test.details.String() != test.exp {
-				t.Fatalf("unexpected %d serialize to string, act %s, exp %s", test.details, test.details.String(), test.exp)
-			}
-		})
-	}
-}
-
-func TestDetailsFromString(t *testing.T) {
-	for _, test := range []struct {
-		exp Details
-		s   string
-	}{
-		{
-			s:   "DriverSystemEvents",
-			exp: DriverSystemEvents,
-		},
-		{
-			s:   "DriverClusterEvents",
-			exp: DriverClusterEvents,
-		},
-		{
-			s:   "DriverNetEvents",
-			exp: DriverNetEvents,
-		},
-		{
-			s:   "DriverCoreEvents",
-			exp: DriverCoreEvents,
-		},
-		{
-			s:   "DriverCredentialsEvents",
-			exp: DriverCredentialsEvents,
-		},
-		{
-			s:   "DiscoveryEvents",
-			exp: DiscoveryEvents,
-		},
-		{
-			s:   "TableSessionLifeCycleEvents",
-			exp: TableSessionLifeCycleEvents,
-		},
-		{
-			s:   "TableSessionQueryInvokeEvents",
-			exp: TableSessionQueryInvokeEvents,
-		},
-		{
-			s:   "TableSessionQueryStreamEvents",
-			exp: TableSessionQueryStreamEvents,
-		},
-		{
-			s:   "TableSessionTransactionEvents",
-			exp: TableSessionTransactionEvents,
-		},
-		{
-			s:   "TablePoolLifeCycleEvents",
-			exp: TablePoolLifeCycleEvents,
-		},
-		{
-			s:   "TablePoolRetryEvents",
-			exp: TablePoolRetryEvents,
-		},
-		{
-			s:   "TablePoolSessionLifeCycleEvents",
-			exp: TablePoolSessionLifeCycleEvents,
-		},
-		{
-			s:   "TablePoolAPIEvents",
-			exp: TablePoolAPIEvents,
-		},
-		{
-			s:   "DriverCoreEvents|DriverSystemEvents",
-			exp: DriverSystemEvents | DriverCoreEvents,
-		},
-		{
-			s:   "DriverClusterEvents|TablePoolAPIEvents",
-			exp: DriverClusterEvents | TablePoolAPIEvents,
-		},
-		{
-			s: "DriverClusterEvents|DriverCoreEvents|DriverSystemEvents|TablePoolAPIEvents|" +
-				"TablePoolLifeCycleEvents|TablePoolRetryEvents|TablePoolSessionLifeCycleEvents",
-			exp: DriverSystemEvents | DriverClusterEvents | DriverCoreEvents | TablePoolEvents,
-		},
-	} {
-		t.Run(test.s, func(t *testing.T) {
-			if DetailsFromString(test.s) != test.exp {
-				t.Fatalf("unexpected %s deserialize to Details, act %d, exp %d", test.s, DetailsFromString(test.s), test.exp)
-			}
-		})
-	}
-}
-
-func TestDetailsToStringToDetails(t *testing.T) {
-	for i, d := range []Details{
-		DriverConnEvents,
-		TableSessionQueryEvents,
-		TableSessionEvents,
-		TablePoolEvents,
-		DriverSystemEvents | DriverConnEvents,
-		DriverSystemEvents | TableSessionQueryEvents,
-		DriverSystemEvents | TableSessionEvents,
-		DriverSystemEvents | TablePoolEvents,
-		TableSessionQueryEvents | DriverConnEvents,
-		TableSessionQueryEvents | TableSessionEvents,
-		TableSessionQueryEvents | TablePoolEvents,
-	} {
-		s := d.String()
-		t.Run(fmt.Sprintf("%d.%s", i, s), func(t *testing.T) {
-			dd := DetailsFromString(s)
-			if dd != d {
-				t.Fatalf("unexpected serialize-deserialize, act %d, exp %d, intermediate string %s", dd, d, s)
+		t.Run(test.pattern, func(t *testing.T) {
+			if MatchDetails(test.pattern) != test.details {
+				t.Fatalf(
+					"unexpected match details by pattern '%s': %d, exp %d",
+					test.pattern,
+					MatchDetails(test.pattern),
+					test.details,
+				)
 			}
 		})
 	}
