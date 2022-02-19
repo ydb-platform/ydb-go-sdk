@@ -2,6 +2,7 @@ package ratelimiter
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -9,47 +10,12 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_RateLimiter_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 )
-
-type Client interface {
-	CreateResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resource ratelimiter.Resource,
-	) (err error)
-	AlterResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resource ratelimiter.Resource,
-	) (err error)
-	DropResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resourcePath string,
-	) (err error)
-	ListResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resourcePath string,
-		recursive bool,
-	) (_ []string, err error)
-	DescribeResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resourcePath string,
-	) (_ *ratelimiter.Resource, err error)
-	AcquireResource(
-		ctx context.Context,
-		coordinationNodePath string,
-		resourcePath string,
-		amount uint64,
-		isUsedAmount bool,
-	) (err error)
-	Close(ctx context.Context) error
-}
 
 type client struct {
 	config  config.Config
@@ -60,21 +26,11 @@ func (c *client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, options []config.Option) Client {
+func New(cc grpc.ClientConnInterface, options []config.Option) *client {
 	return &client{
 		config:  config.New(options...),
 		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
 	}
-}
-
-func (c *client) ctx(ctx context.Context) context.Context {
-	return operation.WithCancelAfter(
-		operation.WithTimeout(
-			ctx,
-			c.config.OperationParams().Timeout,
-		),
-		c.config.OperationParams().CancelAfter,
-	)
 }
 
 func (c *client) CreateResource(
@@ -82,7 +38,7 @@ func (c *client) CreateResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	_, err = c.service.CreateResource(c.ctx(ctx), &Ydb_RateLimiter.CreateResourceRequest{
+	_, err = c.service.CreateResource(ctx, &Ydb_RateLimiter.CreateResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
 			ResourcePath: resource.ResourcePath,
@@ -93,6 +49,11 @@ func (c *client) CreateResource(
 				PrefetchWatermark:       resource.HierarchicalDrr.PrefetchWatermark,
 			}},
 		},
+		OperationParams: operation.Params(
+			c.config.OperationTimeout(),
+			c.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	})
 	return
 }
@@ -102,7 +63,7 @@ func (c *client) AlterResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	_, err = c.service.AlterResource(c.ctx(ctx), &Ydb_RateLimiter.AlterResourceRequest{
+	_, err = c.service.AlterResource(ctx, &Ydb_RateLimiter.AlterResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		Resource: &Ydb_RateLimiter.Resource{
 			ResourcePath: resource.ResourcePath,
@@ -113,6 +74,11 @@ func (c *client) AlterResource(
 				PrefetchWatermark:       resource.HierarchicalDrr.PrefetchWatermark,
 			}},
 		},
+		OperationParams: operation.Params(
+			c.config.OperationTimeout(),
+			c.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	})
 	return
 }
@@ -122,10 +88,14 @@ func (c *client) DropResource(
 	coordinationNodePath string,
 	resourcePath string,
 ) (err error) {
-	_, err = c.service.DropResource(c.ctx(ctx), &Ydb_RateLimiter.DropResourceRequest{
-		OperationParams:      nil,
+	_, err = c.service.DropResource(ctx, &Ydb_RateLimiter.DropResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
+		OperationParams: operation.Params(
+			c.config.OperationTimeout(),
+			c.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	})
 	return
 }
@@ -140,9 +110,14 @@ func (c *client) ListResource(
 		response *Ydb_RateLimiter.ListResourcesResponse
 		result   Ydb_RateLimiter.ListResourcesResult
 	)
-	response, err = c.service.ListResources(c.ctx(ctx), &Ydb_RateLimiter.ListResourcesRequest{
+	response, err = c.service.ListResources(ctx, &Ydb_RateLimiter.ListResourcesRequest{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
+		OperationParams: operation.Params(
+			c.config.OperationTimeout(),
+			c.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	})
 	if err != nil {
 		return nil, err
@@ -163,9 +138,14 @@ func (c *client) DescribeResource(
 		response *Ydb_RateLimiter.DescribeResourceResponse
 		result   Ydb_RateLimiter.DescribeResourceResult
 	)
-	response, err = c.service.DescribeResource(c.ctx(ctx), &Ydb_RateLimiter.DescribeResourceRequest{
+	response, err = c.service.DescribeResource(ctx, &Ydb_RateLimiter.DescribeResourceRequest{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
+		OperationParams: operation.Params(
+			c.config.OperationTimeout(),
+			c.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	})
 	if err != nil {
 		return nil, err
@@ -196,22 +176,74 @@ func (c *client) AcquireResource(
 	coordinationNodePath string,
 	resourcePath string,
 	amount uint64,
-	isUsedAmount bool,
+	opts ...options.AcquireOption,
 ) (err error) {
-	var request Ydb_RateLimiter.AcquireResourceRequest
-	if isUsedAmount {
-		request = Ydb_RateLimiter.AcquireResourceRequest{
-			CoordinationNodePath: coordinationNodePath,
-			ResourcePath:         resourcePath,
-			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Used{Used: amount},
-		}
-	} else {
-		request = Ydb_RateLimiter.AcquireResourceRequest{
-			CoordinationNodePath: coordinationNodePath,
-			ResourcePath:         resourcePath,
-			Units:                &Ydb_RateLimiter.AcquireResourceRequest_Required{Required: amount},
-		}
+	acquireOptions := options.NewAcquire(
+		append(
+			[]options.AcquireOption{
+				options.WithOperationTimeout(c.config.OperationTimeout()),
+				options.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+			},
+			opts...,
+		)...,
+	)
+
+	switch acquireOptions.Type() {
+	case options.AcquireTypeAcquire:
+		_, err = c.service.AcquireResource(
+			ctx,
+			&Ydb_RateLimiter.AcquireResourceRequest{
+				CoordinationNodePath: coordinationNodePath,
+				ResourcePath:         resourcePath,
+				Units: &Ydb_RateLimiter.AcquireResourceRequest_Required{
+					Required: amount,
+				},
+				OperationParams: operation.Params(
+					acquireOptions.OperationTimeout(),
+					acquireOptions.OperationCancelAfter(),
+					operation.ModeSync,
+				),
+			},
+		)
+	case options.AcquireTypeReportSync:
+		_, err = c.service.AcquireResource(
+			ctx,
+			&Ydb_RateLimiter.AcquireResourceRequest{
+				CoordinationNodePath: coordinationNodePath,
+				ResourcePath:         resourcePath,
+				Units: &Ydb_RateLimiter.AcquireResourceRequest_Used{
+					Used: amount,
+				},
+				OperationParams: operation.Params(
+					acquireOptions.OperationTimeout(),
+					acquireOptions.OperationCancelAfter(),
+					operation.ModeSync,
+				),
+			},
+		)
+	case options.AcquireTypeReportAsync:
+		_, err = c.service.AcquireResource(
+			ctx,
+			&Ydb_RateLimiter.AcquireResourceRequest{
+				CoordinationNodePath: coordinationNodePath,
+				ResourcePath:         resourcePath,
+				Units: &Ydb_RateLimiter.AcquireResourceRequest_Used{
+					Used: amount,
+				},
+				OperationParams: operation.Params(
+					acquireOptions.OperationTimeout(),
+					acquireOptions.OperationCancelAfter(),
+					operation.ModeAsync,
+				),
+			},
+		)
+	default:
+		panic(fmt.Errorf("unknown acquire type: %d", acquireOptions.Type()))
 	}
-	_, err = c.service.AcquireResource(c.ctx(ctx), &request)
-	return
+
+	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {
+		return ratelimiter.AcquireError(amount, err)
+	}
+
+	return err
 }

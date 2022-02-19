@@ -2,8 +2,10 @@ package ratelimiter
 
 import (
 	"context"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 )
 
 type Client interface {
@@ -40,6 +42,26 @@ type Client interface {
 		coordinationNodePath string,
 		resourcePath string,
 		amount uint64,
-		isUsedAmount bool,
+		opts ...options.AcquireOption,
 	) (err error)
+}
+
+func WithAcquire() options.AcquireOption {
+	return options.WithAcquire()
+}
+
+func WithReportAsync() options.AcquireOption {
+	return options.WithReportAsync()
+}
+
+func WithReportSync() options.AcquireOption {
+	return options.WithReportAsync()
+}
+
+func WithOperationTimeout(operationTimeout time.Duration) options.AcquireOption {
+	return options.WithOperationTimeout(operationTimeout)
+}
+
+func WithOperationCancelAfter(operationCancelAfter time.Duration) options.AcquireOption {
+	return options.WithOperationCancelAfter(operationCancelAfter)
 }

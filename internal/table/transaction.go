@@ -67,7 +67,7 @@ func (tx *transaction) CommitTx(
 		}
 	}()
 	onDone := trace.TableOnSessionTransactionCommit(
-		tx.s.trace,
+		tx.s.config.Trace(),
 		&ctx,
 		tx.s,
 		tx,
@@ -79,18 +79,23 @@ func (tx *transaction) CommitTx(
 		request = &Ydb_Table.CommitTransactionRequest{
 			SessionId: tx.s.id,
 			TxId:      tx.id,
+			OperationParams: operation.Params(
+				tx.s.config.OperationTimeout(),
+				tx.s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		}
 		response *Ydb_Table.CommitTransactionResponse
 		result   = new(Ydb_Table.CommitTransactionResult)
 	)
+
 	for _, opt := range opts {
 		opt((*options.CommitTransactionDesc)(request))
 	}
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
+
 	t := tx.s.trailer()
 	defer t.processHints()
+
 	response, err = tx.s.tableService.CommitTransaction(
 		cluster.WithEndpoint(ctx, tx.s),
 		request,
@@ -118,7 +123,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		return nil
 	}
 	onDone := trace.TableOnSessionTransactionRollback(
-		tx.s.trace,
+		tx.s.config.Trace(),
 		&ctx,
 		tx.s,
 		tx,
@@ -126,16 +131,20 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
+
 	t := tx.s.trailer()
 	defer t.processHints()
+
 	_, err = tx.s.tableService.RollbackTransaction(
 		cluster.WithEndpoint(ctx, tx.s),
 		&Ydb_Table.RollbackTransactionRequest{
 			SessionId: tx.s.id,
 			TxId:      tx.id,
+			OperationParams: operation.Params(
+				tx.s.config.OperationTimeout(),
+				tx.s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
 		t.Trailer(),
 	)

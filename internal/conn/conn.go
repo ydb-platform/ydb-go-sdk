@@ -13,7 +13,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -226,25 +225,9 @@ func (c *conn) Invoke(
 		opID   string
 		issues []trace.Issue
 	)
-	if t := c.config.RequestTimeout(); t > 0 {
-		ctx, cancel = context.WithTimeout(ctx, t)
-	}
-	defer func() {
-		if cancel != nil {
-			cancel()
-		}
-	}()
-	if t := c.config.OperationTimeout(); t > 0 {
-		ctx = operation.WithTimeout(ctx, t)
-	}
-	if t := c.config.OperationCancelAfter(); t > 0 {
-		ctx = operation.WithCancelAfter(ctx, t)
-	}
 
-	params := operation.ContextParams(ctx)
-	if !params.Empty() {
-		operation.SetOperationParams(req, params)
-	}
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
 
 	onDone := trace.DriverOnConnInvoke(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
@@ -306,16 +289,7 @@ func (c *conn) NewStream(
 	}
 
 	var cancel context.CancelFunc
-	if t := c.config.StreamTimeout(); t > 0 {
-		ctx, cancel = context.WithTimeout(ctx, t)
-		defer func() {
-			if err != nil {
-				cancel()
-			}
-		}()
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
+	ctx, cancel = context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
 			cancel()

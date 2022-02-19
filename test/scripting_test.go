@@ -28,8 +28,6 @@ func TestScripting(t *testing.T) {
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
-			config.WithRequestTimeout(time.Second*2),
-			config.WithStreamTimeout(time.Second*2),
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
 		),
@@ -37,7 +35,7 @@ func TestScripting(t *testing.T) {
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
-			trace.DriverConnEvents,
+			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),

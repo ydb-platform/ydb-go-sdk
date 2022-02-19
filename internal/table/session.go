@@ -22,6 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -38,7 +39,7 @@ import (
 type session struct {
 	id           string
 	tableService Ydb_Table_V1.TableServiceClient
-	trace        trace.Table
+	config       config.Config
 
 	closedMtx sync.RWMutex
 	closed    bool
@@ -86,8 +87,8 @@ func (s *session) isClosing() bool {
 	return s.status == options.SessionClosing
 }
 
-func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table) (s Session, err error) {
-	onDone := trace.TableOnSessionNew(t, &ctx)
+func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (s Session, err error) {
+	onDone := trace.TableOnSessionNew(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
 	defer func() {
 		onDone(s, err)
 	}()
@@ -95,13 +96,16 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
 	)
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
 	c := Ydb_Table_V1.NewTableServiceClient(cc)
 	response, err = c.CreateSession(
 		ctx,
-		&Ydb_Table.CreateSessionRequest{},
+		&Ydb_Table.CreateSessionRequest{
+			OperationParams: operation.Params(
+				config.OperationTimeout(),
+				config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -116,7 +120,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, t trace.Table)
 	return &session{
 		id:           result.GetSessionId(),
 		tableService: c,
-		trace:        t,
+		config:       config,
 	}, nil
 }
 
@@ -153,7 +157,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 	s.closedMtx.Unlock()
 
 	onDone := trace.TableOnSessionDelete(
-		s.trace,
+		s.config.Trace(),
 		&ctx,
 		s,
 	)
@@ -169,13 +173,15 @@ func (s *session) Close(ctx context.Context) (err error) {
 	}
 	s.onCloseMtx.RUnlock()
 
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
 	_, err = s.tableService.DeleteSession(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.DeleteSessionRequest{
 			SessionId: s.id,
+			OperationParams: operation.Params(
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
 	)
 	return err
@@ -183,24 +189,29 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 // KeepAlive keeps idle session alive.
 func (s *session) KeepAlive(ctx context.Context) (err error) {
-	onDone := trace.TableOnSessionKeepAlive(
-		s.trace,
-		&ctx,
-		s,
+	var (
+		result Ydb_Table.KeepAliveResult
+		onDone = trace.TableOnSessionKeepAlive(
+			s.config.Trace(),
+			&ctx,
+			s,
+		)
 	)
 	defer func() {
 		onDone(err)
 	}()
-	var result Ydb_Table.KeepAliveResult
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
+
 	t := s.trailer()
 	defer t.processHints()
 	resp, err := s.tableService.KeepAlive(
 		cluster.WithEndpoint(ctx, s),
 		&Ydb_Table.KeepAliveRequest{
 			SessionId: s.id,
+			OperationParams: operation.Params(
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
 		t.Trailer(),
 	)
@@ -232,6 +243,11 @@ func (s *session) CreateTable(
 	request := Ydb_Table.CreateTableRequest{
 		SessionId: s.id,
 		Path:      path,
+		OperationParams: operation.Params(
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 	for _, opt := range opts {
 		opt((*options.CreateTableDesc)(&request))
@@ -259,6 +275,11 @@ func (s *session) DescribeTable(
 	request := Ydb_Table.DescribeTableRequest{
 		SessionId: s.id,
 		Path:      path,
+		OperationParams: operation.Params(
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 	for _, opt := range opts {
 		opt((*options.DescribeTableDesc)(&request))
@@ -390,6 +411,11 @@ func (s *session) DropTable(
 	request := Ydb_Table.DropTableRequest{
 		SessionId: s.id,
 		Path:      path,
+		OperationParams: operation.Params(
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 	for _, opt := range opts {
 		opt((*options.DropTableDesc)(&request))
@@ -413,6 +439,11 @@ func (s *session) AlterTable(
 	request := Ydb_Table.AlterTableRequest{
 		SessionId: s.id,
 		Path:      path,
+		OperationParams: operation.Params(
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 	for _, opt := range opts {
 		opt((*options.AlterTableDesc)(&request))
@@ -437,6 +468,11 @@ func (s *session) CopyTable(
 		SessionId:       s.id,
 		SourcePath:      src,
 		DestinationPath: dst,
+		OperationParams: operation.Params(
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 	for _, opt := range opts {
 		opt((*options.CopyTableDesc)(&request))
@@ -463,7 +499,7 @@ func (s *session) Explain(
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
 		onDone   = trace.TableOnSessionQueryExplain(
-			s.trace,
+			s.config.Trace(),
 			&ctx,
 			s,
 			query,
@@ -478,9 +514,6 @@ func (s *session) Explain(
 		}
 	}()
 
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
 	t := s.trailer()
 	defer t.processHints()
 	response, err = s.tableService.ExplainDataQuery(
@@ -488,6 +521,11 @@ func (s *session) Explain(
 		&Ydb_Table.ExplainDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
+			OperationParams: operation.Params(
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
 		t.Trailer(),
 	)
@@ -515,20 +553,17 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		q        *dataQuery
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
-	)
-	onDone := trace.TableOnSessionQueryPrepare(
-		s.trace,
-		&ctx,
-		s,
-		query,
+		onDone   = trace.TableOnSessionQueryPrepare(
+			s.config.Trace(),
+			&ctx,
+			s,
+			query,
+		)
 	)
 	defer func() {
 		onDone(q, err)
 	}()
 
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
 	t := s.trailer()
 	defer t.processHints()
 	response, err = s.tableService.PrepareDataQuery(
@@ -536,6 +571,11 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		&Ydb_Table.PrepareDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
+			OperationParams: operation.Params(
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
 		t.Trailer(),
 	)
@@ -574,7 +614,7 @@ func (s *session) Execute(
 	q := new(dataQuery)
 	q.initFromText(query)
 
-	onDone := trace.TableOnSessionQueryExecute(s.trace, &ctx, s, q, params)
+	onDone := trace.TableOnSessionQueryExecute(s.config.Trace(), &ctx, s, q, params)
 	defer func() {
 		onDone(txr, true, r, err)
 	}()
@@ -624,22 +664,26 @@ func (s *session) executeDataQuery(
 	result *Ydb_Table.ExecuteQueryResult,
 	err error,
 ) {
-	var response *Ydb_Table.ExecuteDataQueryResponse
 	result = &Ydb_Table.ExecuteQueryResult{}
 	request = &Ydb_Table.ExecuteDataQueryRequest{
 		SessionId:  s.id,
 		TxControl:  tx.Desc(),
 		Parameters: params.Params(),
 		Query:      &query.query,
+		OperationParams: operation.Params(
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 	for _, opt := range opts {
 		opt((*options.ExecuteDataQueryDesc)(request))
 	}
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
+
 	t := s.trailer()
 	defer t.processHints()
+
+	var response *Ydb_Table.ExecuteDataQueryResponse
 	response, err = s.tableService.ExecuteDataQuery(
 		cluster.WithEndpoint(ctx, s),
 		request,
@@ -664,6 +708,11 @@ func (s *session) ExecuteSchemeQuery(
 	request := Ydb_Table.ExecuteSchemeQueryRequest{
 		SessionId: s.id,
 		YqlText:   query,
+		OperationParams: operation.Params(
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
 	}
 	for _, opt := range opts {
 		opt((*options.ExecuteSchemeQueryDesc)(&request))
@@ -687,7 +736,13 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult
 	)
-	request := Ydb_Table.DescribeTableOptionsRequest{}
+	request := Ydb_Table.DescribeTableOptionsRequest{
+		OperationParams: operation.Params(
+			s.config.OperationTimeout(),
+			s.config.OperationCancelAfter(),
+			operation.ModeSync,
+		),
+	}
 	t := s.trailer()
 	defer t.processHints()
 	response, err = s.tableService.DescribeTableOptions(
@@ -838,7 +893,7 @@ func (s *session) StreamReadTable(
 		&request,
 	)
 
-	onDone := trace.TableOnSessionQueryStreamRead(s.trace, &ctx, s)
+	onDone := trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx, s)
 
 	if err != nil {
 		cancel()
@@ -908,7 +963,7 @@ func (s *session) StreamExecuteScanQuery(
 	)
 
 	onDone := trace.TableOnSessionQueryStreamExecute(
-		s.trace,
+		s.config.Trace(),
 		&ctx,
 		s,
 		q,
@@ -959,6 +1014,11 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
 			Rows:  value.ToYDB(rows),
+			OperationParams: operation.Params(
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
 		t.Trailer(),
 	)
@@ -971,21 +1031,19 @@ func (s *session) BeginTransaction(
 	ctx context.Context,
 	tx *table.TransactionSettings,
 ) (x table.Transaction, err error) {
-	onDone := trace.TableOnSessionTransactionBegin(
-		s.trace,
-		&ctx,
-		s,
+	var (
+		result   Ydb_Table.BeginTransactionResult
+		response *Ydb_Table.BeginTransactionResponse
+		onDone   = trace.TableOnSessionTransactionBegin(
+			s.config.Trace(),
+			&ctx,
+			s,
+		)
 	)
 	defer func() {
 		onDone(x, err)
 	}()
-	var (
-		result   Ydb_Table.BeginTransactionResult
-		response *Ydb_Table.BeginTransactionResponse
-	)
-	if m, _ := operation.ContextMode(ctx); m == operation.ModeUnknown {
-		ctx = operation.WithMode(ctx, operation.ModeSync)
-	}
+
 	t := s.trailer()
 	defer t.processHints()
 	response, err = s.tableService.BeginTransaction(
@@ -993,6 +1051,11 @@ func (s *session) BeginTransaction(
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
 			TxSettings: tx.Settings(),
+			OperationParams: operation.Params(
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
 		},
 		t.Trailer(),
 	)

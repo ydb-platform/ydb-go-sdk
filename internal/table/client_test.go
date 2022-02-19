@@ -1506,7 +1506,7 @@ var simpleCluster = testutil.NewDB(
 )
 
 func simpleSession(t *testing.T) Session {
-	s, err := newSession(context.Background(), simpleCluster, trace.Table{})
+	s, err := newSession(context.Background(), simpleCluster, config.New())
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
 	}
@@ -1561,7 +1561,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session Session, err e
 		return f(ctx)
 	}
 
-	return newSession(ctx, s.cc, trace.ContextTable(ctx))
+	return newSession(ctx, s.cc, config.New())
 }
 
 func (c *client) debug() {

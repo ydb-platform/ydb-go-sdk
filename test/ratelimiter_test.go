@@ -14,7 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	public "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -24,21 +24,19 @@ const (
 )
 
 func TestRatelimiter(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*4)
 	defer cancel()
 	db, err := ydb.New(
 		ctx,
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
-			config.WithRequestTimeout(time.Second*2),
-			config.WithStreamTimeout(time.Second*2),
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
 		),
 		ydb.WithBalancer(balancers.SingleConn()),
 		ydb.WithLogger(
-			trace.DetailsAll,
+			trace.MatchDetails(`ydb\.(driver|discovery|retry|ratelimiter|coordination).*`),
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
@@ -81,9 +79,9 @@ func TestRatelimiter(t *testing.T) {
 		}
 	}()
 	// create resource
-	err = db.Ratelimiter().CreateResource(ctx, testCoordinationNodePath, public.Resource{
+	err = db.Ratelimiter().CreateResource(ctx, testCoordinationNodePath, ratelimiter.Resource{
 		ResourcePath: testResource,
-		HierarchicalDrr: public.HierarchicalDrrSettings{
+		HierarchicalDrr: ratelimiter.HierarchicalDrrSettings{
 			MaxUnitsPerSecond:       1,
 			MaxBurstSizeCoefficient: 2,
 		},
@@ -95,7 +93,7 @@ func TestRatelimiter(t *testing.T) {
 		// cleanup resource
 		err = db.Ratelimiter().DropResource(ctx, testCoordinationNodePath, testResource)
 		if err != nil {
-			t.Fatal("Cannot drop resource")
+			t.Fatalf("Cannot drop resource: %v", err)
 		}
 	}()
 	// describe resource
@@ -110,9 +108,9 @@ func TestRatelimiter(t *testing.T) {
 		t.Fatal("Resource invalid")
 	}
 	// alter resource
-	err = db.Ratelimiter().AlterResource(ctx, testCoordinationNodePath, public.Resource{
+	err = db.Ratelimiter().AlterResource(ctx, testCoordinationNodePath, ratelimiter.Resource{
 		ResourcePath: testResource,
-		HierarchicalDrr: public.HierarchicalDrrSettings{
+		HierarchicalDrr: ratelimiter.HierarchicalDrrSettings{
 			MaxUnitsPerSecond:       3,
 			MaxBurstSizeCoefficient: 4,
 		},
@@ -132,26 +130,49 @@ func TestRatelimiter(t *testing.T) {
 		t.Fatal("Resource invalid")
 	}
 	// list resource
-	list, err := db.Ratelimiter().ListResource(ctx, testCoordinationNodePath, testResource, true)
+	list, err := db.Ratelimiter().ListResource(
+		ctx,
+		testCoordinationNodePath,
+		testResource,
+		true,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(list) != 1 || list[0] != testResource {
 		t.Fatal("ListResource error")
 	}
-	// acquire resource amount <1,false>
+	// acquire resource amount 1
 	time.Sleep(time.Second) // for accumulate
-	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 1, false)
+	err = db.Ratelimiter().AcquireResource(
+		ctx,
+		testCoordinationNodePath,
+		testResource,
+		1,
+		ratelimiter.WithAcquire(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// acquire resource amount <10000,true>
-	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, true)
+	// report resource amount 10000
+	err = db.Ratelimiter().AcquireResource(
+		ctx,
+		testCoordinationNodePath,
+		testResource,
+		10000,
+		ratelimiter.WithReportSync(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// acquire resource amount <10000,false>
-	err = db.Ratelimiter().AcquireResource(ctx, testCoordinationNodePath, testResource, 10000, false)
+	// acquire resource amount 10000
+	err = db.Ratelimiter().AcquireResource(
+		ctx,
+		testCoordinationNodePath,
+		testResource,
+		10000,
+		ratelimiter.WithAcquire(),
+	)
 	if err == nil {
 		t.Fatal("Resource must not be acquired")
 	}
