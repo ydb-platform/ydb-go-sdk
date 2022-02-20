@@ -2,7 +2,6 @@ package ratelimiter
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -238,7 +237,7 @@ func (c *client) AcquireResource(
 			},
 		)
 	default:
-		panic(fmt.Errorf("unknown acquire type: %d", acquireOptions.Type()))
+		panic(errors.Errorf(0, "unknown acquire type: %d", acquireOptions.Type()))
 	}
 
 	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {

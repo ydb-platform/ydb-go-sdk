@@ -40,7 +40,7 @@ var (
 )
 
 func errNoProgress(attempts int) error {
-	return fmt.Errorf("ydb: table: no progress: %w (%d attempts)", ErrNoProgress, attempts)
+	return errors.Errorf(1, "ydb: table: no progress: %w (%d attempts)", ErrNoProgress, attempts)
 }
 
 // SessionBuilder is the interface that holds logic of creating sessions.
@@ -283,6 +283,9 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		}
 		// got session or err is not recoverable
 		if s != nil || !isCreateSessionErrorRetriable(err) {
+			if err != nil {
+				err = errors.Errorf(1, "create session failed: %w", err)
+			}
 			return s, err
 		}
 
@@ -293,9 +296,15 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// be fair here and not to lock more goroutines than we could ship
 		// session to.
 		s, err = c.waitFromCh(ctx, t)
+		if err != nil {
+			err = errors.Errorf(1, "wait from channel failed: %w", err)
+		}
 	}
 	if s == nil && err == nil {
 		err = errNoProgress(i)
+	}
+	if err != nil {
+		err = errors.Errorf(1, "get failed: %w", err)
 	}
 	return s, err
 }
@@ -887,10 +896,14 @@ func (c *client) closeSession(ctx context.Context, s Session) error {
 	return nil
 }
 
-func (c *client) keepAliveSession(ctx context.Context, s Session) error {
+func (c *client) keepAliveSession(ctx context.Context, s Session) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, c.config.KeepAliveTimeout())
 	defer cancel()
-	return s.KeepAlive(ctx)
+	err = s.KeepAlive(ctx)
+	if err != nil {
+		return errors.Errorf(0, "keep-alive session failed: %w", err)
+	}
+	return nil
 }
 
 // p.mu must be held.

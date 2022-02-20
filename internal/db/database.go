@@ -111,13 +111,17 @@ func (db *database) Invoke(
 ) error {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return err
+		return errors.Errorf(0, "cluster get failed: %w", err)
 	}
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
-		return err
+		return errors.Errorf(0, "meta get failed: %w", err)
 	}
-	return cc.Invoke(ctx, method, args, reply, opts...)
+	err = cc.Invoke(ctx, method, args, reply, opts...)
+	if err != nil {
+		return errors.Errorf(0, "invoke failed: %w", err)
+	}
+	return nil
 }
 
 func (db *database) NewStream(

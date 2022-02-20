@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
@@ -63,7 +64,7 @@ func (c *lazyCoordination) DescribeNode(
 	return entry, config, err
 }
 
-func (c *lazyCoordination) Close(ctx context.Context) error {
+func (c *lazyCoordination) Close(ctx context.Context) (err error) {
 	c.m.Lock()
 	defer c.m.Unlock()
 	if c.client == nil {
@@ -72,7 +73,11 @@ func (c *lazyCoordination) Close(ctx context.Context) error {
 	defer func() {
 		c.client = nil
 	}()
-	return c.client.Close(ctx)
+	err = c.client.Close(ctx)
+	if err != nil {
+		return errors.Errorf(0, "close failed: %w", err)
+	}
+	return nil
 }
 
 func (c *lazyCoordination) init() {

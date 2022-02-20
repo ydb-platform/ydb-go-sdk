@@ -31,7 +31,7 @@ func (s *grpcClientStream) Trailer() metadata.MD {
 func (s *grpcClientStream) CloseSend() (err error) {
 	err = s.s.CloseSend()
 	if err != nil {
-		err = errors.MapGRPCError(err)
+		err = errors.Errorf(0, "%w", errors.MapGRPCError(err))
 	}
 	return err
 }
@@ -43,7 +43,7 @@ func (s *grpcClientStream) Context() context.Context {
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	err = s.s.SendMsg(m)
 	if err != nil {
-		err = errors.MapGRPCError(err)
+		err = errors.Errorf(0, "%w", errors.MapGRPCError(err))
 	}
 	return
 }
@@ -60,11 +60,11 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	err = s.s.RecvMsg(m)
 
 	if err != nil {
-		err = errors.MapGRPCError(err)
+		err = errors.Errorf(0, "receive message failed: %w", errors.MapGRPCError(err))
 		if errors.MustPessimizeEndpoint(err) {
 			s.c.pessimize(s.s.Context(), err)
 		}
-		return err
+		return errors.Errorf(0, "%w", err)
 	}
 
 	if operation, ok := m.(wrap.StreamOperationResponse); ok {

@@ -127,7 +127,7 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 		if errors.Is(err, io.EOF) {
 			return err
 		}
-		return r.errorf("receive next result set failed: %w", err)
+		return r.errorf(0, "receive next result set failed: %w", err)
 	}
 	r.Reset(s, columns...)
 	if stats != nil {

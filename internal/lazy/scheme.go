@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -36,7 +37,7 @@ func (s *lazyScheme) ModifyPermissions(
 	})
 }
 
-func (s *lazyScheme) Close(ctx context.Context) error {
+func (s *lazyScheme) Close(ctx context.Context) (err error) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if s.client == nil {
@@ -45,7 +46,11 @@ func (s *lazyScheme) Close(ctx context.Context) error {
 	defer func() {
 		s.client = nil
 	}()
-	return s.client.Close(ctx)
+	err = s.client.Close(ctx)
+	if err != nil {
+		return errors.Errorf(0, "close failed: %w", err)
+	}
+	return nil
 }
 
 func (s *lazyScheme) init() {

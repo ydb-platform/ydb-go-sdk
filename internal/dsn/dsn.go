@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
 var (
@@ -30,7 +31,7 @@ func Register(param string, parser Parser) error {
 	_, has := parsers[param]
 	parsers[param] = parser
 	if has {
-		return fmt.Errorf("%w: %v", errParserExists, param)
+		return errors.Errorf(0, "%w: %v", errParserExists, param)
 	}
 	return nil
 }
@@ -41,7 +42,7 @@ func Parse(dsn string) (options []config.Option, err error) {
 		return nil, err
 	}
 	if _, has := schemasSecure[uri.Scheme]; !has {
-		return nil, fmt.Errorf("%w: %v", errSchemeNotValid, uri.Scheme)
+		return nil, errors.Errorf(0, "%w: %v", errSchemeNotValid, uri.Scheme)
 	}
 	options = append(
 		options,

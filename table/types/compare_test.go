@@ -303,7 +303,7 @@ func TestIncompatiblePrimitives(t *testing.T) {
 	if err == nil {
 		t.Errorf("Error expected")
 	}
-	if !strings.HasPrefix(err.Error(), "not comparable:") {
+	if !strings.Contains(err.Error(), "not comparable:") {
 		t.Errorf("Unexpected error message: %s", err.Error())
 	}
 }
@@ -314,7 +314,7 @@ func TestIncompatibleTuples(t *testing.T) {
 	_, err := Compare(l, r)
 	if err == nil {
 		t.Error("Error expected")
-	} else if !strings.HasPrefix(err.Error(), "not comparable:") {
+	} else if !strings.Contains(err.Error(), "not comparable:") {
 		t.Errorf("Unexpected error message: %s", err.Error())
 	}
 }

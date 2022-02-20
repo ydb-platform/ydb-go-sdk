@@ -62,7 +62,7 @@ func NewOpError(opts ...oeOpt) error {
 	for _, f := range opts {
 		f(oe)
 	}
-	return oe
+	return Errorf(2, "%w", oe)
 }
 
 func (e *OpError) Issues() IssueIterator {

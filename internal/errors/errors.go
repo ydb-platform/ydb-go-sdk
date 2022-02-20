@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"runtime"
+	"strconv"
+	"strings"
 )
 
 func IsTimeoutError(err error) bool {
@@ -54,15 +58,15 @@ func Is(err, target error) bool {
 // New is a proxy to errors.New
 // This need to single import errors
 func New(text string) error {
-	return errors.New(text)
+	return Errorf(2, "%w", errors.New(text))
 }
 
 // NewWithIssues returns error which contains child issues
 func NewWithIssues(text string, issues ...error) error {
-	return &errorWithIssues{
+	return Errorf(2, "%w", &errorWithIssues{
 		reason: text,
 		issues: issues,
-	}
+	})
 }
 
 type errorWithIssues struct {
@@ -82,4 +86,18 @@ func (e *errorWithIssues) Error() string {
 	}
 	b.WriteString("]")
 	return b.String()
+}
+
+// Errorf is alias to fmt.Errorf() with prepend file:line prefix
+func Errorf(depth int, format string, args ...interface{}) error {
+	function, file, line, _ := runtime.Caller(depth + 1)
+	return fmt.Errorf(runtime.FuncForPC(function).Name()+" ("+fileName(file)+":"+strconv.Itoa(line)+") "+format, args...)
+}
+
+func fileName(original string) string {
+	i := strings.LastIndex(original, "/")
+	if i == -1 {
+		return original
+	}
+	return original[i+1:]
 }
