@@ -406,95 +406,6 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 	return err
 }
 
-// Take removes session from the client and ensures that s will not be returned
-// by other Take() or Get() calls.
-//
-// The intended way of Take() use is to create session by calling Create() and
-// Put() it later to prepare KeepAlive tracking when session is idle. When
-// session becomes active, one should call Take() to stop KeepAlive tracking
-// (simultaneous use of session is prohibited).
-//
-// After session returned to the client by calling PutBusy() it can not be taken
-// by Take() any more. That is, semantically PutBusy() is the same as session's
-// Close().
-//
-// It is assumed that Take() callers never call Get() method.
-func (c *client) Take(ctx context.Context, s Session) (took bool, err error) {
-	onWait := trace.TableOnPoolTake(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
-	var onDone func(took bool, _ error)
-	defer func() {
-		if onDone == nil {
-			onDone = onWait()
-		}
-		onDone(took, err)
-	}()
-
-	if c.isClosed() {
-		return false, ErrSessionPoolClosed
-	}
-
-	var has bool
-	c.mu.Lock()
-	for has, took = c.takeIdle(s); has && !took && c.touching; has, took = c.takeIdle(s) {
-		cond := c.touchCond()
-		c.mu.Unlock()
-		onDone = onWait()
-
-		// Keepalive processing takes place right now.
-		// Try to await touched session before creation of new one.
-		select {
-		case <-cond:
-
-		case <-ctx.Done():
-			return false, ctx.Err()
-		}
-
-		c.mu.Lock()
-	}
-	c.mu.Unlock()
-
-	if !has {
-		err = ErrSessionUnknown
-	}
-
-	return took, err
-}
-
-// Create creates new session and returns it.
-// The intended way of Create() usage relates to Take() method.
-func (c *client) Create(ctx context.Context) (s Session, err error) {
-	const maxAttempts = 10
-	i := 0
-	for ; i < maxAttempts; i++ {
-		c.mu.Lock()
-		// NOTE: here is a race condition with keeper() running.
-		// session could be deleted by some reason after we released the mutex.
-		// We are not dealing with this because even if session is not deleted
-		// by keeper() it could be staled on the server and the same user
-		// experience will appear.
-		s, _ = c.peekFirstIdle()
-		c.mu.Unlock()
-
-		if s == nil {
-			return c.createSession(ctx)
-		}
-
-		took, e := c.Take(ctx, s)
-		if e == nil && !took || errors.Is(e, ErrSessionUnknown) {
-			// session was marked for deletion or deleted by keeper() - race happen - retry
-			s = nil
-			continue
-		}
-		if e != nil {
-			return nil, e
-		}
-
-		return s, nil
-	}
-
-	return nil, errNoProgress(i)
-}
-
 // Close deletes all stored sessions inside client.
 // It also stops all underlying timers and goroutines.
 // It returns first error occurred during stale sessions' deletion.
@@ -917,29 +828,6 @@ func (c *client) removeIdle(s Session) sessionInfo {
 	info.idle = nil
 	c.index[s] = info
 	return info
-}
-
-// Removes session from idle client and resets keepAliveCount for it not
-// to die in keeper when it will be returned
-// to be used only in outgoing functions that make session busy.
-// p.mu must be held.
-func (c *client) takeIdle(s Session) (has, took bool) {
-	var info sessionInfo
-	info, has = c.index[s]
-	if !has {
-		// Could not be strict here and panic – session may become deleted by
-		// keeper().
-		return
-	}
-	if info.idle == nil {
-		// session s is not idle.
-		return
-	}
-	took = true
-	info = c.removeIdle(s)
-	info.keepAliveCount = 0
-	c.index[s] = info
-	return
 }
 
 // p.mu must be held.

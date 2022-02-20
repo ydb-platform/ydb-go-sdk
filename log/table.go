@@ -609,45 +609,6 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 					}
 				}
 			}
-			t.OnPoolTake = func(
-				info trace.PoolTakeStartInfo,
-			) func(
-				doneInfo trace.PoolTakeWaitInfo,
-			) func(
-				doneInfo trace.PoolTakeDoneInfo,
-			) {
-				session := info.Session
-				log.Tracef(`take start {id:"%s",status:"%s"}`,
-					session.ID(),
-					session.Status(),
-				)
-				start := time.Now()
-				return func(info trace.PoolTakeWaitInfo) func(info trace.PoolTakeDoneInfo) {
-					log.Tracef(`take intermediate {latency:"%s",id:"%s",status:"%s"}`,
-						time.Since(start),
-						session.ID(),
-						session.Status(),
-					)
-					return func(info trace.PoolTakeDoneInfo) {
-						if info.Error == nil {
-							log.Tracef(`take done {latency:"%s",id:"%s",status:"%s",took:%t}`,
-								time.Since(start),
-								session.ID(),
-								session.Status(),
-								info.Took,
-							)
-						} else {
-							log.Errorf(`take failed {latency:"%s",id:"%s",status:"%s",took:%t,error:"%v"}`,
-								time.Since(start),
-								session.ID(),
-								session.Status(),
-								info.Took,
-								info.Error,
-							)
-						}
-					}
-				}
-			}
 		}
 	}
 	return t

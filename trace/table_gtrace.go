@@ -533,41 +533,6 @@ func (t Table) Compose(x Table) (ret Table) {
 			}
 		}
 	}
-	switch {
-	case t.OnPoolTake == nil:
-		ret.OnPoolTake = x.OnPoolTake
-	case x.OnPoolTake == nil:
-		ret.OnPoolTake = t.OnPoolTake
-	default:
-		h1 := t.OnPoolTake
-		h2 := x.OnPoolTake
-		ret.OnPoolTake = func(p PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
-			r1 := h1(p)
-			r2 := h2(p)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(p PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
-					r11 := r1(p)
-					r21 := r2(p)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(p PoolTakeDoneInfo) {
-							r11(p)
-							r21(p)
-						}
-					}
-				}
-			}
-		}
-	}
 	return ret
 }
 func (t Table) onSessionNew(s SessionNewStartInfo) func(SessionNewDoneInfo) {
@@ -918,33 +883,6 @@ func (t Table) onPoolWait(p PoolWaitStartInfo) func(PoolWaitDoneInfo) {
 	}
 	return res
 }
-func (t Table) onPoolTake(p PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
-	fn := t.OnPoolTake
-	if fn == nil {
-		return func(PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
-			return func(PoolTakeDoneInfo) {
-				return
-			}
-		}
-	}
-	res := fn(p)
-	if res == nil {
-		return func(PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
-			return func(PoolTakeDoneInfo) {
-				return
-			}
-		}
-	}
-	return func(p PoolTakeWaitInfo) func(PoolTakeDoneInfo) {
-		res := res(p)
-		if res == nil {
-			return func(PoolTakeDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
-}
 func TableOnSessionNew(t Table, c *context.Context) func(session sessionInfo, _ error) {
 	var p SessionNewStartInfo
 	p.Context = c
@@ -1199,21 +1137,5 @@ func TableOnPoolWait(t Table, c *context.Context) func(session sessionInfo, _ er
 		p.Session = session
 		p.Error = e
 		res(p)
-	}
-}
-func TableOnPoolTake(t Table, c *context.Context, session sessionInfo) func() func(took bool, _ error) {
-	var p PoolTakeStartInfo
-	p.Context = c
-	p.Session = session
-	res := t.onPoolTake(p)
-	return func() func(bool, error) {
-		var p PoolTakeWaitInfo
-		res := res(p)
-		return func(took bool, e error) {
-			var p PoolTakeDoneInfo
-			p.Took = took
-			p.Error = e
-			res(p)
-		}
 	}
 }
