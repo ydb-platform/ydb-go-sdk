@@ -489,6 +489,9 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 					}
 				}
 			}
+			t.OnPoolStateChange = func(info trace.PooStateChangeInfo) {
+				log.Infof(`state changed {size:%d,event:"%s"}`, info.Size, info.Event)
+			}
 		}
 		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
 			// nolint:govet

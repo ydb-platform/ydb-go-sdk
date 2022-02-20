@@ -344,6 +344,19 @@ func (t Table) Compose(x Table) (ret Table) {
 		}
 	}
 	switch {
+	case t.OnPoolStateChange == nil:
+		ret.OnPoolStateChange = x.OnPoolStateChange
+	case x.OnPoolStateChange == nil:
+		ret.OnPoolStateChange = t.OnPoolStateChange
+	default:
+		h1 := t.OnPoolStateChange
+		h2 := x.OnPoolStateChange
+		ret.OnPoolStateChange = func(p PooStateChangeInfo) {
+			h1(p)
+			h2(p)
+		}
+	}
+	switch {
 	case t.OnPoolDo == nil:
 		ret.OnPoolDo = x.OnPoolDo
 	case x.OnPoolDo == nil:
@@ -754,6 +767,13 @@ func (t Table) onPoolClose(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
 	}
 	return res
 }
+func (t Table) onPoolStateChange(p PooStateChangeInfo) {
+	fn := t.OnPoolStateChange
+	if fn == nil {
+		return
+	}
+	fn(p)
+}
 func (t Table) onPoolDo(p PoolDoStartInfo) func(info PoolDoIntermediateInfo) func(PoolDoDoneInfo) {
 	fn := t.OnPoolDo
 	if fn == nil {
@@ -1049,6 +1069,12 @@ func TableOnPoolClose(t Table, c *context.Context) func(error) {
 		p.Error = e
 		res(p)
 	}
+}
+func TableOnPoolStateChange(t Table, size int, event string) {
+	var p PooStateChangeInfo
+	p.Size = size
+	p.Event = event
+	t.onPoolStateChange(p)
 }
 func TableOnPoolDo(t Table, c *context.Context, idempotent bool) func(error) func(attempts int, _ error) {
 	var p PoolDoStartInfo

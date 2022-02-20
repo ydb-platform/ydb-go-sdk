@@ -200,28 +200,39 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 			panic("ydb: abnormal result of session build")
 		}
 
-		c.mu.Lock()
-		c.createInProgress--
 		if s != nil {
 			s.OnClose(func(ctx context.Context) {
 				c.mu.Lock()
 				defer c.mu.Unlock()
+
 				info, has := c.index[s]
 				if !has {
 					return
 				}
+
 				delete(c.index, s)
+
+				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
 
 				if c.closed {
 					return
 				}
 
 				c.notify(nil)
+
 				if info.idle != nil {
 					panic("ydb: table: session closed while still in idle client")
 				}
 			})
-			c.index[s] = sessionInfo{}
+		}
+
+		c.mu.Lock()
+		{
+			c.createInProgress--
+			if s != nil {
+				c.index[s] = sessionInfo{}
+				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+			}
 		}
 		c.mu.Unlock()
 
@@ -496,29 +507,6 @@ func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		withOptions(opts...),
 		withTrace(c.config.Trace()),
 	)
-}
-
-func (c *client) Stats() poolStats {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	idleCount, waitQCount, indexCount := 0, 0, 0
-	if c.idle != nil {
-		idleCount = c.idle.Len()
-	}
-	if c.waitq != nil {
-		waitQCount = c.waitq.Len()
-	}
-	if c.index != nil {
-		indexCount = len(c.index)
-	}
-	return poolStats{
-		Idle:             idleCount,
-		Index:            indexCount,
-		WaitQ:            waitQCount,
-		CreateInProgress: c.createInProgress,
-		MinSize:          c.config.KeepAliveMinSize(),
-		MaxSize:          c.limit,
-	}
 }
 
 func (c *client) keeper() {
@@ -902,13 +890,4 @@ type sessionInfo struct {
 func panicLocked(mu sync.Locker, message string) {
 	mu.Unlock()
 	panic(message)
-}
-
-type poolStats struct {
-	Idle             int
-	Index            int
-	WaitQ            int
-	MinSize          int
-	MaxSize          int
-	CreateInProgress int
 }

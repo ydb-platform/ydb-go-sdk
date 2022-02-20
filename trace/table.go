@@ -43,8 +43,11 @@ type (
 		// Pool events
 		OnPoolInit  func(PoolInitStartInfo) func(PoolInitDoneInfo)
 		OnPoolClose func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
-		OnPoolDo    func(PoolDoStartInfo) func(info PoolDoIntermediateInfo) func(PoolDoDoneInfo)
-		OnPoolDoTx  func(PoolDoTxStartInfo) func(info PoolDoTxIntermediateInfo) func(PoolDoTxDoneInfo)
+		// Pool state event
+		OnPoolStateChange func(PooStateChangeInfo)
+		// Pool retry events
+		OnPoolDo   func(PoolDoStartInfo) func(info PoolDoIntermediateInfo) func(PoolDoDoneInfo)
+		OnPoolDoTx func(PoolDoTxStartInfo) func(info PoolDoTxIntermediateInfo) func(PoolDoTxDoneInfo)
 		// Pool session lifecycle events
 		OnPoolSessionNew   func(PoolSessionNewStartInfo) func(PoolSessionNewDoneInfo)
 		OnPoolSessionClose func(PoolSessionCloseStartInfo) func(PoolSessionCloseDoneInfo)
@@ -226,6 +229,10 @@ type (
 	PoolInitDoneInfo struct {
 		Limit            int
 		KeepAliveMinSize int
+	}
+	PooStateChangeInfo struct {
+		Size  int
+		Event string
 	}
 	PoolSessionNewStartInfo struct {
 		// Context make available context in trace callback function.

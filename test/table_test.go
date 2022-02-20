@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
@@ -1018,7 +1019,8 @@ func days(date string) time.Time {
 }
 
 func init() {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	log.SetFlags(0)
+	log.SetOutput(ioutil.Discard)
 }
 
 type templateConfig struct {

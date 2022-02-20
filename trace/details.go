@@ -49,6 +49,11 @@ const (
 		TablePoolSessionLifeCycleEvents |
 		TablePoolAPIEvents // 16320
 
+	TablePoolEvents = TablePoolLifeCycleEvents |
+		TablePoolRetryEvents |
+		TablePoolSessionLifeCycleEvents |
+		TablePoolAPIEvents // 16320
+
 	DriverConnEvents = DriverNetEvents |
 		DriverResolverEvents |
 		DriverCoreEvents // 28
@@ -58,10 +63,6 @@ const (
 	TableSessionEvents = TableSessionLifeCycleEvents |
 		TableSessionQueryEvents |
 		TableSessionTransactionEvents // 960
-	TablePoolEvents = TablePoolLifeCycleEvents |
-		TablePoolRetryEvents |
-		TablePoolSessionLifeCycleEvents |
-		TablePoolAPIEvents // 15360
 
 	DetailsAll = ^Details(0) // 18446744073709551615
 )
