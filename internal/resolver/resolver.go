@@ -4,6 +4,7 @@ import (
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/serviceconfig"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -35,7 +36,11 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	return c.cc.UpdateState(state)
+	err = c.cc.UpdateState(state)
+	if err != nil {
+		err = errors.Errorf(0, "update failed: %w", err)
+	}
+	return err
 }
 
 func (c *clientConn) ReportError(err error) {

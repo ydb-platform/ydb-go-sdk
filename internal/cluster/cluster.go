@@ -2,8 +2,6 @@ package cluster
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -18,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -302,18 +301,18 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.closed {
-		return fmt.Errorf("cluster: pessimize failed: %w", ErrClusterClosed)
+		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrClusterClosed)
 	}
 
 	entry, has := c.index[e.Address()]
 	if !has {
-		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownEndpoint)
+		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrUnknownEndpoint)
 	}
 	if entry.Handle == nil {
-		return fmt.Errorf("cluster: pessimize failed: %w", ErrNilBalancerElement)
+		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrNilBalancerElement)
 	}
 	if !c.balancer.Contains(entry.Handle) {
-		return fmt.Errorf("cluster: pessimize failed: %w", ErrUnknownBalancerElement)
+		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrUnknownBalancerElement)
 	}
 	entry.Conn.SetState(ctx, conn.Banned)
 	if c.explorer != nil {

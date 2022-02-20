@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/proxy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
@@ -42,7 +43,25 @@ func newProxy(c Connection, meta meta.Meta) *proxyConnection {
 }
 
 func (c *proxyConnection) Close(ctx context.Context) error {
-	// nop
+	var issues []error
+	if err := c.ratelimiter.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := c.coordination.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := c.scheme.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := c.table.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if err := c.scripting.Close(ctx); err != nil {
+		issues = append(issues, err)
+	}
+	if len(issues) > 0 {
+		return errors.NewWithIssues("close failed", issues...)
+	}
 	return nil
 }
 

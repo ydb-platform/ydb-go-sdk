@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
@@ -26,7 +27,7 @@ func Ratelimiter(db db.Connection, options []config.Option) ratelimiter.Client {
 	}
 }
 
-func (r *lazyRatelimiter) Close(ctx context.Context) error {
+func (r *lazyRatelimiter) Close(ctx context.Context) (err error) {
 	r.m.Lock()
 	defer r.m.Unlock()
 	if r.client == nil {
@@ -35,7 +36,11 @@ func (r *lazyRatelimiter) Close(ctx context.Context) error {
 	defer func() {
 		r.client = nil
 	}()
-	return r.client.Close(ctx)
+	err = r.client.Close(ctx)
+	if err != nil {
+		return errors.Errorf(0, "close failed: %w", err)
+	}
+	return nil
 }
 
 func (r *lazyRatelimiter) CreateResource(

@@ -292,12 +292,18 @@ type Backoff interface {
 // It returns non-nil error if and only if deadline expiration branch wins.
 func waitBackoff(ctx context.Context, b Backoff, i int) error {
 	if b == nil {
-		return ctx.Err()
+		if err := ctx.Err(); err != nil {
+			return errors.Errorf(1, "%w", err)
+		}
+		return nil
 	}
 	select {
 	case <-b.Wait(i):
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		if err := ctx.Err(); err != nil {
+			return errors.Errorf(1, "%w", err)
+		}
+		return nil
 	}
 }

@@ -674,106 +674,6 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 	}
 }
 
-// TestSessionPoolGetDisconnected tests case when session successfully created,
-// but after that connection become broken and cannot be reestablished.
-func TestSessionPoolGetDisconnected(t *testing.T) {
-	timer := timetest.StubSingleTimer(t)
-	defer timer.Cleanup()
-
-	shiftTime, cleanupNow := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
-	defer cleanupNow()
-
-	var (
-		release   = make(chan struct{})
-		keepalive = make(chan struct{})
-	)
-
-	p := newClientWithStubBuilder(
-		t,
-		testutil.NewDB(
-			testutil.WithInvokeHandlers(
-				testutil.InvokeHandlers{
-					// nolint:unparam
-					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
-						return &Ydb_Table.CreateSessionResult{
-							SessionId: testutil.SessionID(),
-						}, nil
-					},
-					// nolint:unparam
-					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
-						keepalive <- struct{}{}
-						// Here we are emulating blocked connection initialization.
-						<-release
-						return nil, nil
-					},
-					testutil.TableDeleteSession: okHandler,
-				},
-			),
-		),
-		1,
-		config.WithSizeLimit(1),
-		config.WithIdleThreshold(time.Hour),
-	)
-	defer func() {
-		_ = p.Close(context.Background())
-	}()
-
-	touched := p.touchCond()
-
-	s := mustGetSession(t, p)
-	mustPutSession(t, p, s)
-
-	<-timer.Created
-
-	// Trigger next KeepAlive iteration.
-	shiftTime(p.config.IdleThreshold())
-	timer.C <- timeutil.Now()
-	<-keepalive
-
-	// Here we are in touching state. That is, there are no session in the client
-	// – it is removed for keepalive operation.
-	//
-	// We expect that Get() method will fail on ctx cancellation.
-	ctx1, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(500*time.Millisecond, cancel)
-
-	x, err := p.Get(ctx1)
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if x != nil {
-		t.Fatalf("obtained unexpected session")
-	}
-
-	// Release session s – connection established.
-	release <- struct{}{}
-	<-timer.Reset
-	<-touched // Wait until first keep alive loop finished.
-
-	mustTakeSession(t, p, s)
-	mustPutSession(t, p, s)
-
-	// Trigger next KeepAlive iteration.
-	shiftTime(p.config.IdleThreshold())
-	timer.C <- timeutil.Now()
-	<-keepalive
-
-	ctx2, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(500*time.Millisecond, cancel)
-
-	took, err := p.Take(ctx2, s)
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if took {
-		t.Fatalf("unexpected take over session")
-	}
-
-	// Release session s to not block on defer p.Close().
-	release <- struct{}{}
-	<-timer.Reset
-}
-
 func TestSessionPoolGetPut(t *testing.T) {
 	var (
 		created int
@@ -1332,7 +1232,7 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 func mustCreateSession(t *testing.T, p *client) Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	s, err := p.Create(trace.WithTable(
+	s, err := p.createSession(trace.WithTable(
 		context.Background(),
 		trace.Table{
 			OnPoolSessionNew: func(info trace.PoolSessionNewStartInfo) func(trace.PoolSessionNewDoneInfo) {
@@ -1390,37 +1290,6 @@ func mustPutSession(t *testing.T, p *client, s Session) {
 	); err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
-	}
-}
-
-func mustTakeSession(t *testing.T, p *client, s Session) {
-	wg := sync.WaitGroup{}
-	defer wg.Wait()
-	took, err := p.Take(
-		trace.WithTable(
-			context.Background(),
-			trace.Table{
-				OnPoolTake: func(
-					info trace.PoolTakeStartInfo,
-				) func(
-					trace.PoolTakeWaitInfo,
-				) func(
-					trace.PoolTakeDoneInfo,
-				) {
-					wg.Add(1)
-					return func(trace.PoolTakeWaitInfo) func(trace.PoolTakeDoneInfo) {
-						return func(trace.PoolTakeDoneInfo) {
-							wg.Done()
-						}
-					}
-				},
-			},
-		),
-		s,
-	)
-	if !took {
-		t.Helper()
-		t.Fatalf("%s: can not take session (%v)", caller(), err)
 	}
 }
 

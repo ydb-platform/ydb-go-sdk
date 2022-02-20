@@ -82,7 +82,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
-	return retryBackoff(
+	err = retryBackoff(
 		ctx,
 		c,
 		retry.FastBackoff,
@@ -91,7 +91,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 		func(ctx context.Context, s table.Session) (err error) {
 			tx, err := s.BeginTransaction(ctx, options.options.TxSettings)
 			if err != nil {
-				return err
+				err = errors.Errorf(0, "begin transaction failed: %w", err)
 			}
 			defer func() {
 				if err != nil {
@@ -99,6 +99,9 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 				}
 			}()
 			err = op(ctx, tx)
+			if err != nil {
+				err = errors.Errorf(0, "operation failed: %w", err)
+			}
 			if attempts > 0 {
 				onIntermediate(err)
 			}
@@ -107,10 +110,17 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 				return err
 			}
 			_, err = tx.CommitTx(ctx, options.options.TxCommitOptions...)
+			if err != nil {
+				err = errors.Errorf(0, "commit failed: %w", err)
+			}
 			return err
 		},
 		options.trace,
 	)
+	if err != nil {
+		err = errors.Errorf(0, "doTx failed: %w", err)
+	}
+	return err
 }
 
 func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retryOption) (err error) {
@@ -119,7 +129,7 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
-	return retryBackoff(
+	err = retryBackoff(
 		ctx,
 		c,
 		options.fastBackoff,
@@ -127,6 +137,9 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 		options.options.Idempotent,
 		func(ctx context.Context, s table.Session) error {
 			err = op(ctx, s)
+			if err != nil {
+				err = errors.Errorf(0, "operation failed: %w", err)
+			}
 			if attempts > 0 {
 				onIntermediate(err)
 			}
@@ -135,6 +148,10 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 		},
 		options.trace,
 	)
+	if err != nil {
+		err = errors.Errorf(0, "do failed: %w", err)
+	}
+	return err
 }
 
 type SessionProviderFunc struct {
@@ -255,28 +272,37 @@ func retryBackoff(
 					return
 				}
 			}
+
 			err = op(ctx, s)
+
 			if s.isClosing() {
 				_ = p.CloseSession(ctx, s)
 				s = nil
 			}
+
 			if err == nil {
 				return
 			}
+
 			m := retry.Check(err)
+
 			if m.StatusCode() != code {
 				i = 0
 			}
+
 			if m.MustDeleteSession() {
 				_ = p.CloseSession(ctx, s)
 				s = nil
 			}
+
 			if !m.MustRetry(isOperationIdempotent) {
 				return
 			}
-			if err = retry.Wait(ctx, fastBackoff, slowBackoff, m, i); err != nil {
-				return
+
+			if retry.Wait(ctx, fastBackoff, slowBackoff, m, i) != nil {
+				return errors.Errorf(0, "wait failed, last operation error: %w", err)
 			}
+
 			code = m.StatusCode()
 		}
 	}

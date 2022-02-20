@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -44,7 +45,7 @@ func (t *lazyTable) DoTx(ctx context.Context, op table.TxOperation, opts ...tabl
 	return t.client.DoTx(ctx, op, opts...)
 }
 
-func (t *lazyTable) Close(ctx context.Context) error {
+func (t *lazyTable) Close(ctx context.Context) (err error) {
 	t.m.Lock()
 	defer t.m.Unlock()
 	if t.client == nil {
@@ -53,7 +54,11 @@ func (t *lazyTable) Close(ctx context.Context) error {
 	defer func() {
 		t.client = nil
 	}()
-	return t.client.Close(ctx)
+	err = t.client.Close(ctx)
+	if err != nil {
+		return errors.Errorf(0, "close failed: %w", err)
+	}
+	return nil
 }
 
 func (t *lazyTable) init(ctx context.Context) {

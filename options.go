@@ -71,8 +71,12 @@ func WithConnectionString(connectionString string) Option {
 	}
 }
 
-func RegisterParser(param string, parser func(value string) ([]config.Option, error)) error {
-	return dsn.Register(param, parser)
+func RegisterParser(param string, parser func(value string) ([]config.Option, error)) (err error) {
+	err = dsn.Register(param, parser)
+	if err != nil {
+		return errors.Errorf(0, "register parser failed: %w", err)
+	}
+	return nil
 }
 
 func WithConnectionTTL(ttl time.Duration) Option {
@@ -183,7 +187,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 	return func(ctx context.Context, c *connection) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
-			return err
+			return errors.Errorf(0, "create credentials failed: %w", err)
 		}
 		c.options = append(c.options, config.WithCredentials(credentials))
 		return nil
@@ -221,7 +225,7 @@ func MergeOptions(options ...Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		for _, o := range options {
 			if err := o(ctx, c); err != nil {
-				return err
+				return errors.Errorf(0, "merge options failed: %w", err)
 			}
 		}
 		return nil
@@ -255,13 +259,13 @@ func WithCertificatesFromFile(caFile string) Option {
 		if len(caFile) > 0 && caFile[0] == '~' {
 			home, err := os.UserHomeDir()
 			if err != nil {
-				return err
+				return errors.Errorf(0, "user home failed: %w", err)
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
 		bytes, err := ioutil.ReadFile(filepath.Clean(caFile))
 		if err != nil {
-			return err
+			return errors.Errorf(0, "read certificates file failed: %w", err)
 		}
 		return WithCertificatesFromPem(bytes)(ctx, c)
 	}
@@ -290,7 +294,7 @@ func WithCertificatesFromPem(bytes []byte) Option {
 			}
 			return
 		}(bytes); !ok {
-			return err
+			return errors.Errorf(0, "certificate append failed: %w", err)
 		}
 		return nil
 	}

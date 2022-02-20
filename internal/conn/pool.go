@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -45,14 +44,15 @@ type pool struct {
 	done   chan struct{}
 }
 
-func (p *pool) Pessimize(ctx context.Context, e endpoint.Endpoint) error {
+func (p *pool) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error) {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
-	if cc, ok := p.conns[e.Address()]; ok {
+	cc, ok := p.conns[e.Address()]
+	if !ok {
 		cc.SetState(ctx, Banned)
 		return nil
 	}
-	panic(fmt.Sprintf("unknown endpoint %v", e))
+	return errors.Errorf(0, "pessimize failed: unknown endpoint %v", e)
 }
 
 func (p *pool) GetConn(e endpoint.Endpoint) Conn {

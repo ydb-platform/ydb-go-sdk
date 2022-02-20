@@ -134,8 +134,12 @@ func (c *connection) Invoke(
 	args interface{},
 	reply interface{},
 	opts ...grpc.CallOption,
-) error {
-	return c.db.Invoke(ctx, method, args, reply, opts...)
+) (err error) {
+	err = c.db.Invoke(ctx, method, args, reply, opts...)
+	if err != nil {
+		err = errors.Errorf(0, "invoke failed: %w", err)
+	}
+	return err
 }
 
 func (c *connection) NewStream(

@@ -180,7 +180,7 @@ func (s *rawConverter) TzDate() (v time.Time) {
 	}
 	src, err := timeutil.UnmarshalTzDate(s.text())
 	if err != nil {
-		_ = s.errorf("scan raw failed: %w", err)
+		_ = s.errorf(0, "scan raw failed: %w", err)
 	}
 	return src
 }
@@ -192,7 +192,7 @@ func (s *rawConverter) TzDatetime() (v time.Time) {
 	}
 	src, err := timeutil.UnmarshalTzDatetime(s.text())
 	if err != nil {
-		_ = s.errorf("scan raw failed: %w", err)
+		_ = s.errorf(0, "scan raw failed: %w", err)
 	}
 	return src
 }
@@ -204,7 +204,7 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 	}
 	src, err := timeutil.UnmarshalTzTimestamp(s.text())
 	if err != nil {
-		_ = s.errorf("scan raw failed: %w", err)
+		_ = s.errorf(0, "scan raw failed: %w", err)
 	}
 	return src
 }
@@ -556,14 +556,14 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 	switch x := typ.VariantType.Type.(type) {
 	case *Ydb.VariantType_TupleItems:
 		if i >= len(x.TupleItems.Elements) {
-			_ = s.errorf("TODO")
+			_ = s.errorf(0, "unimplemented")
 			return
 		}
 		return "", x.TupleItems.Elements[i]
 
 	case *Ydb.VariantType_StructItems:
 		if i >= len(x.StructItems.Members) {
-			_ = s.errorf("TODO")
+			_ = s.errorf(0, "unimplemented")
 			return
 		}
 		m := x.StructItems.Members[i]
@@ -643,7 +643,15 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 	if isOptional(p.t) {
 		return true
 	}
-	_ = s.errorf("not nullable types at %q: %s (%d %s %s)", s.Path(), s.Type(), s.stack.size(), c.t, p.t)
+	_ = s.errorf(
+		1,
+		"not nullable types at %q: %s (%d %s %s)",
+		s.Path(),
+		s.Type(),
+		s.stack.size(),
+		c.t,
+		p.t,
+	)
 	return false
 }
 
@@ -652,8 +660,12 @@ func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	act := value.TypeFromYDB(c.t)
 	if !value.TypesEqual(act, t) {
 		_ = s.errorf(
+			1,
 			"unexpected types at %q %s: %s; want %s",
-			s.Path(), s.Type(), act, t,
+			s.Path(),
+			s.Type(),
+			act,
+			t,
 		)
 		return false
 	}
@@ -722,14 +734,14 @@ func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType
 
 func (s *rawConverter) boundsError(n, i int) {
 	_ = s.errorf(
-		"index out of range: %d; have %d",
+		1, "index out of range: %d; have %d",
 		i, n,
 	)
 }
 
 func (s *rawConverter) decimalTypeError(t types.Type) {
 	_ = s.errorf(
-		"unexpected decimal types at %q %s: want %s",
+		1, "unexpected decimal types at %q %s: want %s",
 		s.Path(), s.getType(), t,
 	)
 }

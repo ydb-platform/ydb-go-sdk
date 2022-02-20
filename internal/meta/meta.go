@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -120,7 +121,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	token, err = m.credentials.Token(ctx)
 	if err != nil {
 		if stringer, ok := m.credentials.(fmt.Stringer); ok {
-			return nil, fmt.Errorf("%s: %w", stringer.String(), err)
+			return nil, errors.Errorf(0, "%s: %w", stringer.String(), err)
 		}
 		return nil, err
 	}

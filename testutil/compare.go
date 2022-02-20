@@ -2,12 +2,12 @@ package testutil
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
@@ -76,7 +76,7 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 }
 
 func notComparableError(l interface{}, r interface{}) error {
-	return fmt.Errorf("not comparable: %v and %v", l, r)
+	return errors.Errorf(1, "not comparable: %v and %v", l, r)
 }
 
 func comparePrimitives(t Ydb.Type_PrimitiveTypeId, l *Ydb.Value, r *Ydb.Value) (int, error) {

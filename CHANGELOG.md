@@ -1,4 +1,7 @@
 ## 3.11.0
+* Added `trace.Table.OnPoolStateChange` event
+* Wrapped internal errors with print <func, file, line>
+* Removed `trace.Table.OnPoolTake` event (unused)
 * Refactored `trace.Details` matching by string pattern
 * Added resolver trace callback
 * Refactored initialization step of grpc dial options 

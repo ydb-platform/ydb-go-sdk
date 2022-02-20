@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"sync"
 	"testing"
@@ -18,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
 func TestClusterFastRedial(t *testing.T) {
@@ -214,7 +214,7 @@ func (ln *stubListener) Accept() (net.Conn, error) {
 	select {
 	case ln.C <- c:
 	case <-ln.exit:
-		return nil, fmt.Errorf("closed")
+		return nil, errors.Errorf(0, "closed")
 	}
 	select {
 	case ln.S <- s:
@@ -239,7 +239,7 @@ func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			select {
 			case <-ln.exit:
-				return nil, fmt.Errorf("refused")
+				return nil, errors.Errorf(0, "refused")
 			case c := <-ln.C:
 				return c, nil
 			case <-ctx.Done():

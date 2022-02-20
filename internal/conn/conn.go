@@ -58,10 +58,14 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) Park(ctx context.Context) error {
+func (c *conn) Park(ctx context.Context) (err error) {
 	c.Lock()
 	defer c.Unlock()
-	return c.close(ctx)
+	err = c.close(ctx)
+	if err != nil {
+		err = errors.Errorf(0, "park failed: %w", err)
+	}
+	return err
 }
 
 func (c *conn) NodeID() uint32 {
@@ -138,7 +142,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		}
 		cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf(0, "dial failed: %w", err)
 		}
 		c.cc = cc
 		c.setState(ctx, Online)
@@ -226,7 +230,7 @@ func (c *conn) Invoke(
 	var cc *grpc.ClientConn
 	cc, err = c.take(ctx)
 	if err != nil {
-		err = errors.MapGRPCError(err)
+		err = errors.Errorf(0, "take failed: %w", errors.MapGRPCError(err))
 		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
 		}
@@ -257,7 +261,7 @@ func (c *conn) Invoke(
 	c.release(ctx)
 
 	if err != nil {
-		err = errors.MapGRPCError(err)
+		err = errors.Errorf(0, "invoke failed: %w", errors.MapGRPCError(err))
 		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
 		}
@@ -294,11 +298,11 @@ func (c *conn) NewStream(
 	var cc *grpc.ClientConn
 	cc, err = c.take(ctx)
 	if err != nil {
-		err = errors.MapGRPCError(err)
+		err = errors.Errorf(0, "take failed: %w", errors.MapGRPCError(err))
 		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
 		}
-		return
+		return nil, err
 	}
 
 	var cancel context.CancelFunc
@@ -324,7 +328,7 @@ func (c *conn) NewStream(
 	var s grpc.ClientStream
 	s, err = cc.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
 	if err != nil {
-		err = errors.MapGRPCError(err)
+		err = errors.Errorf(0, "new stream failed: %w", errors.MapGRPCError(err))
 		if errors.MustPessimizeEndpoint(err) {
 			c.pessimize(ctx, err)
 		}

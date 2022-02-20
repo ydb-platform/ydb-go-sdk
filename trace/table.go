@@ -43,18 +43,18 @@ type (
 		// Pool events
 		OnPoolInit  func(PoolInitStartInfo) func(PoolInitDoneInfo)
 		OnPoolClose func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
-		OnPoolDo    func(PoolDoStartInfo) func(info PoolDoIntermediateInfo) func(PoolDoDoneInfo)
-		OnPoolDoTx  func(PoolDoTxStartInfo) func(info PoolDoTxIntermediateInfo) func(PoolDoTxDoneInfo)
+		// Pool state event
+		OnPoolStateChange func(PooStateChangeInfo)
+		// Pool retry events
+		OnPoolDo   func(PoolDoStartInfo) func(info PoolDoIntermediateInfo) func(PoolDoDoneInfo)
+		OnPoolDoTx func(PoolDoTxStartInfo) func(info PoolDoTxIntermediateInfo) func(PoolDoTxDoneInfo)
 		// Pool session lifecycle events
 		OnPoolSessionNew   func(PoolSessionNewStartInfo) func(PoolSessionNewDoneInfo)
 		OnPoolSessionClose func(PoolSessionCloseStartInfo) func(PoolSessionCloseDoneInfo)
 		// Pool common API events
-		OnPoolPut func(PoolPutStartInfo) func(PoolPutDoneInfo)
-		// Pool native API events
+		OnPoolPut  func(PoolPutStartInfo) func(PoolPutDoneInfo)
 		OnPoolGet  func(PoolGetStartInfo) func(PoolGetDoneInfo)
 		OnPoolWait func(PoolWaitStartInfo) func(PoolWaitDoneInfo)
-		// Pool ydbsql API events
-		OnPoolTake func(PoolTakeStartInfo) func(PoolTakeWaitInfo) func(PoolTakeDoneInfo)
 	}
 )
 
@@ -230,6 +230,10 @@ type (
 		Limit            int
 		KeepAliveMinSize int
 	}
+	PooStateChangeInfo struct {
+		Size  int
+		Event string
+	}
 	PoolSessionNewStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -266,19 +270,6 @@ type (
 	PoolWaitDoneInfo struct {
 		Session sessionInfo
 		Error   error
-	}
-	PoolTakeStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session sessionInfo
-	}
-	PoolTakeWaitInfo struct{}
-	PoolTakeDoneInfo struct {
-		Took  bool
-		Error error
 	}
 	PoolPutStartInfo struct {
 		// Context make available context in trace callback function.
