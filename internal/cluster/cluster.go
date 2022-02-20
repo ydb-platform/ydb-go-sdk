@@ -163,7 +163,12 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	}()
 
 	if e, ok := ContextEndpoint(ctx); ok {
-		if cc, ok = c.endpoints[e.NodeID()]; ok {
+		cc, ok = c.endpoints[e.NodeID()]
+		if ok && cc.IsState(
+			conn.Created,
+			conn.Online,
+			conn.Offline,
+		) {
 			return cc, nil
 		}
 	}
@@ -314,7 +319,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 	if c.explorer != nil {
 		// count ratio (banned/all)
 		online := 0
-		for _, entry := range c.index {
+		for _, entry = range c.index {
 			if entry.Conn != nil && entry.Conn.GetState() == conn.Online {
 				online++
 			}

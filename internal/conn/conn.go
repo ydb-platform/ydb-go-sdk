@@ -22,6 +22,8 @@ type Conn interface {
 	grpc.ClientConnInterface
 
 	Endpoint() endpoint.Endpoint
+
+	IsState(states ...State) bool
 	GetState() State
 	SetState(context.Context, State) State
 	Close(ctx context.Context) error
@@ -43,6 +45,17 @@ type conn struct {
 	state    State
 	locks    int32
 	ttl      timeutil.Timer
+}
+
+func (c *conn) IsState(states ...State) bool {
+	c.Lock()
+	defer c.Unlock()
+	for _, s := range states {
+		if s == c.state {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *conn) Park(ctx context.Context) error {
