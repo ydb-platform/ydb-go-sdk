@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
@@ -241,7 +242,7 @@ func (c *client) AcquireResource(
 	}
 
 	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {
-		return ratelimiter.AcquireError(amount, err)
+		return ratelimiterErrors.NewAcquire(amount, err)
 	}
 
 	return err
