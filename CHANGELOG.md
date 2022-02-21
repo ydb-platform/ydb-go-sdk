@@ -1,3 +1,6 @@
+## 3.11.1
+* Excluded error wrapping from retry operations
+
 ## 3.11.0
 * Added `ydb.WithTLSSInsecureSkipVerify()` option
 * Added `trace.Table.OnPoolStateChange` event

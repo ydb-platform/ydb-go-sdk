@@ -90,18 +90,12 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 		options.options.Idempotent,
 		func(ctx context.Context, s table.Session) (err error) {
 			tx, err := s.BeginTransaction(ctx, options.options.TxSettings)
-			if err != nil {
-				err = errors.Errorf(0, "begin transaction failed: %w", err)
-			}
 			defer func() {
 				if err != nil {
 					_ = tx.Rollback(ctx)
 				}
 			}()
 			err = op(ctx, tx)
-			if err != nil {
-				err = errors.Errorf(0, "operation failed: %w", err)
-			}
 			if attempts > 0 {
 				onIntermediate(err)
 			}
@@ -137,9 +131,6 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 		options.options.Idempotent,
 		func(ctx context.Context, s table.Session) error {
 			err = op(ctx, s)
-			if err != nil {
-				err = errors.Errorf(0, "operation failed: %w", err)
-			}
 			if attempts > 0 {
 				onIntermediate(err)
 			}
