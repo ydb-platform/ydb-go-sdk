@@ -54,7 +54,7 @@ type Config interface {
 	// That is, some balancing methods allow to be configured.
 	Balancer() balancer.Balancer
 
-	// RequestsType set an additional types hint to all requests.
+	// RequestsType set an additional type hint to all requests.
 	// It is needed only for debug purposes and advanced cases.
 	RequestsType() string
 

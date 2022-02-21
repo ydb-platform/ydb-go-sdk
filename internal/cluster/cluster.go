@@ -103,6 +103,11 @@ func New(
 	config config.Config,
 	balancer balancer.Balancer,
 ) Cluster {
+	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)
+	defer func() {
+		onDone()
+	}()
+
 	return &cluster{
 		config:    config,
 		pool:      conn.NewPool(ctx, config),
@@ -118,6 +123,12 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 		c.mu.Unlock()
 		return
 	}
+
+	onDone := trace.DriverOnClusterClose(c.config.Trace(), &ctx)
+	defer func() {
+		onDone(err)
+	}()
+
 	if c.explorer != nil {
 		c.explorer.Stop()
 	}

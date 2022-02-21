@@ -16,7 +16,7 @@ const (
 	HeaderDatabase    = "x-ydb-database"
 	HeaderTicket      = "x-ydb-auth-ticket"
 	HeaderVersion     = "x-ydb-sdk-build-info"
-	HeaderRequestType = "x-ydb-request-types"
+	HeaderRequestType = "x-ydb-request-type"
 	HeaderTraceID     = "x-ydb-trace-id"
 	HeaderUserAgent   = "x-ydb-user-agent"
 

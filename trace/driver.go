@@ -34,6 +34,8 @@ type (
 		OnConnRelease     func(ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
 
 		// Cluster events
+		OnClusterInit   func(ClusterInitStartInfo) func(ClusterInitDoneInfo)
+		OnClusterClose  func(ClusterCloseStartInfo) func(ClusterCloseDoneInfo)
 		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
 		OnClusterInsert func(ClusterInsertStartInfo) func(ClusterInsertDoneInfo)
 		OnClusterUpdate func(ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo)
@@ -226,6 +228,25 @@ type (
 	}
 	ConnNewStreamDoneInfo struct {
 		State ConnState
+		Error error
+	}
+	ClusterInitStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+	}
+	ClusterInitDoneInfo struct {
+	}
+	ClusterCloseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+	}
+	ClusterCloseDoneInfo struct {
 		Error error
 	}
 	ClusterGetStartInfo struct {

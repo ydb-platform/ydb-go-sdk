@@ -332,6 +332,31 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverClusterEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`cluster`)
+		t.OnClusterInit = func(info trace.ClusterInitStartInfo) func(trace.ClusterInitDoneInfo) {
+			log.Tracef(`init start`)
+			start := time.Now()
+			return func(info trace.ClusterInitDoneInfo) {
+				log.Debugf(`init done {latency:"%s"}`,
+					time.Since(start),
+				)
+			}
+		}
+		t.OnClusterClose = func(info trace.ClusterCloseStartInfo) func(trace.ClusterCloseDoneInfo) {
+			log.Tracef(`close start`)
+			start := time.Now()
+			return func(info trace.ClusterCloseDoneInfo) {
+				if info.Error == nil {
+					log.Tracef(`close done {latency:"%s"}`,
+						time.Since(start),
+					)
+				} else {
+					log.Errorf(`close failed {latency:"%s",error:"%s"}`,
+						time.Since(start),
+						info.Error,
+					)
+				}
+			}
+		}
 		t.OnClusterGet = func(info trace.ClusterGetStartInfo) func(trace.ClusterGetDoneInfo) {
 			log.Tracef(`get start`)
 			start := time.Now()

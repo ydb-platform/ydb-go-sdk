@@ -309,6 +309,54 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnClusterInit == nil:
+		ret.OnClusterInit = x.OnClusterInit
+	case x.OnClusterInit == nil:
+		ret.OnClusterInit = t.OnClusterInit
+	default:
+		h1 := t.OnClusterInit
+		h2 := x.OnClusterInit
+		ret.OnClusterInit = func(c ClusterInitStartInfo) func(ClusterInitDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ClusterInitDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnClusterClose == nil:
+		ret.OnClusterClose = x.OnClusterClose
+	case x.OnClusterClose == nil:
+		ret.OnClusterClose = t.OnClusterClose
+	default:
+		h1 := t.OnClusterClose
+		h2 := x.OnClusterClose
+		ret.OnClusterClose = func(c ClusterCloseStartInfo) func(ClusterCloseDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ClusterCloseDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnClusterGet == nil:
 		ret.OnClusterGet = x.OnClusterGet
 	case x.OnClusterGet == nil:
@@ -646,6 +694,36 @@ func (t Driver) onConnRelease(c1 ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
 	}
 	return res
 }
+func (t Driver) onClusterInit(c1 ClusterInitStartInfo) func(ClusterInitDoneInfo) {
+	fn := t.OnClusterInit
+	if fn == nil {
+		return func(ClusterInitDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ClusterInitDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onClusterClose(c1 ClusterCloseStartInfo) func(ClusterCloseDoneInfo) {
+	fn := t.OnClusterClose
+	if fn == nil {
+		return func(ClusterCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ClusterCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
 	fn := t.OnClusterGet
 	if fn == nil {
@@ -880,6 +958,25 @@ func DriverOnConnRelease(t Driver, c *context.Context, endpoint endpointInfo) fu
 	return func(lock int) {
 		var p ConnReleaseDoneInfo
 		p.Lock = lock
+		res(p)
+	}
+}
+func DriverOnClusterInit(t Driver, c *context.Context) func() {
+	var p ClusterInitStartInfo
+	p.Context = c
+	res := t.onClusterInit(p)
+	return func() {
+		var p ClusterInitDoneInfo
+		res(p)
+	}
+}
+func DriverOnClusterClose(t Driver, c *context.Context) func(error) {
+	var p ClusterCloseStartInfo
+	p.Context = c
+	res := t.onClusterClose(p)
+	return func(e error) {
+		var p ClusterCloseDoneInfo
+		p.Error = e
 		res(p)
 	}
 }
