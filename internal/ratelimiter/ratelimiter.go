@@ -222,6 +222,7 @@ func (c *client) AcquireResource(
 			},
 		)
 	case options.AcquireTypeReportAsync:
+		// nolint:godox
 		go func() { // TODO: control for closing
 			_, _ = c.service.AcquireResource(
 				ctx,
