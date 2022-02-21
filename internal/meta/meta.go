@@ -13,18 +13,18 @@ import (
 
 const (
 	// outgoing headers
-	MetaDatabase    = "x-ydb-database"
-	MetaTicket      = "x-ydb-auth-ticket"
-	MetaVersion     = "x-ydb-sdk-build-info"
-	MetaRequestType = "x-ydb-request-types"
-	MetaTraceID     = "x-ydb-trace-id"
-	MetaUserAgent   = "x-ydb-user-agent"
+	HeaderDatabase    = "x-ydb-database"
+	HeaderTicket      = "x-ydb-auth-ticket"
+	HeaderVersion     = "x-ydb-sdk-build-info"
+	HeaderRequestType = "x-ydb-request-types"
+	HeaderTraceID     = "x-ydb-trace-id"
+	HeaderUserAgent   = "x-ydb-user-agent"
 
 	// incomming headers
-	MetaServerHints = "x-ydb-server-hints"
+	HeaderServerHints = "x-ydb-server-hints"
 
 	// hints
-	MetaSessionClose = "session-close"
+	HintSessionClose = "session-close"
 )
 
 type Meta interface {
@@ -93,20 +93,20 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if !has {
 		md = metadata.MD{}
 	}
-	if len(md.Get(MetaDatabase)) == 0 {
-		md.Set(MetaDatabase, m.database)
+	if len(md.Get(HeaderDatabase)) == 0 {
+		md.Set(HeaderDatabase, m.database)
 	}
-	if len(md.Get(MetaVersion)) == 0 {
-		md.Set(MetaVersion, Version)
+	if len(md.Get(HeaderVersion)) == 0 {
+		md.Set(HeaderVersion, Version)
 	}
 	if m.requestsType != "" {
-		if len(md.Get(MetaRequestType)) == 0 {
-			md.Set(MetaRequestType, m.requestsType)
+		if len(md.Get(HeaderRequestType)) == 0 {
+			md.Set(HeaderRequestType, m.requestsType)
 		}
 	}
 	if m.userAgent != "" {
-		if len(md.Get(MetaUserAgent)) == 0 {
-			md.Set(MetaUserAgent, m.userAgent)
+		if len(md.Get(HeaderUserAgent)) == 0 {
+			md.Set(HeaderUserAgent, m.userAgent)
 		}
 	}
 	if m.credentials == nil {
@@ -125,8 +125,8 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		}
 		return nil, err
 	}
-	if len(md.Get(MetaTicket)) == 0 {
-		md.Set(MetaTicket, token)
+	if len(md.Get(HeaderTicket)) == 0 {
+		md.Set(HeaderTicket, token)
 	}
 	return md, nil
 }

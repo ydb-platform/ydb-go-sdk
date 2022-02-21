@@ -38,11 +38,11 @@ func TestMetaRequiredHeaders(t *testing.T) {
 		t.Fatal("no outgoing metadata")
 	}
 
-	testutil.Equal(t, []string{"database"}, md.Get(meta.MetaDatabase))
-	testutil.Equal(t, []string{"requestType"}, md.Get(meta.MetaRequestType))
-	testutil.Equal(t, []string{"token"}, md.Get(meta.MetaTicket))
-	testutil.Equal(t, []string{"userAgent"}, md.Get(meta.MetaUserAgent))
-	testutil.Equal(t, []string{"traceID"}, md.Get(meta.MetaTraceID))
-	testutil.Equal(t, []string{meta.Version}, md.Get(meta.MetaVersion))
+	testutil.Equal(t, []string{"database"}, md.Get(meta.HeaderDatabase))
+	testutil.Equal(t, []string{"requestType"}, md.Get(meta.HeaderRequestType))
+	testutil.Equal(t, []string{"token"}, md.Get(meta.HeaderTicket))
+	testutil.Equal(t, []string{"userAgent"}, md.Get(meta.HeaderUserAgent))
+	testutil.Equal(t, []string{"traceID"}, md.Get(meta.HeaderTraceID))
+	testutil.Equal(t, []string{meta.Version}, md.Get(meta.HeaderVersion))
 	testutil.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
 }

@@ -3,8 +3,8 @@ package ydb
 import "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 
 const (
-	MetaRequestType = meta.MetaRequestType
-	MetaTraceID     = meta.MetaTraceID
+	MetaRequestType = meta.HeaderRequestType
+	MetaTraceID     = meta.HeaderTraceID
 )
 
 func newMeta(meta meta.Meta, opts ...CustomOption) meta.Meta {

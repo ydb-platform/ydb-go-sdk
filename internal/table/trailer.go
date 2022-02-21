@@ -18,8 +18,8 @@ func (t *trailer) Trailer() grpc.CallOption {
 }
 
 func checkHintSessionClose(md metadata.MD) bool {
-	for _, hint := range md.Get(meta.MetaServerHints) {
-		if hint == meta.MetaSessionClose {
+	for _, hint := range md.Get(meta.HeaderServerHints) {
+		if hint == meta.HintSessionClose {
 			return true
 		}
 	}
