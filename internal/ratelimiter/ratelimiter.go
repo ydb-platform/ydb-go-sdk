@@ -221,21 +221,23 @@ func (c *client) AcquireResource(
 			},
 		)
 	case options.AcquireTypeReportAsync:
-		_, err = c.service.AcquireResource(
-			ctx,
-			&Ydb_RateLimiter.AcquireResourceRequest{
-				CoordinationNodePath: coordinationNodePath,
-				ResourcePath:         resourcePath,
-				Units: &Ydb_RateLimiter.AcquireResourceRequest_Used{
-					Used: amount,
+		go func() { // TODO: control for closing
+			_, _ = c.service.AcquireResource(
+				ctx,
+				&Ydb_RateLimiter.AcquireResourceRequest{
+					CoordinationNodePath: coordinationNodePath,
+					ResourcePath:         resourcePath,
+					Units: &Ydb_RateLimiter.AcquireResourceRequest_Used{
+						Used: amount,
+					},
+					OperationParams: operation.Params(
+						acquireOptions.OperationTimeout(),
+						acquireOptions.OperationCancelAfter(),
+						operation.ModeAsync,
+					),
 				},
-				OperationParams: operation.Params(
-					acquireOptions.OperationTimeout(),
-					acquireOptions.OperationCancelAfter(),
-					operation.ModeAsync,
-				),
-			},
-		)
+			)
+		}()
 	default:
 		panic(errors.Errorf(0, "unknown acquire type: %d", acquireOptions.Type()))
 	}
