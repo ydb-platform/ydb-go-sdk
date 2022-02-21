@@ -1,4 +1,5 @@
 ## 3.11.0
+* Added `ydb.WithTLSSInsecureSkipVerify()` option
 * Added `trace.Table.OnPoolStateChange` event
 * Wrapped internal errors with print <func, file, line>
 * Removed `trace.Table.OnPoolTake` event (unused)

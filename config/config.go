@@ -236,6 +236,12 @@ func WithMinTLSVersion(minVersion uint16) Option {
 	}
 }
 
+func WithTLSSInsecureSkipVerify() Option {
+	return func(c *config) {
+		c.tlsConfig.InsecureSkipVerify = true
+	}
+}
+
 func WithGrpcOptions(option ...grpc.DialOption) Option {
 	return func(c *config) {
 		c.grpcOptions = append(c.grpcOptions, option...)

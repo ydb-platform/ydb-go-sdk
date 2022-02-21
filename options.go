@@ -121,6 +121,13 @@ func WithMinTLSVersion(minVersion uint16) Option {
 	}
 }
 
+func WithTLSSInsecureSkipVerify() Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithTLSSInsecureSkipVerify())
+		return nil
+	}
+}
+
 type Level logger.Level
 
 const (
