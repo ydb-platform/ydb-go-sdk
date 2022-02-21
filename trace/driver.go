@@ -237,8 +237,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	ClusterInitDoneInfo struct {
-	}
+	ClusterInitDoneInfo   struct{}
 	ClusterCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
