@@ -205,7 +205,7 @@ func (c *client) AcquireResource(
 				),
 			},
 		)
-	case options.AcquireTypeReportSync:
+	case options.AcquireTypeReport:
 		_, err = c.service.AcquireResource(
 			ctx,
 			&Ydb_RateLimiter.AcquireResourceRequest{
@@ -221,27 +221,8 @@ func (c *client) AcquireResource(
 				),
 			},
 		)
-	case options.AcquireTypeReportAsync:
-		// nolint:godox
-		go func() { // TODO: control for closing
-			_, _ = c.service.AcquireResource(
-				ctx,
-				&Ydb_RateLimiter.AcquireResourceRequest{
-					CoordinationNodePath: coordinationNodePath,
-					ResourcePath:         resourcePath,
-					Units: &Ydb_RateLimiter.AcquireResourceRequest_Used{
-						Used: amount,
-					},
-					OperationParams: operation.Params(
-						acquireOptions.OperationTimeout(),
-						acquireOptions.OperationCancelAfter(),
-						operation.ModeAsync,
-					),
-				},
-			)
-		}()
 	default:
-		panic(errors.Errorf(0, "unknown acquire type: %d", acquireOptions.Type()))
+		return errors.Errorf(0, "unknown acquire type: %d", acquireOptions.Type())
 	}
 
 	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {

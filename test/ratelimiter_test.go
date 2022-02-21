@@ -160,7 +160,7 @@ func TestRatelimiter(t *testing.T) {
 		testCoordinationNodePath,
 		testResource,
 		10000,
-		ratelimiter.WithReportSync(),
+		ratelimiter.WithReport(),
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -10,10 +10,7 @@ type AcquireType uint8
 
 const (
 	AcquireTypeAcquire = AcquireType(iota)
-	AcquireTypeReportSync
-	// AcquireTypeReportAsync runs goroutine with request to background mode
-	// Use context deadline/cancel for manage goroutine lifecycle
-	AcquireTypeReportAsync
+	AcquireTypeReport
 
 	AcquireTypeDefault = AcquireTypeAcquire
 )
@@ -55,15 +52,9 @@ func WithAcquire() AcquireOption {
 	}
 }
 
-func WithReportAsync() AcquireOption {
+func WithReport() AcquireOption {
 	return func(h *acquireOptionsHolder) {
-		h.acquireType = AcquireTypeReportAsync
-	}
-}
-
-func WithReportSync() AcquireOption {
-	return func(h *acquireOptionsHolder) {
-		h.acquireType = AcquireTypeReportSync
+		h.acquireType = AcquireTypeReport
 	}
 }
 

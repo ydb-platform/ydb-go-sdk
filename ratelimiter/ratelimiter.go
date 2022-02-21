@@ -50,12 +50,8 @@ func WithAcquire() options.AcquireOption {
 	return options.WithAcquire()
 }
 
-func WithReportAsync() options.AcquireOption {
-	return options.WithReportAsync()
-}
-
-func WithReportSync() options.AcquireOption {
-	return options.WithReportAsync()
+func WithReport() options.AcquireOption {
+	return options.WithReport()
 }
 
 func WithOperationTimeout(operationTimeout time.Duration) options.AcquireOption {
