@@ -1,3 +1,7 @@
+## 3.11.6
+* Changed `trace.GetCredentialsDoneInfo` token representation from bool to string
+* Added `log.Secret` helper for mask token
+
 ## 3.11.5
 * Replaced meta in `proxyConnection.Invoke` and `proxyConnection.NewStream`
 

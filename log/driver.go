@@ -453,14 +453,14 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.GetCredentialsDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`get done {latency:"%s",ok:%t}`,
+					log.Tracef(`get done {latency:"%s",token:"%s"}`,
 						time.Since(start),
-						info.TokenOk,
+						Secret(info.Token),
 					)
 				} else {
-					log.Errorf(`get failed {latency:"%s",ok:%t,error:"%s"}`,
+					log.Errorf(`get failed {latency:"%s",token:"%s",error:"%s"}`,
 						time.Since(start),
-						info.TokenOk,
+						Secret(info.Token),
 						info.Error,
 					)
 				}

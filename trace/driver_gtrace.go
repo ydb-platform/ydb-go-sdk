@@ -1037,13 +1037,13 @@ func DriverOnPessimizeNode(t Driver, c *context.Context, endpoint endpointInfo, 
 		res(p)
 	}
 }
-func DriverOnGetCredentials(t Driver, c *context.Context) func(tokenOk bool, _ error) {
+func DriverOnGetCredentials(t Driver, c *context.Context) func(token string, _ error) {
 	var p GetCredentialsStartInfo
 	p.Context = c
 	res := t.onGetCredentials(p)
-	return func(tokenOk bool, e error) {
+	return func(token string, e error) {
 		var p GetCredentialsDoneInfo
-		p.TokenOk = tokenOk
+		p.Token = token
 		p.Error = e
 		res(p)
 	}
