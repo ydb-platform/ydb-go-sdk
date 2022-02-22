@@ -122,7 +122,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return errors.Errorf(0, "context done: %w", ctx.Err())
 
 		default:
 			err = op(ctx)

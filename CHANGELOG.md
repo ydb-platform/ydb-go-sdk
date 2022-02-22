@@ -1,3 +1,6 @@
+## 3.11.3
+* Replaced in `table/types/compare_test.go` checking error by error message to checking with `errors.Is()`
+
 ## 3.11.2
 * Wrapped internal errors in retry operations
 
