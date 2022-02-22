@@ -126,20 +126,30 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 		default:
 			err = op(ctx)
+			if err != nil {
+				err = errors.Errorf(0, "retry operation failed: %w", err)
+			}
+
 			onDone = onIntermediate(err)
+
 			if err == nil {
 				return
 			}
+
 			m := Check(err)
+
 			if m.StatusCode() != code {
 				i = 0
 			}
+
 			if !m.MustRetry(h.idempotent) {
 				return
 			}
+
 			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
-				return
+				return errors.Errorf(0, "wait failed, last operation error: %w", err)
 			}
+
 			code = m.StatusCode()
 		}
 	}

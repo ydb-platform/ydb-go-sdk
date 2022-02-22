@@ -1,3 +1,6 @@
+## 3.11.2
+* Wrapped internal errors in retry operations
+
 ## 3.11.1
 * Excluded error wrapping from retry operations
 

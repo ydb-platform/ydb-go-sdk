@@ -90,23 +90,36 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 		options.options.Idempotent,
 		func(ctx context.Context, s table.Session) (err error) {
 			tx, err := s.BeginTransaction(ctx, options.options.TxSettings)
+			if err != nil {
+				err = errors.Errorf(0, "begin transaction failed: %w", err)
+			}
+
 			defer func() {
 				if err != nil {
 					_ = tx.Rollback(ctx)
 				}
 			}()
+
 			err = op(ctx, tx)
+			if err != nil {
+				err = errors.Errorf(0, "retry operation failed: %w", err)
+			}
+
 			if attempts > 0 {
 				onIntermediate(err)
 			}
+
 			attempts++
+
 			if err != nil {
 				return err
 			}
+
 			_, err = tx.CommitTx(ctx, options.options.TxCommitOptions...)
 			if err != nil {
 				err = errors.Errorf(0, "commit failed: %w", err)
 			}
+
 			return err
 		},
 		options.trace,
@@ -131,10 +144,16 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 		options.options.Idempotent,
 		func(ctx context.Context, s table.Session) error {
 			err = op(ctx, s)
+			if err != nil {
+				err = errors.Errorf(0, "retry operation failed: %w", err)
+			}
+
 			if attempts > 0 {
 				onIntermediate(err)
 			}
+
 			attempts++
+
 			return err
 		},
 		options.trace,
@@ -250,8 +269,7 @@ func retryBackoff(
 		}
 		select {
 		case <-ctx.Done():
-			err = ctx.Err()
-			return
+			return errors.Errorf(0, "context done: %w", ctx.Err())
 
 		default:
 			if s == nil {
@@ -260,11 +278,14 @@ func retryBackoff(
 					panic("both of session and error are nil")
 				}
 				if err != nil {
-					return
+					return errors.Errorf(0, "get session from pool failed: %w", ctx.Err())
 				}
 			}
 
 			err = op(ctx, s)
+			if err != nil {
+				err = errors.Errorf(0, "retry operation failed: %w", ctx.Err())
+			}
 
 			if s.isClosing() {
 				_ = p.CloseSession(ctx, s)
