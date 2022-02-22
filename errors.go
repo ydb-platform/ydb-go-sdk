@@ -1,6 +1,8 @@
 package ydb
 
 import (
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
@@ -15,12 +17,10 @@ func IterateByIssues(err error, it func(message string, code uint32, severity ui
 	iterate(issues, it)
 }
 
-func iterate(issues errors.IssueIterator, it func(message string, code uint32, severity uint32)) {
-	l := issues.Len()
-	for i := 0; i < l; i++ {
-		issue, nested := issues.Get(i)
-		it(issue.Message, issue.Code, issue.Severity)
-		iterate(nested, it)
+func iterate(issues []*Ydb_Issue.IssueMessage, it func(message string, code uint32, severity uint32)) {
+	for _, issue := range issues {
+		it(issue.GetMessage(), issue.GetIssueCode(), issue.GetSeverity())
+		iterate(issue.GetIssues(), it)
 	}
 }
 

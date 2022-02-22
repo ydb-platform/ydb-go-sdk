@@ -1,3 +1,6 @@
+## 3.11.7
+* Removed internal alias-type `errors.IssuesIterator`
+
 ## 3.11.6
 * Changed `trace.GetCredentialsDoneInfo` token representation from bool to string
 * Added `log.Secret` helper for mask token

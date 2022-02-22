@@ -65,8 +65,8 @@ func NewOpError(opts ...oeOpt) error {
 	return Errorf(2, "%w", oe)
 }
 
-func (e *OpError) Issues() IssueIterator {
-	return IssueIterator(e.issues)
+func (e *OpError) Issues() []*Ydb_Issue.IssueMessage {
+	return e.issues
 }
 
 func (e *OpError) Error() string {
@@ -81,17 +81,6 @@ func (e *OpError) Error() string {
 		dumpIssues(&buf, e.issues)
 	}
 	return buf.String()
-}
-
-// nolint:unused, deadcode
-func iterateIssues(issues []*Ydb_Issue.IssueMessage, it func(Issue)) {
-	for _, x := range issues {
-		it(Issue{
-			Message:  x.GetMessage(),
-			Code:     x.GetIssueCode(),
-			Severity: x.GetSeverity(),
-		})
-	}
 }
 
 // IsOpError reports whether err is OpError with given code as the Reason.
