@@ -35,7 +35,11 @@ func (c *proxyConnection) Invoke(
 	args interface{},
 	reply interface{},
 	opts ...grpc.CallOption,
-) error {
+) (err error) {
+	ctx, err = c.meta.Meta(ctx)
+	if err != nil {
+		return err
+	}
 	return c.connection.Invoke(
 		ctx,
 		method,
@@ -50,7 +54,11 @@ func (c *proxyConnection) NewStream(
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
+) (_ grpc.ClientStream, err error) {
+	ctx, err = c.meta.Meta(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return c.connection.NewStream(
 		ctx,
 		desc,
