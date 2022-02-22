@@ -1,9 +1,9 @@
 package types
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -303,8 +303,8 @@ func TestIncompatiblePrimitives(t *testing.T) {
 	if err == nil {
 		t.Errorf("Error expected")
 	}
-	if !strings.Contains(err.Error(), "not comparable:") {
-		t.Errorf("Unexpected error message: %s", err.Error())
+	if !errors.Is(err, testutil.ErrNotComparable) {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
@@ -314,8 +314,8 @@ func TestIncompatibleTuples(t *testing.T) {
 	_, err := Compare(l, r)
 	if err == nil {
 		t.Error("Error expected")
-	} else if !strings.Contains(err.Error(), "not comparable:") {
-		t.Errorf("Unexpected error message: %s", err.Error())
+	} else if !errors.Is(err, testutil.ErrNotComparable) {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
 

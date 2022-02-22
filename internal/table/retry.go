@@ -278,13 +278,13 @@ func retryBackoff(
 					panic("both of session and error are nil")
 				}
 				if err != nil {
-					return errors.Errorf(0, "get session from pool failed: %w", ctx.Err())
+					return errors.Errorf(0, "get session from pool failed: %w", err)
 				}
 			}
 
 			err = op(ctx, s)
 			if err != nil {
-				err = errors.Errorf(0, "retry operation failed: %w", ctx.Err())
+				err = errors.Errorf(0, "retry operation failed: %w", err)
 			}
 
 			if s.isClosing() {
