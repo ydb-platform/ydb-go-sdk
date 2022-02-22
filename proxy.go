@@ -3,6 +3,8 @@ package ydb
 import (
 	"context"
 
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -15,9 +17,9 @@ import (
 )
 
 type proxyConnection struct {
-	endpoint string
-	secure   bool
-	meta     meta.Meta
+	connection Connection
+
+	meta meta.Meta
 
 	table        table.Client
 	scripting    scripting.Client
@@ -27,18 +29,47 @@ type proxyConnection struct {
 	ratelimiter  ratelimiter.Client
 }
 
-func newProxy(c Connection, meta meta.Meta) *proxyConnection {
-	return &proxyConnection{
-		endpoint: c.Endpoint(),
-		secure:   c.Secure(),
-		meta:     meta,
+func (c *proxyConnection) Invoke(
+	ctx context.Context,
+	method string,
+	args interface{},
+	reply interface{},
+	opts ...grpc.CallOption,
+) error {
+	return c.connection.Invoke(
+		ctx,
+		method,
+		args,
+		reply,
+		opts...,
+	)
+}
 
-		table:        proxy.Table(c.Table(), meta),
-		scripting:    proxy.Scripting(c.Scripting(), meta),
-		scheme:       proxy.Scheme(c.Scheme(), meta),
-		discovery:    proxy.Discovery(c.Discovery(), meta),
-		coordination: proxy.Coordination(c.Coordination(), meta),
-		ratelimiter:  proxy.Ratelimiter(c.Ratelimiter(), meta),
+func (c *proxyConnection) NewStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
+	return c.connection.NewStream(
+		ctx,
+		desc,
+		method,
+		opts...,
+	)
+}
+
+func newProxy(connection Connection, meta meta.Meta) *proxyConnection {
+	return &proxyConnection{
+		connection: connection,
+		meta:       meta,
+
+		table:        proxy.Table(connection.Table(), meta),
+		scripting:    proxy.Scripting(connection.Scripting(), meta),
+		scheme:       proxy.Scheme(connection.Scheme(), meta),
+		discovery:    proxy.Discovery(connection.Discovery(), meta),
+		coordination: proxy.Coordination(connection.Coordination(), meta),
+		ratelimiter:  proxy.Ratelimiter(connection.Ratelimiter(), meta),
 	}
 }
 
@@ -66,7 +97,7 @@ func (c *proxyConnection) Close(ctx context.Context) error {
 }
 
 func (c *proxyConnection) Endpoint() string {
-	return c.endpoint
+	return c.connection.Endpoint()
 }
 
 func (c *proxyConnection) Name() string {
@@ -74,7 +105,7 @@ func (c *proxyConnection) Name() string {
 }
 
 func (c *proxyConnection) Secure() bool {
-	return c.secure
+	return c.connection.Secure()
 }
 
 func (c *proxyConnection) Table(opts ...CustomOption) table.Client {
