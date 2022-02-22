@@ -1,3 +1,6 @@
+## 3.11.4
+* Refactored `internal/cluster.Cluster` (add option for notify about external lock, lock cluster for update cluster endpoints)
+
 ## 3.11.3
 * Replaced in `table/types/compare_test.go` checking error by error message to checking with `errors.Is()`
 

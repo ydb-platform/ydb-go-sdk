@@ -23,7 +23,7 @@ import (
 func New(
 	ctx context.Context,
 	cc conn.Conn,
-	crudExplorer cluster.CRUDExplorer,
+	crudExplorer cluster.CRUDExplorerLocker,
 	opts ...config.Option,
 ) (_ discovery.Client, err error) {
 	c := &client{
@@ -31,8 +31,11 @@ func New(
 		service: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
 	}
 
+	crudExplorer.Lock()
+	defer crudExplorer.Unlock()
+
 	if c.config.Interval() <= 0 {
-		_ = crudExplorer.Insert(ctx, cc.Endpoint())
+		_ = crudExplorer.Insert(ctx, cc.Endpoint(), cluster.WithoutLock())
 		return c, nil
 	}
 
@@ -49,6 +52,7 @@ func New(
 		crudExplorer.Insert(
 			ctx,
 			e,
+			cluster.WithoutLock(),
 		)
 	}
 
@@ -70,6 +74,9 @@ func New(
 				// NOTE: curr endpoints must be sorted here.
 				cluster.SortEndpoints(next)
 
+				crudExplorer.Lock()
+				defer crudExplorer.Unlock()
+
 				cluster.DiffEndpoints(curr, next,
 					func(i, j int) {
 						// Endpoints are equal, but we still need to update meta
@@ -77,18 +84,21 @@ func New(
 						crudExplorer.Update(
 							ctx,
 							next[j],
+							cluster.WithoutLock(),
 						)
 					},
 					func(i, j int) {
 						crudExplorer.Insert(
 							ctx,
 							next[j],
+							cluster.WithoutLock(),
 						)
 					},
 					func(i, j int) {
 						crudExplorer.Remove(
 							ctx,
 							curr[i],
+							cluster.WithoutLock(),
 						)
 					},
 				)
