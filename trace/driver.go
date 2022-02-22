@@ -280,8 +280,8 @@ type (
 		Context *context.Context
 	}
 	GetCredentialsDoneInfo struct {
-		TokenOk bool
-		Error   error
+		Token string
+		Error error
 	}
 	InitStartInfo struct {
 		// Context make available context in trace callback function.
