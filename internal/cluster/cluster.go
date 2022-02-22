@@ -57,6 +57,14 @@ type cluster struct {
 	closed bool
 }
 
+func (c *cluster) Lock() {
+	c.mu.Lock()
+}
+
+func (c *cluster) Unlock() {
+	c.mu.Unlock()
+}
+
 func (c *cluster) GetConn(endpoint endpoint.Endpoint) conn.Conn {
 	return c.pool.GetConn(endpoint)
 }
@@ -69,11 +77,38 @@ func (c *cluster) SetExplorer(repeater repeater.Repeater) {
 	c.explorer = repeater
 }
 
+type crudOptionsHolder struct {
+	locked bool
+}
+
+type crudOption func(h *crudOptionsHolder)
+
+func WithoutLock() crudOption {
+	return func(h *crudOptionsHolder) {
+		h.locked = true
+	}
+}
+
+func parseOptions(opts ...crudOption) *crudOptionsHolder {
+	h := &crudOptionsHolder{}
+	for _, o := range opts {
+		o(h)
+	}
+	return h
+}
+
 type CRUD interface {
-	Insert(ctx context.Context, endpoint endpoint.Endpoint) conn.Conn
-	Update(ctx context.Context, endpoint endpoint.Endpoint) conn.Conn
-	Remove(ctx context.Context, endpoint endpoint.Endpoint) conn.Conn
-	Get(ctx context.Context) (cc conn.Conn, err error)
+	// Insert inserts endpoint to cluster
+	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
+
+	// Update updates endpoint in cluster
+	Update(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
+
+	// Remove removes endpoint from cluster
+	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
+
+	// Get gets conn from cluster
+	Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, err error)
 }
 
 type Pessimizer interface {
@@ -85,9 +120,15 @@ type Explorer interface {
 	Force()
 }
 
-type CRUDExplorer interface {
+type Locker interface {
+	Lock()
+	Unlock()
+}
+
+type CRUDExplorerLocker interface {
 	CRUD
 	Explorer
+	Locker
 }
 
 type Cluster interface {
@@ -95,6 +136,7 @@ type Cluster interface {
 	CRUD
 	Pessimizer
 	Explorer
+	Locker
 	conn.PoolGetter
 }
 
@@ -151,7 +193,7 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
-func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
+func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
@@ -192,7 +234,7 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 }
 
 // Insert inserts new connection into the cluster.
-func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn) {
+func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
 	onDone := trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e)
 	defer func() {
 		if cc != nil {
@@ -202,8 +244,11 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn
 		}
 	}()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	options := parseOptions(opts...)
+	if !options.locked {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+	}
 
 	if c.closed {
 		return nil
@@ -234,7 +279,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn
 }
 
 // Update updates existing connection's runtime stats such that load factor and others.
-func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn) {
+func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
 	onDone := trace.DriverOnClusterUpdate(c.config.Trace(), &ctx, e)
 	defer func() {
 		if cc != nil {
@@ -244,8 +289,12 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn
 		}
 	}()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	options := parseOptions(opts...)
+	if !options.locked {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+	}
+
 	if c.closed {
 		return
 	}
@@ -260,9 +309,11 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn
 
 	delete(c.endpoints, e.NodeID())
 	c.index[e.Address()] = entry
+
 	if e.NodeID() > 0 {
 		c.endpoints[e.NodeID()] = entry.Conn
 	}
+
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
 		c.balancer.Update(entry.Handle, info.Info{})
@@ -272,7 +323,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn
 }
 
 // Remove removes and closes previously inserted connection.
-func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn) {
+func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
 	onDone := trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e)
 	defer func() {
 		if cc != nil {
@@ -282,9 +333,15 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn
 		}
 	}()
 
-	c.mu.Lock()
+	options := parseOptions(opts...)
+	if !options.locked {
+		c.mu.Lock()
+	}
+
 	if c.closed {
-		c.mu.Unlock()
+		if !options.locked {
+			c.mu.Unlock()
+		}
 		return
 	}
 
@@ -298,7 +355,9 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint) (cc conn.Conn
 	delete(c.index, e.Address())
 	delete(c.endpoints, e.NodeID())
 
-	c.mu.Unlock()
+	if !options.locked {
+		c.mu.Unlock()
+	}
 
 	if entry.Conn != nil {
 		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().

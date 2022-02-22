@@ -68,19 +68,23 @@ func (p *pool) GetConn(e endpoint.Endpoint) Conn {
 
 func (p *pool) Close(ctx context.Context) error {
 	close(p.done)
-	var issues []error
+
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
+
+	var issues []error
 	for a, c := range p.conns {
 		if err := c.Close(ctx); err != nil {
 			issues = append(issues, err)
 		}
 		delete(p.conns, a)
 	}
-	if len(issues) == 0 {
-		return nil
+
+	if len(issues) > 0 {
+		return errors.NewWithIssues("connection pool close failed", issues...)
 	}
-	return errors.NewWithIssues("connection pool close failed", issues...)
+
+	return nil
 }
 
 func (p *pool) connCloser(ctx context.Context, interval time.Duration) {

@@ -38,6 +38,13 @@ const (
 	folder = "table_test"
 )
 
+func init() {
+	log.SetFlags(0)
+	if os.Getenv("HIDE_APPLICATION_OUTPUT") == "1" {
+		log.SetOutput(ioutil.Discard)
+	}
+}
+
 type stats struct {
 	sync.Mutex
 
@@ -1016,11 +1023,6 @@ func days(date string) time.Time {
 		panic(err)
 	}
 	return t
-}
-
-func init() {
-	log.SetFlags(0)
-	log.SetOutput(ioutil.Discard)
 }
 
 type templateConfig struct {
