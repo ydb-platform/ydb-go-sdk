@@ -35,6 +35,7 @@ import (
 type Connection interface {
 	closer.Closer
 	db.ConnectionInfo
+	grpc.ClientConnInterface
 
 	// Table returns table client with options from Connection instance.
 	// Options provide options replacement for requested table client
