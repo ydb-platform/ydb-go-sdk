@@ -1,3 +1,6 @@
+## 3.11.5
+* Replaced meta in `proxyConnection.Invoke` and `proxyConnection.NewStream`
+
 ## 3.11.4
 * Refactored `internal/cluster.Cluster` (add option for notify about external lock, lock cluster for update cluster endpoints)
 * Reverted `grpc.ClientConnInterface` API to `ydb.Connection`
