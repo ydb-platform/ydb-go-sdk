@@ -126,9 +126,6 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 		default:
 			err = op(ctx)
-			if err != nil {
-				err = errors.Errorf(0, "retry operation failed: %w", err)
-			}
 
 			onDone = onIntermediate(err)
 

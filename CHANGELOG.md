@@ -1,3 +1,6 @@
+## 3.11.8
+* Exclude wrapping error from retry operation (returns as is)
+
 ## 3.11.7
 * Removed internal alias-type `errors.IssuesIterator`
 
