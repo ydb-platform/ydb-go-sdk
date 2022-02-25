@@ -14,13 +14,13 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 			start := time.Now()
 			return func(info trace.ExecuteDoneInfo) {
 				if info.Error == nil {
-					log.Debugf(`execute done {latency:"%s",resultSetCount:%v,resultSetErr:"%v""}`,
+					log.Debugf(`execute done {latency:"%v",resultSetCount:%v,resultSetErr:"%v""}`,
 						time.Since(start),
 						info.Result.ResultSetCount(),
 						info.Result.Err(),
 					)
 				} else {
-					log.Errorf(`execute failed {latency:"%s",error:"%s"}`,
+					log.Errorf(`execute failed {latency:"%v",error:"%s"}`,
 						time.Since(start),
 						info.Error,
 					)
@@ -32,13 +32,13 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 			start := time.Now()
 			return func(info trace.ExplainQueryDoneInfo) {
 				if info.Error == nil {
-					log.Debugf(`explain done {latency:"%s",ast:%v,plan:%v"}`,
+					log.Debugf(`explain done {latency:"%v",ast:%v,plan:%v"}`,
 						time.Since(start),
 						info.AST,
 						info.Plan,
 					)
 				} else {
-					log.Errorf(`explain failed {latency:"%s",error:"%s"}`,
+					log.Errorf(`explain failed {latency:"%v",error:"%s"}`,
 						time.Since(start),
 						info.Error,
 					)

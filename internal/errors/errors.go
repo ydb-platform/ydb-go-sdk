@@ -58,12 +58,12 @@ func Is(err, target error) bool {
 // New is a proxy to errors.New
 // This need to single import errors
 func New(text string) error {
-	return Errorf(2, "%w", errors.New(text))
+	return Errorf(0, "%w", errors.New(text))
 }
 
 // NewWithIssues returns error which contains child issues
 func NewWithIssues(text string, issues ...error) error {
-	return Errorf(2, "%w", &errorWithIssues{
+	return Errorf(1, "%w", &errorWithIssues{
 		reason: text,
 		issues: issues,
 	})

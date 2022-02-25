@@ -22,13 +22,13 @@ func Retry(log Logger, details trace.Details) (t trace.Retry) {
 			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 				return func(info trace.RetryLoopDoneInfo) {
 					if info.Error == nil {
-						log.Debugf(`retry done {id:"%s",latency:"%s",attempts:%v}`,
+						log.Debugf(`retry done {id:"%s",latency:"%v",attempts:%v}`,
 							id,
 							time.Since(start),
 							info.Attempts,
 						)
 					} else {
-						log.Errorf(`retry failed {id:"%s",latency:"%s",attempts:%v,error:"%s"}`,
+						log.Errorf(`retry failed {id:"%s",latency:"%v",attempts:%v,error:"%s"}`,
 							id,
 							time.Since(start),
 							info.Attempts,

@@ -17,12 +17,16 @@ func Discovery(log Logger, details trace.Details) (t trace.Discovery) {
 			start := time.Now()
 			return func(info trace.DiscoverDoneInfo) {
 				if info.Error == nil {
-					log.Debugf(`discover done {latency:"%s",endpoints:%v}`,
+					endpoints := make([]string, 0, len(info.Endpoints))
+					for _, e := range info.Endpoints {
+						endpoints = append(endpoints, e.String())
+					}
+					log.Debugf(`discover done {latency:"%v",endpoints:%v}`,
 						time.Since(start),
-						info.Endpoints,
+						endpoints,
 					)
 				} else {
-					log.Errorf(`discover failed {latency:"%s",error:"%s"}`,
+					log.Errorf(`discover failed {latency:"%v",error:"%s"}`,
 						time.Since(start),
 						info.Error,
 					)
@@ -34,13 +38,13 @@ func Discovery(log Logger, details trace.Details) (t trace.Discovery) {
 			start := time.Now()
 			return func(info trace.WhoAmIDoneInfo) {
 				if info.Error == nil {
-					log.Debugf(`whoAmI done {latency:"%s",user:%v,groups:%v}`,
+					log.Debugf(`whoAmI done {latency:"%v",user:%v,groups:%v}`,
 						time.Since(start),
 						info.User,
 						info.Groups,
 					)
 				} else {
-					log.Errorf(`whoAmI failed {latency:"%s",error:"%s"}`,
+					log.Errorf(`whoAmI failed {latency:"%v",error:"%s"}`,
 						time.Since(start),
 						info.Error,
 					)

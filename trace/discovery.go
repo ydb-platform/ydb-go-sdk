@@ -24,7 +24,7 @@ type (
 	}
 	DiscoverDoneInfo struct {
 		Location  string
-		Endpoints []string
+		Endpoints []EndpointInfo
 		Error     error
 	}
 	WhoAmIStartInfo struct {

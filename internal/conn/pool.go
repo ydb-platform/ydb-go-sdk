@@ -61,7 +61,11 @@ func (p *pool) GetConn(e endpoint.Endpoint) Conn {
 	if cc, ok := p.conns[e.Address()]; ok {
 		return cc
 	}
-	cc := New(e, p.config)
+	cc := New(e, p.config, withOnClose(func(c Conn) {
+		p.mtx.Lock()
+		defer p.mtx.Unlock()
+		delete(p.conns, c.Endpoint().Address())
+	}))
 	p.conns[e.Address()] = cc
 	return cc
 }
@@ -70,14 +74,17 @@ func (p *pool) Close(ctx context.Context) error {
 	close(p.done)
 
 	p.mtx.Lock()
-	defer p.mtx.Unlock()
+	conns := make([]Conn, 0, len(p.conns))
+	for _, c := range p.conns {
+		conns = append(conns, c)
+	}
+	p.mtx.Unlock()
 
 	var issues []error
-	for a, c := range p.conns {
+	for _, c := range conns {
 		if err := c.Close(ctx); err != nil {
 			issues = append(issues, err)
 		}
-		delete(p.conns, a)
 	}
 
 	if len(issues) > 0 {

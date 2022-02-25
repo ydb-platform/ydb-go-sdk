@@ -45,6 +45,7 @@ type conn struct {
 	state    State
 	locks    int32
 	ttl      timeutil.Timer
+	onClose  []func(Conn)
 }
 
 func (c *conn) IsState(states ...State) bool {
@@ -79,7 +80,7 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	if c != nil {
 		return c.endpoint
 	}
-	return endpoint.Endpoint{}
+	return nil
 }
 
 func (c *conn) SetState(ctx context.Context, s State) State {
@@ -92,7 +93,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 	onDone := trace.DriverOnConnStateChange(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 		c.state,
 	)
 	c.state = s
@@ -123,7 +124,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	onDone := trace.DriverOnConnTake(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 	)
 	defer func() {
 		onDone(int(atomic.LoadInt32(&c.locks)), err)
@@ -160,7 +161,7 @@ func (c *conn) release(ctx context.Context) {
 	onDone := trace.DriverOnConnRelease(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 	)
 	atomic.AddInt32(&c.locks, -1)
 	onDone(int(atomic.LoadInt32(&c.locks)))
@@ -200,6 +201,9 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	c.closed = true
 	err = c.close(ctx)
 	c.setState(ctx, Destroyed)
+	for _, f := range c.onClose {
+		f(c)
+	}
 	return err
 }
 
@@ -210,7 +214,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	trace.DriverOnPessimizeNode(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 		c.GetState(),
 		err,
 	)(c.SetState(ctx, Banned))
@@ -249,7 +253,7 @@ func (c *conn) Invoke(
 	onDone := trace.DriverOnConnInvoke(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 		trace.Method(method),
 	)
 	defer func() {
@@ -316,7 +320,7 @@ func (c *conn) NewStream(
 	streamRecv := trace.DriverOnConnNewStream(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 		trace.Method(method),
 	)
 	defer func() {
@@ -347,12 +351,23 @@ func (c *conn) NewStream(
 	}, nil
 }
 
-func New(endpoint endpoint.Endpoint, config Config) Conn {
+type option func(c *conn)
+
+func withOnClose(onClose func(Conn)) option {
+	return func(c *conn) {
+		c.onClose = append(c.onClose, onClose)
+	}
+}
+
+func New(endpoint endpoint.Endpoint, config Config, opts ...option) Conn {
 	c := &conn{
 		state:    Created,
 		endpoint: endpoint,
 		config:   config,
 		done:     make(chan struct{}),
+	}
+	for _, o := range opts {
+		o(c)
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
 		c.ttl = timeutil.NewTimer(ttl)

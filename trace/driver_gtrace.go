@@ -893,7 +893,7 @@ func DriverOnResolve(t Driver, target string, resolved []string) func(error) {
 		res(p)
 	}
 }
-func DriverOnConnStateChange(t Driver, c *context.Context, endpoint endpointInfo, state ConnState) func(state ConnState) {
+func DriverOnConnStateChange(t Driver, c *context.Context, endpoint EndpointInfo, state ConnState) func(state ConnState) {
 	var p ConnStateChangeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -905,7 +905,7 @@ func DriverOnConnStateChange(t Driver, c *context.Context, endpoint endpointInfo
 		res(p)
 	}
 }
-func DriverOnConnInvoke(t Driver, c *context.Context, endpoint endpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
+func DriverOnConnInvoke(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
 	var p ConnInvokeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -920,7 +920,7 @@ func DriverOnConnInvoke(t Driver, c *context.Context, endpoint endpointInfo, m M
 		res(p)
 	}
 }
-func DriverOnConnNewStream(t Driver, c *context.Context, endpoint endpointInfo, m Method) func(error) func(state ConnState, _ error) {
+func DriverOnConnNewStream(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(error) func(state ConnState, _ error) {
 	var p ConnNewStreamStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -938,7 +938,7 @@ func DriverOnConnNewStream(t Driver, c *context.Context, endpoint endpointInfo, 
 		}
 	}
 }
-func DriverOnConnTake(t Driver, c *context.Context, endpoint endpointInfo) func(lock int, _ error) {
+func DriverOnConnTake(t Driver, c *context.Context, endpoint EndpointInfo) func(lock int, _ error) {
 	var p ConnTakeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -950,7 +950,7 @@ func DriverOnConnTake(t Driver, c *context.Context, endpoint endpointInfo) func(
 		res(p)
 	}
 }
-func DriverOnConnRelease(t Driver, c *context.Context, endpoint endpointInfo) func(lock int) {
+func DriverOnConnRelease(t Driver, c *context.Context, endpoint EndpointInfo) func(lock int) {
 	var p ConnReleaseStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -980,18 +980,18 @@ func DriverOnClusterClose(t Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func DriverOnClusterGet(t Driver, c *context.Context) func(endpoint endpointInfo, _ error) {
+func DriverOnClusterGet(t Driver, c *context.Context) func(endpoint EndpointInfo, _ error) {
 	var p ClusterGetStartInfo
 	p.Context = c
 	res := t.onClusterGet(p)
-	return func(endpoint endpointInfo, e error) {
+	return func(endpoint EndpointInfo, e error) {
 		var p ClusterGetDoneInfo
 		p.Endpoint = endpoint
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnClusterInsert(t Driver, c *context.Context, endpoint endpointInfo) func(state ConnState) {
+func DriverOnClusterInsert(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState) {
 	var p ClusterInsertStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -1002,7 +1002,7 @@ func DriverOnClusterInsert(t Driver, c *context.Context, endpoint endpointInfo) 
 		res(p)
 	}
 }
-func DriverOnClusterUpdate(t Driver, c *context.Context, endpoint endpointInfo) func(state ConnState) {
+func DriverOnClusterUpdate(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState) {
 	var p ClusterUpdateStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -1013,7 +1013,7 @@ func DriverOnClusterUpdate(t Driver, c *context.Context, endpoint endpointInfo) 
 		res(p)
 	}
 }
-func DriverOnClusterRemove(t Driver, c *context.Context, endpoint endpointInfo) func(state ConnState) {
+func DriverOnClusterRemove(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState) {
 	var p ClusterRemoveStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
@@ -1024,7 +1024,7 @@ func DriverOnClusterRemove(t Driver, c *context.Context, endpoint endpointInfo) 
 		res(p)
 	}
 }
-func DriverOnPessimizeNode(t Driver, c *context.Context, endpoint endpointInfo, state ConnState, cause error) func(state ConnState) {
+func DriverOnPessimizeNode(t Driver, c *context.Context, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
 	var p PessimizeNodeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint

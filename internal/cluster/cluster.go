@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -37,8 +36,10 @@ var (
 
 	// ErrNilBalancerElement returned when requested on a nil Balancer element.
 	ErrNilBalancerElement = errors.New("nil balancer element")
+
 	// ErrUnknownBalancerElement returned when requested on a unknown Balancer element.
 	ErrUnknownBalancerElement = errors.New("unknown balancer element")
+
 	// ErrUnknownTypeOfBalancerElement returned when requested on a unknown types of Balancer element.
 	ErrUnknownTypeOfBalancerElement = errors.New("unknown types of balancer element")
 )
@@ -210,7 +211,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 		if err != nil {
 			onDone(nil, err)
 		} else {
-			onDone(cc.Endpoint(), nil)
+			onDone(cc.Endpoint().Copy(), nil)
 		}
 	}()
 
@@ -235,7 +236,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 
 // Insert inserts new connection into the cluster.
 func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e)
+	onDone := trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e.Copy())
 	defer func() {
 		if cc != nil {
 			onDone(cc.GetState())
@@ -261,16 +262,14 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		panic("ydb: can't insert already existing endpoint")
 	}
 
-	var wait chan struct{}
-	defer func() {
-		if wait != nil {
-			close(wait)
-		}
-	}()
+	cc.Endpoint().Touch()
 
 	entry := entry.Entry{Conn: cc}
+
 	entry.InsertInto(c.balancer)
+
 	c.index[e.Address()] = entry
+
 	if e.NodeID() > 0 {
 		c.endpoints[e.NodeID()] = cc
 	}
@@ -280,7 +279,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 // Update updates existing connection's runtime stats such that load factor and others.
 func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterUpdate(c.config.Trace(), &ctx, e)
+	onDone := trace.DriverOnClusterUpdate(c.config.Trace(), &ctx, e.Copy())
 	defer func() {
 		if cc != nil {
 			onDone(cc.GetState())
@@ -307,6 +306,8 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		panic("ydb: cluster entry with nil conn")
 	}
 
+	entry.Conn.Endpoint().Touch()
+
 	delete(c.endpoints, e.NodeID())
 	c.index[e.Address()] = entry
 
@@ -316,7 +317,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
-		c.balancer.Update(entry.Handle, info.Info{})
+		c.balancer.Update(entry.Handle, e.Info())
 	}
 
 	return entry.Conn
@@ -324,7 +325,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 // Remove removes and closes previously inserted connection.
 func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e)
+	onDone := trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e.Copy())
 	defer func() {
 		if cc != nil {
 			onDone(cc.GetState())
