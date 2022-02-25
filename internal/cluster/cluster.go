@@ -36,8 +36,10 @@ var (
 
 	// ErrNilBalancerElement returned when requested on a nil Balancer element.
 	ErrNilBalancerElement = errors.New("nil balancer element")
+
 	// ErrUnknownBalancerElement returned when requested on a unknown Balancer element.
 	ErrUnknownBalancerElement = errors.New("unknown balancer element")
+
 	// ErrUnknownTypeOfBalancerElement returned when requested on a unknown types of Balancer element.
 	ErrUnknownTypeOfBalancerElement = errors.New("unknown types of balancer element")
 )

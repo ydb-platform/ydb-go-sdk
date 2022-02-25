@@ -6,6 +6,7 @@
 * Added `conn.conn.onClose` slice for call optional funcs on close step
 * Added removing `conn.Conn` from `conn.Pool` on `conn.Conn.Close()` call
 * Checked cluster close/empty on keeper goroutine
+* Fixed `internal.errors.New` wrapping depth
 
 ## 3.11.7
 * Removed internal alias-type `errors.IssuesIterator`
