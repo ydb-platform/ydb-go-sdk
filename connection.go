@@ -14,6 +14,7 @@ import (
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
@@ -136,11 +137,13 @@ func (c *connection) Invoke(
 	reply interface{},
 	opts ...grpc.CallOption,
 ) (err error) {
-	err = c.db.Invoke(ctx, method, args, reply, opts...)
-	if err != nil {
-		err = errors.Errorf(0, "invoke failed: %w", err)
-	}
-	return err
+	return c.db.Invoke(
+		conn.WithoutWrapping(ctx),
+		method,
+		args,
+		reply,
+		opts...,
+	)
 }
 
 func (c *connection) NewStream(
@@ -149,7 +152,12 @@ func (c *connection) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	return c.db.NewStream(ctx, desc, method, opts...)
+	return c.db.NewStream(
+		conn.WithoutWrapping(ctx),
+		desc,
+		method,
+		opts...,
+	)
 }
 
 func (c *connection) Endpoint() string {

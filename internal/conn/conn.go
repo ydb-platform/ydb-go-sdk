@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -126,29 +127,44 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		&ctx,
 		c.endpoint.Copy(),
 	)
+
 	defer func() {
+		if err != nil {
+			atomic.AddInt32(&c.locks, 1)
+		}
 		onDone(int(atomic.LoadInt32(&c.locks)), err)
 	}()
+
 	if c.isClosed() {
-		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
+		return nil, errors.NewGrpcError(
+			codes.Unavailable,
+			errors.WithMsg("ydb driver conn closed early"),
+		)
 	}
+
 	c.Lock()
 	defer c.Unlock()
-	if isBroken(c.cc) {
-		_ = c.close(ctx)
-		if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, dialTimeout)
-			defer cancel()
-		}
-		cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
-		if err != nil {
-			return nil, errors.Errorf(0, "dial failed: %w", err)
-		}
-		c.cc = cc
-		c.setState(ctx, Online)
+
+	if !isBroken(c.cc) {
+		return c.cc, nil
 	}
-	atomic.AddInt32(&c.locks, 1)
+
+	_ = c.close(ctx)
+
+	if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, dialTimeout)
+		defer cancel()
+	}
+
+	cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
+	if err != nil {
+		return nil, errors.Errorf(0, "dial failed: %w", err)
+	}
+
+	c.cc = cc
+	c.setState(ctx, Online)
+
 	return c.cc, nil
 }
 
@@ -220,6 +236,34 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	)(c.SetState(ctx, Banned))
 }
 
+func (c *conn) invoke(
+	ctx context.Context,
+	method string,
+	req interface{},
+	res interface{},
+	opts ...grpc.CallOption,
+) (err error) {
+	defer func() {
+		if err != nil && errors.MustPessimizeEndpoint(err) {
+			c.pessimize(ctx, err)
+		}
+	}()
+
+	var cc *grpc.ClientConn
+	cc, err = c.take(ctx)
+	if err != nil {
+		return errors.NewGrpcError(
+			codes.Unavailable,
+			errors.WithMsg("ydb driver conn take failed"),
+			errors.WithErr(err),
+		)
+	}
+
+	defer c.release(ctx)
+
+	return cc.Invoke(ctx, method, req, res, opts...)
+}
+
 func (c *conn) Invoke(
 	ctx context.Context,
 	method string,
@@ -227,49 +271,33 @@ func (c *conn) Invoke(
 	res interface{},
 	opts ...grpc.CallOption,
 ) (err error) {
-	if c.isClosed() {
-		return errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
-	}
-
-	var cc *grpc.ClientConn
-	cc, err = c.take(ctx)
-	if err != nil {
-		err = errors.Errorf(0, "take failed: %w", errors.MapGRPCError(err))
-		if errors.MustPessimizeEndpoint(err) {
-			c.pessimize(ctx, err)
-		}
-		return
-	}
-
 	var (
-		cancel context.CancelFunc
-		opID   string
-		issues []trace.Issue
+		opID     string
+		issues   []trace.Issue
+		wrapping = needWrapping(ctx)
+		onDone   = trace.DriverOnConnInvoke(
+			trace.ContextDriver(ctx).Compose(c.config.Trace()),
+			&ctx,
+			c.endpoint,
+			trace.Method(method),
+		)
 	)
 
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
-
-	onDone := trace.DriverOnConnInvoke(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
-		&ctx,
-		c.endpoint.Copy(),
-		trace.Method(method),
-	)
 	defer func() {
 		onDone(err, issues, opID, c.GetState())
 	}()
 
-	err = cc.Invoke(ctx, method, req, res, opts...)
+	err = c.invoke(ctx, method, req, res, opts...)
 
-	c.release(ctx)
+	if err != nil && !wrapping {
+		return err
+	}
 
 	if err != nil {
-		err = errors.Errorf(0, "invoke failed: %w", errors.MapGRPCError(err))
-		if errors.MustPessimizeEndpoint(err) {
-			c.pessimize(ctx, err)
+		if wrapping {
+			return errors.Errorf(0, "invoke failed: %w", errors.MapGRPCError(err))
 		}
-		return
+		return err
 	}
 
 	if o, ok := res.(response.Response); ok {
@@ -277,16 +305,43 @@ func (c *conn) Invoke(
 		for _, issue := range o.GetOperation().GetIssues() {
 			issues = append(issues, issue)
 		}
-		switch {
-		case !o.GetOperation().GetReady():
-			return errors.ErrOperationNotReady
+		if wrapping {
+			switch {
+			case !o.GetOperation().GetReady():
+				return errors.ErrOperationNotReady
 
-		case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-			return errors.NewOpError(errors.WithOEOperation(o.GetOperation()))
+			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
+				return errors.NewOpError(errors.WithOEOperation(o.GetOperation()))
+			}
 		}
 	}
 
 	return err
+}
+
+func (c *conn) newStream(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (_ grpc.ClientStream, err error) {
+	defer func() {
+		if err != nil && errors.MustPessimizeEndpoint(err) {
+			c.pessimize(ctx, err)
+		}
+	}()
+
+	var cc *grpc.ClientConn
+	cc, err = c.take(ctx)
+	if err != nil {
+		return nil, errors.NewGrpcError(
+			codes.Unavailable,
+			errors.WithMsg("ydb driver conn take failed"),
+			errors.WithErr(err),
+		)
+	}
+
+	return cc.NewStream(ctx, desc, method, opts...)
 }
 
 func (c *conn) NewStream(
@@ -295,54 +350,43 @@ func (c *conn) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
-	if c.isClosed() {
-		return nil, errors.NewTransportError(errors.WithTEReason(errors.TransportErrorUnavailable))
-	}
+	var (
+		streamRecv = trace.DriverOnConnNewStream(
+			trace.ContextDriver(ctx).Compose(c.config.Trace()),
+			&ctx,
+			c.endpoint.Copy(),
+			trace.Method(method),
+		)
+		wrapping = needWrapping(ctx)
+	)
 
-	var cc *grpc.ClientConn
-	cc, err = c.take(ctx)
-	if err != nil {
-		err = errors.Errorf(0, "take failed: %w", errors.MapGRPCError(err))
-		if errors.MustPessimizeEndpoint(err) {
-			c.pessimize(ctx, err)
+	defer func() {
+		if err != nil {
+			c.release(ctx)
+			streamRecv(err)(c.GetState(), err)
 		}
-		return nil, err
-	}
+	}()
 
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
+
 	defer func() {
 		if err != nil {
 			cancel()
 		}
 	}()
 
-	streamRecv := trace.DriverOnConnNewStream(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
-		&ctx,
-		c.endpoint.Copy(),
-		trace.Method(method),
-	)
-	defer func() {
-		if err != nil {
-			streamRecv(err)(c.GetState(), err)
-		}
-	}()
-
 	var s grpc.ClientStream
-	s, err = cc.NewStream(ctx, desc, method, append(opts, grpc.MaxCallRecvMsgSize(50*1024*1024))...)
-	if err != nil {
-		err = errors.Errorf(0, "new stream failed: %w", errors.MapGRPCError(err))
-		if errors.MustPessimizeEndpoint(err) {
-			c.pessimize(ctx, err)
-		}
-		c.release(ctx)
-		return nil, err
+	s, err = c.newStream(ctx, desc, method, opts...)
+
+	if err != nil && wrapping {
+		return s, errors.Errorf(0, "stream failed: %w", errors.MapGRPCError(err))
 	}
 
 	return &grpcClientStream{
-		c: c,
-		s: s,
+		c:        c,
+		s:        s,
+		wrapping: wrapping,
 		onDone: func(ctx context.Context) {
 			cancel()
 			c.release(ctx)
