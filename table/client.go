@@ -8,9 +8,13 @@ import (
 )
 
 // Operation is the interface that holds an operation for retry.
+// if Operation returns not nil - operation will retry
+// if Operation returns nil - retry loop will break
 type Operation func(ctx context.Context, s Session) error
 
 // TxOperation is the interface that holds an operation for retry.
+// if TxOperation returns not nil - operation will retry
+// if TxOperation returns nil - retry loop will break
 type TxOperation func(ctx context.Context, tx TransactionActor) error
 
 type Option func(o *Options)

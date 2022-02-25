@@ -6,7 +6,9 @@ package trace
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 )
 
 type (
@@ -79,15 +81,19 @@ func (m Method) Split() (service, method string) {
 }
 
 type ConnState interface {
+	fmt.Stringer
+
 	IsValid() bool
-	String() string
 	Code() int
 }
 
-type endpointInfo interface {
+type EndpointInfo interface {
+	fmt.Stringer
+
 	NodeID() uint32
 	Address() string
 	LocalDC() bool
+	LastUpdated() time.Time
 }
 
 type (
@@ -97,7 +103,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 	}
 	ClusterInsertDoneInfo struct {
 		State ConnState
@@ -108,7 +114,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 	}
 	ClusterUpdateDoneInfo struct {
 		State ConnState
@@ -119,7 +125,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 	}
 	ClusterRemoveDoneInfo struct {
 		State ConnState
@@ -130,7 +136,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 		State    ConnState
 	}
 	ConnStateChangeDoneInfo struct {
@@ -182,7 +188,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 	}
 	ConnTakeDoneInfo struct {
 		Lock  int
@@ -194,7 +200,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 	}
 	ConnReleaseDoneInfo struct {
 		Lock int
@@ -205,7 +211,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 		Method   Method
 	}
 	ConnInvokeDoneInfo struct {
@@ -220,7 +226,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 		Method   Method
 	}
 	ConnNewStreamRecvInfo struct {
@@ -256,7 +262,7 @@ type (
 		Context *context.Context
 	}
 	ClusterGetDoneInfo struct {
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 		Error    error
 	}
 	PessimizeNodeStartInfo struct {
@@ -265,7 +271,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
-		Endpoint endpointInfo
+		Endpoint EndpointInfo
 		State    ConnState
 		Cause    error
 	}

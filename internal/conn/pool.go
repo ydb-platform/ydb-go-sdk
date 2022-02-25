@@ -61,7 +61,11 @@ func (p *pool) GetConn(e endpoint.Endpoint) Conn {
 	if cc, ok := p.conns[e.Address()]; ok {
 		return cc
 	}
-	cc := New(e, p.config)
+	cc := New(e, p.config, withOnClose(func(c Conn) {
+		p.mtx.Lock()
+		defer p.mtx.Unlock()
+		delete(p.conns, c.Endpoint().Address())
+	}))
 	p.conns[e.Address()] = cc
 	return cc
 }

@@ -31,7 +31,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 						addresses,
 					)
 				} else {
-					log.Errorf(`update failed {target:"%s",resolved:%v,error:"%v"}`,
+					log.Warnf(`update failed {target:"%s",resolved:%v,error:"%v"}`,
 						target,
 						addresses,
 						info.Error,
@@ -52,13 +52,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.NetReadDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`read done {latency:"%s",address:"%s",received:%d}`,
+					log.Tracef(`read done {latency:"%v",address:"%s",received:%d}`,
 						time.Since(start),
 						address,
 						info.Received,
 					)
 				} else {
-					log.Warnf(`read failed {latency:"%s",address:"%s",received:%d,error:"%s"}`,
+					log.Warnf(`read failed {latency:"%v",address:"%s",received:%d,error:"%s"}`,
 						time.Since(start),
 						address,
 						info.Received,
@@ -73,13 +73,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.NetWriteDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`write done {latency:"%s",address:"%s",sent:%d}`,
+					log.Tracef(`write done {latency:"%v",address:"%s",sent:%d}`,
 						time.Since(start),
 						address,
 						info.Sent,
 					)
 				} else {
-					log.Warnf(`write failed {latency:"%s",address:"%s",sent:%d,error:"%s"}`,
+					log.Warnf(`write failed {latency:"%v",address:"%s",sent:%d,error:"%s"}`,
 						time.Since(start),
 						address,
 						info.Sent,
@@ -96,12 +96,12 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.NetDialDoneInfo) {
 				if info.Error == nil {
-					log.Debugf(`dial done {latency:"%s",address:"%s"}`,
+					log.Debugf(`dial done {latency:"%v",address:"%s"}`,
 						time.Since(start),
 						address,
 					)
 				} else {
-					log.Errorf(`dial failed {latency:"%s",address:"%s",error:"%s"}`,
+					log.Errorf(`dial failed {latency:"%v",address:"%s",error:"%s"}`,
 						time.Since(start),
 						address,
 						info.Error,
@@ -117,12 +117,12 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.NetCloseDoneInfo) {
 				if info.Error == nil {
-					log.Debugf(`close done {latency:"%s",address:"%s"}`,
+					log.Debugf(`close done {latency:"%v",address:"%s"}`,
 						time.Since(start),
 						address,
 					)
 				} else {
-					log.Warnf(`close failed {latency:"%s",address:"%s",error:"%s"}`,
+					log.Warnf(`close failed {latency:"%v",address:"%s",error:"%s"}`,
 						time.Since(start),
 						address,
 						info.Error,
@@ -150,7 +150,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			return func(info trace.InitDoneInfo) {
 				if info.Error == nil {
 					log.Infof(
-						`init done {{endpoint:"%s",database:"%s",endpoint:%v,latency:"%s"}`,
+						`init done {endpoint:"%s",database:"%s",secure:%t,latency:"%v"}`,
 						endpoint,
 						database,
 						secure,
@@ -158,7 +158,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					log.Warnf(
-						`init failed {{endpoint:"%s",database:"%s",endpoint:%v,latency:"%s",error:"%s"}`,
+						`init failed {endpoint:"%s",database:"%s",secure:%t,latency:"%v",error:"%s"}`,
 						endpoint,
 						database,
 						secure,
@@ -174,12 +174,12 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			return func(info trace.CloseDoneInfo) {
 				if info.Error == nil {
 					log.Infof(
-						`close done {latency:"%s"}`,
+						`close done {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
 					log.Warnf(
-						`close failed {latency:"%s",error:"%s"}`,
+						`close failed {latency:"%v",error:"%s"}`,
 						time.Since(start),
 						info.Error,
 					)
@@ -187,89 +187,75 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 		t.OnConnTake = func(info trace.ConnTakeStartInfo) func(trace.ConnTakeDoneInfo) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
-			log.Tracef(`take start {address:"%s",local:%t}`,
-				address,
-				local,
+			endpoint := info.Endpoint.String()
+			log.Tracef(`take start {endpoint:%v}`,
+				endpoint,
 			)
 			start := time.Now()
 			return func(info trace.ConnTakeDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`take done {latency:"%s",address:"%s",local:%t}`,
+					log.Tracef(`take done {endpoint:%v,latency:"%v"}`,
+						endpoint,
 						time.Since(start),
-						address,
-						local,
 					)
 				} else {
-					log.Warnf(`take failed {latency:"%s",address:"%s",local:%t,error:"%s"}`,
+					log.Warnf(`take failed {endpoint:%v,latency:"%v",error:"%s"}`,
+						endpoint,
 						time.Since(start),
-						address,
-						local,
 						info.Error,
 					)
 				}
 			}
 		}
 		t.OnConnRelease = func(info trace.ConnReleaseStartInfo) func(trace.ConnReleaseDoneInfo) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
-			log.Tracef(`release start {address:"%s",local:%t}`,
-				address,
-				local,
+			endpoint := info.Endpoint.String()
+			log.Tracef(`release start {endpoint:%v}`,
+				endpoint,
 			)
 			start := time.Now()
 			return func(info trace.ConnReleaseDoneInfo) {
-				log.Tracef(`release done {latency:"%s",address:"%s",local:%t,locks:%d}`,
+				log.Tracef(`release done {endpoint:%v,latency:"%v",locks:%d}`,
+					endpoint,
 					time.Since(start),
-					address,
-					local,
 					info.Lock,
 				)
 			}
 		}
 		t.OnConnStateChange = func(info trace.ConnStateChangeStartInfo) func(trace.ConnStateChangeDoneInfo) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
-			log.Tracef(`conn state change start {address:"%s",local:%t,state:"%s"}`,
-				address,
-				local,
+			endpoint := info.Endpoint.String()
+			log.Tracef(`conn state change start {endpoint:%v,state:"%s"}`,
+				endpoint,
 				info.State,
 			)
 			start := time.Now()
 			return func(info trace.ConnStateChangeDoneInfo) {
-				log.Tracef(`conn state change done {latency:"%s",address:"%s",local:%t,state:"%s"}`,
+				log.Tracef(`conn state change done {endpoint:%v,latency:"%v",state:"%s"}`,
+					endpoint,
 					time.Since(start),
-					address,
-					local,
 					info.State,
 				)
 			}
 		}
 		t.OnConnInvoke = func(info trace.ConnInvokeStartInfo) func(trace.ConnInvokeDoneInfo) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
+			endpoint := info.Endpoint.String()
 			method := string(info.Method)
-			log.Tracef(`invoke start {address:"%s",local:%t,method:"%s"}`,
-				address,
-				local,
+			log.Tracef(`invoke start {endpoint:%v,method:"%s"}`,
+				endpoint,
 				method,
 			)
 			start := time.Now()
 			return func(info trace.ConnInvokeDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`invoke done {latency:"%s",address:"%s",local:%t,method:"%s"}`,
-						time.Since(start),
-						address,
-						local,
+					log.Tracef(`invoke done {endpoint:%v,method:"%s",latency:"%v"}`,
+						endpoint,
 						method,
+						time.Since(start),
 					)
 				} else {
-					log.Warnf(`invoke failed {latency:"%s",address:"%s",local:%t,method:"%s",error:"%s"}`,
-						time.Since(start),
-						address,
-						local,
+					log.Warnf(`invoke failed {endpoint:%v,method:"%s",latency:"%v",error:"%s"}`,
+						endpoint,
 						method,
+						time.Since(start),
 						info.Error,
 					)
 				}
@@ -282,46 +268,40 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 		) func(
 			trace.ConnNewStreamDoneInfo,
 		) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
+			endpoint := info.Endpoint.String()
 			method := string(info.Method)
-			log.Tracef(`streaming start {address:"%s",local:%t,method:"%s"}`,
-				address,
-				local,
+			log.Tracef(`streaming start {endpoint:%v,method:"%s"}`,
+				endpoint,
 				method,
 			)
 			start := time.Now()
 			return func(info trace.ConnNewStreamRecvInfo) func(trace.ConnNewStreamDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`streaming intermediate receive {latency:"%s",address:"%s",local:%t,method:"%s"}`,
-						time.Since(start),
-						address,
-						local,
+					log.Tracef(`streaming intermediate receive {endpoint:%v,method:"%s",latency:"%v"}`,
+						endpoint,
 						method,
+						time.Since(start),
 					)
 				} else {
-					log.Warnf(`streaming intermediate receive failed {latency:"%s",address:"%s",local:%t,method:"%s",error:"%s"}`,
-						time.Since(start),
-						address,
-						local,
+					log.Warnf(`streaming intermediate fail {endpoint:%v,method:"%s",latency:"%v",error:"%s"}`,
+						endpoint,
 						method,
+						time.Since(start),
 						info.Error,
 					)
 				}
 				return func(info trace.ConnNewStreamDoneInfo) {
 					if info.Error == nil {
-						log.Tracef(`streaming done {latency:"%s",address:"%s",local:%t,method:"%s"}`,
-							time.Since(start),
-							address,
-							local,
+						log.Tracef(`streaming done {endpoint:%v,method:"%s",latency:"%v"}`,
+							endpoint,
 							method,
+							time.Since(start),
 						)
 					} else {
-						log.Warnf(`streaming failed {latency:"%s",address:"%s",local:%t,method:"%s",error:"%s"}`,
-							time.Since(start),
-							address,
-							local,
+						log.Warnf(`streaming done {endpoint:%v,method:"%s",latency:"%v",error:"%s"}`,
+							endpoint,
 							method,
+							time.Since(start),
 							info.Error,
 						)
 					}
@@ -336,7 +316,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			log.Tracef(`init start`)
 			start := time.Now()
 			return func(info trace.ClusterInitDoneInfo) {
-				log.Debugf(`init done {latency:"%s"}`,
+				log.Debugf(`init done {latency:"%v"}`,
 					time.Since(start),
 				)
 			}
@@ -346,11 +326,11 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.ClusterCloseDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`close done {latency:"%s"}`,
+					log.Tracef(`close done {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
-					log.Errorf(`close failed {latency:"%s",error:"%s"}`,
+					log.Errorf(`close failed {latency:"%v",error:"%s"}`,
 						time.Since(start),
 						info.Error,
 					)
@@ -362,13 +342,12 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.ClusterGetDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`get done {latency:"%s",address:"%s",local:%t}`,
+					log.Tracef(`get done {latency:"%v",endpoint:%v}`,
 						time.Since(start),
-						info.Endpoint.Address(),
-						info.Endpoint.LocalDC(),
+						info.Endpoint.String(),
 					)
 				} else {
-					log.Warnf(`get failed {latency:"%s",error:"%s"}`,
+					log.Warnf(`get failed {latency:"%v",error:"%s"}`,
 						time.Since(start),
 						info.Error,
 					)
@@ -376,70 +355,58 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 		t.OnClusterInsert = func(info trace.ClusterInsertStartInfo) func(trace.ClusterInsertDoneInfo) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
-			log.Debugf(`insert start {address:"%s",local:%t}`,
-				address,
-				local,
+			endpoint := info.Endpoint.String()
+			log.Debugf(`insert start {endpoint:%v}`,
+				endpoint,
 			)
 			start := time.Now()
 			return func(info trace.ClusterInsertDoneInfo) {
-				log.Infof(`insert done {latency:"%s",address:"%s",local:%t,state:"%s"}`,
+				log.Infof(`insert done {endpoint:%v,latency:"%v",state:"%s"}`,
+					endpoint,
 					time.Since(start),
-					address,
-					local,
 					info.State,
 				)
 			}
 		}
 		t.OnClusterRemove = func(info trace.ClusterRemoveStartInfo) func(trace.ClusterRemoveDoneInfo) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
-			log.Debugf(`remove start {address:"%s",local:%t}`,
-				address,
-				local,
+			endpoint := info.Endpoint.String()
+			log.Debugf(`remove start {endpoint:%v}`,
+				endpoint,
 			)
 			start := time.Now()
 			return func(info trace.ClusterRemoveDoneInfo) {
-				log.Infof(`remove done {latency:"%s",address:"%s",local:%t,state:"%s"}`,
+				log.Infof(`remove done {endpoint:%v,latency:"%v",state:"%s"}`,
+					endpoint,
 					time.Since(start),
-					address,
-					local,
 					info.State,
 				)
 			}
 		}
 		t.OnClusterUpdate = func(info trace.ClusterUpdateStartInfo) func(trace.ClusterUpdateDoneInfo) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
-			log.Debugf(`update start {address:"%s",local:%t}`,
-				address,
-				local,
+			endpoint := info.Endpoint.String()
+			log.Debugf(`update start {endpoint:%v}`,
+				endpoint,
 			)
 			start := time.Now()
 			return func(info trace.ClusterUpdateDoneInfo) {
-				log.Infof(`update done {latency:"%s",address:"%s",local:%t,state:"%s"}`,
+				log.Infof(`update done {endpoint:%v,latency:"%v",state:"%s"}`,
+					endpoint,
 					time.Since(start),
-					address,
-					local,
 					info.State,
 				)
 			}
 		}
 		t.OnPessimizeNode = func(info trace.PessimizeNodeStartInfo) func(trace.PessimizeNodeDoneInfo) {
-			address := info.Endpoint.Address()
-			local := info.Endpoint.LocalDC()
-			log.Warnf(`pessimize start {address:"%s",local:%t,cause:'"%s"'}`,
-				address,
-				local,
+			endpoint := info.Endpoint.String()
+			log.Warnf(`pessimize start {endpoint:%v,cause:"%s"}`,
+				endpoint,
 				info.Cause,
 			)
 			start := time.Now()
 			return func(info trace.PessimizeNodeDoneInfo) {
-				log.Warnf(`pessimize done {latency:"%s",address:"%s",local:%t,state:"%s"}`,
+				log.Warnf(`pessimize done {endpoint:%v,latency:"%v",state:"%s"}`,
+					endpoint,
 					time.Since(start),
-					address,
-					local,
 					info.State,
 				)
 			}
@@ -453,12 +420,12 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.GetCredentialsDoneInfo) {
 				if info.Error == nil {
-					log.Tracef(`get done {latency:"%s",token:"%s"}`,
+					log.Tracef(`get done {latency:"%v",token:"%s"}`,
 						time.Since(start),
 						Secret(info.Token),
 					)
 				} else {
-					log.Errorf(`get failed {latency:"%s",token:"%s",error:"%s"}`,
+					log.Errorf(`get failed {latency:"%v",token:"%s",error:"%s"}`,
 						time.Since(start),
 						Secret(info.Token),
 						info.Error,

@@ -89,13 +89,13 @@ func (t Discovery) onWhoAmI(w WhoAmIStartInfo) func(WhoAmIDoneInfo) {
 	}
 	return res
 }
-func DiscoveryOnDiscover(t Discovery, c *context.Context, address string, database string) func(location string, endpoints []string, _ error) {
+func DiscoveryOnDiscover(t Discovery, c *context.Context, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
 	var p DiscoverStartInfo
 	p.Context = c
 	p.Address = address
 	p.Database = database
 	res := t.onDiscover(p)
-	return func(location string, endpoints []string, e error) {
+	return func(location string, endpoints []EndpointInfo, e error) {
 		var p DiscoverDoneInfo
 		p.Location = location
 		p.Endpoints = endpoints

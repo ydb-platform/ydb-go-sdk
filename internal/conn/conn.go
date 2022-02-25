@@ -45,6 +45,7 @@ type conn struct {
 	state    State
 	locks    int32
 	ttl      timeutil.Timer
+	onClose  []func(Conn)
 }
 
 func (c *conn) IsState(states ...State) bool {
@@ -79,7 +80,7 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	if c != nil {
 		return c.endpoint
 	}
-	return endpoint.Endpoint{}
+	return nil
 }
 
 func (c *conn) SetState(ctx context.Context, s State) State {
@@ -200,6 +201,9 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	c.closed = true
 	err = c.close(ctx)
 	c.setState(ctx, Destroyed)
+	for _, f := range c.onClose {
+		f(c)
+	}
 	return err
 }
 
@@ -347,12 +351,23 @@ func (c *conn) NewStream(
 	}, nil
 }
 
-func New(endpoint endpoint.Endpoint, config Config) Conn {
+type option func(c *conn)
+
+func withOnClose(onClose func(Conn)) option {
+	return func(c *conn) {
+		c.onClose = append(c.onClose, onClose)
+	}
+}
+
+func New(endpoint endpoint.Endpoint, config Config, opts ...option) Conn {
 	c := &conn{
 		state:    Created,
 		endpoint: endpoint,
 		config:   config,
 		done:     make(chan struct{}),
+	}
+	for _, o := range opts {
+		o(c)
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
 		c.ttl = timeutil.NewTimer(ttl)

@@ -29,6 +29,8 @@ var (
 )
 
 // retryOperation is the interface that holds an operation for retry.
+// if retryOperation returns not nil - operation will retry
+// if retryOperation returns nil - retry loop will break
 type retryOperation func(context.Context) (err error)
 
 type retryableErrorOption func(e *errors.RetryableError)

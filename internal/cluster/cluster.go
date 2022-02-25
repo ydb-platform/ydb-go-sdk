@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -261,16 +260,14 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		panic("ydb: can't insert already existing endpoint")
 	}
 
-	var wait chan struct{}
-	defer func() {
-		if wait != nil {
-			close(wait)
-		}
-	}()
+	cc.Endpoint().Touch()
 
 	entry := entry.Entry{Conn: cc}
+
 	entry.InsertInto(c.balancer)
+
 	c.index[e.Address()] = entry
+
 	if e.NodeID() > 0 {
 		c.endpoints[e.NodeID()] = cc
 	}
@@ -307,6 +304,8 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		panic("ydb: cluster entry with nil conn")
 	}
 
+	entry.Conn.Endpoint().Touch()
+
 	delete(c.endpoints, e.NodeID())
 	c.index[e.Address()] = entry
 
@@ -316,7 +315,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 	if entry.Handle != nil {
 		// entry.Handle may be nil when connection is being tracked.
-		c.balancer.Update(entry.Handle, info.Info{})
+		c.balancer.Update(entry.Handle, e.Info())
 	}
 
 	return entry.Conn
