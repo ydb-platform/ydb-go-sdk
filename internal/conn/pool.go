@@ -74,14 +74,17 @@ func (p *pool) Close(ctx context.Context) error {
 	close(p.done)
 
 	p.mtx.Lock()
-	defer p.mtx.Unlock()
+	conns := make([]Conn, 0, len(p.conns))
+	for _, c := range p.conns {
+		conns = append(conns, c)
+	}
+	p.mtx.Unlock()
 
 	var issues []error
-	for a, c := range p.conns {
+	for _, c := range conns {
 		if err := c.Close(ctx); err != nil {
 			issues = append(issues, err)
 		}
-		delete(p.conns, a)
 	}
 
 	if len(issues) > 0 {
