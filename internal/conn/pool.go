@@ -74,10 +74,11 @@ func (p *pool) Close(ctx context.Context) error {
 	close(p.done)
 
 	p.mtx.Lock()
-	defer p.mtx.Unlock()
+	conns := p.conns
+	p.mtx.Unlock()
 
 	var issues []error
-	for a, c := range p.conns {
+	for a, c := range conns {
 		if err := c.Close(ctx); err != nil {
 			issues = append(issues, err)
 		}
