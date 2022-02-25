@@ -93,6 +93,7 @@ type EndpointInfo interface {
 	NodeID() uint32
 	Address() string
 	LocalDC() bool
+	Location() string
 	LastUpdated() time.Time
 }
 

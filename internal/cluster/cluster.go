@@ -209,7 +209,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 		if err != nil {
 			onDone(nil, err)
 		} else {
-			onDone(cc.Endpoint(), nil)
+			onDone(cc.Endpoint().Copy(), nil)
 		}
 	}()
 
@@ -234,7 +234,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 
 // Insert inserts new connection into the cluster.
 func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e)
+	onDone := trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e.Copy())
 	defer func() {
 		if cc != nil {
 			onDone(cc.GetState())
@@ -277,7 +277,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 // Update updates existing connection's runtime stats such that load factor and others.
 func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterUpdate(c.config.Trace(), &ctx, e)
+	onDone := trace.DriverOnClusterUpdate(c.config.Trace(), &ctx, e.Copy())
 	defer func() {
 		if cc != nil {
 			onDone(cc.GetState())
@@ -323,7 +323,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 // Remove removes and closes previously inserted connection.
 func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e)
+	onDone := trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e.Copy())
 	defer func() {
 		if cc != nil {
 			onDone(cc.GetState())

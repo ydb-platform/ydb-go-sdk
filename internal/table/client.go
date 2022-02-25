@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -580,6 +581,8 @@ func (c *client) keeper() {
 				if err != nil {
 					switch {
 					case
+						errors.Is(err, cluster.ErrClusterClosed),
+						errors.Is(err, cluster.ErrClusterEmpty),
 						errors.IsOpError(err, errors.StatusBadSession),
 						errors.IsTransportError(err, errors.TransportErrorDeadlineExceeded):
 						toDelete = append(toDelete, s)

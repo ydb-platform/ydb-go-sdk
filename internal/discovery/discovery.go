@@ -125,7 +125,7 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
 		for _, e := range endpoints {
-			nodes = append(nodes, e)
+			nodes = append(nodes, e.Copy())
 		}
 		onDone(location, nodes, err)
 	}()

@@ -1,9 +1,11 @@
 ## 3.11.8
 * Added `trace.EndpointInfo.LastUpdated()` timestamp
 * Refactored `endpoint.Endpoint` (split to struct `endopint` and interface `Endpoint`)
+* Returned safe-thread copy of `endpoint.Endpoint` to trace callbacks 
 * Added `endpoint.Endpoint.Touch()` func for refresh endpoint info
 * Added `conn.conn.onClose` slice for call optional funcs on close step
 * Added removing `conn.Conn` from `conn.Pool` on `conn.Conn.Close()` call
+* Checked cluster close/empty on keeper goroutine
 
 ## 3.11.7
 * Removed internal alias-type `errors.IssuesIterator`

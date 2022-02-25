@@ -93,7 +93,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 	onDone := trace.DriverOnConnStateChange(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 		c.state,
 	)
 	c.state = s
@@ -124,7 +124,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	onDone := trace.DriverOnConnTake(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 	)
 	defer func() {
 		onDone(int(atomic.LoadInt32(&c.locks)), err)
@@ -161,7 +161,7 @@ func (c *conn) release(ctx context.Context) {
 	onDone := trace.DriverOnConnRelease(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 	)
 	atomic.AddInt32(&c.locks, -1)
 	onDone(int(atomic.LoadInt32(&c.locks)))
@@ -214,7 +214,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	trace.DriverOnPessimizeNode(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 		c.GetState(),
 		err,
 	)(c.SetState(ctx, Banned))
@@ -253,7 +253,7 @@ func (c *conn) Invoke(
 	onDone := trace.DriverOnConnInvoke(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 		trace.Method(method),
 	)
 	defer func() {
@@ -320,7 +320,7 @@ func (c *conn) NewStream(
 	streamRecv := trace.DriverOnConnNewStream(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
-		c.endpoint,
+		c.endpoint.Copy(),
 		trace.Method(method),
 	)
 	defer func() {
