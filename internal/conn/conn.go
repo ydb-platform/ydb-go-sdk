@@ -362,7 +362,6 @@ func (c *conn) NewStream(
 
 	defer func() {
 		if err != nil {
-			c.release(ctx)
 			streamRecv(err)(c.GetState(), err)
 		}
 	}()
@@ -377,7 +376,18 @@ func (c *conn) NewStream(
 	}()
 
 	var s grpc.ClientStream
-	s, err = c.newStream(ctx, desc, method, opts...)
+	s, err = c.newStream(
+		ctx,
+		desc,
+		method,
+		append([]grpc.CallOption{
+			// nolint:godox
+			// TODO: add onClose callback with c.release(ctx)
+		}, opts...)...,
+	)
+
+	// released before read from stream because if client no
+	defer c.release(ctx)
 
 	if err != nil && wrapping {
 		return s, errors.Errorf(0, "stream failed: %w", errors.MapGRPCError(err))
@@ -389,7 +399,6 @@ func (c *conn) NewStream(
 		wrapping: wrapping,
 		onDone: func(ctx context.Context) {
 			cancel()
-			c.release(ctx)
 		},
 		recv: streamRecv,
 	}, nil
