@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"net"
 	"strconv"
 	"testing"
@@ -469,8 +468,6 @@ var testData = [...]struct {
 func TestRoundRobin(t *testing.T) {
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			var (
 				mconn = map[conn.Conn]string{} // Conn to addr mapping for easy matching.
 				maddr = map[string]conn.Conn{} // addr to Conn mapping.
@@ -486,10 +483,10 @@ func TestRoundRobin(t *testing.T) {
 						config.WithEndpoint("test"),
 					),
 				)
-				c.SetState(ctx, conn.Online)
+				c.SetState(conn.Online)
 				if test.banned != nil {
 					if _, ok := test.banned[e.Address()]; ok {
-						c.SetState(ctx, conn.Banned)
+						c.SetState(conn.Banned)
 					}
 				}
 				mconn[c] = e.Address()
@@ -529,8 +526,6 @@ func TestRandomChoice(t *testing.T) {
 	multiplier := 100
 	for _, test := range testData {
 		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			var (
 				mconn = map[conn.Conn]string{} // Conn to addr mapping for easy matching.
 				maddr = map[string]conn.Conn{} // addr to Conn mapping.
@@ -543,9 +538,9 @@ func TestRandomChoice(t *testing.T) {
 					e,
 					config.New(),
 				)
-				c.SetState(ctx, conn.Online)
+				c.SetState(conn.Online)
 				if _, ok := test.banned[e.Address()]; ok {
-					c.SetState(ctx, conn.Banned)
+					c.SetState(conn.Banned)
 				}
 				mconn[c] = e.Address()
 				maddr[e.Address()] = c

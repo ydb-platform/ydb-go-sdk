@@ -26,7 +26,7 @@ type Conn interface {
 
 	IsState(states ...State) bool
 	GetState() State
-	SetState(context.Context, State) State
+	SetState(State) State
 	Close(ctx context.Context) error
 	Park(ctx context.Context) error
 	TTL() <-chan time.Time
@@ -44,7 +44,7 @@ type conn struct {
 	endpoint endpoint.Endpoint // ro access
 	closed   bool
 	state    State
-	locks    int32
+	usages   int32
 	ttl      timeutil.Timer
 	onClose  []func(Conn)
 }
@@ -63,7 +63,7 @@ func (c *conn) IsState(states ...State) bool {
 func (c *conn) Park(ctx context.Context) (err error) {
 	c.Lock()
 	defer c.Unlock()
-	err = c.close(ctx)
+	err = c.close()
 	if err != nil {
 		err = errors.Errorf(0, "park failed: %w", err)
 	}
@@ -84,21 +84,19 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	return nil
 }
 
-func (c *conn) SetState(ctx context.Context, s State) State {
+func (c *conn) SetState(s State) State {
 	c.Lock()
 	defer c.Unlock()
-	return c.setState(ctx, s)
+	return c.setState(s)
 }
 
-func (c *conn) setState(ctx context.Context, s State) State {
-	onDone := trace.DriverOnConnStateChange(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
-		&ctx,
+func (c *conn) setState(s State) State {
+	c.state = s
+	trace.DriverOnConnStateChange(
+		c.config.Trace(),
 		c.endpoint.Copy(),
 		c.state,
 	)
-	c.state = s
-	onDone(c.state)
 	return c.state
 }
 
@@ -115,7 +113,7 @@ func (c *conn) TTL() <-chan time.Time {
 	if c.isClosed() {
 		return nil
 	}
-	if atomic.LoadInt32(&c.locks) > 0 {
+	if atomic.LoadInt32(&c.usages) > 0 {
 		return nil
 	}
 	return c.ttl.C()
@@ -129,10 +127,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	)
 
 	defer func() {
-		if err != nil {
-			atomic.AddInt32(&c.locks, 1)
-		}
-		onDone(int(atomic.LoadInt32(&c.locks)), err)
+		onDone(err)
 	}()
 
 	if c.isClosed() {
@@ -149,7 +144,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		return c.cc, nil
 	}
 
-	_ = c.close(ctx)
+	_ = c.close()
 
 	if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
 		var cancel context.CancelFunc
@@ -163,24 +158,30 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}
 
 	c.cc = cc
-	c.setState(ctx, Online)
+	c.setState(Online)
 
 	return c.cc, nil
 }
 
-func (c *conn) release(ctx context.Context) {
+func (c *conn) changeUsages(delta int32) {
+	trace.DriverOnConnUsagesChange(
+		c.config.Trace(),
+		c.endpoint.Copy(),
+		int(atomic.AddInt32(&c.usages, delta)),
+	)
+}
+
+func (c *conn) incUsages() {
+	c.changeUsages(1)
+}
+
+func (c *conn) decUsages() {
 	c.Lock()
 	defer c.Unlock()
 	if ttl := c.config.ConnectionTTL(); ttl > 0 {
 		c.ttl.Reset(ttl)
 	}
-	onDone := trace.DriverOnConnRelease(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
-		&ctx,
-		c.endpoint.Copy(),
-	)
-	atomic.AddInt32(&c.locks, -1)
-	onDone(int(atomic.LoadInt32(&c.locks)))
+	c.changeUsages(-1)
 }
 
 func isBroken(raw *grpc.ClientConn) bool {
@@ -192,13 +193,13 @@ func isBroken(raw *grpc.ClientConn) bool {
 }
 
 // conn must be locked
-func (c *conn) close(ctx context.Context) (err error) {
+func (c *conn) close() (err error) {
 	if c.cc == nil {
 		return nil
 	}
 	err = c.cc.Close()
 	c.cc = nil
-	c.setState(ctx, Offline)
+	c.setState(Offline)
 	return err
 }
 
@@ -215,8 +216,8 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		return nil
 	}
 	c.closed = true
-	err = c.close(ctx)
-	c.setState(ctx, Destroyed)
+	err = c.close()
+	c.setState(Destroyed)
 	for _, f := range c.onClose {
 		f(c)
 	}
@@ -233,7 +234,7 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 		c.endpoint.Copy(),
 		c.GetState(),
 		err,
-	)(c.SetState(ctx, Banned))
+	)(c.SetState(Banned))
 }
 
 func (c *conn) invoke(
@@ -259,7 +260,8 @@ func (c *conn) invoke(
 		)
 	}
 
-	defer c.release(ctx)
+	c.incUsages()
+	defer c.decUsages()
 
 	return cc.Invoke(ctx, method, req, res, opts...)
 }
@@ -341,6 +343,9 @@ func (c *conn) newStream(
 		)
 	}
 
+	c.incUsages()
+	defer c.decUsages()
+
 	return cc.NewStream(ctx, desc, method, opts...)
 }
 
@@ -380,17 +385,14 @@ func (c *conn) NewStream(
 		ctx,
 		desc,
 		method,
-		append([]grpc.CallOption{
-			// nolint:godox
-			// TODO: add onClose callback with c.release(ctx)
-		}, opts...)...,
+		opts...,
 	)
 
-	// released before read from stream because if client no
-	defer c.release(ctx)
-
-	if err != nil && wrapping {
-		return s, errors.Errorf(0, "stream failed: %w", errors.MapGRPCError(err))
+	if err != nil {
+		if wrapping {
+			return s, errors.Errorf(0, "stream failed: %w", errors.MapGRPCError(err))
+		}
+		return s, err
 	}
 
 	return &grpcClientStream{

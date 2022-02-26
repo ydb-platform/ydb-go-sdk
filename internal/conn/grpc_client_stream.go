@@ -42,6 +42,8 @@ func (s *grpcClientStream) Context() context.Context {
 }
 
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
+	s.c.incUsages()
+	defer s.c.decUsages()
 	err = s.s.SendMsg(m)
 	if err != nil && s.wrapping {
 		err = errors.Errorf(0, "%w", errors.MapGRPCError(err))
@@ -50,6 +52,9 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
+	s.c.incUsages()
+	defer s.c.decUsages()
+
 	defer func() {
 		onDone := s.recv(errors.HideEOF(err))
 		if err != nil {

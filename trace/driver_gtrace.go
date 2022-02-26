@@ -285,27 +285,16 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
-	case t.OnConnRelease == nil:
-		ret.OnConnRelease = x.OnConnRelease
-	case x.OnConnRelease == nil:
-		ret.OnConnRelease = t.OnConnRelease
+	case t.OnConnUsagesChange == nil:
+		ret.OnConnUsagesChange = x.OnConnUsagesChange
+	case x.OnConnUsagesChange == nil:
+		ret.OnConnUsagesChange = t.OnConnUsagesChange
 	default:
-		h1 := t.OnConnRelease
-		h2 := x.OnConnRelease
-		ret.OnConnRelease = func(c ConnReleaseStartInfo) func(ConnReleaseDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(c ConnReleaseDoneInfo) {
-					r1(c)
-					r2(c)
-				}
-			}
+		h1 := t.OnConnUsagesChange
+		h2 := x.OnConnUsagesChange
+		ret.OnConnUsagesChange = func(c ConnUsagesChangeInfo) {
+			h1(c)
+			h2(c)
 		}
 	}
 	switch {
@@ -679,20 +668,12 @@ func (t Driver) onConnTake(c1 ConnTakeStartInfo) func(ConnTakeDoneInfo) {
 	}
 	return res
 }
-func (t Driver) onConnRelease(c1 ConnReleaseStartInfo) func(ConnReleaseDoneInfo) {
-	fn := t.OnConnRelease
+func (t Driver) onConnUsagesChange(c1 ConnUsagesChangeInfo) {
+	fn := t.OnConnUsagesChange
 	if fn == nil {
-		return func(ConnReleaseDoneInfo) {
-			return
-		}
+		return
 	}
-	res := fn(c1)
-	if res == nil {
-		return func(ConnReleaseDoneInfo) {
-			return
-		}
-	}
-	return res
+	fn(c1)
 }
 func (t Driver) onClusterInit(c1 ClusterInitStartInfo) func(ClusterInitDoneInfo) {
 	fn := t.OnClusterInit
@@ -893,9 +874,8 @@ func DriverOnResolve(t Driver, target string, resolved []string) func(error) {
 		res(p)
 	}
 }
-func DriverOnConnStateChange(t Driver, c *context.Context, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+func DriverOnConnStateChange(t Driver, endpoint EndpointInfo, state ConnState) func(state ConnState) {
 	var p ConnStateChangeStartInfo
-	p.Context = c
 	p.Endpoint = endpoint
 	p.State = state
 	res := t.onConnStateChange(p)
@@ -938,28 +918,22 @@ func DriverOnConnNewStream(t Driver, c *context.Context, endpoint EndpointInfo, 
 		}
 	}
 }
-func DriverOnConnTake(t Driver, c *context.Context, endpoint EndpointInfo) func(lock int, _ error) {
+func DriverOnConnTake(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
 	var p ConnTakeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onConnTake(p)
-	return func(lock int, e error) {
+	return func(e error) {
 		var p ConnTakeDoneInfo
-		p.Lock = lock
 		p.Error = e
 		res(p)
 	}
 }
-func DriverOnConnRelease(t Driver, c *context.Context, endpoint EndpointInfo) func(lock int) {
-	var p ConnReleaseStartInfo
-	p.Context = c
+func DriverOnConnUsagesChange(t Driver, endpoint EndpointInfo, usages int) {
+	var p ConnUsagesChangeInfo
 	p.Endpoint = endpoint
-	res := t.onConnRelease(p)
-	return func(lock int) {
-		var p ConnReleaseDoneInfo
-		p.Lock = lock
-		res(p)
-	}
+	p.Usages = usages
+	t.onConnUsagesChange(p)
 }
 func DriverOnClusterInit(t Driver, c *context.Context) func() {
 	var p ClusterInitStartInfo

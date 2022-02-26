@@ -49,7 +49,7 @@ func (p *pool) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error) {
 	defer p.mtx.RUnlock()
 	cc, ok := p.conns[e.Address()]
 	if !ok {
-		cc.SetState(ctx, Banned)
+		cc.SetState(Banned)
 		return nil
 	}
 	return errors.Errorf(0, "pessimize failed: unknown endpoint %v", e)
