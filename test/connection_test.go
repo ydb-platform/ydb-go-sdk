@@ -98,20 +98,35 @@ func TestConnection(t *testing.T) {
 				return
 			}
 			if len(result.GetResultSets()) != 1 {
-				return fmt.Errorf("unexpected result sets count: %d", len(result.GetResultSets()))
+				return fmt.Errorf(
+					"unexpected result sets count: %d",
+					len(result.GetResultSets()),
+				)
 			}
 			if len(result.GetResultSets()[0].GetColumns()) != 1 {
-				return fmt.Errorf("unexpected colums count: %d", len(result.GetResultSets()[0].GetColumns()))
+				return fmt.Errorf(
+					"unexpected colums count: %d",
+					len(result.GetResultSets()[0].GetColumns()),
+				)
 			}
 			// nolint:goconst
 			if result.GetResultSets()[0].GetColumns()[0].GetName() != "sum" {
-				return fmt.Errorf("unexpected colum name: %s", result.GetResultSets()[0].GetColumns()[0].GetName())
+				return fmt.Errorf(
+					"unexpected colum name: %s",
+					result.GetResultSets()[0].GetColumns()[0].GetName(),
+				)
 			}
 			if len(result.GetResultSets()[0].GetRows()) != 1 {
-				return fmt.Errorf("unexpected rows count: %d", len(result.GetResultSets()[0].GetRows()))
+				return fmt.Errorf(
+					"unexpected rows count: %d",
+					len(result.GetResultSets()[0].GetRows()),
+				)
 			}
 			if result.GetResultSets()[0].GetRows()[0].GetItems()[0].GetInt32Value() != 101 {
-				return fmt.Errorf("unexpected result of select: %d", result.GetResultSets()[0].GetRows()[0].GetInt64Value())
+				return fmt.Errorf(
+					"unexpected result of select: %d",
+					result.GetResultSets()[0].GetRows()[0].GetInt64Value(),
+				)
 			}
 			return nil
 		}, retry.WithIdempotent()); err != nil {
@@ -163,7 +178,9 @@ func TestConnection(t *testing.T) {
 	})
 	t.Run("export.ExportToS3", func(t *testing.T) {
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			exportClient := Ydb_Export_V1.NewExportServiceClient(db)
+			exportClient := Ydb_Export_V1.NewExportServiceClient(db.With(
+				ydb.WithCustomToken(""),
+			))
 			response, err := exportClient.ExportToS3(
 				ctx,
 				&Ydb_Export.ExportToS3Request{
