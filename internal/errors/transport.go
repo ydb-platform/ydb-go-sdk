@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	grpc "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
@@ -92,7 +92,7 @@ func NewTransportError(opts ...teOpt) error {
 	for _, f := range opts {
 		f(te)
 	}
-	return Errorf(2, "%w", te)
+	return Errorf(1, "%w", te)
 }
 
 func (t *TransportError) Error() string {
@@ -269,25 +269,25 @@ const (
 )
 
 var grpcCodesToTransportError = [...]TransportErrorCode{
-	grpc.Canceled:           TransportErrorCanceled,
-	grpc.Unknown:            TransportErrorUnknown,
-	grpc.InvalidArgument:    TransportErrorInvalidArgument,
-	grpc.DeadlineExceeded:   TransportErrorDeadlineExceeded,
-	grpc.NotFound:           TransportErrorNotFound,
-	grpc.AlreadyExists:      TransportErrorAlreadyExists,
-	grpc.PermissionDenied:   TransportErrorPermissionDenied,
-	grpc.ResourceExhausted:  TransportErrorResourceExhausted,
-	grpc.FailedPrecondition: TransportErrorFailedPrecondition,
-	grpc.Aborted:            TransportErrorAborted,
-	grpc.OutOfRange:         TransportErrorOutOfRange,
-	grpc.Unimplemented:      TransportErrorUnimplemented,
-	grpc.Internal:           TransportErrorInternal,
-	grpc.Unavailable:        TransportErrorUnavailable,
-	grpc.DataLoss:           TransportErrorDataLoss,
-	grpc.Unauthenticated:    TransportErrorUnauthenticated,
+	grpcCodes.Canceled:           TransportErrorCanceled,
+	grpcCodes.Unknown:            TransportErrorUnknown,
+	grpcCodes.InvalidArgument:    TransportErrorInvalidArgument,
+	grpcCodes.DeadlineExceeded:   TransportErrorDeadlineExceeded,
+	grpcCodes.NotFound:           TransportErrorNotFound,
+	grpcCodes.AlreadyExists:      TransportErrorAlreadyExists,
+	grpcCodes.PermissionDenied:   TransportErrorPermissionDenied,
+	grpcCodes.ResourceExhausted:  TransportErrorResourceExhausted,
+	grpcCodes.FailedPrecondition: TransportErrorFailedPrecondition,
+	grpcCodes.Aborted:            TransportErrorAborted,
+	grpcCodes.OutOfRange:         TransportErrorOutOfRange,
+	grpcCodes.Unimplemented:      TransportErrorUnimplemented,
+	grpcCodes.Internal:           TransportErrorInternal,
+	grpcCodes.Unavailable:        TransportErrorUnavailable,
+	grpcCodes.DataLoss:           TransportErrorDataLoss,
+	grpcCodes.Unauthenticated:    TransportErrorUnauthenticated,
 }
 
-func transportErrorCode(c grpc.Code) TransportErrorCode {
+func transportErrorCode(c grpcCodes.Code) TransportErrorCode {
 	if int(c) < len(grpcCodesToTransportError) {
 		return grpcCodesToTransportError[c]
 	}
@@ -341,7 +341,7 @@ func MapGRPCError(err error) error {
 	if errors.As(err, &t) {
 		return t
 	}
-	if s, ok := status.FromError(err); ok {
+	if s, ok := grpcStatus.FromError(err); ok {
 		return &TransportError{
 			Reason:  transportErrorCode(s.Code()),
 			message: s.Message(),
@@ -352,7 +352,10 @@ func MapGRPCError(err error) error {
 }
 
 func MustPessimizeEndpoint(err error) bool {
-	var t *TransportError
+	var (
+		t *TransportError
+		g *grpcError
+	)
 	switch {
 	case err == nil:
 		return false
@@ -361,6 +364,14 @@ func MustPessimizeEndpoint(err error) bool {
 		case
 			TransportErrorResourceExhausted,
 			TransportErrorOutOfRange:
+			return false
+		default:
+			return true
+		}
+	case errors.As(err, &g):
+		switch g.GRPCStatus().Code() {
+		case
+			grpcCodes.ResourceExhausted, grpcCodes.OutOfRange:
 			return false
 		default:
 			return true

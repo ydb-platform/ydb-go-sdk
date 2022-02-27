@@ -207,19 +207,11 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnConnRelease = func(info trace.ConnReleaseStartInfo) func(trace.ConnReleaseDoneInfo) {
-			endpoint := info.Endpoint.String()
-			log.Tracef(`release start {endpoint:%v}`,
-				endpoint,
+		t.OnConnUsagesChange = func(info trace.ConnUsagesChangeInfo) {
+			log.Tracef(`release done {endpoint:%v,usages:%d}`,
+				info.Endpoint.String(),
+				info.Usages,
 			)
-			start := time.Now()
-			return func(info trace.ConnReleaseDoneInfo) {
-				log.Tracef(`release done {endpoint:%v,latency:"%v",locks:%d}`,
-					endpoint,
-					time.Since(start),
-					info.Lock,
-				)
-			}
 		}
 		t.OnConnStateChange = func(info trace.ConnStateChangeStartInfo) func(trace.ConnStateChangeDoneInfo) {
 			endpoint := info.Endpoint.String()

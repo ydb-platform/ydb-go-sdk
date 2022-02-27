@@ -29,11 +29,11 @@ type (
 		OnResolve func(ResolveStartInfo) func(ResolveDoneInfo)
 
 		// Conn events
-		OnConnStateChange func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
-		OnConnInvoke      func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
-		OnConnNewStream   func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
-		OnConnTake        func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
-		OnConnRelease     func(ConnReleaseStartInfo) func(ConnReleaseDoneInfo)
+		OnConnStateChange  func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
+		OnConnInvoke       func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
+		OnConnNewStream    func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
+		OnConnTake         func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
+		OnConnUsagesChange func(ConnUsagesChangeInfo)
 
 		// Cluster events
 		OnClusterInit   func(ClusterInitStartInfo) func(ClusterInitDoneInfo)
@@ -132,11 +132,6 @@ type (
 		State ConnState
 	}
 	ConnStateChangeStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
 		Endpoint EndpointInfo
 		State    ConnState
 	}
@@ -192,19 +187,11 @@ type (
 		Endpoint EndpointInfo
 	}
 	ConnTakeDoneInfo struct {
-		Lock  int
 		Error error
 	}
-	ConnReleaseStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
+	ConnUsagesChangeInfo struct {
 		Endpoint EndpointInfo
-	}
-	ConnReleaseDoneInfo struct {
-		Lock int
+		Usages   int
 	}
 	ConnInvokeStartInfo struct {
 		// Context make available context in trace callback function.

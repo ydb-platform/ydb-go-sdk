@@ -7,6 +7,8 @@
 * Added removing `conn.Conn` from `conn.Pool` on `conn.Conn.Close()` call
 * Checked cluster close/empty on keeper goroutine
 * Fixed `internal.errors.New` wrapping depth
+* Added context flag for no wrapping operation results as error
+* Refactored `trace.Driver` conn events
 
 ## 3.11.7
 * Removed internal alias-type `errors.IssuesIterator`

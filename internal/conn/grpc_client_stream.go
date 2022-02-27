@@ -14,10 +14,11 @@ import (
 )
 
 type grpcClientStream struct {
-	c      *conn
-	s      grpc.ClientStream
-	onDone func(ctx context.Context)
-	recv   func(error) func(trace.ConnState, error)
+	c        *conn
+	s        grpc.ClientStream
+	wrapping bool
+	onDone   func(ctx context.Context)
+	recv     func(error) func(trace.ConnState, error)
 }
 
 func (s *grpcClientStream) Header() (metadata.MD, error) {
@@ -41,14 +42,19 @@ func (s *grpcClientStream) Context() context.Context {
 }
 
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
+	s.c.incUsages()
+	defer s.c.decUsages()
 	err = s.s.SendMsg(m)
-	if err != nil {
+	if err != nil && s.wrapping {
 		err = errors.Errorf(0, "%w", errors.MapGRPCError(err))
 	}
 	return
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
+	s.c.incUsages()
+	defer s.c.decUsages()
+
 	defer func() {
 		onDone := s.recv(errors.HideEOF(err))
 		if err != nil {
@@ -60,16 +66,20 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	err = s.s.RecvMsg(m)
 
 	if err != nil {
-		err = errors.Errorf(0, "receive message failed: %w", errors.MapGRPCError(err))
 		if errors.MustPessimizeEndpoint(err) {
 			s.c.pessimize(s.s.Context(), err)
 		}
-		return errors.Errorf(0, "%w", err)
+		if s.wrapping {
+			return errors.Errorf(0, "receive message failed: %w", errors.MapGRPCError(err))
+		}
+		return err
 	}
 
-	if operation, ok := m.(wrap.StreamOperationResponse); ok {
-		if s := operation.GetStatus(); s != Ydb.StatusIds_SUCCESS {
-			err = errors.NewOpError(errors.WithOEOperation(operation))
+	if s.wrapping {
+		if operation, ok := m.(wrap.StreamOperationResponse); ok {
+			if s := operation.GetStatus(); s != Ydb.StatusIds_SUCCESS {
+				err = errors.NewOpError(errors.WithOEOperation(operation))
+			}
 		}
 	}
 

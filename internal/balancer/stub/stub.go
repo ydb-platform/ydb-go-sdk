@@ -44,7 +44,7 @@ func Balancer() (*list.List, balancer.Balancer) {
 		},
 		OnPessimize: func(ctx context.Context, x balancer.Element) error {
 			e := x.(*list.Element)
-			e.Conn.SetState(ctx, conn.Banned)
+			e.Conn.SetState(conn.Banned)
 			return nil
 		},
 		OnContains: func(x balancer.Element) bool {

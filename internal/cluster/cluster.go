@@ -385,7 +385,7 @@ func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error
 	if !c.balancer.Contains(entry.Handle) {
 		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrUnknownBalancerElement)
 	}
-	entry.Conn.SetState(ctx, conn.Banned)
+	entry.Conn.SetState(conn.Banned)
 	if c.explorer != nil {
 		// count ratio (banned/all)
 		online := 0
