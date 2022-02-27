@@ -291,10 +291,6 @@ func (c *conn) Invoke(
 
 	err = c.invoke(ctx, method, req, res, opts...)
 
-	if err != nil && !wrapping {
-		return err
-	}
-
 	if err != nil {
 		if wrapping {
 			return errors.Errorf(0, "invoke failed: %w", errors.MapGRPCError(err))

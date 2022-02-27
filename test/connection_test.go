@@ -12,10 +12,15 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Export_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scripting_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Export"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
@@ -154,6 +159,33 @@ func TestConnection(t *testing.T) {
 			return nil
 		}, retry.WithIdempotent()); err != nil {
 			t.Fatalf("Stream execute failed: %v", err)
+		}
+	})
+	t.Run("export.ExportToS3", func(t *testing.T) {
+		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			exportClient := Ydb_Export_V1.NewExportServiceClient(db)
+			response, err := exportClient.ExportToS3(
+				ctx,
+				&Ydb_Export.ExportToS3Request{
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationTimeout: durationpb.New(time.Second),
+						CancelAfter:      durationpb.New(time.Second),
+					},
+					Settings: &Ydb_Export.ExportToS3Settings{},
+				},
+			)
+			if err != nil {
+				return err
+			}
+			if response.GetOperation().GetStatus() != Ydb.StatusIds_BAD_REQUEST {
+				return fmt.Errorf(
+					"operation must be BAD_REQUEST: %s",
+					response.GetOperation().GetStatus().String(),
+				)
+			}
+			return nil
+		}, retry.WithIdempotent()); err != nil {
+			t.Fatalf("check export failed: %v", err)
 		}
 	})
 }
