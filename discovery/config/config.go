@@ -105,7 +105,7 @@ func WithSecure(ssl bool) Option {
 
 func WithTrace(trace trace.Discovery) Option {
 	return func(c *config) {
-		c.trace = trace
+		c.trace = c.trace.Compose(trace)
 	}
 }
 

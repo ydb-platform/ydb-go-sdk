@@ -91,12 +91,12 @@ func (c *conn) SetState(s State) State {
 }
 
 func (c *conn) setState(s State) State {
-	c.state = s
 	trace.DriverOnConnStateChange(
 		c.config.Trace(),
 		c.endpoint.Copy(),
 		c.state,
-	)
+	)(s)
+	c.state = s
 	return c.state
 }
 
