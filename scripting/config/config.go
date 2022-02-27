@@ -48,7 +48,7 @@ type Option func(c *config)
 
 func WithTrace(trace trace.Scripting) Option {
 	return func(c *config) {
-		c.trace = trace
+		c.trace = c.trace.Compose(trace)
 	}
 }
 

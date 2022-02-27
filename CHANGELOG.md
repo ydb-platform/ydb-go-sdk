@@ -1,3 +1,7 @@
+## 3.11.9
+* Fixed composing of service traces
+* Fixed end-call of `trace.Driver.OnConnStateChange`
+
 ## 3.11.8
 * Added `trace.EndpointInfo.LastUpdated()` timestamp
 * Refactored `endpoint.Endpoint` (split to struct `endopint` and interface `Endpoint`)
