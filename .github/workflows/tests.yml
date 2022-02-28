@@ -27,20 +27,6 @@ jobs:
         uses: actions/checkout@v2
       - name: Test
         run: go test -race -tags fast -coverprofile unit.txt -covermode atomic ./...
-      - name: Clear report (unix)
-        if: runner.os != 'Windows'
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            sed -i '/testutil\|trace\|test\|gtrace/d' unit.txt
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            sed -i '' '/testutil\|trace\|test\|gtrace/d' unit.txt
-          fi
-        shell: bash
-      - name: Clear report (windows)
-        if: runner.os == 'Windows'
-        run: |
-          (Get-Content unit.txt) -replace '^(testutil\|trace\|test\|gtrace).*$', '' | Out-File -encoding UTF8 unit.txt
-        shell: pwsh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -80,10 +66,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile table.txt -covermode atomic ./test/table_test.go
-      - name: Clear report
-        run: sed -i '/testutil\|trace\|test\|gtrace/d' table.txt
-        shell: bash
+        run: go test -race -coverpkg=./... -coverprofile unit.txt -covermode atomic ./test/table_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -122,9 +105,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile ratelimiter.txt -covermode atomic ./test/ratelimiter_test.go
-      - name: Clear report
-        run: sed -i '/testutil\|trace\|test\|gtrace/d' ratelimiter.txt
+        run: go test -race -coverpkg=./... -coverprofile unit.txt -covermode atomic ./test/ratelimiter_test.go
         shell: bash
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
@@ -164,10 +145,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile scripting.txt -covermode atomic ./test/scripting_test.go
-      - name: Clear report
-        run: sed -i '/testutil\|trace\|test\|gtrace/d' scripting.txt
-        shell: bash
+        run: go test -race -coverpkg=./... -coverprofile unit.txt -covermode atomic ./test/scripting_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -206,10 +184,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile connection.txt -covermode atomic ./test/connection_test.go
-      - name: Clear report
-        run: sed -i '/testutil\|trace\|test\|gtrace/d' connection.txt
-        shell: bash
+        run: go test -race -coverpkg=./... -coverprofile unit.txt -covermode atomic ./test/connection_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:

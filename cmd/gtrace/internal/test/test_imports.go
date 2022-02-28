@@ -1,6 +1,8 @@
 package test
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/cmd/gtrace/test/internal"
+import (
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/cmd/gtrace/internal/types"
+)
 
 //go:generate gtrace -v
 

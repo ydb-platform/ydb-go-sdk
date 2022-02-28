@@ -36,6 +36,7 @@ func (t TraceReturningTrace) onReturnedTrace() ReturnedTrace {
 	res := fn()
 	return res
 }
+
 // Compose returns a new ReturnedTrace which has functional fields composed
 // both from t and x.
 func (t ReturnedTrace) Compose(x ReturnedTrace) (ret ReturnedTrace) {
@@ -93,6 +94,7 @@ func (t ReturnedTrace) Compose(x ReturnedTrace) (ret ReturnedTrace) {
 	}
 	return ret
 }
+
 // isZero checks whether t is empty
 func (t ReturnedTrace) isZero() bool {
 	if t.OnSomething != nil {

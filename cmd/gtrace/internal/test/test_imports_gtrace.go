@@ -5,7 +5,7 @@ package test
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/cmd/gtrace/test/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cmd/gtrace/internal/types"
 )
 
 // Compose returns a new TraceNoShortcut which has functional fields composed
@@ -51,7 +51,7 @@ func WithTraceNoShortcut(ctx context.Context, t TraceNoShortcut) context.Context
 }
 
 // ContextTraceNoShortcut returns TraceNoShortcut associated with ctx.
-// If there is no TraceNoShortcut associated with ctx then zero value 
+// If there is no TraceNoShortcut associated with ctx then zero value
 // of TraceNoShortcut is returned.
 func ContextTraceNoShortcut(ctx context.Context) TraceNoShortcut {
 	t, _ := ctx.Value(traceNoShortcutContextKey{}).(TraceNoShortcut)
@@ -60,7 +60,7 @@ func ContextTraceNoShortcut(ctx context.Context) TraceNoShortcut {
 
 func (t TraceNoShortcut) onSomethingA(ctx context.Context, t1 Type) {
 	c := ContextTraceNoShortcut(ctx)
-	var fn func(Type) 
+	var fn func(Type)
 	switch {
 	case t.OnSomethingA == nil:
 		fn = c.OnSomethingA
@@ -81,7 +81,7 @@ func (t TraceNoShortcut) onSomethingA(ctx context.Context, t1 Type) {
 }
 func (t TraceNoShortcut) onSomethingB(ctx context.Context, t1 internal.Type) {
 	c := ContextTraceNoShortcut(ctx)
-	var fn func(internal.Type) 
+	var fn func(internal.Type)
 	switch {
 	case t.OnSomethingB == nil:
 		fn = c.OnSomethingB
