@@ -1,0 +1,5 @@
+.idea
+/gtrace
+/pinger
+/buildtags
+/test/test_gtrace.go
