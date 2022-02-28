@@ -1,6 +1,6 @@
 package trace
 
-// tool gtrace used from repository github.com/asmyasnikov/cmd/gtrace
+// tool gtrace used from ./cmd/gtrace
 
 //go:generate gtrace
 

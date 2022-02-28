@@ -58,7 +58,7 @@ We are tried to support `go1.18` features seamlessly. But now we was tested `go1
 
 ## Prerequisites <a name="Prerequisites"></a>
 
-Requires `go1.13` or later.
+Requires `go1.14` or later.
 
 ## Installation <a name="Installation"></a>
 
