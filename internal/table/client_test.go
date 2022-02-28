@@ -53,12 +53,13 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 	defer func() {
 		_ = p.Close(context.Background())
 	}()
+	r := rand.New(rand.WithLock())
 	errCh := make(chan error, limit*10)
 	fn := func(wg *sync.WaitGroup) {
 		defer wg.Done()
 		childCtx, childCancel := context.WithTimeout(
 			ctx,
-			time.Duration(rand.Int64(int64(time.Minute))),
+			time.Duration(r.Int64(int64(time.Minute))),
 		)
 		defer childCancel()
 		s, err := p.createSession(childCtx)

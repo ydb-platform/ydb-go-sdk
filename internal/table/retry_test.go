@@ -301,6 +301,7 @@ func TestRetryContextDeadline(t *testing.T) {
 	p := SessionProviderFunc{
 		OnGet: client.createSession,
 	}
+	r := rand.New(rand.WithLock())
 	for i := range timeouts {
 		for j := range sleeps {
 			timeout := timeouts[i]
@@ -339,7 +340,7 @@ func TestRetryContextDeadline(t *testing.T) {
 						case <-ctx.Done():
 							return ctx.Err()
 						case <-time.After(sleep):
-							return errs[rand.Int(len(errs))]
+							return errs[r.Int(len(errs))]
 						}
 					},
 				)

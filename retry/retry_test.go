@@ -25,11 +25,11 @@ func TestLogBackoff(t *testing.T) {
 		seeds   int64
 	}{
 		{
-			backoff: logBackoff{
-				SlotDuration: time.Second,
-				Ceiling:      3,
-				JitterLimit:  0,
-			},
+			backoff: newBackoff(
+				withSlotDuration(time.Second),
+				withCeiling(3),
+				withJitterLimit(0),
+			),
 			exp: []exp{
 				{gte: 0, lte: time.Second},     // 1 << min(0, 3)
 				{gte: 0, lte: 2 * time.Second}, // 1 << min(1, 3)
@@ -42,11 +42,11 @@ func TestLogBackoff(t *testing.T) {
 			seeds: 1000,
 		},
 		{
-			backoff: logBackoff{
-				SlotDuration: time.Second,
-				Ceiling:      3,
-				JitterLimit:  0.5,
-			},
+			backoff: newBackoff(
+				withSlotDuration(time.Second),
+				withCeiling(3),
+				withJitterLimit(0.5),
+			),
 			exp: []exp{
 				{gte: 500 * time.Millisecond, lte: time.Second}, // 1 << min(0, 3)
 				{gte: 1 * time.Second, lte: 2 * time.Second},    // 1 << min(1, 3)
@@ -59,11 +59,11 @@ func TestLogBackoff(t *testing.T) {
 			seeds: 1000,
 		},
 		{
-			backoff: logBackoff{
-				SlotDuration: time.Second,
-				Ceiling:      3,
-				JitterLimit:  1,
-			},
+			backoff: newBackoff(
+				withSlotDuration(time.Second),
+				withCeiling(3),
+				withJitterLimit(1),
+			),
 			exp: []exp{
 				{eq: time.Second},     // 1 << min(0, 3)
 				{eq: 2 * time.Second}, // 1 << min(1, 3)

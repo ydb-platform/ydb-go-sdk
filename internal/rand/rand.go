@@ -1,22 +1,52 @@
 package rand
 
 import (
-	"crypto/rand"
-	"math/big"
+	"math"
+	"math/rand"
+	"sync"
 )
 
-func int64n(max int64) int64 {
-	n, err := rand.Int(rand.Reader, big.NewInt(max))
-	if err != nil {
-		panic(err) // err on negative max
+type Rand interface {
+	Int64(max int64) int64
+	Int(max int) int
+}
+
+type r struct {
+	r *rand.Rand
+	m *sync.Mutex
+}
+
+type option func(r *r)
+
+func WithLock() option {
+	return func(r *r) {
+		r.m = &sync.Mutex{}
 	}
-	return n.Int64()
 }
 
-func Int64(max int64) int64 {
-	return int64n(max)
+func New(opts ...option) Rand {
+	r := &r{
+		// nolint:gosec
+		r: rand.New(rand.NewSource(math.MaxInt64)),
+	}
+	for _, o := range opts {
+		o(r)
+	}
+	return r
 }
 
-func Int(max int) int {
-	return int(int64n(int64(max)))
+func (r *r) int64n(max int64) int64 {
+	if r.m != nil {
+		r.m.Lock()
+		defer r.m.Unlock()
+	}
+	return r.r.Int63n(max)
+}
+
+func (r *r) Int64(max int64) int64 {
+	return r.int64n(max)
+}
+
+func (r *r) Int(max int) int {
+	return int(r.int64n(int64(max)))
 }

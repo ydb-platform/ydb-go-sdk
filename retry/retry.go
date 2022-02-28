@@ -18,14 +18,14 @@ const (
 
 // Default parameters used by Retry() functions within different sub packages.
 var (
-	FastBackoff = logBackoff{
-		SlotDuration: fastSlot,
-		Ceiling:      6,
-	}
-	SlowBackoff = logBackoff{
-		SlotDuration: slowSlot,
-		Ceiling:      6,
-	}
+	FastBackoff = newBackoff(
+		withSlotDuration(fastSlot),
+		withCeiling(6),
+	)
+	SlowBackoff = newBackoff(
+		withSlotDuration(slowSlot),
+		withCeiling(6),
+	)
 )
 
 // retryOperation is the interface that holds an operation for retry.
@@ -226,6 +226,39 @@ type logBackoff struct {
 	// where F is a result of multiplication of this value and calculated delay
 	// duration D; and R is a random sized part from [0,(D - F)].
 	JitterLimit float64
+
+	// generator of jitter
+	r rand.Rand
+}
+
+type option func(b *logBackoff)
+
+func withSlotDuration(slotDuration time.Duration) option {
+	return func(b *logBackoff) {
+		b.SlotDuration = slotDuration
+	}
+}
+
+func withCeiling(ceiling uint) option {
+	return func(b *logBackoff) {
+		b.Ceiling = ceiling
+	}
+}
+
+func withJitterLimit(jitterLimit float64) option {
+	return func(b *logBackoff) {
+		b.JitterLimit = jitterLimit
+	}
+}
+
+func newBackoff(opts ...option) logBackoff {
+	b := logBackoff{
+		r: rand.New(rand.WithLock()),
+	}
+	for _, o := range opts {
+		o(&b)
+	}
+	return b
 }
 
 // Wait implements Backoff interface.
@@ -245,7 +278,7 @@ func (b logBackoff) delay(i int) time.Duration {
 	if f == d {
 		return f
 	}
-	return f + time.Duration(rand.Int64(int64(d-f)+1))
+	return f + time.Duration(b.r.Int64(int64(d-f)+1))
 }
 
 func min(a, b uint) uint {
