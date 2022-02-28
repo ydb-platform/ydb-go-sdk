@@ -48,9 +48,11 @@ func TestRepeaterCancellation(t *testing.T) {
 		enter  = make(chan struct{}, 2)
 		exit   = make(chan struct{}, 2)
 	)
+
 	timer := timetest.Timer{
 		Ch: timerC,
 	}
+
 	cleanup := timeutil.StubTestHookNewTimer(func(time.Duration) timeutil.Timer {
 		return timer
 	})
@@ -59,13 +61,16 @@ func TestRepeaterCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	r := repeater.NewRepeater(ctx, 42*time.Second,
+	r := repeater.NewRepeater(
+		ctx,
+		42*time.Second,
 		func(ctx context.Context) error {
 			enter <- struct{}{}
 			<-ctx.Done()
 			exit <- struct{}{}
 			return nil
-		})
+		},
+	)
 
 	// Run callback in a separate goroutine to avoid deadlock.
 	// That is, StubTimer run its function in the same goroutine as Emit

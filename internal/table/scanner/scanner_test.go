@@ -18,8 +18,8 @@ import (
 )
 
 // nolint:gocyclo
-func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
-	rv := rand.Int64(math.MaxInt16)
+func valueFromPrimitiveTypeID(c *column, r rand.Rand) (*Ydb.Value, interface{}) {
+	rv := r.Int64(math.MaxInt16)
 	switch c.typeID {
 	case Ydb.Type_BOOL:
 		v := rv%2 == 1
@@ -443,8 +443,8 @@ func valueFromPrimitiveTypeID(c *column) (*Ydb.Value, interface{}) {
 	}
 }
 
-func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]indexed.RequiredOrOptional) {
-	r = &Ydb.ResultSet{}
+func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [][]indexed.RequiredOrOptional) {
+	result = &Ydb.ResultSet{}
 	for _, c := range col {
 		t := &Ydb.Type{
 			Type: &Ydb.Type_TypeId{
@@ -460,8 +460,8 @@ func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]in
 				},
 			}
 		}
-		r.Columns = append(
-			r.Columns,
+		result.Columns = append(
+			result.Columns,
 			&Ydb.Column{
 				Name: c.name,
 				Type: t,
@@ -469,21 +469,22 @@ func getResultSet(count int, col []*column) (r *Ydb.ResultSet, testValues [][]in
 		)
 	}
 
+	r := rand.New(rand.WithLock())
 	testValues = make([][]indexed.RequiredOrOptional, count)
 	for i := 0; i < count; i++ {
 		var items []*Ydb.Value
 		var vals []indexed.RequiredOrOptional
-		for j := range r.Columns {
-			v, val := valueFromPrimitiveTypeID(col[j])
+		for j := range result.Columns {
+			v, val := valueFromPrimitiveTypeID(col[j], r)
 			vals = append(vals, val)
 			items = append(items, v)
 		}
-		r.Rows = append(r.Rows, &Ydb.Value{
+		result.Rows = append(result.Rows, &Ydb.Value{
 			Items: items,
 		})
 		testValues[i] = vals
 	}
-	return r, testValues
+	return result, testValues
 }
 
 func TestScanSqlTypes(t *testing.T) {

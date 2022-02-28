@@ -1,3 +1,6 @@
+## 3.11.11
+* Reverted usage of `math/rand` (instead `crypto/rand`)
+
 ## 3.11.10
 * Imported tool gtrace to `./cmd/gtrace`
 * Changed minimal version of go from 1.13 to 1.14

@@ -24,6 +24,7 @@ type roundRobin struct {
 	belt  []int
 	next  int32
 	conns list.List
+	r     rand.Rand
 }
 
 func (r *roundRobin) Create() balancer.Balancer {
@@ -33,15 +34,22 @@ func (r *roundRobin) Create() balancer.Balancer {
 		belt:  r.belt,
 		next:  r.next,
 		conns: r.conns,
+		r:     rand.New(),
 	}
 }
 
 func RoundRobin() balancer.Balancer {
-	return &roundRobin{}
+	return &roundRobin{
+		r: rand.New(),
+	}
 }
 
 func RandomChoice() balancer.Balancer {
-	return &randomChoice{}
+	return &randomChoice{
+		roundRobin: roundRobin{
+			r: rand.New(),
+		},
+	}
 }
 
 type randomChoice struct {
@@ -51,7 +59,14 @@ type randomChoice struct {
 
 func (r *randomChoice) Create() balancer.Balancer {
 	return &randomChoice{
-		roundRobin: *(r.roundRobin.Create().(*roundRobin)),
+		roundRobin: roundRobin{
+			min:   r.roundRobin.min,
+			max:   r.roundRobin.max,
+			belt:  r.roundRobin.belt,
+			next:  r.roundRobin.next,
+			conns: r.roundRobin.conns,
+			r:     rand.New(),
+		},
 	}
 }
 
@@ -69,7 +84,7 @@ func (r *randomChoice) Next() conn.Conn {
 		return nil
 	}
 	r.m.Lock()
-	i := r.belt[rand.Int(len(r.belt))]
+	i := r.belt[r.r.Int(len(r.belt))]
 	r.m.Unlock()
 	return r.conns[i].Conn
 }
