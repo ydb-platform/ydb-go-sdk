@@ -1,5 +1,6 @@
 ## 3.11.10
 * Imported tool gtrace to `./cmd/gtrace`
+* Changed minimal version of go from 1.13 to 1.14
 
 ## 3.11.9
 * Fixed composing of service traces
