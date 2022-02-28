@@ -32,6 +32,10 @@ jobs:
       run: |
         go install ./cmd/gtrace
 
+    - name: Remove committed codegen file for recreate with gtrace on next step
+      run: |
+        rm ./cmd/gtrace/test/test_gtrace.go
+
     - name: Generate
       run: |
         gtrace -v -w ./cmd/gtrace/test/test.go
