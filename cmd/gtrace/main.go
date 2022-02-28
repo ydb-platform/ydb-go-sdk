@@ -23,8 +23,10 @@ import (
 )
 
 //go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile
+// nolint:revive
 func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
 
+// nolint:gocyclo
 func main() {
 	var (
 		verbose    bool
@@ -106,6 +108,7 @@ func main() {
 	}
 
 	var writers []*Writer
+	// nolint:nestif
 	if isGoGenerate || write {
 		// We should respect Go suffixes like `_linux.go`.
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
@@ -120,7 +123,8 @@ func main() {
 			if verbose {
 				log.Printf("destination file path: %+v", p)
 			}
-			f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+			var f *os.File
+			f, err = os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -171,13 +175,16 @@ func main() {
 		if verbose {
 			log.Printf("parsing package file: %q", name)
 		}
-		file, err := os.Open(filepath.Join(workDir, name))
+		var file *os.File
+		file, err = os.Open(filepath.Join(workDir, name))
 		if err != nil {
+			// nolint:gocritic
 			log.Fatal(err)
 		}
 		defer file.Close()
 
-		ast, err := parser.ParseFile(fset, file.Name(), file, parser.ParseComments)
+		var ast *ast.File
+		ast, err = parser.ParseFile(fset, file.Name(), file, parser.ParseComments)
 		if err != nil {
 			log.Fatalf("parse %q error: %v", file.Name(), err)
 		}
@@ -186,7 +193,7 @@ func main() {
 		astFiles = append(astFiles, ast)
 
 		if name == gofile {
-			if _, err := file.Seek(0, io.SeekStart); err != nil {
+			if _, err = file.Seek(0, io.SeekStart); err != nil {
 				log.Fatal(err)
 			}
 			buildConstraints, err = scanBuildConstraints(file)
@@ -490,11 +497,13 @@ func (f GenFlag) Has(x GenFlag) bool {
 }
 
 const (
+	// nolint:deadcode
 	GenZero GenFlag = 1 << iota >> 1
 	GenShortcut
 	GenShortcutPublic
 	GenContext
 
+	// nolint:deadcode
 	GenAll = ^GenFlag(0)
 )
 

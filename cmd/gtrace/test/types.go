@@ -2,11 +2,10 @@ package test
 
 import "bytes"
 
-type Embeded struct {
-}
+type Embedded struct{}
 
 type Type struct {
-	Embeded
+	Embedded
 	String  string
 	Integer int
 	Boolean bool

@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"container/list"
-	"crypto/md5"
 	"encoding/hex"
 	"fmt"
 	"go/build"
@@ -19,8 +18,12 @@ import (
 	"sync"
 	"unicode"
 	"unicode/utf8"
+
+	// nolint:gosec
+	"crypto/md5"
 )
 
+// nolint:maligned
 type Writer struct {
 	Output   io.Writer
 	BuildTag string
@@ -271,9 +274,7 @@ func (w *Writer) importDeps(deps []dep) {
 		return d0.pkgPath < d1.pkgPath
 	})
 	w.line(`import (`)
-	var (
-		lastStd bool
-	)
+	var lastStd bool
 	for _, d := range deps {
 		if w.isStdLib(d.pkgPath) {
 			lastStd = true
@@ -310,9 +311,7 @@ func (w *Writer) ensureStdLibMapping() {
 		}
 		name := filepath.Base(file.Name())
 		switch name {
-		case
-			"cmd",
-			"internal":
+		case "cmd", "internal":
 			// Ignored.
 
 		default:
@@ -457,6 +456,7 @@ func (w *Writer) isEmptyResult(name string, r FuncResult) {
 	}
 }
 
+// nolint
 var contextType = (func() types.Type {
 	pkg := types.NewPackage("context", "context")
 	typ := types.NewInterfaceType(nil, nil)
@@ -567,7 +567,7 @@ func (w *Writer) stubShortcutFunc(id string, f *Func) (name string) {
 	w.newScope(func() {
 		w.code(`func `, name)
 		w.code(`(`)
-		params := flattenParams(nil, f.Params)
+		params := flattenParams(f.Params)
 		for i, p := range params {
 			if i > 0 {
 				w.code(`, `)
@@ -620,7 +620,7 @@ func (w *Writer) stubHookShortcut(trace *Trace, hook Hook, export bool) {
 		}
 	}
 
-	params := flattenParams(nil, hook.Func.Params)
+	params := flattenParams(hook.Func.Params)
 	haveNames := haveNames(params)
 
 	w.newScope(func() {
@@ -806,7 +806,7 @@ func (w *Writer) declareParams(src []Param) (names []string) {
 	return names
 }
 
-func flattenParams(dst, src []Param) []Param {
+func flattenParams(src []Param) (dst []Param) {
 	for _, p := range src {
 		_, s := unwrapStruct(p.Type)
 		if s != nil {
@@ -836,7 +836,7 @@ func flattenStruct(dst []Param, s *types.Struct) []Param {
 			typ  = f.Type()
 		)
 		if name == typeBasename(typ) {
-			// NOTE: field name essentially be empty for embeded structs or
+			// NOTE: field name essentially be empty for embedded structs or
 			// fields called exactly as type.
 			name = ""
 		}
@@ -866,7 +866,6 @@ func (w *Writer) constructParams(params []Param, names []string) (res []string) 
 
 func (w *Writer) constructStruct(n *types.Named, s *types.Struct, vars []string) (string, []string) {
 	p := w.declare("p")
-	// TODO Ptr
 	// maybe skip pointers from flattening to not allocate anyhing during trace.
 	w.line(`var `, p, ` `, w.typeString(n))
 	for i := 0; i < s.NumFields(); i++ {
@@ -903,7 +902,7 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook, export bool) {
 		w.code(t, ` `, trace.Name)
 
 		var (
-			params = flattenParams(nil, hook.Func.Params)
+			params = flattenParams(hook.Func.Params)
 			names  = w.declareParams(params)
 		)
 		for i, p := range params {
@@ -949,7 +948,7 @@ func (w *Writer) hookFuncShortcut(fn *Func, name string) {
 	w.newScope(func() {
 		w.code(`func(`)
 		var (
-			params = flattenParams(nil, fn.Params)
+			params = flattenParams(fn.Params)
 			names  = w.declareParams(params)
 		)
 		for i, p := range params {
@@ -1057,6 +1056,7 @@ func (f flags) has(x flags) bool {
 }
 
 const (
+	// nolint
 	zeroFlags flags = 1 << iota >> 1
 	docs
 )
@@ -1101,7 +1101,7 @@ func (w *Writer) funcSignature(fn *Func) {
 
 func (w *Writer) shortcutFuncSignFlags(fn *Func, flags flags) {
 	var (
-		params    = flattenParams(nil, fn.Params)
+		params    = flattenParams(fn.Params)
 		haveNames = haveNames(params)
 	)
 	w.code(`func(`)
@@ -1173,19 +1173,19 @@ func (w *Writer) newScope(fn func()) {
 
 func (w *Writer) line(args ...string) {
 	w.code(args...)
-	w.bw.WriteByte('\n')
+	_ = w.bw.WriteByte('\n')
 	w.atEOL = true
 }
 
 func (w *Writer) code(args ...string) {
 	if w.atEOL {
 		for i := 0; i < w.depth; i++ {
-			w.bw.WriteByte('\t')
+			_ = w.bw.WriteByte('\t')
 		}
 		w.atEOL = false
 	}
 	for _, arg := range args {
-		w.bw.WriteString(arg)
+		_, _ = w.bw.WriteString(arg)
 	}
 }
 
@@ -1287,17 +1287,19 @@ func (s *scope) where(v string) string {
 }
 
 func uniqueTraceID(t *Trace) string {
+	// nolint:gosec
 	hash := md5.New()
-	io.WriteString(hash, t.Name)
+	_, _ = io.WriteString(hash, t.Name)
 	p := hash.Sum(nil)
 	s := hex.EncodeToString(p)
 	return s[:8]
 }
 
 func uniqueTraceHookID(t *Trace, h Hook) string {
+	// nolint:gosec
 	hash := md5.New()
-	io.WriteString(hash, t.Name)
-	io.WriteString(hash, h.Name)
+	_, _ = io.WriteString(hash, t.Name)
+	_, _ = io.WriteString(hash, h.Name)
 	p := hash.Sum(nil)
 	s := hex.EncodeToString(p)
 	return s[:8]

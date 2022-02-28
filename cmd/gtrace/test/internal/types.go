@@ -1,4 +1,3 @@
 package internal
 
-type Type struct {
-}
+type Type struct{}
