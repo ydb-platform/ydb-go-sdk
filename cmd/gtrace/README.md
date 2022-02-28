@@ -1,6 +1,6 @@
-# gtrace
+This is a fork of repository https://github.com/gobwas/gtrace
 
-[![CI][ci-badge]][ci-url]
+# gtrace
 
 Command line tool **gtrace** generates boilerplate code for Go components tracing (aka _instrumentation_).
 
@@ -11,8 +11,6 @@ As a developer of some module (whenever its library or application module) you s
 ### TL;DR
 
 **gtrace** suggests you to use structures (tagged with `//gtrace:gen`) holding all _hooks_ related to your component and generates helper functions around them so that you can merge such structures and call the _hooks_ without any checks for `nil`. It also can generate context aware helpers to call _hooks_ associated with context.
-
-Example of generated code [is here](examples/pinger/main_gtrace.go).
 
 ### Basic
 
@@ -255,10 +253,3 @@ func (c *Client) ClientTracePing(ctx context.Context) error {
 To do that, you can pass the `-tag` flag to `gtrace` binary, which will result generation of two `_gtrace` files -- one which will be used when compiling with `-tags gtrace`, and one with stubs.
 
 > NOTE: **gtrace** also respects build constraints for GOOS and GOARCH.
-
-### Examples
-
-For more details feel free to read the `examples` package of this repo as well as delve into `test/test_grace.go`.
-
-[ci-badge]: https://github.com/gobwas/gtrace/workflows/CI/badge.svg
-[ci-url]:   https://github.com/gobwas/gtrace/actions?query=workflow%3ACI

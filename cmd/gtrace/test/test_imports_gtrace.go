@@ -5,7 +5,7 @@ package test
 import (
 	"context"
 
-	"github.com/gobwas/gtrace/test/internal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/cmd/gtrace/test/internal"
 )
 
 // Compose returns a new TraceNoShortcut which has functional fields composed
