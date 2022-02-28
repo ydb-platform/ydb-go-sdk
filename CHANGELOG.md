@@ -1,3 +1,6 @@
+## 3.11.10
+* Imported tool gtrace to `./cmd/gtrace`
+
 ## 3.11.9
 * Fixed composing of service traces
 * Fixed end-call of `trace.Driver.OnConnStateChange`
