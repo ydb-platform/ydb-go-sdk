@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -378,6 +379,16 @@ func TestRetryWithCustomErrors(t *testing.T) {
 	}{
 		{
 			error: &CustomError{
+				Err: retry.RetryableError(
+					fmt.Errorf("custom error"),
+					retry.WithDeleteSession(),
+				),
+			},
+			retriable:     true,
+			deleteSession: true,
+		},
+		{
+			error: &CustomError{
 				Err: errors.NewOpError(
 					errors.WithOEReason(
 						errors.StatusBadSession,
@@ -422,11 +433,6 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				sessions = make(map[table.Session]int)
 			)
 			err := do(ctx, p, func(ctx context.Context, s table.Session) (err error) {
-				if test.deleteSession {
-					if _, has := sessions[s]; has {
-						t.Fatalf("session already used: %s", s.ID())
-					}
-				}
 				sessions[s]++
 				i++
 				if i < limit {
@@ -434,9 +440,20 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				}
 				return nil
 			})
+			// nolint:nestif
 			if test.retriable {
 				if i != limit {
 					t.Fatalf("unexpected i: %d, err: %v", i, err)
+				}
+				if test.deleteSession {
+					if len(sessions) != limit {
+						t.Fatalf("unexpected len(sessions): %d, err: %v", len(sessions), err)
+					}
+					for s, n := range sessions {
+						if n != 1 {
+							t.Fatalf("unexpected session usage: %d, session: %v", n, s.ID())
+						}
+					}
 				}
 			} else {
 				if i != 1 {

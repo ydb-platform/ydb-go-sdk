@@ -622,6 +622,15 @@ func TestRetryWithCustomErrors(t *testing.T) {
 	}{
 		{
 			error: &CustomError{
+				Err: RetryableError(
+					fmt.Errorf("custom error"),
+					WithDeleteSession(),
+				),
+			},
+			retriable: true,
+		},
+		{
+			error: &CustomError{
 				Err: errors.NewOpError(
 					errors.WithOEReason(
 						errors.StatusBadSession,
