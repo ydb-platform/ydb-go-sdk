@@ -965,13 +965,14 @@ func DriverOnClusterGet(t Driver, c *context.Context) func(endpoint EndpointInfo
 		res(p)
 	}
 }
-func DriverOnClusterInsert(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState) {
+func DriverOnClusterInsert(t Driver, c *context.Context, endpoint EndpointInfo) func(inserted bool, state ConnState) {
 	var p ClusterInsertStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onClusterInsert(p)
-	return func(state ConnState) {
+	return func(inserted bool, state ConnState) {
 		var p ClusterInsertDoneInfo
+		p.Inserted = inserted
 		p.State = state
 		res(p)
 	}
@@ -987,14 +988,15 @@ func DriverOnClusterUpdate(t Driver, c *context.Context, endpoint EndpointInfo) 
 		res(p)
 	}
 }
-func DriverOnClusterRemove(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState) {
+func DriverOnClusterRemove(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState, removed bool) {
 	var p ClusterRemoveStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onClusterRemove(p)
-	return func(state ConnState) {
+	return func(state ConnState, removed bool) {
 		var p ClusterRemoveDoneInfo
 		p.State = state
+		p.Removed = removed
 		res(p)
 	}
 }

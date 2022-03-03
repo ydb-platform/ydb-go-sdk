@@ -43,12 +43,12 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 					func(ctx context.Context, _ table.Session) error {
 						return testErr
 					},
-					withFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+					withRetryFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
 						ch := make(chan time.Time)
 						backoff <- ch
 						return ch
 					})),
-					withSlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+					withRetrySlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
 						ch := make(chan time.Time)
 						backoff <- ch
 						return ch
@@ -185,10 +185,10 @@ func TestRetryerImmediateReturn(t *testing.T) {
 				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
-				withFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+				withRetryFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
 					panic("this code will not be called")
 				})),
-				withSlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
+				withRetrySlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
 					panic("this code will not be called")
 				})),
 			)

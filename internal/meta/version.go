@@ -1,5 +1,5 @@
 package meta
 
 const (
-	Version = "ydb-go-sdk/3.11.11"
+	Version = "ydb-go-sdk/3.11.12"
 )

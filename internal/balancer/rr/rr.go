@@ -103,11 +103,12 @@ func (r *roundRobin) Update(el balancer.Element, info info.Info) {
 	r.belt = r.distribute()
 }
 
-func (r *roundRobin) Remove(x balancer.Element) {
+func (r *roundRobin) Remove(x balancer.Element) bool {
 	el := x.(*list.Element)
 	r.conns.Remove(el)
 	r.inspectMinMax(el.Info)
 	r.belt = r.distribute()
+	return true
 }
 
 func (r *roundRobin) Contains(x balancer.Element) bool {

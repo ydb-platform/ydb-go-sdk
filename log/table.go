@@ -288,7 +288,7 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 						if info.Error == nil {
 							log.Tracef(`intermediate`)
 						} else {
-							log.Errorf(`intermediate failed {error:"%v"}`,
+							log.Warnf(`intermediate failed {error:"%v"}`,
 								info.Error,
 							)
 						}
@@ -335,7 +335,7 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 						if info.Error == nil {
 							log.Tracef(`intermediate`)
 						} else {
-							log.Errorf(`intermediate failed {error:"%v"}`,
+							log.Warnf(`intermediate failed {error:"%v"}`,
 								info.Error,
 							)
 						}
