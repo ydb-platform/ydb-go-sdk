@@ -1,3 +1,6 @@
+## 3.12.0
+* Added `balancers.Prefer` and `balancers.PreferWithFallback` constructors
+
 ## 3.11.13
 * Added `trace.Driver.OnRepeaterWakeUp` event
 * Refactored package `repeater`

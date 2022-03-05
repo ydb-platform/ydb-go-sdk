@@ -25,33 +25,23 @@ func SingleConn() balancer.Balancer {
 // PreferLocalDC creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 func PreferLocalDC(balancer balancer.Balancer) balancer.Balancer {
-	return multi.Balancer(
-		multi.WithBalancer(
-			balancer,
-			func(cc conn.Conn) bool {
-				return cc.Endpoint().LocalDC()
-			},
-		),
+	return Prefer(
+		balancer,
+		func(endpoint Endpoint) bool {
+			return endpoint.LocalDC()
+		},
 	)
 }
 
 // PreferLocalDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocalDCWithFallBack(b balancer.Balancer) balancer.Balancer {
-	return multi.Balancer(
-		multi.WithBalancer(
-			b,
-			func(cc conn.Conn) bool {
-				return cc.Endpoint().LocalDC()
-			},
-		),
-		multi.WithBalancer(
-			b.(balancer.Creator).Create(),
-			func(cc conn.Conn) bool {
-				return !cc.Endpoint().LocalDC()
-			},
-		),
+func PreferLocalDCWithFallBack(balancer balancer.Balancer) balancer.Balancer {
+	return PreferWithFallback(
+		balancer,
+		func(endpoint Endpoint) bool {
+			return endpoint.LocalDC()
+		},
 	)
 }
 
@@ -64,48 +54,81 @@ func PreferLocations(balancer balancer.Balancer, locations ...string) balancer.B
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
-	return multi.Balancer(
-		multi.WithBalancer(balancer, func(cc conn.Conn) bool {
-			location := strings.ToUpper(cc.Endpoint().Location())
+	return Prefer(
+		balancer,
+		func(endpoint Endpoint) bool {
+			location := strings.ToUpper(endpoint.Location())
 			for _, l := range locations {
 				if location == l {
 					return true
 				}
 			}
 			return false
-		}),
+		},
 	)
 }
 
 // PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocationsWithFallback(b balancer.Balancer, locations ...string) balancer.Balancer {
+func PreferLocationsWithFallback(balancer balancer.Balancer, locations ...string) balancer.Balancer {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
-	return multi.Balancer(
-		multi.WithBalancer(b, func(cc conn.Conn) bool {
-			location := strings.ToUpper(cc.Endpoint().Location())
+	return PreferWithFallback(
+		balancer,
+		func(endpoint Endpoint) bool {
+			location := strings.ToUpper(endpoint.Location())
 			for _, l := range locations {
 				if location == l {
 					return true
 				}
 			}
 			return false
-		}),
-		multi.WithBalancer(b.(balancer.Creator).Create(), func(cc conn.Conn) bool {
-			location := strings.ToUpper(cc.Endpoint().Location())
-			for _, l := range locations {
-				if location == l {
-					return false
-				}
-			}
-			return true
-		}),
+		},
+	)
+}
+
+type Endpoint interface {
+	NodeID() uint32
+	Address() string
+	Location() string
+	LocalDC() bool
+}
+
+// Prefer creates balancer which use endpoints by filter
+// Balancer "balancer" defines balancing algorithm between endpoints selected with filter
+func Prefer(balancer balancer.Balancer, filter func(endpoint Endpoint) bool) balancer.Balancer {
+	return multi.Balancer(
+		multi.WithBalancer(
+			balancer,
+			func(cc conn.Conn) bool {
+				return filter(cc.Endpoint())
+			},
+		),
+	)
+}
+
+// PreferWithFallback creates balancer which use endpoints by filter
+// Balancer "balancer" defines balancing algorithm between endpoints selected with filter
+// If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
+func PreferWithFallback(balancer balancer.Balancer, filter func(endpoint Endpoint) bool) balancer.Balancer {
+	return multi.Balancer(
+		multi.WithBalancer(
+			balancer,
+			func(cc conn.Conn) bool {
+				return filter(cc.Endpoint())
+			},
+		),
+		multi.WithBalancer(
+			balancer,
+			func(cc conn.Conn) bool {
+				return !filter(cc.Endpoint())
+			},
+		),
 	)
 }
 
