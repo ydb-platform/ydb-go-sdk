@@ -35,7 +35,7 @@ type retryOptions struct {
 
 type retryOption func(o *retryOptions)
 
-func withOptions(opts ...table.Option) retryOption {
+func withRetryOptions(opts ...table.Option) retryOption {
 	return func(options *retryOptions) {
 		for _, o := range opts {
 			o(&options.options)
@@ -43,21 +43,21 @@ func withOptions(opts ...table.Option) retryOption {
 	}
 }
 
-func withTrace(t trace.Table) retryOption {
-	return func(options *retryOptions) {
-		options.trace = options.trace.Compose(t)
-	}
-}
-
-func withFastBackoff(fastBackoff retry.Backoff) retryOption {
+func withRetryFastBackoff(fastBackoff retry.Backoff) retryOption {
 	return func(options *retryOptions) {
 		options.fastBackoff = fastBackoff
 	}
 }
 
-func withSlowBackoff(slowBackoff retry.Backoff) retryOption {
+func withRetrySlowBackoff(slowBackoff retry.Backoff) retryOption {
 	return func(options *retryOptions) {
 		options.slowBackoff = slowBackoff
+	}
+}
+
+func withRetryTrace(trace trace.Table) retryOption {
+	return func(o *retryOptions) {
+		o.trace = o.trace.Compose(trace)
 	}
 }
 

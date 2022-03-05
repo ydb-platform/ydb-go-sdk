@@ -65,17 +65,25 @@ func (m *multi) Next() conn.Conn {
 }
 
 func (m *multi) Insert(conn conn.Conn) balancer.Element {
-	n := len(m.filter)
-	h := multiHandle{
-		elements: make([]balancer.Element, n),
-	}
+	var (
+		n = len(m.filter)
+		h = multiHandle{
+			elements: make([]balancer.Element, n),
+		}
+		inserted = false
+	)
+
 	for i, f := range m.filter {
 		if f(conn) {
 			x := m.balancer[i].Insert(conn)
 			h.elements[i] = x
+			inserted = true
 		}
 	}
-	return h
+	if inserted {
+		return h
+	}
+	return nil
 }
 
 func (m *multi) Update(x balancer.Element, info info.Info) {
@@ -86,10 +94,13 @@ func (m *multi) Update(x balancer.Element, info info.Info) {
 	}
 }
 
-func (m *multi) Remove(x balancer.Element) {
+func (m *multi) Remove(x balancer.Element) (removed bool) {
 	for i, x := range x.(multiHandle).elements {
 		if x != nil {
-			m.balancer[i].Remove(x)
+			if m.balancer[i].Remove(x) {
+				removed = true
+			}
 		}
 	}
+	return removed
 }

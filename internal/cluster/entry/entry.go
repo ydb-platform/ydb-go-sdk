@@ -11,7 +11,7 @@ type Entry struct {
 	Handle balancer.Element
 }
 
-func (c *Entry) InsertInto(b balancer.Balancer) {
+func (c *Entry) InsertInto(b balancer.Balancer) bool {
 	if c.Handle != nil {
 		panic("ydb: Handle already exists")
 	}
@@ -19,15 +19,14 @@ func (c *Entry) InsertInto(b balancer.Balancer) {
 		panic("ydb: can't insert nil Conn into balancer")
 	}
 	c.Handle = b.Insert(c.Conn)
-	if c.Handle == nil {
-		panic("ydb: balancer has returned nil Handle")
-	}
+	return c.Handle != nil
 }
 
-func (c *Entry) RemoveFrom(b balancer.Balancer) {
+func (c *Entry) RemoveFrom(b balancer.Balancer) bool {
 	if c.Handle == nil {
-		panic("ydb: no Handle to remove from balancer")
+		return false
 	}
 	b.Remove(c.Handle)
 	c.Handle = nil
+	return true
 }

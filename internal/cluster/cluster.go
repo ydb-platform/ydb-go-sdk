@@ -236,13 +236,12 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 
 // Insert inserts new connection into the cluster.
 func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e.Copy())
+	var (
+		onDone   = trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e.Copy())
+		inserted = false
+	)
 	defer func() {
-		if cc != nil {
-			onDone(cc.GetState())
-		} else {
-			onDone(conn.Unknown)
-		}
+		onDone(inserted, cc.GetState())
 	}()
 
 	options := parseOptions(opts...)
@@ -266,7 +265,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 	entry := entry.Entry{Conn: cc}
 
-	entry.InsertInto(c.balancer)
+	inserted = entry.InsertInto(c.balancer)
 
 	c.index[e.Address()] = entry
 
@@ -325,13 +324,12 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 // Remove removes and closes previously inserted connection.
 func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e.Copy())
+	var (
+		onDone  = trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e.Copy())
+		removed = false
+	)
 	defer func() {
-		if cc != nil {
-			onDone(cc.GetState())
-		} else {
-			onDone(conn.Unknown)
-		}
+		onDone(cc.GetState(), removed)
 	}()
 
 	options := parseOptions(opts...)
@@ -352,7 +350,8 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	entry.RemoveFrom(c.balancer)
+	removed = entry.RemoveFrom(c.balancer)
+
 	delete(c.index, e.Address())
 	delete(c.endpoints, e.NodeID())
 

@@ -107,7 +107,8 @@ type (
 		Endpoint EndpointInfo
 	}
 	ClusterInsertDoneInfo struct {
-		State ConnState
+		Inserted bool
+		State    ConnState
 	}
 	ClusterUpdateStartInfo struct {
 		// Context make available context in trace callback function.
@@ -129,7 +130,8 @@ type (
 		Endpoint EndpointInfo
 	}
 	ClusterRemoveDoneInfo struct {
-		State ConnState
+		State   ConnState
+		Removed bool
 	}
 	ConnStateChangeStartInfo struct {
 		Endpoint EndpointInfo

@@ -25,7 +25,7 @@ type Balancer interface {
 	Update(Element, info.Info)
 
 	// Remove removes previously inserted connection.
-	Remove(Element)
+	Remove(Element) bool
 
 	// Contains returns true if Balancer contains requested element.
 	Contains(Element) bool

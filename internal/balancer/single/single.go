@@ -30,11 +30,12 @@ func (b *single) Insert(conn conn.Conn) balancer.Element {
 	return conn
 }
 
-func (b *single) Remove(x balancer.Element) {
+func (b *single) Remove(x balancer.Element) bool {
 	if b.conn != x.(conn.Conn) {
 		panic("ydb: single Conn Balancer: Remove() unknown Conn")
 	}
 	b.conn = nil
+	return true
 }
 
 func (b *single) Update(balancer.Element, info.Info) {}

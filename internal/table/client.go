@@ -90,7 +90,7 @@ func newClient(
 	if config.IdleThreshold() > 0 {
 		c.keeperStop = make(chan struct{})
 		c.keeperDone = make(chan struct{})
-		go c.keeper()
+		go c.keeper(ctx)
 	}
 	onDone(c.limit, c.config.KeepAliveMinSize())
 	return c
@@ -451,7 +451,11 @@ func (c *client) Close(ctx context.Context) (err error) {
 	issues := make([]error, 0, len(c.index))
 
 	for e := c.idle.Front(); e != nil; e = e.Next() {
-		if err = c.closeSession(ctx, e.Value.(Session)); err != nil {
+		if err = c.closeSession(
+			ctx,
+			e.Value.(Session),
+			withCloseSessionAsync(),
+		); err != nil {
 			issues = append(issues, err)
 		}
 	}
@@ -489,8 +493,8 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 		ctx,
 		c,
 		op,
-		withOptions(opts...),
-		withTrace(c.config.Trace()),
+		withRetryOptions(opts...),
+		withRetryTrace(c.config.Trace()),
 	)
 }
 
@@ -505,12 +509,12 @@ func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		ctx,
 		c,
 		op,
-		withOptions(opts...),
-		withTrace(c.config.Trace()),
+		withRetryOptions(opts...),
+		withRetryTrace(c.config.Trace()),
 	)
 }
 
-func (c *client) keeper() {
+func (c *client) keeper(ctx context.Context) {
 	defer close(c.keeperDone)
 	var (
 		toTouch    []Session // Cached for reuse.
@@ -584,7 +588,8 @@ func (c *client) keeper() {
 						errors.Is(err, cluster.ErrClusterClosed),
 						errors.Is(err, cluster.ErrClusterEmpty),
 						errors.IsOpError(err, errors.StatusBadSession),
-						errors.IsTransportError(err, errors.TransportErrorDeadlineExceeded):
+						errors.IsTransportError(err, errors.TransportErrorDeadlineExceeded),
+						errors.IsTransportError(err, errors.TransportErrorUnavailable):
 						toDelete = append(toDelete, s)
 					default:
 						toTryAgain = append(toTryAgain, s)
@@ -644,14 +649,12 @@ func (c *client) keeper() {
 			if !sleep {
 				timer.Reset(delay)
 			}
-			for i, s := range toDelete {
-				toDelete[i] = nil
-				ctx, cancel := context.WithTimeout(
-					context.Background(),
-					c.config.DeleteTimeout(),
+			for _, s := range toDelete {
+				_ = c.closeSession(
+					ctx,
+					s,
+					withCloseSessionLock(),
 				)
-				_ = s.Close(ctx)
-				cancel()
 			}
 			if touchingDone != nil {
 				close(touchingDone)
@@ -769,21 +772,63 @@ func (c *client) notify(s Session) (notified bool) {
 // instead of plain session.Close().
 // CloseSession must be fast. If necessary, can be async.
 func (c *client) CloseSession(ctx context.Context, s Session) error {
-	onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
-	defer onDone()
+	return c.closeSession(
+		ctx,
+		s,
+		withCloseSessionLock(),
+		withCloseSessionAsync(),
+		withCloseSessionTrace(),
+	)
+}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+type closeSessionOptionsHolder struct {
+	withTrace bool
+	withAsync bool
+	withLock  bool
+}
 
-	return c.closeSession(ctx, s)
+type closeSessionOption func(h *closeSessionOptionsHolder)
+
+func withCloseSessionLock() closeSessionOption {
+	return func(h *closeSessionOptionsHolder) {
+		h.withLock = true
+	}
+}
+
+func withCloseSessionAsync() closeSessionOption {
+	return func(h *closeSessionOptionsHolder) {
+		h.withAsync = true
+	}
+}
+
+func withCloseSessionTrace() closeSessionOption {
+	return func(h *closeSessionOptionsHolder) {
+		h.withTrace = true
+	}
 }
 
 // closeSession is an async func which close session, but without `trace.OnPoolSessionClose` tracing
-// c.mu must be locked
-func (c *client) closeSession(ctx context.Context, s Session) error {
-	c.wgClosed.Add(1)
+func (c *client) closeSession(ctx context.Context, s Session, opts ...closeSessionOption) error {
+	h := closeSessionOptionsHolder{}
 
-	go func() {
+	for _, o := range opts {
+		o(&h)
+	}
+
+	if h.withTrace {
+		onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
+		defer onDone()
+	}
+
+	if h.withLock {
+		c.mu.Lock()
+		c.wgClosed.Add(1)
+		c.mu.Unlock()
+	} else {
+		c.wgClosed.Add(1)
+	}
+
+	f := func() {
 		defer c.wgClosed.Done()
 
 		closeCtx, cancel := context.WithTimeout(
@@ -793,7 +838,13 @@ func (c *client) closeSession(ctx context.Context, s Session) error {
 		defer cancel()
 
 		_ = s.Close(closeCtx)
-	}()
+	}
+
+	if h.withAsync {
+		go f()
+	} else {
+		f()
+	}
 
 	return nil
 }

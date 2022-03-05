@@ -13,7 +13,7 @@ type stubBalancer struct {
 	OnNext      func() conn.Conn
 	OnInsert    func(conn.Conn) balancer.Element
 	OnUpdate    func(balancer.Element, info.Info)
-	OnRemove    func(balancer.Element)
+	OnRemove    func(balancer.Element) bool
 	OnPessimize func(context.Context, balancer.Element) error
 	OnContains  func(balancer.Element) bool
 }
@@ -34,9 +34,10 @@ func Balancer() (*list.List, balancer.Balancer) {
 		OnInsert: func(conn conn.Conn) balancer.Element {
 			return cs.Insert(conn)
 		},
-		OnRemove: func(x balancer.Element) {
+		OnRemove: func(x balancer.Element) bool {
 			e := x.(*list.Element)
 			cs.Remove(e)
+			return true
 		},
 		OnUpdate: func(x balancer.Element, info info.Info) {
 			e := x.(*list.Element)
@@ -74,10 +75,11 @@ func (s stubBalancer) Update(el balancer.Element, i info.Info) {
 	}
 }
 
-func (s stubBalancer) Remove(el balancer.Element) {
+func (s stubBalancer) Remove(el balancer.Element) bool {
 	if f := s.OnRemove; f != nil {
-		f(el)
+		return f(el)
 	}
+	return true
 }
 
 func (s stubBalancer) Pessimize(ctx context.Context, el balancer.Element) error {

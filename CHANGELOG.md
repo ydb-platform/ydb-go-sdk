@@ -1,3 +1,7 @@
+## 3.11.12
+* Added `trace.ClusterInsertDoneInfo.Inserted` boolean flag for notify about success of insert endpoint into balancer
+* Added `trace.ClusterRemoveDoneInfo.Removed` boolean flag for notify about success of remove endpoint from balancer
+
 ## 3.11.11
 * Reverted usage of `math/rand` (instead `crypto/rand`)
 

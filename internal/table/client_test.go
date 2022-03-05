@@ -1012,6 +1012,9 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	cond := p.touchCond()
 	assertFilled := func(want bool) {
 		const timeout = time.Millisecond
+
+		t.Helper()
+
 		select {
 		case <-cond:
 			if !want {

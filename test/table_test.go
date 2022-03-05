@@ -70,6 +70,18 @@ func (s *stats) print(t *testing.T) {
 func (s *stats) check(t *testing.T) {
 	s.Lock()
 	defer s.Unlock()
+	if s.keepAliveMinSize < 0 {
+		t.Fatalf("negative keepAliveMinSize: %d", s.keepAliveMinSize)
+	}
+	if s.limit < 0 {
+		t.Fatalf("negative limit: %d", s.limit)
+	}
+	if s.inFlight < 0 {
+		t.Fatalf("negative in_flight: %d", s.inFlight)
+	}
+	if s.balance < 0 {
+		t.Fatalf("negative balance: %d", s.balance)
+	}
 	if s.keepAliveMinSize > s.inFlight {
 		t.Fatalf("keepAliveMinSize > in_flight (%d > %d)", s.keepAliveMinSize, s.inFlight)
 	}
@@ -225,7 +237,7 @@ func TestTable(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.INFO),
+			ydb.WithMinLevel(ydb.ERROR),
 		),
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
