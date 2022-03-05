@@ -44,6 +44,9 @@ type (
 		OnClusterRemove func(ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo)
 		OnPessimizeNode func(PessimizeNodeStartInfo) func(PessimizeNodeDoneInfo)
 
+		// Repeater events
+		OnRepeaterWakeUp func(RepeaterTickStartInfo) func(RepeaterTickDoneInfo)
+
 		// Credentials events
 		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
 	}
@@ -267,6 +270,18 @@ type (
 	}
 	PessimizeNodeDoneInfo struct {
 		State ConnState
+	}
+	RepeaterTickStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Name    string
+		Event   string
+	}
+	RepeaterTickDoneInfo struct {
+		Error error
 	}
 	GetCredentialsStartInfo struct {
 		// Context make available context in trace callback function.

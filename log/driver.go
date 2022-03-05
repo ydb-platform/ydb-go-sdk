@@ -300,6 +300,31 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
+		t.OnRepeaterWakeUp = func(info trace.RepeaterTickStartInfo) func(trace.RepeaterTickDoneInfo) {
+			name := info.Name
+			event := info.Event
+			log.Tracef(`repeater wake up {name:"%s",event:"%s"}`,
+				name,
+				event,
+			)
+			start := time.Now()
+			return func(info trace.RepeaterTickDoneInfo) {
+				if info.Error == nil {
+					log.Tracef(`repeater wake up done {name:"%s",event:"%s",latency:"%v"}`,
+						name,
+						event,
+						time.Since(start),
+					)
+				} else {
+					log.Errorf(`repeater wake up fail {name:"%s",event:"%s",latency:"%v",error:"%v"}`,
+						name,
+						event,
+						time.Since(start),
+						info.Error,
+					)
+				}
+			}
+		}
 	}
 	if details&trace.DriverClusterEvents != 0 {
 		// nolint:govet
