@@ -2,10 +2,9 @@ package repeater
 
 import (
 	"context"
-	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Repeater interface {
@@ -19,50 +18,73 @@ type repeater struct {
 	// Interval must be greater than zero; if not, Repeater will panic.
 	interval time.Duration
 
+	name  string
+	trace trace.Driver
+
 	// Task is a function that must be executed periodically.
 	task func(context.Context) error
 
-	timer    timeutil.Timer
-	stopOnce sync.Once
-	stop     chan struct{}
-	done     chan struct{}
-	ctx      context.Context
-	cancel   context.CancelFunc
-	force    chan struct{}
+	stop  chan struct{}
+	done  chan struct{}
+	force chan struct{}
 }
 
-// NewRepeater creates and begins to execute task periodically.
-func NewRepeater(
+type option func(r *repeater)
+
+func WithName(name string) option {
+	return func(r *repeater) {
+		r.name = name
+	}
+}
+
+func WithTrace(trace trace.Driver) option {
+	return func(r *repeater) {
+		r.trace = trace
+	}
+}
+
+func WithInterval(interval time.Duration) option {
+	return func(r *repeater) {
+		r.interval = interval
+	}
+}
+
+type event string
+
+const (
+	eventTick  = event("tick")
+	eventForce = event("force")
+)
+
+// New creates and begins to execute task periodically.
+func New(
 	ctx context.Context,
-	interval time.Duration,
 	task func(ctx context.Context) (err error),
+	opts ...option,
 ) Repeater {
-	if interval <= 0 {
+	r := &repeater{
+		task:  task,
+		stop:  make(chan struct{}),
+		done:  make(chan struct{}),
+		force: make(chan struct{}),
+	}
+
+	for _, o := range opts {
+		o(r)
+	}
+
+	if r.interval <= 0 {
 		return nil
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	r := &repeater{
-		interval: interval,
-		task:     task,
-		timer:    timeutil.NewTimer(interval),
-		stopOnce: sync.Once{},
-		stop:     make(chan struct{}),
-		done:     make(chan struct{}),
-		ctx:      ctx,
-		cancel:   cancel,
-		force:    make(chan struct{}),
-	}
-	go r.worker()
+
+	go r.worker(ctx, r.interval)
+
 	return r
 }
 
 // Stop stops to execute its task.
 func (r *repeater) Stop() {
-	r.stopOnce.Do(func() {
-		close(r.stop)
-		r.cancel()
-		<-r.done
-	})
+	close(r.stop)
 }
 
 func (r *repeater) Force() {
@@ -72,30 +94,32 @@ func (r *repeater) Force() {
 	}
 }
 
-func (r *repeater) singleTask() {
-	if err := r.task(r.ctx); err != nil {
-		r.timer.Reset(time.Second)
-	} else {
-		r.timer.Reset(r.interval)
-	}
+func (r *repeater) wakeUp(ctx context.Context, e event) {
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
+	trace.DriverOnRepeaterWakeUp(
+		r.trace,
+		&ctx,
+		r.name,
+		string(e),
+	)(r.task(ctx))
 }
 
-func (r *repeater) worker() {
-	defer func() {
-		close(r.done)
-	}()
-	r.singleTask()
+func (r *repeater) worker(ctx context.Context, interval time.Duration) {
+	defer close(r.done)
+
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-r.stop:
 			return
-		case <-r.timer.C():
-			r.singleTask()
+		case <-time.After(interval):
+			r.wakeUp(ctx, eventTick)
 		case <-r.force:
-			if !r.timer.Stop() {
-				<-r.timer.C()
-			}
-			r.timer.Reset(r.interval)
+			r.wakeUp(ctx, eventForce)
 		}
 	}
 }

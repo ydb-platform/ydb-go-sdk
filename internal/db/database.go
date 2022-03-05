@@ -81,6 +81,7 @@ func New(
 		ctx,
 		db.cluster.GetConn(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
 		db.cluster,
+		db.config.Trace(),
 		opts...,
 	)
 	if err != nil {

@@ -1,3 +1,7 @@
+## 3.11.13
+* Added `trace.Driver.OnRepeaterWakeUp` event
+* Refactored package `repeater`
+
 ## 3.11.12
 * Added `trace.ClusterInsertDoneInfo.Inserted` boolean flag for notify about success of insert endpoint into balancer
 * Added `trace.ClusterRemoveDoneInfo.Removed` boolean flag for notify about success of remove endpoint from balancer

@@ -24,6 +24,7 @@ func New(
 	ctx context.Context,
 	cc conn.Conn,
 	crudExplorer cluster.CRUDExplorerLocker,
+	driverTrace trace.Driver,
 	opts ...config.Option,
 ) (_ discovery.Client, err error) {
 	c := &client{
@@ -57,9 +58,8 @@ func New(
 	}
 
 	crudExplorer.SetExplorer(
-		repeater.NewRepeater(
+		repeater.New(
 			deadline.ContextWithoutDeadline(ctx),
-			c.config.Interval(),
 			func(ctx context.Context) (err error) {
 				next, err = c.Discover(ctx)
 				if err != nil {
@@ -107,6 +107,9 @@ func New(
 
 				return nil
 			},
+			repeater.WithInterval(c.config.Interval()),
+			repeater.WithName("discovery"),
+			repeater.WithTrace(driverTrace),
 		),
 	)
 

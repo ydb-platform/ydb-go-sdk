@@ -466,6 +466,30 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnRepeaterWakeUp == nil:
+		ret.OnRepeaterWakeUp = x.OnRepeaterWakeUp
+	case x.OnRepeaterWakeUp == nil:
+		ret.OnRepeaterWakeUp = t.OnRepeaterWakeUp
+	default:
+		h1 := t.OnRepeaterWakeUp
+		h2 := x.OnRepeaterWakeUp
+		ret.OnRepeaterWakeUp = func(r RepeaterTickStartInfo) func(RepeaterTickDoneInfo) {
+			r1 := h1(r)
+			r2 := h2(r)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(r RepeaterTickDoneInfo) {
+					r1(r)
+					r2(r)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnGetCredentials == nil:
 		ret.OnGetCredentials = x.OnGetCredentials
 	case x.OnGetCredentials == nil:
@@ -780,6 +804,21 @@ func (t Driver) onPessimizeNode(p PessimizeNodeStartInfo) func(PessimizeNodeDone
 	}
 	return res
 }
+func (t Driver) onRepeaterWakeUp(r RepeaterTickStartInfo) func(RepeaterTickDoneInfo) {
+	fn := t.OnRepeaterWakeUp
+	if fn == nil {
+		return func(RepeaterTickDoneInfo) {
+			return
+		}
+	}
+	res := fn(r)
+	if res == nil {
+		return func(RepeaterTickDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
 	if fn == nil {
@@ -1010,6 +1049,18 @@ func DriverOnPessimizeNode(t Driver, c *context.Context, endpoint EndpointInfo, 
 	return func(state ConnState) {
 		var p PessimizeNodeDoneInfo
 		p.State = state
+		res(p)
+	}
+}
+func DriverOnRepeaterWakeUp(t Driver, c *context.Context, name string, event string) func(error) {
+	var p RepeaterTickStartInfo
+	p.Context = c
+	p.Name = name
+	p.Event = event
+	res := t.onRepeaterWakeUp(p)
+	return func(e error) {
+		var p RepeaterTickDoneInfo
+		p.Error = e
 		res(p)
 	}
 }
