@@ -28,6 +28,13 @@ import (
 
 type Option func(ctx context.Context, c *connection) error
 
+func withOnClose(onClose func(c *connection)) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.onClose = append(c.onClose, onClose)
+		return nil
+	}
+}
+
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
 		credentials.NewAccessTokenCredentials(

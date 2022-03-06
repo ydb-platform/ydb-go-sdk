@@ -1,3 +1,9 @@
+## 3.13.0
+* Refactored `Connection` interface
+* Removed `CustomOption` and taking client with custom options
+* Removed `proxy` package
+* Improved `db.With()` helper for create child connections
+
 ## 3.12.1
 * Added `trace.Driver.OnConnPark` event
 * Added `trace.Driver.OnConnClose` event

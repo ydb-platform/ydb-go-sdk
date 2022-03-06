@@ -12,8 +12,10 @@ type Rand interface {
 }
 
 type r struct {
+	m   *sync.Mutex
+	max int64
+
 	r *rand.Rand
-	m *sync.Mutex
 }
 
 type option func(r *r)
@@ -24,14 +26,21 @@ func WithLock() option {
 	}
 }
 
+func WithMax(max int64) option {
+	return func(r *r) {
+		r.max = max
+	}
+}
+
 func New(opts ...option) Rand {
 	r := &r{
-		// nolint:gosec
-		r: rand.New(rand.NewSource(math.MaxInt64)),
+		max: math.MaxInt64,
 	}
 	for _, o := range opts {
 		o(r)
 	}
+	// nolint:gosec
+	r.r = rand.New(rand.NewSource(math.MaxInt64))
 	return r
 }
 
