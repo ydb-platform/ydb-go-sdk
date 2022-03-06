@@ -34,6 +34,8 @@ type (
 		OnConnNewStream    func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
 		OnConnTake         func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
 		OnConnUsagesChange func(ConnUsagesChangeInfo)
+		OnConnPark         func(ConnParkStartInfo) func(ConnParkDoneInfo)
+		OnConnClose        func(ConnCloseStartInfo) func(ConnCloseDoneInfo)
 
 		// Cluster events
 		OnClusterInit   func(ClusterInitStartInfo) func(ClusterInitDoneInfo)
@@ -192,6 +194,28 @@ type (
 		Endpoint EndpointInfo
 	}
 	ConnTakeDoneInfo struct {
+		Error error
+	}
+	ConnParkStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Endpoint EndpointInfo
+	}
+	ConnParkDoneInfo struct {
+		Error error
+	}
+	ConnCloseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Endpoint EndpointInfo
+	}
+	ConnCloseDoneInfo struct {
 		Error error
 	}
 	ConnUsagesChangeInfo struct {

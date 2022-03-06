@@ -298,6 +298,54 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
+	case t.OnConnPark == nil:
+		ret.OnConnPark = x.OnConnPark
+	case x.OnConnPark == nil:
+		ret.OnConnPark = t.OnConnPark
+	default:
+		h1 := t.OnConnPark
+		h2 := x.OnConnPark
+		ret.OnConnPark = func(c ConnParkStartInfo) func(ConnParkDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnParkDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnConnClose == nil:
+		ret.OnConnClose = x.OnConnClose
+	case x.OnConnClose == nil:
+		ret.OnConnClose = t.OnConnClose
+	default:
+		h1 := t.OnConnClose
+		h2 := x.OnConnClose
+		ret.OnConnClose = func(c ConnCloseStartInfo) func(ConnCloseDoneInfo) {
+			r1 := h1(c)
+			r2 := h2(c)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(c ConnCloseDoneInfo) {
+					r1(c)
+					r2(c)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnClusterInit == nil:
 		ret.OnClusterInit = x.OnClusterInit
 	case x.OnClusterInit == nil:
@@ -699,6 +747,36 @@ func (t Driver) onConnUsagesChange(c1 ConnUsagesChangeInfo) {
 	}
 	fn(c1)
 }
+func (t Driver) onConnPark(c1 ConnParkStartInfo) func(ConnParkDoneInfo) {
+	fn := t.OnConnPark
+	if fn == nil {
+		return func(ConnParkDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnParkDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onConnClose(c1 ConnCloseStartInfo) func(ConnCloseDoneInfo) {
+	fn := t.OnConnClose
+	if fn == nil {
+		return func(ConnCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(c1)
+	if res == nil {
+		return func(ConnCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onClusterInit(c1 ClusterInitStartInfo) func(ClusterInitDoneInfo) {
 	fn := t.OnClusterInit
 	if fn == nil {
@@ -973,6 +1051,28 @@ func DriverOnConnUsagesChange(t Driver, endpoint EndpointInfo, usages int) {
 	p.Endpoint = endpoint
 	p.Usages = usages
 	t.onConnUsagesChange(p)
+}
+func DriverOnConnPark(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
+	var p ConnParkStartInfo
+	p.Context = c
+	p.Endpoint = endpoint
+	res := t.onConnPark(p)
+	return func(e error) {
+		var p ConnParkDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnConnClose(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
+	var p ConnCloseStartInfo
+	p.Context = c
+	p.Endpoint = endpoint
+	res := t.onConnClose(p)
+	return func(e error) {
+		var p ConnCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
 }
 func DriverOnClusterInit(t Driver, c *context.Context) func() {
 	var p ClusterInitStartInfo

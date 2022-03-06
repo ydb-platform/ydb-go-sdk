@@ -37,37 +37,60 @@ func (c *conn) Address() string {
 }
 
 type conn struct {
-	sync.Mutex
-	config   Config // ro access
-	cc       *grpc.ClientConn
-	done     chan struct{}
-	endpoint endpoint.Endpoint // ro access
-	closed   bool
-	state    State
-	usages   int32
-	ttl      timeutil.Timer
-	onClose  []func(Conn)
+	sync.RWMutex
+	config      Config // ro access
+	cc          *grpc.ClientConn
+	done        chan struct{}
+	endpoint    endpoint.Endpoint // ro access
+	closed      bool
+	state       State
+	usages      int32
+	ttl         timeutil.Timer
+	onClose     []func(Conn)
+	onPessimize []func(e endpoint.Endpoint)
 }
 
 func (c *conn) IsState(states ...State) bool {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
+	defer c.RUnlock()
+
 	for _, s := range states {
 		if s == c.state {
 			return true
 		}
 	}
+
 	return false
 }
 
 func (c *conn) Park(ctx context.Context) (err error) {
 	c.Lock()
 	defer c.Unlock()
-	err = c.close()
-	if err != nil {
-		err = errors.Errorf(0, "park failed: %w", err)
+
+	if c.closed {
+		return nil
 	}
-	return err
+
+	if c.cc == nil {
+		return nil
+	}
+
+	onDone := trace.DriverOnConnPark(
+		c.config.Trace(),
+		&ctx,
+		c.Endpoint(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	err = c.close()
+
+	if err != nil {
+		return errors.Errorf(0, "park failed: %w", err)
+	}
+
+	return nil
 }
 
 func (c *conn) NodeID() uint32 {
@@ -101,8 +124,8 @@ func (c *conn) setState(s State) State {
 }
 
 func (c *conn) GetState() (s State) {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
+	defer c.RUnlock()
 	return c.state
 }
 
@@ -204,23 +227,38 @@ func (c *conn) close() (err error) {
 }
 
 func (c *conn) isClosed() bool {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
+	defer c.RUnlock()
 	return c.closed
 }
 
 func (c *conn) Close(ctx context.Context) (err error) {
 	c.Lock()
 	defer c.Unlock()
+
 	if c.closed {
 		return nil
 	}
+
+	onDone := trace.DriverOnConnClose(
+		c.config.Trace(),
+		&ctx,
+		c.Endpoint(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
 	c.closed = true
+
 	err = c.close()
+
 	c.setState(Destroyed)
+
 	for _, f := range c.onClose {
 		f(c)
 	}
+
 	return err
 }
 
@@ -228,6 +266,13 @@ func (c *conn) pessimize(ctx context.Context, err error) {
 	if c.isClosed() {
 		return
 	}
+
+	defer func() {
+		for _, f := range c.onPessimize {
+			f(c.endpoint)
+		}
+	}()
+
 	trace.DriverOnPessimizeNode(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
 		&ctx,
@@ -404,18 +449,30 @@ func (c *conn) NewStream(
 
 type option func(c *conn)
 
-func withOnClose(onClose func(Conn)) option {
+func withOnPessimize(onPessimize func(e endpoint.Endpoint)) option {
 	return func(c *conn) {
-		c.onClose = append(c.onClose, onClose)
+		if onPessimize != nil {
+			c.onPessimize = append(c.onPessimize, onPessimize)
+		}
 	}
 }
 
-func New(endpoint endpoint.Endpoint, config Config, opts ...option) Conn {
+func withOnClose(onClose func(Conn)) option {
+	return func(c *conn) {
+		if onClose != nil {
+			c.onClose = append(c.onClose, onClose)
+		}
+	}
+}
+
+func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
 	c := &conn{
-		state:    Created,
-		endpoint: endpoint,
-		config:   config,
-		done:     make(chan struct{}),
+		state:       Created,
+		endpoint:    e,
+		config:      config,
+		done:        make(chan struct{}),
+		onClose:     make([]func(Conn), 0),
+		onPessimize: make([]func(e endpoint.Endpoint), 0),
 	}
 	for _, o := range opts {
 		o(c)

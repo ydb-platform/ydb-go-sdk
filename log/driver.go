@@ -131,10 +131,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	// nolint:nestif
-	if details&trace.DriverCoreEvents != 0 {
-		// nolint:govet
-		log := log.WithName(`core`)
+	if details&trace.DriverEvents != 0 {
 		t.OnInit = func(info trace.InitStartInfo) func(trace.InitDoneInfo) {
 			endpoint := info.Endpoint
 			database := info.Database
@@ -186,6 +183,11 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
+	}
+	// nolint:nestif
+	if details&trace.DriverConnEvents != 0 {
+		// nolint:govet
+		log := log.WithName(`conn`)
 		t.OnConnTake = func(info trace.ConnTakeStartInfo) func(trace.ConnTakeDoneInfo) {
 			endpoint := info.Endpoint.String()
 			log.Tracef(`take start {endpoint:%v}`,
@@ -226,6 +228,48 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 					time.Since(start),
 					info.State,
 				)
+			}
+		}
+		t.OnConnPark = func(info trace.ConnParkStartInfo) func(trace.ConnParkDoneInfo) {
+			endpoint := info.Endpoint
+			log.Tracef(`conn park start {endpoint:%v}`,
+				endpoint,
+			)
+			start := time.Now()
+			return func(info trace.ConnParkDoneInfo) {
+				if info.Error == nil {
+					log.Tracef(`conn park done {endpoint:%v,latency:"%v"}`,
+						endpoint,
+						time.Since(start),
+					)
+				} else {
+					log.Warnf(`conn park fail {endpoint:%v,latency:"%v",error:"%s"}`,
+						endpoint,
+						time.Since(start),
+						info.Error,
+					)
+				}
+			}
+		}
+		t.OnConnClose = func(info trace.ConnCloseStartInfo) func(trace.ConnCloseDoneInfo) {
+			endpoint := info.Endpoint
+			log.Tracef(`conn close start {endpoint:%v}`,
+				endpoint,
+			)
+			start := time.Now()
+			return func(info trace.ConnCloseDoneInfo) {
+				if info.Error == nil {
+					log.Tracef(`conn close done {endpoint:%v,latency:"%v"}`,
+						endpoint,
+						time.Since(start),
+					)
+				} else {
+					log.Warnf(`conn close fail {endpoint:%v,latency:"%v",error:"%s"}`,
+						endpoint,
+						time.Since(start),
+						info.Error,
+					)
+				}
 			}
 		}
 		t.OnConnInvoke = func(info trace.ConnInvokeStartInfo) func(trace.ConnInvokeDoneInfo) {
@@ -300,6 +344,10 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
+	}
+	if details&trace.DriverRepeaterEvents != 0 {
+		// nolint:govet
+		log := log.WithName(`repeater`)
 		t.OnRepeaterWakeUp = func(info trace.RepeaterTickStartInfo) func(trace.RepeaterTickDoneInfo) {
 			name := info.Name
 			event := info.Event

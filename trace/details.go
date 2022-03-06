@@ -8,12 +8,11 @@ type Details uint64
 
 const (
 	DriverNetEvents         Details = 1 << iota // 1
-	DriverResolverEvents                        // 2
+	DriverConnEvents                            // 2
 	DriverClusterEvents                         // 4
-	DriverCoreEvents                            // 8
-	DriverCredentialsEvents                     // 16
-
-	DiscoveryEvents // 32
+	DriverResolverEvents                        // 8
+	DriverRepeaterEvents                        // 16
+	DriverCredentialsEvents                     // 32
 
 	TableSessionLifeCycleEvents     // 64
 	TableSessionQueryInvokeEvents   // 128
@@ -24,7 +23,7 @@ const (
 	TablePoolSessionLifeCycleEvents // 4096
 	TablePoolAPIEvents              // 8192
 
-	RetryEvents // 16384
+	DiscoveryEvents // 16384
 
 	SchemeEvents // 32768
 
@@ -34,10 +33,13 @@ const (
 
 	CoordinationEvents // 262144
 
-	DriverEvents = DriverClusterEvents |
-		DriverNetEvents |
+	RetryEvents // 524288
+
+	DriverEvents = DriverNetEvents |
+		DriverConnEvents |
+		DriverClusterEvents |
 		DriverResolverEvents |
-		DriverCoreEvents |
+		DriverRepeaterEvents |
 		DriverCredentialsEvents // 63
 
 	TableEvents = TableSessionLifeCycleEvents |
@@ -52,11 +54,7 @@ const (
 	TablePoolEvents = TablePoolLifeCycleEvents |
 		TablePoolRetryEvents |
 		TablePoolSessionLifeCycleEvents |
-		TablePoolAPIEvents // 16320
-
-	DriverConnEvents = DriverNetEvents |
-		DriverResolverEvents |
-		DriverCoreEvents // 28
+		TablePoolAPIEvents // 15360
 
 	TableSessionQueryEvents = TableSessionQueryInvokeEvents |
 		TableSessionQueryStreamEvents // 384
@@ -73,7 +71,8 @@ var (
 		DriverClusterEvents:     "ydb.driver.cluster",
 		DriverNetEvents:         "ydb.driver.net",
 		DriverResolverEvents:    "ydb.driver.resolver",
-		DriverCoreEvents:        "ydb.driver.core",
+		DriverRepeaterEvents:    "ydb.driver.repeater",
+		DriverConnEvents:        "ydb.driver.conn",
 		DriverCredentialsEvents: "ydb.driver.credentials",
 
 		DiscoveryEvents: "ydb.discovery",

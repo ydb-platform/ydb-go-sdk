@@ -79,19 +79,21 @@ func (c *cluster) SetExplorer(repeater repeater.Repeater) {
 }
 
 type crudOptionsHolder struct {
-	locked bool
+	withLock bool
 }
 
 type crudOption func(h *crudOptionsHolder)
 
 func WithoutLock() crudOption {
 	return func(h *crudOptionsHolder) {
-		h.locked = true
+		h.withLock = false
 	}
 }
 
 func parseOptions(opts ...crudOption) *crudOptionsHolder {
-	h := &crudOptionsHolder{}
+	h := &crudOptionsHolder{
+		withLock: true,
+	}
 	for _, o := range opts {
 		o(h)
 	}
@@ -110,10 +112,6 @@ type CRUD interface {
 
 	// Get gets conn from cluster
 	Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, err error)
-}
-
-type Pessimizer interface {
-	Pessimize(ctx context.Context, endpoint endpoint.Endpoint) error
 }
 
 type Explorer interface {
@@ -135,7 +133,6 @@ type CRUDExplorerLocker interface {
 type Cluster interface {
 	closer.Closer
 	CRUD
-	Pessimizer
 	Explorer
 	Locker
 	conn.PoolGetter
@@ -151,13 +148,57 @@ func New(
 		onDone()
 	}()
 
-	return &cluster{
+	c := &cluster{
 		config:    config,
-		pool:      conn.NewPool(ctx, config),
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
 		balancer:  balancer,
 	}
+
+	c.pool = conn.NewPool(
+		ctx,
+		config,
+		func(e endpoint.Endpoint) {
+			c.mu.RLock()
+			defer c.mu.RUnlock()
+
+			if c.closed {
+				return
+			}
+
+			entry, has := c.index[e.Address()]
+			if !has {
+				return
+			}
+
+			if entry.Handle == nil {
+				return
+			}
+
+			if !c.balancer.Contains(entry.Handle) {
+				return
+			}
+
+			if c.explorer == nil {
+				return
+			}
+
+			// count ratio (banned/all)
+			online := 0
+			for _, entry = range c.index {
+				if entry.Conn != nil && entry.Conn.GetState() == conn.Online {
+					online++
+				}
+			}
+
+			// more than half connections banned - re-discover now
+			if online*2 < len(c.index) {
+				c.explorer.Force()
+			}
+		},
+	)
+
+	return c
 }
 
 func (c *cluster) Close(ctx context.Context) (err error) {
@@ -245,7 +286,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 	}()
 
 	options := parseOptions(opts...)
-	if !options.locked {
+	if options.withLock {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 	}
@@ -288,7 +329,7 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 	}()
 
 	options := parseOptions(opts...)
-	if !options.locked {
+	if options.withLock {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 	}
@@ -333,20 +374,17 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 	}()
 
 	options := parseOptions(opts...)
-	if !options.locked {
+	if options.withLock {
 		c.mu.Lock()
+		defer c.mu.Unlock()
 	}
 
 	if c.closed {
-		if !options.locked {
-			c.mu.Unlock()
-		}
 		return
 	}
 
 	entry, has := c.index[e.Address()]
 	if !has {
-		c.mu.Unlock()
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
@@ -355,50 +393,12 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 	delete(c.index, e.Address())
 	delete(c.endpoints, e.NodeID())
 
-	if !options.locked {
-		c.mu.Unlock()
-	}
-
 	if entry.Conn != nil {
 		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
 		_ = entry.Conn.Close(ctx)
 	}
 
 	return entry.Conn
-}
-
-func (c *cluster) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if c.closed {
-		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrClusterClosed)
-	}
-
-	entry, has := c.index[e.Address()]
-	if !has {
-		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrUnknownEndpoint)
-	}
-	if entry.Handle == nil {
-		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrNilBalancerElement)
-	}
-	if !c.balancer.Contains(entry.Handle) {
-		return errors.Errorf(0, "cluster: pessimize failed: %w", ErrUnknownBalancerElement)
-	}
-	entry.Conn.SetState(conn.Banned)
-	if c.explorer != nil {
-		// count ratio (banned/all)
-		online := 0
-		for _, entry = range c.index {
-			if entry.Conn != nil && entry.Conn.GetState() == conn.Online {
-				online++
-			}
-		}
-		// more than half connections banned - re-discover now
-		if online*2 < len(c.index) {
-			c.explorer.Force()
-		}
-	}
-	return err
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
