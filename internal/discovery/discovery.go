@@ -32,11 +32,8 @@ func New(
 		service: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
 	}
 
-	crudExplorer.Lock()
-	defer crudExplorer.Unlock()
-
 	if c.config.Interval() <= 0 {
-		_ = crudExplorer.Insert(ctx, cc.Endpoint(), cluster.WithoutLock())
+		_ = crudExplorer.Insert(ctx, cc.Endpoint())
 		return c, nil
 	}
 
@@ -46,6 +43,9 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+
+	crudExplorer.Lock()
+	defer crudExplorer.Unlock()
 
 	// Endpoints must be sorted to merge
 	cluster.SortEndpoints(curr)
@@ -64,11 +64,6 @@ func New(
 				next, err = c.Discover(ctx)
 				if err != nil {
 					return err
-				}
-
-				// if nothing endpoint - use old endpoint list
-				if len(next) == 0 {
-					return
 				}
 
 				// NOTE: curr endpoints must be sorted here.

@@ -95,16 +95,27 @@ func (r *repeater) Force() {
 }
 
 func (r *repeater) wakeUp(ctx context.Context, e event) {
-	var cancel context.CancelFunc
+	var (
+		onDone = trace.DriverOnRepeaterWakeUp(
+			r.trace,
+			&ctx,
+			r.name,
+			string(e),
+		)
+		cancel context.CancelFunc
+		err    error
+	)
+
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
-	trace.DriverOnRepeaterWakeUp(
-		r.trace,
-		&ctx,
-		r.name,
-		string(e),
-	)(r.task(ctx))
+	err = r.task(ctx)
+
+	if err != nil {
+		r.Force()
+	}
+
+	onDone(err)
 }
 
 func (r *repeater) worker(ctx context.Context, interval time.Duration) {

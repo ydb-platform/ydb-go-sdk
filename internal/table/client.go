@@ -828,7 +828,7 @@ func (c *client) closeSession(ctx context.Context, s Session, opts ...closeSessi
 		c.wgClosed.Add(1)
 	}
 
-	f := func() {
+	f := func(s Session) {
 		defer c.wgClosed.Done()
 
 		closeCtx, cancel := context.WithTimeout(
@@ -841,9 +841,9 @@ func (c *client) closeSession(ctx context.Context, s Session, opts ...closeSessi
 	}
 
 	if h.withAsync {
-		go f()
+		go f(s)
 	} else {
-		f()
+		f(s)
 	}
 
 	return nil

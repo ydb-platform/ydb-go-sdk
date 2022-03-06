@@ -14,16 +14,11 @@ import (
 
 type Pool interface {
 	closer.Closer
-	Pessimizer
 	PoolGetter
 }
 
 type PoolGetter interface {
 	GetConn(endpoint endpoint.Endpoint) Conn
-}
-
-type Pessimizer interface {
-	Pessimize(ctx context.Context, e endpoint.Endpoint) error
 }
 
 type PoolGetterCloser interface {
@@ -37,22 +32,12 @@ type PoolConfig interface {
 }
 
 type pool struct {
-	config Config
-	mtx    sync.RWMutex
-	opts   []grpc.DialOption
-	conns  map[string]Conn
-	done   chan struct{}
-}
-
-func (p *pool) Pessimize(ctx context.Context, e endpoint.Endpoint) (err error) {
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-	cc, ok := p.conns[e.Address()]
-	if !ok {
-		cc.SetState(Banned)
-		return nil
-	}
-	return errors.Errorf(0, "pessimize failed: unknown endpoint %v", e)
+	config      Config
+	mtx         sync.RWMutex
+	opts        []grpc.DialOption
+	conns       map[string]Conn
+	done        chan struct{}
+	onPessimize func(e endpoint.Endpoint)
 }
 
 func (p *pool) GetConn(e endpoint.Endpoint) Conn {
@@ -61,11 +46,17 @@ func (p *pool) GetConn(e endpoint.Endpoint) Conn {
 	if cc, ok := p.conns[e.Address()]; ok {
 		return cc
 	}
-	cc := New(e, p.config, withOnClose(func(c Conn) {
-		p.mtx.Lock()
-		defer p.mtx.Unlock()
-		delete(p.conns, c.Endpoint().Address())
-	}))
+	cc := New(
+		e,
+		p.config,
+		withOnPessimize(
+			p.onPessimize,
+		),
+		withOnClose(func(c Conn) {
+			// conn.Conn.Close() must called on under locked p.mtx
+			delete(p.conns, c.Endpoint().Address())
+		}),
+	)
 	p.conns[e.Address()] = cc
 	return cc
 }
@@ -74,14 +65,10 @@ func (p *pool) Close(ctx context.Context) error {
 	close(p.done)
 
 	p.mtx.Lock()
-	conns := make([]Conn, 0, len(p.conns))
-	for _, c := range p.conns {
-		conns = append(conns, c)
-	}
-	p.mtx.Unlock()
+	defer p.mtx.Unlock()
 
 	var issues []error
-	for _, c := range conns {
+	for _, c := range p.conns {
 		if err := c.Close(ctx); err != nil {
 			issues = append(issues, err)
 		}
@@ -114,12 +101,17 @@ func (p *pool) connCloser(ctx context.Context, interval time.Duration) {
 	}
 }
 
-func NewPool(ctx context.Context, config Config) Pool {
+func NewPool(
+	ctx context.Context,
+	config Config,
+	onPessimize func(e endpoint.Endpoint),
+) Pool {
 	p := &pool{
-		config: config,
-		opts:   config.GrpcDialOptions(),
-		conns:  make(map[string]Conn),
-		done:   make(chan struct{}),
+		config:      config,
+		opts:        config.GrpcDialOptions(),
+		conns:       make(map[string]Conn),
+		done:        make(chan struct{}),
+		onPessimize: onPessimize,
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
 		go p.connCloser(ctx, ttl/10)

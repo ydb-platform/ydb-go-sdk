@@ -1,3 +1,11 @@
+## 3.12.1
+* Added `trace.Driver.OnConnPark` event
+* Added `trace.Driver.OnConnClose` event
+* Fixed bug with closing nil session in table retryer
+* Restored repeater `Force` call on pessimize event
+* Changed mutex type in `conn.Conn` from `sync.Mutex` to `sync.RWMutex` for exclude deadlocks
+* Reverted applying empty `discovery` results to `cluster` 
+
 ## 3.12.0
 * Added `balancers.Prefer` and `balancers.PreferWithFallback` constructors
 
