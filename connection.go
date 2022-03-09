@@ -83,6 +83,8 @@ type connection struct {
 	ratelimiter        ratelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
+	pool conn.Pool
+
 	mtx sync.Mutex
 	db  db.Connection
 
@@ -94,6 +96,12 @@ type connection struct {
 func (c *connection) Close(ctx context.Context) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
+
+	defer func() {
+		for _, f := range c.onClose {
+			f(c)
+		}
+	}()
 
 	var (
 		issues   []error
@@ -136,12 +144,12 @@ func (c *connection) Close(ctx context.Context) error {
 		issues = append(issues, err)
 	}
 
-	if len(issues) > 0 {
-		return errors.NewWithIssues("close failed", issues...)
+	if err := c.pool.Release(ctx); err != nil {
+		issues = append(issues, err)
 	}
 
-	for _, f := range c.onClose {
-		f(c)
+	if len(issues) > 0 {
+		return errors.NewWithIssues("close failed", issues...)
 	}
 
 	return nil
@@ -257,9 +265,17 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)
 	}
 
+	if c.pool == nil {
+		c.pool = conn.NewPool(
+			ctx,
+			c.config,
+		)
+	}
+
 	c.db, err = db.New(
 		ctx,
 		c.config,
+		c.pool,
 		append(
 			// prepend config params from root config
 			[]discoveryConfig.Option{

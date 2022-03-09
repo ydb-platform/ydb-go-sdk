@@ -51,6 +51,7 @@ func (db *database) Close(ctx context.Context) (err error) {
 func New(
 	ctx context.Context,
 	c config.Config,
+	pool conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {
 	ctx, err = c.Meta().Meta(ctx)
@@ -66,7 +67,7 @@ func New(
 
 	db := &database{
 		config:  c,
-		cluster: cluster.New(ctx, c, c.Balancer()),
+		cluster: cluster.New(ctx, c, pool, c.Balancer()),
 	}
 
 	var cancel context.CancelFunc
@@ -118,6 +119,11 @@ func (db *database) Invoke(
 	if err != nil {
 		return errors.Errorf(0, "meta get failed: %w", err)
 	}
+	defer func() {
+		if err != nil && errors.MustPessimizeEndpoint(err) {
+			db.cluster.Pessimize(ctx, cc, err)
+		}
+	}()
 	err = cc.Invoke(ctx, method, args, reply, opts...)
 	if err != nil {
 		return errors.Errorf(0, "invoke failed: %w", err)
@@ -139,5 +145,10 @@ func (db *database) NewStream(
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil && errors.MustPessimizeEndpoint(err) {
+			db.cluster.Pessimize(ctx, cc, err)
+		}
+	}()
 	return cc.NewStream(ctx, desc, method, opts...)
 }

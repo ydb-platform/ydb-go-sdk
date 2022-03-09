@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
@@ -32,6 +33,13 @@ func withOnClose(onClose func(c *connection)) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.onClose = append(c.onClose, onClose)
 		return nil
+	}
+}
+
+func withConnPool(pool conn.Pool) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.pool = pool
+		return pool.Take(ctx)
 	}
 }
 

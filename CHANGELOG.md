@@ -3,6 +3,7 @@
 * Removed `CustomOption` and taking client with custom options
 * Removed `proxy` package
 * Improved `db.With()` helper for create child connections
+* Setted shared `conn.Pool` for all child `ydb.Connection`  
 
 ## 3.12.1
 * Added `trace.Driver.OnConnPark` event
