@@ -30,6 +30,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// nolint:gocyclo
 func TestConnection(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -176,11 +177,63 @@ func TestConnection(t *testing.T) {
 			t.Fatalf("Stream execute failed: %v", err)
 		}
 	})
+	t.Run("with.scripting.StreamExecuteYql", func(t *testing.T) {
+		var childDB ydb.Connection
+		childDB, err = db.With(
+			ctx,
+			ydb.WithAccessTokenCredentials(""),
+		)
+		if err != nil {
+			t.Fatalf("failed to open sub-connection: %v", err)
+		}
+		defer func() {
+			_ = childDB.Close(ctx)
+		}()
+		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(childDB)
+			client, err := scriptingClient.StreamExecuteYql(
+				ctx,
+				&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
+			)
+			if err != nil {
+				return err
+			}
+			response, err := client.Recv()
+			if err != nil {
+				return err
+			}
+			if len(response.GetResult().GetResultSet().GetColumns()) != 1 {
+				return fmt.Errorf(
+					"unexpected colums count: %d",
+					len(response.GetResult().GetResultSet().GetColumns()),
+				)
+			}
+			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != "sum" {
+				return fmt.Errorf(
+					"unexpected colum name: %s",
+					response.GetResult().GetResultSet().GetColumns()[0].GetName(),
+				)
+			}
+			if len(response.GetResult().GetResultSet().GetRows()) != 1 {
+				return fmt.Errorf(
+					"unexpected rows count: %d",
+					len(response.GetResult().GetResultSet().GetRows()),
+				)
+			}
+			if response.GetResult().GetResultSet().GetRows()[0].GetItems()[0].GetInt32Value() != 101 {
+				return fmt.Errorf(
+					"unexpected result of select: %d",
+					response.GetResult().GetResultSet().GetRows()[0].GetInt64Value(),
+				)
+			}
+			return nil
+		}, retry.WithIdempotent()); err != nil {
+			t.Fatalf("Stream execute failed: %v", err)
+		}
+	})
 	t.Run("export.ExportToS3", func(t *testing.T) {
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			exportClient := Ydb_Export_V1.NewExportServiceClient(db.With(
-				ydb.WithCustomToken(""),
-			))
+			exportClient := Ydb_Export_V1.NewExportServiceClient(db)
 			response, err := exportClient.ExportToS3(
 				ctx,
 				&Ydb_Export.ExportToS3Request{

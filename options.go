@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
@@ -27,6 +28,20 @@ import (
 )
 
 type Option func(ctx context.Context, c *connection) error
+
+func withOnClose(onClose func(c *connection)) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.onClose = append(c.onClose, onClose)
+		return nil
+	}
+}
+
+func withConnPool(pool conn.Pool) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.pool = pool
+		return pool.Take(ctx)
+	}
+}
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
@@ -42,6 +57,13 @@ func WithAccessTokenCredentials(accessToken string) Option {
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithUserAgent(userAgent))
+		return nil
+	}
+}
+
+func WithRequestsType(requestsType string) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithRequestsType(requestsType))
 		return nil
 	}
 }

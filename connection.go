@@ -19,7 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/proxy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -38,42 +37,32 @@ type Connection interface {
 	db.ConnectionInfo
 	grpc.ClientConnInterface
 
-	// Table returns table client with options from Connection instance.
-	// Options provide options replacement for requested table client
-	// such as database and access token
-	Table(opts ...CustomOption) table.Client
+	// Table returns table client
+	Table() table.Client
 
-	// Scheme returns scheme client with options from Connection instance.
-	// Options provide options replacement for requested scheme client
-	// such as database and access token
-	Scheme(opts ...CustomOption) scheme.Client
+	// Scheme returns scheme client
+	Scheme() scheme.Client
 
-	// Coordination returns coordination client with options from Connection instance.
-	// Options provide options replacement for requested coordination client
-	// such as database and access token
-	Coordination(opts ...CustomOption) coordination.Client
+	// Coordination returns coordination client
+	Coordination() coordination.Client
 
-	// Ratelimiter returns rate limiter client with options from Connection instance.
-	// Options provide options replacement for requested rate limiter client
-	// such as database and access token
-	Ratelimiter(opts ...CustomOption) ratelimiter.Client
+	// Ratelimiter returns rate limiter client
+	Ratelimiter() ratelimiter.Client
 
-	// Discovery returns discovery client with options from Connection instance.
-	// Options provide options replacement for requested discovery client
-	// such as database and access token
-	Discovery(opts ...CustomOption) discovery.Client
+	// Discovery returns discovery client
+	Discovery() discovery.Client
 
-	// Scripting returns scripting client with options from Connection instance.
-	// Options provide options replacement for requested scripting client
-	// such as database and access token
-	Scripting(opts ...CustomOption) scripting.Client
+	// Scripting returns scripting client
+	Scripting() scripting.Client
 
 	// With returns Connection specified with custom options
 	// Options provide options replacement for all clients taked from new Connection
-	With(opts ...CustomOption) Connection
+	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
 type connection struct {
+	opts []Option
+
 	config  config.Config
 	options []config.Option
 
@@ -94,39 +83,75 @@ type connection struct {
 	ratelimiter        ratelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
+	pool conn.Pool
+
 	mtx sync.Mutex
 	db  db.Connection
-}
 
-func (c *connection) With(opts ...CustomOption) Connection {
-	return newProxy(c, newMeta(c.config.Meta(), opts...))
+	children    map[uint64]Connection
+	childrenMtx sync.Mutex
+	onClose     []func(c *connection)
 }
 
 func (c *connection) Close(ctx context.Context) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
-	var issues []error
+
+	defer func() {
+		for _, f := range c.onClose {
+			f(c)
+		}
+	}()
+
+	var (
+		issues   []error
+		children = make([]Connection, 0, len(c.children))
+	)
+
+	c.childrenMtx.Lock()
+	for _, child := range c.children {
+		children = append(children, child)
+	}
+	c.childrenMtx.Unlock()
+
+	for _, child := range children {
+		if err := child.Close(ctx); err != nil {
+			issues = append(issues, err)
+		}
+	}
+
 	if err := c.ratelimiter.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
+
 	if err := c.coordination.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
+
 	if err := c.scheme.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
+
 	if err := c.table.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
+
 	if err := c.scripting.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
+
 	if err := c.db.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
+
+	if err := c.pool.Release(ctx); err != nil {
+		issues = append(issues, err)
+	}
+
 	if len(issues) > 0 {
 		return errors.NewWithIssues("close failed", issues...)
 	}
+
 	return nil
 }
 
@@ -172,51 +197,36 @@ func (c *connection) Secure() bool {
 	return c.config.Secure()
 }
 
-func (c *connection) Table(opts ...CustomOption) table.Client {
-	if len(opts) == 0 {
-		return c.table
-	}
-	return proxy.Table(c.table, newMeta(c.config.Meta(), opts...))
+func (c *connection) Table() table.Client {
+	return c.table
 }
 
-func (c *connection) Scheme(opts ...CustomOption) scheme.Client {
-	if len(opts) == 0 {
-		return c.scheme
-	}
-	return proxy.Scheme(c.scheme, newMeta(c.config.Meta(), opts...))
+func (c *connection) Scheme() scheme.Client {
+	return c.scheme
 }
 
-func (c *connection) Coordination(opts ...CustomOption) coordination.Client {
-	if len(opts) == 0 {
-		return c.coordination
-	}
-	return proxy.Coordination(c.coordination, newMeta(c.config.Meta(), opts...))
+func (c *connection) Coordination() coordination.Client {
+	return c.coordination
 }
 
-func (c *connection) Ratelimiter(opts ...CustomOption) ratelimiter.Client {
-	if len(opts) == 0 {
-		return c.ratelimiter
-	}
-	return proxy.Ratelimiter(c.ratelimiter, newMeta(c.config.Meta(), opts...))
+func (c *connection) Ratelimiter() ratelimiter.Client {
+	return c.ratelimiter
 }
 
-func (c *connection) Discovery(opts ...CustomOption) discovery.Client {
-	if len(opts) == 0 {
-		return c.db.Discovery()
-	}
-	return proxy.Discovery(c.db.Discovery(), newMeta(c.config.Meta(), opts...))
+func (c *connection) Discovery() discovery.Client {
+	return c.db.Discovery()
 }
 
-func (c *connection) Scripting(opts ...CustomOption) scripting.Client {
-	if len(opts) == 0 {
-		return c.scripting
-	}
-	return proxy.Scripting(c.scripting, newMeta(c.config.Meta(), opts...))
+func (c *connection) Scripting() scripting.Client {
+	return c.scripting
 }
 
 // New connects to name and return name runtime holder
 func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
-	c := &connection{}
+	c := &connection{
+		opts:     opts,
+		children: make(map[uint64]Connection),
+	}
 	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
 		opts = append([]Option{WithCertificatesFromFile(caFile)}, opts...)
 	}
@@ -255,9 +265,17 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)
 	}
 
+	if c.pool == nil {
+		c.pool = conn.NewPool(
+			ctx,
+			c.config,
+		)
+	}
+
 	c.db, err = db.New(
 		ctx,
 		c.config,
+		c.pool,
 		append(
 			// prepend config params from root config
 			[]discoveryConfig.Option{

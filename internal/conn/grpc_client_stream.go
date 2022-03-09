@@ -66,9 +66,6 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	err = s.s.RecvMsg(m)
 
 	if err != nil {
-		if errors.MustPessimizeEndpoint(err) {
-			s.c.pessimize(s.s.Context(), err)
-		}
 		if s.wrapping {
 			return errors.Errorf(0, "receive message failed: %w", errors.MapGRPCError(err))
 		}

@@ -46,7 +46,7 @@ var (
 
 type cluster struct {
 	config   config.Config
-	pool     conn.PoolGetterCloser
+	pool     conn.Pool
 	dial     func(context.Context, string) (*grpc.ClientConn, error)
 	balancer balancer.Balancer
 	explorer repeater.Repeater
@@ -56,6 +56,47 @@ type cluster struct {
 
 	mu     sync.RWMutex
 	closed bool
+}
+
+func (c *cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
+	c.pool.Pessimize(ctx, cc, cause)
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.closed {
+		return
+	}
+
+	entry, has := c.index[cc.Endpoint().Address()]
+	if !has {
+		return
+	}
+
+	if entry.Handle == nil {
+		return
+	}
+
+	if !c.balancer.Contains(entry.Handle) {
+		return
+	}
+
+	if c.explorer == nil {
+		return
+	}
+
+	// count ratio (banned/all)
+	online := 0
+	for _, entry = range c.index {
+		if entry.Conn != nil && entry.Conn.GetState() == conn.Online {
+			online++
+		}
+	}
+
+	// more than half connections banned - re-discover now
+	if online*2 < len(c.index) {
+		c.explorer.Force()
+	}
 }
 
 func (c *cluster) Lock() {
@@ -136,75 +177,34 @@ type Cluster interface {
 	Explorer
 	Locker
 	conn.PoolGetter
+	conn.Pessimizer
 }
 
 func New(
 	ctx context.Context,
 	config config.Config,
+	pool conn.Pool,
 	balancer balancer.Balancer,
 ) Cluster {
 	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)
 	defer func() {
-		onDone()
+		onDone(pool.Take(ctx))
 	}()
 
-	c := &cluster{
+	return &cluster{
 		config:    config,
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
+		pool:      pool,
 		balancer:  balancer,
 	}
-
-	c.pool = conn.NewPool(
-		ctx,
-		config,
-		func(e endpoint.Endpoint) {
-			c.mu.RLock()
-			defer c.mu.RUnlock()
-
-			if c.closed {
-				return
-			}
-
-			entry, has := c.index[e.Address()]
-			if !has {
-				return
-			}
-
-			if entry.Handle == nil {
-				return
-			}
-
-			if !c.balancer.Contains(entry.Handle) {
-				return
-			}
-
-			if c.explorer == nil {
-				return
-			}
-
-			// count ratio (banned/all)
-			online := 0
-			for _, entry = range c.index {
-				if entry.Conn != nil && entry.Conn.GetState() == conn.Online {
-					online++
-				}
-			}
-
-			// more than half connections banned - re-discover now
-			if online*2 < len(c.index) {
-				c.explorer.Force()
-			}
-		},
-	)
-
-	return c
 }
 
 func (c *cluster) Close(ctx context.Context) (err error) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.closed {
-		c.mu.Unlock()
 		return
 	}
 
@@ -218,19 +218,10 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 	}
 	c.closed = true
 
-	index := c.index
 	c.index = nil
 	c.endpoints = nil
 
-	c.mu.Unlock()
-
-	for _, entry := range index {
-		if entry.Conn != nil {
-			_ = entry.Conn.Close(ctx)
-		}
-	}
-
-	return c.pool.Close(ctx)
+	return c.pool.Release(ctx)
 }
 
 // Get returns next available connection.

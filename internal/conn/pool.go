@@ -3,27 +3,37 @@ package conn
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Pool interface {
-	closer.Closer
 	PoolGetter
+	Taker
+	Releaser
+	Pessimizer
 }
 
 type PoolGetter interface {
 	GetConn(endpoint endpoint.Endpoint) Conn
 }
 
-type PoolGetterCloser interface {
-	PoolGetter
-	closer.Closer
+type Taker interface {
+	Take(ctx context.Context) error
+}
+
+type Releaser interface {
+	Release(ctx context.Context) error
+}
+
+type Pessimizer interface {
+	Pessimize(ctx context.Context, cc Conn, cause error)
 }
 
 type PoolConfig interface {
@@ -32,36 +42,40 @@ type PoolConfig interface {
 }
 
 type pool struct {
-	config      Config
-	mtx         sync.RWMutex
-	opts        []grpc.DialOption
-	conns       map[string]Conn
-	done        chan struct{}
-	onPessimize func(e endpoint.Endpoint)
+	usages int64
+	config Config
+	mtx    sync.RWMutex
+	opts   []grpc.DialOption
+	conns  map[string]Conn
+	done   chan struct{}
 }
 
-func (p *pool) GetConn(e endpoint.Endpoint) Conn {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	if cc, ok := p.conns[e.Address()]; ok {
-		return cc
+func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
+	e := cc.Endpoint().Copy()
+	cc, ok := p.conns[e.Address()]
+	if !ok {
+		return
 	}
-	cc := New(
+
+	trace.DriverOnPessimizeNode(
+		trace.ContextDriver(ctx).Compose(p.config.Trace()),
+		&ctx,
 		e,
-		p.config,
-		withOnPessimize(
-			p.onPessimize,
-		),
-		withOnClose(func(c Conn) {
-			// conn.Conn.Close() must called on under locked p.mtx
-			delete(p.conns, c.Endpoint().Address())
-		}),
-	)
-	p.conns[e.Address()] = cc
-	return cc
+		cc.GetState(),
+		cause,
+	)(cc.SetState(Banned))
 }
 
-func (p *pool) Close(ctx context.Context) error {
+func (p *pool) Take(ctx context.Context) error {
+	atomic.AddInt64(&p.usages, 1)
+	return nil
+}
+
+func (p *pool) Release(ctx context.Context) error {
+	if atomic.AddInt64(&p.usages, -1) > 0 {
+		return nil
+	}
+
 	close(p.done)
 
 	p.mtx.Lock()
@@ -81,7 +95,25 @@ func (p *pool) Close(ctx context.Context) error {
 	return nil
 }
 
-func (p *pool) connCloser(ctx context.Context, interval time.Duration) {
+func (p *pool) GetConn(e endpoint.Endpoint) Conn {
+	p.mtx.Lock()
+	defer p.mtx.Unlock()
+	if cc, ok := p.conns[e.Address()]; ok {
+		return cc
+	}
+	cc := New(
+		e,
+		p.config,
+		withOnClose(func(c Conn) {
+			// conn.Conn.Close() must called on under locked p.mtx
+			delete(p.conns, c.Endpoint().Address())
+		}),
+	)
+	p.conns[e.Address()] = cc
+	return cc
+}
+
+func (p *pool) connParker(ctx context.Context, interval time.Duration) {
 	for {
 		select {
 		case <-p.done:
@@ -104,17 +136,16 @@ func (p *pool) connCloser(ctx context.Context, interval time.Duration) {
 func NewPool(
 	ctx context.Context,
 	config Config,
-	onPessimize func(e endpoint.Endpoint),
 ) Pool {
 	p := &pool{
-		config:      config,
-		opts:        config.GrpcDialOptions(),
-		conns:       make(map[string]Conn),
-		done:        make(chan struct{}),
-		onPessimize: onPessimize,
+		usages: 1,
+		config: config,
+		opts:   config.GrpcDialOptions(),
+		conns:  make(map[string]Conn),
+		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connCloser(ctx, ttl/10)
+		go p.connParker(ctx, ttl/10)
 	}
 	return p
 }

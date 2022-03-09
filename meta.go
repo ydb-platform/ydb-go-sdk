@@ -1,19 +1,17 @@
 package ydb
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+import (
+	"context"
 
-const (
-	MetaRequestType = meta.HeaderRequestType
-	MetaTraceID     = meta.HeaderTraceID
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 )
 
-func newMeta(meta meta.Meta, opts ...CustomOption) meta.Meta {
-	if len(opts) == 0 {
-		return meta
-	}
-	options := &customOptions{meta: meta}
-	for _, opt := range opts {
-		opt(options)
-	}
-	return options.meta
+// WithTraceID returns a copy of parent context with traceID
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	return meta.WithTraceID(ctx, traceID)
+}
+
+// WithRequestType returns a copy of parent context with custom request type
+func WithRequestType(ctx context.Context, requestType string) context.Context {
+	return meta.WithRequestType(ctx, requestType)
 }

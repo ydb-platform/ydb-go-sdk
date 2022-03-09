@@ -15,7 +15,7 @@ type single struct {
 }
 
 func (b *single) Create() balancer.Balancer {
-	return &single{conn: b.conn}
+	return &single{}
 }
 
 func (b *single) Next() conn.Conn {

@@ -39,7 +39,7 @@ func TestClusterFastRedial(t *testing.T) {
 		balancer:  b,
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
-		pool:      conn.NewPool(ctx, config.New(), nil),
+		pool:      conn.NewPool(ctx, config.New()),
 	}
 
 	pingConnects := func(size int) chan struct{} {
@@ -96,7 +96,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		}(),
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
-		pool:      conn.NewPool(ctx, config.New(), nil),
+		pool:      conn.NewPool(ctx, config.New()),
 	}
 
 	assert := func(t *testing.T, exp []endpoint.Endpoint) {
