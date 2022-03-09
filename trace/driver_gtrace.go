@@ -1074,12 +1074,13 @@ func DriverOnConnClose(t Driver, c *context.Context, endpoint EndpointInfo) func
 		res(p)
 	}
 }
-func DriverOnClusterInit(t Driver, c *context.Context) func() {
+func DriverOnClusterInit(t Driver, c *context.Context) func(error) {
 	var p ClusterInitStartInfo
 	p.Context = c
 	res := t.onClusterInit(p)
-	return func() {
+	return func(e error) {
 		var p ClusterInitDoneInfo
+		p.Error = e
 		res(p)
 	}
 }

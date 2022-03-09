@@ -24,12 +24,14 @@ type Conn interface {
 
 	Endpoint() endpoint.Endpoint
 
+	TTL() <-chan time.Time
+
 	IsState(states ...State) bool
 	GetState() State
 	SetState(State) State
+
 	Close(ctx context.Context) error
 	Park(ctx context.Context) error
-	TTL() <-chan time.Time
 }
 
 func (c *conn) Address() string {
@@ -38,16 +40,15 @@ func (c *conn) Address() string {
 
 type conn struct {
 	sync.RWMutex
-	config      Config // ro access
-	cc          *grpc.ClientConn
-	done        chan struct{}
-	endpoint    endpoint.Endpoint // ro access
-	closed      bool
-	state       State
-	usages      int32
-	ttl         timeutil.Timer
-	onClose     []func(Conn)
-	onPessimize []func(e endpoint.Endpoint)
+	config   Config // ro access
+	cc       *grpc.ClientConn
+	done     chan struct{}
+	endpoint endpoint.Endpoint // ro access
+	closed   bool
+	state    State
+	usages   int32
+	ttl      timeutil.Timer
+	onClose  []func(Conn)
 }
 
 func (c *conn) IsState(states ...State) bool {
@@ -262,26 +263,6 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	return err
 }
 
-func (c *conn) pessimize(ctx context.Context, err error) {
-	if c.isClosed() {
-		return
-	}
-
-	defer func() {
-		for _, f := range c.onPessimize {
-			f(c.endpoint)
-		}
-	}()
-
-	trace.DriverOnPessimizeNode(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
-		&ctx,
-		c.endpoint.Copy(),
-		c.GetState(),
-		err,
-	)(c.SetState(Banned))
-}
-
 func (c *conn) invoke(
 	ctx context.Context,
 	method string,
@@ -289,12 +270,6 @@ func (c *conn) invoke(
 	res interface{},
 	opts ...grpc.CallOption,
 ) (err error) {
-	defer func() {
-		if err != nil && errors.MustPessimizeEndpoint(err) {
-			c.pessimize(ctx, err)
-		}
-	}()
-
 	var cc *grpc.ClientConn
 	cc, err = c.take(ctx)
 	if err != nil {
@@ -368,12 +343,6 @@ func (c *conn) newStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
-	defer func() {
-		if err != nil && errors.MustPessimizeEndpoint(err) {
-			c.pessimize(ctx, err)
-		}
-	}()
-
 	var cc *grpc.ClientConn
 	cc, err = c.take(ctx)
 	if err != nil {
@@ -449,14 +418,6 @@ func (c *conn) NewStream(
 
 type option func(c *conn)
 
-func withOnPessimize(onPessimize func(e endpoint.Endpoint)) option {
-	return func(c *conn) {
-		if onPessimize != nil {
-			c.onPessimize = append(c.onPessimize, onPessimize)
-		}
-	}
-}
-
 func withOnClose(onClose func(Conn)) option {
 	return func(c *conn) {
 		if onClose != nil {
@@ -467,12 +428,11 @@ func withOnClose(onClose func(Conn)) option {
 
 func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
 	c := &conn{
-		state:       Created,
-		endpoint:    e,
-		config:      config,
-		done:        make(chan struct{}),
-		onClose:     make([]func(Conn), 0),
-		onPessimize: make([]func(e endpoint.Endpoint), 0),
+		state:    Created,
+		endpoint: e,
+		config:   config,
+		done:     make(chan struct{}),
+		onClose:  make([]func(Conn), 0),
 	}
 	for _, o := range opts {
 		o(c)

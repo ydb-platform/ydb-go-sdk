@@ -27,9 +27,11 @@ func (c *connection) With(ctx context.Context, opts ...Option) (Connection, erro
 
 	opts = append(
 		opts,
-		withOnClose(func(c *connection) {
+		withConnPool(c.pool),
+		withOnClose(func(child *connection) {
 			c.childrenMtx.Lock()
 			defer c.childrenMtx.Unlock()
+
 			delete(c.children, id)
 		}),
 	)

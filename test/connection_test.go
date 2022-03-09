@@ -178,17 +178,18 @@ func TestConnection(t *testing.T) {
 		}
 	})
 	t.Run("with.scripting.StreamExecuteYql", func(t *testing.T) {
+		var childDB ydb.Connection
+		childDB, err = db.With(
+			ctx,
+			ydb.WithAccessTokenCredentials(""),
+		)
+		if err != nil {
+			t.Fatalf("failed to open sub-connection: %v", err)
+		}
+		defer func() {
+			_ = childDB.Close(ctx)
+		}()
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			childDB, err := db.With(
-				ctx,
-				ydb.WithAccessTokenCredentials(""),
-			)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = childDB.Close(ctx)
-			}()
 			scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(childDB)
 			client, err := scriptingClient.StreamExecuteYql(
 				ctx,
