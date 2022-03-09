@@ -15,7 +15,8 @@ import (
 
 type Pool interface {
 	PoolGetter
-	TakerReleaser
+	Taker
+	Releaser
 	Pessimizer
 }
 
@@ -23,8 +24,11 @@ type PoolGetter interface {
 	GetConn(endpoint endpoint.Endpoint) Conn
 }
 
-type TakerReleaser interface {
+type Taker interface {
 	Take(ctx context.Context) error
+}
+
+type Releaser interface {
 	Release(ctx context.Context) error
 }
 
