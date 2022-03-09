@@ -28,14 +28,7 @@ type roundRobin struct {
 }
 
 func (r *roundRobin) Create() balancer.Balancer {
-	return &roundRobin{
-		min:   r.min,
-		max:   r.max,
-		belt:  r.belt,
-		next:  r.next,
-		conns: r.conns,
-		r:     rand.New(),
-	}
+	return RoundRobin()
 }
 
 func RoundRobin() balancer.Balancer {
@@ -58,16 +51,7 @@ type randomChoice struct {
 }
 
 func (r *randomChoice) Create() balancer.Balancer {
-	return &randomChoice{
-		roundRobin: roundRobin{
-			min:   r.roundRobin.min,
-			max:   r.roundRobin.max,
-			belt:  r.roundRobin.belt,
-			next:  r.roundRobin.next,
-			conns: r.roundRobin.conns,
-			r:     rand.New(),
-		},
-	}
+	return RandomChoice()
 }
 
 func (r *roundRobin) Next() conn.Conn {
