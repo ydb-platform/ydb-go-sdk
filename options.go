@@ -61,6 +61,13 @@ func WithUserAgent(userAgent string) Option {
 	}
 }
 
+func WithRequestsType(requestsType string) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithRequestsType(requestsType))
+		return nil
+	}
+}
+
 // WithConnectionString accept connection string like 'grpc[s]://{endpoint}/?database={database}'
 func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *connection) error {
