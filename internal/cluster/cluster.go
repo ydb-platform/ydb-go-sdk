@@ -34,10 +34,13 @@ var (
 )
 
 type cluster struct {
-	config   config.Config
-	pool     conn.Pool
-	dial     func(context.Context, string) (*grpc.ClientConn, error)
-	balancer balancer.Balancer
+	config config.Config
+	pool   conn.Pool
+	dial   func(context.Context, string) (*grpc.ClientConn, error)
+
+	balancerMtx sync.RWMutex
+	balancer    balancer.Balancer
+
 	explorer repeater.Repeater
 
 	index     map[string]entry.Entry
@@ -65,6 +68,9 @@ func (c *cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 	if entry.Handle == nil {
 		return
 	}
+
+	c.balancerMtx.Lock()
+	defer c.balancerMtx.Unlock()
 
 	if !c.balancer.Contains(entry.Handle) {
 		return
@@ -224,7 +230,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	defer c.mu.RUnlock()
 
 	if c.closed {
-		return nil, errors.Errorf(0, "cluster.Get(): %w", ErrClusterClosed)
+		return nil, errors.Errorf("cluster.Get(): %w", ErrClusterClosed)
 	}
 
 	onDone := trace.DriverOnClusterGet(c.config.Trace(), &ctx)
@@ -247,9 +253,12 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 		}
 	}
 
+	c.balancerMtx.RLock()
+	defer c.balancerMtx.RUnlock()
+
 	cc = c.balancer.Next()
 	if cc == nil {
-		return nil, errors.Errorf(0, "cluster.Get(): %w", ErrClusterEmpty)
+		return nil, errors.Errorf("cluster.Get(): %w", ErrClusterEmpty)
 	}
 
 	return cc, nil
@@ -286,7 +295,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 	entry := entry.Entry{Conn: cc}
 
-	inserted = entry.InsertInto(c.balancer)
+	inserted = entry.InsertInto(c.balancer, &c.balancerMtx)
 
 	c.index[e.Address()] = entry
 
@@ -335,10 +344,10 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		c.endpoints[e.NodeID()] = entry.Conn
 	}
 
-	if entry.Handle != nil {
-		// entry.Handle may be nil when connection is being tracked.
-		c.balancer.Update(entry.Handle, e.Info())
-	}
+	c.balancerMtx.Lock()
+	defer c.balancerMtx.Unlock()
+
+	c.balancer.Update(entry.Handle, e.Info())
 
 	return entry.Conn
 }
@@ -368,7 +377,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	removed = entry.RemoveFrom(c.balancer)
+	removed = entry.RemoveFrom(c.balancer, &c.balancerMtx)
 
 	delete(c.index, e.Address())
 	delete(c.endpoints, e.NodeID())

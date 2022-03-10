@@ -214,7 +214,7 @@ func (ln *stubListener) Accept() (net.Conn, error) {
 	select {
 	case ln.C <- c:
 	case <-ln.exit:
-		return nil, errors.Errorf(0, "closed")
+		return nil, errors.Errorf("closed")
 	}
 	select {
 	case ln.S <- s:
@@ -239,7 +239,7 @@ func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			select {
 			case <-ln.exit:
-				return nil, errors.Errorf(0, "refused")
+				return nil, errors.Errorf("refused")
 			case c := <-ln.C:
 				return c, nil
 			case <-ctx.Done():

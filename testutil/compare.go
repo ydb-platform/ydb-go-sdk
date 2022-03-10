@@ -79,7 +79,7 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 }
 
 func notComparableError(l interface{}, r interface{}) error {
-	return errors.Errorf(1, "%w: %v and %v", ErrNotComparable, l, r)
+	return errors.ErrorfSkip(1, "%w: %v and %v", ErrNotComparable, l, r)
 }
 
 func comparePrimitives(t Ydb.Type_PrimitiveTypeId, l *Ydb.Value, r *Ydb.Value) (int, error) {

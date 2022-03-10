@@ -90,7 +90,7 @@ func NewTransportError(opts ...teOpt) error {
 	for _, f := range opts {
 		f(te)
 	}
-	return Errorf(1, "%w", te)
+	return ErrorfSkip(1, "%w", te)
 }
 
 func (t *TransportError) Error() string {

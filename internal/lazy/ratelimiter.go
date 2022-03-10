@@ -38,7 +38,7 @@ func (r *lazyRatelimiter) Close(ctx context.Context) (err error) {
 	}()
 	err = r.client.Close(ctx)
 	if err != nil {
-		return errors.Errorf(0, "lazyRatelimiter.Close(): %w", err)
+		return errors.Errorf("lazyRatelimiter.Close(): %w", err)
 	}
 	return nil
 }

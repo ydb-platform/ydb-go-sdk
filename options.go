@@ -96,7 +96,7 @@ func WithConnectionString(connectionString string) Option {
 func RegisterParser(param string, parser func(value string) ([]config.Option, error)) (err error) {
 	err = dsn.Register(param, parser)
 	if err != nil {
-		return errors.Errorf(0, "RegisterParser(%v, %v): %w", param, parser, err)
+		return errors.Errorf("RegisterParser(%v, %v): %w", param, parser, err)
 	}
 	return nil
 }
@@ -216,7 +216,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 	return func(ctx context.Context, c *connection) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
-			return errors.Errorf(0, "WithCreateCredentialsFunc(%v): %w", createCredentials, err)
+			return errors.Errorf("WithCreateCredentialsFunc(%v): %w", createCredentials, err)
 		}
 		c.options = append(c.options, config.WithCredentials(credentials))
 		return nil
@@ -254,7 +254,7 @@ func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		for _, o := range opts {
 			if err := o(ctx, c); err != nil {
-				return errors.Errorf(0, "MergeOptions(%v): %w", opts, err)
+				return errors.Errorf("MergeOptions(%v): %w", opts, err)
 			}
 		}
 		return nil
@@ -288,16 +288,16 @@ func WithCertificatesFromFile(caFile string) Option {
 		if len(caFile) > 0 && caFile[0] == '~' {
 			home, err := os.UserHomeDir()
 			if err != nil {
-				return errors.Errorf(0, "WithCertificatesFromFile(%v): %w", caFile, err)
+				return errors.Errorf("WithCertificatesFromFile(%v): %w", caFile, err)
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
 		bytes, err := ioutil.ReadFile(filepath.Clean(caFile))
 		if err != nil {
-			return errors.Errorf(0, "WithCertificatesFromFile(%v): %w", caFile, err)
+			return errors.Errorf("WithCertificatesFromFile(%v): %w", caFile, err)
 		}
 		if err = WithCertificatesFromPem(bytes)(ctx, c); err != nil {
-			return errors.Errorf(0, "WithCertificatesFromFile(%v): %w", caFile, err)
+			return errors.Errorf("WithCertificatesFromFile(%v): %w", caFile, err)
 		}
 		return nil
 	}
@@ -326,7 +326,7 @@ func WithCertificatesFromPem(bytes []byte) Option {
 			}
 			return
 		}(bytes); !ok {
-			return errors.Errorf(0, "WithCertificatesFromPem(...): %w", err)
+			return errors.Errorf("WithCertificatesFromPem(...): %w", err)
 		}
 		return nil
 	}

@@ -96,7 +96,7 @@ func (c *conn) Park(ctx context.Context) (err error) {
 	err = c.close()
 
 	if err != nil {
-		return errors.Errorf(0, "conn.Park(): %w", err)
+		return errors.Errorf("conn.Park(): %w", err)
 	}
 
 	return nil
@@ -186,7 +186,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, errors.Errorf(0, "conn.take(): %w", err)
+		return nil, errors.Errorf("conn.take(): %w", err)
 	}
 
 	c.cc = cc
@@ -321,7 +321,7 @@ func (c *conn) Invoke(
 
 	if err != nil {
 		if wrapping {
-			return errors.Errorf(0, "conn.Invoke(%v, %v, %v, %v): %w",
+			return errors.Errorf("conn.Invoke(%v, %v, %v, %v): %w",
 				method,
 				req,
 				res,
@@ -340,7 +340,7 @@ func (c *conn) Invoke(
 		if wrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return errors.Errorf(0, "conn.Invoke(%v, %v, %v, %v): %w",
+				return errors.Errorf("conn.Invoke(%v, %v, %v, %v): %w",
 					method,
 					req,
 					res,
@@ -349,7 +349,7 @@ func (c *conn) Invoke(
 				)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return errors.Errorf(0, "conn.Invoke(%v, %v, %v, %v): %w",
+				return errors.Errorf("conn.Invoke(%v, %v, %v, %v): %w",
 					method,
 					req,
 					res,
@@ -426,7 +426,7 @@ func (c *conn) NewStream(
 
 	if err != nil {
 		if wrapping {
-			return s, errors.Errorf(0, "conn.NewStream(%v, %v, %v, %v): %w",
+			return s, errors.Errorf("conn.NewStream(%v, %v, %v, %v): %w",
 				ctx,
 				desc,
 				method,

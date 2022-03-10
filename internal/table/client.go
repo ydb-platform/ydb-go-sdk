@@ -163,7 +163,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 	c.mu.Unlock()
 
 	if !enoughSpace {
-		return nil, errors.Errorf(0, "client.createSession(): %w", ErrSessionPoolOverflow)
+		return nil, errors.Errorf("client.createSession(): %w", ErrSessionPoolOverflow)
 	}
 
 	resCh := make(chan createSessionResult, 1) // for non-block write
@@ -267,7 +267,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
 		if c.isClosed() {
-			return nil, errors.Errorf(0, "client.Get(): %w", ErrSessionPoolClosed)
+			return nil, errors.Errorf("client.Get(): %w", ErrSessionPoolClosed)
 		}
 
 		// First, we try to get session from idle
@@ -287,7 +287,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// got session or err is not recoverable
 		if s != nil || !isCreateSessionErrorRetriable(err) {
 			if err != nil {
-				err = errors.Errorf(1, "client.Get(): %w", err)
+				err = errors.Errorf("client.Get(): %w", err)
 			}
 			return s, err
 		}
@@ -300,14 +300,14 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// session to.
 		s, err = c.waitFromCh(ctx, t)
 		if err != nil {
-			err = errors.Errorf(1, "client.Get(): %w", err)
+			err = errors.Errorf("client.Get(): %w", err)
 		}
 	}
 	if s == nil && err == nil {
-		err = errors.Errorf(1, "client.Get(): %w (attempts=%d)", ErrNoProgress, i)
+		err = errors.Errorf("client.Get(): %w (attempts=%d)", ErrNoProgress, i)
 	}
 	if err != nil {
-		err = errors.Errorf(1, "client.Get(): %w (attempts=%d)", err, i)
+		err = errors.Errorf("client.Get(): %w (attempts=%d)", err, i)
 	}
 	return s, err
 }
@@ -379,13 +379,13 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 
 	switch {
 	case c.closed:
-		err = errors.Errorf(0, "client.Put(%s): %w", s.ID(), ErrSessionPoolClosed)
+		err = errors.Errorf("client.Put(%s): %w", s.ID(), ErrSessionPoolClosed)
 
 	case c.idle.Len() >= c.limit:
-		err = errors.Errorf(0, "client.Put(%s): %w", s.ID(), ErrSessionPoolOverflow)
+		err = errors.Errorf("client.Put(%s): %w", s.ID(), ErrSessionPoolOverflow)
 
 	case s.isClosing():
-		err = errors.Errorf(0, "client.Put(%s): %w", s.ID(), ErrSessionShutdown)
+		err = errors.Errorf("client.Put(%s): %w", s.ID(), ErrSessionShutdown)
 
 	default:
 		if !c.notify(s) {
@@ -478,7 +478,7 @@ func (c *client) Close(ctx context.Context) (err error) {
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
 	if c.isClosed() {
-		return errors.Errorf(0, "client.Do(): %w", ErrSessionPoolClosed)
+		return errors.Errorf("client.Do(): %w", ErrSessionPoolClosed)
 	}
 	return do(
 		ctx,
@@ -491,7 +491,7 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
 	if c.isClosed() {
-		return errors.Errorf(0, "client.DoTx(): %w", ErrSessionPoolClosed)
+		return errors.Errorf("client.DoTx(): %w", ErrSessionPoolClosed)
 	}
 	return doTx(
 		ctx,
@@ -842,7 +842,7 @@ func (c *client) keepAliveSession(ctx context.Context, s Session) (err error) {
 	defer cancel()
 	err = s.KeepAlive(ctx)
 	if err != nil {
-		return errors.Errorf(0, "client.keepAliveSession(%s): %w", s.ID(), err)
+		return errors.Errorf("client.keepAliveSession(%s): %w", s.ID(), err)
 	}
 	return nil
 }

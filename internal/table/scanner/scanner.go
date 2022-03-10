@@ -1033,7 +1033,7 @@ func (s *scanner) errorf(depth int, f string, args ...interface{}) error {
 	if s.err != nil {
 		return s.err
 	}
-	s.err = errors.Errorf(depth+1, f, args...)
+	s.err = errors.ErrorfSkip(depth+1, f, args...)
 	return s.err
 }
 

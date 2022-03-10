@@ -56,7 +56,7 @@ func (t *lazyTable) Close(ctx context.Context) (err error) {
 	}()
 	err = t.client.Close(ctx)
 	if err != nil {
-		return errors.Errorf(0, "lazyTable.Close(): %w", err)
+		return errors.Errorf("lazyTable.Close(): %w", err)
 	}
 	return nil
 }

@@ -350,7 +350,7 @@ type ClientStream struct {
 
 func (s *ClientStream) Header() (metadata.MD, error) {
 	if s.OnHeader == nil {
-		return nil, errors.Errorf(0, "ClientStream: Header: %w", ErrNotImplemented)
+		return nil, errors.Errorf("ClientStream: Header: %w", ErrNotImplemented)
 	}
 	return s.OnHeader()
 }
@@ -364,7 +364,7 @@ func (s *ClientStream) Trailer() metadata.MD {
 
 func (s *ClientStream) CloseSend() error {
 	if s.OnCloseSend == nil {
-		return errors.Errorf(0, "ClientStream: CloseSend: %w", ErrNotImplemented)
+		return errors.Errorf("ClientStream: CloseSend: %w", ErrNotImplemented)
 	}
 	return s.OnCloseSend()
 }
@@ -378,14 +378,14 @@ func (s *ClientStream) Context() context.Context {
 
 func (s *ClientStream) SendMsg(m interface{}) error {
 	if s.OnSendMsg == nil {
-		return errors.Errorf(0, "ClientStream: SendMsg: %w", ErrNotImplemented)
+		return errors.Errorf("ClientStream: SendMsg: %w", ErrNotImplemented)
 	}
 	return s.OnSendMsg(m)
 }
 
 func (s *ClientStream) RecvMsg(m interface{}) error {
 	if s.OnRecvMsg == nil {
-		return errors.Errorf(0, "ClientStream: RecvMsg: %w", ErrNotImplemented)
+		return errors.Errorf("ClientStream: RecvMsg: %w", ErrNotImplemented)
 	}
 	return s.OnRecvMsg(m)
 }

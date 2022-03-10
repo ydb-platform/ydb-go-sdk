@@ -31,7 +31,7 @@ func Register(param string, parser Parser) error {
 	_, has := parsers[param]
 	parsers[param] = parser
 	if has {
-		return errors.Errorf(0, "%w: %v", errParserExists, param)
+		return errors.Errorf("%w: %v", errParserExists, param)
 	}
 	return nil
 }
@@ -42,7 +42,7 @@ func Parse(dsn string) (options []config.Option, err error) {
 		return nil, err
 	}
 	if _, has := schemasSecure[uri.Scheme]; !has {
-		return nil, errors.Errorf(0, "%w: %v", errSchemeNotValid, uri.Scheme)
+		return nil, errors.Errorf("%w: %v", errSchemeNotValid, uri.Scheme)
 	}
 	options = append(
 		options,

@@ -92,7 +92,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 		func(ctx context.Context, s table.Session) (err error) {
 			tx, err := s.BeginTransaction(ctx, h.opts.TxSettings)
 			if err != nil {
-				return errors.Errorf(0, "doTx(): %w", err)
+				return errors.Errorf("doTx(): %w", err)
 			}
 
 			defer func() {
@@ -103,7 +103,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 
 			err = op(ctx, tx)
 			if err != nil {
-				err = errors.Errorf(0, "doTx(): %w", err)
+				err = errors.Errorf("doTx(): %w", err)
 			}
 
 			if attempts > 0 {
@@ -118,7 +118,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 
 			_, err = tx.CommitTx(ctx, h.opts.TxCommitOptions...)
 			if err != nil {
-				return errors.Errorf(0, "doTx(): %w", err)
+				return errors.Errorf("doTx(): %w", err)
 			}
 
 			return nil
@@ -126,7 +126,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 		h.trace,
 	)
 	if err != nil {
-		err = errors.Errorf(0, "doTx(): %w", err)
+		err = errors.Errorf("doTx(): %w", err)
 	}
 	return err
 }
@@ -146,7 +146,7 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 		func(ctx context.Context, s table.Session) error {
 			err = op(ctx, s)
 			if err != nil {
-				err = errors.Errorf(0, "do(): %w", err)
+				err = errors.Errorf("do(): %w", err)
 			}
 
 			if attempts > 0 {
@@ -160,7 +160,7 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 		options.trace,
 	)
 	if err != nil {
-		err = errors.Errorf(0, "do(): %w", err)
+		err = errors.Errorf("do(): %w", err)
 	}
 	return err
 }
@@ -174,14 +174,14 @@ var _ SessionProvider = SessionProviderFunc{}
 
 func (f SessionProviderFunc) Get(ctx context.Context) (Session, error) {
 	if f.OnGet == nil {
-		return nil, errors.Errorf(0, "SessionProviderFunc: Get: %w", errNoSession)
+		return nil, errors.Errorf("SessionProviderFunc: Get: %w", errNoSession)
 	}
 	return f.OnGet(ctx)
 }
 
 func (f SessionProviderFunc) Put(ctx context.Context, s Session) error {
 	if f.OnPut == nil {
-		return errors.Errorf(0, "SessionProviderFunc: Put: %w", testutil.ErrNotImplemented)
+		return errors.Errorf("SessionProviderFunc: Put: %w", testutil.ErrNotImplemented)
 	}
 	return f.OnPut(ctx, s)
 }
@@ -213,7 +213,7 @@ func (s *singleSession) Close(ctx context.Context) error {
 
 func (s *singleSession) Get(context.Context) (Session, error) {
 	if s.empty {
-		return nil, errors.Errorf(0, "singleSession.Get(): %w", errNoSession)
+		return nil, errors.Errorf("singleSession.Get(): %w", errNoSession)
 	}
 	s.empty = true
 	return s.s, nil
@@ -221,10 +221,10 @@ func (s *singleSession) Get(context.Context) (Session, error) {
 
 func (s *singleSession) Put(_ context.Context, x Session) error {
 	if x != s.s {
-		return errors.Errorf(0, "singleSession.Put(): %w", errUnexpectedSession)
+		return errors.Errorf("singleSession.Put(): %w", errUnexpectedSession)
 	}
 	if !s.empty {
-		return errors.Errorf(0, "singleSession.Put(): %w", errSessionOverflow)
+		return errors.Errorf("singleSession.Put(): %w", errSessionOverflow)
 	}
 	s.empty = false
 	return nil
@@ -232,10 +232,10 @@ func (s *singleSession) Put(_ context.Context, x Session) error {
 
 func (s *singleSession) CloseSession(ctx context.Context, x Session) error {
 	if x != s.s {
-		return errors.Errorf(0, "singleSession.CloseSession(): %w", errUnexpectedSession)
+		return errors.Errorf("singleSession.CloseSession(): %w", errUnexpectedSession)
 	}
 	if !s.empty {
-		return errors.Errorf(0, "singleSession.CloseSession(): %w", errSessionOverflow)
+		return errors.Errorf("singleSession.CloseSession(): %w", errSessionOverflow)
 	}
 	s.empty = true
 	return x.Close(ctx)
@@ -270,7 +270,7 @@ func retryBackoff(
 		}
 		select {
 		case <-ctx.Done():
-			return errors.Errorf(0, "retryBackoff(): %w", ctx.Err())
+			return errors.Errorf("retryBackoff(): %w", ctx.Err())
 
 		default:
 			if s == nil {
@@ -279,13 +279,13 @@ func retryBackoff(
 					panic("both of session and error are nil")
 				}
 				if err != nil {
-					return errors.Errorf(0, "retryBackoff(): %w", err)
+					return errors.Errorf("retryBackoff(): %w", err)
 				}
 			}
 
 			err = op(ctx, s)
 			if err != nil {
-				err = errors.Errorf(0, "retryBackoff(): %w", err)
+				err = errors.Errorf("retryBackoff(): %w", err)
 			}
 
 			if s.isClosing() {
@@ -313,7 +313,7 @@ func retryBackoff(
 			}
 
 			if retry.Wait(ctx, fastBackoff, slowBackoff, m, i) != nil {
-				return errors.Errorf(0, "retryBackoff(): %w", err)
+				return errors.Errorf("retryBackoff(): %w", err)
 			}
 
 			code = m.StatusCode()

@@ -113,7 +113,7 @@ func (db *database) Invoke(
 ) error {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return errors.Errorf(0, "database.Invoke(%v, %v, %v, %v): %w",
+		return errors.Errorf("database.Invoke(%v, %v, %v, %v): %w",
 			method,
 			args,
 			reply,
@@ -123,7 +123,7 @@ func (db *database) Invoke(
 	}
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
-		return errors.Errorf(0, "database.Invoke(%v, %v, %v, %v): %w",
+		return errors.Errorf("database.Invoke(%v, %v, %v, %v): %w",
 			method,
 			args,
 			reply,
@@ -138,7 +138,7 @@ func (db *database) Invoke(
 	}()
 	err = cc.Invoke(ctx, method, args, reply, opts...)
 	if err != nil {
-		return errors.Errorf(0, "database.Invoke(%v, %v, %v, %v): %w",
+		return errors.Errorf("database.Invoke(%v, %v, %v, %v): %w",
 			method,
 			args,
 			reply,
@@ -157,7 +157,7 @@ func (db *database) NewStream(
 ) (grpc.ClientStream, error) {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return nil, errors.Errorf(0, "database.NewStream(%v, %v, %v): %w",
+		return nil, errors.Errorf("database.NewStream(%v, %v, %v): %w",
 			desc,
 			method,
 			opts,
@@ -166,7 +166,7 @@ func (db *database) NewStream(
 	}
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
-		return nil, errors.Errorf(0, "database.NewStream(%v, %v, %v): %w",
+		return nil, errors.Errorf("database.NewStream(%v, %v, %v): %w",
 			desc,
 			method,
 			opts,
@@ -181,7 +181,7 @@ func (db *database) NewStream(
 	var client grpc.ClientStream
 	client, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
-		return nil, errors.Errorf(0, "database.NewStream(%v, %v, %v, %v): %w", ctx, desc, method, opts, err)
+		return nil, errors.Errorf("database.NewStream(%v, %v, %v, %v): %w", ctx, desc, method, opts, err)
 	}
 	return client, nil
 }

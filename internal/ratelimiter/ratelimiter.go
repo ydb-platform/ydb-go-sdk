@@ -222,7 +222,7 @@ func (c *client) AcquireResource(
 			},
 		)
 	default:
-		return errors.Errorf(0, "unknown acquire type: %d", acquireOptions.Type())
+		return errors.Errorf("unknown acquire type: %d", acquireOptions.Type())
 	}
 
 	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {
