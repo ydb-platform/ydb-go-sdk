@@ -75,7 +75,7 @@ func (c *lazyCoordination) Close(ctx context.Context) (err error) {
 	}()
 	err = c.client.Close(ctx)
 	if err != nil {
-		return errors.Errorf("lazyCoordination.Close(): %w", err)
+		return errors.Error(err)
 	}
 	return nil
 }

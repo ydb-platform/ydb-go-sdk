@@ -22,7 +22,7 @@ func New(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err e
 	}()
 	cc, err := (&net.Dialer{}).DialContext(ctx, "tcp", address)
 	if err != nil {
-		return nil, errors.Errorf("New(%v): %w", address, err)
+		return nil, errors.Errorf("%w: %s", err, address)
 	}
 	return &conn{
 		address: address,
@@ -38,7 +38,7 @@ func (c *conn) Read(b []byte) (n int, err error) {
 	}()
 	n, err = c.cc.Read(b)
 	if err != nil {
-		return n, errors.Errorf("conn.Read(...): %w", err)
+		return n, errors.Error(err)
 	}
 	return n, nil
 }
@@ -50,7 +50,7 @@ func (c *conn) Write(b []byte) (n int, err error) {
 	}()
 	n, err = c.cc.Write(b)
 	if err != nil {
-		return n, errors.Errorf("conn.Write(...): %w", err)
+		return n, errors.Error(err)
 	}
 	return n, nil
 }
@@ -62,7 +62,7 @@ func (c *conn) Close() (err error) {
 	}()
 	err = c.cc.Close()
 	if err != nil {
-		return errors.Errorf("conn.Close(): %w", err)
+		return errors.Error(err)
 	}
 	return nil
 }

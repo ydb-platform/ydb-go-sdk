@@ -38,7 +38,7 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	}()
 	err = c.cc.UpdateState(state)
 	if err != nil {
-		err = errors.Errorf("clientConn.UpdateState(%v): %w", state, err)
+		err = errors.Error(err)
 	}
 	return err
 }

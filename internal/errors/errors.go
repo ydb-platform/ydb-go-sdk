@@ -88,6 +88,11 @@ func (e *errorWithIssues) Error() string {
 	return b.String()
 }
 
+// Error is alias to fmt.Errorf() with prepend file:line prefix
+func Error(err error) error {
+	return ErrorfSkip(1, "%w", err)
+}
+
 // Errorf is alias to fmt.Errorf() with prepend file:line prefix
 func Errorf(format string, args ...interface{}) error {
 	return ErrorfSkip(1, format, args...)

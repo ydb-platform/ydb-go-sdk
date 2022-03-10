@@ -230,7 +230,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	defer c.mu.RUnlock()
 
 	if c.closed {
-		return nil, errors.Errorf("cluster.Get(): %w", ErrClusterClosed)
+		return nil, errors.Error(ErrClusterClosed)
 	}
 
 	onDone := trace.DriverOnClusterGet(c.config.Trace(), &ctx)
@@ -258,7 +258,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 
 	cc = c.balancer.Next()
 	if cc == nil {
-		return nil, errors.Errorf("cluster.Get(): %w", ErrClusterEmpty)
+		return nil, errors.Error(ErrClusterEmpty)
 	}
 
 	return cc, nil

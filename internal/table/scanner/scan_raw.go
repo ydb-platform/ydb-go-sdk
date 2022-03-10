@@ -570,7 +570,7 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 		return m.Name, m.Type
 
 	default:
-		panic("ydb/table: unexpected variant items types")
+		panic("unexpected variant items types")
 	}
 }
 

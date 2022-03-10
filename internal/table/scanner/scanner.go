@@ -404,7 +404,7 @@ func (s *scanner) any() interface{} {
 		value.TypeJSONDocument:
 		return []byte(s.text())
 	default:
-		_ = s.errorf(0, "ydb/table: unknown primitive types")
+		_ = s.errorf(0, "unknown primitive types")
 		return nil
 	}
 }
