@@ -124,12 +124,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return errors.Errorf(0, "context done: %w", ctx.Err())
+			return errors.Errorf(0, "Retry(): %w", ctx.Err())
 
 		default:
 			err = op(ctx)
 			if err != nil {
-				err = errors.Errorf(0, "retry operation failed: %w", err)
+				err = errors.Errorf(0, "Retry(): %w", err)
 			}
 
 			onDone = onIntermediate(err)
@@ -149,7 +149,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
-				return errors.Errorf(0, "wait failed, last operation error: %w", err)
+				return errors.Errorf(0, "Retry(): %w", err)
 			}
 
 			code = m.StatusCode()

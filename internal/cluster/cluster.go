@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -26,22 +27,10 @@ const (
 
 var (
 	// ErrClusterClosed returned when requested on a closed cluster.
-	ErrClusterClosed = errors.New("cluster closed")
+	ErrClusterClosed = fmt.Errorf("cluster closed")
 
 	// ErrClusterEmpty returned when no connections left in cluster.
-	ErrClusterEmpty = errors.New("cluster empty")
-
-	// ErrUnknownEndpoint returned when no connections left in cluster.
-	ErrUnknownEndpoint = errors.New("unknown endpoint")
-
-	// ErrNilBalancerElement returned when requested on a nil Balancer element.
-	ErrNilBalancerElement = errors.New("nil balancer element")
-
-	// ErrUnknownBalancerElement returned when requested on a unknown Balancer element.
-	ErrUnknownBalancerElement = errors.New("unknown balancer element")
-
-	// ErrUnknownTypeOfBalancerElement returned when requested on a unknown types of Balancer element.
-	ErrUnknownTypeOfBalancerElement = errors.New("unknown types of balancer element")
+	ErrClusterEmpty = fmt.Errorf("cluster empty")
 )
 
 type cluster struct {
@@ -235,7 +224,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	defer c.mu.RUnlock()
 
 	if c.closed {
-		return nil, ErrClusterClosed
+		return nil, errors.Errorf(0, "cluster.Get(): %w", ErrClusterClosed)
 	}
 
 	onDone := trace.DriverOnClusterGet(c.config.Trace(), &ctx)
@@ -260,7 +249,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 
 	cc = c.balancer.Next()
 	if cc == nil {
-		return nil, ErrClusterEmpty
+		return nil, errors.Errorf(0, "cluster.Get(): %w", ErrClusterEmpty)
 	}
 
 	return cc, nil

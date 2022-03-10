@@ -113,11 +113,23 @@ func (db *database) Invoke(
 ) error {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return errors.Errorf(0, "cluster get failed: %w", err)
+		return errors.Errorf(0, "database.Invoke(%v, %v, %v, %v): %w",
+			method,
+			args,
+			reply,
+			opts,
+			err,
+		)
 	}
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
-		return errors.Errorf(0, "meta get failed: %w", err)
+		return errors.Errorf(0, "database.Invoke(%v, %v, %v, %v): %w",
+			method,
+			args,
+			reply,
+			opts,
+			err,
+		)
 	}
 	defer func() {
 		if err != nil && errors.MustPessimizeEndpoint(err) {
@@ -126,7 +138,13 @@ func (db *database) Invoke(
 	}()
 	err = cc.Invoke(ctx, method, args, reply, opts...)
 	if err != nil {
-		return errors.Errorf(0, "invoke failed: %w", err)
+		return errors.Errorf(0, "database.Invoke(%v, %v, %v, %v): %w",
+			method,
+			args,
+			reply,
+			opts,
+			err,
+		)
 	}
 	return nil
 }
@@ -139,16 +157,31 @@ func (db *database) NewStream(
 ) (grpc.ClientStream, error) {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf(0, "database.NewStream(%v, %v, %v): %w",
+			desc,
+			method,
+			opts,
+			err,
+		)
 	}
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf(0, "database.NewStream(%v, %v, %v): %w",
+			desc,
+			method,
+			opts,
+			err,
+		)
 	}
 	defer func() {
 		if err != nil && errors.MustPessimizeEndpoint(err) {
 			db.cluster.Pessimize(ctx, cc, err)
 		}
 	}()
-	return cc.NewStream(ctx, desc, method, opts...)
+	var client grpc.ClientStream
+	client, err = cc.NewStream(ctx, desc, method, opts...)
+	if err != nil {
+		return nil, errors.Errorf(0, "database.NewStream(%v, %v, %v, %v): %w", ctx, desc, method, opts, err)
+	}
+	return client, nil
 }

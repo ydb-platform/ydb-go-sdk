@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -15,9 +14,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
-var ErrNotImplemented = errors.New("testutil: not implemented")
+var ErrNotImplemented = fmt.Errorf("testutil: not implemented")
 
 type MethodCode uint
 
@@ -334,7 +334,7 @@ func (c *clientConn) NewStream(
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
 	if c.onNewStream == nil {
-		return nil, fmt.Errorf("onNewStream not implemented (method: %s, desc: %v)", method, desc)
+		return nil, fmt.Errorf("clientConn: NewStream: onNewStream not implemented (method: %s, desc: %v)", method, desc)
 	}
 	return c.onNewStream(ctx, desc, method, opts...)
 }
@@ -350,7 +350,7 @@ type ClientStream struct {
 
 func (s *ClientStream) Header() (metadata.MD, error) {
 	if s.OnHeader == nil {
-		return nil, ErrNotImplemented
+		return nil, errors.Errorf(0, "ClientStream: Header: %w", ErrNotImplemented)
 	}
 	return s.OnHeader()
 }
@@ -364,7 +364,7 @@ func (s *ClientStream) Trailer() metadata.MD {
 
 func (s *ClientStream) CloseSend() error {
 	if s.OnCloseSend == nil {
-		return ErrNotImplemented
+		return errors.Errorf(0, "ClientStream: CloseSend: %w", ErrNotImplemented)
 	}
 	return s.OnCloseSend()
 }
@@ -378,14 +378,14 @@ func (s *ClientStream) Context() context.Context {
 
 func (s *ClientStream) SendMsg(m interface{}) error {
 	if s.OnSendMsg == nil {
-		return ErrNotImplemented
+		return errors.Errorf(0, "ClientStream: SendMsg: %w", ErrNotImplemented)
 	}
 	return s.OnSendMsg(m)
 }
 
 func (s *ClientStream) RecvMsg(m interface{}) error {
 	if s.OnRecvMsg == nil {
-		return ErrNotImplemented
+		return errors.Errorf(0, "ClientStream: RecvMsg: %w", ErrNotImplemented)
 	}
 	return s.OnRecvMsg(m)
 }

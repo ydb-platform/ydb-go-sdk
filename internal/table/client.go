@@ -19,30 +19,22 @@ import (
 )
 
 var (
-	// ErrSessionPoolClosed is returned by a client instance to indicate
+	// ErrSessionPoolClosed returned by a client instance to indicate
 	// that client is closed and not able to complete requested operation.
-	ErrSessionPoolClosed = errors.New("ydb: table: session pool is closed")
+	ErrSessionPoolClosed = fmt.Errorf("ydb: table: session pool is closed")
 
-	// ErrSessionPoolOverflow is returned by a client instance to indicate
+	// ErrSessionPoolOverflow returned by a client instance to indicate
 	// that the client is full and requested operation is not able to complete.
-	ErrSessionPoolOverflow = errors.New("ydb: table: session pool overflow")
+	ErrSessionPoolOverflow = fmt.Errorf("ydb: table: session pool overflow")
 
-	// ErrSessionUnknown is returned by a client instance to indicate that
-	// requested session does not exist within the client.
-	ErrSessionUnknown = errors.New("ydb: table: unknown session")
-
-	// ErrSessionShutdown is returned by a client instance to indicate that
+	// ErrSessionShutdown returned by a client instance to indicate that
 	// requested session is under shutdown.
-	ErrSessionShutdown = errors.New("ydb: table: session under shutdown")
+	ErrSessionShutdown = fmt.Errorf("ydb: table: session under shutdown")
 
-	// ErrNoProgress is returned by a client instance to indicate that
+	// ErrNoProgress returned by a client instance to indicate that
 	// operation could not be completed.
-	ErrNoProgress = errors.New("ydb: table: no progress")
+	ErrNoProgress = fmt.Errorf("ydb: table: no progress")
 )
-
-func errNoProgress(attempts int) error {
-	return errors.Errorf(1, "ydb: table: no progress: %w (%d attempts)", ErrNoProgress, attempts)
-}
 
 // SessionBuilder is the interface that holds logic of creating sessions.
 type SessionBuilder func(context.Context) (Session, error)
@@ -134,7 +126,6 @@ func (c *client) isClosed() bool {
 func isCreateSessionErrorRetriable(err error) bool {
 	switch {
 	case
-		errors.Is(err, errors.ErrNilConnection),
 		errors.Is(err, ErrSessionPoolOverflow),
 		errors.IsOpError(err, errors.StatusOverloaded),
 		errors.IsTransportError(err, errors.TransportErrorResourceExhausted),
@@ -172,7 +163,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 	c.mu.Unlock()
 
 	if !enoughSpace {
-		return nil, ErrSessionPoolOverflow
+		return nil, errors.Errorf(0, "client.createSession(): %w", ErrSessionPoolOverflow)
 	}
 
 	resCh := make(chan createSessionResult, 1) // for non-block write
@@ -276,7 +267,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
 		if c.isClosed() {
-			return nil, ErrSessionPoolClosed
+			return nil, errors.Errorf(0, "client.Get(): %w", ErrSessionPoolClosed)
 		}
 
 		// First, we try to get session from idle
@@ -296,7 +287,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// got session or err is not recoverable
 		if s != nil || !isCreateSessionErrorRetriable(err) {
 			if err != nil {
-				err = errors.Errorf(1, "create session failed: %w", err)
+				err = errors.Errorf(1, "client.Get(): %w", err)
 			}
 			return s, err
 		}
@@ -309,14 +300,14 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// session to.
 		s, err = c.waitFromCh(ctx, t)
 		if err != nil {
-			err = errors.Errorf(1, "wait from channel failed: %w", err)
+			err = errors.Errorf(1, "client.Get(): %w", err)
 		}
 	}
 	if s == nil && err == nil {
-		err = errNoProgress(i)
+		err = errors.Errorf(1, "client.Get(): %w (attempts=%d)", ErrNoProgress, i)
 	}
 	if err != nil {
-		err = errors.Errorf(1, "get failed: %w", err)
+		err = errors.Errorf(1, "client.Get(): %w (attempts=%d)", err, i)
 	}
 	return s, err
 }
@@ -388,13 +379,13 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 
 	switch {
 	case c.closed:
-		err = ErrSessionPoolClosed
+		err = errors.Errorf(0, "client.Put(%s): %w", s.ID(), ErrSessionPoolClosed)
 
 	case c.idle.Len() >= c.limit:
-		err = ErrSessionPoolOverflow
+		err = errors.Errorf(0, "client.Put(%s): %w", s.ID(), ErrSessionPoolOverflow)
 
 	case s.isClosing():
-		err = ErrSessionShutdown
+		err = errors.Errorf(0, "client.Put(%s): %w", s.ID(), ErrSessionShutdown)
 
 	default:
 		if !c.notify(s) {
@@ -487,7 +478,7 @@ func (c *client) Close(ctx context.Context) (err error) {
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
 	if c.isClosed() {
-		return ErrSessionPoolClosed
+		return errors.Errorf(0, "client.Do(): %w", ErrSessionPoolClosed)
 	}
 	return do(
 		ctx,
@@ -500,10 +491,7 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
 	if c.isClosed() {
-		return ErrSessionPoolClosed
-	}
-	if c.isClosed() {
-		return ErrSessionPoolClosed
+		return errors.Errorf(0, "client.DoTx(): %w", ErrSessionPoolClosed)
 	}
 	return doTx(
 		ctx,
@@ -854,7 +842,7 @@ func (c *client) keepAliveSession(ctx context.Context, s Session) (err error) {
 	defer cancel()
 	err = s.KeepAlive(ctx)
 	if err != nil {
-		return errors.Errorf(0, "keep-alive session failed: %w", err)
+		return errors.Errorf(0, "client.keepAliveSession(%s): %w", s.ID(), err)
 	}
 	return nil
 }

@@ -67,7 +67,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return errors.Errorf(0, "receive message failed: %w", errors.MapGRPCError(err))
+			return errors.Errorf(0, "grpcClientStream.RecvMsg(%v): %w", m, errors.MapGRPCError(err))
 		}
 		return err
 	}

@@ -20,8 +20,6 @@ type Issue struct {
 	Severity uint32
 }
 
-var ErrOperationNotReady = errors.New("operation is not ready yet")
-
 type IssueIterator []*Ydb_Issue.IssueMessage
 
 func (it IssueIterator) Len() int {

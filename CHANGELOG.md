@@ -1,3 +1,6 @@
+## 3.13.1
+* Improved error messages 
+
 ## 3.13.0
 * Refactored `Connection` interface
 * Removed `CustomOption` and taking client with custom options

@@ -48,7 +48,7 @@ func (s *lazyScheme) Close(ctx context.Context) (err error) {
 	}()
 	err = s.client.Close(ctx)
 	if err != nil {
-		return errors.Errorf(0, "close failed: %w", err)
+		return errors.Errorf(0, "lazyScheme.Close(): %w", err)
 	}
 	return nil
 }

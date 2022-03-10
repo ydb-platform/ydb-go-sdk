@@ -2,13 +2,15 @@ package credentials
 
 import (
 	"context"
-	"errors"
+	"fmt"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
 // ErrNoCredentials may be returned by Credentials implementations to
 // make driver act as if there are no Credentials at all. That is, driver will
 // not send any token meta information during request.
-var ErrNoCredentials = errors.New("ydb: credentials: no credentials")
+var ErrNoCredentials = fmt.Errorf("ydb: credentials: no credentials")
 
 // Credentials is an interface that contains options used to authorize a
 // client.
@@ -63,7 +65,7 @@ func (m *multiCredentials) Token(ctx context.Context) (token string, err error) 
 		}
 	}
 	if err == nil {
-		err = ErrNoCredentials
+		err = errors.Errorf(1, "multiCredentials.Token(): %w", ErrNoCredentials)
 	}
 	return
 }
