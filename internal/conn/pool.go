@@ -46,7 +46,7 @@ type pool struct {
 	config Config
 	mtx    sync.RWMutex
 	opts   []grpc.DialOption
-	conns  map[string]Conn
+	conns  map[string]*conn
 	done   chan struct{}
 }
 
@@ -101,10 +101,10 @@ func (p *pool) GetConn(e endpoint.Endpoint) Conn {
 	if cc, ok := p.conns[e.Address()]; ok {
 		return cc
 	}
-	cc := New(
+	cc := newConn(
 		e,
 		p.config,
-		withOnClose(func(c Conn) {
+		withOnClose(func(c *conn) {
 			// conn.Conn.Close() must called on under locked p.mtx
 			delete(p.conns, c.Endpoint().Address())
 		}),
@@ -141,7 +141,7 @@ func NewPool(
 		usages: 1,
 		config: config,
 		opts:   config.GrpcDialOptions(),
-		conns:  make(map[string]Conn),
+		conns:  make(map[string]*conn),
 		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {

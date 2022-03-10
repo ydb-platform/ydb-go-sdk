@@ -37,9 +37,6 @@ type Conn interface {
 	IsState(states ...State) bool
 	GetState() State
 	SetState(State) State
-
-	Close(ctx context.Context) error
-	Park(ctx context.Context) error
 }
 
 func (c *conn) Address() string {
@@ -56,7 +53,7 @@ type conn struct {
 	state    State
 	usages   int32
 	ttl      timeutil.Timer
-	onClose  []func(Conn)
+	onClose  []func(*conn)
 }
 
 func (c *conn) IsState(states ...State) bool {
@@ -426,7 +423,7 @@ func (c *conn) NewStream(
 
 type option func(c *conn)
 
-func withOnClose(onClose func(Conn)) option {
+func withOnClose(onClose func(*conn)) option {
 	return func(c *conn) {
 		if onClose != nil {
 			c.onClose = append(c.onClose, onClose)
@@ -434,13 +431,13 @@ func withOnClose(onClose func(Conn)) option {
 	}
 }
 
-func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
+func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
 		state:    Created,
 		endpoint: e,
 		config:   config,
 		done:     make(chan struct{}),
-		onClose:  make([]func(Conn), 0),
+		onClose:  make([]func(*conn), 0),
 	}
 	for _, o := range opts {
 		o(c)
@@ -449,4 +446,8 @@ func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
 		c.ttl = timeutil.NewTimer(ttl)
 	}
 	return c
+}
+
+func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
+	return newConn(e, config, opts...)
 }

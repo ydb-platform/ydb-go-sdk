@@ -46,10 +46,10 @@ func TestClusterFastRedial(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			for i := 0; i < size*10; i++ {
-				c, err := c.Get(context.Background())
+				cc, err := c.Get(context.Background())
 				// enforce close bad connects to track them
-				if err == nil && c != nil && c.Endpoint().Address() == "bad:0" {
-					_ = c.Close(ctx)
+				if err == nil && c != nil && cc.Endpoint().Address() == "bad:0" {
+					_ = c.Remove(ctx, cc.Endpoint())
 				}
 			}
 			close(done)

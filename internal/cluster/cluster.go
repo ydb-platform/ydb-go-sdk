@@ -382,11 +382,6 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 	delete(c.index, e.Address())
 	delete(c.endpoints, e.NodeID())
 
-	if entry.Conn != nil {
-		// entry.Conn may be nil when connection is being tracked after unsuccessful dial().
-		_ = entry.Conn.Close(ctx)
-	}
-
 	return entry.Conn
 }
 

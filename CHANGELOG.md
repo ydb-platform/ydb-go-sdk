@@ -1,6 +1,7 @@
 ## 3.13.1
 * Improved error messages
 * Defended `cluster.balancer` with `sync.RWMutex` on `cluster.Insert`, `cluster.Update`, `cluster.Remove` and `cluster.Get`
+* Excluded `Close` and `Park` methods from `conn.Conn` interface
 
 ## 3.13.0
 * Refactored `Connection` interface
