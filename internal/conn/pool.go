@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,6 +53,10 @@ type pool struct {
 
 func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
 	e := cc.Endpoint().Copy()
+
+	p.mtx.RLock()
+	defer p.mtx.RUnlock()
+
 	cc, ok := p.conns[e.Address()]
 	if !ok {
 		return
@@ -78,11 +83,15 @@ func (p *pool) Release(ctx context.Context) error {
 
 	close(p.done)
 
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
+	p.mtx.RLock()
+	conns := make([]closer.Closer, 0, len(p.conns))
+	for _, c := range p.conns {
+		conns = append(conns, c)
+	}
+	p.mtx.RUnlock()
 
 	var issues []error
-	for _, c := range p.conns {
+	for _, c := range conns {
 		if err := c.Close(ctx); err != nil {
 			issues = append(issues, err)
 		}
@@ -105,7 +114,8 @@ func (p *pool) GetConn(e endpoint.Endpoint) Conn {
 		e,
 		p.config,
 		withOnClose(func(c *conn) {
-			// conn.Conn.Close() must called on under locked p.mtx
+			p.mtx.Lock()
+			defer p.mtx.Unlock()
 			delete(p.conns, c.Endpoint().Address())
 		}),
 	)

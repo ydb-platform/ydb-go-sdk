@@ -1,3 +1,6 @@
+## 3.13.2
+* Fixed race with read/write pool conns on closing conn 
+
 ## 3.13.1
 * Improved error messages
 * Defended `cluster.balancer` with `sync.RWMutex` on `cluster.Insert`, `cluster.Update`, `cluster.Remove` and `cluster.Get`
