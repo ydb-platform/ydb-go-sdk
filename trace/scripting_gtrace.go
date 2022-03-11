@@ -151,7 +151,7 @@ func (t Scripting) onExplain(info ExplainQueryStartInfo) func(doneInfo ExplainQu
 	}
 	return res
 }
-func ScriptingOnExecute(t Scripting, c context.Context, query string, parameters queryParameters) func(result result, _ error) {
+func ScriptingOnExecute(t Scripting, c *context.Context, query string, parameters queryParameters) func(result result, _ error) {
 	var p ExecuteStartInfo
 	p.Context = c
 	p.Query = query
@@ -164,7 +164,7 @@ func ScriptingOnExecute(t Scripting, c context.Context, query string, parameters
 		res(p)
 	}
 }
-func ScriptingOnStreamExecute(t Scripting, c context.Context, query string, parameters queryParameters) func(error) func(error) {
+func ScriptingOnStreamExecute(t Scripting, c *context.Context, query string, parameters queryParameters) func(error) func(error) {
 	var p StreamExecuteStartInfo
 	p.Context = c
 	p.Query = query

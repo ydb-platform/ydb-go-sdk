@@ -17,7 +17,11 @@ type (
 		OnExplain       func(info ExplainQueryStartInfo) func(doneInfo ExplainQueryDoneInfo)
 	}
 	ExecuteStartInfo struct {
-		Context    context.Context
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
 		Query      string
 		Parameters queryParameters
 	}
@@ -26,7 +30,11 @@ type (
 		Error  error
 	}
 	StreamExecuteStartInfo struct {
-		Context    context.Context
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
 		Query      string
 		Parameters queryParameters
 	}
