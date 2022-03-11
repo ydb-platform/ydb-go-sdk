@@ -13,6 +13,9 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Table struct {
+		// Pool events
+		OnInit  func(TableInitStartInfo) func(TableInitDoneInfo)
+		OnClose func(TableCloseStartInfo) func(TableCloseDoneInfo)
 		// Session events
 		OnSessionNew       func(SessionNewStartInfo) func(SessionNewDoneInfo)
 		OnSessionDelete    func(SessionDeleteStartInfo) func(SessionDeleteDoneInfo)
@@ -40,9 +43,6 @@ type (
 		OnSessionTransactionBegin    func(SessionTransactionBeginStartInfo) func(SessionTransactionBeginDoneInfo)
 		OnSessionTransactionCommit   func(SessionTransactionCommitStartInfo) func(SessionTransactionCommitDoneInfo)
 		OnSessionTransactionRollback func(SessionTransactionRollbackStartInfo) func(SessionTransactionRollbackDoneInfo)
-		// Pool events
-		OnPoolInit  func(PoolInitStartInfo) func(PoolInitDoneInfo)
-		OnPoolClose func(PoolCloseStartInfo) func(PoolCloseDoneInfo)
 		// Pool state event
 		OnPoolStateChange func(PooStateChangeInfo)
 		// Pool retry events
@@ -138,6 +138,10 @@ type (
 		Parameters queryParameters
 	}
 	ExplainQueryStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Session sessionInfo
 		Query   string
@@ -219,14 +223,14 @@ type (
 	SessionTransactionRollbackDoneInfo struct {
 		Error error
 	}
-	PoolInitStartInfo struct {
+	TableInitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	PoolInitDoneInfo struct {
+	TableInitDoneInfo struct {
 		Limit            int
 		KeepAliveMinSize int
 	}
@@ -291,14 +295,14 @@ type (
 		Session sessionInfo
 	}
 	PoolSessionCloseDoneInfo struct{}
-	PoolCloseStartInfo       struct {
+	TableCloseStartInfo      struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	PoolCloseDoneInfo struct {
+	TableCloseDoneInfo struct {
 		Error error
 	}
 	PoolDoStartInfo struct {

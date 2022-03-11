@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -19,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type client struct {
@@ -30,21 +32,29 @@ func (c *client) Execute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
-) (result.Result, error) {
-	request := &Ydb_Scripting.ExecuteYqlRequest{
-		Script:     query,
-		Parameters: params.Params(),
-		OperationParams: operation.Params(
-			c.config.OperationTimeout(),
-			c.config.OperationCancelAfter(),
-			operation.ModeSync,
-		),
-	}
-	response, err := c.service.ExecuteYql(ctx, request)
+) (r result.Result, err error) {
+	var (
+		onDone  = trace.ScriptingOnExecute(c.config.Trace(), &ctx, query, params)
+		request = &Ydb_Scripting.ExecuteYqlRequest{
+			Script:     query,
+			Parameters: params.Params(),
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		}
+		result   = Ydb_Scripting.ExecuteYqlResult{}
+		response *Ydb_Scripting.ExecuteYqlResponse
+	)
+	defer func() {
+		onDone(r, err)
+	}()
+	response, err = c.service.ExecuteYql(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	result := Ydb_Scripting.ExecuteYqlResult{}
+
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
 		return nil, err
@@ -69,6 +79,7 @@ func (c *client) Explain(
 	mode scripting.ExplainMode,
 ) (e table.ScriptingYQLExplanation, err error) {
 	var (
+		onDone  = trace.ScriptingOnExplain(c.config.Trace(), &ctx, query)
 		request = &Ydb_Scripting.ExplainYqlRequest{
 			Script: query,
 			Mode:   mode2mode(mode),
@@ -81,6 +92,9 @@ func (c *client) Explain(
 		response *Ydb_Scripting.ExplainYqlResponse
 		result   = Ydb_Scripting.ExplainYqlResult{}
 	)
+	defer func() {
+		onDone(e.Explanation.Plan, err)
+	}()
 	response, err = c.service.ExplainYql(ctx, request)
 	if err != nil {
 		return
@@ -106,16 +120,24 @@ func (c *client) StreamExecute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
-) (result.StreamResult, error) {
-	request := &Ydb_Scripting.ExecuteYqlRequest{
-		Script:     query,
-		Parameters: params.Params(),
-		OperationParams: operation.Params(
-			c.config.OperationTimeout(),
-			c.config.OperationCancelAfter(),
-			operation.ModeSync,
-		),
-	}
+) (r result.StreamResult, err error) {
+	var (
+		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx, query, params)
+		request        = &Ydb_Scripting.ExecuteYqlRequest{
+			Script:     query,
+			Parameters: params.Params(),
+			OperationParams: operation.Params(
+				c.config.OperationTimeout(),
+				c.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		}
+	)
+	defer func() {
+		if err != nil {
+			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -131,6 +153,9 @@ func (c *client) StreamExecute(
 			stats *Ydb_TableStats.QueryStats,
 			err error,
 		) {
+			defer func() {
+				onIntermediate(errors.HideEOF(err))
+			}()
 			select {
 			case <-ctx.Done():
 				return nil, nil, ctx.Err()
@@ -145,12 +170,17 @@ func (c *client) StreamExecute(
 		},
 		func(err error) error {
 			cancel()
+			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
 			return err
 		},
 	), nil
 }
 
-func (c *client) Close(context.Context) error {
+func (c *client) Close(ctx context.Context) (err error) {
+	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx)
+	defer func() {
+		onDone(err)
+	}()
 	return nil
 }
 

@@ -124,12 +124,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return errors.Errorf(0, "context done: %w", ctx.Err())
+			return errors.Error(ctx.Err())
 
 		default:
 			err = op(ctx)
 			if err != nil {
-				err = errors.Errorf(0, "retry operation failed: %w", err)
+				err = errors.Error(err)
 			}
 
 			onDone = onIntermediate(err)
@@ -149,7 +149,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
-				return errors.Errorf(0, "wait failed, last operation error: %w", err)
+				return errors.Error(err)
 			}
 
 			code = m.StatusCode()
@@ -338,7 +338,7 @@ type Backoff interface {
 func waitBackoff(ctx context.Context, b Backoff, i int) error {
 	if b == nil {
 		if err := ctx.Err(); err != nil {
-			return errors.Errorf(1, "%w", err)
+			return errors.Error(err)
 		}
 		return nil
 	}
@@ -347,7 +347,7 @@ func waitBackoff(ctx context.Context, b Backoff, i int) error {
 		return nil
 	case <-ctx.Done():
 		if err := ctx.Err(); err != nil {
-			return errors.Errorf(1, "%w", err)
+			return errors.Error(err)
 		}
 		return nil
 	}

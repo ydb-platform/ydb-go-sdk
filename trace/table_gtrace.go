@@ -10,6 +10,54 @@ import (
 // both from t and x.
 func (t Table) Compose(x Table) (ret Table) {
 	switch {
+	case t.OnInit == nil:
+		ret.OnInit = x.OnInit
+	case x.OnInit == nil:
+		ret.OnInit = t.OnInit
+	default:
+		h1 := t.OnInit
+		h2 := x.OnInit
+		ret.OnInit = func(t TableInitStartInfo) func(TableInitDoneInfo) {
+			r1 := h1(t)
+			r2 := h2(t)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(t TableInitDoneInfo) {
+					r1(t)
+					r2(t)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnClose == nil:
+		ret.OnClose = x.OnClose
+	case x.OnClose == nil:
+		ret.OnClose = t.OnClose
+	default:
+		h1 := t.OnClose
+		h2 := x.OnClose
+		ret.OnClose = func(t TableCloseStartInfo) func(TableCloseDoneInfo) {
+			r1 := h1(t)
+			r2 := h2(t)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(t TableCloseDoneInfo) {
+					r1(t)
+					r2(t)
+				}
+			}
+		}
+	}
+	switch {
 	case t.OnSessionNew == nil:
 		ret.OnSessionNew = x.OnSessionNew
 	case x.OnSessionNew == nil:
@@ -296,54 +344,6 @@ func (t Table) Compose(x Table) (ret Table) {
 		}
 	}
 	switch {
-	case t.OnPoolInit == nil:
-		ret.OnPoolInit = x.OnPoolInit
-	case x.OnPoolInit == nil:
-		ret.OnPoolInit = t.OnPoolInit
-	default:
-		h1 := t.OnPoolInit
-		h2 := x.OnPoolInit
-		ret.OnPoolInit = func(p PoolInitStartInfo) func(PoolInitDoneInfo) {
-			r1 := h1(p)
-			r2 := h2(p)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(p PoolInitDoneInfo) {
-					r1(p)
-					r2(p)
-				}
-			}
-		}
-	}
-	switch {
-	case t.OnPoolClose == nil:
-		ret.OnPoolClose = x.OnPoolClose
-	case x.OnPoolClose == nil:
-		ret.OnPoolClose = t.OnPoolClose
-	default:
-		h1 := t.OnPoolClose
-		h2 := x.OnPoolClose
-		ret.OnPoolClose = func(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
-			r1 := h1(p)
-			r2 := h2(p)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(p PoolCloseDoneInfo) {
-					r1(p)
-					r2(p)
-				}
-			}
-		}
-	}
-	switch {
 	case t.OnPoolStateChange == nil:
 		ret.OnPoolStateChange = x.OnPoolStateChange
 	case x.OnPoolStateChange == nil:
@@ -548,6 +548,36 @@ func (t Table) Compose(x Table) (ret Table) {
 	}
 	return ret
 }
+func (t Table) onInit(t1 TableInitStartInfo) func(TableInitDoneInfo) {
+	fn := t.OnInit
+	if fn == nil {
+		return func(TableInitDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableInitDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Table) onClose(t1 TableCloseStartInfo) func(TableCloseDoneInfo) {
+	fn := t.OnClose
+	if fn == nil {
+		return func(TableCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Table) onSessionNew(s SessionNewStartInfo) func(SessionNewDoneInfo) {
 	fn := t.OnSessionNew
 	if fn == nil {
@@ -737,36 +767,6 @@ func (t Table) onSessionTransactionRollback(s SessionTransactionRollbackStartInf
 	}
 	return res
 }
-func (t Table) onPoolInit(p PoolInitStartInfo) func(PoolInitDoneInfo) {
-	fn := t.OnPoolInit
-	if fn == nil {
-		return func(PoolInitDoneInfo) {
-			return
-		}
-	}
-	res := fn(p)
-	if res == nil {
-		return func(PoolInitDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t Table) onPoolClose(p PoolCloseStartInfo) func(PoolCloseDoneInfo) {
-	fn := t.OnPoolClose
-	if fn == nil {
-		return func(PoolCloseDoneInfo) {
-			return
-		}
-	}
-	res := fn(p)
-	if res == nil {
-		return func(PoolCloseDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t Table) onPoolStateChange(p PooStateChangeInfo) {
 	fn := t.OnPoolStateChange
 	if fn == nil {
@@ -902,6 +902,27 @@ func (t Table) onPoolWait(p PoolWaitStartInfo) func(PoolWaitDoneInfo) {
 		}
 	}
 	return res
+}
+func TableOnInit(t Table, c *context.Context) func(limit int, keepAliveMinSize int) {
+	var p TableInitStartInfo
+	p.Context = c
+	res := t.onInit(p)
+	return func(limit int, keepAliveMinSize int) {
+		var p TableInitDoneInfo
+		p.Limit = limit
+		p.KeepAliveMinSize = keepAliveMinSize
+		res(p)
+	}
+}
+func TableOnClose(t Table, c *context.Context) func(error) {
+	var p TableCloseStartInfo
+	p.Context = c
+	res := t.onClose(p)
+	return func(e error) {
+		var p TableCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
 }
 func TableOnSessionNew(t Table, c *context.Context) func(session sessionInfo, _ error) {
 	var p SessionNewStartInfo
@@ -1045,27 +1066,6 @@ func TableOnSessionTransactionRollback(t Table, c *context.Context, session sess
 	res := t.onSessionTransactionRollback(p)
 	return func(e error) {
 		var p SessionTransactionRollbackDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-func TableOnPoolInit(t Table, c *context.Context) func(limit int, keepAliveMinSize int) {
-	var p PoolInitStartInfo
-	p.Context = c
-	res := t.onPoolInit(p)
-	return func(limit int, keepAliveMinSize int) {
-		var p PoolInitDoneInfo
-		p.Limit = limit
-		p.KeepAliveMinSize = keepAliveMinSize
-		res(p)
-	}
-}
-func TableOnPoolClose(t Table, c *context.Context) func(error) {
-	var p PoolCloseStartInfo
-	p.Context = c
-	res := t.onPoolClose(p)
-	return func(e error) {
-		var p PoolCloseDoneInfo
 		p.Error = e
 		res(p)
 	}

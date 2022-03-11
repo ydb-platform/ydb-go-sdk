@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/protobuf/proto"
 
@@ -15,6 +16,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+)
+
+// nolint:gofumpt
+// nolint:nolintlint
+var (
+	// ErrAlreadyCommited returns if transaction Commit called twice
+	ErrAlreadyCommited = fmt.Errorf("already committed")
 )
 
 type transaction struct {
@@ -59,7 +67,7 @@ func (tx *transaction) CommitTx(
 	opts ...options.CommitTransactionOption,
 ) (r result.Result, err error) {
 	if tx.committed {
-		return nil, errors.ErrAlreadyCommited
+		return nil, errors.Error(ErrAlreadyCommited)
 	}
 	defer func() {
 		if err == nil {

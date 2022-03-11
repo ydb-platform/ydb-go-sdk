@@ -180,7 +180,7 @@ func (s *rawConverter) TzDate() (v time.Time) {
 	}
 	src, err := timeutil.UnmarshalTzDate(s.text())
 	if err != nil {
-		_ = s.errorf(0, "scan raw failed: %w", err)
+		_ = s.errorf(0, "rawConverter.TzDate(): %w", err)
 	}
 	return src
 }
@@ -192,7 +192,7 @@ func (s *rawConverter) TzDatetime() (v time.Time) {
 	}
 	src, err := timeutil.UnmarshalTzDatetime(s.text())
 	if err != nil {
-		_ = s.errorf(0, "scan raw failed: %w", err)
+		_ = s.errorf(0, "rawConverter.TzDatetime(): %w", err)
 	}
 	return src
 }
@@ -204,7 +204,7 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 	}
 	src, err := timeutil.UnmarshalTzTimestamp(s.text())
 	if err != nil {
-		_ = s.errorf(0, "scan raw failed: %w", err)
+		_ = s.errorf(0, "rawConverter.TzTimestamp(): %w", err)
 	}
 	return src
 }
@@ -570,7 +570,7 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 		return m.Name, m.Type
 
 	default:
-		panic("ydb/table: unexpected variant items types")
+		panic("unexpected variant items types")
 	}
 }
 

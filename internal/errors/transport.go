@@ -20,8 +20,6 @@ type Issue struct {
 	Severity uint32
 }
 
-var ErrOperationNotReady = errors.New("operation is not ready yet")
-
 type IssueIterator []*Ydb_Issue.IssueMessage
 
 func (it IssueIterator) Len() int {
@@ -92,11 +90,11 @@ func NewTransportError(opts ...teOpt) error {
 	for _, f := range opts {
 		f(te)
 	}
-	return Errorf(1, "%w", te)
+	return ErrorfSkip(1, "%w", te)
 }
 
 func (t *TransportError) Error() string {
-	s := "ydb: transport error: " + t.Reason.String()
+	s := "transport error: " + t.Reason.String()
 	if t.message != "" {
 		s += ": " + t.message
 	}
@@ -322,7 +320,7 @@ func transportErrorString(t TransportErrorCode) string {
 
 // IsTransportError reports whether err is TransportError with given code as
 // the Reason.
-func IsTransportError(err error, code TransportErrorCode) bool {
+func IsTransportError(err error, codes ...TransportErrorCode) bool {
 	if err == nil {
 		return false
 	}
@@ -330,7 +328,15 @@ func IsTransportError(err error, code TransportErrorCode) bool {
 	if !errors.As(err, &t) {
 		return false
 	}
-	return t.Reason == code
+	if len(codes) == 0 {
+		return true
+	}
+	for _, code := range codes {
+		if t.Reason == code {
+			return true
+		}
+	}
+	return false
 }
 
 func MapGRPCError(err error) error {

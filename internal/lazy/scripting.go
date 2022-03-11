@@ -71,7 +71,7 @@ func (s *lazyScripting) Close(ctx context.Context) (err error) {
 	}()
 	err = s.client.Close(ctx)
 	if err != nil {
-		return errors.Errorf(0, "close failed: %w", err)
+		return errors.Error(err)
 	}
 	return nil
 }

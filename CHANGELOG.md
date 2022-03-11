@@ -1,3 +1,13 @@
+## 3.13.1
+* Improved error messages
+* Defended `cluster.balancer` with `sync.RWMutex` on `cluster.Insert`, `cluster.Update`, `cluster.Remove` and `cluster.Get`
+* Excluded `Close` and `Park` methods from `conn.Conn` interface
+* Fixed bug with `Multi` balancer `Create()` 
+* Improved `errors.IsTransportError` (check a few transport error codes instead check single transport error code)
+* Improved `errors.Is` (check a few errors instead check single error)
+* Refactored YDB errors checking API on client-side
+* Implemented of scripting traces 
+
 ## 3.13.0
 * Refactored `Connection` interface
 * Removed `CustomOption` and taking client with custom options

@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -15,9 +14,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
-var ErrNotImplemented = errors.New("testutil: not implemented")
+var ErrNotImplemented = fmt.Errorf("testutil: not implemented")
 
 type MethodCode uint
 
@@ -107,14 +107,14 @@ func setField(name string, dst, value interface{}) {
 	f, ok := t.FieldByName(name)
 	if !ok {
 		panic(fmt.Sprintf(
-			"ydb/testutil: struct %s has no field %q",
+			"struct %s has no field %q",
 			t, name,
 		))
 	}
 	v := reflect.ValueOf(value)
 	if f.Type.Kind() != v.Type().Kind() {
 		panic(fmt.Sprintf(
-			"ydb/testutil: struct %s field %q is types of %s, not %s",
+			"struct %s field %q is types of %s, not %s",
 			t, name, f.Type, v.Type(),
 		))
 	}
@@ -142,11 +142,11 @@ func getField(name string, src, dst interface{}) bool {
 
 		v := reflect.ValueOf(dst)
 		if v.Type().Kind() != reflect.Ptr {
-			panic("ydb/testutil: destination value must be a pointer")
+			panic("destination value must be a pointer")
 		}
 		if v.Type().Elem().Kind() != fv.Type().Kind() {
 			panic(fmt.Sprintf(
-				"ydb/testutil: struct %s field %q is types of %s, not %s",
+				"struct %s field %q is types of %s, not %s",
 				t, name, f.Type, v.Type(),
 			))
 		}
@@ -255,7 +255,7 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) dbOption {
 				)
 				return nil
 			}
-			return fmt.Errorf("testutil: method '%s' not implemented", method)
+			return fmt.Errorf("method '%s' not implemented", method)
 		}
 	}
 }
@@ -271,7 +271,7 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) dbOption {
 			if handler, ok := newStreamHandlers[Method(method).Code()]; ok {
 				return handler(desc)
 			}
-			return nil, fmt.Errorf("testutil: method '%s' not implemented", method)
+			return nil, fmt.Errorf("method '%s' not implemented", method)
 		}
 	}
 }
@@ -350,7 +350,7 @@ type ClientStream struct {
 
 func (s *ClientStream) Header() (metadata.MD, error) {
 	if s.OnHeader == nil {
-		return nil, ErrNotImplemented
+		return nil, errors.Error(ErrNotImplemented)
 	}
 	return s.OnHeader()
 }
@@ -364,7 +364,7 @@ func (s *ClientStream) Trailer() metadata.MD {
 
 func (s *ClientStream) CloseSend() error {
 	if s.OnCloseSend == nil {
-		return ErrNotImplemented
+		return errors.Error(ErrNotImplemented)
 	}
 	return s.OnCloseSend()
 }
@@ -378,14 +378,14 @@ func (s *ClientStream) Context() context.Context {
 
 func (s *ClientStream) SendMsg(m interface{}) error {
 	if s.OnSendMsg == nil {
-		return ErrNotImplemented
+		return errors.Error(ErrNotImplemented)
 	}
 	return s.OnSendMsg(m)
 }
 
 func (s *ClientStream) RecvMsg(m interface{}) error {
 	if s.OnRecvMsg == nil {
-		return ErrNotImplemented
+		return errors.Error(ErrNotImplemented)
 	}
 	return s.OnRecvMsg(m)
 }

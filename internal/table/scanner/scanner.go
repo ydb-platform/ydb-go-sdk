@@ -381,19 +381,19 @@ func (s *scanner) any() interface{} {
 	case value.TypeTzDate:
 		src, err := timeutil.UnmarshalTzDate(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scan row failed: %w", err)
+			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 		return src
 	case value.TypeTzDatetime:
 		src, err := timeutil.UnmarshalTzDatetime(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scan row failed: %w", err)
+			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 		return src
 	case value.TypeTzTimestamp:
 		src, err := timeutil.UnmarshalTzTimestamp(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scan row failed: %w", err)
+			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 		return src
 	case value.TypeUTF8, value.TypeDyNumber:
@@ -404,7 +404,7 @@ func (s *scanner) any() interface{} {
 		value.TypeJSONDocument:
 		return []byte(s.text())
 	default:
-		_ = s.errorf(0, "ydb/table: unknown primitive types")
+		_ = s.errorf(0, "unknown primitive types")
 		return nil
 	}
 }
@@ -631,23 +631,23 @@ func (s *scanner) setTime(dst *time.Time) {
 	case Ydb.Type_TZ_DATE:
 		src, err := timeutil.UnmarshalTzDate(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scan row failed: %w", err)
+			_ = s.errorf(0, "scanner.setTime(): %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_DATETIME:
 		src, err := timeutil.UnmarshalTzDatetime(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scan row failed: %w", err)
+			_ = s.errorf(0, "scanner.setTime(): %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_TIMESTAMP:
 		src, err := timeutil.UnmarshalTzTimestamp(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scan row failed: %w", err)
+			_ = s.errorf(0, "scanner.setTime(): %w", err)
 		}
 		*dst = src
 	default:
-		_ = s.errorf(0, "scan row failed: incorrect source types %s", t)
+		_ = s.errorf(0, "scanner.setTime(): incorrect source types %s", t)
 	}
 }
 
@@ -1033,7 +1033,7 @@ func (s *scanner) errorf(depth int, f string, args ...interface{}) error {
 	if s.err != nil {
 		return s.err
 	}
-	s.err = errors.Errorf(depth+1, f, args...)
+	s.err = errors.ErrorfSkip(depth+1, f, args...)
 	return s.err
 }
 

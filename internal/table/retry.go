@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -91,7 +92,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 		func(ctx context.Context, s table.Session) (err error) {
 			tx, err := s.BeginTransaction(ctx, h.opts.TxSettings)
 			if err != nil {
-				return errors.Errorf(0, "begin transaction failed: %w", err)
+				return errors.Error(err)
 			}
 
 			defer func() {
@@ -102,7 +103,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 
 			err = op(ctx, tx)
 			if err != nil {
-				err = errors.Errorf(0, "retry operation failed: %w", err)
+				err = errors.Error(err)
 			}
 
 			if attempts > 0 {
@@ -117,7 +118,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 
 			_, err = tx.CommitTx(ctx, h.opts.TxCommitOptions...)
 			if err != nil {
-				return errors.Errorf(0, "commit failed: %w", err)
+				return errors.Error(err)
 			}
 
 			return nil
@@ -125,7 +126,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 		h.trace,
 	)
 	if err != nil {
-		err = errors.Errorf(0, "doTx failed: %w", err)
+		err = errors.Error(err)
 	}
 	return err
 }
@@ -145,7 +146,7 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 		func(ctx context.Context, s table.Session) error {
 			err = op(ctx, s)
 			if err != nil {
-				err = errors.Errorf(0, "retry operation failed: %w", err)
+				err = errors.Error(err)
 			}
 
 			if attempts > 0 {
@@ -159,7 +160,7 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retr
 		options.trace,
 	)
 	if err != nil {
-		err = errors.Errorf(0, "do failed: %w", err)
+		err = errors.Error(err)
 	}
 	return err
 }
@@ -173,14 +174,14 @@ var _ SessionProvider = SessionProviderFunc{}
 
 func (f SessionProviderFunc) Get(ctx context.Context) (Session, error) {
 	if f.OnGet == nil {
-		return nil, errNoSession
+		return nil, errors.Error(errNoSession)
 	}
 	return f.OnGet(ctx)
 }
 
 func (f SessionProviderFunc) Put(ctx context.Context, s Session) error {
 	if f.OnPut == nil {
-		return testutil.ErrNotImplemented
+		return errors.Error(testutil.ErrNotImplemented)
 	}
 	return f.OnPut(ctx, s)
 }
@@ -196,9 +197,9 @@ func SingleSession(s Session) SessionProvider {
 }
 
 var (
-	errNoSession         = errors.New("no session")
-	errUnexpectedSession = errors.New("unexpected session")
-	errSessionOverflow   = errors.New("session overflow")
+	errNoSession         = fmt.Errorf("no session")
+	errUnexpectedSession = fmt.Errorf("unexpected session")
+	errSessionOverflow   = fmt.Errorf("session overflow")
 )
 
 type singleSession struct {
@@ -212,7 +213,7 @@ func (s *singleSession) Close(ctx context.Context) error {
 
 func (s *singleSession) Get(context.Context) (Session, error) {
 	if s.empty {
-		return nil, errNoSession
+		return nil, errors.Error(errNoSession)
 	}
 	s.empty = true
 	return s.s, nil
@@ -220,10 +221,10 @@ func (s *singleSession) Get(context.Context) (Session, error) {
 
 func (s *singleSession) Put(_ context.Context, x Session) error {
 	if x != s.s {
-		return errUnexpectedSession
+		return errors.Error(errUnexpectedSession)
 	}
 	if !s.empty {
-		return errSessionOverflow
+		return errors.Error(errSessionOverflow)
 	}
 	s.empty = false
 	return nil
@@ -231,10 +232,10 @@ func (s *singleSession) Put(_ context.Context, x Session) error {
 
 func (s *singleSession) CloseSession(ctx context.Context, x Session) error {
 	if x != s.s {
-		return errUnexpectedSession
+		return errors.Error(errUnexpectedSession)
 	}
 	if !s.empty {
-		return errSessionOverflow
+		return errors.Error(errSessionOverflow)
 	}
 	s.empty = true
 	return x.Close(ctx)
@@ -269,7 +270,7 @@ func retryBackoff(
 		}
 		select {
 		case <-ctx.Done():
-			return errors.Errorf(0, "context done: %w", ctx.Err())
+			return errors.Error(ctx.Err())
 
 		default:
 			if s == nil {
@@ -278,13 +279,13 @@ func retryBackoff(
 					panic("both of session and error are nil")
 				}
 				if err != nil {
-					return errors.Errorf(0, "get session from pool failed: %w", err)
+					return errors.Error(err)
 				}
 			}
 
 			err = op(ctx, s)
 			if err != nil {
-				err = errors.Errorf(0, "retry operation failed: %w", err)
+				err = errors.Error(err)
 			}
 
 			if s.isClosing() {
@@ -312,7 +313,7 @@ func retryBackoff(
 			}
 
 			if retry.Wait(ctx, fastBackoff, slowBackoff, m, i) != nil {
-				return errors.Errorf(0, "wait failed, last operation error: %w", err)
+				return errors.Error(err)
 			}
 
 			code = m.StatusCode()

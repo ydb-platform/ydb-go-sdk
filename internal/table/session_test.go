@@ -2,7 +2,7 @@ package table
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -54,7 +54,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e = errors.New("any error")
+	e = fmt.Errorf("any error")
 	err = s.KeepAlive(ctx)
 	if err == nil {
 		t.Fatal(err)
@@ -113,7 +113,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	}
 
 	{
-		e = errors.New("any error")
+		e = fmt.Errorf("any error")
 		_, err = s.DescribeTable(ctx, "")
 		if err == nil {
 			t.Fatal(err)

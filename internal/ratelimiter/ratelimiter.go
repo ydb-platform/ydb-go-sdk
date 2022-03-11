@@ -2,6 +2,7 @@ package ratelimiter
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -15,6 +16,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
+)
+
+// nolint:gofumpt
+// nolint:nolintlint
+var (
+	errUnknownAcquireType = fmt.Errorf("unknown acquire type")
 )
 
 type client struct {
@@ -222,7 +229,7 @@ func (c *client) AcquireResource(
 			},
 		)
 	default:
-		return errors.Errorf(0, "unknown acquire type: %d", acquireOptions.Type())
+		return errors.Errorf("%w: %d", errUnknownAcquireType, acquireOptions.Type())
 	}
 
 	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {

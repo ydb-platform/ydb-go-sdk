@@ -62,7 +62,7 @@ func NewOpError(opts ...oeOpt) error {
 	for _, f := range opts {
 		f(oe)
 	}
-	return Errorf(1, "%w", oe)
+	return ErrorfSkip(1, "%w", oe)
 }
 
 func (e *OpError) Issues() []*Ydb_Issue.IssueMessage {
@@ -74,7 +74,7 @@ func (e *OpError) Error() string {
 		return e.Reason.String()
 	}
 	var buf bytes.Buffer
-	buf.WriteString("ydb: operation error: ")
+	buf.WriteString("operation error: ")
 	buf.WriteString(e.Reason.String())
 	if len(e.issues) > 0 {
 		buf.WriteByte(':')
@@ -88,6 +88,9 @@ func IsOpError(err error, codes ...StatusCode) bool {
 	var op *OpError
 	if !errors.As(err, &op) {
 		return false
+	}
+	if len(codes) == 0 {
+		return true
 	}
 	for _, code := range codes {
 		if op.Reason == code {

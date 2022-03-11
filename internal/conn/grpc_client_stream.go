@@ -32,7 +32,7 @@ func (s *grpcClientStream) Trailer() metadata.MD {
 func (s *grpcClientStream) CloseSend() (err error) {
 	err = s.s.CloseSend()
 	if err != nil {
-		err = errors.Errorf(0, "%w", errors.MapGRPCError(err))
+		err = errors.Error(errors.MapGRPCError(err))
 	}
 	return err
 }
@@ -46,7 +46,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	defer s.c.decUsages()
 	err = s.s.SendMsg(m)
 	if err != nil && s.wrapping {
-		err = errors.Errorf(0, "%w", errors.MapGRPCError(err))
+		err = errors.Error(errors.MapGRPCError(err))
 	}
 	return
 }
@@ -67,7 +67,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return errors.Errorf(0, "receive message failed: %w", errors.MapGRPCError(err))
+			return errors.Error(errors.MapGRPCError(err))
 		}
 		return err
 	}

@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +20,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// nolint:gofumpt
+// nolint:nolintlint
+var (
+	// ErrOperationNotReady specified error when operation is not ready
+	ErrOperationNotReady = fmt.Errorf("operation is not ready yet")
+)
+
 type Conn interface {
 	grpc.ClientConnInterface
 
@@ -29,9 +37,6 @@ type Conn interface {
 	IsState(states ...State) bool
 	GetState() State
 	SetState(State) State
-
-	Close(ctx context.Context) error
-	Park(ctx context.Context) error
 }
 
 func (c *conn) Address() string {
@@ -48,7 +53,7 @@ type conn struct {
 	state    State
 	usages   int32
 	ttl      timeutil.Timer
-	onClose  []func(Conn)
+	onClose  []func(*conn)
 }
 
 func (c *conn) IsState(states ...State) bool {
@@ -88,7 +93,7 @@ func (c *conn) Park(ctx context.Context) (err error) {
 	err = c.close()
 
 	if err != nil {
-		return errors.Errorf(0, "park failed: %w", err)
+		return errors.Error(err)
 	}
 
 	return nil
@@ -178,7 +183,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, errors.Errorf(0, "dial failed: %w", err)
+		return nil, errors.Error(err)
 	}
 
 	c.cc = cc
@@ -313,7 +318,7 @@ func (c *conn) Invoke(
 
 	if err != nil {
 		if wrapping {
-			return errors.Errorf(0, "invoke failed: %w", errors.MapGRPCError(err))
+			return errors.Error(errors.MapGRPCError(err))
 		}
 		return err
 	}
@@ -326,10 +331,10 @@ func (c *conn) Invoke(
 		if wrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return errors.ErrOperationNotReady
+				return errors.Error(ErrOperationNotReady)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return errors.NewOpError(errors.WithOEOperation(o.GetOperation()))
+				return errors.Error(errors.NewOpError(errors.WithOEOperation(o.GetOperation())))
 			}
 		}
 	}
@@ -400,7 +405,7 @@ func (c *conn) NewStream(
 
 	if err != nil {
 		if wrapping {
-			return s, errors.Errorf(0, "stream failed: %w", errors.MapGRPCError(err))
+			return s, errors.Error(errors.MapGRPCError(err))
 		}
 		return s, err
 	}
@@ -418,7 +423,7 @@ func (c *conn) NewStream(
 
 type option func(c *conn)
 
-func withOnClose(onClose func(Conn)) option {
+func withOnClose(onClose func(*conn)) option {
 	return func(c *conn) {
 		if onClose != nil {
 			c.onClose = append(c.onClose, onClose)
@@ -426,13 +431,13 @@ func withOnClose(onClose func(Conn)) option {
 	}
 }
 
-func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
+func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
 		state:    Created,
 		endpoint: e,
 		config:   config,
 		done:     make(chan struct{}),
-		onClose:  make([]func(Conn), 0),
+		onClose:  make([]func(*conn), 0),
 	}
 	for _, o := range opts {
 		o(c)
@@ -441,4 +446,8 @@ func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
 		c.ttl = timeutil.NewTimer(ttl)
 	}
 	return c
+}
+
+func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
+	return newConn(e, config, opts...)
 }

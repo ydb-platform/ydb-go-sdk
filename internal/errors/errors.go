@@ -14,12 +14,17 @@ import (
 func IsTimeoutError(err error) bool {
 	switch {
 	case
-		IsOpError(err, StatusTimeout),
-		IsOpError(err, StatusCancelled),
-		IsTransportError(err, TransportErrorCanceled),
-		IsTransportError(err, TransportErrorDeadlineExceeded),
-		errors.Is(err, context.DeadlineExceeded),
-		errors.Is(err, context.Canceled):
+		IsOpError(
+			err,
+			StatusTimeout,
+			StatusCancelled,
+		),
+		IsTransportError(err, TransportErrorCanceled, TransportErrorDeadlineExceeded),
+		Is(
+			err,
+			context.DeadlineExceeded,
+			context.Canceled,
+		):
 		return true
 	default:
 		return false
@@ -49,21 +54,29 @@ func As(err error, target interface{}) bool {
 	return errors.As(err, target)
 }
 
-// Is is a proxy to errors.Is
+// Is is a improved proxy to errors.Is
 // This need to single import errors
-func Is(err, target error) bool {
-	return errors.Is(err, target)
+func Is(err error, targets ...error) bool {
+	if len(targets) == 0 {
+		panic("empty targets")
+	}
+	for _, target := range targets {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
 }
 
 // New is a proxy to errors.New
 // This need to single import errors
 func New(text string) error {
-	return Errorf(0, "%w", errors.New(text))
+	return ErrorfSkip(1, "%w", errors.New(text))
 }
 
 // NewWithIssues returns error which contains child issues
 func NewWithIssues(text string, issues ...error) error {
-	return Errorf(1, "%w", &errorWithIssues{
+	return ErrorfSkip(1, "%w", &errorWithIssues{
 		reason: text,
 		issues: issues,
 	})
@@ -88,8 +101,18 @@ func (e *errorWithIssues) Error() string {
 	return b.String()
 }
 
+// Error is alias to fmt.Errorf() with prepend file:line prefix
+func Error(err error) error {
+	return ErrorfSkip(1, "%w", err)
+}
+
 // Errorf is alias to fmt.Errorf() with prepend file:line prefix
-func Errorf(depth int, format string, args ...interface{}) error {
+func Errorf(format string, args ...interface{}) error {
+	return ErrorfSkip(1, format, args...)
+}
+
+// ErrorfSkip is alias to fmt.Errorf() with prepend file:line prefix
+func ErrorfSkip(depth int, format string, args ...interface{}) error {
 	function, file, line, _ := runtime.Caller(depth + 1)
 	return fmt.Errorf(runtime.FuncForPC(function).Name()+" ("+fileName(file)+":"+strconv.Itoa(line)+") "+format, args...)
 }

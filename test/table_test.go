@@ -261,12 +261,12 @@ func TestTable(t *testing.T) {
 						s.addBalance(t, -1)
 						return nil
 					},
-					OnPoolInit: func(
-						info trace.PoolInitStartInfo,
+					OnInit: func(
+						info trace.TableInitStartInfo,
 					) func(
-						trace.PoolInitDoneInfo,
+						trace.TableInitDoneInfo,
 					) {
-						return func(info trace.PoolInitDoneInfo) {
+						return func(info trace.TableInitDoneInfo) {
 							s.Lock()
 							s.keepAliveMinSize = info.KeepAliveMinSize
 							s.limit = info.Limit
