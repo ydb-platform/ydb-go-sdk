@@ -2,13 +2,13 @@ package conn
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"

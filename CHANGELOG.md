@@ -1,3 +1,6 @@
+## 3.13.3
+* Fixed linter issues
+
 ## 3.13.2
 * Fixed race with read/write pool conns on closing conn 
 
