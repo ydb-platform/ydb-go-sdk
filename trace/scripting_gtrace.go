@@ -76,18 +76,42 @@ func (t Scripting) Compose(x Scripting) (ret Scripting) {
 	default:
 		h1 := t.OnExplain
 		h2 := x.OnExplain
-		ret.OnExplain = func(info ExplainQueryStartInfo) func(ExplainQueryDoneInfo) {
-			r1 := h1(info)
-			r2 := h2(info)
+		ret.OnExplain = func(e ExplainStartInfo) func(ExplainDoneInfo) {
+			r1 := h1(e)
+			r2 := h2(e)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(doneInfo ExplainQueryDoneInfo) {
-					r1(doneInfo)
-					r2(doneInfo)
+				return func(e ExplainDoneInfo) {
+					r1(e)
+					r2(e)
+				}
+			}
+		}
+	}
+	switch {
+	case t.OnClose == nil:
+		ret.OnClose = x.OnClose
+	case x.OnClose == nil:
+		ret.OnClose = t.OnClose
+	default:
+		h1 := t.OnClose
+		h2 := x.OnClose
+		ret.OnClose = func(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo) {
+			r1 := h1(s)
+			r2 := h2(s)
+			switch {
+			case r1 == nil:
+				return r2
+			case r2 == nil:
+				return r1
+			default:
+				return func(s ScriptingCloseDoneInfo) {
+					r1(s)
+					r2(s)
 				}
 			}
 		}
@@ -136,16 +160,31 @@ func (t Scripting) onStreamExecute(s StreamExecuteStartInfo) func(StreamExecuteI
 		return res
 	}
 }
-func (t Scripting) onExplain(info ExplainQueryStartInfo) func(doneInfo ExplainQueryDoneInfo) {
+func (t Scripting) onExplain(e ExplainStartInfo) func(ExplainDoneInfo) {
 	fn := t.OnExplain
 	if fn == nil {
-		return func(ExplainQueryDoneInfo) {
+		return func(ExplainDoneInfo) {
 			return
 		}
 	}
-	res := fn(info)
+	res := fn(e)
 	if res == nil {
-		return func(ExplainQueryDoneInfo) {
+		return func(ExplainDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo) {
+	fn := t.OnClose
+	if fn == nil {
+		return func(ScriptingCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(s)
+	if res == nil {
+		return func(ScriptingCloseDoneInfo) {
 			return
 		}
 	}
@@ -181,16 +220,24 @@ func ScriptingOnStreamExecute(t Scripting, c *context.Context, query string, par
 		}
 	}
 }
-func ScriptingOnExplain(t Scripting, c *context.Context, session sessionInfo, query string) func(aST string, plan string, _ error) {
-	var p ExplainQueryStartInfo
+func ScriptingOnExplain(t Scripting, c *context.Context, query string) func(plan string, _ error) {
+	var p ExplainStartInfo
 	p.Context = c
-	p.Session = session
 	p.Query = query
 	res := t.onExplain(p)
-	return func(aST string, plan string, e error) {
-		var p ExplainQueryDoneInfo
-		p.AST = aST
+	return func(plan string, e error) {
+		var p ExplainDoneInfo
 		p.Plan = plan
+		p.Error = e
+		res(p)
+	}
+}
+func ScriptingOnClose(t Scripting, c *context.Context) func(error) {
+	var p ScriptingCloseStartInfo
+	p.Context = c
+	res := t.onClose(p)
+	return func(e error) {
+		var p ScriptingCloseDoneInfo
 		p.Error = e
 		res(p)
 	}

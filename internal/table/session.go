@@ -944,6 +944,13 @@ func (s *session) StreamExecuteScanQuery(
 	q := new(dataQuery)
 	q.initFromText(query)
 	var (
+		onIntermediate = trace.TableOnSessionQueryStreamExecute(
+			s.config.Trace(),
+			&ctx,
+			s,
+			q,
+			params,
+		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
 			Query:      &q.query,
 			Parameters: params.Params(),
@@ -951,6 +958,12 @@ func (s *session) StreamExecuteScanQuery(
 		}
 		stream Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 	)
+	defer func() {
+		if err != nil {
+			onIntermediate(err)(err)
+		}
+	}()
+
 	for _, opt := range opts {
 		opt((*options.ExecuteScanQueryDesc)(&request))
 	}
@@ -962,17 +975,8 @@ func (s *session) StreamExecuteScanQuery(
 		&request,
 	)
 
-	onDone := trace.TableOnSessionQueryStreamExecute(
-		s.config.Trace(),
-		&ctx,
-		s,
-		q,
-		params,
-	)
-
 	if err != nil {
 		cancel()
-		onDone(err)
 		return nil, err
 	}
 
@@ -982,6 +986,9 @@ func (s *session) StreamExecuteScanQuery(
 			stats *Ydb_TableStats.QueryStats,
 			err error,
 		) {
+			defer func() {
+				onIntermediate(err)
+			}()
 			select {
 			case <-ctx.Done():
 				return nil, nil, ctx.Err()
@@ -996,7 +1003,7 @@ func (s *session) StreamExecuteScanQuery(
 		},
 		func(err error) error {
 			cancel()
-			onDone(err)
+			onIntermediate(err)(err)
 			if checkHintSessionClose(stream.Trailer()) {
 				s.SetStatus(options.SessionClosing)
 			}

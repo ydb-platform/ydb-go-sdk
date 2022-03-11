@@ -273,7 +273,7 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 					session := info.Session
 					query := info.Query
 					params := info.Parameters
-					log.Tracef(`execute start {id:"%s",status:"%s",query:"%s",params:"%s"}`,
+					log.Tracef(`stream execute start {id:"%s",status:"%s",query:"%s",params:"%s"}`,
 						session.ID(),
 						session.Status(),
 						query,
@@ -286,15 +286,15 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 						trace.SessionQueryStreamExecuteDoneInfo,
 					) {
 						if info.Error == nil {
-							log.Tracef(`intermediate`)
+							log.Tracef(`stream execute intermediate`)
 						} else {
-							log.Warnf(`intermediate failed {error:"%v"}`,
+							log.Warnf(`stream execute intermediate failed {error:"%v"}`,
 								info.Error,
 							)
 						}
 						return func(info trace.SessionQueryStreamExecuteDoneInfo) {
 							if info.Error == nil {
-								log.Debugf(`execute done {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s"}`,
+								log.Debugf(`stream execute done {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s"}`,
 									time.Since(start),
 									session.ID(),
 									session.Status(),
@@ -302,7 +302,7 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 									params,
 								)
 							} else {
-								log.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v"}`,
+								log.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v"}`,
 									time.Since(start),
 									session.ID(),
 									session.Status(),
