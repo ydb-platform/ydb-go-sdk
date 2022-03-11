@@ -7,6 +7,7 @@ import (
 )
 
 func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
+	// nolint:nestif
 	if details&trace.ScriptingEvents != 0 {
 		log = log.WithName(`scripting`)
 		t.OnExecute = func(info trace.ExecuteStartInfo) func(trace.ExecuteDoneInfo) {

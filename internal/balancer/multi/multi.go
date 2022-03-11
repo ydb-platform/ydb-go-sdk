@@ -24,9 +24,9 @@ type multi struct {
 }
 
 func (m *multi) Create() balancer.Balancer {
-	bb := m.balancer
-	for i := range bb {
-		bb[i] = bb[i].(balancer.Creator).Create()
+	bb := make([]balancer.Balancer, len(m.balancer))
+	for i, b := range m.balancer {
+		bb[i] = b.(balancer.Creator).Create()
 	}
 	return &multi{
 		balancer: bb,
