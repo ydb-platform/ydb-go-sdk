@@ -12,7 +12,6 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Scripting struct {
-		OnInit          func(ScriptingInitStartInfo) func(ScriptingInitDoneInfo)
 		OnExecute       func(ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo)
 		OnStreamExecute func(
 			ScriptingStreamExecuteStartInfo,
@@ -72,16 +71,6 @@ type (
 		Context *context.Context
 	}
 	ScriptingCloseDoneInfo struct {
-		Error error
-	}
-	ScriptingInitStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-	}
-	ScriptingInitDoneInfo struct {
 		Error error
 	}
 )

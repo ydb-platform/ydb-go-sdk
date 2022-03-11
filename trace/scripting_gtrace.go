@@ -10,30 +10,6 @@ import (
 // both from t and x.
 func (t Scripting) Compose(x Scripting) (ret Scripting) {
 	switch {
-	case t.OnInit == nil:
-		ret.OnInit = x.OnInit
-	case x.OnInit == nil:
-		ret.OnInit = t.OnInit
-	default:
-		h1 := t.OnInit
-		h2 := x.OnInit
-		ret.OnInit = func(s ScriptingInitStartInfo) func(ScriptingInitDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s ScriptingInitDoneInfo) {
-					r1(s)
-					r2(s)
-				}
-			}
-		}
-	}
-	switch {
 	case t.OnExecute == nil:
 		ret.OnExecute = x.OnExecute
 	case x.OnExecute == nil:
@@ -142,21 +118,6 @@ func (t Scripting) Compose(x Scripting) (ret Scripting) {
 	}
 	return ret
 }
-func (t Scripting) onInit(s ScriptingInitStartInfo) func(ScriptingInitDoneInfo) {
-	fn := t.OnInit
-	if fn == nil {
-		return func(ScriptingInitDoneInfo) {
-			return
-		}
-	}
-	res := fn(s)
-	if res == nil {
-		return func(ScriptingInitDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t Scripting) onExecute(s ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo) {
 	fn := t.OnExecute
 	if fn == nil {
@@ -228,16 +189,6 @@ func (t Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInf
 		}
 	}
 	return res
-}
-func ScriptingOnInit(t Scripting, c *context.Context) func(error) {
-	var p ScriptingInitStartInfo
-	p.Context = c
-	res := t.onInit(p)
-	return func(e error) {
-		var p ScriptingInitDoneInfo
-		p.Error = e
-		res(p)
-	}
 }
 func ScriptingOnExecute(t Scripting, c *context.Context, query string, parameters queryParameters) func(result result, _ error) {
 	var p ScriptingExecuteStartInfo

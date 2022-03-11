@@ -105,22 +105,6 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 				}
 			}
 		}
-		t.OnInit = func(info trace.ScriptingInitStartInfo) func(trace.ScriptingInitDoneInfo) {
-			log.Debugf(`init start`)
-			start := time.Now()
-			return func(info trace.ScriptingInitDoneInfo) {
-				if info.Error == nil {
-					log.Debugf(`init done {latency:"%v"}`,
-						time.Since(start),
-					)
-				} else {
-					log.Errorf(`init failed {latency:"%v",error:"%s"}`,
-						time.Since(start),
-						info.Error,
-					)
-				}
-			}
-		}
 	}
 	return t
 }
