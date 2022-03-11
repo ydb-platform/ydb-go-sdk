@@ -320,7 +320,7 @@ func transportErrorString(t TransportErrorCode) string {
 
 // IsTransportError reports whether err is TransportError with given code as
 // the Reason.
-func IsTransportError(err error, code TransportErrorCode) bool {
+func IsTransportError(err error, codes ...TransportErrorCode) bool {
 	if err == nil {
 		return false
 	}
@@ -328,7 +328,15 @@ func IsTransportError(err error, code TransportErrorCode) bool {
 	if !errors.As(err, &t) {
 		return false
 	}
-	return t.Reason == code
+	if len(codes) == 0 {
+		return true
+	}
+	for _, code := range codes {
+		if t.Reason == code {
+			return true
+		}
+	}
+	return false
 }
 
 func MapGRPCError(err error) error {

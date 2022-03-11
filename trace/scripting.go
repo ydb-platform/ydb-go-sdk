@@ -12,12 +12,19 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Scripting struct {
-		OnExecute       func(ExecuteStartInfo) func(ExecuteDoneInfo)
-		OnStreamExecute func(StreamExecuteStartInfo) func(StreamExecuteIntermediateInfo) func(StreamExecuteDoneInfo)
-		OnExplain       func(ExplainStartInfo) func(ExplainDoneInfo)
-		OnClose         func(ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo)
+		OnInit          func(ScriptingInitStartInfo) func(ScriptingInitDoneInfo)
+		OnExecute       func(ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo)
+		OnStreamExecute func(
+			ScriptingStreamExecuteStartInfo,
+		) func(
+			ScriptingStreamExecuteIntermediateInfo,
+		) func(
+			ScriptingStreamExecuteDoneInfo,
+		)
+		OnExplain func(ScriptingExplainStartInfo) func(ScriptingExplainDoneInfo)
+		OnClose   func(ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo)
 	}
-	ExecuteStartInfo struct {
+	ScriptingExecuteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -26,11 +33,11 @@ type (
 		Query      string
 		Parameters queryParameters
 	}
-	ExecuteDoneInfo struct {
+	ScriptingExecuteDoneInfo struct {
 		Result result
 		Error  error
 	}
-	StreamExecuteStartInfo struct {
+	ScriptingStreamExecuteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -39,13 +46,13 @@ type (
 		Query      string
 		Parameters queryParameters
 	}
-	StreamExecuteIntermediateInfo struct {
+	ScriptingStreamExecuteIntermediateInfo struct {
 		Error error
 	}
-	StreamExecuteDoneInfo struct {
+	ScriptingStreamExecuteDoneInfo struct {
 		Error error
 	}
-	ExplainStartInfo struct {
+	ScriptingExplainStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -53,7 +60,7 @@ type (
 		Context *context.Context
 		Query   string
 	}
-	ExplainDoneInfo struct {
+	ScriptingExplainDoneInfo struct {
 		Plan  string
 		Error error
 	}
@@ -65,6 +72,16 @@ type (
 		Context *context.Context
 	}
 	ScriptingCloseDoneInfo struct {
+		Error error
+	}
+	ScriptingInitStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+	}
+	ScriptingInitDoneInfo struct {
 		Error error
 	}
 )

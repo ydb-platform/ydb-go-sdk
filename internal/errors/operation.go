@@ -89,6 +89,9 @@ func IsOpError(err error, codes ...StatusCode) bool {
 	if !errors.As(err, &op) {
 		return false
 	}
+	if len(codes) == 0 {
+		return true
+	}
 	for _, code := range codes {
 		if op.Reason == code {
 			return true

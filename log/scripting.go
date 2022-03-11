@@ -10,10 +10,10 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 	// nolint:nestif
 	if details&trace.ScriptingEvents != 0 {
 		log = log.WithName(`scripting`)
-		t.OnExecute = func(info trace.ExecuteStartInfo) func(trace.ExecuteDoneInfo) {
+		t.OnExecute = func(info trace.ScriptingExecuteStartInfo) func(trace.ScriptingExecuteDoneInfo) {
 			log.Debugf(`execute start`)
 			start := time.Now()
-			return func(info trace.ExecuteDoneInfo) {
+			return func(info trace.ScriptingExecuteDoneInfo) {
 				if info.Error == nil {
 					log.Debugf(`execute done {latency:"%v",resultSetCount:%v,resultSetErr:"%v""}`,
 						time.Since(start),
@@ -28,10 +28,10 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 				}
 			}
 		}
-		t.OnExplain = func(info trace.ExplainStartInfo) func(trace.ExplainDoneInfo) {
+		t.OnExplain = func(info trace.ScriptingExplainStartInfo) func(trace.ScriptingExplainDoneInfo) {
 			log.Debugf(`explain start`)
 			start := time.Now()
-			return func(info trace.ExplainDoneInfo) {
+			return func(info trace.ScriptingExplainDoneInfo) {
 				if info.Error == nil {
 					log.Debugf(`explain done {latency:"%v",plan:%v"}`,
 						time.Since(start),
@@ -46,11 +46,11 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 			}
 		}
 		t.OnStreamExecute = func(
-			info trace.StreamExecuteStartInfo,
+			info trace.ScriptingStreamExecuteStartInfo,
 		) func(
-			trace.StreamExecuteIntermediateInfo,
+			trace.ScriptingStreamExecuteIntermediateInfo,
 		) func(
-			trace.StreamExecuteDoneInfo,
+			trace.ScriptingStreamExecuteDoneInfo,
 		) {
 			query := info.Query
 			params := info.Parameters
@@ -60,9 +60,9 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 			)
 			start := time.Now()
 			return func(
-				info trace.StreamExecuteIntermediateInfo,
+				info trace.ScriptingStreamExecuteIntermediateInfo,
 			) func(
-				trace.StreamExecuteDoneInfo,
+				trace.ScriptingStreamExecuteDoneInfo,
 			) {
 				if info.Error == nil {
 					log.Tracef(`stream execute intermediate`)
@@ -71,7 +71,7 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 						info.Error,
 					)
 				}
-				return func(info trace.StreamExecuteDoneInfo) {
+				return func(info trace.ScriptingStreamExecuteDoneInfo) {
 					if info.Error == nil {
 						log.Debugf(`stream execute done {latency:"%v",query:"%s",params:"%s"}`,
 							time.Since(start),
@@ -99,6 +99,22 @@ func Scripting(log Logger, details trace.Details) (t trace.Scripting) {
 					)
 				} else {
 					log.Errorf(`close failed {latency:"%v",error:"%s"}`,
+						time.Since(start),
+						info.Error,
+					)
+				}
+			}
+		}
+		t.OnInit = func(info trace.ScriptingInitStartInfo) func(trace.ScriptingInitDoneInfo) {
+			log.Debugf(`init start`)
+			start := time.Now()
+			return func(info trace.ScriptingInitDoneInfo) {
+				if info.Error == nil {
+					log.Debugf(`init done {latency:"%v"}`,
+						time.Since(start),
+					)
+				} else {
+					log.Errorf(`init failed {latency:"%v",error:"%s"}`,
 						time.Since(start),
 						info.Error,
 					)

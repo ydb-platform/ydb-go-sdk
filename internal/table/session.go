@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
@@ -960,7 +961,7 @@ func (s *session) StreamExecuteScanQuery(
 	)
 	defer func() {
 		if err != nil {
-			onIntermediate(err)(err)
+			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
 		}
 	}()
 
@@ -987,7 +988,7 @@ func (s *session) StreamExecuteScanQuery(
 			err error,
 		) {
 			defer func() {
-				onIntermediate(err)
+				onIntermediate(errors.HideEOF(err))
 			}()
 			select {
 			case <-ctx.Done():
@@ -1003,7 +1004,7 @@ func (s *session) StreamExecuteScanQuery(
 		},
 		func(err error) error {
 			cancel()
-			onIntermediate(err)(err)
+			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
 			if checkHintSessionClose(stream.Trailer()) {
 				s.SetStatus(options.SessionClosing)
 			}

@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -134,7 +135,7 @@ func (c *client) StreamExecute(
 	)
 	defer func() {
 		if err != nil {
-			onIntermediate(err)(err)
+			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
 		}
 	}()
 
@@ -153,7 +154,7 @@ func (c *client) StreamExecute(
 			err error,
 		) {
 			defer func() {
-				onIntermediate(err)
+				onIntermediate(errors.HideEOF(err))
 			}()
 			select {
 			case <-ctx.Done():
@@ -169,7 +170,7 @@ func (c *client) StreamExecute(
 		},
 		func(err error) error {
 			cancel()
-			onIntermediate(err)(err)
+			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
 			return err
 		},
 	), nil

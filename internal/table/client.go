@@ -58,7 +58,7 @@ func newClient(
 	builder SessionBuilder,
 	config config.Config,
 ) *client {
-	onDone := trace.TableOnPoolInit(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+	onDone := trace.TableOnInit(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
 	if builder == nil {
 		builder = func(ctx context.Context) (s Session, err error) {
 			return newSession(ctx, cc, config)
@@ -128,9 +128,12 @@ func isCreateSessionErrorRetriable(err error) bool {
 	case
 		errors.Is(err, ErrSessionPoolOverflow),
 		errors.IsOpError(err, errors.StatusOverloaded),
-		errors.IsTransportError(err, errors.TransportErrorResourceExhausted),
-		errors.IsTransportError(err, errors.TransportErrorDeadlineExceeded),
-		errors.IsTransportError(err, errors.TransportErrorUnavailable):
+		errors.IsTransportError(
+			err,
+			errors.TransportErrorResourceExhausted,
+			errors.TransportErrorDeadlineExceeded,
+			errors.TransportErrorUnavailable,
+		):
 		return true
 	default:
 		return false
@@ -414,7 +417,7 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 // It returns first error occurred during stale sessions' deletion.
 // Note that even on error it calls Close() on each session.
 func (c *client) Close(ctx context.Context) (err error) {
-	onDone := trace.TableOnPoolClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+	onDone := trace.TableOnClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
 	defer func() {
 		onDone(err)
 	}()
@@ -573,11 +576,17 @@ func (c *client) keeper(ctx context.Context) {
 				if err != nil {
 					switch {
 					case
-						errors.Is(err, cluster.ErrClusterClosed),
-						errors.Is(err, cluster.ErrClusterEmpty),
+						errors.Is(
+							err,
+							cluster.ErrClusterClosed,
+							cluster.ErrClusterEmpty,
+						),
 						errors.IsOpError(err, errors.StatusBadSession),
-						errors.IsTransportError(err, errors.TransportErrorDeadlineExceeded),
-						errors.IsTransportError(err, errors.TransportErrorUnavailable):
+						errors.IsTransportError(
+							err,
+							errors.TransportErrorDeadlineExceeded,
+							errors.TransportErrorUnavailable,
+						):
 						toDelete = append(toDelete, s)
 					default:
 						toTryAgain = append(toTryAgain, s)
