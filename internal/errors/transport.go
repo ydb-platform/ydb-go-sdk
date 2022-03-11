@@ -94,7 +94,7 @@ func NewTransportError(opts ...teOpt) error {
 }
 
 func (t *TransportError) Error() string {
-	s := "ydb: transport error: " + t.Reason.String()
+	s := "transport error: " + t.Reason.String()
 	if t.message != "" {
 		s += ": " + t.message
 	}

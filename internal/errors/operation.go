@@ -74,7 +74,7 @@ func (e *OpError) Error() string {
 		return e.Reason.String()
 	}
 	var buf bytes.Buffer
-	buf.WriteString("ydb: operation error: ")
+	buf.WriteString("operation error: ")
 	buf.WriteString(e.Reason.String())
 	if len(e.issues) > 0 {
 		buf.WriteByte(':')
