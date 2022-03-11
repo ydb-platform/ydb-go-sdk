@@ -6,6 +6,7 @@
 * Improved `errors.IsTransportError` (check a few transport error codes instead check single transport error code)
 * Improved `errors.Is` (check a few errors instead check single error)
 * Refactored YDB errors checking API on client-side
+* Implemented of scripting traces 
 
 ## 3.13.0
 * Refactored `Connection` interface
