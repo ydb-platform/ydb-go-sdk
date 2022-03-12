@@ -48,23 +48,15 @@ func WithParseErrorHandler(errorHandler func(error)) fromConfigOption {
 	}
 }
 
-func FromConfig(config string, opts ...fromConfigOption) (b balancer.Balancer) {
+func CreateFromConfig(config string) (balancer.Balancer, error) {
 	var (
-		h = fromConfigOptionsHolder{
-			fallbackBalancer: Default(),
-		}
-		c balancersConfig
+		b   balancer.Balancer
+		err error
+		c   balancersConfig
 	)
 
-	for _, o := range opts {
-		o(&h)
-	}
-
-	if err := json.Unmarshal([]byte(config), &c); err != nil {
-		if h.errorHandler != nil {
-			h.errorHandler(err)
-		}
-		return h.fallbackBalancer
+	if err = json.Unmarshal([]byte(config), &c); err != nil {
+		return nil, err
 	}
 
 	switch c.Type {
@@ -75,30 +67,47 @@ func FromConfig(config string, opts ...fromConfigOption) (b balancer.Balancer) {
 	case typeRoundRobin:
 		b = RoundRobin()
 	default:
-		if h.errorHandler != nil {
-			h.errorHandler(errors.Errorf("unknown type of balancer: %s", c.Type))
-		}
-		return h.fallbackBalancer
+		return nil, errors.Errorf("unknown type of balancer: %s", c.Type)
 	}
 
 	switch c.Prefer {
 	case preferLocalDC:
 		if c.Fallback {
-			return PreferLocalDCWithFallBack(b)
+			return PreferLocalDCWithFallBack(b), nil
 		}
-		return PreferLocalDC(b)
+		return PreferLocalDC(b), nil
 	case preferLocations:
 		if len(c.Locations) == 0 {
-			if h.errorHandler != nil {
-				h.errorHandler(errors.Errorf("empty locations list in balancer '%s' config", c.Type))
-			}
-			return h.fallbackBalancer
+			return nil, errors.Errorf("empty locations list in balancer '%s' config", c.Type)
 		}
 		if c.Fallback {
-			return PreferLocationsWithFallback(b, c.Locations...)
+			return PreferLocationsWithFallback(b, c.Locations...), nil
 		}
-		return PreferLocations(b, c.Locations...)
+		return PreferLocations(b, c.Locations...), nil
 	default:
-		return b
+		return b, nil
 	}
+}
+
+func FromConfig(config string, opts ...fromConfigOption) balancer.Balancer {
+	var (
+		h = fromConfigOptionsHolder{
+			fallbackBalancer: Default(),
+		}
+		b   balancer.Balancer
+		err error
+	)
+	for _, o := range opts {
+		o(&h)
+	}
+
+	b, err = CreateFromConfig(config)
+	if err != nil {
+		if h.errorHandler != nil {
+			h.errorHandler(err)
+		}
+		return h.fallbackBalancer
+	}
+
+	return b
 }

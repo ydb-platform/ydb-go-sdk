@@ -10,6 +10,10 @@ import (
 
 type testBalancer struct{}
 
+func (t testBalancer) Create() balancer.Balancer {
+	panic("unexpected call")
+}
+
 func (t testBalancer) Next() conn.Conn {
 	panic("unexpected call")
 }

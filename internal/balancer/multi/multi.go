@@ -26,7 +26,7 @@ type multi struct {
 func (m *multi) Create() balancer.Balancer {
 	bb := make([]balancer.Balancer, len(m.balancer))
 	for i, b := range m.balancer {
-		bb[i] = b.(balancer.Creator).Create()
+		bb[i] = b.Create()
 	}
 	return &multi{
 		balancer: bb,

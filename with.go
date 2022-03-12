@@ -3,8 +3,6 @@ package ydb
 import (
 	"context"
 	"sync/atomic"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 )
 
 var nextID = uint64(0)
@@ -14,14 +12,12 @@ func (c *connection) With(ctx context.Context, opts ...Option) (Connection, erro
 		return c, nil
 	}
 
-	if creator, ok := c.config.Balancer().(balancer.Creator); ok {
-		opts = append(
-			opts,
-			WithBalancer(
-				creator.Create(),
-			),
-		)
-	}
+	opts = append(
+		opts,
+		WithBalancer(
+			c.config.Balancer().Create(),
+		),
+	)
 
 	id := atomic.AddUint64(&nextID, 1)
 
