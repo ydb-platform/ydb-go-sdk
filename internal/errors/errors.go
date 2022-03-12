@@ -103,7 +103,10 @@ func (e *errorWithIssues) Error() string {
 
 // Error is alias to fmt.Errorf() with prepend file:line prefix
 func Error(err error) error {
-	return ErrorfSkip(1, "%w", err)
+	return &stackError{
+		stackRecord: stackRecord(1),
+		err:         err,
+	}
 }
 
 // Errorf is alias to fmt.Errorf() with prepend file:line prefix
@@ -113,8 +116,16 @@ func Errorf(format string, args ...interface{}) error {
 
 // ErrorfSkip is alias to fmt.Errorf() with prepend file:line prefix
 func ErrorfSkip(depth int, format string, args ...interface{}) error {
+	return &stackError{
+		stackRecord: stackRecord(depth + 1),
+		err:         fmt.Errorf(format, args...),
+	}
+}
+
+func stackRecord(depth int) string {
 	function, file, line, _ := runtime.Caller(depth + 1)
-	return fmt.Errorf(runtime.FuncForPC(function).Name()+" ("+fileName(file)+":"+strconv.Itoa(line)+") "+format, args...)
+	name := runtime.FuncForPC(function).Name()
+	return funcName(name) + "(" + packageName(name) + "/" + fileName(file) + ":" + strconv.Itoa(line) + ")"
 }
 
 func fileName(original string) string {
@@ -123,4 +134,33 @@ func fileName(original string) string {
 		return original
 	}
 	return original[i+1:]
+}
+
+func packageName(original string) string {
+	i := strings.LastIndex(original, ".")
+	if i == -1 {
+		return original
+	}
+	return original[:i]
+}
+
+func funcName(original string) string {
+	i := strings.LastIndex(original, "/")
+	if i == -1 {
+		return original
+	}
+	return original[i+1:]
+}
+
+type stackError struct {
+	stackRecord string
+	err         error
+}
+
+func (e *stackError) Error() string {
+	return e.err.Error() + " at `" + e.stackRecord + "`"
+}
+
+func (e *stackError) Unwrap() error {
+	return e.err
 }

@@ -1,3 +1,6 @@
+## 3.14.2
+* Refactored internal error wrapping (with file and line identification) - replaced `fmt.Printf("%w", err)` error wrapping to internal `stackError`
+
 ## 3.14.1
 * Added `balacers.CreateFromConfig` balancer creator
 * Added `Create` method to interface `balancer.Balancer`
