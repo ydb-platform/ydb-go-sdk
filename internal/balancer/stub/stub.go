@@ -16,6 +16,7 @@ type stubBalancer struct {
 	OnRemove    func(balancer.Element) bool
 	OnPessimize func(context.Context, balancer.Element) error
 	OnContains  func(balancer.Element) bool
+	OnCreate    func() balancer.Balancer
 }
 
 func Balancer() (*list.List, balancer.Balancer) {
@@ -53,6 +54,13 @@ func Balancer() (*list.List, balancer.Balancer) {
 			return cs.Contains(e)
 		},
 	}
+}
+
+func (s stubBalancer) Create() balancer.Balancer {
+	if f := s.OnCreate; f != nil {
+		return f()
+	}
+	return nil
 }
 
 func (s stubBalancer) Next() conn.Conn {

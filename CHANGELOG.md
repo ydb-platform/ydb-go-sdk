@@ -1,5 +1,9 @@
+## 3.14.1
+* Added `balacers.CreateFromConfig` balancer creator
+* Added `Create` method to interface `balancer.Balancer`
+
 ## 3.14.0
-* Added `balacers.FromConfig` balancers creator
+* Added `balacers.FromConfig` balancer creator
 
 ## 3.13.3
 * Fixed linter issues
