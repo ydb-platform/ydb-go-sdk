@@ -1,3 +1,6 @@
+## 3.14.0
+* Added `balacers.FromConfig` balancers creator
+
 ## 3.13.3
 * Fixed linter issues
 
