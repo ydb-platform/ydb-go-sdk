@@ -26,10 +26,6 @@ func (db *database) Discovery() discovery.Client {
 	return db.discovery
 }
 
-func (db *database) GetConn(endpoint endpoint.Endpoint) conn.Conn {
-	return db.cluster.GetConn(endpoint)
-}
-
 func (db *database) Close(ctx context.Context) (err error) {
 	issues := make([]error, 0, 2)
 
@@ -78,14 +74,17 @@ func New(
 	}
 	defer cancel()
 
+	cc := pool.Get(ctx, endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true)))
+
 	db.discovery, err = builder.New(
 		ctx,
-		db.cluster.GetConn(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
+		cc,
 		db.cluster,
 		db.config.Trace(),
 		opts...,
 	)
 	if err != nil {
+		cc.Release(ctx)
 		return nil, err
 	}
 

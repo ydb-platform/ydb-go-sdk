@@ -102,10 +102,6 @@ func (c *cluster) Unlock() {
 	c.mu.Unlock()
 }
 
-func (c *cluster) GetConn(endpoint endpoint.Endpoint) conn.Conn {
-	return c.pool.GetConn(endpoint)
-}
-
 func (c *cluster) Force() {
 	c.explorer.Force()
 }
@@ -171,7 +167,6 @@ type Cluster interface {
 	CRUD
 	Explorer
 	Locker
-	conn.PoolGetter
 	conn.Pessimizer
 }
 
@@ -211,10 +206,40 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 	if c.explorer != nil {
 		c.explorer.Stop()
 	}
+
+	for _, entry := range c.index {
+		c.Remove(
+			ctx,
+			entry.Conn.Endpoint(),
+			WithoutLock(),
+		)
+	}
+
 	c.closed = true
 
-	c.index = nil
-	c.endpoints = nil
+	if len(c.index) > 0 {
+		panic(fmt.Sprintf(
+			"non empty index after remove all entries: %v",
+			func() (endpoints []string) {
+				for e := range c.index {
+					endpoints = append(endpoints, e)
+				}
+				return endpoints
+			}(),
+		))
+	}
+
+	if len(c.endpoints) > 0 {
+		panic(fmt.Sprintf(
+			"non empty nodes after remove all entries: %v",
+			func() (nodes []uint32) {
+				for e := range c.endpoints {
+					nodes = append(nodes, e)
+				}
+				return nodes
+			}(),
+		))
+	}
 
 	return c.pool.Release(ctx)
 }
@@ -284,7 +309,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		return nil
 	}
 
-	cc = c.pool.GetConn(e)
+	cc = c.pool.Get(ctx, e)
 
 	_, has := c.index[e.Address()]
 	if has {
@@ -335,7 +360,12 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		panic("ydb: cluster entry with nil conn")
 	}
 
-	entry.Conn.Endpoint().Touch()
+	entry.Conn.Endpoint().Touch(
+		endpoint.WithLocation(e.Location()),
+		endpoint.WithID(e.NodeID()),
+		endpoint.WithLoadFactor(e.LoadFactor()),
+		endpoint.WithLocalDC(e.LocalDC()),
+	)
 
 	delete(c.endpoints, e.NodeID())
 	c.index[e.Address()] = entry
@@ -379,6 +409,8 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 	if !has {
 		panic("ydb: can't remove not-existing endpoint")
 	}
+
+	defer entry.Conn.Release(ctx)
 
 	removed = entry.RemoveFrom(c.balancer, &c.balancerMtx)
 

@@ -28,6 +28,7 @@ func New(
 	opts ...config.Option,
 ) (_ discovery.Client, err error) {
 	c := &client{
+		cc:      cc,
 		config:  config.New(opts...),
 		service: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
 	}
@@ -114,6 +115,7 @@ func New(
 type client struct {
 	config  config.Config
 	service Ydb_Discovery_V1.DiscoveryServiceClient
+	cc      conn.Conn
 }
 
 func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
@@ -184,6 +186,7 @@ func (d *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 	}, nil
 }
 
-func (d *client) Close(context.Context) error {
+func (d *client) Close(ctx context.Context) error {
+	d.cc.Release(ctx)
 	return nil
 }

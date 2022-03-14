@@ -231,6 +231,7 @@ func TestTable(t *testing.T) {
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithSessionPoolSizeLimit(limit),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
+		ydb.WithConnectionTTL(5*time.Second),
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
@@ -239,6 +240,11 @@ func TestTable(t *testing.T) {
 			ydb.WithErrWriter(os.Stderr),
 			ydb.WithMinLevel(ydb.ERROR),
 		),
+		ydb.WithTraceDriver(trace.Driver{
+			OnConnUsagesChange: func(info trace.ConnUsagesChangeInfo) {
+				fmt.Printf("usages=%d (address: %s)\n", info.Usages, info.Endpoint.Address())
+			},
+		}),
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
 				trace.Table{

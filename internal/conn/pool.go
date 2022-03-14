@@ -15,14 +15,14 @@ import (
 )
 
 type Pool interface {
-	PoolGetter
+	Getter
 	Taker
 	Releaser
 	Pessimizer
 }
 
-type PoolGetter interface {
-	GetConn(endpoint endpoint.Endpoint) Conn
+type Getter interface {
+	Get(ctx context.Context, endpoint endpoint.Endpoint) Conn
 }
 
 type Taker interface {
@@ -49,6 +49,36 @@ type pool struct {
 	opts   []grpc.DialOption
 	conns  map[string]*conn
 	done   chan struct{}
+}
+
+func (p *pool) Get(ctx context.Context, endpoint endpoint.Endpoint) Conn {
+	p.mtx.Lock()
+	defer p.mtx.Unlock()
+
+	var (
+		address = endpoint.Address()
+		cc      *conn
+		has     bool
+	)
+
+	if cc, has = p.conns[address]; has {
+		cc.incUsages()
+		return cc
+	}
+
+	cc = newConn(
+		endpoint,
+		p.config,
+		withOnClose(func(c *conn) {
+			p.mtx.Lock()
+			defer p.mtx.Unlock()
+			delete(p.conns, c.Endpoint().Address())
+		}),
+	)
+
+	p.conns[address] = cc
+
+	return cc
 }
 
 func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
@@ -104,25 +134,6 @@ func (p *pool) Release(ctx context.Context) error {
 	return nil
 }
 
-func (p *pool) GetConn(e endpoint.Endpoint) Conn {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
-	if cc, ok := p.conns[e.Address()]; ok {
-		return cc
-	}
-	cc := newConn(
-		e,
-		p.config,
-		withOnClose(func(c *conn) {
-			p.mtx.Lock()
-			defer p.mtx.Unlock()
-			delete(p.conns, c.Endpoint().Address())
-		}),
-	)
-	p.conns[e.Address()] = cc
-	return cc
-}
-
 func (p *pool) connParker(ctx context.Context, interval time.Duration) {
 	for {
 		select {
@@ -130,15 +141,16 @@ func (p *pool) connParker(ctx context.Context, interval time.Duration) {
 			return
 		case <-time.After(interval):
 			p.mtx.RLock()
+			conns := make([]*conn, 0, len(p.conns))
 			for _, c := range p.conns {
-				select {
-				case <-c.TTL():
-					_ = c.Park(ctx)
-				default:
-					// pass
-				}
+				conns = append(conns, c)
 			}
 			p.mtx.RUnlock()
+			for _, c := range conns {
+				if time.Since(c.LastUsage()) > p.config.ConnectionTTL() {
+					_ = c.park(ctx)
+				}
+			}
 		}
 	}
 }
@@ -155,7 +167,7 @@ func NewPool(
 		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(ctx, ttl/10)
+		go p.connParker(ctx, ttl/2)
 	}
 	return p
 }

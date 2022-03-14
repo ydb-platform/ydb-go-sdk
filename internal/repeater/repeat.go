@@ -111,11 +111,11 @@ func (r *repeater) wakeUp(ctx context.Context, e event) {
 
 	err = r.task(ctx)
 
+	onDone(err)
+
 	if err != nil {
 		r.Force()
 	}
-
-	onDone(err)
 }
 
 func (r *repeater) worker(ctx context.Context, interval time.Duration) {

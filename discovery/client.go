@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
@@ -18,7 +19,8 @@ func (w WhoAmI) String() string {
 }
 
 type Client interface {
+	closer.Closer
+
 	Discover(ctx context.Context) ([]endpoint.Endpoint, error)
 	WhoAmI(ctx context.Context) (*WhoAmI, error)
-	Close(ctx context.Context) error
 }

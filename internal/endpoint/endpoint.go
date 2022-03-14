@@ -113,8 +113,12 @@ func (e *endpoint) LastUpdated() time.Time {
 func (e *endpoint) Touch(opts ...option) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.lastUpdated = time.Now()
-	for _, o := range opts {
+	for _, o := range append(
+		[]option{
+			withLastUpdated(time.Now()),
+		},
+		opts...,
+	) {
 		o(e)
 	}
 }
@@ -123,48 +127,36 @@ type option func(e *endpoint)
 
 func WithID(id uint32) option {
 	return func(e *endpoint) {
-		e.mu.Lock()
-		defer e.mu.Unlock()
 		e.id = id
 	}
 }
 
 func WithLocation(location string) option {
 	return func(e *endpoint) {
-		e.mu.Lock()
-		defer e.mu.Unlock()
 		e.location = location
 	}
 }
 
 func WithLocalDC(local bool) option {
 	return func(e *endpoint) {
-		e.mu.Lock()
-		defer e.mu.Unlock()
 		e.local = local
 	}
 }
 
 func WithLoadFactor(loadFactor float32) option {
 	return func(e *endpoint) {
-		e.mu.Lock()
-		defer e.mu.Unlock()
 		e.loadFactor = loadFactor
 	}
 }
 
 func WithServices(services []string) option {
 	return func(e *endpoint) {
-		e.mu.Lock()
-		defer e.mu.Unlock()
 		e.services = append(e.services, services...)
 	}
 }
 
-func WithLastUpdated(ts time.Time) option {
+func withLastUpdated(ts time.Time) option {
 	return func(e *endpoint) {
-		e.mu.Lock()
-		defer e.mu.Unlock()
 		e.lastUpdated = ts
 	}
 }
