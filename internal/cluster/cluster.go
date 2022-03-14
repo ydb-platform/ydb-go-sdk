@@ -347,7 +347,10 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 	c.balancerMtx.Lock()
 	defer c.balancerMtx.Unlock()
 
-	c.balancer.Update(entry.Handle, e.Info())
+	if entry.Handle != nil {
+		// entry.Handle may be nil because endpoint may be no in balancer
+		c.balancer.Update(entry.Handle, e.Info())
+	}
 
 	return entry.Conn
 }
