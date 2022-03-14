@@ -1,3 +1,6 @@
+## 3.14.3
+* Fixed bug with update balancer element with nil handle
+
 ## 3.14.2
 * Refactored internal error wrapping (with file and line identification) - replaced `fmt.Printf("%w", err)` error wrapping to internal `stackError`
 
