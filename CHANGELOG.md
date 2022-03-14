@@ -1,3 +1,7 @@
+## 3.14.4
+* Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`
+* Refactored naming of source files which declares service client interfaces
+
 ## 3.14.3
 * Fixed bug with update balancer element with nil handle
 

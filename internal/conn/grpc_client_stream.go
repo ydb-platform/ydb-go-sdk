@@ -44,10 +44,12 @@ func (s *grpcClientStream) Context() context.Context {
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	s.c.incUsages()
 	defer s.c.decUsages()
+
 	err = s.s.SendMsg(m)
 	if err != nil && s.wrapping {
 		err = errors.Error(errors.MapGRPCError(err))
 	}
+
 	return
 }
 

@@ -125,26 +125,10 @@ func ErrorfSkip(depth int, format string, args ...interface{}) error {
 func stackRecord(depth int) string {
 	function, file, line, _ := runtime.Caller(depth + 1)
 	name := runtime.FuncForPC(function).Name()
-	return funcName(name) + "(" + packageName(name) + "/" + fileName(file) + ":" + strconv.Itoa(line) + ")"
+	return name + "(" + fileName(file) + ":" + strconv.Itoa(line) + ")"
 }
 
 func fileName(original string) string {
-	i := strings.LastIndex(original, "/")
-	if i == -1 {
-		return original
-	}
-	return original[i+1:]
-}
-
-func packageName(original string) string {
-	i := strings.LastIndex(original, ".")
-	if i == -1 {
-		return original
-	}
-	return original[:i]
-}
-
-func funcName(original string) string {
 	i := strings.LastIndex(original, "/")
 	if i == -1 {
 		return original

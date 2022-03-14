@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -32,11 +32,13 @@ type Conn interface {
 
 	Endpoint() endpoint.Endpoint
 
-	TTL() <-chan time.Time
+	LastUsage() time.Time
 
 	IsState(states ...State) bool
 	GetState() State
 	SetState(State) State
+
+	Release(ctx context.Context)
 }
 
 func (c *conn) Address() string {
@@ -45,15 +47,28 @@ func (c *conn) Address() string {
 
 type conn struct {
 	sync.RWMutex
-	config   Config // ro access
-	cc       *grpc.ClientConn
-	done     chan struct{}
-	endpoint endpoint.Endpoint // ro access
-	closed   bool
-	state    State
-	usages   int32
-	ttl      timeutil.Timer
-	onClose  []func(*conn)
+	config    Config // ro access
+	cc        *grpc.ClientConn
+	done      chan struct{}
+	endpoint  endpoint.Endpoint // ro access
+	closed    bool
+	state     State
+	usages    int32
+	lastUsage time.Time
+	onClose   []func(*conn)
+}
+
+func (c *conn) Release(ctx context.Context) {
+	if c.decUsages() == 0 {
+		_ = c.Close(ctx)
+	}
+}
+
+func (c *conn) LastUsage() time.Time {
+	c.RLock()
+	defer c.RUnlock()
+
+	return c.lastUsage
 }
 
 func (c *conn) IsState(states ...State) bool {
@@ -69,7 +84,7 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) Park(ctx context.Context) (err error) {
+func (c *conn) park(ctx context.Context) (err error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -135,19 +150,6 @@ func (c *conn) GetState() (s State) {
 	return c.state
 }
 
-func (c *conn) TTL() <-chan time.Time {
-	if c.config.ConnectionTTL() == 0 {
-		return nil
-	}
-	if c.isClosed() {
-		return nil
-	}
-	if atomic.LoadInt32(&c.usages) > 0 {
-		return nil
-	}
-	return c.ttl.C()
-}
-
 func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	onDone := trace.DriverOnConnTake(
 		trace.ContextDriver(ctx).Compose(c.config.Trace()),
@@ -192,25 +194,30 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	return c.cc, nil
 }
 
-func (c *conn) changeUsages(delta int32) {
-	trace.DriverOnConnUsagesChange(
-		c.config.Trace(),
-		c.endpoint.Copy(),
-		int(atomic.AddInt32(&c.usages, delta)),
-	)
+func (c *conn) changeUsages(delta int32) int32 {
+	if usages := atomic.AddInt32(&c.usages, delta); usages < 0 {
+		panic("negative usages" + strconv.Itoa(int(usages)))
+	} else {
+		trace.DriverOnConnUsagesChange(
+			c.config.Trace(),
+			c.endpoint.Copy(),
+			int(usages),
+		)
+		return usages
+	}
 }
 
 func (c *conn) incUsages() {
+	c.Lock()
+	defer c.Unlock()
 	c.changeUsages(1)
 }
 
-func (c *conn) decUsages() {
+func (c *conn) decUsages() int32 {
 	c.Lock()
 	defer c.Unlock()
-	if ttl := c.config.ConnectionTTL(); ttl > 0 {
-		c.ttl.Reset(ttl)
-	}
-	c.changeUsages(-1)
+	c.lastUsage = time.Now()
+	return c.changeUsages(-1)
 }
 
 func isBroken(raw *grpc.ClientConn) bool {
@@ -433,6 +440,7 @@ func withOnClose(onClose func(*conn)) option {
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
+		usages:   1,
 		state:    Created,
 		endpoint: e,
 		config:   config,
@@ -441,9 +449,6 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	}
 	for _, o := range opts {
 		o(c)
-	}
-	if ttl := config.ConnectionTTL(); ttl > 0 {
-		c.ttl = timeutil.NewTimer(ttl)
 	}
 	return c
 }

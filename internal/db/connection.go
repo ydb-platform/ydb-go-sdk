@@ -5,7 +5,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
 type Cluster interface {
@@ -34,7 +33,6 @@ type ConnectionInfo interface {
 
 type Connection interface {
 	Cluster
-	conn.PoolGetter
 	ConnectionInfo
 	ConnectionDiscovery
 }
