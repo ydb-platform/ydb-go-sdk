@@ -20,6 +20,18 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+type noWrapperError struct {
+	text string
+}
+
+func (e *noWrapperError) Error() string {
+	return e.text
+}
+
+func (e *noWrapperError) Wrap() bool {
+	return false
+}
+
 func TestScripting(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -52,6 +64,16 @@ func TestScripting(t *testing.T) {
 			t.Fatalf("db close failed: %+v", e)
 		}
 	}()
+	// Test no wrapping error
+	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return &noWrapperError{
+			text: "no wrap!!!",
+		}
+	}); err != nil {
+		if err.Error() != "no wrap!!!" {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
 	// Execute
 	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().Execute(

@@ -149,7 +149,7 @@ func (c *connection) Close(ctx context.Context) error {
 	}
 
 	if len(issues) > 0 {
-		return errors.NewWithIssues("close failed", issues...)
+		return errors.Error(errors.NewWithIssues("close failed", issues...))
 	}
 
 	return nil

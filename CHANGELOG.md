@@ -1,3 +1,8 @@
+## 3.14.5
+* Declared internal interface `wrapper` for manage error wrapping from client-side
+* Supported check err as `wrapper`
+* Fixed race on check trailer on closing table grpc-stream
+
 ## 3.14.4
 * Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`
 * Refactored naming of source files which declares service client interfaces

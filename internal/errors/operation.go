@@ -62,7 +62,7 @@ func NewOpError(opts ...oeOpt) error {
 	for _, f := range opts {
 		f(oe)
 	}
-	return ErrorfSkip(1, "%w", oe)
+	return oe
 }
 
 func (e *OpError) Issues() []*Ydb_Issue.IssueMessage {

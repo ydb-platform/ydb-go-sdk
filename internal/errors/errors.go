@@ -76,10 +76,10 @@ func New(text string) error {
 
 // NewWithIssues returns error which contains child issues
 func NewWithIssues(text string, issues ...error) error {
-	return ErrorfSkip(1, "%w", &errorWithIssues{
+	return &errorWithIssues{
 		reason: text,
 		issues: issues,
-	})
+	}
 }
 
 type errorWithIssues struct {
@@ -101,20 +101,27 @@ func (e *errorWithIssues) Error() string {
 	return b.String()
 }
 
-// Error is alias to fmt.Errorf() with prepend file:line prefix
+// Error is a wrapper over original err with file:line identification
 func Error(err error) error {
+	if err == nil {
+		panic("nil error")
+	}
+	if w := wrapper(nil); errors.As(err, &w) && !w.Wrap() {
+		return err
+	}
 	return &stackError{
 		stackRecord: stackRecord(1),
 		err:         err,
 	}
 }
 
-// Errorf is alias to fmt.Errorf() with prepend file:line prefix
+// Errorf looks like fmt.Errorf() and stores file:line identification
 func Errorf(format string, args ...interface{}) error {
 	return ErrorfSkip(1, format, args...)
 }
 
-// ErrorfSkip is alias to fmt.Errorf() with prepend file:line prefix
+// ErrorfSkip looks like fmt.Errorf() and stores file:line identification
+// depth define depth to skip stacktrace item
 func ErrorfSkip(depth int, format string, args ...interface{}) error {
 	return &stackError{
 		stackRecord: stackRecord(depth + 1),
@@ -147,4 +154,8 @@ func (e *stackError) Error() string {
 
 func (e *stackError) Unwrap() error {
 	return e.err
+}
+
+type wrapper interface {
+	Wrap() bool
 }

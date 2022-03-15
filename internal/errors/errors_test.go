@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+type managedWrappingError struct {
+	text string
+	wrap bool
+}
+
+func (e *managedWrappingError) Error() string {
+	return e.text
+}
+
+func (e *managedWrappingError) Wrap() bool {
+	return e.wrap
+}
+
 func TestError(t *testing.T) {
 	for _, test := range []struct {
 		error error
@@ -12,15 +25,30 @@ func TestError(t *testing.T) {
 	}{
 		{
 			error: Error(fmt.Errorf("TestError")),
-			text:  "TestError at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:14)`",
+			text:  "TestError at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:27)`",
 		},
 		{
 			error: Errorf("TestError%s", "Printf"),
-			text:  "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:18)`",
+			text:  "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:31)`",
 		},
 		{
 			error: ErrorfSkip(0, "TestError%s", "Printf"),
-			text:  "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:22)`",
+			text:  "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:35)`",
+		},
+		{
+			error: Error(&managedWrappingError{
+				text: "no wrapped managedWrappingError",
+				wrap: false,
+			}),
+			text: "no wrapped managedWrappingError",
+		},
+		{
+			error: Error(&managedWrappingError{
+				text: "wrapped managedWrappingError",
+				wrap: true,
+			}),
+			// nolint:lll
+			text: "wrapped managedWrappingError at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:46)`",
 		},
 	} {
 		t.Run(test.text, func(t *testing.T) {

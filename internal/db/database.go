@@ -38,7 +38,7 @@ func (db *database) Close(ctx context.Context) (err error) {
 	}
 
 	if len(issues) > 0 {
-		return errors.NewWithIssues("db close failed", issues...)
+		return errors.Error(errors.NewWithIssues("db close failed", issues...))
 	}
 
 	return nil
