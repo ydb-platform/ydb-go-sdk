@@ -14,22 +14,32 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type noWrapperError struct {
+type customError struct {
 	text string
 }
 
-func (e *noWrapperError) Error() string {
+func (e *customError) Error() string {
 	return e.text
 }
 
-func (e *noWrapperError) Wrap() bool {
+func (e *customError) WithStackTrace() bool {
 	return false
+}
+
+func (e *customError) MapLogLevel(l log.Level) log.Level {
+	switch l {
+	case log.ERROR:
+		return log.DEBUG
+	default:
+		return l
+	}
 }
 
 func TestScripting(t *testing.T) {
@@ -51,7 +61,7 @@ func TestScripting(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.TRACE),
+			ydb.WithMinLevel(log.TRACE),
 		),
 		ydb.WithUserAgent("scripting"),
 	)
@@ -66,7 +76,7 @@ func TestScripting(t *testing.T) {
 	}()
 	// Test no wrapping error
 	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return &noWrapperError{
+		return &customError{
 			text: "no wrap!!!",
 		}
 	}); err != nil {

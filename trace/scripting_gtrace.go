@@ -190,20 +190,20 @@ func (t Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInf
 	}
 	return res
 }
-func ScriptingOnExecute(t Scripting, c *context.Context, query string, parameters queryParameters) func(result result, _ error) {
+func ScriptingOnExecute(t Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
 	var p ScriptingExecuteStartInfo
 	p.Context = c
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onExecute(p)
-	return func(result result, e error) {
+	return func(result scriptingResult, e error) {
 		var p ScriptingExecuteDoneInfo
 		p.Result = result
 		p.Error = e
 		res(p)
 	}
 }
-func ScriptingOnStreamExecute(t Scripting, c *context.Context, query string, parameters queryParameters) func(error) func(error) {
+func ScriptingOnStreamExecute(t Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(error) func(error) {
 	var p ScriptingStreamExecuteStartInfo
 	p.Context = c
 	p.Query = query

@@ -135,11 +135,13 @@ func (p *pool) Release(ctx context.Context) error {
 }
 
 func (p *pool) connParker(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	ttl := p.config.ConnectionTTL()
 	for {
 		select {
 		case <-p.done:
 			return
-		case <-time.After(interval):
+		case <-ticker.C:
 			p.mtx.RLock()
 			conns := make([]*conn, 0, len(p.conns))
 			for _, c := range p.conns {
@@ -147,7 +149,7 @@ func (p *pool) connParker(ctx context.Context, interval time.Duration) {
 			}
 			p.mtx.RUnlock()
 			for _, c := range conns {
-				if time.Since(c.LastUsage()) > p.config.ConnectionTTL() {
+				if time.Since(c.LastUsage()) > ttl {
 					_ = c.park(ctx)
 				}
 			}

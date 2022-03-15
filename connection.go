@@ -18,7 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -231,13 +231,13 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		opts = append([]Option{WithCertificatesFromFile(caFile)}, opts...)
 	}
 	if logLevel, has := os.LookupEnv("YDB_LOG_SEVERITY_LEVEL"); has {
-		if l := logger.FromString(logLevel); l < logger.QUIET {
+		if l := log.FromString(logLevel); l < log.QUIET {
 			opts = append(
 				opts,
 				WithLogger(
 					trace.DetailsAll,
 					WithNamespace("ydb"),
-					WithMinLevel(Level(logger.FromString(logLevel))),
+					WithMinLevel(log.FromString(logLevel)),
 					WithNoColor(os.Getenv("YDB_LOG_NO_COLOR") != ""),
 				),
 			)

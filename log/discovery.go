@@ -9,13 +9,13 @@ import (
 func Discovery(log Logger, details trace.Details) (t trace.Discovery) {
 	if details&trace.DiscoveryEvents != 0 {
 		log = log.WithName(`discovery`)
-		t.OnDiscover = func(info trace.DiscoverStartInfo) func(trace.DiscoverDoneInfo) {
+		t.OnDiscover = func(info trace.DiscoveryDiscoverStartInfo) func(trace.DiscoveryDiscoverDoneInfo) {
 			log.Infof(`discover start {address:"%s",database:"%s"}`,
 				info.Address,
 				info.Database,
 			)
 			start := time.Now()
-			return func(info trace.DiscoverDoneInfo) {
+			return func(info trace.DiscoveryDiscoverDoneInfo) {
 				if info.Error == nil {
 					endpoints := make([]string, 0, len(info.Endpoints))
 					for _, e := range info.Endpoints {
@@ -33,10 +33,10 @@ func Discovery(log Logger, details trace.Details) (t trace.Discovery) {
 				}
 			}
 		}
-		t.OnWhoAmI = func(info trace.WhoAmIStartInfo) func(doneInfo trace.WhoAmIDoneInfo) {
+		t.OnWhoAmI = func(info trace.DiscoveryWhoAmIStartInfo) func(doneInfo trace.DiscoveryWhoAmIDoneInfo) {
 			log.Debugf(`whoAmI start`)
 			start := time.Now()
-			return func(info trace.WhoAmIDoneInfo) {
+			return func(info trace.DiscoveryWhoAmIDoneInfo) {
 				if info.Error == nil {
 					log.Debugf(`whoAmI done {latency:"%v",user:%v,groups:%v}`,
 						time.Since(start),

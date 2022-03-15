@@ -23,6 +23,16 @@ type (
 		OnExplain func(ScriptingExplainStartInfo) func(ScriptingExplainDoneInfo)
 		OnClose   func(ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo)
 	}
+	scriptingQueryParameters interface {
+		String() string
+	}
+	scriptingResultErr interface {
+		Err() error
+	}
+	scriptingResult interface {
+		scriptingResultErr
+		ResultSetCount() int
+	}
 	ScriptingExecuteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -30,10 +40,10 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Query      string
-		Parameters queryParameters
+		Parameters scriptingQueryParameters
 	}
 	ScriptingExecuteDoneInfo struct {
-		Result result
+		Result scriptingResult
 		Error  error
 	}
 	ScriptingStreamExecuteStartInfo struct {
@@ -43,7 +53,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Query      string
-		Parameters queryParameters
+		Parameters scriptingQueryParameters
 	}
 	ScriptingStreamExecuteIntermediateInfo struct {
 		Error error

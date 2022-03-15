@@ -17,3 +17,20 @@ type Logger interface {
 	// WithName provide applying sub-scope of logger messages
 	WithName(name string) Logger
 }
+
+func logf(l Logger, level Level, format string, args ...interface{}) {
+	switch level {
+	case TRACE:
+		l.Tracef(format, args...)
+	case DEBUG:
+		l.Debugf(format, args...)
+	case INFO:
+		l.Infof(format, args...)
+	case WARN:
+		l.Warnf(format, args...)
+	case ERROR:
+		l.Errorf(format, args...)
+	case FATAL:
+		l.Fatalf(format, args...)
+	}
+}

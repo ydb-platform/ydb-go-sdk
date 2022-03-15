@@ -10,10 +10,10 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Discovery struct {
-		OnDiscover func(DiscoverStartInfo) func(DiscoverDoneInfo)
-		OnWhoAmI   func(WhoAmIStartInfo) func(WhoAmIDoneInfo)
+		OnDiscover func(DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo)
+		OnWhoAmI   func(DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo)
 	}
-	DiscoverStartInfo struct {
+	DiscoveryDiscoverStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -22,19 +22,19 @@ type (
 		Address  string
 		Database string
 	}
-	DiscoverDoneInfo struct {
+	DiscoveryDiscoverDoneInfo struct {
 		Location  string
 		Endpoints []EndpointInfo
 		Error     error
 	}
-	WhoAmIStartInfo struct {
+	DiscoveryWhoAmIStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	WhoAmIDoneInfo struct {
+	DiscoveryWhoAmIDoneInfo struct {
 		User   string
 		Groups []string
 		Error  error

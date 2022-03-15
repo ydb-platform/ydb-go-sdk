@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -148,44 +147,6 @@ func WithTLSSInsecureSkipVerify() Option {
 		c.options = append(c.options, config.WithTLSSInsecureSkipVerify())
 		return nil
 	}
-}
-
-type Level logger.Level
-
-const (
-	QUIET = Level(logger.QUIET)
-	TRACE = Level(logger.TRACE)
-	DEBUG = Level(logger.DEBUG)
-	INFO  = Level(logger.INFO)
-	WARN  = Level(logger.WARN)
-	ERROR = Level(logger.ERROR)
-	FATAL = Level(logger.FATAL)
-)
-
-type LoggerOption logger.Option
-
-func WithNamespace(namespace string) LoggerOption {
-	return LoggerOption(logger.WithNamespace(namespace))
-}
-
-func WithMinLevel(minLevel Level) LoggerOption {
-	return LoggerOption(logger.WithMinLevel(logger.Level(minLevel)))
-}
-
-func WithNoColor(b bool) LoggerOption {
-	return LoggerOption(logger.WithNoColor(b))
-}
-
-func WithExternalLogger(external log.Logger) LoggerOption {
-	return LoggerOption(logger.WithExternalLogger(external))
-}
-
-func WithOutWriter(out io.Writer) LoggerOption {
-	return LoggerOption(logger.WithOutWriter(out))
-}
-
-func WithErrWriter(err io.Writer) LoggerOption {
-	return LoggerOption(logger.WithErrWriter(err))
 }
 
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {

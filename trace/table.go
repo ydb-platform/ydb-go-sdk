@@ -13,214 +13,222 @@ type (
 	//gtrace:gen
 	//gtrace:set Shortcut
 	Table struct {
-		// Pool events
-		OnInit  func(TableInitStartInfo) func(TableInitDoneInfo)
-		OnClose func(TableCloseStartInfo) func(TableCloseDoneInfo)
+		// Client events
+		OnInit          func(TableInitStartInfo) func(TableInitDoneInfo)
+		OnClose         func(TableCloseStartInfo) func(TableCloseDoneInfo)
+		OnDo            func(TableDoStartInfo) func(info TableDoIntermediateInfo) func(TableDoDoneInfo)
+		OnDoTx          func(TableDoTxStartInfo) func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo)
+		OnCreateSession func(TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo)
 		// Session events
-		OnSessionNew       func(SessionNewStartInfo) func(SessionNewDoneInfo)
-		OnSessionDelete    func(SessionDeleteStartInfo) func(SessionDeleteDoneInfo)
-		OnSessionKeepAlive func(KeepAliveStartInfo) func(KeepAliveDoneInfo)
+		OnSessionNew       func(TableSessionNewStartInfo) func(TableSessionNewDoneInfo)
+		OnSessionDelete    func(TableSessionDeleteStartInfo) func(TableSessionDeleteDoneInfo)
+		OnSessionKeepAlive func(TableKeepAliveStartInfo) func(TableKeepAliveDoneInfo)
 		// Query events
-		OnSessionQueryPrepare func(PrepareDataQueryStartInfo) func(PrepareDataQueryDoneInfo)
-		OnSessionQueryExecute func(ExecuteDataQueryStartInfo) func(ExecuteDataQueryDoneInfo)
-		OnSessionQueryExplain func(ExplainQueryStartInfo) func(ExplainQueryDoneInfo)
+		OnSessionQueryPrepare func(TablePrepareDataQueryStartInfo) func(TablePrepareDataQueryDoneInfo)
+		OnSessionQueryExecute func(TableExecuteDataQueryStartInfo) func(TableExecuteDataQueryDoneInfo)
+		OnSessionQueryExplain func(TableExplainQueryStartInfo) func(TableExplainQueryDoneInfo)
 		// Stream events
 		OnSessionQueryStreamExecute func(
-			SessionQueryStreamExecuteStartInfo,
+			TableSessionQueryStreamExecuteStartInfo,
 		) func(
-			SessionQueryStreamExecuteIntermediateInfo,
+			TableSessionQueryStreamExecuteIntermediateInfo,
 		) func(
-			SessionQueryStreamExecuteDoneInfo,
+			TableSessionQueryStreamExecuteDoneInfo,
 		)
 		OnSessionQueryStreamRead func(
-			SessionQueryStreamReadStartInfo,
+			TableSessionQueryStreamReadStartInfo,
 		) func(
-			SessionQueryStreamReadIntermediateInfo,
+			TableSessionQueryStreamReadIntermediateInfo,
 		) func(
-			SessionQueryStreamReadDoneInfo,
+			TableSessionQueryStreamReadDoneInfo,
 		)
 		// Transaction events
-		OnSessionTransactionBegin    func(SessionTransactionBeginStartInfo) func(SessionTransactionBeginDoneInfo)
-		OnSessionTransactionCommit   func(SessionTransactionCommitStartInfo) func(SessionTransactionCommitDoneInfo)
-		OnSessionTransactionRollback func(SessionTransactionRollbackStartInfo) func(SessionTransactionRollbackDoneInfo)
+		OnSessionTransactionBegin  func(TableSessionTransactionBeginStartInfo) func(TableSessionTransactionBeginDoneInfo)
+		OnSessionTransactionCommit func(
+			TableSessionTransactionCommitStartInfo,
+		) func(
+			TableSessionTransactionCommitDoneInfo,
+		)
+		OnSessionTransactionRollback func(
+			TableSessionTransactionRollbackStartInfo,
+		) func(
+			TableSessionTransactionRollbackDoneInfo,
+		)
 		// Pool state event
-		OnPoolStateChange func(PooStateChangeInfo)
-		// Pool retry events
-		OnPoolDo   func(PoolDoStartInfo) func(info PoolDoIntermediateInfo) func(PoolDoDoneInfo)
-		OnPoolDoTx func(PoolDoTxStartInfo) func(info PoolDoTxIntermediateInfo) func(PoolDoTxDoneInfo)
+		OnPoolStateChange func(TablePooStateChangeInfo)
 		// Pool session lifecycle events
-		OnPoolSessionNew   func(PoolSessionNewStartInfo) func(PoolSessionNewDoneInfo)
-		OnPoolSessionClose func(PoolSessionCloseStartInfo) func(PoolSessionCloseDoneInfo)
+		OnPoolSessionNew   func(TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo)
+		OnPoolSessionClose func(TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo)
 		// Pool common API events
-		OnPoolPut  func(PoolPutStartInfo) func(PoolPutDoneInfo)
-		OnPoolGet  func(PoolGetStartInfo) func(PoolGetDoneInfo)
-		OnPoolWait func(PoolWaitStartInfo) func(PoolWaitDoneInfo)
+		OnPoolPut  func(TablePoolPutStartInfo) func(TablePoolPutDoneInfo)
+		OnPoolGet  func(TablePoolGetStartInfo) func(TablePoolGetDoneInfo)
+		OnPoolWait func(TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo)
 	}
 )
 
 type (
-	queryParameters interface {
+	tableQueryParameters interface {
 		String() string
 	}
-	dataQuery interface {
+	tableDataQuery interface {
 		String() string
 		ID() string
 		YQL() string
 	}
-	sessionInfo interface {
+	tableSessionInfo interface {
 		ID() string
 		Status() string
 	}
-	transactionInfo interface {
+	tableTransactionInfo interface {
 		ID() string
 	}
-	resultErr interface {
+	tableResultErr interface {
 		Err() error
 	}
-	result interface {
-		resultErr
+	tableResult interface {
+		tableResultErr
 		ResultSetCount() int
 	}
-	SessionNewStartInfo struct {
+	TableSessionNewStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	SessionNewDoneInfo struct {
-		Session sessionInfo
+	TableSessionNewDoneInfo struct {
+		Session tableSessionInfo
 		Error   error
 	}
-	KeepAliveStartInfo struct {
+	TableKeepAliveStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
+		Session tableSessionInfo
 	}
-	KeepAliveDoneInfo struct {
+	TableKeepAliveDoneInfo struct {
 		Error error
 	}
-	SessionDeleteStartInfo struct {
+	TableSessionDeleteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
+		Session tableSessionInfo
 	}
-	SessionDeleteDoneInfo struct {
+	TableSessionDeleteDoneInfo struct {
 		Error error
 	}
-	PrepareDataQueryStartInfo struct {
+	TablePrepareDataQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
+		Session tableSessionInfo
 		Query   string
 	}
-	PrepareDataQueryDoneInfo struct {
-		Result dataQuery
+	TablePrepareDataQueryDoneInfo struct {
+		Result tableDataQuery
 		Error  error
 	}
-	ExecuteDataQueryStartInfo struct {
+	TableExecuteDataQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
-		Session    sessionInfo
-		Query      dataQuery
-		Parameters queryParameters
+		Session    tableSessionInfo
+		Query      tableDataQuery
+		Parameters tableQueryParameters
 	}
-	ExplainQueryStartInfo struct {
+	TableExplainQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
+		Session tableSessionInfo
 		Query   string
 	}
-	ExplainQueryDoneInfo struct {
+	TableExplainQueryDoneInfo struct {
 		AST   string
 		Plan  string
 		Error error
 	}
-	ExecuteDataQueryDoneInfo struct {
-		Tx       transactionInfo
+	TableExecuteDataQueryDoneInfo struct {
+		Tx       tableTransactionInfo
 		Prepared bool
-		Result   result
+		Result   tableResult
 		Error    error
 	}
-	SessionQueryStreamReadStartInfo struct {
+	TableSessionQueryStreamReadStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
+		Session tableSessionInfo
 	}
-	SessionQueryStreamReadIntermediateInfo struct {
+	TableSessionQueryStreamReadIntermediateInfo struct {
 		Error error
 	}
-	SessionQueryStreamReadDoneInfo struct {
+	TableSessionQueryStreamReadDoneInfo struct {
 		Error error
 	}
-	SessionQueryStreamExecuteStartInfo struct {
+	TableSessionQueryStreamExecuteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
-		Session    sessionInfo
-		Query      dataQuery
-		Parameters queryParameters
+		Session    tableSessionInfo
+		Query      tableDataQuery
+		Parameters tableQueryParameters
 	}
-	SessionQueryStreamExecuteIntermediateInfo struct {
+	TableSessionQueryStreamExecuteIntermediateInfo struct {
 		Error error
 	}
-	SessionQueryStreamExecuteDoneInfo struct {
+	TableSessionQueryStreamExecuteDoneInfo struct {
 		Error error
 	}
-	SessionTransactionBeginStartInfo struct {
+	TableSessionTransactionBeginStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
+		Session tableSessionInfo
 	}
-	SessionTransactionBeginDoneInfo struct {
-		Tx    transactionInfo
+	TableSessionTransactionBeginDoneInfo struct {
+		Tx    tableTransactionInfo
 		Error error
 	}
-	SessionTransactionCommitStartInfo struct {
+	TableSessionTransactionCommitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
-		Tx      transactionInfo
+		Session tableSessionInfo
+		Tx      tableTransactionInfo
 	}
-	SessionTransactionCommitDoneInfo struct {
+	TableSessionTransactionCommitDoneInfo struct {
 		Error error
 	}
-	SessionTransactionRollbackStartInfo struct {
+	TableSessionTransactionRollbackStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
-		Tx      transactionInfo
+		Session tableSessionInfo
+		Tx      tableTransactionInfo
 	}
-	SessionTransactionRollbackDoneInfo struct {
+	TableSessionTransactionRollbackDoneInfo struct {
 		Error error
 	}
 	TableInitStartInfo struct {
@@ -234,68 +242,68 @@ type (
 		Limit            int
 		KeepAliveMinSize int
 	}
-	PooStateChangeInfo struct {
+	TablePooStateChangeInfo struct {
 		Size  int
 		Event string
 	}
-	PoolSessionNewStartInfo struct {
+	TablePoolSessionNewStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	PoolSessionNewDoneInfo struct {
-		Session sessionInfo
+	TablePoolSessionNewDoneInfo struct {
+		Session tableSessionInfo
 		Error   error
 	}
-	PoolGetStartInfo struct {
+	TablePoolGetStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	PoolGetDoneInfo struct {
-		Session  sessionInfo
+	TablePoolGetDoneInfo struct {
+		Session  tableSessionInfo
 		Attempts int
 		Error    error
 	}
-	PoolWaitStartInfo struct {
+	TablePoolWaitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	// PoolWaitDoneInfo means a wait iteration inside Get call is done
+	// TablePoolWaitDoneInfo means a wait iteration inside Get call is done
 	// Warning: Session and Error may be nil at the same time. This means
-	// that a wait iteration donned without any significant resultErr
-	PoolWaitDoneInfo struct {
-		Session sessionInfo
+	// that a wait iteration donned without any significant tableResultErr
+	TablePoolWaitDoneInfo struct {
+		Session tableSessionInfo
 		Error   error
 	}
-	PoolPutStartInfo struct {
+	TablePoolPutStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
+		Session tableSessionInfo
 	}
-	PoolPutDoneInfo struct {
+	TablePoolPutDoneInfo struct {
 		Error error
 	}
-	PoolSessionCloseStartInfo struct {
+	TablePoolSessionCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
-		Session sessionInfo
+		Session tableSessionInfo
 	}
-	PoolSessionCloseDoneInfo struct{}
-	TableCloseStartInfo      struct {
+	TablePoolSessionCloseDoneInfo struct{}
+	TableCloseStartInfo           struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -305,7 +313,7 @@ type (
 	TableCloseDoneInfo struct {
 		Error error
 	}
-	PoolDoStartInfo struct {
+	TableDoStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -313,14 +321,14 @@ type (
 		Context    *context.Context
 		Idempotent bool
 	}
-	PoolDoIntermediateInfo struct {
+	TableDoIntermediateInfo struct {
 		Error error
 	}
-	PoolDoDoneInfo struct {
+	TableDoDoneInfo struct {
 		Attempts int
 		Error    error
 	}
-	PoolDoTxStartInfo struct {
+	TableDoTxStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -328,10 +336,22 @@ type (
 		Context    *context.Context
 		Idempotent bool
 	}
-	PoolDoTxIntermediateInfo struct {
+	TableDoTxIntermediateInfo struct {
 		Error error
 	}
-	PoolDoTxDoneInfo struct {
+	TableDoTxDoneInfo struct {
+		Attempts int
+		Error    error
+	}
+	TableCreateSessionStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
+		Idempotent bool
+	}
+	TableCreateSessionDoneInfo struct {
 		Attempts int
 		Error    error
 	}

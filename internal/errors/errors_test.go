@@ -6,16 +6,16 @@ import (
 )
 
 type managedWrappingError struct {
-	text string
-	wrap bool
+	text           string
+	withStackTrace bool
 }
 
 func (e *managedWrappingError) Error() string {
 	return e.text
 }
 
-func (e *managedWrappingError) Wrap() bool {
-	return e.wrap
+func (e *managedWrappingError) WithStackTrace() bool {
+	return e.withStackTrace
 }
 
 func TestError(t *testing.T) {
@@ -37,15 +37,15 @@ func TestError(t *testing.T) {
 		},
 		{
 			error: Error(&managedWrappingError{
-				text: "no wrapped managedWrappingError",
-				wrap: false,
+				text:           "no wrapped managedWrappingError",
+				withStackTrace: false,
 			}),
 			text: "no wrapped managedWrappingError",
 		},
 		{
 			error: Error(&managedWrappingError{
-				text: "wrapped managedWrappingError",
-				wrap: true,
+				text:           "wrapped managedWrappingError",
+				withStackTrace: true,
 			}),
 			// nolint:lll
 			text: "wrapped managedWrappingError at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:46)`",

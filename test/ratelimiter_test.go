@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -40,7 +41,7 @@ func TestRatelimiter(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.TRACE),
+			ydb.WithMinLevel(log.TRACE),
 		),
 	)
 	if err != nil {

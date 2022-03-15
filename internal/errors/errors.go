@@ -106,7 +106,7 @@ func Error(err error) error {
 	if err == nil {
 		panic("nil error")
 	}
-	if w := wrapper(nil); errors.As(err, &w) && !w.Wrap() {
+	if w := StackTraceError(nil); errors.As(err, &w) && !w.WithStackTrace() {
 		return err
 	}
 	return &stackError{
@@ -156,6 +156,9 @@ func (e *stackError) Unwrap() error {
 	return e.err
 }
 
-type wrapper interface {
-	Wrap() bool
+// StackTraceError interface provide management of stacktrace error identification
+type StackTraceError interface {
+	error
+
+	WithStackTrace() bool
 }

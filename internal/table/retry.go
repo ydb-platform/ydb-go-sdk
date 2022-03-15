@@ -79,7 +79,7 @@ func parseOpts(ctx context.Context, opts ...retryOption) retryOptionsHolder {
 
 func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...retryOption) (err error) {
 	h := parseOpts(ctx, opts...)
-	attempts, onIntermediate := 0, trace.TableOnPoolDoTx(h.trace, &ctx, h.opts.Idempotent)
+	attempts, onIntermediate := 0, trace.TableOnDoTx(h.trace, &ctx, h.opts.Idempotent)
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
@@ -133,7 +133,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts ...
 
 func do(ctx context.Context, c SessionProvider, op table.Operation, opts ...retryOption) (err error) {
 	options := parseOpts(ctx, opts...)
-	attempts, onIntermediate := 0, trace.TableOnPoolDo(options.trace, &ctx, options.opts.Idempotent)
+	attempts, onIntermediate := 0, trace.TableOnDo(options.trace, &ctx, options.opts.Idempotent)
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
@@ -255,7 +255,7 @@ func retryBackoff(
 		i              int
 		attempts       int
 		code           = int32(0)
-		onIntermediate = trace.TableOnPoolDo(t, &ctx, isOperationIdempotent)
+		onIntermediate = trace.TableOnDo(t, &ctx, isOperationIdempotent)
 	)
 	defer func() {
 		if s != nil {

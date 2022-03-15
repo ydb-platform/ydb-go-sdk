@@ -7,8 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"math"
 	"net/http"
 	"os"
@@ -25,6 +23,7 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -37,13 +36,6 @@ import (
 const (
 	folder = "table_test"
 )
-
-func init() {
-	log.SetFlags(0)
-	if os.Getenv("HIDE_APPLICATION_OUTPUT") == "1" {
-		log.SetOutput(ioutil.Discard)
-	}
-}
 
 type stats struct {
 	sync.Mutex
@@ -152,11 +144,11 @@ func TestTable(t *testing.T) {
 
 		shutdownTrace = trace.Table{
 			OnPoolSessionNew: func(
-				info trace.PoolSessionNewStartInfo,
+				info trace.TablePoolSessionNewStartInfo,
 			) func(
-				trace.PoolSessionNewDoneInfo,
+				trace.TablePoolSessionNewDoneInfo,
 			) {
-				return func(info trace.PoolSessionNewDoneInfo) {
+				return func(info trace.TablePoolSessionNewDoneInfo) {
 					if info.Session != nil && atomic.LoadUint32(&shutdowned) == 0 {
 						sessionsMtx.Lock()
 						defer sessionsMtx.Unlock()
@@ -165,11 +157,11 @@ func TestTable(t *testing.T) {
 				}
 			},
 			OnPoolGet: func(
-				info trace.PoolGetStartInfo,
+				info trace.TablePoolGetStartInfo,
 			) func(
-				trace.PoolGetDoneInfo,
+				trace.TablePoolGetDoneInfo,
 			) {
-				return func(info trace.PoolGetDoneInfo) {
+				return func(info trace.TablePoolGetDoneInfo) {
 					if info.Session == nil {
 						return
 					}
@@ -238,10 +230,10 @@ func TestTable(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.ERROR),
+			ydb.WithMinLevel(log.ERROR),
 		),
 		ydb.WithTraceDriver(trace.Driver{
-			OnConnUsagesChange: func(info trace.ConnUsagesChangeInfo) {
+			OnConnUsagesChange: func(info trace.DriverConnUsagesChangeInfo) {
 				fmt.Printf("usages=%d (address: %s)\n", info.Usages, info.Endpoint.Address())
 			},
 		}),
@@ -249,20 +241,20 @@ func TestTable(t *testing.T) {
 			shutdownTrace.Compose(
 				trace.Table{
 					OnSessionNew: func(
-						info trace.SessionNewStartInfo,
+						info trace.TableSessionNewStartInfo,
 					) func(
-						trace.SessionNewDoneInfo,
+						trace.TableSessionNewDoneInfo,
 					) {
-						return func(info trace.SessionNewDoneInfo) {
+						return func(info trace.TableSessionNewDoneInfo) {
 							if info.Error == nil {
 								s.addBalance(t, 1)
 							}
 						}
 					},
 					OnSessionDelete: func(
-						info trace.SessionDeleteStartInfo,
+						info trace.TableSessionDeleteStartInfo,
 					) func(
-						trace.SessionDeleteDoneInfo,
+						trace.TableSessionDeleteDoneInfo,
 					) {
 						s.addBalance(t, -1)
 						return nil
@@ -280,28 +272,28 @@ func TestTable(t *testing.T) {
 						}
 					},
 					OnPoolGet: func(
-						info trace.PoolGetStartInfo,
+						info trace.TablePoolGetStartInfo,
 					) func(
-						trace.PoolGetDoneInfo,
+						trace.TablePoolGetDoneInfo,
 					) {
-						return func(info trace.PoolGetDoneInfo) {
+						return func(info trace.TablePoolGetDoneInfo) {
 							if info.Error == nil {
 								s.addInFlight(t, 1)
 							}
 						}
 					},
 					OnPoolPut: func(
-						info trace.PoolPutStartInfo,
+						info trace.TablePoolPutStartInfo,
 					) func(
-						trace.PoolPutDoneInfo,
+						trace.TablePoolPutDoneInfo,
 					) {
 						s.addInFlight(t, -1)
 						return nil
 					},
 					OnPoolSessionClose: func(
-						info trace.PoolSessionCloseStartInfo,
+						info trace.TablePoolSessionCloseStartInfo,
 					) func(
-						trace.PoolSessionCloseDoneInfo,
+						trace.TablePoolSessionCloseDoneInfo,
 					) {
 						s.addInFlight(t, -1)
 						return nil
@@ -510,7 +502,7 @@ func TestTable(t *testing.T) {
 
 	// multiple result sets
 	// - create table
-	log.Printf("> creating table stream_query...\n")
+	fmt.Printf("> creating table stream_query...\n")
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -522,7 +514,7 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("create table failed: %v\n", err)
 	}
-	log.Printf("> table stream_query created\n")
+	fmt.Printf("> table stream_query created\n")
 
 	var (
 		upsertRowsCount = 40000
@@ -530,7 +522,7 @@ func TestTable(t *testing.T) {
 	)
 
 	// - upsert data
-	log.Printf("> preparing values to upsert...\n")
+	fmt.Printf("> preparing values to upsert...\n")
 	values := make([]types.Value, 0, upsertRowsCount)
 	for i := 0; i < upsertRowsCount; i++ {
 		sum += uint64(i)
@@ -541,9 +533,9 @@ func TestTable(t *testing.T) {
 			),
 		)
 	}
-	log.Printf("> values to upsert prepared\n")
+	fmt.Printf("> values to upsert prepared\n")
 
-	log.Printf("> upserting prepared values...\n")
+	fmt.Printf("> upserting prepared values...\n")
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -577,10 +569,10 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("upsert failed: %v\n", err)
 	}
-	log.Printf("> prepared values upserted\n")
+	fmt.Printf("> prepared values upserted\n")
 
 	// - scan select
-	log.Printf("> scan-selecting values...\n")
+	fmt.Printf("> scan-selecting values...\n")
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -628,12 +620,12 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("scan select failed: %v\n", err)
 	}
-	log.Printf("> values selected\n")
+	fmt.Printf("> values selected\n")
 
 	// shutdown existing sessions
 	urls := os.Getenv("YDB_SHUTDOWN_URLS")
 	if len(urls) > 0 {
-		log.Printf("> shutdowning existing sessions...\n")
+		fmt.Printf("> shutdowning existing sessions...\n")
 		for _, url := range strings.Split(urls, ",") {
 			// nolint:gosec
 			_, err = http.Get(url)
@@ -642,11 +634,11 @@ func TestTable(t *testing.T) {
 			}
 		}
 		atomic.StoreUint32(&shutdowned, 1)
-		log.Printf("> existing sessions shutdowned\n")
+		fmt.Printf("> existing sessions shutdowned\n")
 	}
 
 	// select concurrently
-	log.Printf("> concurrent quering...\n")
+	fmt.Printf("> concurrent quering...\n")
 	wg := sync.WaitGroup{}
 
 	for i := 0; i < limit; i++ {
@@ -690,7 +682,7 @@ func TestTable(t *testing.T) {
 	}
 
 	wg.Wait()
-	log.Printf("> concurrent quering done\n")
+	fmt.Printf("> concurrent quering done\n")
 }
 
 func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
@@ -715,14 +707,14 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 			defer func() {
 				_ = res.Close()
 			}()
-			log.Printf("> read_table:\n")
+			fmt.Printf("> read_table:\n")
 			for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 				for res.NextRow() {
 					err = res.Scan(&id, &title, &date)
 					if err != nil {
 						return err
 					}
-					log.Printf("  > %d %s %s", *id, *title, date.String())
+					fmt.Printf("  > %d %s %s", *id, *title, date.String())
 				}
 			}
 			if err = res.Err(); err != nil {
@@ -734,7 +726,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 				if !ok {
 					break
 				}
-				log.Printf(
+				fmt.Printf(
 					"# phase #%d: took %s",
 					i, phase.Duration(),
 				)
@@ -743,7 +735,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 					if !ok {
 						break
 					}
-					log.Printf(
+					fmt.Printf(
 						"#  accessed %s: read=(%drows, %dbytes)",
 						tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
 					)
@@ -807,7 +799,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			defer func() {
 				_ = res.Close()
 			}()
-			log.Printf("> select_simple_transaction:\n")
+			fmt.Printf("> select_simple_transaction:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanNamed(
@@ -818,7 +810,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 					if err != nil {
 						return err
 					}
-					log.Printf(
+					fmt.Printf(
 						"  > %d %s %s\n",
 						*id, *title, *date,
 					)
@@ -873,14 +865,14 @@ func executeScanQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			defer func() {
 				_ = res.Close()
 			}()
-			log.Printf("> scan_query_select:\n")
+			fmt.Printf("> scan_query_select:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
 					if err != nil {
 						return err
 					}
-					log.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
+					fmt.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
 				}
 			}
 			return res.Err()
@@ -1134,37 +1126,37 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	if err != nil {
 		return err
 	}
-	log.Println("> describe_options:")
+	fmt.Println("> describe_options:")
 
 	for i, p := range desc.TableProfilePresets {
-		log.Printf("  > TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)
+		fmt.Printf("  > TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)
 	}
 	for i, p := range desc.StoragePolicyPresets {
-		log.Printf("  > StoragePolicyPresets: %d/%d: %+v", i+1, len(desc.StoragePolicyPresets), p)
+		fmt.Printf("  > StoragePolicyPresets: %d/%d: %+v", i+1, len(desc.StoragePolicyPresets), p)
 	}
 	for i, p := range desc.CompactionPolicyPresets {
-		log.Printf("  > CompactionPolicyPresets: %d/%d: %+v", i+1, len(desc.CompactionPolicyPresets), p)
+		fmt.Printf("  > CompactionPolicyPresets: %d/%d: %+v", i+1, len(desc.CompactionPolicyPresets), p)
 	}
 	for i, p := range desc.PartitioningPolicyPresets {
-		log.Printf("  > PartitioningPolicyPresets: %d/%d: %+v", i+1, len(desc.PartitioningPolicyPresets), p)
+		fmt.Printf("  > PartitioningPolicyPresets: %d/%d: %+v", i+1, len(desc.PartitioningPolicyPresets), p)
 	}
 	for i, p := range desc.ExecutionPolicyPresets {
-		log.Printf("  > ExecutionPolicyPresets: %d/%d: %+v", i+1, len(desc.ExecutionPolicyPresets), p)
+		fmt.Printf("  > ExecutionPolicyPresets: %d/%d: %+v", i+1, len(desc.ExecutionPolicyPresets), p)
 	}
 	for i, p := range desc.ReplicationPolicyPresets {
-		log.Printf("  > ReplicationPolicyPresets: %d/%d: %+v", i+1, len(desc.ReplicationPolicyPresets), p)
+		fmt.Printf("  > ReplicationPolicyPresets: %d/%d: %+v", i+1, len(desc.ReplicationPolicyPresets), p)
 	}
 	for i, p := range desc.CachingPolicyPresets {
-		log.Printf("  > CachingPolicyPresets: %d/%d: %+v", i+1, len(desc.CachingPolicyPresets), p)
+		fmt.Printf("  > CachingPolicyPresets: %d/%d: %+v", i+1, len(desc.CachingPolicyPresets), p)
 	}
 
 	return nil
 }
 
 func fill(ctx context.Context, db ydb.Connection, folder string) error {
-	log.Printf("> filling tables\n")
+	fmt.Printf("> filling tables\n")
 	defer func() {
-		log.Printf("> filling tables done\n")
+		fmt.Printf("> filling tables done\n")
 	}()
 	// prepare write transaction.
 	writeTx := table.TxControl(
@@ -1252,12 +1244,12 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 			if err != nil {
 				return
 			}
-			log.Printf("> describe table: %s\n", path)
+			fmt.Printf("> describe table: %s\n", path)
 			for _, c := range desc.Columns {
-				log.Printf("  > column, name: %s, %s\n", c.Type, c.Name)
+				fmt.Printf("  > column, name: %s, %s\n", c.Type, c.Name)
 			}
 			for i, keyRange := range desc.KeyRanges {
-				log.Printf("  > key range %d: %s\n", i, keyRange.String())
+				fmt.Printf("  > key range %d: %s\n", i, keyRange.String())
 			}
 			return
 		},

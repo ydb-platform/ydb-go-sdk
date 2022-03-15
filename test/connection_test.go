@@ -26,6 +26,7 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -50,7 +51,7 @@ func TestConnection(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(ydb.WARN),
+			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithUserAgent("scripting"),
 	)
