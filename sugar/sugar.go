@@ -2,6 +2,7 @@ package sugar
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"strings"
 
@@ -34,12 +35,12 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
 			err = db.Scheme().MakeDirectory(ctx, sub)
 			if err != nil {
-				return errors.Error(err)
+				return errors.WithStackTrace(err)
 			}
 			info, err = db.Scheme().DescribePath(ctx, sub)
 		}
 		if err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		switch info.Type {
 		case
@@ -47,9 +48,9 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 			scheme.EntryDirectory:
 			// OK
 		default:
-			return errors.Errorf("entry %q exists but it is a %s",
+			return errors.WithStackTrace(fmt.Errorf("entry %q exists but it is a %s",
 				sub, info.Type,
-			)
+			))
 		}
 	}
 	return nil
@@ -76,7 +77,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 			return nil
 		}
 		if err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 
 		for _, child := range dir.Children {
@@ -87,13 +88,13 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 			switch child.Type {
 			case scheme.EntryDirectory:
 				if err = list(i+1, pt); err != nil {
-					return errors.Error(err)
+					return errors.WithStackTrace(err)
 				}
 				err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 					return db.Scheme().RemoveDirectory(ctx, pt)
 				}, retry.WithIdempotent())
 				if err != nil {
-					return errors.Error(err)
+					return errors.WithStackTrace(err)
 				}
 
 			case scheme.EntryTable:
@@ -101,7 +102,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 					return session.DropTable(ctx, pt)
 				})
 				if err != nil {
-					return errors.Error(err)
+					return errors.WithStackTrace(err)
 				}
 
 			default:

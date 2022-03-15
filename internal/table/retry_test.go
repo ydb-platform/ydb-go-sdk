@@ -43,16 +43,18 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 					func(ctx context.Context, _ table.Session) error {
 						return testErr
 					},
-					withRetryFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
-						ch := make(chan time.Time)
-						backoff <- ch
-						return ch
-					})),
-					withRetrySlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
-						ch := make(chan time.Time)
-						backoff <- ch
-						return ch
-					})),
+					table.Options{
+						FastBackoff: testutil.BackoffFunc(func(n int) <-chan time.Time {
+							ch := make(chan time.Time)
+							backoff <- ch
+							return ch
+						}),
+						SlowBackoff: testutil.BackoffFunc(func(n int) <-chan time.Time {
+							ch := make(chan time.Time)
+							backoff <- ch
+							return ch
+						}),
+					},
 				)
 				results <- err
 			}()
@@ -98,6 +100,7 @@ func TestRetryerBadSession(t *testing.T) {
 				errors.WithOEReason(errors.StatusBadSession),
 			)
 		},
+		table.Options{},
 	)
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("unexpected error: %v", err)
@@ -136,6 +139,7 @@ func TestRetryerSessionClosing(t *testing.T) {
 				s.(*session).SetStatus(options.SessionClosing)
 				return nil
 			},
+			table.Options{},
 		)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -185,12 +189,14 @@ func TestRetryerImmediateReturn(t *testing.T) {
 				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
-				withRetryFastBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
-					panic("this code will not be called")
-				})),
-				withRetrySlowBackoff(testutil.BackoffFunc(func(n int) <-chan time.Time {
-					panic("this code will not be called")
-				})),
+				table.Options{
+					FastBackoff: testutil.BackoffFunc(func(n int) <-chan time.Time {
+						panic("this code will not be called")
+					}),
+					SlowBackoff: testutil.BackoffFunc(func(n int) <-chan time.Time {
+						panic("this code will not be called")
+					}),
+				},
 			)
 			if !errors.Is(err, testErr) {
 				t.Fatalf("unexpected error: %v", err)
@@ -344,6 +350,7 @@ func TestRetryContextDeadline(t *testing.T) {
 							return errs[r.Int(len(errs))]
 						}
 					},
+					table.Options{},
 				)
 			})
 		}
@@ -439,7 +446,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 					return test.error
 				}
 				return nil
-			})
+			}, table.Options{})
 			// nolint:nestif
 			if test.retriable {
 				if i != limit {

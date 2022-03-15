@@ -121,7 +121,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	token, err = m.credentials.Token(ctx)
 	if err != nil {
 		if stringer, ok := m.credentials.(fmt.Stringer); ok {
-			return nil, errors.Errorf("%w: %s", err, stringer.String())
+			return nil, errors.WithStackTrace(fmt.Errorf("%w: %s", err, stringer.String()))
 		}
 		return nil, err
 	}

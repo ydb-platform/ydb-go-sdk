@@ -8,9 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
-// StackTraceError interface provide management of stacktrace error identification
-type StackTraceError errors.StackTraceError
-
 func IterateByIssues(err error, it func(message string, code uint32, severity uint32)) {
 	var o *errors.OpError
 	if !errors.As(err, &o) {

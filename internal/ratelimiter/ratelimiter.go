@@ -229,7 +229,7 @@ func (c *client) AcquireResource(
 			},
 		)
 	default:
-		return errors.Errorf("%w: %d", errUnknownAcquireType, acquireOptions.Type())
+		return errors.WithStackTrace(fmt.Errorf("%w: %d", errUnknownAcquireType, acquireOptions.Type()))
 	}
 
 	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {

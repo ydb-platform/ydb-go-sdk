@@ -232,11 +232,6 @@ func TestTable(t *testing.T) {
 			ydb.WithErrWriter(os.Stderr),
 			ydb.WithMinLevel(log.ERROR),
 		),
-		ydb.WithTraceDriver(trace.Driver{
-			OnConnUsagesChange: func(info trace.DriverConnUsagesChangeInfo) {
-				fmt.Printf("usages=%d (address: %s)\n", info.Usages, info.Endpoint.Address())
-			},
-		}),
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
 				trace.Table{
@@ -714,7 +709,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 					if err != nil {
 						return err
 					}
-					fmt.Printf("  > %d %s %s", *id, *title, date.String())
+					fmt.Printf("  > %d %s %s\n", *id, *title, date.String())
 				}
 			}
 			if err = res.Err(); err != nil {
@@ -727,7 +722,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 					break
 				}
 				fmt.Printf(
-					"# phase #%d: took %s",
+					"# phase #%d: took %s\n",
 					i, phase.Duration(),
 				)
 				for {
@@ -736,7 +731,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 						break
 					}
 					fmt.Printf(
-						"#  accessed %s: read=(%drows, %dbytes)",
+						"#  accessed %s: read=(%drows, %dbytes)\n",
 						tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
 					)
 				}
@@ -872,7 +867,7 @@ func executeScanQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 					if err != nil {
 						return err
 					}
-					fmt.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
+					fmt.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
 				}
 			}
 			return res.Err()
@@ -1129,25 +1124,25 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	fmt.Println("> describe_options:")
 
 	for i, p := range desc.TableProfilePresets {
-		fmt.Printf("  > TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)
+		fmt.Printf("  > TableProfilePresets: %d/%d: %+v\n", i+1, len(desc.TableProfilePresets), p)
 	}
 	for i, p := range desc.StoragePolicyPresets {
-		fmt.Printf("  > StoragePolicyPresets: %d/%d: %+v", i+1, len(desc.StoragePolicyPresets), p)
+		fmt.Printf("  > StoragePolicyPresets: %d/%d: %+v\n", i+1, len(desc.StoragePolicyPresets), p)
 	}
 	for i, p := range desc.CompactionPolicyPresets {
-		fmt.Printf("  > CompactionPolicyPresets: %d/%d: %+v", i+1, len(desc.CompactionPolicyPresets), p)
+		fmt.Printf("  > CompactionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CompactionPolicyPresets), p)
 	}
 	for i, p := range desc.PartitioningPolicyPresets {
-		fmt.Printf("  > PartitioningPolicyPresets: %d/%d: %+v", i+1, len(desc.PartitioningPolicyPresets), p)
+		fmt.Printf("  > PartitioningPolicyPresets: %d/%d: %+v\n", i+1, len(desc.PartitioningPolicyPresets), p)
 	}
 	for i, p := range desc.ExecutionPolicyPresets {
-		fmt.Printf("  > ExecutionPolicyPresets: %d/%d: %+v", i+1, len(desc.ExecutionPolicyPresets), p)
+		fmt.Printf("  > ExecutionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ExecutionPolicyPresets), p)
 	}
 	for i, p := range desc.ReplicationPolicyPresets {
-		fmt.Printf("  > ReplicationPolicyPresets: %d/%d: %+v", i+1, len(desc.ReplicationPolicyPresets), p)
+		fmt.Printf("  > ReplicationPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ReplicationPolicyPresets), p)
 	}
 	for i, p := range desc.CachingPolicyPresets {
-		fmt.Printf("  > CachingPolicyPresets: %d/%d: %+v", i+1, len(desc.CachingPolicyPresets), p)
+		fmt.Printf("  > CachingPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CachingPolicyPresets), p)
 	}
 
 	return nil

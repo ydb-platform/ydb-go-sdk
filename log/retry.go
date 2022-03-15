@@ -1,7 +1,6 @@
 package log
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -30,24 +29,12 @@ func Retry(l Logger, details trace.Details) (t trace.Retry) {
 							info.Attempts,
 						)
 					} else {
-						if m := LevelMapper(nil); errors.As(info.Error, &m) {
-							logf(
-								l,
-								m.MapLogLevel(ERROR),
-								`retry failed {id:"%s",latency:"%v",attempts:%v,error:"%s"}`,
-								id,
-								time.Since(start),
-								info.Attempts,
-								info.Error,
-							)
-						} else {
-							l.Errorf(`retry failed {id:"%s",latency:"%v",attempts:%v,error:"%s"}`,
-								id,
-								time.Since(start),
-								info.Attempts,
-								info.Error,
-							)
-						}
+						l.Errorf(`retry failed {id:"%s",latency:"%v",attempts:%v,error:"%s"}`,
+							id,
+							time.Since(start),
+							info.Attempts,
+							info.Error,
+						)
 					}
 				}
 			}

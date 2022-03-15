@@ -20,10 +20,3 @@ const (
 func FromString(l string) Level {
 	return Level(level.FromString(l))
 }
-
-// LevelMapper interface provide replacement logging level
-type LevelMapper interface {
-	error
-
-	MapLogLevel(level Level) Level
-}

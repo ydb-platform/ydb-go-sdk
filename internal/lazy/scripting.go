@@ -71,7 +71,7 @@ func (s *lazyScripting) Close(ctx context.Context) (err error) {
 	}()
 	err = s.client.Close(ctx)
 	if err != nil {
-		return errors.Error(err)
+		return errors.WithStackTrace(err)
 	}
 	return nil
 }

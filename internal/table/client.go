@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -113,7 +114,7 @@ type client struct {
 	closed            bool
 }
 
-func (c *client) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
+func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (s table.ClosableSession, err error) {
 	return c.build(ctx)
 }
 
@@ -166,7 +167,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 	c.mu.Unlock()
 
 	if !enoughSpace {
-		return nil, errors.Error(ErrSessionPoolOverflow)
+		return nil, errors.WithStackTrace(ErrSessionPoolOverflow)
 	}
 
 	resCh := make(chan createSessionResult, 1) // for non-block write
@@ -270,7 +271,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
 		if c.isClosed() {
-			return nil, errors.Error(ErrSessionPoolClosed)
+			return nil, errors.WithStackTrace(ErrSessionPoolClosed)
 		}
 
 		// First, we try to get session from idle
@@ -290,7 +291,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// got session or err is not recoverable
 		if s != nil || !isCreateSessionErrorRetriable(err) {
 			if err != nil {
-				err = errors.Error(err)
+				err = errors.WithStackTrace(err)
 			}
 			return s, err
 		}
@@ -303,14 +304,14 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// session to.
 		s, err = c.waitFromCh(ctx, t)
 		if err != nil {
-			err = errors.Error(err)
+			err = errors.WithStackTrace(err)
 		}
 	}
 	if s == nil && err == nil {
-		err = errors.Errorf("%w: attempts=%d", ErrNoProgress, i)
+		err = errors.WithStackTrace(fmt.Errorf("%w: attempts=%d", ErrNoProgress, i))
 	}
 	if err != nil {
-		err = errors.Errorf("%w: attempts=%d", err, i)
+		err = errors.WithStackTrace(fmt.Errorf("%w: attempts=%d", err, i))
 	}
 	return s, err
 }
@@ -382,13 +383,13 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 
 	switch {
 	case c.closed:
-		err = errors.Error(ErrSessionPoolClosed)
+		err = errors.WithStackTrace(ErrSessionPoolClosed)
 
 	case c.idle.Len() >= c.limit:
-		err = errors.Error(ErrSessionPoolOverflow)
+		err = errors.WithStackTrace(ErrSessionPoolOverflow)
 
 	case s.isClosing():
-		err = errors.Error(ErrSessionShutdown)
+		err = errors.WithStackTrace(ErrSessionShutdown)
 
 	default:
 		if !c.notify(s) {
@@ -465,13 +466,25 @@ func (c *client) Close(ctx context.Context) (err error) {
 	c.wgClosed.Wait()
 
 	if len(issues) > 0 {
-		return errors.Error(errors.NewWithIssues(
+		return errors.WithStackTrace(errors.NewWithIssues(
 			"table client closed with issues",
 			issues...,
 		))
 	}
 
 	return nil
+}
+
+func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
+	options := table.Options{
+		Trace:       trace,
+		FastBackoff: retry.FastBackoff,
+		SlowBackoff: retry.SlowBackoff,
+	}
+	for _, o := range opts {
+		o(&options)
+	}
+	return options
 }
 
 // Do provide the best effort for execute operation
@@ -481,27 +494,26 @@ func (c *client) Close(ctx context.Context) (err error) {
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
 	if c.isClosed() {
-		return errors.Error(ErrSessionPoolClosed)
+		return errors.WithStackTrace(ErrSessionPoolClosed)
 	}
+	opts = append(opts, table.WithTrace(c.config.Trace()))
 	return do(
 		ctx,
 		c,
 		op,
-		withRetryOptions(opts...),
-		withRetryTrace(c.config.Trace()),
+		retryOptions(c.config.Trace(), opts...),
 	)
 }
 
 func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
 	if c.isClosed() {
-		return errors.Error(ErrSessionPoolClosed)
+		return errors.WithStackTrace(ErrSessionPoolClosed)
 	}
 	return doTx(
 		ctx,
 		c,
 		op,
-		withRetryOptions(opts...),
-		withRetryTrace(c.config.Trace()),
+		retryOptions(c.config.Trace(), opts...),
 	)
 }
 
@@ -851,7 +863,7 @@ func (c *client) keepAliveSession(ctx context.Context, s Session) (err error) {
 	defer cancel()
 	err = s.KeepAlive(ctx)
 	if err != nil {
-		return errors.Error(err)
+		return errors.WithStackTrace(err)
 	}
 	return nil
 }

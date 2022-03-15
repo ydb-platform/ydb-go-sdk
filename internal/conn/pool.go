@@ -128,7 +128,7 @@ func (p *pool) Release(ctx context.Context) error {
 	}
 
 	if len(issues) > 0 {
-		return errors.Error(errors.NewWithIssues("connection pool close failed", issues...))
+		return errors.WithStackTrace(errors.NewWithIssues("connection pool close failed", issues...))
 	}
 
 	return nil

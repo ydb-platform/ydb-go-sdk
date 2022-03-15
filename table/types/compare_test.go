@@ -301,7 +301,7 @@ func TestIncompatiblePrimitives(t *testing.T) {
 	r := TimestampValue(2)
 	_, err := Compare(l, r)
 	if err == nil {
-		t.Errorf("Error expected")
+		t.Errorf("WithStackTrace expected")
 	}
 	if !errors.Is(err, testutil.ErrNotComparable) {
 		t.Errorf("Unexpected error: %v", err)
@@ -313,7 +313,7 @@ func TestIncompatibleTuples(t *testing.T) {
 	r := TupleValue(Uint64Value(1), StringValue([]byte("abc")))
 	_, err := Compare(l, r)
 	if err == nil {
-		t.Error("Error expected")
+		t.Error("WithStackTrace expected")
 	} else if !errors.Is(err, testutil.ErrNotComparable) {
 		t.Errorf("Unexpected error: %v", err)
 	}

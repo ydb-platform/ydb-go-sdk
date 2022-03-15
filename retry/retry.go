@@ -31,7 +31,6 @@ var (
 // retryOperation is the interface that holds an operation for retry.
 // if retryOperation returns not nil - operation will retry
 // if retryOperation returns nil - retry loop will break
-// retryOperation result err may be implements ydb.StackTracerError and log.LevelMapper interfaces
 type retryOperation func(context.Context) (err error)
 
 type retryableErrorOption func(e *errors.RetryableError)
@@ -65,27 +64,38 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 }
 
 type retryOptionsHolder struct {
-	id         string
-	trace      trace.Retry
-	idempotent bool
+	noTraceErrors []interface{}
+	id            string
+	trace         trace.Retry
+	idempotent    bool
 }
 
 type retryOption func(h *retryOptionsHolder)
 
+// WithID returns id option
 func WithID(id string) retryOption {
 	return func(h *retryOptionsHolder) {
 		h.id = id
 	}
 }
 
-// WithTrace returns discovery trace option
+// WithNoTraceErrors provides management error wrapping with or without stacktrace points
+func WithNoTraceErrors(noTraceErrors ...error) retryOption {
+	return func(h *retryOptionsHolder) {
+		for i := range noTraceErrors {
+			h.noTraceErrors = append(h.noTraceErrors, &noTraceErrors[i])
+		}
+	}
+}
+
+// WithTrace returns trace option
 func WithTrace(trace trace.Retry) retryOption {
 	return func(h *retryOptionsHolder) {
 		h.trace = trace
 	}
 }
 
-// WithIdempotent returns discovery trace option
+// WithIdempotent returns idempotent trace option
 func WithIdempotent() retryOption {
 	return func(h *retryOptionsHolder) {
 		h.idempotent = true
@@ -105,35 +115,30 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	for _, o := range opts {
 		o(h)
 	}
-
 	var (
 		i        int
 		attempts int
 
 		code           = int32(0)
 		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id, h.idempotent)
-		onDone         func(attempts int, _ error)
 	)
 	defer func() {
-		if onDone == nil {
-			onDone = onIntermediate(err)
-		}
-		onDone(attempts, err)
+		onIntermediate(errors.TraceError(err, h.noTraceErrors...))(attempts, errors.TraceError(err, h.noTraceErrors...))
 	}()
 	for {
 		i++
 		attempts++
 		select {
 		case <-ctx.Done():
-			return errors.Error(ctx.Err())
+			return errors.WithStackTrace(ctx.Err())
 
 		default:
 			err = op(ctx)
 			if err != nil {
-				err = errors.Error(err)
+				err = errors.WithStackTrace(err)
 			}
 
-			onDone = onIntermediate(err)
+			onIntermediate(errors.TraceError(err, h.noTraceErrors...))
 
 			if err == nil {
 				return
@@ -150,7 +155,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
-				return errors.Error(err)
+				return errors.WithStackTrace(err)
 			}
 
 			code = m.StatusCode()
@@ -339,7 +344,7 @@ type Backoff interface {
 func waitBackoff(ctx context.Context, b Backoff, i int) error {
 	if b == nil {
 		if err := ctx.Err(); err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		return nil
 	}
@@ -348,7 +353,7 @@ func waitBackoff(ctx context.Context, b Backoff, i int) error {
 		return nil
 	case <-ctx.Done():
 		if err := ctx.Err(); err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		return nil
 	}

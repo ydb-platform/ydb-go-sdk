@@ -26,7 +26,7 @@ func Table(db db.Connection, options []config.Option) table.Client {
 	}
 }
 
-func (t *lazyTable) CreateSession(ctx context.Context) (s table.ClosableSession, err error) {
+func (t *lazyTable) CreateSession(ctx context.Context, opts ...table.Option) (s table.ClosableSession, err error) {
 	t.init(ctx)
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		s, err = t.client.CreateSession(ctx)
@@ -56,7 +56,7 @@ func (t *lazyTable) Close(ctx context.Context) (err error) {
 	}()
 	err = t.client.Close(ctx)
 	if err != nil {
-		return errors.Error(err)
+		return errors.WithStackTrace(err)
 	}
 	return nil
 }

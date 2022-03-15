@@ -1,7 +1,6 @@
 package log
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -34,22 +33,11 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 						idempotent,
 					)
 				} else {
-					if m := LevelMapper(nil); errors.As(info.Error, &m) {
-						logf(
-							log,
-							m.MapLogLevel(DEBUG),
-							`do intermediate {latency:"%v",idempotent:%t,error:"%v"}`,
-							time.Since(start),
-							idempotent,
-							info.Error,
-						)
-					} else {
-						log.Debugf(`do intermediate {latency:"%v",idempotent:%t,error:"%v"}`,
-							time.Since(start),
-							idempotent,
-							info.Error,
-						)
-					}
+					log.Debugf(`do intermediate {latency:"%v",idempotent:%t,error:"%v"}`,
+						time.Since(start),
+						idempotent,
+						info.Error,
+					)
 				}
 				return func(info trace.TableDoDoneInfo) {
 					if info.Error == nil {
@@ -59,23 +47,11 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 							info.Attempts,
 						)
 					} else {
-						if m := LevelMapper(nil); errors.As(info.Error, &m) {
-							logf(
-								log,
-								m.MapLogLevel(ERROR),
-								`do failed {latency:"%v",idempotent:%t,attempts:%d,error:"%v"}`,
-								time.Since(start),
-								idempotent,
-								info.Attempts,
-								info.Error,
-							)
-						} else {
-							log.Errorf(`do intermediate {latency:"%v",idempotent:%t,error:"%v"}`,
-								time.Since(start),
-								idempotent,
-								info.Error,
-							)
-						}
+						log.Errorf(`do intermediate {latency:"%v",idempotent:%t,error:"%v"}`,
+							time.Since(start),
+							idempotent,
+							info.Error,
+						)
 					}
 				}
 			}
@@ -99,22 +75,11 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 						idempotent,
 					)
 				} else {
-					if m := LevelMapper(nil); errors.As(info.Error, &m) {
-						logf(
-							log,
-							m.MapLogLevel(DEBUG),
-							`doTx intermediate {latency:"%v",idempotent:%t,error:"%v"}`,
-							time.Since(start),
-							idempotent,
-							info.Error,
-						)
-					} else {
-						log.Errorf(`doTx intermediate {latency:"%v",idempotent:%t,error:"%v"}`,
-							time.Since(start),
-							idempotent,
-							info.Error,
-						)
-					}
+					log.Errorf(`doTx intermediate {latency:"%v",idempotent:%t,error:"%v"}`,
+						time.Since(start),
+						idempotent,
+						info.Error,
+					)
 				}
 				return func(info trace.TableDoTxDoneInfo) {
 					if info.Error == nil {
@@ -124,24 +89,12 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 							info.Attempts,
 						)
 					} else {
-						if m := LevelMapper(nil); errors.As(info.Error, &m) {
-							logf(
-								log,
-								m.MapLogLevel(ERROR),
-								`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%v"}`,
-								time.Since(start),
-								idempotent,
-								info.Attempts,
-								info.Error,
-							)
-						} else {
-							log.Errorf(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%v"}`,
-								time.Since(start),
-								idempotent,
-								info.Attempts,
-								info.Error,
-							)
-						}
+						log.Errorf(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%v"}`,
+							time.Since(start),
+							idempotent,
+							info.Attempts,
+							info.Error,
+						)
 					}
 				}
 			}

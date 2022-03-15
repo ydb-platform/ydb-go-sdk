@@ -1,9 +1,9 @@
 ## 3.14.5
-* Declared internal interface `StackTracer` for manage retry operations error wrapping 
-* Declared `log.LevelMapper` for manage retry operations error logging level 
-* Supported check err as `StackTracer`
 * Fixed race on check trailer on closing table grpc-stream
 * Refactored traces (start and done struct names have prefix about trace)
+* Replaced `errors.Error`, `errors.Errorf` and `errors.ErrorfSkip` to single `errors.WithStackTrace`
+* Refactored table client options 
+* Added `NoTraceErrors` option to retry and table retry
 
 ## 3.14.4
 * Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`

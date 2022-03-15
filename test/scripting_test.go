@@ -14,6 +14,7 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -27,19 +28,6 @@ type customError struct {
 
 func (e *customError) Error() string {
 	return e.text
-}
-
-func (e *customError) WithStackTrace() bool {
-	return false
-}
-
-func (e *customError) MapLogLevel(l log.Level) log.Level {
-	switch l {
-	case log.ERROR:
-		return log.DEBUG
-	default:
-		return l
-	}
 }
 
 func TestScripting(t *testing.T) {
@@ -75,12 +63,33 @@ func TestScripting(t *testing.T) {
 		}
 	}()
 	// Test no wrapping error
-	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return &customError{
-			text: "no wrap!!!",
-		}
-	}); err != nil {
-		if err.Error() != "no wrap!!!" {
+	if err = retry.Retry(
+		ctx,
+		func(ctx context.Context) (err error) {
+			return &customError{
+				text: "custom error",
+			}
+		},
+		retry.WithNoTraceErrors(&customError{}),
+		retry.WithTrace(
+			trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						if info.Error != nil {
+							t.Fatalf("unexpected error: %v", err)
+						}
+						return func(info trace.RetryLoopDoneInfo) {
+							if info.Error != nil {
+								t.Fatalf("unexpected error: %v", err)
+							}
+						}
+					}
+				},
+			},
+		),
+	); err != nil {
+		var e *customError
+		if !errors.As(err, &e) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	}
