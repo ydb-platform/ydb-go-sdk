@@ -894,16 +894,16 @@ func (s *session) StreamReadTable(
 		&request,
 	)
 
-	if checkHintSessionClose(stream.Trailer()) {
-		s.SetStatus(options.SessionClosing)
-	}
-
 	onDone := trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx, s)
 
 	if err != nil {
 		cancel()
 		onDone(err)
 		return nil, err
+	}
+
+	if checkHintSessionClose(stream.Trailer()) {
+		s.SetStatus(options.SessionClosing)
 	}
 
 	return scanner.NewStream(
@@ -977,13 +977,13 @@ func (s *session) StreamExecuteScanQuery(
 		&request,
 	)
 
-	if checkHintSessionClose(stream.Trailer()) {
-		s.SetStatus(options.SessionClosing)
-	}
-
 	if err != nil {
 		cancel()
 		return nil, err
+	}
+
+	if checkHintSessionClose(stream.Trailer()) {
+		s.SetStatus(options.SessionClosing)
 	}
 
 	return scanner.NewStream(
