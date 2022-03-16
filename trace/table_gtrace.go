@@ -135,7 +135,7 @@ func (t Table) Compose(x Table) (ret Table) {
 	default:
 		h1 := t.OnCreateSession
 		h2 := x.OnCreateSession
-		ret.OnCreateSession = func(t TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo) {
+		ret.OnCreateSession = func(t TableCreateSessionStartInfo) func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
 			r1 := h1(t)
 			r2 := h2(t)
 			switch {
@@ -144,9 +144,20 @@ func (t Table) Compose(x Table) (ret Table) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(t TableCreateSessionDoneInfo) {
-					r1(t)
-					r2(t)
+				return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
+					r11 := r1(info)
+					r21 := r2(info)
+					switch {
+					case r11 == nil:
+						return r21
+					case r21 == nil:
+						return r11
+					default:
+						return func(t TableCreateSessionDoneInfo) {
+							r11(t)
+							r21(t)
+						}
+					}
 				}
 			}
 		}
@@ -656,20 +667,32 @@ func (t Table) onDoTx(t1 TableDoTxStartInfo) func(info TableDoTxIntermediateInfo
 		return res
 	}
 }
-func (t Table) onCreateSession(t1 TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo) {
+func (t Table) onCreateSession(t1 TableCreateSessionStartInfo) func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
 	fn := t.OnCreateSession
 	if fn == nil {
-		return func(TableCreateSessionDoneInfo) {
-			return
+		return func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
+			return func(TableCreateSessionDoneInfo) {
+				return
+			}
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableCreateSessionDoneInfo) {
-			return
+		return func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
+			return func(TableCreateSessionDoneInfo) {
+				return
+			}
 		}
 	}
-	return res
+	return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
+		res := res(info)
+		if res == nil {
+			return func(TableCreateSessionDoneInfo) {
+				return
+			}
+		}
+		return res
+	}
 }
 func (t Table) onSessionNew(t1 TableSessionNewStartInfo) func(TableSessionNewDoneInfo) {
 	fn := t.OnSessionNew
@@ -997,16 +1020,22 @@ func TableOnDoTx(t Table, c *context.Context, idempotent bool) func(error) func(
 		}
 	}
 }
-func TableOnCreateSession(t Table, c *context.Context, idempotent bool) func(attempts int, _ error) {
+func TableOnCreateSession(t Table, c *context.Context, idempotent bool) func(error) func(session tableSessionInfo, attempts int, _ error) {
 	var p TableCreateSessionStartInfo
 	p.Context = c
 	p.Idempotent = idempotent
 	res := t.onCreateSession(p)
-	return func(attempts int, e error) {
-		var p TableCreateSessionDoneInfo
-		p.Attempts = attempts
+	return func(e error) func(tableSessionInfo, int, error) {
+		var p TableCreateSessionIntermediateInfo
 		p.Error = e
-		res(p)
+		res := res(p)
+		return func(session tableSessionInfo, attempts int, e error) {
+			var p TableCreateSessionDoneInfo
+			p.Session = session
+			p.Attempts = attempts
+			p.Error = e
+			res(p)
+		}
 	}
 }
 func TableOnSessionNew(t Table, c *context.Context) func(session tableSessionInfo, _ error) {

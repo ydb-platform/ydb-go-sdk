@@ -5,6 +5,9 @@
 * Refactored table client options 
 * Added `IsTraceError` function to table retry options struct for check error before submit intermediate/done events of retry operation
 * Fixed double tracing table do events
+* Added `retry.WithFastBackoff` and `retry.WithFastBackoff` options
+* Refactored `table.CreateSession` as retry operation with options
+* Moved log level from root of repository to package `log`
 
 ## 3.14.4
 * Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`

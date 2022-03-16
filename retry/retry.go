@@ -64,9 +64,11 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 }
 
 type retryOptionsHolder struct {
-	id         string
-	trace      trace.Retry
-	idempotent bool
+	id          string
+	trace       trace.Retry
+	idempotent  bool
+	fastBackoff Backoff
+	slowBackoff Backoff
 }
 
 type retryOption func(h *retryOptionsHolder)
@@ -92,6 +94,20 @@ func WithIdempotent() retryOption {
 	}
 }
 
+// WithFastBackoff returns fast backoff trace option
+func WithFastBackoff(b Backoff) retryOption {
+	return func(h *retryOptionsHolder) {
+		h.fastBackoff = b
+	}
+}
+
+// WithSlowBackoff returns fast backoff trace option
+func WithSlowBackoff(b Backoff) retryOption {
+	return func(h *retryOptionsHolder) {
+		h.slowBackoff = b
+	}
+}
+
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
 // - deadline was canceled or deadlined
@@ -100,7 +116,9 @@ func WithIdempotent() retryOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err error) {
 	h := &retryOptionsHolder{
-		trace: trace.ContextRetry(ctx),
+		trace:       trace.ContextRetry(ctx),
+		fastBackoff: FastBackoff,
+		slowBackoff: SlowBackoff,
 	}
 	for _, o := range opts {
 		o(h)
@@ -144,7 +162,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 				return
 			}
 
-			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
+			if e := Wait(ctx, h.fastBackoff, h.slowBackoff, m, i); e != nil {
 				return errors.WithStackTrace(err)
 			}
 

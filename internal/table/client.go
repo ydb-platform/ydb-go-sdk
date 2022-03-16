@@ -114,8 +114,35 @@ type client struct {
 	closed            bool
 }
 
-func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (s table.ClosableSession, err error) {
-	return c.build(ctx)
+func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (table.ClosableSession, error) {
+	var (
+		s       Session
+		err     error
+		options = retryOptions(c.config.Trace(), opts...)
+	)
+	err = retry.Retry(
+		ctx,
+		func(ctx context.Context) (err error) {
+			s, err = c.build(ctx)
+			return err
+		},
+		retry.WithIdempotent(),
+		retry.WithID("CreateSession"),
+		retry.WithFastBackoff(options.FastBackoff),
+		retry.WithSlowBackoff(options.SlowBackoff),
+		retry.WithTrace(trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+				onIntermediate := trace.TableOnCreateSession(c.config.Trace(), &info.Context, info.Idempotent)
+				return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+					onDone := onIntermediate(traceError(table.EventIntermediate, info.Error, options))
+					return func(info trace.RetryLoopDoneInfo) {
+						onDone(s, info.Attempts, traceError(table.EventDone, info.Error, options))
+					}
+				}
+			},
+		}),
+	)
+	return s, err
 }
 
 func (c *client) isClosed() bool {

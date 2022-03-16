@@ -18,7 +18,13 @@ type (
 		OnClose         func(TableCloseStartInfo) func(TableCloseDoneInfo)
 		OnDo            func(TableDoStartInfo) func(info TableDoIntermediateInfo) func(TableDoDoneInfo)
 		OnDoTx          func(TableDoTxStartInfo) func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo)
-		OnCreateSession func(TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo)
+		OnCreateSession func(
+			TableCreateSessionStartInfo,
+		) func(
+			info TableCreateSessionIntermediateInfo,
+		) func(
+			TableCreateSessionDoneInfo,
+		)
 		// Session events
 		OnSessionNew       func(TableSessionNewStartInfo) func(TableSessionNewDoneInfo)
 		OnSessionDelete    func(TableSessionDeleteStartInfo) func(TableSessionDeleteDoneInfo)
@@ -351,7 +357,11 @@ type (
 		Context    *context.Context
 		Idempotent bool
 	}
+	TableCreateSessionIntermediateInfo struct {
+		Error error
+	}
 	TableCreateSessionDoneInfo struct {
+		Session  tableSessionInfo
 		Attempts int
 		Error    error
 	}
