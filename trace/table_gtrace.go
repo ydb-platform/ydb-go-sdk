@@ -1020,10 +1020,9 @@ func TableOnDoTx(t Table, c *context.Context, idempotent bool) func(error) func(
 		}
 	}
 }
-func TableOnCreateSession(t Table, c *context.Context, idempotent bool) func(error) func(session tableSessionInfo, attempts int, _ error) {
+func TableOnCreateSession(t Table, c *context.Context) func(error) func(session tableSessionInfo, attempts int, _ error) {
 	var p TableCreateSessionStartInfo
 	p.Context = c
-	p.Idempotent = idempotent
 	res := t.onCreateSession(p)
 	return func(e error) func(tableSessionInfo, int, error) {
 		var p TableCreateSessionIntermediateInfo

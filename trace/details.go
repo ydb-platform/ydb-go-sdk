@@ -19,9 +19,10 @@ const (
 	TableSessionQueryStreamEvents   // 256
 	TableSessionTransactionEvents   // 512
 	TablePoolLifeCycleEvents        // 1024
-	TablePoolRetryEvents            // 2048
-	TablePoolSessionLifeCycleEvents // 4096
-	TablePoolAPIEvents              // 8192
+	TablePoolSessionLifeCycleEvents // 2048
+	TablePoolAPIEvents              // 4096
+
+	RetryEvents // 8192
 
 	DiscoveryEvents // 16384
 
@@ -32,8 +33,6 @@ const (
 	RatelimiterEvents // 131072
 
 	CoordinationEvents // 262144
-
-	RetryEvents // 524288
 
 	DriverEvents = DriverNetEvents |
 		DriverConnEvents |
@@ -47,12 +46,10 @@ const (
 		TableSessionQueryStreamEvents |
 		TableSessionTransactionEvents |
 		TablePoolLifeCycleEvents |
-		TablePoolRetryEvents |
 		TablePoolSessionLifeCycleEvents |
 		TablePoolAPIEvents // 16320
 
 	TablePoolEvents = TablePoolLifeCycleEvents |
-		TablePoolRetryEvents |
 		TablePoolSessionLifeCycleEvents |
 		TablePoolAPIEvents // 15360
 
@@ -93,7 +90,6 @@ var (
 		TableSessionQueryStreamEvents:   "ydb.table.session.query.stream",
 		TableSessionTransactionEvents:   "ydb.table.session.tx",
 		TablePoolLifeCycleEvents:        "ydb.table.pool",
-		TablePoolRetryEvents:            "ydb.table.pool.retry",
 		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
 		TablePoolAPIEvents:              "ydb.table.pool.api",
 	}

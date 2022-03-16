@@ -11,9 +11,7 @@ import (
 func Table(log Logger, details trace.Details) (t trace.Table) {
 	log = log.WithName(`table`)
 	// nolint:nestif
-	if details&trace.TablePoolRetryEvents != 0 {
-		// nolint:govet
-		log := log.WithName(`retry`)
+	if details&trace.TableEvents != 0 {
 		t.OnDo = func(
 			info trace.TableDoStartInfo,
 		) func(
@@ -92,6 +90,44 @@ func Table(log Logger, details trace.Details) (t trace.Table) {
 						log.Errorf(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%v"}`,
 							time.Since(start),
 							idempotent,
+							info.Attempts,
+							info.Error,
+						)
+					}
+				}
+			}
+		}
+		t.OnCreateSession = func(
+			info trace.TableCreateSessionStartInfo,
+		) func(
+			info trace.TableCreateSessionIntermediateInfo,
+		) func(
+			trace.TableCreateSessionDoneInfo,
+		) {
+			log.Tracef(`create session start`)
+			start := time.Now()
+			return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
+				if info.Error == nil {
+					log.Tracef(`create session intermediate {latency:"%v"}`,
+						time.Since(start),
+					)
+				} else {
+					log.Errorf(`create session intermediate {latency:"%v",error:"%v"}`,
+						time.Since(start),
+						info.Error,
+					)
+				}
+				return func(info trace.TableCreateSessionDoneInfo) {
+					if info.Error == nil {
+						log.Tracef(`create session done {latency:"%v",attempts:%d,session:{id:"%s",status:"%s"}}`,
+							time.Since(start),
+							info.Attempts,
+							info.Session.ID(),
+							info.Session.Status(),
+						)
+					} else {
+						log.Errorf(`create session failed {latency:"%v",attempts:%d,error:"%v"}`,
+							time.Since(start),
 							info.Attempts,
 							info.Error,
 						)
