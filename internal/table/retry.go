@@ -27,6 +27,13 @@ type SessionProvider interface {
 	CloseSession(ctx context.Context, s Session) error
 }
 
+func traceError(event table.Event, err error, opts table.Options) error {
+	if opts.IsTraceError != nil && !opts.IsTraceError(event, err) {
+		return nil
+	}
+	return err
+}
+
 func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts table.Options) (err error) {
 	attempts, onIntermediate := 0, trace.TableOnDoTx(
 		opts.Trace,
@@ -34,7 +41,12 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 		opts.Idempotent,
 	)
 	defer func() {
-		onIntermediate(errors.TraceError(err, opts.NoTraceErrors...))(attempts, errors.TraceError(err, opts.NoTraceErrors...))
+		onIntermediate(
+			traceError(table.EventIntermediate, err, opts),
+		)(
+			attempts,
+			traceError(table.EventDone, err, opts),
+		)
 	}()
 	err = retryBackoff(
 		ctx,
@@ -60,7 +72,9 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 			}
 
 			if attempts > 0 {
-				onIntermediate(errors.TraceError(err, opts.NoTraceErrors...))
+				onIntermediate(
+					traceError(table.EventIntermediate, err, opts),
+				)
 			}
 
 			attempts++
@@ -76,7 +90,6 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 
 			return nil
 		},
-		opts.Trace,
 	)
 	if err != nil {
 		err = errors.WithStackTrace(err)
@@ -91,7 +104,12 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 		opts.Idempotent,
 	)
 	defer func() {
-		onIntermediate(errors.TraceError(err, opts.NoTraceErrors...))(attempts, errors.TraceError(err, opts.NoTraceErrors...))
+		onIntermediate(
+			traceError(table.EventIntermediate, err, opts),
+		)(
+			attempts,
+			traceError(table.EventDone, err, opts),
+		)
 	}()
 	err = retryBackoff(
 		ctx,
@@ -106,14 +124,15 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 			}
 
 			if attempts > 0 {
-				onIntermediate(errors.TraceError(err, opts.NoTraceErrors...))
+				onIntermediate(
+					traceError(table.EventIntermediate, err, opts),
+				)
 			}
 
 			attempts++
 
 			return err
 		},
-		opts.Trace,
 	)
 	if err != nil {
 		err = errors.WithStackTrace(err)
@@ -204,26 +223,20 @@ func retryBackoff(
 	slowBackoff retry.Backoff,
 	isOperationIdempotent bool,
 	op table.Operation,
-	t trace.Table,
 ) (err error) {
 	var (
-		s              Session
-		i              int
-		attempts       int
-		code           = int32(0)
-		onIntermediate = trace.TableOnDo(t, &ctx, isOperationIdempotent)
+		s        Session
+		i        int
+		attempts int
+		code     = int32(0)
 	)
 	defer func() {
 		if s != nil {
 			_ = p.Put(ctx, s)
 		}
-		onIntermediate(err)(attempts, err)
 	}()
 	for ; ; i++ {
 		attempts++
-		if i > 0 {
-			onIntermediate(err)
-		}
 		select {
 		case <-ctx.Done():
 			return errors.WithStackTrace(ctx.Err())

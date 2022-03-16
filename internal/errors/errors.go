@@ -156,10 +156,3 @@ func (e *stackError) Error() string {
 func (e *stackError) Unwrap() error {
 	return e.err
 }
-
-func TraceError(err error, noTraceErrors ...interface{}) error {
-	if As(err, noTraceErrors...) {
-		return nil
-	}
-	return err
-}

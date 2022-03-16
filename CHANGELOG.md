@@ -3,7 +3,8 @@
 * Refactored traces (start and done struct names have prefix about trace)
 * Replaced `errors.Error`, `errors.Errorf` and `errors.ErrorfSkip` to single `errors.WithStackTrace`
 * Refactored table client options 
-* Added `NoTraceErrors` option to retry and table retry
+* Added `IsTraceError` function to table retry options struct for check error before submit intermediate/done events of retry operation
+* Fixed double tracing table do events
 
 ## 3.14.4
 * Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`

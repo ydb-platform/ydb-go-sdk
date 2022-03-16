@@ -64,10 +64,9 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 }
 
 type retryOptionsHolder struct {
-	noTraceErrors []interface{}
-	id            string
-	trace         trace.Retry
-	idempotent    bool
+	id         string
+	trace      trace.Retry
+	idempotent bool
 }
 
 type retryOption func(h *retryOptionsHolder)
@@ -76,15 +75,6 @@ type retryOption func(h *retryOptionsHolder)
 func WithID(id string) retryOption {
 	return func(h *retryOptionsHolder) {
 		h.id = id
-	}
-}
-
-// WithNoTraceErrors provides management error wrapping with or without stacktrace points
-func WithNoTraceErrors(noTraceErrors ...error) retryOption {
-	return func(h *retryOptionsHolder) {
-		for i := range noTraceErrors {
-			h.noTraceErrors = append(h.noTraceErrors, &noTraceErrors[i])
-		}
 	}
 }
 
@@ -123,7 +113,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id, h.idempotent)
 	)
 	defer func() {
-		onIntermediate(errors.TraceError(err, h.noTraceErrors...))(attempts, errors.TraceError(err, h.noTraceErrors...))
+		onIntermediate(err)(attempts, err)
 	}()
 	for {
 		i++
@@ -138,7 +128,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 				err = errors.WithStackTrace(err)
 			}
 
-			onIntermediate(errors.TraceError(err, h.noTraceErrors...))
+			onIntermediate(err)
 
 			if err == nil {
 				return

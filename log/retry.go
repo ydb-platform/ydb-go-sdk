@@ -7,7 +7,6 @@ import (
 )
 
 func Retry(l Logger, details trace.Details) (t trace.Retry) {
-	// nolint:nestif
 	if details&trace.RetryEvents != 0 {
 		l = l.WithName(`retry`)
 		t.OnRetry = func(

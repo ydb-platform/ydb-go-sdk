@@ -6,6 +6,7 @@ package test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -109,6 +110,14 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 	s.Lock()
 	s.inFlight += delta
 	s.Unlock()
+}
+
+type customError struct {
+	text string
+}
+
+func (e *customError) Error() string {
+	return e.text
 }
 
 // nolint:gocyclo
@@ -306,18 +315,107 @@ func TestTable(t *testing.T) {
 		_ = db.Close(ctx)
 	}()
 
-	// ping
-	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
-		// hack for wait pool initializing
-		return nil
-	}); err != nil {
-		t.Fatalf("pool not initialized: %+v", err)
-	}
+	t.Run("IsTraceError/Do", func(t *testing.T) {
+		if err = db.Table().Do(
+			ctx,
+			func(ctx context.Context, s table.Session) error {
+				return &customError{
+					text: "custom error",
+				}
+			},
+			table.WithTrace(
+				trace.Table{
+					OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+						return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+							if info.Error != nil {
+								t.Fatalf("unexpected error: %v", err)
+							}
+							return func(info trace.TableDoDoneInfo) {
+								if info.Error != nil {
+									t.Fatalf("unexpected error: %v", err)
+								}
+							}
+						}
+					},
+				},
+			),
+			func(o *table.Options) {
+				o.IsTraceError = func(event table.Event, err error) bool {
+					var ce *customError
+					return !errors.As(err, &ce)
+				}
+			},
+		); err != nil {
+			var e *customError
+			if !errors.As(err, &e) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}
+	})
 
-	// check pool init
-	if s.min() < 0 || s.max() != limit {
-		t.Fatalf("pool sizes not applied: %+v", s)
-	}
+	t.Run("IsTraceError/Do", func(t *testing.T) {
+		if err = db.Table().DoTx(
+			ctx,
+			func(ctx context.Context, tx table.TransactionActor) error {
+				return &customError{
+					text: "custom error",
+				}
+			},
+			table.WithTrace(
+				trace.Table{
+					OnDoTx: func(
+						info trace.TableDoTxStartInfo,
+					) func(
+						info trace.TableDoTxIntermediateInfo,
+					) func(
+						trace.TableDoTxDoneInfo,
+					) {
+						return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
+							if info.Error != nil {
+								t.Fatalf("unexpected error: %v", err)
+							}
+							return func(info trace.TableDoTxDoneInfo) {
+								if info.Error != nil {
+									t.Fatalf("unexpected error: %v", err)
+								}
+							}
+						}
+					},
+				},
+			),
+			table.WithTxSettings(
+				table.TxSettings(
+					table.WithSerializableReadWrite(),
+				),
+			),
+			func(o *table.Options) {
+				o.IsTraceError = func(event table.Event, err error) bool {
+					var ce *customError
+					return !errors.As(err, &ce)
+				}
+			},
+		); err != nil {
+			var e *customError
+			if !errors.As(err, &e) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}
+	})
+
+	t.Run("ping", func(t *testing.T) {
+		if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
+			// hack for wait pool initializing
+			return nil
+		}); err != nil {
+			t.Fatalf("pool not initialized: %+v", err)
+		}
+	})
+
+	t.Run("pool init checking", func(t *testing.T) {
+		if s.min() < 0 || s.max() != limit {
+			t.Fatalf("pool sizes not applied: %+v", s)
+		}
+	})
 
 	// prepare scheme
 	err = sugar.RemoveRecursive(ctx, db, folder)

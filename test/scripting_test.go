@@ -14,21 +14,12 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
-
-type customError struct {
-	text string
-}
-
-func (e *customError) Error() string {
-	return e.text
-}
 
 func TestScripting(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -62,37 +53,6 @@ func TestScripting(t *testing.T) {
 			t.Fatalf("db close failed: %+v", e)
 		}
 	}()
-	// Test no wrapping error
-	if err = retry.Retry(
-		ctx,
-		func(ctx context.Context) (err error) {
-			return &customError{
-				text: "custom error",
-			}
-		},
-		retry.WithNoTraceErrors(&customError{}),
-		retry.WithTrace(
-			trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						if info.Error != nil {
-							t.Fatalf("unexpected error: %v", err)
-						}
-						return func(info trace.RetryLoopDoneInfo) {
-							if info.Error != nil {
-								t.Fatalf("unexpected error: %v", err)
-							}
-						}
-					}
-				},
-			},
-		),
-	); err != nil {
-		var e *customError
-		if !errors.As(err, &e) {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	}
 	// Execute
 	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().Execute(

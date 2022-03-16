@@ -6,14 +6,35 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// Event declares event type
+//
+// Warning: This is an experimental feature and could change at any time
+type Event uint8
+
+const (
+	// EventIntermediate declares intermediate event type
+	//
+	// Warning: This is an experimental feature and could change at any time
+	EventIntermediate = Event(iota)
+
+	// EventDone declares done event type
+	//
+	// Warning: This is an experimental feature and could change at any time
+	EventDone
+)
+
 type Options struct {
-	NoTraceErrors   []interface{}
 	Idempotent      bool
 	TxSettings      *TransactionSettings
 	TxCommitOptions []options.CommitTransactionOption
 	FastBackoff     retry.Backoff
 	SlowBackoff     retry.Backoff
 	Trace           trace.Table
+
+	// IsTraceError checks err before submit trace
+	//
+	// Warning: This is an experimental feature and could change at any time
+	IsTraceError func(event Event, err error) bool
 }
 
 type Option func(o *Options)
@@ -21,15 +42,6 @@ type Option func(o *Options)
 func WithIdempotent() Option {
 	return func(o *Options) {
 		o.Idempotent = true
-	}
-}
-
-// WithNoTraceErrors provides management error wrapping with or without stacktrace points
-func WithNoTraceErrors(noTraceErrors ...error) Option {
-	return func(o *Options) {
-		for i := range noTraceErrors {
-			o.NoTraceErrors = append(o.NoTraceErrors, &noTraceErrors[i])
-		}
 	}
 }
 
@@ -47,6 +59,6 @@ func WithTxCommitOptions(opts ...options.CommitTransactionOption) Option {
 
 func WithTrace(t trace.Table) Option {
 	return func(o *Options) {
-		o.Trace = t
+		o.Trace = o.Trace.Compose(t)
 	}
 }
