@@ -325,7 +325,12 @@ func (c *conn) Invoke(
 
 	if err != nil {
 		if wrapping {
-			return errors.WithStackTrace(errors.MapGRPCError(err))
+			return errors.WithStackTrace(
+				errors.MapGRPCError(
+					err,
+					errors.WithTEAddress(c.Address()),
+				),
+			)
 		}
 		return err
 	}
@@ -412,7 +417,12 @@ func (c *conn) NewStream(
 
 	if err != nil {
 		if wrapping {
-			return s, errors.WithStackTrace(errors.MapGRPCError(err))
+			return s, errors.WithStackTrace(
+				errors.MapGRPCError(
+					err,
+					errors.WithTEAddress(c.Address()),
+				),
+			)
 		}
 		return s, err
 	}

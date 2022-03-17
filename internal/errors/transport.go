@@ -44,6 +44,8 @@ type TransportError struct {
 
 	message string
 	err     error
+	details []interface{}
+	address string
 }
 
 func (t *TransportError) Code() int32 {
@@ -59,6 +61,12 @@ type teOpt func(te *TransportError)
 func WithTEReason(reason TransportErrorCode) teOpt {
 	return func(te *TransportError) {
 		te.Reason = reason
+	}
+}
+
+func WithTEAddress(address string) teOpt {
+	return func(te *TransportError) {
+		te.address = address
 	}
 }
 
@@ -95,11 +103,22 @@ func NewTransportError(opts ...teOpt) error {
 }
 
 func (t *TransportError) Error() string {
-	s := "transport error: " + t.Reason.String()
+	var b bytes.Buffer
+	b.WriteString("transport error: ")
+	b.WriteString(t.Reason.String())
 	if t.message != "" {
-		s += ": " + t.message
+		b.WriteString(", message: ")
+		b.WriteString(t.message)
 	}
-	return s
+	if len(t.address) > 0 {
+		b.WriteString(", address: ")
+		b.WriteString(t.address)
+	}
+	if len(t.details) > 0 {
+		b.WriteString(", details: ")
+		b.WriteString(fmt.Sprintf("%v", t.details))
+	}
+	return b.String()
 }
 
 func (t *TransportError) Unwrap() error {
@@ -340,7 +359,7 @@ func IsTransportError(err error, codes ...TransportErrorCode) bool {
 	return false
 }
 
-func MapGRPCError(err error) error {
+func MapGRPCError(err error, opts ...teOpt) error {
 	if err == nil {
 		return nil
 	}
@@ -349,11 +368,16 @@ func MapGRPCError(err error) error {
 		return t
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
-		return &TransportError{
+		te := &TransportError{
 			Reason:  transportErrorCode(s.Code()),
 			message: s.Message(),
-			err:     err,
+			err:     s.Err(),
+			details: s.Details(),
 		}
+		for _, o := range opts {
+			o(te)
+		}
+		return te
 	}
 	return err
 }
