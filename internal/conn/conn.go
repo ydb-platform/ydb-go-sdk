@@ -217,6 +217,7 @@ func (c *conn) incUsages() {
 func (c *conn) decUsages() int32 {
 	c.Lock()
 	defer c.Unlock()
+	c.lastUsage = time.Now()
 	return c.changeUsages(-1)
 }
 
