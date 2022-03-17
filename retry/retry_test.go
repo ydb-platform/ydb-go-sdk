@@ -355,7 +355,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusUnknownStatus,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -366,7 +366,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusBadRequest,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -377,7 +377,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusUnauthorized,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -388,7 +388,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusInternalError,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -399,7 +399,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusAborted,
 			},
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -410,7 +410,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusUnavailable,
 			},
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -421,7 +421,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusOverloaded,
 			},
 			backoff:       errors.BackoffTypeSlowBackoff,
@@ -432,7 +432,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusSchemeError,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -443,7 +443,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusGenericError,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -454,7 +454,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusTimeout,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -465,7 +465,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusBadSession,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -476,7 +476,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusPreconditionFailed,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -487,7 +487,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusAlreadyExists,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -498,7 +498,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusNotFound,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -509,7 +509,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusSessionExpired,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -520,7 +520,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusCancelled,
 			},
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -531,7 +531,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusUndetermined,
 			},
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -542,7 +542,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusUnsupported,
 			},
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -553,7 +553,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OpError{
+			err: &errors.OperationError{
 				Reason: errors.StatusSessionBusy,
 			},
 			backoff:       errors.BackoffTypeFastBackoff,

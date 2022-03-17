@@ -48,12 +48,14 @@ type TransportError struct {
 	address string
 }
 
-func (t *TransportError) Code() int32 {
-	return int32(t.Reason)
+func (e *TransportError) isYdbError() {}
+
+func (e *TransportError) Code() int32 {
+	return int32(e.Reason)
 }
 
-func (t *TransportError) Name() string {
-	return t.Reason.String()
+func (e *TransportError) Name() string {
+	return e.Reason.String()
 }
 
 type teOpt func(te *TransportError)
@@ -102,23 +104,23 @@ func NewTransportError(opts ...teOpt) error {
 	return WithStackTrace(fmt.Errorf("%w", te), WithSkipDepth(1))
 }
 
-func (t *TransportError) Error() string {
+func (e *TransportError) Error() string {
 	var b bytes.Buffer
 	b.WriteString("transport error: ")
-	b.WriteString(t.Reason.String())
-	if t.message != "" {
+	b.WriteString(e.Reason.String())
+	if e.message != "" {
 		b.WriteString(", message: ")
-		b.WriteString(t.message)
+		b.WriteString(e.message)
 	}
-	if len(t.address) > 0 {
+	if len(e.address) > 0 {
 		b.WriteString(", address: ")
-		b.WriteString(t.address)
+		b.WriteString(e.address)
 	}
-	if len(t.details) > 0 {
+	if len(e.details) > 0 {
 		b.WriteString(", details: ")
-		if len(t.details) > 0 {
+		if len(e.details) > 0 {
 			b.WriteString(", details:")
-			for _, detail := range t.details {
+			for _, detail := range e.details {
 				b.WriteString(fmt.Sprintf("\n- %v", detail))
 			}
 		}
@@ -126,8 +128,8 @@ func (t *TransportError) Error() string {
 	return b.String()
 }
 
-func (t *TransportError) Unwrap() error {
-	return t.err
+func (e *TransportError) Unwrap() error {
+	return e.err
 }
 
 func dumpIssues(buf *bytes.Buffer, ms []*Ydb_Issue.IssueMessage) {
@@ -370,7 +372,7 @@ func MapGRPCError(err error, opts ...teOpt) error {
 	}
 	var t *TransportError
 	if errors.As(err, &t) {
-		return t
+		return err
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
 		te := &TransportError{

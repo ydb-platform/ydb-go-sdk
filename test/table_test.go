@@ -339,12 +339,6 @@ func TestTable(t *testing.T) {
 					},
 				},
 			),
-			func(o *table.Options) {
-				o.IsTraceError = func(event table.Event, err error) bool {
-					var ce *customError
-					return !errors.As(err, &ce)
-				}
-			},
 		); err != nil {
 			var e *customError
 			if !errors.As(err, &e) {
@@ -388,12 +382,6 @@ func TestTable(t *testing.T) {
 					table.WithSerializableReadWrite(),
 				),
 			),
-			func(o *table.Options) {
-				o.IsTraceError = func(event table.Event, err error) bool {
-					var ce *customError
-					return !errors.As(err, &ce)
-				}
-			},
 		); err != nil {
 			var e *customError
 			if !errors.As(err, &e) {

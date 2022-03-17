@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -186,8 +187,8 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	if c.isClosed() {
 		return nil, errors.NewGrpcError(
-			codes.Unavailable,
-			errors.WithMsg("ydb driver conn closed early"),
+			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn closed early")),
+			errors.WithErr(err),
 		)
 	}
 
@@ -312,6 +313,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	return err
 }
 
+// invoke have behavior like grpc call
 func (c *conn) invoke(
 	ctx context.Context,
 	method string,
@@ -323,8 +325,7 @@ func (c *conn) invoke(
 	cc, err = c.take(ctx)
 	if err != nil {
 		return errors.NewGrpcError(
-			codes.Unavailable,
-			errors.WithMsg("ydb driver conn take failed"),
+			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn take failed")),
 			errors.WithErr(err),
 		)
 	}
@@ -332,8 +333,7 @@ func (c *conn) invoke(
 	ctx, err = c.config.Meta().Meta(ctx)
 	if err != nil {
 		return errors.NewGrpcError(
-			codes.Unavailable,
-			errors.WithMsg("ydb driver conn apply meta failed"),
+			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn apply meta failed")),
 			errors.WithErr(err),
 		)
 	}
@@ -341,7 +341,18 @@ func (c *conn) invoke(
 	c.changeUsages(1)
 	defer c.changeUsages(-1)
 
-	return cc.Invoke(ctx, method, req, res, opts...)
+	err = cc.Invoke(ctx, method, req, res, opts...)
+
+	if err != nil {
+		if s, ok := grpcStatus.FromError(err); ok {
+			return errors.NewGrpcError(
+				errors.WithStatus(s),
+			)
+		}
+		return errors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (c *conn) Invoke(
@@ -400,6 +411,7 @@ func (c *conn) Invoke(
 	return err
 }
 
+// newStream have behavior like grpc call
 func (c *conn) newStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
@@ -410,17 +422,7 @@ func (c *conn) newStream(
 	cc, err = c.take(ctx)
 	if err != nil {
 		return nil, errors.NewGrpcError(
-			codes.Unavailable,
-			errors.WithMsg("ydb driver conn take failed"),
-			errors.WithErr(err),
-		)
-	}
-
-	ctx, err = c.config.Meta().Meta(ctx)
-	if err != nil {
-		return nil, errors.NewGrpcError(
-			codes.Unavailable,
-			errors.WithMsg("ydb driver conn apply meta failed"),
+			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn take failed")),
 			errors.WithErr(err),
 		)
 	}
@@ -428,7 +430,19 @@ func (c *conn) newStream(
 	c.changeStreamUsages(1)
 	defer c.changeStreamUsages(-1)
 
-	return cc.NewStream(ctx, desc, method, opts...)
+	var client grpc.ClientStream
+	client, err = cc.NewStream(ctx, desc, method, opts...)
+
+	if err != nil {
+		if s, ok := grpcStatus.FromError(err); ok {
+			return nil, errors.NewGrpcError(
+				errors.WithStatus(s),
+			)
+		}
+		return nil, errors.WithStackTrace(err)
+	}
+
+	return client, nil
 }
 
 func (c *conn) NewStream(

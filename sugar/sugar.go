@@ -31,7 +31,7 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 		i += x
 		sub := pathToCreate[:i+1]
 		info, err := db.Scheme().DescribePath(ctx, sub)
-		var opErr *errors.OpError
+		var opErr *errors.OperationError
 		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
 			err = db.Scheme().MakeDirectory(ctx, sub)
 			if err != nil {
@@ -72,7 +72,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 			dir, err = db.Scheme().ListDirectory(ctx, p)
 			return err
 		}, retry.WithIdempotent())
-		var opErr *errors.OpError
+		var opErr *errors.OperationError
 		if errors.As(err, &opErr) && opErr.Reason == errors.StatusSchemeError {
 			return nil
 		}

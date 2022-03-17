@@ -6,23 +6,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Event declares event type
-//
-// Warning: This is an experimental feature and could change at any time
-type Event uint8
-
-const (
-	// EventIntermediate declares intermediate event type
-	//
-	// Warning: This is an experimental feature and could change at any time
-	EventIntermediate = Event(iota)
-
-	// EventDone declares done event type
-	//
-	// Warning: This is an experimental feature and could change at any time
-	EventDone
-)
-
 type Options struct {
 	Idempotent      bool
 	TxSettings      *TransactionSettings
@@ -30,11 +13,6 @@ type Options struct {
 	FastBackoff     retry.Backoff
 	SlowBackoff     retry.Backoff
 	Trace           trace.Table
-
-	// IsTraceError checks err before submit trace
-	//
-	// Warning: This is an experimental feature and could change at any time
-	IsTraceError func(event Event, err error) bool
 }
 
 type Option func(o *Options)

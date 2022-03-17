@@ -27,11 +27,11 @@ type SessionProvider interface {
 	CloseSession(ctx context.Context, s Session) error
 }
 
-func traceError(event table.Event, err error, opts table.Options) error {
-	if opts.IsTraceError != nil && !opts.IsTraceError(event, err) {
-		return nil
+func traceError(err error) error {
+	if errors.IsYdb(err) {
+		return err
 	}
-	return err
+	return nil
 }
 
 func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts table.Options) (err error) {
@@ -42,13 +42,13 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 	)
 	defer func() {
 		onIntermediate(
-			traceError(table.EventIntermediate, err, opts),
+			traceError(err),
 		)(
 			attempts,
-			traceError(table.EventDone, err, opts),
+			traceError(err),
 		)
 	}()
-	err = retryBackoff(
+	return retryBackoff(
 		ctx,
 		c,
 		opts.FastBackoff,
@@ -67,13 +67,10 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 			}()
 
 			err = op(ctx, tx)
-			if err != nil {
-				err = errors.WithStackTrace(err)
-			}
 
 			if attempts > 0 {
 				onIntermediate(
-					traceError(table.EventIntermediate, err, opts),
+					traceError(err),
 				)
 			}
 
@@ -91,10 +88,6 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 			return nil
 		},
 	)
-	if err != nil {
-		err = errors.WithStackTrace(err)
-	}
-	return err
 }
 
 func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.Options) (err error) {
@@ -105,13 +98,13 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 	)
 	defer func() {
 		onIntermediate(
-			traceError(table.EventIntermediate, err, opts),
+			traceError(err),
 		)(
 			attempts,
-			traceError(table.EventDone, err, opts),
+			traceError(err),
 		)
 	}()
-	err = retryBackoff(
+	return retryBackoff(
 		ctx,
 		c,
 		opts.FastBackoff,
@@ -119,13 +112,10 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 		opts.Idempotent,
 		func(ctx context.Context, s table.Session) error {
 			err = op(ctx, s)
-			if err != nil {
-				err = errors.WithStackTrace(err)
-			}
 
 			if attempts > 0 {
 				onIntermediate(
-					traceError(table.EventIntermediate, err, opts),
+					traceError(err),
 				)
 			}
 
@@ -134,10 +124,6 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 			return err
 		},
 	)
-	if err != nil {
-		err = errors.WithStackTrace(err)
-	}
-	return err
 }
 
 type SessionProviderFunc struct {
@@ -253,9 +239,6 @@ func retryBackoff(
 			}
 
 			err = op(ctx, s)
-			if err != nil {
-				err = errors.WithStackTrace(err)
-			}
 
 			if s.isClosing() {
 				_ = p.CloseSession(ctx, s)
@@ -282,7 +265,7 @@ func retryBackoff(
 			}
 
 			if retry.Wait(ctx, fastBackoff, slowBackoff, m, i) != nil {
-				return errors.WithStackTrace(err)
+				return
 			}
 
 			code = m.StatusCode()

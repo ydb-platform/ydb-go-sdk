@@ -45,6 +45,7 @@ func TestDiscovery(t *testing.T) {
 				t.Fatalf("unknown request type: %s", requestTypes[0])
 			}
 		}
+		parking = make(chan struct{})
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -57,7 +58,7 @@ func TestDiscovery(t *testing.T) {
 			config.WithOperationCancelAfter(time.Second*2),
 		),
 		ydb.WithBalancer(balancers.SingleConn()),
-		ydb.WithConnectionTTL(time.Millisecond*500),
+		ydb.WithConnectionTTL(time.Second*1),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery).*`),
@@ -94,6 +95,13 @@ func TestDiscovery(t *testing.T) {
 				}),
 			),
 		),
+		ydb.WithTraceDriver(trace.Driver{
+			OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
+				return func(info trace.DriverConnParkDoneInfo) {
+					parking <- struct{}{}
+				}
+			},
+		}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -104,8 +112,14 @@ func TestDiscovery(t *testing.T) {
 			t.Fatalf("db close failed: %+v", e)
 		}
 	}()
-	t.Run("Discover", func(t *testing.T) {
-		time.Sleep(time.Second) // wait for parking conn
+	t.Run("immediate", func(t *testing.T) {
+		if _, err = db.Discovery().Discover(ctx); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+	})
+	t.Run("after parking", func(t *testing.T) {
+		// wait for parking conn
+		<-parking
 		if _, err = db.Discovery().Discover(ctx); err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}

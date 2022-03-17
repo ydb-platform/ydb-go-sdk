@@ -3,7 +3,6 @@ package errors
 import (
 	"fmt"
 
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -13,9 +12,11 @@ type grpcError struct {
 	err    error
 }
 
+func (e *grpcError) isYdbError() {}
+
 func (e *grpcError) Error() string {
 	if e.err != nil {
-		return fmt.Sprintf("%s: %v", e.status.String(), e.err)
+		return fmt.Sprintf("%s: %v", e.err, e.status.String())
 	}
 	return e.status.String()
 }
@@ -28,32 +29,24 @@ func (e *grpcError) GRPCStatus() *status.Status {
 	return e.status
 }
 
-type grpcErrorOptionsHolder struct {
-	msg string
-	err error
-}
+type grpcErrorOption func(e *grpcError)
 
-type grpcErrorOption func(h *grpcErrorOptionsHolder)
-
-func WithMsg(msg string) grpcErrorOption {
-	return func(h *grpcErrorOptionsHolder) {
-		h.msg = msg
+func WithStatus(s *status.Status) grpcErrorOption {
+	return func(e *grpcError) {
+		e.status = s
 	}
 }
 
 func WithErr(err error) grpcErrorOption {
-	return func(h *grpcErrorOptionsHolder) {
-		h.err = err
+	return func(e *grpcError) {
+		e.err = err
 	}
 }
 
-func NewGrpcError(code codes.Code, opts ...grpcErrorOption) error {
-	h := &grpcErrorOptionsHolder{}
+func NewGrpcError(opts ...grpcErrorOption) error {
+	e := &grpcError{}
 	for _, o := range opts {
-		o(h)
+		o(e)
 	}
-	return &grpcError{
-		status: status.New(code, h.msg),
-		err:    h.err,
-	}
+	return e
 }
