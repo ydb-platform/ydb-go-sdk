@@ -44,11 +44,8 @@ func WithBalancer(b balancer.Balancer, filter func(cc conn.Conn) bool) Option {
 type Option func(*multi)
 
 func (m *multi) Contains(x balancer.Element) bool {
-	for i, x := range x.(multiHandle).elements {
-		if x == nil {
-			continue
-		}
-		if m.balancer[i].Contains(x) {
+	for i, h := range x.(multiHandle).elements {
+		if h != nil && m.balancer[i].Contains(x) {
 			return true
 		}
 	}
@@ -75,8 +72,7 @@ func (m *multi) Insert(conn conn.Conn) balancer.Element {
 
 	for i, f := range m.filter {
 		if f(conn) {
-			x := m.balancer[i].Insert(conn)
-			h.elements[i] = x
+			h.elements[i] = m.balancer[i].Insert(conn)
 			inserted = true
 		}
 	}
@@ -87,17 +83,17 @@ func (m *multi) Insert(conn conn.Conn) balancer.Element {
 }
 
 func (m *multi) Update(x balancer.Element, info info.Info) {
-	for i, x := range x.(multiHandle).elements {
-		if x != nil {
-			m.balancer[i].Update(x, info)
+	for i, h := range x.(multiHandle).elements {
+		if h != nil {
+			m.balancer[i].Update(h, info)
 		}
 	}
 }
 
 func (m *multi) Remove(x balancer.Element) (removed bool) {
-	for i, x := range x.(multiHandle).elements {
-		if x != nil {
-			if m.balancer[i].Remove(x) {
+	for i, h := range x.(multiHandle).elements {
+		if h != nil {
+			if m.balancer[i].Remove(h) {
 				removed = true
 			}
 		}

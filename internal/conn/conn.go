@@ -210,13 +210,13 @@ func (c *conn) changeUsages(delta int32) int32 {
 func (c *conn) incUsages() {
 	c.Lock()
 	defer c.Unlock()
+	c.lastUsage = time.Now()
 	c.changeUsages(1)
 }
 
 func (c *conn) decUsages() int32 {
 	c.Lock()
 	defer c.Unlock()
-	c.lastUsage = time.Now()
 	return c.changeUsages(-1)
 }
 

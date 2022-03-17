@@ -8,13 +8,13 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Pool interface {
+	Creator
 	Getter
 	Taker
 	Releaser
@@ -23,6 +23,11 @@ type Pool interface {
 
 type Getter interface {
 	Get(ctx context.Context, endpoint endpoint.Endpoint) Conn
+}
+
+type Creator interface {
+	// Create Conn but don't put it into pool
+	Create(ctx context.Context, endpoint endpoint.Endpoint) Conn
 }
 
 type Taker interface {
@@ -43,17 +48,22 @@ type PoolConfig interface {
 }
 
 type pool struct {
+	sync.RWMutex
 	usages int64
 	config Config
-	mtx    sync.RWMutex
 	opts   []grpc.DialOption
 	conns  map[string]*conn
 	done   chan struct{}
 }
 
-func (p *pool) Get(ctx context.Context, endpoint endpoint.Endpoint) Conn {
-	p.mtx.Lock()
-	defer p.mtx.Unlock()
+func (p *pool) Create(_ context.Context, endpoint endpoint.Endpoint) Conn {
+	cc := newConn(endpoint, p.config)
+	return cc
+}
+
+func (p *pool) Get(_ context.Context, endpoint endpoint.Endpoint) Conn {
+	p.Lock()
+	defer p.Unlock()
 
 	var (
 		address = endpoint.Address()
@@ -66,26 +76,24 @@ func (p *pool) Get(ctx context.Context, endpoint endpoint.Endpoint) Conn {
 		return cc
 	}
 
-	cc = newConn(
-		endpoint,
-		p.config,
-		withOnClose(func(c *conn) {
-			p.mtx.Lock()
-			defer p.mtx.Unlock()
-			delete(p.conns, c.Endpoint().Address())
-		}),
-	)
+	cc = newConn(endpoint, p.config, withOnClose(p.remove))
 
 	p.conns[address] = cc
 
 	return cc
 }
 
+func (p *pool) remove(c *conn) {
+	p.Lock()
+	defer p.Unlock()
+	delete(p.conns, c.Endpoint().Address())
+}
+
 func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
 	e := cc.Endpoint().Copy()
 
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
+	p.RLock()
+	defer p.RUnlock()
 
 	cc, ok := p.conns[e.Address()]
 	if !ok {
@@ -101,7 +109,7 @@ func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
 	)(cc.SetState(Banned))
 }
 
-func (p *pool) Take(ctx context.Context) error {
+func (p *pool) Take(context.Context) error {
 	atomic.AddInt64(&p.usages, 1)
 	return nil
 }
@@ -113,14 +121,8 @@ func (p *pool) Release(ctx context.Context) error {
 
 	close(p.done)
 
-	p.mtx.RLock()
-	conns := make([]closer.Closer, 0, len(p.conns))
-	for _, c := range p.conns {
-		conns = append(conns, c)
-	}
-	p.mtx.RUnlock()
-
 	var issues []error
+	conns := p.collectConns()
 	for _, c := range conns {
 		if err := c.Close(ctx); err != nil {
 			issues = append(issues, err)
@@ -134,25 +136,32 @@ func (p *pool) Release(ctx context.Context) error {
 	return nil
 }
 
-func (p *pool) connParker(ctx context.Context, interval time.Duration) {
+func (p *pool) connParker(ctx context.Context, ttl, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-p.done:
 			return
-		case <-time.After(interval):
-			p.mtx.RLock()
-			conns := make([]*conn, 0, len(p.conns))
-			for _, c := range p.conns {
-				conns = append(conns, c)
-			}
-			p.mtx.RUnlock()
+		case <-ticker.C:
+			conns := p.collectConns()
 			for _, c := range conns {
-				if time.Since(c.LastUsage()) > p.config.ConnectionTTL() {
+				if time.Since(c.LastUsage()) > ttl {
 					_ = c.park(ctx)
 				}
 			}
 		}
 	}
+}
+
+func (p *pool) collectConns() []*conn {
+	p.RLock()
+	defer p.RUnlock()
+	conns := make([]*conn, 0, len(p.conns))
+	for _, c := range p.conns {
+		conns = append(conns, c)
+	}
+	return conns
 }
 
 func NewPool(
@@ -167,7 +176,7 @@ func NewPool(
 		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(ctx, ttl/2)
+		go p.connParker(ctx, ttl, ttl/2)
 	}
 	return p
 }
