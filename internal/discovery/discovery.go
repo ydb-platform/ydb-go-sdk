@@ -75,8 +75,7 @@ func New(
 
 				cluster.DiffEndpoints(curr, next,
 					func(i, j int) {
-						// Endpoints are equal, but we still need to update meta
-						// data such that load factor and others.
+						// Endpoints are equal, but we still need to update metadata (e.g., load factor).
 						crudExplorer.Update(
 							ctx,
 							next[j],
