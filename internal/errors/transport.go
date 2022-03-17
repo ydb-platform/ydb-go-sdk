@@ -44,6 +44,7 @@ type TransportError struct {
 
 	message string
 	err     error
+	details []interface{}
 }
 
 func (t *TransportError) Code() int32 {
@@ -95,11 +96,18 @@ func NewTransportError(opts ...teOpt) error {
 }
 
 func (t *TransportError) Error() string {
-	s := "transport error: " + t.Reason.String()
+	var b bytes.Buffer
+	b.WriteString("transport error: ")
+	b.WriteString(t.Reason.String())
 	if t.message != "" {
-		s += ": " + t.message
+		b.WriteString(", message: ")
+		b.WriteString(t.message)
 	}
-	return s
+	if len(t.details) > 0 {
+		b.WriteString(", details: ")
+		b.WriteString(fmt.Sprintf("%v", t.details))
+	}
+	return b.String()
 }
 
 func (t *TransportError) Unwrap() error {
@@ -352,7 +360,8 @@ func MapGRPCError(err error) error {
 		return &TransportError{
 			Reason:  transportErrorCode(s.Code()),
 			message: s.Message(),
-			err:     err,
+			err:     s.Err(),
+			details: s.Details(),
 		}
 	}
 	return err
