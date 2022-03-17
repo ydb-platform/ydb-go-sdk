@@ -120,6 +120,7 @@ func (c *client) ListResource(
 	response, err = c.service.ListResources(ctx, &Ydb_RateLimiter.ListResourcesRequest{
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
+		Recursive:            recursive,
 		OperationParams: operation.Params(
 			c.config.OperationTimeout(),
 			c.config.OperationCancelAfter(),
