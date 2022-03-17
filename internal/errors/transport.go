@@ -116,7 +116,12 @@ func (t *TransportError) Error() string {
 	}
 	if len(t.details) > 0 {
 		b.WriteString(", details: ")
-		b.WriteString(fmt.Sprintf("%v", t.details))
+		if len(t.details) > 0 {
+			b.WriteString(", details:")
+			for _, detail := range t.details {
+				b.WriteString(fmt.Sprintf("\n- %v", detail))
+			}
+		}
 	}
 	return b.String()
 }

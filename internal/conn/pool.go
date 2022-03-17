@@ -66,19 +66,17 @@ func (p *pool) Get(ctx context.Context, endpoint endpoint.Endpoint) Conn {
 		return cc
 	}
 
-	cc = newConn(
-		endpoint,
-		p.config,
-		withOnClose(func(c *conn) {
-			p.mtx.Lock()
-			defer p.mtx.Unlock()
-			delete(p.conns, c.Endpoint().Address())
-		}),
-	)
+	cc = newConn(endpoint, p.config, withOnClose(p.remove))
 
 	p.conns[address] = cc
 
 	return cc
+}
+
+func (p *pool) remove(c *conn) {
+	p.mtx.Lock()
+	defer p.mtx.Unlock()
+	delete(p.conns, c.Endpoint().Address())
 }
 
 func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
@@ -101,7 +99,7 @@ func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
 	)(cc.SetState(Banned))
 }
 
-func (p *pool) Take(ctx context.Context) error {
+func (p *pool) Take(context.Context) error {
 	atomic.AddInt64(&p.usages, 1)
 	return nil
 }
@@ -134,27 +132,30 @@ func (p *pool) Release(ctx context.Context) error {
 	return nil
 }
 
-func (p *pool) connParker(ctx context.Context, interval time.Duration) {
+func (p *pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 	ticker := time.NewTicker(interval)
-	ttl := p.config.ConnectionTTL()
 	for {
 		select {
 		case <-p.done:
 			return
 		case <-ticker.C:
-			p.mtx.RLock()
-			conns := make([]*conn, 0, len(p.conns))
-			for _, c := range p.conns {
-				conns = append(conns, c)
-			}
-			p.mtx.RUnlock()
-			for _, c := range conns {
+			for _, c := range p.collectConns() {
 				if time.Since(c.LastUsage()) > ttl {
 					_ = c.park(ctx)
 				}
 			}
 		}
 	}
+}
+
+func (p *pool) collectConns() []*conn {
+	p.mtx.RLock()
+	defer p.mtx.RUnlock()
+	conns := make([]*conn, 0, len(p.conns))
+	for _, c := range p.conns {
+		conns = append(conns, c)
+	}
+	return conns
 }
 
 func NewPool(
@@ -169,7 +170,7 @@ func NewPool(
 		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(ctx, ttl/2)
+		go p.connParker(ctx, ttl, ttl/2)
 	}
 	return p
 }

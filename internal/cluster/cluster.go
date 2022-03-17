@@ -437,15 +437,7 @@ func DiffEndpoints(curr, next []endpoint.Endpoint, eq, add, del func(i, j int)) 
 		func(i, j int) int {
 			return compareEndpoints(curr[i], next[j])
 		},
-		func(i, j int) {
-			eq(i, j)
-		},
-		func(i, j int) {
-			add(i, j)
-		},
-		func(i, j int) {
-			del(i, j)
-		},
+		eq, add, del,
 	)
 }
 
