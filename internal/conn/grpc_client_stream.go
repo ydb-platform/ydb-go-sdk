@@ -32,7 +32,12 @@ func (s *grpcClientStream) Trailer() metadata.MD {
 func (s *grpcClientStream) CloseSend() (err error) {
 	err = s.s.CloseSend()
 	if err != nil {
-		err = errors.WithStackTrace(errors.MapGRPCError(err))
+		err = errors.WithStackTrace(
+			errors.MapGRPCError(
+				err,
+				errors.WithTEAddress(s.c.Address()),
+			),
+		)
 	}
 	return err
 }
@@ -47,7 +52,12 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 	err = s.s.SendMsg(m)
 	if err != nil && s.wrapping {
-		err = errors.WithStackTrace(errors.MapGRPCError(err))
+		err = errors.WithStackTrace(
+			errors.MapGRPCError(
+				err,
+				errors.WithTEAddress(s.c.Address()),
+			),
+		)
 	}
 
 	return
@@ -69,7 +79,12 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return errors.WithStackTrace(errors.MapGRPCError(err))
+			return errors.WithStackTrace(
+				errors.MapGRPCError(
+					err,
+					errors.WithTEAddress(s.c.Address()),
+				),
+			)
 		}
 		return err
 	}

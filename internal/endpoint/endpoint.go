@@ -9,8 +9,9 @@ import (
 )
 
 type Endpoint interface {
+	fmt.Stringer
+
 	Info() info.Info
-	String() string
 	Copy() Endpoint
 
 	NodeID() uint32
