@@ -210,10 +210,34 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 		t.OnConnUsagesChange = func(info trace.DriverConnUsagesChangeInfo) {
-			log.Tracef(`release done {endpoint:%v,usages:%d}`,
+			log.Tracef(`change conn usages {endpoint:%v,usages:%d}`,
 				info.Endpoint.String(),
 				info.Usages,
 			)
+		}
+		t.OnConnStreamUsagesChange = func(info trace.DriverConnStreamUsagesChangeInfo) {
+			log.Tracef(`change conn stream usages {endpoint:%v,usages:%d}`,
+				info.Endpoint.String(),
+				info.Usages,
+			)
+		}
+		t.OnConnRelease = func(info trace.DriverConnReleaseStartInfo) func(trace.DriverConnReleaseDoneInfo) {
+			endpoint := info.Endpoint.String()
+			log.Tracef(`release conn {endpoint:%v}`,
+				endpoint,
+			)
+			return func(info trace.DriverConnReleaseDoneInfo) {
+				if info.Error == nil {
+					log.Tracef(`release conn done {endpoint:%v}`,
+						endpoint,
+					)
+				} else {
+					log.Warnf(`release conn failed {endpoint:%v,error:"%s"}`,
+						endpoint,
+						info.Error,
+					)
+				}
+			}
 		}
 		t.OnConnStateChange = func(info trace.DriverConnStateChangeStartInfo) func(trace.DriverConnStateChangeDoneInfo) {
 			endpoint := info.Endpoint.String()

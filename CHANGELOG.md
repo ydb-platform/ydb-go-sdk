@@ -9,7 +9,10 @@
 * Refactored `table.CreateSession` as retry operation with options
 * Moved log level from root of repository to package `log`
 * Added details and address to transport error
-* Fixed `recursive` param in `ratelimiter.ListResource` 
+* Fixed `recursive` param in `ratelimiter.ListResource`
+* Added counting stream usages for exclude park connection if it in use
+* Added `trace.Driver` events about change stream usage and `conn.Release()` call
+* Fixed bug with non-applying meta headers on direct call `db.Discovery.Discover`
 
 ## 3.14.4
 * Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`

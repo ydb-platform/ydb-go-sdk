@@ -62,7 +62,7 @@ func (p *pool) Get(ctx context.Context, endpoint endpoint.Endpoint) Conn {
 	)
 
 	if cc, has = p.conns[address]; has {
-		cc.incUsages()
+		cc.changeUsages(1)
 		return cc
 	}
 
