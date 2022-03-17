@@ -45,7 +45,7 @@ type Option func(*multi)
 
 func (m *multi) Contains(x balancer.Element) bool {
 	for i, h := range x.(multiHandle).elements {
-		if h != nil && m.balancer[i].Contains(x) {
+		if h != nil && m.balancer[i].Contains(h) {
 			return true
 		}
 	}
