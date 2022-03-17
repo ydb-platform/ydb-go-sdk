@@ -74,7 +74,7 @@ func New(
 	}
 	defer cancel()
 
-	cc := pool.Get(ctx, endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true)))
+	cc := pool.Create(ctx, endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true)))
 
 	db.discovery, err = builder.New(
 		ctx,

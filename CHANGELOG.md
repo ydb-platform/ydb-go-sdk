@@ -1,3 +1,7 @@
+## 3.14.5
+* Added `conn.Creator` interface to `conn.Pool`
+* Never close discovery connection from `conn.Pool`
+
 ## 3.14.4
 * Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`
 * Refactored naming of source files which declares service client interfaces
