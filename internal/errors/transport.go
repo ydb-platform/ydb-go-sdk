@@ -110,13 +110,13 @@ func (t *TransportError) Error() string {
 		b.WriteString(", message: ")
 		b.WriteString(t.message)
 	}
-	if len(t.details) > 0 {
-		b.WriteString(", details: ")
-		b.WriteString(fmt.Sprintf("%v", t.details))
-	}
 	if len(t.address) > 0 {
 		b.WriteString(", address: ")
 		b.WriteString(t.address)
+	}
+	if len(t.details) > 0 {
+		b.WriteString(", details: ")
+		b.WriteString(fmt.Sprintf("%v", t.details))
 	}
 	return b.String()
 }
