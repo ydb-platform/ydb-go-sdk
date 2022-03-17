@@ -38,10 +38,12 @@ type (
 		) func(
 			DriverConnNewStreamDoneInfo,
 		)
-		OnConnTake         func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
-		OnConnUsagesChange func(DriverConnUsagesChangeInfo)
-		OnConnPark         func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
-		OnConnClose        func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
+		OnConnTake               func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
+		OnConnUsagesChange       func(DriverConnUsagesChangeInfo)
+		OnConnStreamUsagesChange func(DriverConnStreamUsagesChangeInfo)
+		OnConnPark               func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
+		OnConnClose              func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
+		OnConnRelease            func(DriverConnReleaseStartInfo) func(DriverConnReleaseDoneInfo)
 
 		// Cluster events
 		OnClusterInit   func(DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo)
@@ -224,7 +226,22 @@ type (
 	DriverConnCloseDoneInfo struct {
 		Error error
 	}
+	DriverConnReleaseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Endpoint EndpointInfo
+	}
+	DriverConnReleaseDoneInfo struct {
+		Error error
+	}
 	DriverConnUsagesChangeInfo struct {
+		Endpoint EndpointInfo
+		Usages   int
+	}
+	DriverConnStreamUsagesChangeInfo struct {
 		Endpoint EndpointInfo
 		Usages   int
 	}
