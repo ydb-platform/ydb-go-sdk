@@ -3,7 +3,7 @@
 * Refactored traces (start and done struct names have prefix about trace)
 * Replaced `errors.Error`, `errors.Errorf` and `errors.ErrorfSkip` to single `errors.WithStackTrace`
 * Refactored table client options 
-* Added `IsTraceError` function to table retry options struct for check error before submit intermediate/done events of retry operation
+* Declared and implemented interface `errors.isYdbError` for checking ybd/non-ydb errors
 * Fixed double tracing table do events
 * Added `retry.WithFastBackoff` and `retry.WithFastBackoff` options
 * Refactored `table.CreateSession` as retry operation with options
@@ -12,7 +12,6 @@
 * Fixed `recursive` param in `ratelimiter.ListResource`
 * Added counting stream usages for exclude park connection if it in use
 * Added `trace.Driver` events about change stream usage and `conn.Release()` call
-* Fixed bug with non-applying meta headers on direct call `db.Discovery.Discover`
 
 ## 3.14.4
 * Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`

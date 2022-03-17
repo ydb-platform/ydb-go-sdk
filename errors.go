@@ -9,7 +9,7 @@ import (
 )
 
 func IterateByIssues(err error, it func(message string, code uint32, severity uint32)) {
-	var o *errors.OpError
+	var o *errors.OperationError
 	if !errors.As(err, &o) {
 		return
 	}
@@ -80,7 +80,7 @@ func IsOperationError(err error, codes ...int32) bool {
 }
 
 func OperationErrorDescription(err error) Error {
-	var o *errors.OpError
+	var o *errors.OperationError
 	if errors.As(err, &o) {
 		return o
 	}

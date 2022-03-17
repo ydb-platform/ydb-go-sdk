@@ -11,13 +11,13 @@ func TestIsOperationError(t *testing.T) {
 		StatusBadSession,
 	} {
 		for _, err := range []error{
-			&OpError{Reason: code},
+			&OperationError{Reason: code},
 			NewOpError(WithOEReason(code)),
-			fmt.Errorf("wrapped: %w", &OpError{Reason: code}),
+			fmt.Errorf("wrapped: %w", &OperationError{Reason: code}),
 		} {
 			t.Run("", func(t *testing.T) {
 				if !IsOpError(err, code) {
-					t.Errorf("expected %v to be OpError with code=%v", err, code)
+					t.Errorf("expected %v to be OperationError with code=%v", err, code)
 				}
 			})
 		}

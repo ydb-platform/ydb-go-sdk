@@ -108,6 +108,13 @@ func WithSlowBackoff(b Backoff) retryOption {
 	}
 }
 
+func traceError(err error) error {
+	if errors.IsYdb(err) {
+		return err
+	}
+	return nil
+}
+
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
 // - deadline was canceled or deadlined
@@ -131,7 +138,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id, h.idempotent)
 	)
 	defer func() {
-		onIntermediate(err)(attempts, err)
+		onIntermediate(traceError(err))(attempts, traceError(err))
 	}()
 	for {
 		i++
@@ -142,11 +149,8 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 		default:
 			err = op(ctx)
-			if err != nil {
-				err = errors.WithStackTrace(err)
-			}
 
-			onIntermediate(err)
+			onIntermediate(traceError(err))
 
 			if err == nil {
 				return
@@ -163,7 +167,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if e := Wait(ctx, h.fastBackoff, h.slowBackoff, m, i); e != nil {
-				return errors.WithStackTrace(err)
+				return
 			}
 
 			code = m.StatusCode()
@@ -174,7 +178,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 // Check returns retry mode for err.
 func Check(err error) (m retryMode) {
 	var te *errors.TransportError
-	var oe *errors.OpError
+	var oe *errors.OperationError
 	var re *errors.RetryableError
 	switch {
 	case errors.As(err, &te):

@@ -28,7 +28,7 @@ func TestIsNonTransportError(t *testing.T) {
 		&TransportError{Reason: TransportErrorAborted},
 		&TransportError{Reason: TransportErrorAborted, err: context.Canceled},
 		fmt.Errorf("wrapped: %w", &TransportError{Reason: TransportErrorAborted}),
-		&OpError{Reason: StatusBadRequest},
+		&OperationError{Reason: StatusBadRequest},
 	} {
 		t.Run("", func(t *testing.T) {
 			if IsTransportError(err, code) {
@@ -51,13 +51,13 @@ func TestTransportErrorWrapsContextError(t *testing.T) {
 func TestIsNonOperationError(t *testing.T) {
 	code := StatusBadRequest
 	for _, err := range []error{
-		&OpError{Reason: StatusTimeout},
-		fmt.Errorf("wrapped: %w", &OpError{Reason: StatusTimeout}),
+		&OperationError{Reason: StatusTimeout},
+		fmt.Errorf("wrapped: %w", &OperationError{Reason: StatusTimeout}),
 		&TransportError{Reason: TransportErrorAborted},
 	} {
 		t.Run("", func(t *testing.T) {
 			if IsOpError(err, code) {
-				t.Errorf("expected %v not to be OpError with code=%v", err, code)
+				t.Errorf("expected %v not to be OperationError with code=%v", err, code)
 			}
 		})
 	}

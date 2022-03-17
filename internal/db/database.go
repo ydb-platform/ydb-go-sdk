@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
@@ -113,18 +112,26 @@ func (db *database) Invoke(
 ) error {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return errors.NewGrpcError(
-			codes.Unavailable,
-			errors.WithMsg("ydb driver cluster get failed"),
-			errors.WithErr(err),
-		)
+		return errors.WithStackTrace(err)
 	}
+
+	ctx, err = db.config.Meta().Meta(ctx)
+	if err != nil {
+		return errors.WithStackTrace(err)
+	}
+
 	defer func() {
 		if err != nil && errors.MustPessimizeEndpoint(err) {
 			db.cluster.Pessimize(ctx, cc, err)
 		}
 	}()
-	return cc.Invoke(ctx, method, args, reply, opts...)
+
+	err = cc.Invoke(ctx, method, args, reply, opts...)
+	if err != nil {
+		return errors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (db *database) NewStream(
@@ -135,16 +142,25 @@ func (db *database) NewStream(
 ) (grpc.ClientStream, error) {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return nil, errors.NewGrpcError(
-			codes.Unavailable,
-			errors.WithMsg("ydb driver cluster get failed"),
-			errors.WithErr(err),
-		)
+		return nil, errors.WithStackTrace(err)
 	}
+
+	ctx, err = db.config.Meta().Meta(ctx)
+	if err != nil {
+		return nil, errors.WithStackTrace(err)
+	}
+
 	defer func() {
 		if err != nil && errors.MustPessimizeEndpoint(err) {
 			db.cluster.Pessimize(ctx, cc, err)
 		}
 	}()
-	return cc.NewStream(ctx, desc, method, opts...)
+
+	var client grpc.ClientStream
+	client, err = cc.NewStream(ctx, desc, method, opts...)
+	if err != nil {
+		return nil, errors.WithStackTrace(err)
+	}
+
+	return client, nil
 }

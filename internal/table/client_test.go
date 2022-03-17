@@ -1028,7 +1028,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	}
 
 	// Now fail the Keepalive() call from above.
-	keepaliveResult <- &errors.OpError{
+	keepaliveResult <- &errors.OperationError{
 		Reason: errors.StatusBadSession,
 	}
 
@@ -1130,7 +1130,7 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 					},
 					// nolint:unparam
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
-						return nil, &errors.OpError{
+						return nil, &errors.OperationError{
 							Reason: errors.StatusBadSession,
 						}
 					},

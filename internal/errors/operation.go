@@ -8,18 +8,20 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
 
-// OpError reports about operation fail.
-type OpError struct {
+// OperationError reports about operation fail.
+type OperationError struct {
 	Reason StatusCode
 
 	issues []*Ydb_Issue.IssueMessage
 }
 
-func (e *OpError) Code() int32 {
+func (e *OperationError) isYdbError() {}
+
+func (e *OperationError) Code() int32 {
 	return int32(e.Reason)
 }
 
-func (e *OpError) Name() string {
+func (e *OperationError) Name() string {
 	return e.Reason.String()
 }
 
@@ -31,7 +33,7 @@ type operation interface {
 // WithOEIssues is an option for construct operation error with issues list
 // WithOEIssues must use as `NewOpError(WithOEIssues(issues))`
 func WithOEIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
-	return func(oe *OpError) {
+	return func(oe *OperationError) {
 		oe.issues = issues
 	}
 }
@@ -39,7 +41,7 @@ func WithOEIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
 // WithOEReason is an option for construct operation error with reason code
 // WithOEReason must use as `NewOpError(WithOEReason(reason))`
 func WithOEReason(reason StatusCode) oeOpt {
-	return func(oe *OpError) {
+	return func(oe *OperationError) {
 		oe.Reason = reason
 	}
 }
@@ -47,16 +49,16 @@ func WithOEReason(reason StatusCode) oeOpt {
 // WithOEOperation is an option for construct operation error from operation
 // WithOEOperation must use as `NewOpError(WithOEOperation(operation))`
 func WithOEOperation(operation operation) oeOpt {
-	return func(oe *OpError) {
+	return func(oe *OperationError) {
 		oe.Reason = statusCode(operation.GetStatus())
 		oe.issues = operation.GetIssues()
 	}
 }
 
-type oeOpt func(ops *OpError)
+type oeOpt func(ops *OperationError)
 
 func NewOpError(opts ...oeOpt) error {
-	oe := &OpError{
+	oe := &OperationError{
 		Reason: StatusUnknownStatus,
 	}
 	for _, f := range opts {
@@ -65,11 +67,11 @@ func NewOpError(opts ...oeOpt) error {
 	return oe
 }
 
-func (e *OpError) Issues() []*Ydb_Issue.IssueMessage {
+func (e *OperationError) Issues() []*Ydb_Issue.IssueMessage {
 	return e.issues
 }
 
-func (e *OpError) Error() string {
+func (e *OperationError) Error() string {
 	if len(e.issues) == 0 {
 		return e.Reason.String()
 	}
@@ -83,9 +85,9 @@ func (e *OpError) Error() string {
 	return buf.String()
 }
 
-// IsOpError reports whether err is OpError with given code as the Reason.
+// IsOpError reports whether err is OperationError with given code as the Reason.
 func IsOpError(err error, codes ...StatusCode) bool {
-	var op *OpError
+	var op *OperationError
 	if !errors.As(err, &op) {
 		return false
 	}

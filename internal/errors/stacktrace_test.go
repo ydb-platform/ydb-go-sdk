@@ -5,22 +5,25 @@ import (
 	"testing"
 )
 
-func TestError(t *testing.T) {
+func TestStackTraceError(t *testing.T) {
 	for _, test := range []struct {
 		error error
 		text  string
 	}{
 		{
 			error: WithStackTrace(fmt.Errorf("TestError")),
-			text:  "TestError at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:14)`",
+			// nolint:lll
+			text: "TestError at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestStackTraceError(stacktrace_test.go:14)`",
 		},
 		{
 			error: WithStackTrace(fmt.Errorf("TestError%s", "Printf")),
-			text:  "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:18)`",
+			// nolint:lll
+			text: "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestStackTraceError(stacktrace_test.go:19)`",
 		},
 		{
 			error: WithStackTrace(fmt.Errorf("TestError%s", "Printf")),
-			text:  "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestError(errors_test.go:22)`",
+			// nolint:lll
+			text: "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/errors.TestStackTraceError(stacktrace_test.go:24)`",
 		},
 	} {
 		t.Run(test.text, func(t *testing.T) {
