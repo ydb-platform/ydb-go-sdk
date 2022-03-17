@@ -12,6 +12,7 @@
 * Fixed `recursive` param in `ratelimiter.ListResource`
 * Added counting stream usages for exclude park connection if it in use
 * Added `trace.Driver` events about change stream usage and `conn.Release()` call
+* Fixed bug with non-applying meta headers on direct call `db.Discovery.Discover`
 
 ## 3.14.4
 * Implemented auto-removing `conn.Conn` from `conn.Pool` with counting usages of `conn.Conn`

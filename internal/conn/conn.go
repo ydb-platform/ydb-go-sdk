@@ -329,6 +329,15 @@ func (c *conn) invoke(
 		)
 	}
 
+	ctx, err = c.config.Meta().Meta(ctx)
+	if err != nil {
+		return errors.NewGrpcError(
+			codes.Unavailable,
+			errors.WithMsg("ydb driver conn apply meta failed"),
+			errors.WithErr(err),
+		)
+	}
+
 	c.changeUsages(1)
 	defer c.changeUsages(-1)
 
@@ -403,6 +412,15 @@ func (c *conn) newStream(
 		return nil, errors.NewGrpcError(
 			codes.Unavailable,
 			errors.WithMsg("ydb driver conn take failed"),
+			errors.WithErr(err),
+		)
+	}
+
+	ctx, err = c.config.Meta().Meta(ctx)
+	if err != nil {
+		return nil, errors.NewGrpcError(
+			codes.Unavailable,
+			errors.WithMsg("ydb driver conn apply meta failed"),
 			errors.WithErr(err),
 		)
 	}
