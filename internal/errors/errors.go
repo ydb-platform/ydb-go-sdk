@@ -47,11 +47,16 @@ func HideEOF(err error) error {
 
 // As is a proxy to errors.As
 // This need to single import errors
-func As(err error, target interface{}) bool {
+func As(err error, targets ...interface{}) bool {
 	if err == nil {
 		return false
 	}
-	return errors.As(err, target)
+	for _, t := range targets {
+		if errors.As(err, t) {
+			return true
+		}
+	}
+	return false
 }
 
 // Is is a improved proxy to errors.Is
@@ -71,15 +76,15 @@ func Is(err error, targets ...error) bool {
 // New is a proxy to errors.New
 // This need to single import errors
 func New(text string) error {
-	return ErrorfSkip(1, "%w", errors.New(text))
+	return WithStackTrace(fmt.Errorf("%w", errors.New(text)), WithSkipDepth(1))
 }
 
 // NewWithIssues returns error which contains child issues
 func NewWithIssues(text string, issues ...error) error {
-	return ErrorfSkip(1, "%w", &errorWithIssues{
+	return &errorWithIssues{
 		reason: text,
 		issues: issues,
-	})
+	}
 }
 
 type errorWithIssues struct {
@@ -101,24 +106,27 @@ func (e *errorWithIssues) Error() string {
 	return b.String()
 }
 
-// Error is alias to fmt.Errorf() with prepend file:line prefix
-func Error(err error) error {
-	return &stackError{
-		stackRecord: stackRecord(1),
-		err:         err,
+type withStackTraceOptions struct {
+	skipDepth int
+}
+
+type withStackTraceOption func(o *withStackTraceOptions)
+
+func WithSkipDepth(skipDepth int) withStackTraceOption {
+	return func(o *withStackTraceOptions) {
+		o.skipDepth = skipDepth
 	}
 }
 
-// Errorf is alias to fmt.Errorf() with prepend file:line prefix
-func Errorf(format string, args ...interface{}) error {
-	return ErrorfSkip(1, format, args...)
-}
-
-// ErrorfSkip is alias to fmt.Errorf() with prepend file:line prefix
-func ErrorfSkip(depth int, format string, args ...interface{}) error {
+// WithStackTrace is a wrapper over original err with file:line identification
+func WithStackTrace(err error, opts ...withStackTraceOption) error {
+	options := withStackTraceOptions{}
+	for _, o := range opts {
+		o(&options)
+	}
 	return &stackError{
-		stackRecord: stackRecord(depth + 1),
-		err:         fmt.Errorf(format, args...),
+		stackRecord: stackRecord(options.skipDepth + 1),
+		err:         err,
 	}
 }
 

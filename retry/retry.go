@@ -64,30 +64,47 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 }
 
 type retryOptionsHolder struct {
-	id         string
-	trace      trace.Retry
-	idempotent bool
+	id          string
+	trace       trace.Retry
+	idempotent  bool
+	fastBackoff Backoff
+	slowBackoff Backoff
 }
 
 type retryOption func(h *retryOptionsHolder)
 
+// WithID returns id option
 func WithID(id string) retryOption {
 	return func(h *retryOptionsHolder) {
 		h.id = id
 	}
 }
 
-// WithTrace returns discovery trace option
+// WithTrace returns trace option
 func WithTrace(trace trace.Retry) retryOption {
 	return func(h *retryOptionsHolder) {
 		h.trace = trace
 	}
 }
 
-// WithIdempotent returns discovery trace option
+// WithIdempotent returns idempotent trace option
 func WithIdempotent() retryOption {
 	return func(h *retryOptionsHolder) {
 		h.idempotent = true
+	}
+}
+
+// WithFastBackoff returns fast backoff trace option
+func WithFastBackoff(b Backoff) retryOption {
+	return func(h *retryOptionsHolder) {
+		h.fastBackoff = b
+	}
+}
+
+// WithSlowBackoff returns fast backoff trace option
+func WithSlowBackoff(b Backoff) retryOption {
+	return func(h *retryOptionsHolder) {
+		h.slowBackoff = b
 	}
 }
 
@@ -99,40 +116,37 @@ func WithIdempotent() retryOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err error) {
 	h := &retryOptionsHolder{
-		trace: trace.ContextRetry(ctx),
+		trace:       trace.ContextRetry(ctx),
+		fastBackoff: FastBackoff,
+		slowBackoff: SlowBackoff,
 	}
 	for _, o := range opts {
 		o(h)
 	}
-
 	var (
 		i        int
 		attempts int
 
 		code           = int32(0)
 		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id, h.idempotent)
-		onDone         func(attempts int, _ error)
 	)
 	defer func() {
-		if onDone == nil {
-			onDone = onIntermediate(err)
-		}
-		onDone(attempts, err)
+		onIntermediate(err)(attempts, err)
 	}()
 	for {
 		i++
 		attempts++
 		select {
 		case <-ctx.Done():
-			return errors.Error(ctx.Err())
+			return errors.WithStackTrace(ctx.Err())
 
 		default:
 			err = op(ctx)
 			if err != nil {
-				err = errors.Error(err)
+				err = errors.WithStackTrace(err)
 			}
 
-			onDone = onIntermediate(err)
+			onIntermediate(err)
 
 			if err == nil {
 				return
@@ -148,8 +162,8 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 				return
 			}
 
-			if e := Wait(ctx, FastBackoff, SlowBackoff, m, i); e != nil {
-				return errors.Error(err)
+			if e := Wait(ctx, h.fastBackoff, h.slowBackoff, m, i); e != nil {
+				return errors.WithStackTrace(err)
 			}
 
 			code = m.StatusCode()
@@ -338,7 +352,7 @@ type Backoff interface {
 func waitBackoff(ctx context.Context, b Backoff, i int) error {
 	if b == nil {
 		if err := ctx.Err(); err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		return nil
 	}
@@ -347,7 +361,7 @@ func waitBackoff(ctx context.Context, b Backoff, i int) error {
 		return nil
 	case <-ctx.Done():
 		if err := ctx.Err(); err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		return nil
 	}

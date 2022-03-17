@@ -108,7 +108,7 @@ func (c *conn) park(ctx context.Context) (err error) {
 	err = c.close()
 
 	if err != nil {
-		return errors.Error(err)
+		return errors.WithStackTrace(err)
 	}
 
 	return nil
@@ -185,7 +185,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, errors.Error(err)
+		return nil, errors.WithStackTrace(err)
 	}
 
 	c.cc = cc
@@ -325,7 +325,7 @@ func (c *conn) Invoke(
 
 	if err != nil {
 		if wrapping {
-			return errors.Error(errors.MapGRPCError(err))
+			return errors.WithStackTrace(errors.MapGRPCError(err))
 		}
 		return err
 	}
@@ -338,10 +338,10 @@ func (c *conn) Invoke(
 		if wrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return errors.Error(ErrOperationNotReady)
+				return errors.WithStackTrace(ErrOperationNotReady)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return errors.Error(errors.NewOpError(errors.WithOEOperation(o.GetOperation())))
+				return errors.WithStackTrace(errors.NewOpError(errors.WithOEOperation(o.GetOperation())))
 			}
 		}
 	}
@@ -412,7 +412,7 @@ func (c *conn) NewStream(
 
 	if err != nil {
 		if wrapping {
-			return s, errors.Error(errors.MapGRPCError(err))
+			return s, errors.WithStackTrace(errors.MapGRPCError(err))
 		}
 		return s, err
 	}

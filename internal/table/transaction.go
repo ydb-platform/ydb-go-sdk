@@ -67,7 +67,7 @@ func (tx *transaction) CommitTx(
 	opts ...options.CommitTransactionOption,
 ) (r result.Result, err error) {
 	if tx.committed {
-		return nil, errors.Error(ErrAlreadyCommited)
+		return nil, errors.WithStackTrace(ErrAlreadyCommited)
 	}
 	defer func() {
 		if err == nil {

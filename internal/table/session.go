@@ -902,6 +902,10 @@ func (s *session) StreamReadTable(
 		return nil, err
 	}
 
+	if checkHintSessionClose(stream.Trailer()) {
+		s.SetStatus(options.SessionClosing)
+	}
+
 	return scanner.NewStream(
 		func(ctx context.Context) (
 			set *Ydb.ResultSet,
@@ -923,9 +927,6 @@ func (s *session) StreamReadTable(
 		func(err error) error {
 			cancel()
 			onDone(err)
-			if checkHintSessionClose(stream.Trailer()) {
-				s.SetStatus(options.SessionClosing)
-			}
 			return err
 		},
 	), nil
@@ -981,6 +982,10 @@ func (s *session) StreamExecuteScanQuery(
 		return nil, err
 	}
 
+	if checkHintSessionClose(stream.Trailer()) {
+		s.SetStatus(options.SessionClosing)
+	}
+
 	return scanner.NewStream(
 		func(ctx context.Context) (
 			set *Ydb.ResultSet,
@@ -1005,9 +1010,6 @@ func (s *session) StreamExecuteScanQuery(
 		func(err error) error {
 			cancel()
 			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
-			if checkHintSessionClose(stream.Trailer()) {
-				s.SetStatus(options.SessionClosing)
-			}
 			return err
 		},
 	), nil

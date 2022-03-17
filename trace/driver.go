@@ -16,41 +16,47 @@ type (
 	//gtrace:set Shortcut
 	Driver struct {
 		// Driver runtime events
-		OnInit  func(InitStartInfo) func(InitDoneInfo)
-		OnClose func(CloseStartInfo) func(CloseDoneInfo)
+		OnInit  func(DriverInitStartInfo) func(DriverInitDoneInfo)
+		OnClose func(DriverCloseStartInfo) func(DriverCloseDoneInfo)
 
 		// Network events
-		OnNetRead  func(NetReadStartInfo) func(NetReadDoneInfo)
-		OnNetWrite func(NetWriteStartInfo) func(NetWriteDoneInfo)
-		OnNetDial  func(NetDialStartInfo) func(NetDialDoneInfo)
-		OnNetClose func(NetCloseStartInfo) func(NetCloseDoneInfo)
+		OnNetRead  func(DriverNetReadStartInfo) func(DriverNetReadDoneInfo)
+		OnNetWrite func(DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo)
+		OnNetDial  func(DriverNetDialStartInfo) func(DriverNetDialDoneInfo)
+		OnNetClose func(DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo)
 
 		// Resolver events
-		OnResolve func(ResolveStartInfo) func(ResolveDoneInfo)
+		OnResolve func(DriverResolveStartInfo) func(DriverResolveDoneInfo)
 
 		// Conn events
-		OnConnStateChange  func(ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo)
-		OnConnInvoke       func(ConnInvokeStartInfo) func(ConnInvokeDoneInfo)
-		OnConnNewStream    func(ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo)
-		OnConnTake         func(ConnTakeStartInfo) func(ConnTakeDoneInfo)
-		OnConnUsagesChange func(ConnUsagesChangeInfo)
-		OnConnPark         func(ConnParkStartInfo) func(ConnParkDoneInfo)
-		OnConnClose        func(ConnCloseStartInfo) func(ConnCloseDoneInfo)
+		OnConnStateChange func(DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo)
+		OnConnInvoke      func(DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo)
+		OnConnNewStream   func(
+			DriverConnNewStreamStartInfo,
+		) func(
+			DriverConnNewStreamRecvInfo,
+		) func(
+			DriverConnNewStreamDoneInfo,
+		)
+		OnConnTake         func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
+		OnConnUsagesChange func(DriverConnUsagesChangeInfo)
+		OnConnPark         func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
+		OnConnClose        func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
 
 		// Cluster events
-		OnClusterInit   func(ClusterInitStartInfo) func(ClusterInitDoneInfo)
-		OnClusterClose  func(ClusterCloseStartInfo) func(ClusterCloseDoneInfo)
-		OnClusterGet    func(ClusterGetStartInfo) func(ClusterGetDoneInfo)
-		OnClusterInsert func(ClusterInsertStartInfo) func(ClusterInsertDoneInfo)
-		OnClusterUpdate func(ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo)
-		OnClusterRemove func(ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo)
-		OnPessimizeNode func(PessimizeNodeStartInfo) func(PessimizeNodeDoneInfo)
+		OnClusterInit   func(DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo)
+		OnClusterClose  func(DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo)
+		OnClusterGet    func(DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo)
+		OnClusterInsert func(DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo)
+		OnClusterUpdate func(DriverClusterUpdateStartInfo) func(DriverClusterUpdateDoneInfo)
+		OnClusterRemove func(DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo)
+		OnPessimizeNode func(DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo)
 
 		// Repeater events
-		OnRepeaterWakeUp func(RepeaterTickStartInfo) func(RepeaterTickDoneInfo)
+		OnRepeaterWakeUp func(DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo)
 
 		// Credentials events
-		OnGetCredentials func(GetCredentialsStartInfo) func(GetCredentialsDoneInfo)
+		OnGetCredentials func(DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo)
 	}
 )
 
@@ -103,7 +109,7 @@ type EndpointInfo interface {
 }
 
 type (
-	ClusterInsertStartInfo struct {
+	DriverClusterInsertStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -111,11 +117,11 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
-	ClusterInsertDoneInfo struct {
+	DriverClusterInsertDoneInfo struct {
 		Inserted bool
 		State    ConnState
 	}
-	ClusterUpdateStartInfo struct {
+	DriverClusterUpdateStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -123,10 +129,10 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
-	ClusterUpdateDoneInfo struct {
+	DriverClusterUpdateDoneInfo struct {
 		State ConnState
 	}
-	ClusterRemoveStartInfo struct {
+	DriverClusterRemoveStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -134,41 +140,41 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
-	ClusterRemoveDoneInfo struct {
+	DriverClusterRemoveDoneInfo struct {
 		State   ConnState
 		Removed bool
 	}
-	ConnStateChangeStartInfo struct {
+	DriverConnStateChangeStartInfo struct {
 		Endpoint EndpointInfo
 		State    ConnState
 	}
-	ConnStateChangeDoneInfo struct {
+	DriverConnStateChangeDoneInfo struct {
 		State ConnState
 	}
-	ResolveStartInfo struct {
+	DriverResolveStartInfo struct {
 		Target   string
 		Resolved []string
 	}
-	ResolveDoneInfo struct {
+	DriverResolveDoneInfo struct {
 		Error error
 	}
-	NetReadStartInfo struct {
+	DriverNetReadStartInfo struct {
 		Address string
 		Buffer  int
 	}
-	NetReadDoneInfo struct {
+	DriverNetReadDoneInfo struct {
 		Received int
 		Error    error
 	}
-	NetWriteStartInfo struct {
+	DriverNetWriteStartInfo struct {
 		Address string
 		Bytes   int
 	}
-	NetWriteDoneInfo struct {
+	DriverNetWriteDoneInfo struct {
 		Sent  int
 		Error error
 	}
-	NetDialStartInfo struct {
+	DriverNetDialStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -176,16 +182,16 @@ type (
 		Context *context.Context
 		Address string
 	}
-	NetDialDoneInfo struct {
+	DriverNetDialDoneInfo struct {
 		Error error
 	}
-	NetCloseStartInfo struct {
+	DriverNetCloseStartInfo struct {
 		Address string
 	}
-	NetCloseDoneInfo struct {
+	DriverNetCloseDoneInfo struct {
 		Error error
 	}
-	ConnTakeStartInfo struct {
+	DriverConnTakeStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -193,10 +199,10 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
-	ConnTakeDoneInfo struct {
+	DriverConnTakeDoneInfo struct {
 		Error error
 	}
-	ConnParkStartInfo struct {
+	DriverConnParkStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -204,10 +210,10 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
-	ConnParkDoneInfo struct {
+	DriverConnParkDoneInfo struct {
 		Error error
 	}
-	ConnCloseStartInfo struct {
+	DriverConnCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -215,14 +221,14 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
-	ConnCloseDoneInfo struct {
+	DriverConnCloseDoneInfo struct {
 		Error error
 	}
-	ConnUsagesChangeInfo struct {
+	DriverConnUsagesChangeInfo struct {
 		Endpoint EndpointInfo
 		Usages   int
 	}
-	ConnInvokeStartInfo struct {
+	DriverConnInvokeStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -231,13 +237,13 @@ type (
 		Endpoint EndpointInfo
 		Method   Method
 	}
-	ConnInvokeDoneInfo struct {
+	DriverConnInvokeDoneInfo struct {
 		Error  error
 		Issues []Issue
 		OpID   string
 		State  ConnState
 	}
-	ConnNewStreamStartInfo struct {
+	DriverConnNewStreamStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -246,45 +252,45 @@ type (
 		Endpoint EndpointInfo
 		Method   Method
 	}
-	ConnNewStreamRecvInfo struct {
+	DriverConnNewStreamRecvInfo struct {
 		Error error
 	}
-	ConnNewStreamDoneInfo struct {
+	DriverConnNewStreamDoneInfo struct {
 		State ConnState
 		Error error
 	}
-	ClusterInitStartInfo struct {
+	DriverClusterInitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	ClusterInitDoneInfo struct {
+	DriverClusterInitDoneInfo struct {
 		Error error
 	}
-	ClusterCloseStartInfo struct {
+	DriverClusterCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	ClusterCloseDoneInfo struct {
+	DriverClusterCloseDoneInfo struct {
 		Error error
 	}
-	ClusterGetStartInfo struct {
+	DriverClusterGetStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	ClusterGetDoneInfo struct {
+	DriverClusterGetDoneInfo struct {
 		Endpoint EndpointInfo
 		Error    error
 	}
-	PessimizeNodeStartInfo struct {
+	DriverPessimizeNodeStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -294,10 +300,10 @@ type (
 		State    ConnState
 		Cause    error
 	}
-	PessimizeNodeDoneInfo struct {
+	DriverPessimizeNodeDoneInfo struct {
 		State ConnState
 	}
-	RepeaterTickStartInfo struct {
+	DriverRepeaterTickStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -306,21 +312,21 @@ type (
 		Name    string
 		Event   string
 	}
-	RepeaterTickDoneInfo struct {
+	DriverRepeaterTickDoneInfo struct {
 		Error error
 	}
-	GetCredentialsStartInfo struct {
+	DriverGetCredentialsStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	GetCredentialsDoneInfo struct {
+	DriverGetCredentialsDoneInfo struct {
 		Token string
 		Error error
 	}
-	InitStartInfo struct {
+	DriverInitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -330,17 +336,17 @@ type (
 		Database string
 		Secure   bool
 	}
-	InitDoneInfo struct {
+	DriverInitDoneInfo struct {
 		Error error
 	}
-	CloseStartInfo struct {
+	DriverCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	CloseDoneInfo struct {
+	DriverCloseDoneInfo struct {
 		Error error
 	}
 )

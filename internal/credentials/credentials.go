@@ -65,7 +65,7 @@ func (m *multiCredentials) Token(ctx context.Context) (token string, err error) 
 		}
 	}
 	if err == nil {
-		err = errors.Error(ErrNoCredentials)
+		err = errors.WithStackTrace(ErrNoCredentials)
 	}
 	return
 }

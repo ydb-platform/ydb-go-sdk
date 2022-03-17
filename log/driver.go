@@ -14,9 +14,9 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 		// nolint:govet
 		log := log.WithName(`resolver`)
 		t.OnResolve = func(
-			info trace.ResolveStartInfo,
+			info trace.DriverResolveStartInfo,
 		) func(
-			trace.ResolveDoneInfo,
+			trace.DriverResolveDoneInfo,
 		) {
 			target := info.Target
 			addresses := info.Resolved
@@ -24,7 +24,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				target,
 				addresses,
 			)
-			return func(info trace.ResolveDoneInfo) {
+			return func(info trace.DriverResolveDoneInfo) {
 				if info.Error == nil {
 					log.Infof(`update done {target:"%s",resolved:%v}`,
 						target,
@@ -44,13 +44,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverNetEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`net`)
-		t.OnNetRead = func(info trace.NetReadStartInfo) func(trace.NetReadDoneInfo) {
+		t.OnNetRead = func(info trace.DriverNetReadStartInfo) func(trace.DriverNetReadDoneInfo) {
 			address := info.Address
 			log.Tracef(`read start {address:"%s"}`,
 				address,
 			)
 			start := time.Now()
-			return func(info trace.NetReadDoneInfo) {
+			return func(info trace.DriverNetReadDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`read done {latency:"%v",address:"%s",received:%d}`,
 						time.Since(start),
@@ -67,11 +67,11 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnNetWrite = func(info trace.NetWriteStartInfo) func(trace.NetWriteDoneInfo) {
+		t.OnNetWrite = func(info trace.DriverNetWriteStartInfo) func(trace.DriverNetWriteDoneInfo) {
 			address := info.Address
 			log.Tracef(`write start {address:"%s"}`, address)
 			start := time.Now()
-			return func(info trace.NetWriteDoneInfo) {
+			return func(info trace.DriverNetWriteDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`write done {latency:"%v",address:"%s",sent:%d}`,
 						time.Since(start),
@@ -88,13 +88,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnNetDial = func(info trace.NetDialStartInfo) func(trace.NetDialDoneInfo) {
+		t.OnNetDial = func(info trace.DriverNetDialStartInfo) func(trace.DriverNetDialDoneInfo) {
 			address := info.Address
 			log.Debugf(`dial start {address:"%s"}`,
 				address,
 			)
 			start := time.Now()
-			return func(info trace.NetDialDoneInfo) {
+			return func(info trace.DriverNetDialDoneInfo) {
 				if info.Error == nil {
 					log.Debugf(`dial done {latency:"%v",address:"%s"}`,
 						time.Since(start),
@@ -109,13 +109,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnNetClose = func(info trace.NetCloseStartInfo) func(trace.NetCloseDoneInfo) {
+		t.OnNetClose = func(info trace.DriverNetCloseStartInfo) func(trace.DriverNetCloseDoneInfo) {
 			address := info.Address
 			log.Debugf(`close start {address:"%s"}`,
 				address,
 			)
 			start := time.Now()
-			return func(info trace.NetCloseDoneInfo) {
+			return func(info trace.DriverNetCloseDoneInfo) {
 				if info.Error == nil {
 					log.Debugf(`close done {latency:"%v",address:"%s"}`,
 						time.Since(start),
@@ -132,7 +132,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 		}
 	}
 	if details&trace.DriverEvents != 0 {
-		t.OnInit = func(info trace.InitStartInfo) func(trace.InitDoneInfo) {
+		t.OnInit = func(info trace.DriverInitStartInfo) func(trace.DriverInitDoneInfo) {
 			endpoint := info.Endpoint
 			database := info.Database
 			secure := info.Secure
@@ -144,7 +144,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				secure,
 			)
 			start := time.Now()
-			return func(info trace.InitDoneInfo) {
+			return func(info trace.DriverInitDoneInfo) {
 				if info.Error == nil {
 					log.Infof(
 						`init done {endpoint:"%s",database:"%s",secure:%t,latency:"%v"}`,
@@ -165,10 +165,10 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnClose = func(info trace.CloseStartInfo) func(trace.CloseDoneInfo) {
+		t.OnClose = func(info trace.DriverCloseStartInfo) func(trace.DriverCloseDoneInfo) {
 			log.Infof(`close start`)
 			start := time.Now()
-			return func(info trace.CloseDoneInfo) {
+			return func(info trace.DriverCloseDoneInfo) {
 				if info.Error == nil {
 					log.Infof(
 						`close done {latency:"%v"}`,
@@ -188,13 +188,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverConnEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`conn`)
-		t.OnConnTake = func(info trace.ConnTakeStartInfo) func(trace.ConnTakeDoneInfo) {
+		t.OnConnTake = func(info trace.DriverConnTakeStartInfo) func(trace.DriverConnTakeDoneInfo) {
 			endpoint := info.Endpoint.String()
 			log.Tracef(`take start {endpoint:%v}`,
 				endpoint,
 			)
 			start := time.Now()
-			return func(info trace.ConnTakeDoneInfo) {
+			return func(info trace.DriverConnTakeDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`take done {endpoint:%v,latency:"%v"}`,
 						endpoint,
@@ -209,20 +209,20 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnConnUsagesChange = func(info trace.ConnUsagesChangeInfo) {
+		t.OnConnUsagesChange = func(info trace.DriverConnUsagesChangeInfo) {
 			log.Tracef(`release done {endpoint:%v,usages:%d}`,
 				info.Endpoint.String(),
 				info.Usages,
 			)
 		}
-		t.OnConnStateChange = func(info trace.ConnStateChangeStartInfo) func(trace.ConnStateChangeDoneInfo) {
+		t.OnConnStateChange = func(info trace.DriverConnStateChangeStartInfo) func(trace.DriverConnStateChangeDoneInfo) {
 			endpoint := info.Endpoint.String()
 			log.Tracef(`conn state change start {endpoint:%v,state:"%s"}`,
 				endpoint,
 				info.State,
 			)
 			start := time.Now()
-			return func(info trace.ConnStateChangeDoneInfo) {
+			return func(info trace.DriverConnStateChangeDoneInfo) {
 				log.Tracef(`conn state change done {endpoint:%v,latency:"%v",state:"%s"}`,
 					endpoint,
 					time.Since(start),
@@ -230,13 +230,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
-		t.OnConnPark = func(info trace.ConnParkStartInfo) func(trace.ConnParkDoneInfo) {
+		t.OnConnPark = func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
 			endpoint := info.Endpoint
 			log.Tracef(`conn park start {endpoint:%v}`,
 				endpoint,
 			)
 			start := time.Now()
-			return func(info trace.ConnParkDoneInfo) {
+			return func(info trace.DriverConnParkDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`conn park done {endpoint:%v,latency:"%v"}`,
 						endpoint,
@@ -251,13 +251,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnConnClose = func(info trace.ConnCloseStartInfo) func(trace.ConnCloseDoneInfo) {
+		t.OnConnClose = func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
 			endpoint := info.Endpoint
 			log.Tracef(`conn close start {endpoint:%v}`,
 				endpoint,
 			)
 			start := time.Now()
-			return func(info trace.ConnCloseDoneInfo) {
+			return func(info trace.DriverConnCloseDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`conn close done {endpoint:%v,latency:"%v"}`,
 						endpoint,
@@ -272,7 +272,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnConnInvoke = func(info trace.ConnInvokeStartInfo) func(trace.ConnInvokeDoneInfo) {
+		t.OnConnInvoke = func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
 			endpoint := info.Endpoint.String()
 			method := string(info.Method)
 			log.Tracef(`invoke start {endpoint:%v,method:"%s"}`,
@@ -280,7 +280,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				method,
 			)
 			start := time.Now()
-			return func(info trace.ConnInvokeDoneInfo) {
+			return func(info trace.DriverConnInvokeDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`invoke done {endpoint:%v,method:"%s",latency:"%v"}`,
 						endpoint,
@@ -298,11 +298,11 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 		t.OnConnNewStream = func(
-			info trace.ConnNewStreamStartInfo,
+			info trace.DriverConnNewStreamStartInfo,
 		) func(
-			trace.ConnNewStreamRecvInfo,
+			trace.DriverConnNewStreamRecvInfo,
 		) func(
-			trace.ConnNewStreamDoneInfo,
+			trace.DriverConnNewStreamDoneInfo,
 		) {
 			endpoint := info.Endpoint.String()
 			method := string(info.Method)
@@ -311,7 +311,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				method,
 			)
 			start := time.Now()
-			return func(info trace.ConnNewStreamRecvInfo) func(trace.ConnNewStreamDoneInfo) {
+			return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`streaming intermediate receive {endpoint:%v,method:"%s",latency:"%v"}`,
 						endpoint,
@@ -326,7 +326,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 						info.Error,
 					)
 				}
-				return func(info trace.ConnNewStreamDoneInfo) {
+				return func(info trace.DriverConnNewStreamDoneInfo) {
 					if info.Error == nil {
 						log.Tracef(`streaming done {endpoint:%v,method:"%s",latency:"%v"}`,
 							endpoint,
@@ -348,7 +348,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverRepeaterEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`repeater`)
-		t.OnRepeaterWakeUp = func(info trace.RepeaterTickStartInfo) func(trace.RepeaterTickDoneInfo) {
+		t.OnRepeaterWakeUp = func(info trace.DriverRepeaterTickStartInfo) func(trace.DriverRepeaterTickDoneInfo) {
 			name := info.Name
 			event := info.Event
 			log.Tracef(`repeater wake up {name:"%s",event:"%s"}`,
@@ -356,7 +356,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				event,
 			)
 			start := time.Now()
-			return func(info trace.RepeaterTickDoneInfo) {
+			return func(info trace.DriverRepeaterTickDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`repeater wake up done {name:"%s",event:"%s",latency:"%v"}`,
 						name,
@@ -377,19 +377,19 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverClusterEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`cluster`)
-		t.OnClusterInit = func(info trace.ClusterInitStartInfo) func(trace.ClusterInitDoneInfo) {
+		t.OnClusterInit = func(info trace.DriverClusterInitStartInfo) func(trace.DriverClusterInitDoneInfo) {
 			log.Tracef(`init start`)
 			start := time.Now()
-			return func(info trace.ClusterInitDoneInfo) {
+			return func(info trace.DriverClusterInitDoneInfo) {
 				log.Debugf(`init done {latency:"%v"}`,
 					time.Since(start),
 				)
 			}
 		}
-		t.OnClusterClose = func(info trace.ClusterCloseStartInfo) func(trace.ClusterCloseDoneInfo) {
+		t.OnClusterClose = func(info trace.DriverClusterCloseStartInfo) func(trace.DriverClusterCloseDoneInfo) {
 			log.Tracef(`close start`)
 			start := time.Now()
-			return func(info trace.ClusterCloseDoneInfo) {
+			return func(info trace.DriverClusterCloseDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`close done {latency:"%v"}`,
 						time.Since(start),
@@ -402,10 +402,10 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnClusterGet = func(info trace.ClusterGetStartInfo) func(trace.ClusterGetDoneInfo) {
+		t.OnClusterGet = func(info trace.DriverClusterGetStartInfo) func(trace.DriverClusterGetDoneInfo) {
 			log.Tracef(`get start`)
 			start := time.Now()
-			return func(info trace.ClusterGetDoneInfo) {
+			return func(info trace.DriverClusterGetDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`get done {latency:"%v",endpoint:%v}`,
 						time.Since(start),
@@ -419,13 +419,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnClusterInsert = func(info trace.ClusterInsertStartInfo) func(trace.ClusterInsertDoneInfo) {
+		t.OnClusterInsert = func(info trace.DriverClusterInsertStartInfo) func(trace.DriverClusterInsertDoneInfo) {
 			endpoint := info.Endpoint.String()
 			log.Debugf(`insert start {endpoint:%v}`,
 				endpoint,
 			)
 			start := time.Now()
-			return func(info trace.ClusterInsertDoneInfo) {
+			return func(info trace.DriverClusterInsertDoneInfo) {
 				log.Infof(`insert done {endpoint:%v,latency:"%v",state:"%s"}`,
 					endpoint,
 					time.Since(start),
@@ -433,13 +433,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
-		t.OnClusterRemove = func(info trace.ClusterRemoveStartInfo) func(trace.ClusterRemoveDoneInfo) {
+		t.OnClusterRemove = func(info trace.DriverClusterRemoveStartInfo) func(trace.DriverClusterRemoveDoneInfo) {
 			endpoint := info.Endpoint.String()
 			log.Debugf(`remove start {endpoint:%v}`,
 				endpoint,
 			)
 			start := time.Now()
-			return func(info trace.ClusterRemoveDoneInfo) {
+			return func(info trace.DriverClusterRemoveDoneInfo) {
 				log.Infof(`remove done {endpoint:%v,latency:"%v",state:"%s"}`,
 					endpoint,
 					time.Since(start),
@@ -447,13 +447,13 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
-		t.OnClusterUpdate = func(info trace.ClusterUpdateStartInfo) func(trace.ClusterUpdateDoneInfo) {
+		t.OnClusterUpdate = func(info trace.DriverClusterUpdateStartInfo) func(trace.DriverClusterUpdateDoneInfo) {
 			endpoint := info.Endpoint.String()
 			log.Debugf(`update start {endpoint:%v}`,
 				endpoint,
 			)
 			start := time.Now()
-			return func(info trace.ClusterUpdateDoneInfo) {
+			return func(info trace.DriverClusterUpdateDoneInfo) {
 				log.Infof(`update done {endpoint:%v,latency:"%v",state:"%s"}`,
 					endpoint,
 					time.Since(start),
@@ -461,14 +461,14 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
-		t.OnPessimizeNode = func(info trace.PessimizeNodeStartInfo) func(trace.PessimizeNodeDoneInfo) {
+		t.OnPessimizeNode = func(info trace.DriverPessimizeNodeStartInfo) func(trace.DriverPessimizeNodeDoneInfo) {
 			endpoint := info.Endpoint.String()
 			log.Warnf(`pessimize start {endpoint:%v,cause:"%s"}`,
 				endpoint,
 				info.Cause,
 			)
 			start := time.Now()
-			return func(info trace.PessimizeNodeDoneInfo) {
+			return func(info trace.DriverPessimizeNodeDoneInfo) {
 				log.Warnf(`pessimize done {endpoint:%v,latency:"%v",state:"%s"}`,
 					endpoint,
 					time.Since(start),
@@ -480,10 +480,10 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverCredentialsEvents != 0 {
 		// nolint:govet
 		log := log.WithName(`credentials`)
-		t.OnGetCredentials = func(info trace.GetCredentialsStartInfo) func(trace.GetCredentialsDoneInfo) {
+		t.OnGetCredentials = func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
 			log.Tracef(`get start`)
 			start := time.Now()
-			return func(info trace.GetCredentialsDoneInfo) {
+			return func(info trace.DriverGetCredentialsDoneInfo) {
 				if info.Error == nil {
 					log.Tracef(`get done {latency:"%v",token:"%s"}`,
 						time.Since(start),

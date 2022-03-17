@@ -3,6 +3,7 @@ package errors
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -90,7 +91,7 @@ func NewTransportError(opts ...teOpt) error {
 	for _, f := range opts {
 		f(te)
 	}
-	return ErrorfSkip(1, "%w", te)
+	return WithStackTrace(fmt.Errorf("%w", te), WithSkipDepth(1))
 }
 
 func (t *TransportError) Error() string {

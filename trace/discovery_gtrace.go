@@ -17,7 +17,7 @@ func (t Discovery) Compose(x Discovery) (ret Discovery) {
 	default:
 		h1 := t.OnDiscover
 		h2 := x.OnDiscover
-		ret.OnDiscover = func(d DiscoverStartInfo) func(DiscoverDoneInfo) {
+		ret.OnDiscover = func(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
 			r1 := h1(d)
 			r2 := h2(d)
 			switch {
@@ -26,7 +26,7 @@ func (t Discovery) Compose(x Discovery) (ret Discovery) {
 			case r2 == nil:
 				return r1
 			default:
-				return func(d DiscoverDoneInfo) {
+				return func(d DiscoveryDiscoverDoneInfo) {
 					r1(d)
 					r2(d)
 				}
@@ -41,62 +41,62 @@ func (t Discovery) Compose(x Discovery) (ret Discovery) {
 	default:
 		h1 := t.OnWhoAmI
 		h2 := x.OnWhoAmI
-		ret.OnWhoAmI = func(w WhoAmIStartInfo) func(WhoAmIDoneInfo) {
-			r1 := h1(w)
-			r2 := h2(w)
+		ret.OnWhoAmI = func(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(w WhoAmIDoneInfo) {
-					r1(w)
-					r2(w)
+				return func(d DiscoveryWhoAmIDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
 	}
 	return ret
 }
-func (t Discovery) onDiscover(d DiscoverStartInfo) func(DiscoverDoneInfo) {
+func (t Discovery) onDiscover(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
 	fn := t.OnDiscover
 	if fn == nil {
-		return func(DiscoverDoneInfo) {
+		return func(DiscoveryDiscoverDoneInfo) {
 			return
 		}
 	}
 	res := fn(d)
 	if res == nil {
-		return func(DiscoverDoneInfo) {
+		return func(DiscoveryDiscoverDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Discovery) onWhoAmI(w WhoAmIStartInfo) func(WhoAmIDoneInfo) {
+func (t Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
 	fn := t.OnWhoAmI
 	if fn == nil {
-		return func(WhoAmIDoneInfo) {
+		return func(DiscoveryWhoAmIDoneInfo) {
 			return
 		}
 	}
-	res := fn(w)
+	res := fn(d)
 	if res == nil {
-		return func(WhoAmIDoneInfo) {
+		return func(DiscoveryWhoAmIDoneInfo) {
 			return
 		}
 	}
 	return res
 }
 func DiscoveryOnDiscover(t Discovery, c *context.Context, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
-	var p DiscoverStartInfo
+	var p DiscoveryDiscoverStartInfo
 	p.Context = c
 	p.Address = address
 	p.Database = database
 	res := t.onDiscover(p)
 	return func(location string, endpoints []EndpointInfo, e error) {
-		var p DiscoverDoneInfo
+		var p DiscoveryDiscoverDoneInfo
 		p.Location = location
 		p.Endpoints = endpoints
 		p.Error = e
@@ -104,11 +104,11 @@ func DiscoveryOnDiscover(t Discovery, c *context.Context, address string, databa
 	}
 }
 func DiscoveryOnWhoAmI(t Discovery, c *context.Context) func(user string, groups []string, _ error) {
-	var p WhoAmIStartInfo
+	var p DiscoveryWhoAmIStartInfo
 	p.Context = c
 	res := t.onWhoAmI(p)
 	return func(user string, groups []string, e error) {
-		var p WhoAmIDoneInfo
+		var p DiscoveryWhoAmIDoneInfo
 		p.User = user
 		p.Groups = groups
 		p.Error = e

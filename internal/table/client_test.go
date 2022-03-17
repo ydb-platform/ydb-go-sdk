@@ -180,7 +180,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				config.WithSizeLimit(1),
 				config.WithTrace(
 					trace.Table{
-						OnPoolWait: func(trace.PoolWaitStartInfo) func(trace.PoolWaitDoneInfo) {
+						OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
 							wait <- struct{}{}
 							return nil
 						},
@@ -198,7 +198,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 					trace.WithTable(
 						context.Background(),
 						trace.Table{
-							OnPoolGet: func(trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
+							OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 								get <- struct{}{}
 								return nil
 							},
@@ -261,19 +261,19 @@ func TestSessionPoolClose(t *testing.T) {
 		config.WithIdleThreshold(time.Hour),
 		config.WithTrace(
 			trace.Table{
-				OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
+				OnPoolPut: func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
 					wg.Add(1)
-					return func(info trace.PoolPutDoneInfo) {
+					return func(info trace.TablePoolPutDoneInfo) {
 						wg.Done()
 					}
 				},
 				OnPoolSessionClose: func(
-					info trace.PoolSessionCloseStartInfo,
+					info trace.TablePoolSessionCloseStartInfo,
 				) func(
-					doneInfo trace.PoolSessionCloseDoneInfo,
+					doneInfo trace.TablePoolSessionCloseDoneInfo,
 				) {
 					wg.Add(1)
-					return func(info trace.PoolSessionCloseDoneInfo) {
+					return func(info trace.TablePoolSessionCloseDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -415,11 +415,11 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				config.WithIdleThreshold(time.Hour),
 				config.WithTrace(
 					trace.Table{
-						OnPoolGet: func(trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
+						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 							get <- struct{}{}
 							return nil
 						},
-						OnPoolWait: func(trace.PoolWaitStartInfo) func(trace.PoolWaitDoneInfo) {
+						OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
 							wait <- struct{}{}
 							return nil
 						},
@@ -625,11 +625,11 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 					trace.WithTable(
 						context.Background(),
 						trace.Table{
-							OnPoolGet: func(trace.PoolGetStartInfo) func(trace.PoolGetDoneInfo) {
+							OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 								get <- struct{}{}
 								return nil
 							},
-							OnPoolWait: func(trace.PoolWaitStartInfo) func(trace.PoolWaitDoneInfo) {
+							OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
 								wait <- struct{}{}
 								return nil
 							},
@@ -1239,9 +1239,9 @@ func mustCreateSession(t *testing.T, p *client) Session {
 	s, err := p.createSession(trace.WithTable(
 		context.Background(),
 		trace.Table{
-			OnPoolSessionNew: func(info trace.PoolSessionNewStartInfo) func(trace.PoolSessionNewDoneInfo) {
+			OnPoolSessionNew: func(info trace.TablePoolSessionNewStartInfo) func(trace.TablePoolSessionNewDoneInfo) {
 				wg.Add(1)
-				return func(info trace.PoolSessionNewDoneInfo) {
+				return func(info trace.TablePoolSessionNewDoneInfo) {
 					wg.Done()
 				}
 			},
@@ -1272,19 +1272,19 @@ func mustPutSession(t *testing.T, p *client, s Session) {
 		trace.WithTable(
 			context.Background(),
 			trace.Table{
-				OnPoolPut: func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
+				OnPoolPut: func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
 					wg.Add(1)
-					return func(info trace.PoolPutDoneInfo) {
+					return func(info trace.TablePoolPutDoneInfo) {
 						wg.Done()
 					}
 				},
 				OnPoolSessionClose: func(
-					info trace.PoolSessionCloseStartInfo,
+					info trace.TablePoolSessionCloseStartInfo,
 				) func(
-					doneInfo trace.PoolSessionCloseDoneInfo,
+					doneInfo trace.TablePoolSessionCloseDoneInfo,
 				) {
 					wg.Add(1)
-					return func(info trace.PoolSessionCloseDoneInfo) {
+					return func(info trace.TablePoolSessionCloseDoneInfo) {
 						wg.Done()
 					}
 				},
@@ -1305,12 +1305,12 @@ func mustClose(t *testing.T, p *client) {
 			context.Background(),
 			trace.Table{
 				OnPoolSessionClose: func(
-					info trace.PoolSessionCloseStartInfo,
+					info trace.TablePoolSessionCloseStartInfo,
 				) func(
-					doneInfo trace.PoolSessionCloseDoneInfo,
+					doneInfo trace.TablePoolSessionCloseDoneInfo,
 				) {
 					wg.Add(1)
-					return func(info trace.PoolSessionCloseDoneInfo) {
+					return func(info trace.TablePoolSessionCloseDoneInfo) {
 						wg.Done()
 					}
 				},

@@ -38,7 +38,7 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	}()
 	err = c.cc.UpdateState(state)
 	if err != nil {
-		err = errors.Error(err)
+		err = errors.WithStackTrace(err)
 	}
 	return err
 }

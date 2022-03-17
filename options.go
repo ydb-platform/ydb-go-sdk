@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
-	"io"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -96,11 +96,13 @@ func WithConnectionString(connectionString string) Option {
 func RegisterParser(param string, parser func(value string) ([]config.Option, error)) (err error) {
 	err = dsn.Register(param, parser)
 	if err != nil {
-		return errors.Errorf("%w: %s", err, param)
+		return errors.WithStackTrace(fmt.Errorf("%w: %s", err, param))
 	}
 	return nil
 }
 
+// WithConnectionTTL defines duration for parking idle connections
+// Warning: if defined WithSessionPoolIdleThreshold - idleThreshold must be less than connectionTTL
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithConnectionTTL(ttl))
@@ -150,44 +152,6 @@ func WithTLSSInsecureSkipVerify() Option {
 	}
 }
 
-type Level logger.Level
-
-const (
-	QUIET = Level(logger.QUIET)
-	TRACE = Level(logger.TRACE)
-	DEBUG = Level(logger.DEBUG)
-	INFO  = Level(logger.INFO)
-	WARN  = Level(logger.WARN)
-	ERROR = Level(logger.ERROR)
-	FATAL = Level(logger.FATAL)
-)
-
-type LoggerOption logger.Option
-
-func WithNamespace(namespace string) LoggerOption {
-	return LoggerOption(logger.WithNamespace(namespace))
-}
-
-func WithMinLevel(minLevel Level) LoggerOption {
-	return LoggerOption(logger.WithMinLevel(logger.Level(minLevel)))
-}
-
-func WithNoColor(b bool) LoggerOption {
-	return LoggerOption(logger.WithNoColor(b))
-}
-
-func WithExternalLogger(external log.Logger) LoggerOption {
-	return LoggerOption(logger.WithExternalLogger(external))
-}
-
-func WithOutWriter(out io.Writer) LoggerOption {
-	return LoggerOption(logger.WithOutWriter(out))
-}
-
-func WithErrWriter(err io.Writer) LoggerOption {
-	return LoggerOption(logger.WithErrWriter(err))
-}
-
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 	loggerOpts := make([]logger.Option, 0, len(opts))
 	for _, o := range opts {
@@ -216,7 +180,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 	return func(ctx context.Context, c *connection) error {
 		credentials, err := createCredentials(ctx)
 		if err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		c.options = append(c.options, config.WithCredentials(credentials))
 		return nil
@@ -254,7 +218,7 @@ func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		for _, o := range opts {
 			if err := o(ctx, c); err != nil {
-				return errors.Error(err)
+				return errors.WithStackTrace(err)
 			}
 		}
 		return nil
@@ -288,16 +252,16 @@ func WithCertificatesFromFile(caFile string) Option {
 		if len(caFile) > 0 && caFile[0] == '~' {
 			home, err := os.UserHomeDir()
 			if err != nil {
-				return errors.Error(err)
+				return errors.WithStackTrace(err)
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
 		bytes, err := ioutil.ReadFile(filepath.Clean(caFile))
 		if err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		if err = WithCertificatesFromPem(bytes)(ctx, c); err != nil {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		return nil
 	}
@@ -326,7 +290,7 @@ func WithCertificatesFromPem(bytes []byte) Option {
 			}
 			return
 		}(bytes); !ok {
-			return errors.Error(err)
+			return errors.WithStackTrace(err)
 		}
 		return nil
 	}
@@ -353,6 +317,8 @@ func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	}
 }
 
+// WithSessionPoolIdleThreshold defines keep-alive interval for idle sessions
+// Warning: if defined WithConnectionTTL - idleThreshold must be less than connectionTTL
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))

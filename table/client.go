@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 // Operation is the interface that holds an operation for retry.
@@ -17,55 +16,6 @@ type Operation func(ctx context.Context, s Session) error
 // if TxOperation returns nil - retry loop will break
 type TxOperation func(ctx context.Context, tx TransactionActor) error
 
-type Option func(o *Options)
-
-type Options struct {
-	Idempotent      bool
-	TxSettings      *TransactionSettings
-	TxCommitOptions []options.CommitTransactionOption
-}
-
-func WithIdempotent() Option {
-	return func(o *Options) {
-		o.Idempotent = true
-	}
-}
-
-func WithTxSettings(tx *TransactionSettings) Option {
-	return func(o *Options) {
-		o.TxSettings = tx
-	}
-}
-
-func WithTxCommitOptions(opts ...options.CommitTransactionOption) Option {
-	return func(o *Options) {
-		o.TxCommitOptions = append(o.TxCommitOptions, opts...)
-	}
-}
-
-type ctxIdempotentOperationKey struct{}
-
-func WithIdempotentOperation(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxIdempotentOperationKey{}, struct{}{})
-}
-
-func ContextIdempotentOperation(ctx context.Context) bool {
-	return ctx.Value(ctxIdempotentOperationKey{}) != nil
-}
-
-type ctxTransactionSettingsKey struct{}
-
-func WithTransactionSettings(ctx context.Context, tx *TransactionSettings) context.Context {
-	return context.WithValue(ctx, ctxTransactionSettingsKey{}, tx)
-}
-
-func ContextTransactionSettings(ctx context.Context) *TransactionSettings {
-	if tx, ok := ctx.Value(ctxTransactionSettingsKey{}).(*TransactionSettings); ok {
-		return tx
-	}
-	return nil
-}
-
 type ClosableSession interface {
 	closer.Closer
 	Session
@@ -77,7 +27,7 @@ type Client interface {
 	// CreateSession returns session or error for manually control of session lifecycle
 	// CreateSession do not provide retry loop for failed create session requests.
 	// Best effort policy may be implements with outer retry loop includes CreateSession call
-	CreateSession(ctx context.Context) (s ClosableSession, err error)
+	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
 
 	// Do provide the best effort for execute operation
 	// Do implements internal busy loop until one of the following conditions is met:

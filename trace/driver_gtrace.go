@@ -17,18 +17,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnInit
 		h2 := x.OnInit
-		ret.OnInit = func(i InitStartInfo) func(InitDoneInfo) {
-			r1 := h1(i)
-			r2 := h2(i)
+		ret.OnInit = func(d DriverInitStartInfo) func(DriverInitDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(i InitDoneInfo) {
-					r1(i)
-					r2(i)
+				return func(d DriverInitDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -41,18 +41,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnClose
 		h2 := x.OnClose
-		ret.OnClose = func(c CloseStartInfo) func(CloseDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnClose = func(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c CloseDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverCloseDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -65,18 +65,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnNetRead
 		h2 := x.OnNetRead
-		ret.OnNetRead = func(n NetReadStartInfo) func(NetReadDoneInfo) {
-			r1 := h1(n)
-			r2 := h2(n)
+		ret.OnNetRead = func(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(n NetReadDoneInfo) {
-					r1(n)
-					r2(n)
+				return func(d DriverNetReadDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -89,18 +89,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnNetWrite
 		h2 := x.OnNetWrite
-		ret.OnNetWrite = func(n NetWriteStartInfo) func(NetWriteDoneInfo) {
-			r1 := h1(n)
-			r2 := h2(n)
+		ret.OnNetWrite = func(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(n NetWriteDoneInfo) {
-					r1(n)
-					r2(n)
+				return func(d DriverNetWriteDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -113,18 +113,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnNetDial
 		h2 := x.OnNetDial
-		ret.OnNetDial = func(n NetDialStartInfo) func(NetDialDoneInfo) {
-			r1 := h1(n)
-			r2 := h2(n)
+		ret.OnNetDial = func(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(n NetDialDoneInfo) {
-					r1(n)
-					r2(n)
+				return func(d DriverNetDialDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -137,18 +137,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnNetClose
 		h2 := x.OnNetClose
-		ret.OnNetClose = func(n NetCloseStartInfo) func(NetCloseDoneInfo) {
-			r1 := h1(n)
-			r2 := h2(n)
+		ret.OnNetClose = func(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(n NetCloseDoneInfo) {
-					r1(n)
-					r2(n)
+				return func(d DriverNetCloseDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -161,18 +161,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnResolve
 		h2 := x.OnResolve
-		ret.OnResolve = func(r ResolveStartInfo) func(ResolveDoneInfo) {
-			r1 := h1(r)
-			r2 := h2(r)
+		ret.OnResolve = func(d DriverResolveStartInfo) func(DriverResolveDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(r ResolveDoneInfo) {
-					r1(r)
-					r2(r)
+				return func(d DriverResolveDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -185,18 +185,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnStateChange
 		h2 := x.OnConnStateChange
-		ret.OnConnStateChange = func(c ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnConnStateChange = func(d DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnStateChangeDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverConnStateChangeDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -209,18 +209,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnInvoke
 		h2 := x.OnConnInvoke
-		ret.OnConnInvoke = func(c ConnInvokeStartInfo) func(ConnInvokeDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnConnInvoke = func(d DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnInvokeDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverConnInvokeDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -233,27 +233,27 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnNewStream
 		h2 := x.OnConnNewStream
-		ret.OnConnNewStream = func(c ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnConnNewStream = func(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
-					r11 := r1(c)
-					r21 := r2(c)
+				return func(d DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+					r11 := r1(d)
+					r21 := r2(d)
 					switch {
 					case r11 == nil:
 						return r21
 					case r21 == nil:
 						return r11
 					default:
-						return func(c ConnNewStreamDoneInfo) {
-							r11(c)
-							r21(c)
+						return func(d DriverConnNewStreamDoneInfo) {
+							r11(d)
+							r21(d)
 						}
 					}
 				}
@@ -268,18 +268,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnTake
 		h2 := x.OnConnTake
-		ret.OnConnTake = func(c ConnTakeStartInfo) func(ConnTakeDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnConnTake = func(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnTakeDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverConnTakeDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -292,9 +292,9 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnUsagesChange
 		h2 := x.OnConnUsagesChange
-		ret.OnConnUsagesChange = func(c ConnUsagesChangeInfo) {
-			h1(c)
-			h2(c)
+		ret.OnConnUsagesChange = func(d DriverConnUsagesChangeInfo) {
+			h1(d)
+			h2(d)
 		}
 	}
 	switch {
@@ -305,18 +305,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnPark
 		h2 := x.OnConnPark
-		ret.OnConnPark = func(c ConnParkStartInfo) func(ConnParkDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnConnPark = func(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnParkDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverConnParkDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -329,18 +329,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnConnClose
 		h2 := x.OnConnClose
-		ret.OnConnClose = func(c ConnCloseStartInfo) func(ConnCloseDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnConnClose = func(d DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ConnCloseDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverConnCloseDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -353,18 +353,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnClusterInit
 		h2 := x.OnClusterInit
-		ret.OnClusterInit = func(c ClusterInitStartInfo) func(ClusterInitDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnClusterInit = func(d DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ClusterInitDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverClusterInitDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -377,18 +377,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnClusterClose
 		h2 := x.OnClusterClose
-		ret.OnClusterClose = func(c ClusterCloseStartInfo) func(ClusterCloseDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnClusterClose = func(d DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ClusterCloseDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverClusterCloseDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -401,18 +401,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnClusterGet
 		h2 := x.OnClusterGet
-		ret.OnClusterGet = func(c ClusterGetStartInfo) func(ClusterGetDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnClusterGet = func(d DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ClusterGetDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverClusterGetDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -425,18 +425,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnClusterInsert
 		h2 := x.OnClusterInsert
-		ret.OnClusterInsert = func(c ClusterInsertStartInfo) func(ClusterInsertDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnClusterInsert = func(d DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ClusterInsertDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverClusterInsertDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -449,18 +449,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnClusterUpdate
 		h2 := x.OnClusterUpdate
-		ret.OnClusterUpdate = func(c ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnClusterUpdate = func(d DriverClusterUpdateStartInfo) func(DriverClusterUpdateDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ClusterUpdateDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverClusterUpdateDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -473,18 +473,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnClusterRemove
 		h2 := x.OnClusterRemove
-		ret.OnClusterRemove = func(c ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo) {
-			r1 := h1(c)
-			r2 := h2(c)
+		ret.OnClusterRemove = func(d DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(c ClusterRemoveDoneInfo) {
-					r1(c)
-					r2(c)
+				return func(d DriverClusterRemoveDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -497,18 +497,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnPessimizeNode
 		h2 := x.OnPessimizeNode
-		ret.OnPessimizeNode = func(p PessimizeNodeStartInfo) func(PessimizeNodeDoneInfo) {
-			r1 := h1(p)
-			r2 := h2(p)
+		ret.OnPessimizeNode = func(d DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(p PessimizeNodeDoneInfo) {
-					r1(p)
-					r2(p)
+				return func(d DriverPessimizeNodeDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -521,18 +521,18 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnRepeaterWakeUp
 		h2 := x.OnRepeaterWakeUp
-		ret.OnRepeaterWakeUp = func(r RepeaterTickStartInfo) func(RepeaterTickDoneInfo) {
-			r1 := h1(r)
-			r2 := h2(r)
+		ret.OnRepeaterWakeUp = func(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(r RepeaterTickDoneInfo) {
-					r1(r)
-					r2(r)
+				return func(d DriverRepeaterTickDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
@@ -545,471 +545,471 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 	default:
 		h1 := t.OnGetCredentials
 		h2 := x.OnGetCredentials
-		ret.OnGetCredentials = func(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
-			r1 := h1(g)
-			r2 := h2(g)
+		ret.OnGetCredentials = func(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
+			r1 := h1(d)
+			r2 := h2(d)
 			switch {
 			case r1 == nil:
 				return r2
 			case r2 == nil:
 				return r1
 			default:
-				return func(g GetCredentialsDoneInfo) {
-					r1(g)
-					r2(g)
+				return func(d DriverGetCredentialsDoneInfo) {
+					r1(d)
+					r2(d)
 				}
 			}
 		}
 	}
 	return ret
 }
-func (t Driver) onInit(i InitStartInfo) func(InitDoneInfo) {
+func (t Driver) onInit(d DriverInitStartInfo) func(DriverInitDoneInfo) {
 	fn := t.OnInit
 	if fn == nil {
-		return func(InitDoneInfo) {
+		return func(DriverInitDoneInfo) {
 			return
 		}
 	}
-	res := fn(i)
+	res := fn(d)
 	if res == nil {
-		return func(InitDoneInfo) {
+		return func(DriverInitDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onClose(c1 CloseStartInfo) func(CloseDoneInfo) {
+func (t Driver) onClose(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
 	fn := t.OnClose
 	if fn == nil {
-		return func(CloseDoneInfo) {
+		return func(DriverCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(CloseDoneInfo) {
+		return func(DriverCloseDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onNetRead(n NetReadStartInfo) func(NetReadDoneInfo) {
+func (t Driver) onNetRead(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
 	fn := t.OnNetRead
 	if fn == nil {
-		return func(NetReadDoneInfo) {
+		return func(DriverNetReadDoneInfo) {
 			return
 		}
 	}
-	res := fn(n)
+	res := fn(d)
 	if res == nil {
-		return func(NetReadDoneInfo) {
+		return func(DriverNetReadDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onNetWrite(n NetWriteStartInfo) func(NetWriteDoneInfo) {
+func (t Driver) onNetWrite(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo) {
 	fn := t.OnNetWrite
 	if fn == nil {
-		return func(NetWriteDoneInfo) {
+		return func(DriverNetWriteDoneInfo) {
 			return
 		}
 	}
-	res := fn(n)
+	res := fn(d)
 	if res == nil {
-		return func(NetWriteDoneInfo) {
+		return func(DriverNetWriteDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onNetDial(n NetDialStartInfo) func(NetDialDoneInfo) {
+func (t Driver) onNetDial(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) {
 	fn := t.OnNetDial
 	if fn == nil {
-		return func(NetDialDoneInfo) {
+		return func(DriverNetDialDoneInfo) {
 			return
 		}
 	}
-	res := fn(n)
+	res := fn(d)
 	if res == nil {
-		return func(NetDialDoneInfo) {
+		return func(DriverNetDialDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onNetClose(n NetCloseStartInfo) func(NetCloseDoneInfo) {
+func (t Driver) onNetClose(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo) {
 	fn := t.OnNetClose
 	if fn == nil {
-		return func(NetCloseDoneInfo) {
+		return func(DriverNetCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(n)
+	res := fn(d)
 	if res == nil {
-		return func(NetCloseDoneInfo) {
+		return func(DriverNetCloseDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onResolve(r ResolveStartInfo) func(ResolveDoneInfo) {
+func (t Driver) onResolve(d DriverResolveStartInfo) func(DriverResolveDoneInfo) {
 	fn := t.OnResolve
 	if fn == nil {
-		return func(ResolveDoneInfo) {
+		return func(DriverResolveDoneInfo) {
 			return
 		}
 	}
-	res := fn(r)
+	res := fn(d)
 	if res == nil {
-		return func(ResolveDoneInfo) {
+		return func(DriverResolveDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onConnStateChange(c1 ConnStateChangeStartInfo) func(ConnStateChangeDoneInfo) {
+func (t Driver) onConnStateChange(d DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo) {
 	fn := t.OnConnStateChange
 	if fn == nil {
-		return func(ConnStateChangeDoneInfo) {
+		return func(DriverConnStateChangeDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ConnStateChangeDoneInfo) {
+		return func(DriverConnStateChangeDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onConnInvoke(c1 ConnInvokeStartInfo) func(ConnInvokeDoneInfo) {
+func (t Driver) onConnInvoke(d DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo) {
 	fn := t.OnConnInvoke
 	if fn == nil {
-		return func(ConnInvokeDoneInfo) {
+		return func(DriverConnInvokeDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ConnInvokeDoneInfo) {
+		return func(DriverConnInvokeDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onConnNewStream(c1 ConnNewStreamStartInfo) func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
+func (t Driver) onConnNewStream(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
 	fn := t.OnConnNewStream
 	if fn == nil {
-		return func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
-			return func(ConnNewStreamDoneInfo) {
+		return func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+			return func(DriverConnNewStreamDoneInfo) {
 				return
 			}
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
-			return func(ConnNewStreamDoneInfo) {
+		return func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+			return func(DriverConnNewStreamDoneInfo) {
 				return
 			}
 		}
 	}
-	return func(c ConnNewStreamRecvInfo) func(ConnNewStreamDoneInfo) {
-		res := res(c)
+	return func(d DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+		res := res(d)
 		if res == nil {
-			return func(ConnNewStreamDoneInfo) {
+			return func(DriverConnNewStreamDoneInfo) {
 				return
 			}
 		}
 		return res
 	}
 }
-func (t Driver) onConnTake(c1 ConnTakeStartInfo) func(ConnTakeDoneInfo) {
+func (t Driver) onConnTake(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
 	fn := t.OnConnTake
 	if fn == nil {
-		return func(ConnTakeDoneInfo) {
+		return func(DriverConnTakeDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ConnTakeDoneInfo) {
+		return func(DriverConnTakeDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onConnUsagesChange(c1 ConnUsagesChangeInfo) {
+func (t Driver) onConnUsagesChange(d DriverConnUsagesChangeInfo) {
 	fn := t.OnConnUsagesChange
 	if fn == nil {
 		return
 	}
-	fn(c1)
+	fn(d)
 }
-func (t Driver) onConnPark(c1 ConnParkStartInfo) func(ConnParkDoneInfo) {
+func (t Driver) onConnPark(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
 	fn := t.OnConnPark
 	if fn == nil {
-		return func(ConnParkDoneInfo) {
+		return func(DriverConnParkDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ConnParkDoneInfo) {
+		return func(DriverConnParkDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onConnClose(c1 ConnCloseStartInfo) func(ConnCloseDoneInfo) {
+func (t Driver) onConnClose(d DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo) {
 	fn := t.OnConnClose
 	if fn == nil {
-		return func(ConnCloseDoneInfo) {
+		return func(DriverConnCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ConnCloseDoneInfo) {
+		return func(DriverConnCloseDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onClusterInit(c1 ClusterInitStartInfo) func(ClusterInitDoneInfo) {
+func (t Driver) onClusterInit(d DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo) {
 	fn := t.OnClusterInit
 	if fn == nil {
-		return func(ClusterInitDoneInfo) {
+		return func(DriverClusterInitDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ClusterInitDoneInfo) {
+		return func(DriverClusterInitDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onClusterClose(c1 ClusterCloseStartInfo) func(ClusterCloseDoneInfo) {
+func (t Driver) onClusterClose(d DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo) {
 	fn := t.OnClusterClose
 	if fn == nil {
-		return func(ClusterCloseDoneInfo) {
+		return func(DriverClusterCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ClusterCloseDoneInfo) {
+		return func(DriverClusterCloseDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onClusterGet(c1 ClusterGetStartInfo) func(ClusterGetDoneInfo) {
+func (t Driver) onClusterGet(d DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo) {
 	fn := t.OnClusterGet
 	if fn == nil {
-		return func(ClusterGetDoneInfo) {
+		return func(DriverClusterGetDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ClusterGetDoneInfo) {
+		return func(DriverClusterGetDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onClusterInsert(c1 ClusterInsertStartInfo) func(ClusterInsertDoneInfo) {
+func (t Driver) onClusterInsert(d DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo) {
 	fn := t.OnClusterInsert
 	if fn == nil {
-		return func(ClusterInsertDoneInfo) {
+		return func(DriverClusterInsertDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ClusterInsertDoneInfo) {
+		return func(DriverClusterInsertDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onClusterUpdate(c1 ClusterUpdateStartInfo) func(ClusterUpdateDoneInfo) {
+func (t Driver) onClusterUpdate(d DriverClusterUpdateStartInfo) func(DriverClusterUpdateDoneInfo) {
 	fn := t.OnClusterUpdate
 	if fn == nil {
-		return func(ClusterUpdateDoneInfo) {
+		return func(DriverClusterUpdateDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ClusterUpdateDoneInfo) {
+		return func(DriverClusterUpdateDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onClusterRemove(c1 ClusterRemoveStartInfo) func(ClusterRemoveDoneInfo) {
+func (t Driver) onClusterRemove(d DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo) {
 	fn := t.OnClusterRemove
 	if fn == nil {
-		return func(ClusterRemoveDoneInfo) {
+		return func(DriverClusterRemoveDoneInfo) {
 			return
 		}
 	}
-	res := fn(c1)
+	res := fn(d)
 	if res == nil {
-		return func(ClusterRemoveDoneInfo) {
+		return func(DriverClusterRemoveDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onPessimizeNode(p PessimizeNodeStartInfo) func(PessimizeNodeDoneInfo) {
+func (t Driver) onPessimizeNode(d DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo) {
 	fn := t.OnPessimizeNode
 	if fn == nil {
-		return func(PessimizeNodeDoneInfo) {
+		return func(DriverPessimizeNodeDoneInfo) {
 			return
 		}
 	}
-	res := fn(p)
+	res := fn(d)
 	if res == nil {
-		return func(PessimizeNodeDoneInfo) {
+		return func(DriverPessimizeNodeDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onRepeaterWakeUp(r RepeaterTickStartInfo) func(RepeaterTickDoneInfo) {
+func (t Driver) onRepeaterWakeUp(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
 	fn := t.OnRepeaterWakeUp
 	if fn == nil {
-		return func(RepeaterTickDoneInfo) {
+		return func(DriverRepeaterTickDoneInfo) {
 			return
 		}
 	}
-	res := fn(r)
+	res := fn(d)
 	if res == nil {
-		return func(RepeaterTickDoneInfo) {
+		return func(DriverRepeaterTickDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Driver) onGetCredentials(g GetCredentialsStartInfo) func(GetCredentialsDoneInfo) {
+func (t Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
 	if fn == nil {
-		return func(GetCredentialsDoneInfo) {
+		return func(DriverGetCredentialsDoneInfo) {
 			return
 		}
 	}
-	res := fn(g)
+	res := fn(d)
 	if res == nil {
-		return func(GetCredentialsDoneInfo) {
+		return func(DriverGetCredentialsDoneInfo) {
 			return
 		}
 	}
 	return res
 }
 func DriverOnInit(t Driver, c *context.Context, endpoint string, database string, secure bool) func(error) {
-	var p InitStartInfo
+	var p DriverInitStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.Database = database
 	p.Secure = secure
 	res := t.onInit(p)
 	return func(e error) {
-		var p InitDoneInfo
+		var p DriverInitDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnClose(t Driver, c *context.Context) func(error) {
-	var p CloseStartInfo
+	var p DriverCloseStartInfo
 	p.Context = c
 	res := t.onClose(p)
 	return func(e error) {
-		var p CloseDoneInfo
+		var p DriverCloseDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ error) {
-	var p NetReadStartInfo
+	var p DriverNetReadStartInfo
 	p.Address = address
 	p.Buffer = buffer
 	res := t.onNetRead(p)
 	return func(received int, e error) {
-		var p NetReadDoneInfo
+		var p DriverNetReadDoneInfo
 		p.Received = received
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ error) {
-	var p NetWriteStartInfo
+	var p DriverNetWriteStartInfo
 	p.Address = address
 	p.Bytes = bytes
 	res := t.onNetWrite(p)
 	return func(sent int, e error) {
-		var p NetWriteDoneInfo
+		var p DriverNetWriteDoneInfo
 		p.Sent = sent
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnNetDial(t Driver, c *context.Context, address string) func(error) {
-	var p NetDialStartInfo
+	var p DriverNetDialStartInfo
 	p.Context = c
 	p.Address = address
 	res := t.onNetDial(p)
 	return func(e error) {
-		var p NetDialDoneInfo
+		var p DriverNetDialDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnNetClose(t Driver, address string) func(error) {
-	var p NetCloseStartInfo
+	var p DriverNetCloseStartInfo
 	p.Address = address
 	res := t.onNetClose(p)
 	return func(e error) {
-		var p NetCloseDoneInfo
+		var p DriverNetCloseDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnResolve(t Driver, target string, resolved []string) func(error) {
-	var p ResolveStartInfo
+	var p DriverResolveStartInfo
 	p.Target = target
 	p.Resolved = resolved
 	res := t.onResolve(p)
 	return func(e error) {
-		var p ResolveDoneInfo
+		var p DriverResolveDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnConnStateChange(t Driver, endpoint EndpointInfo, state ConnState) func(state ConnState) {
-	var p ConnStateChangeStartInfo
+	var p DriverConnStateChangeStartInfo
 	p.Endpoint = endpoint
 	p.State = state
 	res := t.onConnStateChange(p)
 	return func(state ConnState) {
-		var p ConnStateChangeDoneInfo
+		var p DriverConnStateChangeDoneInfo
 		p.State = state
 		res(p)
 	}
 }
 func DriverOnConnInvoke(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
-	var p ConnInvokeStartInfo
+	var p DriverConnInvokeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnInvoke(p)
 	return func(e error, issues []Issue, opID string, state ConnState) {
-		var p ConnInvokeDoneInfo
+		var p DriverConnInvokeDoneInfo
 		p.Error = e
 		p.Issues = issues
 		p.OpID = opID
@@ -1018,17 +1018,17 @@ func DriverOnConnInvoke(t Driver, c *context.Context, endpoint EndpointInfo, m M
 	}
 }
 func DriverOnConnNewStream(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(error) func(state ConnState, _ error) {
-	var p ConnNewStreamStartInfo
+	var p DriverConnNewStreamStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnNewStream(p)
 	return func(e error) func(ConnState, error) {
-		var p ConnNewStreamRecvInfo
+		var p DriverConnNewStreamRecvInfo
 		p.Error = e
 		res := res(p)
 		return func(state ConnState, e error) {
-			var p ConnNewStreamDoneInfo
+			var p DriverConnNewStreamDoneInfo
 			p.State = state
 			p.Error = e
 			res(p)
@@ -1036,141 +1036,141 @@ func DriverOnConnNewStream(t Driver, c *context.Context, endpoint EndpointInfo, 
 	}
 }
 func DriverOnConnTake(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
-	var p ConnTakeStartInfo
+	var p DriverConnTakeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onConnTake(p)
 	return func(e error) {
-		var p ConnTakeDoneInfo
+		var p DriverConnTakeDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnConnUsagesChange(t Driver, endpoint EndpointInfo, usages int) {
-	var p ConnUsagesChangeInfo
+	var p DriverConnUsagesChangeInfo
 	p.Endpoint = endpoint
 	p.Usages = usages
 	t.onConnUsagesChange(p)
 }
 func DriverOnConnPark(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
-	var p ConnParkStartInfo
+	var p DriverConnParkStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onConnPark(p)
 	return func(e error) {
-		var p ConnParkDoneInfo
+		var p DriverConnParkDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnConnClose(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
-	var p ConnCloseStartInfo
+	var p DriverConnCloseStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onConnClose(p)
 	return func(e error) {
-		var p ConnCloseDoneInfo
+		var p DriverConnCloseDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnClusterInit(t Driver, c *context.Context) func(error) {
-	var p ClusterInitStartInfo
+	var p DriverClusterInitStartInfo
 	p.Context = c
 	res := t.onClusterInit(p)
 	return func(e error) {
-		var p ClusterInitDoneInfo
+		var p DriverClusterInitDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnClusterClose(t Driver, c *context.Context) func(error) {
-	var p ClusterCloseStartInfo
+	var p DriverClusterCloseStartInfo
 	p.Context = c
 	res := t.onClusterClose(p)
 	return func(e error) {
-		var p ClusterCloseDoneInfo
+		var p DriverClusterCloseDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnClusterGet(t Driver, c *context.Context) func(endpoint EndpointInfo, _ error) {
-	var p ClusterGetStartInfo
+	var p DriverClusterGetStartInfo
 	p.Context = c
 	res := t.onClusterGet(p)
 	return func(endpoint EndpointInfo, e error) {
-		var p ClusterGetDoneInfo
+		var p DriverClusterGetDoneInfo
 		p.Endpoint = endpoint
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnClusterInsert(t Driver, c *context.Context, endpoint EndpointInfo) func(inserted bool, state ConnState) {
-	var p ClusterInsertStartInfo
+	var p DriverClusterInsertStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onClusterInsert(p)
 	return func(inserted bool, state ConnState) {
-		var p ClusterInsertDoneInfo
+		var p DriverClusterInsertDoneInfo
 		p.Inserted = inserted
 		p.State = state
 		res(p)
 	}
 }
 func DriverOnClusterUpdate(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState) {
-	var p ClusterUpdateStartInfo
+	var p DriverClusterUpdateStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onClusterUpdate(p)
 	return func(state ConnState) {
-		var p ClusterUpdateDoneInfo
+		var p DriverClusterUpdateDoneInfo
 		p.State = state
 		res(p)
 	}
 }
 func DriverOnClusterRemove(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState, removed bool) {
-	var p ClusterRemoveStartInfo
+	var p DriverClusterRemoveStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	res := t.onClusterRemove(p)
 	return func(state ConnState, removed bool) {
-		var p ClusterRemoveDoneInfo
+		var p DriverClusterRemoveDoneInfo
 		p.State = state
 		p.Removed = removed
 		res(p)
 	}
 }
 func DriverOnPessimizeNode(t Driver, c *context.Context, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
-	var p PessimizeNodeStartInfo
+	var p DriverPessimizeNodeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.State = state
 	p.Cause = cause
 	res := t.onPessimizeNode(p)
 	return func(state ConnState) {
-		var p PessimizeNodeDoneInfo
+		var p DriverPessimizeNodeDoneInfo
 		p.State = state
 		res(p)
 	}
 }
 func DriverOnRepeaterWakeUp(t Driver, c *context.Context, name string, event string) func(error) {
-	var p RepeaterTickStartInfo
+	var p DriverRepeaterTickStartInfo
 	p.Context = c
 	p.Name = name
 	p.Event = event
 	res := t.onRepeaterWakeUp(p)
 	return func(e error) {
-		var p RepeaterTickDoneInfo
+		var p DriverRepeaterTickDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
 func DriverOnGetCredentials(t Driver, c *context.Context) func(token string, _ error) {
-	var p GetCredentialsStartInfo
+	var p DriverGetCredentialsStartInfo
 	p.Context = c
 	res := t.onGetCredentials(p)
 	return func(token string, e error) {
-		var p GetCredentialsDoneInfo
+		var p DriverGetCredentialsDoneInfo
 		p.Token = token
 		p.Error = e
 		res(p)
