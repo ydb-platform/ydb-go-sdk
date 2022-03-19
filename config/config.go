@@ -73,6 +73,9 @@ type Config interface {
 
 	// Meta is an option which contains meta information about database connection
 	Meta() meta.Meta
+
+	// UseDNSResolver is a flag about using dns-resolving or not
+	UseDNSResolver() bool
 }
 
 // Config contains driver configuration options.
@@ -84,6 +87,7 @@ type config struct {
 	connectionTTL        time.Duration
 	balancer             balancer.Balancer
 	secure               bool
+	dnsResolver          bool
 	endpoint             string
 	database             string
 	requestsType         string
@@ -92,6 +96,10 @@ type config struct {
 	credentials          credentials.Credentials
 	tlsConfig            *tls.Config
 	meta                 meta.Meta
+}
+
+func (c *config) UseDNSResolver() bool {
+	return c.dnsResolver
 }
 
 func (c *config) GrpcDialOptions() []grpc.DialOption {
@@ -151,6 +159,15 @@ func (c *config) RequestsType() string {
 }
 
 type Option func(c *config)
+
+// WithInternalDNSResolver disable dns-resolving before dialing
+// If dns-resolving are disabled - dial used FQDN as address
+// If dns-resolving are enabled - dial used IP-address
+func WithInternalDNSResolver() Option {
+	return func(c *config) {
+		c.dnsResolver = true
+	}
+}
 
 func WithEndpoint(endpoint string) Option {
 	return func(c *config) {
@@ -259,10 +276,15 @@ func New(opts ...Option) Config {
 			c.secure,
 			c.tlsConfig,
 		),
-		grpc.WithResolvers(
-			resolver.New("ydb", c.trace),
-		),
 	)
+	if c.dnsResolver {
+		c.grpcOptions = append(
+			c.grpcOptions,
+			grpc.WithResolvers(
+				resolver.New("ydb", c.trace),
+			),
+		)
+	}
 	c.meta = meta.New(
 		c.database,
 		c.credentials,

@@ -207,7 +207,13 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		defer cancel()
 	}
 
-	cc, err = grpc.DialContext(ctx, "ydb:///"+c.endpoint.Address(), c.config.GrpcDialOptions()...)
+	address := c.endpoint.Address()
+	if c.config.UseDNSResolver() {
+		// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
+		address = "ydb:///" + address
+	}
+
+	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
 	if err != nil {
 		return nil, errors.WithStackTrace(err)
 	}

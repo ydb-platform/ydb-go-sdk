@@ -15,4 +15,5 @@ type Config interface {
 	ConnectionTTL() time.Duration
 	GrpcDialOptions() []grpc.DialOption
 	Meta() meta.Meta
+	UseDNSResolver() bool
 }

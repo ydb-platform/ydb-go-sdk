@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type conn struct {
+	net.Conn
 	address string
 	trace   trace.Driver
-	cc      net.Conn
 }
 
 func New(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err error) {
@@ -26,8 +25,8 @@ func New(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err e
 		return nil, errors.WithStackTrace(fmt.Errorf("%w: %s", err, address))
 	}
 	return &conn{
+		Conn:    cc,
 		address: address,
-		cc:      cc,
 		trace:   t,
 	}, nil
 }
@@ -37,7 +36,7 @@ func (c *conn) Read(b []byte) (n int, err error) {
 	defer func() {
 		onDone(n, err)
 	}()
-	n, err = c.cc.Read(b)
+	n, err = c.Conn.Read(b)
 	if err != nil {
 		return n, errors.WithStackTrace(err)
 	}
@@ -49,7 +48,7 @@ func (c *conn) Write(b []byte) (n int, err error) {
 	defer func() {
 		onDone(n, err)
 	}()
-	n, err = c.cc.Write(b)
+	n, err = c.Conn.Write(b)
 	if err != nil {
 		return n, errors.WithStackTrace(err)
 	}
@@ -61,29 +60,9 @@ func (c *conn) Close() (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	err = c.cc.Close()
+	err = c.Conn.Close()
 	if err != nil {
 		return errors.WithStackTrace(err)
 	}
 	return nil
-}
-
-func (c *conn) LocalAddr() net.Addr {
-	return c.cc.LocalAddr()
-}
-
-func (c *conn) RemoteAddr() net.Addr {
-	return c.cc.RemoteAddr()
-}
-
-func (c *conn) SetDeadline(t time.Time) (err error) {
-	return c.cc.SetDeadline(t)
-}
-
-func (c *conn) SetReadDeadline(t time.Time) error {
-	return c.cc.SetReadDeadline(t)
-}
-
-func (c *conn) SetWriteDeadline(t time.Time) error {
-	return c.cc.SetWriteDeadline(t)
 }
