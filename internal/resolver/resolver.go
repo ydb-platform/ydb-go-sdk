@@ -1,9 +1,10 @@
 package resolver
 
 import (
+	"google.golang.org/grpc/resolver"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"google.golang.org/grpc/resolver"
 )
 
 type dnsBuilder struct {
@@ -46,7 +47,7 @@ func (d *dnsBuilder) Build(
 	cc resolver.ClientConn,
 	opts resolver.BuildOptions,
 ) (resolver.Resolver, error) {
-	return d.Build(
+	return d.Builder.Build(
 		target,
 		&clientConn{
 			ClientConn: cc,
