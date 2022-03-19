@@ -1,4 +1,6 @@
-## 3.14.5
+* Added github action for publish release tags
+* Refactored version constant (split to major, minor and patch constants)
+* Added `table.types.Nullable{*}Value` helpers and `table.types.Nullable()` common helper
 * Fixed race on check trailer on closing table grpc-stream
 * Refactored traces (start and done struct names have prefix about trace)
 * Replaced `errors.Error`, `errors.Errorf` and `errors.ErrorfSkip` to single `errors.WithStackTrace`

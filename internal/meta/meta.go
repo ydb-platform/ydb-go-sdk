@@ -97,7 +97,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		md.Set(HeaderDatabase, m.database)
 	}
 	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, Version)
+		md.Set(HeaderVersion, "ydb-go-sdk/"+VersionMajor+"."+VersionMinor+"."+VersionPatch)
 	}
 	if m.requestsType != "" {
 		if len(md.Get(HeaderRequestType)) == 0 {
