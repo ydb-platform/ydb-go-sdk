@@ -1,3 +1,4 @@
+## v3.15.1
 * Removed all conditions for trace retry errors
 * Fixed background color of warn messages
 * Added to log messages additional information about error, such as retryable (or not), delete session (or not), etc. 
