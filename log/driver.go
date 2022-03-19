@@ -138,7 +138,7 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 			secure := info.Secure
 			log.Infof(
 				`init start {version:%s,endpoint:"%s",database:"%s",secure:%v}`,
-				meta.Version,
+				meta.VersionMajor+"."+meta.VersionMinor+"."+meta.VersionPatch,
 				endpoint,
 				database,
 				secure,
