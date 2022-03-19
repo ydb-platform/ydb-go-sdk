@@ -200,7 +200,7 @@ func TestTable(t *testing.T) {
 		ydb.With(
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
-			config.WithoutDNSResolver(),
+			config.WithInternalDNSResolver(),
 			config.WithGrpcOptions(
 				grpc.WithUnaryInterceptor(func(
 					ctx context.Context,

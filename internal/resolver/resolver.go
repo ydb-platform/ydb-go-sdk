@@ -1,22 +1,20 @@
 package resolver
 
 import (
-	"google.golang.org/grpc/resolver"
-	"google.golang.org/grpc/serviceconfig"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"google.golang.org/grpc/resolver"
 )
 
 type dnsBuilder struct {
-	builder resolver.Builder
-	scheme  string
-	trace   trace.Driver
+	resolver.Builder
+	scheme string
+	trace  trace.Driver
 }
 
 type clientConn struct {
+	resolver.ClientConn
 	target resolver.Target
-	cc     resolver.ClientConn
 	trace  trace.Driver
 }
 
@@ -36,31 +34,11 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	err = c.cc.UpdateState(state)
+	err = c.ClientConn.UpdateState(state)
 	if err != nil {
 		err = errors.WithStackTrace(err)
 	}
 	return err
-}
-
-func (c *clientConn) ReportError(err error) {
-	c.cc.ReportError(err)
-}
-
-func (c *clientConn) NewAddress(addresses []resolver.Address) {
-	// nolint:staticcheck
-	// nolint:nolintlint
-	c.cc.NewAddress(addresses)
-}
-
-func (c *clientConn) NewServiceConfig(serviceConfig string) {
-	// nolint:staticcheck
-	// nolint:nolintlint
-	c.cc.NewServiceConfig(serviceConfig)
-}
-
-func (c *clientConn) ParseServiceConfig(serviceConfigJSON string) *serviceconfig.ParseResult {
-	return c.cc.ParseServiceConfig(serviceConfigJSON)
 }
 
 func (d *dnsBuilder) Build(
@@ -68,12 +46,12 @@ func (d *dnsBuilder) Build(
 	cc resolver.ClientConn,
 	opts resolver.BuildOptions,
 ) (resolver.Resolver, error) {
-	return d.builder.Build(
+	return d.Build(
 		target,
 		&clientConn{
-			target: target,
-			cc:     cc,
-			trace:  d.trace,
+			ClientConn: cc,
+			target:     target,
+			trace:      d.trace,
 		},
 		opts,
 	)
@@ -85,7 +63,7 @@ func (d *dnsBuilder) Scheme() string {
 
 func New(scheme string, trace trace.Driver) resolver.Builder {
 	return &dnsBuilder{
-		builder: resolver.Get("dns"),
+		Builder: resolver.Get("dns"),
 		scheme:  scheme,
 		trace:   trace,
 	}

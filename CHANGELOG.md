@@ -1,4 +1,5 @@
-* Added option `config.WithoutDNSResolver` for exclude internal dns-resolver and use direct FQDN for dialing
+* Refactored internal dns-resolver
+* Added option `config.WithInternalDNSResolver` for use internal dns-resolver and use resolved IP-address for dialing instead FQDN-address
 
 ## v3.15.1
 * Removed all conditions for trace retry errors

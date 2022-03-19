@@ -74,7 +74,7 @@ type Config interface {
 	// Meta is an option which contains meta information about database connection
 	Meta() meta.Meta
 
-	// UseDNSResolver is a flag about using or not dns-resolving
+	// UseDNSResolver is a flag about using dns-resolving or not
 	UseDNSResolver() bool
 }
 
@@ -160,12 +160,12 @@ func (c *config) RequestsType() string {
 
 type Option func(c *config)
 
-// WithoutDNSResolver disable dns-resolving before dialing
+// WithInternalDNSResolver disable dns-resolving before dialing
 // If dns-resolving are disabled - dial used FQDN as address
 // If dns-resolving are enabled - dial used IP-address
-func WithoutDNSResolver() Option {
+func WithInternalDNSResolver() Option {
 	return func(c *config) {
-		c.dnsResolver = false
+		c.dnsResolver = true
 	}
 }
 
@@ -312,9 +312,8 @@ func certPool() (certPool *x509.CertPool) {
 
 func defaultConfig() (c *config) {
 	return &config{
-		balancer:    balancers.Default(),
-		dnsResolver: true,
-		secure:      true,
+		balancer: balancers.Default(),
+		secure:   true,
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			RootCAs:    certPool(),
