@@ -108,13 +108,6 @@ func WithSlowBackoff(b Backoff) retryOption {
 	}
 }
 
-func traceError(err error) error {
-	if errors.IsYdb(err) {
-		return err
-	}
-	return nil
-}
-
 // Retry provide the best effort fo retrying operation
 // Retry implements internal busy loop until one of the following conditions is met:
 // - deadline was canceled or deadlined
@@ -138,7 +131,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id, h.idempotent)
 	)
 	defer func() {
-		onIntermediate(traceError(err))(attempts, traceError(err))
+		onIntermediate(err)(attempts, err)
 	}()
 	for {
 		i++
@@ -149,8 +142,6 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 		default:
 			err = op(ctx)
-
-			onIntermediate(traceError(err))
 
 			if err == nil {
 				return
@@ -171,6 +162,8 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			code = m.StatusCode()
+
+			onIntermediate(err)
 		}
 	}
 }

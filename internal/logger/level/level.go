@@ -43,7 +43,7 @@ const (
 	colorTraceBold = "\033[47m"
 	colorDebugBold = "\033[100m"
 	colorInfoBold  = "\033[106m"
-	colorWarnBold  = "\033[103m"
+	colorWarnBold  = "\u001B[30m\033[103m"
 	colorErrorBold = "\033[101m"
 	colorFatalBold = "\033[101m"
 	colorQuietBold = ""

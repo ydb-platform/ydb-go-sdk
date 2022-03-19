@@ -1,3 +1,7 @@
+* Removed all conditions for trace retry errors
+* Fixed background color of warn messages
+* Added to log messages additional information about error, such as retryable (or not), delete session (or not), etc. 
+
 ## v3.15.0
 * Added github action for publish release tags
 * Refactored version constant (split to major, minor and patch constants)

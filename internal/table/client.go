@@ -134,9 +134,9 @@ func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (table
 			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 				onIntermediate := trace.TableOnCreateSession(c.config.Trace(), &info.Context)
 				return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					onDone := onIntermediate(traceError(info.Error))
+					onDone := onIntermediate(info.Error)
 					return func(info trace.RetryLoopDoneInfo) {
-						onDone(s, info.Attempts, traceError(info.Error))
+						onDone(s, info.Attempts, info.Error)
 					}
 				}
 			},

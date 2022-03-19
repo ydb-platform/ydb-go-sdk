@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -239,7 +240,7 @@ func TestTable(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(log.ERROR),
+			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
@@ -328,10 +329,14 @@ func TestTable(t *testing.T) {
 					OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
 						return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
 							if info.Error != nil {
-								t.Fatalf("unexpected error: %v", err)
+								m := retry.Check(info.Error)
+								if m.StatusCode() >= 0 {
+									t.Fatalf("unexpected error: %v", err)
+								}
 							}
 							return func(info trace.TableDoDoneInfo) {
-								if info.Error != nil {
+								m := retry.Check(info.Error)
+								if m.StatusCode() >= 0 {
 									t.Fatalf("unexpected error: %v", err)
 								}
 							}
@@ -365,11 +370,13 @@ func TestTable(t *testing.T) {
 						trace.TableDoTxDoneInfo,
 					) {
 						return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
-							if info.Error != nil {
+							m := retry.Check(info.Error)
+							if m.StatusCode() >= 0 {
 								t.Fatalf("unexpected error: %v", err)
 							}
 							return func(info trace.TableDoTxDoneInfo) {
-								if info.Error != nil {
+								m := retry.Check(info.Error)
+								if m.StatusCode() >= 0 {
 									t.Fatalf("unexpected error: %v", err)
 								}
 							}
