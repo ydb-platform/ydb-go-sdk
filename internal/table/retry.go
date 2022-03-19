@@ -27,13 +27,6 @@ type SessionProvider interface {
 	CloseSession(ctx context.Context, s Session) error
 }
 
-func traceError(err error) error {
-	if errors.IsYdb(err) {
-		return err
-	}
-	return nil
-}
-
 func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts table.Options) (err error) {
 	attempts, onIntermediate := 0, trace.TableOnDoTx(
 		opts.Trace,
@@ -41,12 +34,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 		opts.Idempotent,
 	)
 	defer func() {
-		onIntermediate(
-			traceError(err),
-		)(
-			attempts,
-			traceError(err),
-		)
+		onIntermediate(err)(attempts, err)
 	}()
 	return retryBackoff(
 		ctx,
@@ -69,9 +57,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 			err = op(ctx, tx)
 
 			if attempts > 0 {
-				onIntermediate(
-					traceError(err),
-				)
+				onIntermediate(err)
 			}
 
 			attempts++
@@ -97,12 +83,7 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 		opts.Idempotent,
 	)
 	defer func() {
-		onIntermediate(
-			traceError(err),
-		)(
-			attempts,
-			traceError(err),
-		)
+		onIntermediate(err)(attempts, err)
 	}()
 	return retryBackoff(
 		ctx,
@@ -114,9 +95,7 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 			err = op(ctx, s)
 
 			if attempts > 0 {
-				onIntermediate(
-					traceError(err),
-				)
+				onIntermediate(err)
 			}
 
 			attempts++

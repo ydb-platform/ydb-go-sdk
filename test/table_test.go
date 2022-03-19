@@ -239,7 +239,7 @@ func TestTable(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stderr),
-			ydb.WithMinLevel(log.ERROR),
+			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
@@ -323,22 +323,6 @@ func TestTable(t *testing.T) {
 					text: "custom error",
 				}
 			},
-			table.WithTrace(
-				trace.Table{
-					OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-						return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-							if info.Error != nil {
-								t.Fatalf("unexpected error: %v", err)
-							}
-							return func(info trace.TableDoDoneInfo) {
-								if info.Error != nil {
-									t.Fatalf("unexpected error: %v", err)
-								}
-							}
-						}
-					},
-				},
-			),
 		); err != nil {
 			var e *customError
 			if !errors.As(err, &e) {
@@ -355,28 +339,6 @@ func TestTable(t *testing.T) {
 					text: "custom error",
 				}
 			},
-			table.WithTrace(
-				trace.Table{
-					OnDoTx: func(
-						info trace.TableDoTxStartInfo,
-					) func(
-						info trace.TableDoTxIntermediateInfo,
-					) func(
-						trace.TableDoTxDoneInfo,
-					) {
-						return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
-							if info.Error != nil {
-								t.Fatalf("unexpected error: %v", err)
-							}
-							return func(info trace.TableDoTxDoneInfo) {
-								if info.Error != nil {
-									t.Fatalf("unexpected error: %v", err)
-								}
-							}
-						}
-					},
-				},
-			),
 			table.WithTxSettings(
 				table.TxSettings(
 					table.WithSerializableReadWrite(),
