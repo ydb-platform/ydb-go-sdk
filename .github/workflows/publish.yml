@@ -58,6 +58,5 @@ jobs:
             git commit -m "Release v$MAJOR.$MINOR.$PATCH";
             git tag v$MAJOR.$MINOR.$PATCH;
           fi;
-          git push
-          git push --tags
+          git push --tags && git push
         
