@@ -1,3 +1,4 @@
+## v3.15.0
 * Added github action for publish release tags
 * Refactored version constant (split to major, minor and patch constants)
 * Added `table.types.Nullable{*}Value` helpers and `table.types.Nullable()` common helper
