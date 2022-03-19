@@ -1,3 +1,4 @@
+## v3.16.0
 * Refactored internal dns-resolver
 * Added option `config.WithInternalDNSResolver` for use internal dns-resolver and use resolved IP-address for dialing instead FQDN-address
 
