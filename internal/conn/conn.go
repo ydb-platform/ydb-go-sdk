@@ -209,6 +209,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	address := c.endpoint.Address()
 	if c.config.UseDNSResolver() {
+		// force prepend "ydb" scheme for grpc library was found dns-resolver "ydb" and used it
 		address = "ydb:///" + address
 	}
 
