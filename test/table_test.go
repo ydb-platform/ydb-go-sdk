@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -323,6 +324,26 @@ func TestTable(t *testing.T) {
 					text: "custom error",
 				}
 			},
+			table.WithTrace(
+				trace.Table{
+					OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+						return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+							if info.Error != nil {
+								m := retry.Check(info.Error)
+								if m.StatusCode() >= 0 {
+									t.Fatalf("unexpected error: %v", err)
+								}
+							}
+							return func(info trace.TableDoDoneInfo) {
+								m := retry.Check(info.Error)
+								if m.StatusCode() >= 0 {
+									t.Fatalf("unexpected error: %v", err)
+								}
+							}
+						}
+					},
+				},
+			),
 		); err != nil {
 			var e *customError
 			if !errors.As(err, &e) {
@@ -339,6 +360,30 @@ func TestTable(t *testing.T) {
 					text: "custom error",
 				}
 			},
+			table.WithTrace(
+				trace.Table{
+					OnDoTx: func(
+						info trace.TableDoTxStartInfo,
+					) func(
+						info trace.TableDoTxIntermediateInfo,
+					) func(
+						trace.TableDoTxDoneInfo,
+					) {
+						return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
+							m := retry.Check(info.Error)
+							if m.StatusCode() >= 0 {
+								t.Fatalf("unexpected error: %v", err)
+							}
+							return func(info trace.TableDoTxDoneInfo) {
+								m := retry.Check(info.Error)
+								if m.StatusCode() >= 0 {
+									t.Fatalf("unexpected error: %v", err)
+								}
+							}
+						}
+					},
+				},
+			),
 			table.WithTxSettings(
 				table.TxSettings(
 					table.WithSerializableReadWrite(),
