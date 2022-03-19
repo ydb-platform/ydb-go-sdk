@@ -208,7 +208,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}
 
 	address := c.endpoint.Address()
-	if c.config.UseDnsResolver() {
+	if c.config.UseDNSResolver() {
 		address = "ydb:///" + address
 	}
 

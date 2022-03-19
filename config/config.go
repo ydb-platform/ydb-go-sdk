@@ -74,8 +74,8 @@ type Config interface {
 	// Meta is an option which contains meta information about database connection
 	Meta() meta.Meta
 
-	// UseDnsResolver is a flag about using or not dns-resolving
-	UseDnsResolver() bool
+	// UseDNSResolver is a flag about using or not dns-resolving
+	UseDNSResolver() bool
 }
 
 // Config contains driver configuration options.
@@ -98,7 +98,7 @@ type config struct {
 	meta                 meta.Meta
 }
 
-func (c *config) UseDnsResolver() bool {
+func (c *config) UseDNSResolver() bool {
 	return c.dnsResolver
 }
 
