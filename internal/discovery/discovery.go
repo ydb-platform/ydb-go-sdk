@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -64,7 +65,7 @@ func New(
 			func(ctx context.Context) (err error) {
 				next, err = c.Discover(ctx)
 				if err != nil {
-					return err
+					return errors.WithStackTrace(err)
 				}
 
 				// NOTE: curr endpoints must be sorted here.
@@ -117,8 +118,15 @@ type client struct {
 	cc      conn.Conn
 }
 
-func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
-	onDone := trace.DiscoveryOnDiscover(d.config.Trace(), &ctx, d.config.Endpoint(), d.config.Database())
+func (c *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
+	var (
+		onDone  = trace.DiscoveryOnDiscover(c.config.Trace(), &ctx, c.config.Endpoint(), c.config.Database())
+		request = Ydb_Discovery.ListEndpointsRequest{
+			Database: c.config.Database(),
+		}
+		response *Ydb_Discovery.ListEndpointsResponse
+		result   Ydb_Discovery.ListEndpointsResult
+	)
 
 	var location string
 	defer func() {
@@ -129,24 +137,25 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		onDone(location, nodes, err)
 	}()
 
-	request := Ydb_Discovery.ListEndpointsRequest{
-		Database: d.config.Database(),
-	}
-	response, err := d.service.ListEndpoints(ctx, &request)
+	ctx, err = c.config.Meta().Meta(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
-	result := Ydb_Discovery.ListEndpointsResult{}
+	response, err = c.service.ListEndpoints(ctx, &request)
+	if err != nil {
+		return nil, errors.WithStackTrace(err)
+	}
+
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	location = result.GetSelfLocation()
 	endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
 	for _, e := range result.Endpoints {
-		if e.Ssl == d.config.Secure() {
+		if e.Ssl == c.config.Secure() {
 			endpoints = append(endpoints, endpoint.New(
 				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
 				endpoint.WithLocation(e.GetLocation()),
@@ -157,11 +166,17 @@ func (d *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 			))
 		}
 	}
+
 	return endpoints, nil
 }
 
-func (d *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
-	onDone := trace.DiscoveryOnWhoAmI(d.config.Trace(), &ctx)
+func (c *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
+	var (
+		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx)
+		request            = Ydb_Discovery.WhoAmIRequest{}
+		response           *Ydb_Discovery.WhoAmIResponse
+		whoAmIResultResult Ydb_Discovery.WhoAmIResult
+	)
 	defer func() {
 		if err != nil {
 			onDone("", nil, err)
@@ -169,23 +184,29 @@ func (d *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 			onDone(whoAmI.User, whoAmI.Groups, err)
 		}
 	}()
-	request := Ydb_Discovery.WhoAmIRequest{}
-	response, err := d.service.WhoAmI(ctx, &request)
+
+	ctx, err = c.config.Meta().Meta(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
-	whoAmIResultResult := Ydb_Discovery.WhoAmIResult{}
+
+	response, err = c.service.WhoAmI(ctx, &request)
+	if err != nil {
+		return nil, errors.WithStackTrace(err)
+	}
+
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &whoAmIResultResult)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
+
 	return &discovery.WhoAmI{
 		User:   whoAmIResultResult.GetUser(),
 		Groups: whoAmIResultResult.GetGroups(),
 	}, nil
 }
 
-func (d *client) Close(ctx context.Context) error {
-	d.cc.Release(ctx)
+func (c *client) Close(ctx context.Context) error {
+	c.cc.Release(ctx)
 	return nil
 }
