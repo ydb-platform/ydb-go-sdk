@@ -1,3 +1,4 @@
+## v3.16.1
 * Added `WithMeta()` discovery config option 
 * Fixed bug with credentials on discovery
 
