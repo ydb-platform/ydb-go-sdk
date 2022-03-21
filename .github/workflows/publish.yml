@@ -29,6 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
+          token: ${{ secrets.YDB_PLATFORM_BOT_TOKEN_REPO }}
           fetch-depth: 0
       - run: |
           MAJOR=$(cat $VERSION_FILE | grep VersionMajor | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
@@ -53,8 +54,6 @@ jobs:
             git add $VERSION_FILE;
             echo "## v$MAJOR.$MINOR.$PATCH" >> $CHANGELOG_FILE.tmp && cat $CHANGELOG_FILE >> $CHANGELOG_FILE.tmp && mv $CHANGELOG_FILE.tmp $CHANGELOG_FILE;
             git add $CHANGELOG_FILE;
-            git config --global user.email "robot@umbrella";
-            git config --global user.name "robot";
             git commit -m "Release v$MAJOR.$MINOR.$PATCH";
             git tag v$MAJOR.$MINOR.$PATCH;
           fi;
