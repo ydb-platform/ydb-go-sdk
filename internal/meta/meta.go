@@ -93,31 +93,38 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if !has {
 		md = metadata.MD{}
 	}
+
 	if len(md.Get(HeaderDatabase)) == 0 {
 		md.Set(HeaderDatabase, m.database)
 	}
+
 	if len(md.Get(HeaderVersion)) == 0 {
 		md.Set(HeaderVersion, "ydb-go-sdk/"+VersionMajor+"."+VersionMinor+"."+VersionPatch)
 	}
+
 	if m.requestsType != "" {
 		if len(md.Get(HeaderRequestType)) == 0 {
 			md.Set(HeaderRequestType, m.requestsType)
 		}
 	}
+
 	if m.userAgent != "" {
 		if len(md.Get(HeaderUserAgent)) == 0 {
 			md.Set(HeaderUserAgent, m.userAgent)
 		}
 	}
+
 	if m.credentials == nil {
 		return md, nil
 	}
+
 	var token string
-	t := trace.ContextDriver(ctx).Compose(m.trace)
-	getCredentialsDone := trace.DriverOnGetCredentials(t, &ctx)
+
+	getCredentialsDone := trace.DriverOnGetCredentials(trace.ContextDriver(ctx).Compose(m.trace), &ctx)
 	defer func() {
 		getCredentialsDone(token, err)
 	}()
+
 	token, err = m.credentials.Token(ctx)
 	if err != nil {
 		if stringer, ok := m.credentials.(fmt.Stringer); ok {
@@ -125,9 +132,9 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		}
 		return nil, err
 	}
-	if len(md.Get(HeaderTicket)) == 0 {
-		md.Set(HeaderTicket, token)
-	}
+
+	md.Set(HeaderTicket, token)
+
 	return md, nil
 }
 
