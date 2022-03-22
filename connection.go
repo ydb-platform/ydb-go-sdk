@@ -246,7 +246,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	for _, opt := range opts {
 		err = opt(ctx, c)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStackTrace(err)
 		}
 	}
 	c.config = config.New(c.options...)
@@ -290,7 +290,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)...,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	c.table = lazy.Table(

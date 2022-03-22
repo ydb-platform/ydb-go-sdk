@@ -1,3 +1,6 @@
+* Added closing `conn.Conn` if discovery client build failure
+* Added wrapping errors with stacktrace
+
 ## v3.16.6
 * Rollback moving `meta.Meta` call to conn exclusively from `internal/db` and `internal/discovery`
 * Added `WithMeta()` discovery config option
