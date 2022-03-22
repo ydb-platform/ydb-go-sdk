@@ -1,3 +1,4 @@
+## v3.16.2
 * Fixed bug in `types.Nullable()`
 * Refactored package `meta`
 * Removed explicit call meta in `db.New()`
