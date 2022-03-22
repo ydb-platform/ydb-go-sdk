@@ -50,13 +50,13 @@ func New(
 	pool conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {
-	ctx, err = c.Meta().Meta(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	t := trace.ContextDriver(ctx).Compose(c.Trace())
-	onDone := trace.DriverOnInit(t, &ctx, c.Endpoint(), c.Database(), c.Secure())
+	onDone := trace.DriverOnInit(
+		trace.ContextDriver(ctx).Compose(c.Trace()),
+		&ctx,
+		c.Endpoint(),
+		c.Database(),
+		c.Secure(),
+	)
 	defer func() {
 		onDone(err)
 	}()

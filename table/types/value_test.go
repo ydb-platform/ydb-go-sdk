@@ -16,7 +16,7 @@ func TestNullable(t *testing.T) {
 			name: "bool",
 			t:    TypeBool,
 			v:    func(v bool) *bool { return &v }(true),
-			exp:  BoolValue(true),
+			exp:  OptionalValue(BoolValue(true)),
 		},
 		{
 			name: "nil bool",
@@ -28,7 +28,7 @@ func TestNullable(t *testing.T) {
 			name: "int8",
 			t:    TypeInt8,
 			v:    func(v int8) *int8 { return &v }(123),
-			exp:  Int8Value(123),
+			exp:  OptionalValue(Int8Value(123)),
 		},
 		{
 			name: "nil int8",
@@ -40,7 +40,7 @@ func TestNullable(t *testing.T) {
 			name: "uint8",
 			t:    TypeUint8,
 			v:    func(v uint8) *uint8 { return &v }(123),
-			exp:  Uint8Value(123),
+			exp:  OptionalValue(Uint8Value(123)),
 		},
 		{
 			name: "nil uint8",
@@ -52,7 +52,7 @@ func TestNullable(t *testing.T) {
 			name: "int16",
 			t:    TypeInt16,
 			v:    func(v int16) *int16 { return &v }(123),
-			exp:  Int16Value(123),
+			exp:  OptionalValue(Int16Value(123)),
 		},
 		{
 			name: "nil int16",
@@ -64,7 +64,7 @@ func TestNullable(t *testing.T) {
 			name: "uint16",
 			t:    TypeUint16,
 			v:    func(v uint16) *uint16 { return &v }(123),
-			exp:  Uint16Value(123),
+			exp:  OptionalValue(Uint16Value(123)),
 		},
 		{
 			name: "nil uint16",
@@ -76,7 +76,7 @@ func TestNullable(t *testing.T) {
 			name: "int32",
 			t:    TypeInt32,
 			v:    func(v int32) *int32 { return &v }(123),
-			exp:  Int32Value(123),
+			exp:  OptionalValue(Int32Value(123)),
 		},
 		{
 			name: "nil int32",
@@ -88,7 +88,7 @@ func TestNullable(t *testing.T) {
 			name: "uint32",
 			t:    TypeUint32,
 			v:    func(v uint32) *uint32 { return &v }(123),
-			exp:  Uint32Value(123),
+			exp:  OptionalValue(Uint32Value(123)),
 		},
 		{
 			name: "nil uint32",
@@ -100,7 +100,7 @@ func TestNullable(t *testing.T) {
 			name: "int64",
 			t:    TypeInt64,
 			v:    func(v int64) *int64 { return &v }(123),
-			exp:  Int64Value(123),
+			exp:  OptionalValue(Int64Value(123)),
 		},
 		{
 			name: "nil int64",
@@ -112,7 +112,7 @@ func TestNullable(t *testing.T) {
 			name: "uint64",
 			t:    TypeUint64,
 			v:    func(v uint64) *uint64 { return &v }(123),
-			exp:  Uint64Value(123),
+			exp:  OptionalValue(Uint64Value(123)),
 		},
 		{
 			name: "nil uint64",
@@ -124,7 +124,7 @@ func TestNullable(t *testing.T) {
 			name: "float",
 			t:    TypeFloat,
 			v:    func(v float32) *float32 { return &v }(123),
-			exp:  FloatValue(123),
+			exp:  OptionalValue(FloatValue(123)),
 		},
 		{
 			name: "nil float",
@@ -136,7 +136,7 @@ func TestNullable(t *testing.T) {
 			name: "double",
 			t:    TypeDouble,
 			v:    func(v float64) *float64 { return &v }(123),
-			exp:  DoubleValue(123),
+			exp:  OptionalValue(DoubleValue(123)),
 		},
 		{
 			name: "nil float",
@@ -148,13 +148,13 @@ func TestNullable(t *testing.T) {
 			name: "date from int32",
 			t:    TypeDate,
 			v:    func(v uint32) *uint32 { return &v }(123),
-			exp:  DateValue(123),
+			exp:  OptionalValue(DateValue(123)),
 		},
 		{
 			name: "date from time.Time",
 			t:    TypeDate,
 			v:    func(v time.Time) *time.Time { return &v }(time.Unix(123, 456)),
-			exp:  DateValueFromTime(time.Unix(123, 456)),
+			exp:  OptionalValue(DateValueFromTime(time.Unix(123, 456))),
 		},
 		{
 			name: "nil date",
@@ -166,13 +166,13 @@ func TestNullable(t *testing.T) {
 			name: "datetime from int32",
 			t:    TypeDatetime,
 			v:    func(v uint32) *uint32 { return &v }(123),
-			exp:  DatetimeValue(123),
+			exp:  OptionalValue(DatetimeValue(123)),
 		},
 		{
 			name: "datetime from time.Time",
 			t:    TypeDatetime,
 			v:    func(v time.Time) *time.Time { return &v }(time.Unix(123, 456)),
-			exp:  DatetimeValueFromTime(time.Unix(123, 456)),
+			exp:  OptionalValue(DatetimeValueFromTime(time.Unix(123, 456))),
 		},
 		{
 			name: "nil datetime",
@@ -184,13 +184,13 @@ func TestNullable(t *testing.T) {
 			name: "timestamp from int32",
 			t:    TypeTimestamp,
 			v:    func(v uint64) *uint64 { return &v }(123),
-			exp:  TimestampValue(123),
+			exp:  OptionalValue(TimestampValue(123)),
 		},
 		{
 			name: "timestamp from time.Time",
 			t:    TypeTimestamp,
 			v:    func(v time.Time) *time.Time { return &v }(time.Unix(123, 456)),
-			exp:  TimestampValueFromTime(time.Unix(123, 456)),
+			exp:  OptionalValue(TimestampValueFromTime(time.Unix(123, 456))),
 		},
 		{
 			name: "nil timestamp",
@@ -202,13 +202,13 @@ func TestNullable(t *testing.T) {
 			name: "tzDate from int32",
 			t:    TypeTzDate,
 			v:    func(v string) *string { return &v }(""),
-			exp:  TzDateValue(""),
+			exp:  OptionalValue(TzDateValue("")),
 		},
 		{
 			name: "tzDate from time.Time",
 			t:    TypeTzDate,
 			v:    func(v time.Time) *time.Time { return &v }(time.Unix(123, 456)),
-			exp:  TzDateValueFromTime(time.Unix(123, 456)),
+			exp:  OptionalValue(TzDateValueFromTime(time.Unix(123, 456))),
 		},
 		{
 			name: "nil tzDate",
@@ -220,13 +220,13 @@ func TestNullable(t *testing.T) {
 			name: "interval from int32",
 			t:    TypeInterval,
 			v:    func(v int64) *int64 { return &v }(123),
-			exp:  IntervalValue(123),
+			exp:  OptionalValue(IntervalValue(123)),
 		},
 		{
 			name: "interval from time.Time",
 			t:    TypeInterval,
 			v:    func(v time.Duration) *time.Duration { return &v }(time.Second),
-			exp:  IntervalValueFromDuration(time.Second),
+			exp:  OptionalValue(IntervalValueFromDuration(time.Second)),
 		},
 		{
 			name: "nil interval",
@@ -238,13 +238,13 @@ func TestNullable(t *testing.T) {
 			name: "tzDatetime from int32",
 			t:    TypeTzDatetime,
 			v:    func(v string) *string { return &v }(""),
-			exp:  TzDatetimeValue(""),
+			exp:  OptionalValue(TzDatetimeValue("")),
 		},
 		{
 			name: "tzTzDatetime from time.Time",
 			t:    TypeTzDatetime,
 			v:    func(v time.Time) *time.Time { return &v }(time.Unix(123, 456)),
-			exp:  TzDatetimeValueFromTime(time.Unix(123, 456)),
+			exp:  OptionalValue(TzDatetimeValueFromTime(time.Unix(123, 456))),
 		},
 		{
 			name: "nil tzTzDatetime",
@@ -256,13 +256,13 @@ func TestNullable(t *testing.T) {
 			name: "tzTimestamp from int32",
 			t:    TypeTzTimestamp,
 			v:    func(v string) *string { return &v }(""),
-			exp:  TzTimestampValue(""),
+			exp:  OptionalValue(TzTimestampValue("")),
 		},
 		{
 			name: "TzTimestamp from time.Time",
 			t:    TypeTzTimestamp,
 			v:    func(v time.Time) *time.Time { return &v }(time.Unix(123, 456)),
-			exp:  TzTimestampValueFromTime(time.Unix(123, 456)),
+			exp:  OptionalValue(TzTimestampValueFromTime(time.Unix(123, 456))),
 		},
 		{
 			name: "nil TzTimestamp",
@@ -274,13 +274,13 @@ func TestNullable(t *testing.T) {
 			name: "string",
 			t:    TypeString,
 			v:    func(v string) *string { return &v }("test"),
-			exp:  StringValueFromString("test"),
+			exp:  OptionalValue(StringValueFromString("test")),
 		},
 		{
 			name: "string",
 			t:    TypeString,
 			v:    func(v []byte) *[]byte { return &v }([]byte("test")),
-			exp:  StringValueFromString("test"),
+			exp:  OptionalValue(StringValueFromString("test")),
 		},
 		{
 			name: "nil string",
@@ -292,7 +292,7 @@ func TestNullable(t *testing.T) {
 			name: "utf8",
 			t:    TypeUTF8,
 			v:    func(v string) *string { return &v }("test"),
-			exp:  UTF8Value("test"),
+			exp:  OptionalValue(UTF8Value("test")),
 		},
 		{
 			name: "nil utf8",
@@ -304,13 +304,13 @@ func TestNullable(t *testing.T) {
 			name: "yson",
 			t:    TypeYSON,
 			v:    func(v string) *string { return &v }("test"),
-			exp:  YSONValue("test"),
+			exp:  OptionalValue(YSONValue("test")),
 		},
 		{
 			name: "yson",
 			t:    TypeYSON,
 			v:    func(v []byte) *[]byte { return &v }([]byte("test")),
-			exp:  YSONValueFromBytes([]byte("test")),
+			exp:  OptionalValue(YSONValueFromBytes([]byte("test"))),
 		},
 		{
 			name: "nil yson",
@@ -322,13 +322,13 @@ func TestNullable(t *testing.T) {
 			name: "json",
 			t:    TypeJSON,
 			v:    func(v string) *string { return &v }("test"),
-			exp:  JSONValue("test"),
+			exp:  OptionalValue(JSONValue("test")),
 		},
 		{
 			name: "json",
 			t:    TypeJSON,
 			v:    func(v []byte) *[]byte { return &v }([]byte("test")),
-			exp:  JSONValueFromBytes([]byte("test")),
+			exp:  OptionalValue(JSONValueFromBytes([]byte("test"))),
 		},
 		{
 			name: "nil json",
@@ -340,19 +340,19 @@ func TestNullable(t *testing.T) {
 			name: "uuid",
 			t:    TypeUUID,
 			v:    func(v [16]byte) *[16]byte { return &v }([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
-			exp:  UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}),
+			exp:  OptionalValue(UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})),
 		},
 		{
 			name: "jsonDocument",
 			t:    TypeJSONDocument,
 			v:    func(v string) *string { return &v }("test"),
-			exp:  JSONDocumentValue("test"),
+			exp:  OptionalValue(JSONDocumentValue("test")),
 		},
 		{
 			name: "jsonDocument",
 			t:    TypeJSONDocument,
 			v:    func(v []byte) *[]byte { return &v }([]byte("test")),
-			exp:  JSONDocumentValueFromBytes([]byte("test")),
+			exp:  OptionalValue(JSONDocumentValueFromBytes([]byte("test"))),
 		},
 		{
 			name: "nil jsonDocument",
@@ -364,7 +364,7 @@ func TestNullable(t *testing.T) {
 			name: "dyNumber",
 			t:    TypeDyNumber,
 			v:    func(v string) *string { return &v }("test"),
-			exp:  DyNumberValue("test"),
+			exp:  OptionalValue(DyNumberValue("test")),
 		},
 		{
 			name: "nil dyNumber",
@@ -374,7 +374,7 @@ func TestNullable(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			v := Nullable(test.t, &test.v)
+			v := Nullable(test.t, test.v)
 			if v.String() != test.exp.String() {
 				t.Fatalf("unexpected value: %v, exp: %v", v, test.exp)
 			}

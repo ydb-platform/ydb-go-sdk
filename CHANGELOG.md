@@ -1,3 +1,7 @@
+* Fixed bug in `types.Nullable()`
+* Refactored package `meta`
+* Removed explicit call meta in `db.New()`
+
 ## v3.16.1
 * Added `WithMeta()` discovery config option 
 * Fixed bug with credentials on discovery

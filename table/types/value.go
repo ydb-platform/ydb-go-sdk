@@ -177,286 +177,283 @@ func NullableBoolValue(v *bool) Value {
 	if v == nil {
 		return NullValue(TypeBool)
 	}
-	return BoolValue(*v)
+	return OptionalValue(BoolValue(*v))
 }
 
 func NullableInt8Value(v *int8) Value {
 	if v == nil {
 		return NullValue(TypeInt8)
 	}
-	return Int8Value(*v)
+	return OptionalValue(Int8Value(*v))
 }
 
 func NullableInt16Value(v *int16) Value {
 	if v == nil {
 		return NullValue(TypeInt16)
 	}
-	return Int16Value(*v)
+	return OptionalValue(Int16Value(*v))
 }
 
 func NullableInt32Value(v *int32) Value {
 	if v == nil {
 		return NullValue(TypeInt32)
 	}
-	return Int32Value(*v)
+	return OptionalValue(Int32Value(*v))
 }
 
 func NullableInt64Value(v *int64) Value {
 	if v == nil {
 		return NullValue(TypeInt64)
 	}
-	return Int64Value(*v)
+	return OptionalValue(Int64Value(*v))
 }
 
 func NullableUint8Value(v *uint8) Value {
 	if v == nil {
 		return NullValue(TypeUint8)
 	}
-	return Uint8Value(*v)
+	return OptionalValue(Uint8Value(*v))
 }
 
 func NullableUint16Value(v *uint16) Value {
 	if v == nil {
 		return NullValue(TypeUint16)
 	}
-	return Uint16Value(*v)
+	return OptionalValue(Uint16Value(*v))
 }
 
 func NullableUint32Value(v *uint32) Value {
 	if v == nil {
 		return NullValue(TypeUint32)
 	}
-	return Uint32Value(*v)
+	return OptionalValue(Uint32Value(*v))
 }
 
 func NullableUint64Value(v *uint64) Value {
 	if v == nil {
 		return NullValue(TypeUint64)
 	}
-	return Uint64Value(*v)
+	return OptionalValue(Uint64Value(*v))
 }
 
 func NullableFloatValue(v *float32) Value {
 	if v == nil {
 		return NullValue(TypeFloat)
 	}
-	return FloatValue(*v)
+	return OptionalValue(FloatValue(*v))
 }
 
 func NullableDoubleValue(v *float64) Value {
 	if v == nil {
 		return NullValue(TypeDouble)
 	}
-	return DoubleValue(*v)
+	return OptionalValue(DoubleValue(*v))
 }
 
 func NullableDateValue(v *uint32) Value {
 	if v == nil {
 		return NullValue(TypeDate)
 	}
-	return DateValue(*v)
+	return OptionalValue(DateValue(*v))
 }
 
 func NullableDateValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeDate)
 	}
-	return DateValueFromTime(*v)
+	return OptionalValue(DateValueFromTime(*v))
 }
 
 func NullableDatetimeValue(v *uint32) Value {
 	if v == nil {
 		return NullValue(TypeDatetime)
 	}
-	return DatetimeValue(*v)
+	return OptionalValue(DatetimeValue(*v))
 }
 
 func NullableDatetimeValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeDatetime)
 	}
-	return DatetimeValueFromTime(*v)
+	return OptionalValue(DatetimeValueFromTime(*v))
 }
 
 func NullableTzDateValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeTzDate)
 	}
-	return TzDateValue(*v)
+	return OptionalValue(TzDateValue(*v))
 }
 
 func NullableTzDateValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeTzDate)
 	}
-	return TzDateValueFromTime(*v)
+	return OptionalValue(TzDateValueFromTime(*v))
 }
 
 func NullableTzDatetimeValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeTzDatetime)
 	}
-	return TzDatetimeValue(*v)
+	return OptionalValue(TzDatetimeValue(*v))
 }
 
 func NullableTzDatetimeValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeTzDatetime)
 	}
-	return TzDatetimeValueFromTime(*v)
+	return OptionalValue(TzDatetimeValueFromTime(*v))
 }
 
 func NullableTimestampValue(v *uint64) Value {
 	if v == nil {
 		return NullValue(TypeTimestamp)
 	}
-	return TimestampValue(*v)
+	return OptionalValue(TimestampValue(*v))
 }
 
 func NullableTimestampValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeTimestamp)
 	}
-	return TimestampValueFromTime(*v)
+	return OptionalValue(TimestampValueFromTime(*v))
 }
 
 func NullableTzTimestampValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeTzTimestamp)
 	}
-	return TzTimestampValue(*v)
+	return OptionalValue(TzTimestampValue(*v))
 }
 
 func NullableTzTimestampValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeTzTimestamp)
 	}
-	return TzTimestampValueFromTime(*v)
+	return OptionalValue(TzTimestampValueFromTime(*v))
 }
 
 func NullableIntervalValue(v *int64) Value {
 	if v == nil {
 		return NullValue(TypeInterval)
 	}
-	return IntervalValue(*v)
+	return OptionalValue(IntervalValue(*v))
 }
 
 func NullableIntervalValueFromDuration(v *time.Duration) Value {
 	if v == nil {
 		return NullValue(TypeInterval)
 	}
-	return IntervalValueFromDuration(*v)
+	return OptionalValue(IntervalValueFromDuration(*v))
 }
 
 func NullableStringValue(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeString)
 	}
-	return StringValue(*v)
+	return OptionalValue(StringValue(*v))
 }
 
 func NullableStringValueFromString(v *string) Value {
 	if v == nil {
 		return NullValue(TypeString)
 	}
-	return StringValueFromString(*v)
+	return OptionalValue(StringValueFromString(*v))
 }
 
 func NullableUTF8Value(v *string) Value {
 	if v == nil {
 		return NullValue(TypeUTF8)
 	}
-	return UTF8Value(*v)
+	return OptionalValue(UTF8Value(*v))
 }
 
 func NullableYSONValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeYSON)
 	}
-	return YSONValue(*v)
+	return OptionalValue(YSONValue(*v))
 }
 
 func NullableYSONValueFromBytes(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeYSON)
 	}
-	return YSONValueFromBytes(*v)
+	return OptionalValue(YSONValueFromBytes(*v))
 }
 
 func NullableJSONValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeJSON)
 	}
-	return JSONValue(*v)
+	return OptionalValue(JSONValue(*v))
 }
 
 func NullableJSONValueFromBytes(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeJSON)
 	}
-	return JSONValueFromBytes(*v)
+	return OptionalValue(JSONValueFromBytes(*v))
 }
 
 func NullableUUIDValue(v *[16]byte) Value {
 	if v == nil {
 		return NullValue(TypeJSON)
 	}
-	return UUIDValue(*v)
+	return OptionalValue(UUIDValue(*v))
 }
 
 func NullableJSONDocumentValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeJSONDocument)
 	}
-	return JSONDocumentValue(*v)
+	return OptionalValue(JSONDocumentValue(*v))
 }
 
 func NullableJSONDocumentValueFromBytes(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeJSONDocument)
 	}
-	return JSONDocumentValueFromBytes(*v)
+	return OptionalValue(JSONDocumentValueFromBytes(*v))
 }
 
 func NullableDyNumberValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeDyNumber)
 	}
-	return DyNumberValue(*v)
+	return OptionalValue(DyNumberValue(*v))
 }
 
 // Nullable makes optional value from nullable type
 // Warning: type interface will be replaced in the future with typed parameters pattern from go1.18
 // nolint:gocyclo
-func Nullable(t Type, v *interface{}) Value {
-	if v == nil {
-		return NullValue(t)
-	}
+func Nullable(t Type, v interface{}) Value {
 	switch t {
 	case TypeBool:
-		return NullableBoolValue((*v).(*bool))
+		return NullableBoolValue(v.(*bool))
 	case TypeInt8:
-		return NullableInt8Value((*v).(*int8))
+		return NullableInt8Value(v.(*int8))
 	case TypeUint8:
-		return NullableUint8Value((*v).(*uint8))
+		return NullableUint8Value(v.(*uint8))
 	case TypeInt16:
-		return NullableInt16Value((*v).(*int16))
+		return NullableInt16Value(v.(*int16))
 	case TypeUint16:
-		return NullableUint16Value((*v).(*uint16))
+		return NullableUint16Value(v.(*uint16))
 	case TypeInt32:
-		return NullableInt32Value((*v).(*int32))
+		return NullableInt32Value(v.(*int32))
 	case TypeUint32:
-		return NullableUint32Value((*v).(*uint32))
+		return NullableUint32Value(v.(*uint32))
 	case TypeInt64:
-		return NullableInt64Value((*v).(*int64))
+		return NullableInt64Value(v.(*int64))
 	case TypeUint64:
-		return NullableUint64Value((*v).(*uint64))
+		return NullableUint64Value(v.(*uint64))
 	case TypeFloat:
-		return NullableFloatValue((*v).(*float32))
+		return NullableFloatValue(v.(*float32))
 	case TypeDouble:
-		return NullableDoubleValue((*v).(*float64))
+		return NullableDoubleValue(v.(*float64))
 	case TypeDate:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *uint32:
 			return NullableDateValue(tt)
 		case *time.Time:
@@ -465,7 +462,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeDatetime:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *uint32:
 			return NullableDatetimeValue(tt)
 		case *time.Time:
@@ -474,7 +471,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeTimestamp:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *uint64:
 			return NullableTimestampValue(tt)
 		case *time.Time:
@@ -483,7 +480,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeInterval:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *int64:
 			return NullableIntervalValue(tt)
 		case *time.Duration:
@@ -492,7 +489,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeTzDate:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *string:
 			return NullableTzDateValue(tt)
 		case *time.Time:
@@ -501,7 +498,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeTzDatetime:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *string:
 			return NullableTzDatetimeValue(tt)
 		case *time.Time:
@@ -510,7 +507,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeTzTimestamp:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *string:
 			return NullableTzTimestampValue(tt)
 		case *time.Time:
@@ -519,7 +516,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeString:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *[]byte:
 			return NullableStringValue(tt)
 		case *string:
@@ -528,14 +525,14 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeUTF8:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *string:
 			return NullableUTF8Value(tt)
 		default:
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeYSON:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *string:
 			return NullableYSONValue(tt)
 		case *[]byte:
@@ -544,7 +541,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeJSON:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *string:
 			return NullableJSONValue(tt)
 		case *[]byte:
@@ -553,14 +550,14 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeUUID:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *[16]byte:
 			return NullableUUIDValue(tt)
 		default:
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeJSONDocument:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *string:
 			return NullableJSONDocumentValue(tt)
 		case *[]byte:
@@ -569,7 +566,7 @@ func Nullable(t Type, v *interface{}) Value {
 			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
 		}
 	case TypeDyNumber:
-		switch tt := (*v).(type) {
+		switch tt := v.(type) {
 		case *string:
 			return NullableDyNumberValue(tt)
 		default:
