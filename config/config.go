@@ -76,6 +76,9 @@ type Config interface {
 
 	// UseDNSResolver is a flag about using dns-resolving or not
 	UseDNSResolver() bool
+
+	// SharedPool is a flag about using shared connection pool or detached
+	SharedPool() bool
 }
 
 // Config contains driver configuration options.
@@ -88,6 +91,7 @@ type config struct {
 	balancer             balancer.Balancer
 	secure               bool
 	dnsResolver          bool
+	sharedPool           bool
 	endpoint             string
 	database             string
 	requestsType         string
@@ -96,6 +100,10 @@ type config struct {
 	credentials          credentials.Credentials
 	tlsConfig            *tls.Config
 	meta                 meta.Meta
+}
+
+func (c *config) SharedPool() bool {
+	return c.sharedPool
 }
 
 func (c *config) UseDNSResolver() bool {
@@ -211,9 +219,16 @@ func WithConnectionTTL(ttl time.Duration) Option {
 	}
 }
 
+func WithSharedPool() Option {
+	return func(c *config) {
+		c.sharedPool = true
+	}
+}
+
 func WithCredentials(credentials credentials.Credentials) Option {
 	return func(c *config) {
 		c.credentials = credentials
+		c.sharedPool = false // use separated pool for another credentials
 	}
 }
 
@@ -231,6 +246,9 @@ func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(c *config) {
+		if c.dialTimeout != timeout {
+			c.sharedPool = false // use separated pool for another dial timeout
+		}
 		c.dialTimeout = timeout
 	}
 }
@@ -312,8 +330,9 @@ func certPool() (certPool *x509.CertPool) {
 
 func defaultConfig() (c *config) {
 	return &config{
-		balancer: balancers.Default(),
-		secure:   true,
+		balancer:   balancers.Default(),
+		secure:     true,
+		sharedPool: true,
 		tlsConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 			RootCAs:    certPool(),

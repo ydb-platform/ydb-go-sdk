@@ -39,7 +39,7 @@ type Conn interface {
 	GetState() State
 	SetState(State) State
 
-	Release(ctx context.Context)
+	Release(ctx context.Context) error
 }
 
 func (c *conn) Address() string {
@@ -60,19 +60,19 @@ type conn struct {
 	onClose      []func(*conn)
 }
 
-func (c *conn) Release(ctx context.Context) {
+func (c *conn) Release(ctx context.Context) (err error) {
 	var (
 		onDone = trace.DriverOnConnRelease(
 			c.config.Trace(),
 			&ctx,
 			c.endpoint.Copy(),
 		)
-		err error
+		issues []error
 	)
 	defer func() {
 		onDone(err)
 	}()
-	var issues []error
+
 	if c.changeUsages(-1) == 0 {
 		if usages := atomic.LoadInt32(&c.streamUsages); usages > 0 {
 			issues = append(issues, fmt.Errorf("conn in stream use: usages=%d", usages))
@@ -81,9 +81,12 @@ func (c *conn) Release(ctx context.Context) {
 			issues = append(issues, closeErr)
 		}
 	}
+
 	if len(issues) > 0 {
-		err = errors.NewWithIssues("conn released with issues", issues...)
+		return errors.NewWithIssues("conn released with issues", issues...)
 	}
+
+	return nil
 }
 
 func (c *conn) LastUsage() time.Time {

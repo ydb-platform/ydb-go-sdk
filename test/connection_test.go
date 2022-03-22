@@ -83,6 +83,7 @@ func TestConnection(t *testing.T) {
 		ydb.WithUserAgent(userAgent),
 		ydb.WithRequestsType(requestType),
 		ydb.With(
+			config.WithInternalDNSResolver(),
 			config.WithGrpcOptions(
 				grpc.WithUnaryInterceptor(func(
 					ctx context.Context,
@@ -236,7 +237,7 @@ func TestConnection(t *testing.T) {
 		var childDB ydb.Connection
 		childDB, err = db.With(
 			ctx,
-			ydb.WithAccessTokenCredentials(""),
+			ydb.WithDialTimeout(time.Second*5),
 		)
 		if err != nil {
 			t.Fatalf("failed to open sub-connection: %v", err)

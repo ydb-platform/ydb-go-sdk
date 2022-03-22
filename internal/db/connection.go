@@ -16,11 +16,11 @@ type Cluster interface {
 	closer.Closer
 }
 
-type ConnectionDiscovery interface {
+type Discoverer interface {
 	Discovery() discovery.Client
 }
 
-type ConnectionInfo interface {
+type Info interface {
 	// Endpoint returns initial endpoint
 	Endpoint() string
 
@@ -33,6 +33,6 @@ type ConnectionInfo interface {
 
 type Connection interface {
 	Cluster
-	ConnectionInfo
-	ConnectionDiscovery
+	Info
+	Discoverer
 }
