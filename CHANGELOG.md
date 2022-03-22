@@ -1,3 +1,4 @@
+## v3.16.4
 * Removed `WithMeta()` discovery config option
 * Moved `meta.Meta` call to conn exclusively
 
