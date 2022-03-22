@@ -1,3 +1,4 @@
+## v3.16.6
 * Rollback moving `meta.Meta` call to conn exclusively from `internal/db` and `internal/discovery`
 * Added `WithMeta()` discovery config option
 
