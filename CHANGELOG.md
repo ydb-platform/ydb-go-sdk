@@ -1,3 +1,4 @@
+## v3.16.5
 * Added `config.SharedPool()` setting and `config.WithSharedPool()` option
 * Added management of shared pool flag on change dial timeout and credentials 
 * Removed explicit checks of conditions for use (or not) shared pool in `ydb.With()`
