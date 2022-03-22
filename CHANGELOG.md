@@ -1,3 +1,6 @@
+* Removed `WithMeta()` discovery config option
+* Moved `meta.Meta` call to conn exclusively
+
 ## v3.16.3
 * Replaced panic on cluster close to error issues
 

@@ -3,6 +3,8 @@ package ydb
 import (
 	"context"
 	"sync/atomic"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 )
 
 var nextID = uint64(0)
@@ -23,7 +25,6 @@ func (c *connection) With(ctx context.Context, opts ...Option) (Connection, erro
 
 	opts = append(
 		opts,
-		withConnPool(c.pool),
 		withOnClose(func(child *connection) {
 			c.childrenMtx.Lock()
 			defer c.childrenMtx.Unlock()
@@ -31,6 +32,16 @@ func (c *connection) With(ctx context.Context, opts ...Option) (Connection, erro
 			delete(c.children, id)
 		}),
 	)
+	// check if credentials have been overridden
+	tmp := new(connection)
+	for _, o := range opts {
+		_ = o(ctx, tmp)
+	}
+	tmpCfg := config.New(tmp.options...)
+	if tmpCfg.Credentials() == nil {
+		// use previous credentials, so we can share conn pool
+		opts = append(opts, withConnPool(c.pool))
+	}
 
 	child, err := New(
 		ctx,

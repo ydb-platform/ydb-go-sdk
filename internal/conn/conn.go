@@ -236,7 +236,7 @@ func (c *conn) changeUsages(delta int32) int32 {
 	usages := atomic.AddInt32(&c.usages, delta)
 
 	if usages < 0 {
-		panic("negative usages" + strconv.Itoa(int(usages)))
+		panic("negative usages: " + strconv.Itoa(int(usages)))
 	}
 
 	trace.DriverOnConnUsagesChange(
@@ -254,7 +254,7 @@ func (c *conn) changeStreamUsages(delta int32) {
 	usages := atomic.AddInt32(&c.streamUsages, delta)
 
 	if usages < 0 {
-		panic("negative stream usages" + strconv.Itoa(int(usages)))
+		panic("negative stream usages: " + strconv.Itoa(int(usages)))
 	}
 
 	trace.DriverOnConnStreamUsagesChange(
@@ -429,6 +429,14 @@ func (c *conn) newStream(
 	if err != nil {
 		return nil, errors.NewGrpcError(
 			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn take failed")),
+			errors.WithErr(err),
+		)
+	}
+
+	ctx, err = c.config.Meta().Meta(ctx)
+	if err != nil {
+		return nil, errors.NewGrpcError(
+			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn apply meta failed")),
 			errors.WithErr(err),
 		)
 	}

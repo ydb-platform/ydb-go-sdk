@@ -151,22 +151,17 @@ type Explorer interface {
 	Force()
 }
 
-type Locker interface {
-	Lock()
-	Unlock()
-}
-
 type CRUDExplorerLocker interface {
 	CRUD
 	Explorer
-	Locker
+	sync.Locker
 }
 
 type Cluster interface {
 	closer.Closer
 	CRUD
 	Explorer
-	Locker
+	sync.Locker
 	conn.Pessimizer
 }
 
@@ -260,8 +255,11 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	options := parseOptions(opts...)
+	if options.withLock {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+	}
 
 	if c.closed {
 		return nil, errors.WithStackTrace(ErrClusterClosed)
@@ -318,7 +316,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		return nil
 	}
 
-	cc = c.pool.Get(ctx, e)
+	cc = c.pool.Get(e)
 
 	_, has := c.index[e.Address()]
 	if has {
