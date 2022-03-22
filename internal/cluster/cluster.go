@@ -217,8 +217,9 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 
 	c.closed = true
 
+	var issues []error
 	if len(c.index) > 0 {
-		panic(fmt.Sprintf(
+		issues = append(issues, fmt.Errorf(
 			"non empty index after remove all entries: %v",
 			func() (endpoints []string) {
 				for e := range c.index {
@@ -230,7 +231,7 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 	}
 
 	if len(c.endpoints) > 0 {
-		panic(fmt.Sprintf(
+		issues = append(issues, fmt.Errorf(
 			"non empty nodes after remove all entries: %v",
 			func() (nodes []uint32) {
 				for e := range c.endpoints {
@@ -241,7 +242,15 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 		))
 	}
 
-	return c.pool.Release(ctx)
+	if err = c.pool.Release(ctx); err != nil {
+		issues = append(issues, err)
+	}
+
+	if len(issues) > 0 {
+		return errors.NewWithIssues("cluster closed with issues", issues...)
+	}
+
+	return nil
 }
 
 // Get returns next available connection.
