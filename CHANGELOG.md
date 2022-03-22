@@ -1,3 +1,4 @@
+## v3.16.3
 * Replaced panic on cluster close to error issues
 
 ## v3.16.2
