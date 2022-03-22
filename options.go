@@ -178,15 +178,17 @@ func WithAnonymousCredentials() Option {
 
 func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (credentials.Credentials, error)) Option {
 	return func(ctx context.Context, c *connection) error {
-		credentials, err := createCredentials(ctx)
+		creds, err := createCredentials(ctx)
 		if err != nil {
 			return errors.WithStackTrace(err)
 		}
-		c.options = append(c.options, config.WithCredentials(credentials))
+		c.options = append(c.options, config.WithCredentials(creds))
 		return nil
 	}
 }
 
+// WithCredentials in conjunction with Connection.With function prohibit reuse of conn pool.
+// Thus, Connection.With will effectively create totally separate Connection.
 func WithCredentials(c credentials.Credentials) Option {
 	return WithCreateCredentialsFunc(func(context.Context) (credentials.Credentials, error) {
 		return c, nil

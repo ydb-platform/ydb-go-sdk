@@ -282,7 +282,6 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 				discoveryConfig.WithEndpoint(c.Endpoint()),
 				discoveryConfig.WithDatabase(c.Name()),
 				discoveryConfig.WithSecure(c.Secure()),
-				discoveryConfig.WithMeta(c.config.Meta()),
 				discoveryConfig.WithOperationTimeout(c.config.OperationTimeout()),
 				discoveryConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
 			},

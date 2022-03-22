@@ -15,14 +15,19 @@ import (
 )
 
 type Pool interface {
+	Creator
 	Getter
 	Taker
 	Releaser
 	Pessimizer
 }
 
+type Creator interface {
+	Create(endpoint endpoint.Endpoint) Conn // creates new detached conn applying pool config
+}
+
 type Getter interface {
-	Get(ctx context.Context, endpoint endpoint.Endpoint) Conn
+	Get(endpoint endpoint.Endpoint) Conn
 }
 
 type Taker interface {
@@ -51,7 +56,11 @@ type pool struct {
 	done   chan struct{}
 }
 
-func (p *pool) Get(ctx context.Context, endpoint endpoint.Endpoint) Conn {
+func (p *pool) Create(endpoint endpoint.Endpoint) Conn {
+	return newConn(endpoint, p.config)
+}
+
+func (p *pool) Get(endpoint endpoint.Endpoint) Conn {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 

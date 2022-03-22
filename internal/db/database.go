@@ -74,7 +74,7 @@ func New(
 	}
 	defer cancel()
 
-	cc := pool.Get(ctx, endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true)))
+	cc := pool.Create(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true)))
 
 	db.discovery, err = builder.New(
 		ctx,
@@ -115,11 +115,6 @@ func (db *database) Invoke(
 		return errors.WithStackTrace(err)
 	}
 
-	ctx, err = db.config.Meta().Meta(ctx)
-	if err != nil {
-		return errors.WithStackTrace(err)
-	}
-
 	defer func() {
 		if err != nil && errors.MustPessimizeEndpoint(err) {
 			db.cluster.Pessimize(ctx, cc, err)
@@ -141,11 +136,6 @@ func (db *database) NewStream(
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
 	cc, err := db.cluster.Get(ctx)
-	if err != nil {
-		return nil, errors.WithStackTrace(err)
-	}
-
-	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
 		return nil, errors.WithStackTrace(err)
 	}
