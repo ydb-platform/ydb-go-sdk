@@ -339,14 +339,6 @@ func (c *conn) invoke(
 		)
 	}
 
-	ctx, err = c.config.Meta().Meta(ctx)
-	if err != nil {
-		return errors.NewGrpcError(
-			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn apply meta failed")),
-			errors.WithErr(err),
-		)
-	}
-
 	c.changeUsages(1)
 	defer c.changeUsages(-1)
 
@@ -356,6 +348,7 @@ func (c *conn) invoke(
 		if s, ok := grpcStatus.FromError(err); ok {
 			return errors.NewGrpcError(
 				errors.WithStatus(s),
+				errors.WithErr(errors.WithStackTrace(err)),
 			)
 		}
 		return errors.WithStackTrace(err)
@@ -436,14 +429,6 @@ func (c *conn) newStream(
 		)
 	}
 
-	ctx, err = c.config.Meta().Meta(ctx)
-	if err != nil {
-		return nil, errors.NewGrpcError(
-			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn apply meta failed")),
-			errors.WithErr(err),
-		)
-	}
-
 	c.changeStreamUsages(1)
 	defer c.changeStreamUsages(-1)
 
@@ -454,6 +439,7 @@ func (c *conn) newStream(
 		if s, ok := grpcStatus.FromError(err); ok {
 			return nil, errors.NewGrpcError(
 				errors.WithStatus(s),
+				errors.WithErr(errors.WithStackTrace(err)),
 			)
 		}
 		return nil, errors.WithStackTrace(err)

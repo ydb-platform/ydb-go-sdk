@@ -120,6 +120,11 @@ func (db *database) Invoke(
 		}
 	}()
 
+	ctx, err = db.config.Meta().Meta(ctx)
+	if err != nil {
+		return errors.WithStackTrace(err)
+	}
+
 	err = cc.Invoke(ctx, method, args, reply, opts...)
 	if err != nil {
 		return errors.WithStackTrace(err)
@@ -144,6 +149,11 @@ func (db *database) NewStream(
 			db.cluster.Pessimize(ctx, cc, err)
 		}
 	}()
+
+	ctx, err = db.config.Meta().Meta(ctx)
+	if err != nil {
+		return nil, errors.WithStackTrace(err)
+	}
 
 	var client grpc.ClientStream
 	client, err = cc.NewStream(ctx, desc, method, opts...)

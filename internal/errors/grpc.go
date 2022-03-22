@@ -1,8 +1,6 @@
 package errors
 
 import (
-	"fmt"
-
 	"google.golang.org/grpc/status"
 )
 
@@ -14,11 +12,11 @@ type grpcError struct {
 
 func (e *grpcError) isYdbError() {}
 
-func (e *grpcError) Error() string {
+func (e *grpcError) Error() (s string) {
 	if e.err != nil {
-		return fmt.Sprintf("%s: %v", e.err, e.status.String())
+		s += e.err.Error() + ": "
 	}
-	return e.status.String()
+	return s + e.status.String()
 }
 
 func (e *grpcError) Unwrap() error {

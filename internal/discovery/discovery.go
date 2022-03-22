@@ -137,6 +137,11 @@ func (c *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		onDone(location, nodes, err)
 	}()
 
+	ctx, err = c.config.Meta().Meta(ctx)
+	if err != nil {
+		return nil, errors.WithStackTrace(err)
+	}
+
 	response, err = c.service.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, errors.WithStackTrace(err)
@@ -179,6 +184,11 @@ func (c *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 			onDone(whoAmI.User, whoAmI.Groups, err)
 		}
 	}()
+
+	ctx, err = c.config.Meta().Meta(ctx)
+	if err != nil {
+		return nil, errors.WithStackTrace(err)
+	}
 
 	response, err = c.service.WhoAmI(ctx, &request)
 	if err != nil {
