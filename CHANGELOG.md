@@ -1,3 +1,5 @@
+* Replaced panic on cluster close to error issues
+
 ## v3.16.2
 * Fixed bug in `types.Nullable()`
 * Refactored package `meta`
