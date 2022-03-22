@@ -197,6 +197,5 @@ func (c *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 }
 
 func (c *client) Close(ctx context.Context) error {
-	c.cc.Release(ctx)
-	return nil
+	return c.cc.Release(ctx)
 }

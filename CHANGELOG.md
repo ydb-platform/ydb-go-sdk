@@ -1,3 +1,9 @@
+* Added `config.SharedPool()` setting and `config.WithSharedPool()` option
+* Added management of shared pool flag on change dial timeout and credentials 
+* Removed explicit checks of conditions for use (or not) shared pool in `ydb.With()`
+* Renamed `internal/db` interfaces
+* Changed signature of `conn.Conn.Release` (added error as result)
+
 ## v3.16.4
 * Removed `WithMeta()` discovery config option
 * Moved `meta.Meta` call to conn exclusively

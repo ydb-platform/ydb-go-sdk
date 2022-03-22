@@ -417,7 +417,9 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		panic("ydb: can't remove not-existing endpoint")
 	}
 
-	defer entry.Conn.Release(ctx)
+	defer func() {
+		_ = entry.Conn.Release(ctx)
+	}()
 
 	removed = entry.RemoveFrom(c.balancer, &c.balancerMtx)
 

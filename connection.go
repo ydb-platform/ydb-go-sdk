@@ -34,7 +34,7 @@ import (
 // Interface and list of clients may be changed in the future
 type Connection interface {
 	closer.Closer
-	db.ConnectionInfo
+	db.Info
 	grpc.ClientConnInterface
 
 	// Table returns table client
@@ -265,7 +265,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)
 	}
 
-	if c.pool == nil {
+	if c.pool == nil || !c.config.SharedPool() {
 		c.pool = conn.NewPool(
 			ctx,
 			c.config,
