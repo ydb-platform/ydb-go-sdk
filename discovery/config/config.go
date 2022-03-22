@@ -3,6 +3,7 @@ package config
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -41,18 +42,26 @@ type Config interface {
 	// If Interval is zero then the DefaultInterval is used.
 	// If Interval is negative, then no background discovery prepared.
 	Interval() time.Duration
+
+	// Meta is an option which contains meta information about database connection
+	Meta() meta.Meta
 }
 
 type config struct {
 	endpoint string
 	database string
 	secure   bool
+	meta     meta.Meta
 
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
 
 	interval time.Duration
 	trace    trace.Discovery
+}
+
+func (c *config) Meta() meta.Meta {
+	return c.meta
 }
 
 func (c *config) OperationTimeout() time.Duration {
@@ -100,6 +109,12 @@ func WithDatabase(database string) Option {
 func WithSecure(ssl bool) Option {
 	return func(c *config) {
 		c.secure = ssl
+	}
+}
+
+func WithMeta(meta meta.Meta) Option {
+	return func(c *config) {
+		c.meta = meta
 	}
 }
 

@@ -1,3 +1,6 @@
+* Rollback moving `meta.Meta` call to conn exclusively from `internal/db` and `internal/discovery`
+* Added `WithMeta()` discovery config option
+
 ## v3.16.5
 * Added `config.SharedPool()` setting and `config.WithSharedPool()` option
 * Added management of shared pool flag on change dial timeout and credentials 
