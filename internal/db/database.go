@@ -82,7 +82,7 @@ func New(
 		opts...,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	return db, nil

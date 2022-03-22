@@ -240,11 +240,11 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) dbOption {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
 				result, err := handler(args)
 				if err != nil {
-					return err
+					return errors.WithStackTrace(err)
 				}
 				anyResult, err := anypb.New(result)
 				if err != nil {
-					return err
+					return errors.WithStackTrace(err)
 				}
 				setField(
 					"Operation",

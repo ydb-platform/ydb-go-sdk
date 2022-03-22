@@ -390,10 +390,7 @@ func MapGRPCError(err error, opts ...teOpt) error {
 }
 
 func MustPessimizeEndpoint(err error) bool {
-	var (
-		te *TransportError
-		ge *grpcError
-	)
+	var te *TransportError
 	switch {
 	case err == nil:
 		return false
@@ -402,14 +399,6 @@ func MustPessimizeEndpoint(err error) bool {
 		case
 			TransportErrorResourceExhausted,
 			TransportErrorOutOfRange:
-			return false
-		default:
-			return true
-		}
-	case errors.As(err, &ge):
-		switch ge.GRPCStatus().Code() {
-		case
-			grpcCodes.ResourceExhausted, grpcCodes.OutOfRange:
 			return false
 		default:
 			return true

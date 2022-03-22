@@ -109,14 +109,14 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),
 		&result,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	return &session{
 		id:           result.GetSessionId(),
@@ -185,7 +185,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 			),
 		},
 	)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 // KeepAlive keeps idle session alive.
@@ -260,7 +260,7 @@ func (s *session) CreateTable(
 		&request,
 		t.Trailer(),
 	)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 // DescribeTable describes table at given path.
@@ -290,14 +290,14 @@ func (s *session) DescribeTable(
 		&request,
 	)
 	if err != nil {
-		return desc, err
+		return desc, errors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),
 		&result,
 	)
 	if err != nil {
-		return
+		return desc, errors.WithStackTrace(err)
 	}
 
 	cs := make(
@@ -428,7 +428,7 @@ func (s *session) DropTable(
 		&request,
 		t.Trailer(),
 	)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 // AlterTable modifies schema of table at given path with given options.
@@ -456,7 +456,7 @@ func (s *session) AlterTable(
 		&request,
 		t.Trailer(),
 	)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 // CopyTable creates copy of table at given path.
@@ -485,7 +485,7 @@ func (s *session) CopyTable(
 		&request,
 		t.Trailer(),
 	)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 // Explain explains data query represented by text.
@@ -622,7 +622,7 @@ func (s *session) Execute(
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStackTrace(err)
 	}
 	if keepInCache(request) && result.QueryMeta != nil {
 		queryID := result.QueryMeta.Id
@@ -691,13 +691,13 @@ func (s *session) executeDataQuery(
 		t.Trailer(),
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),
 		result,
 	)
-	return request, result, err
+	return request, result, errors.WithStackTrace(err)
 }
 
 // ExecuteSchemeQuery executes scheme query.
@@ -725,7 +725,7 @@ func (s *session) ExecuteSchemeQuery(
 		&request,
 		t.Trailer(),
 	)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 // DescribeTableOptions describes supported table options.
@@ -877,12 +877,19 @@ func (s *session) StreamReadTable(
 	opts ...options.ReadTableOption,
 ) (_ result.StreamResult, err error) {
 	var (
-		request = Ydb_Table.ReadTableRequest{
+		onIntermediate = trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx, s)
+		request        = Ydb_Table.ReadTableRequest{
 			SessionId: s.id,
 			Path:      path,
 		}
 		stream Ydb_Table_V1.TableService_StreamReadTableClient
 	)
+	defer func() {
+		if err != nil {
+			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
+		}
+	}()
+
 	for _, opt := range opts {
 		opt((*options.ReadTableDesc)(&request))
 	}
@@ -894,12 +901,9 @@ func (s *session) StreamReadTable(
 		&request,
 	)
 
-	onDone := trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx, s)
-
 	if err != nil {
 		cancel()
-		onDone(err)
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	if checkHintSessionClose(stream.Trailer()) {
@@ -912,21 +916,25 @@ func (s *session) StreamReadTable(
 			stats *Ydb_TableStats.QueryStats,
 			err error,
 		) {
+			defer func() {
+				onIntermediate(errors.HideEOF(err))
+			}()
 			select {
 			case <-ctx.Done():
-				return nil, nil, ctx.Err()
+				return nil, nil, errors.WithStackTrace(ctx.Err())
 			default:
-				response, err := stream.Recv()
+				var response *Ydb_Table.ReadTableResponse
+				response, err = stream.Recv()
 				result := response.GetResult()
 				if result == nil || err != nil {
-					return nil, nil, err
+					return nil, nil, errors.WithStackTrace(err)
 				}
 				return result.GetResultSet(), nil, nil
 			}
 		},
 		func(err error) error {
 			cancel()
-			onDone(err)
+			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
 			return err
 		},
 	), nil
@@ -979,7 +987,7 @@ func (s *session) StreamExecuteScanQuery(
 
 	if err != nil {
 		cancel()
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	if checkHintSessionClose(stream.Trailer()) {
@@ -997,12 +1005,13 @@ func (s *session) StreamExecuteScanQuery(
 			}()
 			select {
 			case <-ctx.Done():
-				return nil, nil, ctx.Err()
+				return nil, nil, errors.WithStackTrace(ctx.Err())
 			default:
-				response, err := stream.Recv()
+				var response *Ydb_Table.ExecuteScanQueryPartialResponse
+				response, err = stream.Recv()
 				result := response.GetResult()
 				if result == nil || err != nil {
-					return nil, nil, err
+					return nil, nil, errors.WithStackTrace(err)
 				}
 				return result.GetResultSet(), result.GetQueryStats(), nil
 			}
@@ -1032,7 +1041,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 		},
 		t.Trailer(),
 	)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 // BeginTransaction begins new transaction within given session with given
@@ -1070,7 +1079,7 @@ func (s *session) BeginTransaction(
 		t.Trailer(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),

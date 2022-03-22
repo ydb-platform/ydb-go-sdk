@@ -117,15 +117,15 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
 	if r.isClosed() {
 		if err = r.Err(); err != nil {
-			return err
+			return errors.WithStackTrace(err)
 		}
-		return io.EOF
+		return errors.WithStackTrace(io.EOF)
 	}
 	s, stats, err := r.recv(ctx)
 	if err != nil {
 		r.Reset(nil)
 		if errors.Is(err, io.EOF) {
-			return err
+			return errors.WithStackTrace(err)
 		}
 		return r.errorf(0, "streamResult.NextResultSetErr(): %w", err)
 	}

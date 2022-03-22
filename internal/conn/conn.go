@@ -8,12 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/connectivity"
-	grpcStatus "google.golang.org/grpc/status"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -21,11 +18,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// nolint:gofumpt
-// nolint:nolintlint
 var (
-	// ErrOperationNotReady specified error when operation is not ready
-	ErrOperationNotReady = fmt.Errorf("operation is not ready yet")
+	// errOperationNotReady specified error when operation is not ready
+	errOperationNotReady = fmt.Errorf("operation is not ready yet")
+	// errClosedConnection specified error when connection are closed early
+	errClosedConnection = fmt.Errorf("connection closed early")
 )
 
 type Conn interface {
@@ -189,10 +186,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}()
 
 	if c.isClosed() {
-		return nil, errors.NewGrpcError(
-			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn closed early")),
-			errors.WithErr(err),
-		)
+		return nil, errors.WithStackTrace(errClosedConnection)
 	}
 
 	c.mtx.Lock()
@@ -283,7 +277,7 @@ func (c *conn) close() (err error) {
 	err = c.cc.Close()
 	c.cc = nil
 	c.setState(Offline)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 func (c *conn) isClosed() bool {
@@ -319,42 +313,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		f(c)
 	}
 
-	return err
-}
-
-// invoke have behavior like grpc call
-func (c *conn) invoke(
-	ctx context.Context,
-	method string,
-	req interface{},
-	res interface{},
-	opts ...grpc.CallOption,
-) (err error) {
-	var cc *grpc.ClientConn
-	cc, err = c.take(ctx)
-	if err != nil {
-		return errors.NewGrpcError(
-			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn take failed")),
-			errors.WithErr(err),
-		)
-	}
-
-	c.changeUsages(1)
-	defer c.changeUsages(-1)
-
-	err = cc.Invoke(ctx, method, req, res, opts...)
-
-	if err != nil {
-		if s, ok := grpcStatus.FromError(err); ok {
-			return errors.NewGrpcError(
-				errors.WithStatus(s),
-				errors.WithErr(errors.WithStackTrace(err)),
-			)
-		}
-		return errors.WithStackTrace(err)
-	}
-
-	return nil
+	return errors.WithStackTrace(err)
 }
 
 func (c *conn) Invoke(
@@ -374,13 +333,22 @@ func (c *conn) Invoke(
 			c.endpoint,
 			trace.Method(method),
 		)
+		cc *grpc.ClientConn
 	)
 
 	defer func() {
 		onDone(err, issues, opID, c.GetState())
 	}()
 
-	err = c.invoke(ctx, method, req, res, opts...)
+	cc, err = c.take(ctx)
+	if err != nil {
+		return errors.WithStackTrace(err)
+	}
+
+	c.changeUsages(1)
+	defer c.changeUsages(-1)
+
+	err = cc.Invoke(ctx, method, req, res, opts...)
 
 	if err != nil {
 		if wrapping {
@@ -391,7 +359,7 @@ func (c *conn) Invoke(
 				),
 			)
 		}
-		return err
+		return errors.WithStackTrace(err)
 	}
 
 	if o, ok := res.(response.Response); ok {
@@ -402,50 +370,21 @@ func (c *conn) Invoke(
 		if wrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return errors.WithStackTrace(ErrOperationNotReady)
+				return errors.WithStackTrace(errOperationNotReady)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return errors.WithStackTrace(errors.NewOpError(errors.WithOEOperation(o.GetOperation())))
+				return errors.WithStackTrace(
+					errors.NewOpError(
+						errors.WithOEOperation(
+							o.GetOperation(),
+						),
+					),
+				)
 			}
 		}
 	}
 
 	return err
-}
-
-// newStream have behavior like grpc call
-func (c *conn) newStream(
-	ctx context.Context,
-	desc *grpc.StreamDesc,
-	method string,
-	opts ...grpc.CallOption,
-) (_ grpc.ClientStream, err error) {
-	var cc *grpc.ClientConn
-	cc, err = c.take(ctx)
-	if err != nil {
-		return nil, errors.NewGrpcError(
-			errors.WithStatus(grpcStatus.New(codes.Unavailable, "ydb driver conn take failed")),
-			errors.WithErr(err),
-		)
-	}
-
-	c.changeStreamUsages(1)
-	defer c.changeStreamUsages(-1)
-
-	var client grpc.ClientStream
-	client, err = cc.NewStream(ctx, desc, method, opts...)
-
-	if err != nil {
-		if s, ok := grpcStatus.FromError(err); ok {
-			return nil, errors.NewGrpcError(
-				errors.WithStatus(s),
-				errors.WithErr(errors.WithStackTrace(err)),
-			)
-		}
-		return nil, errors.WithStackTrace(err)
-	}
-
-	return client, nil
 }
 
 func (c *conn) NewStream(
@@ -462,6 +401,8 @@ func (c *conn) NewStream(
 			trace.Method(method),
 		)
 		wrapping = needWrapping(ctx)
+		cc       *grpc.ClientConn
+		s        grpc.ClientStream
 	)
 
 	defer func() {
@@ -479,13 +420,15 @@ func (c *conn) NewStream(
 		}
 	}()
 
-	var s grpc.ClientStream
-	s, err = c.newStream(
-		ctx,
-		desc,
-		method,
-		opts...,
-	)
+	cc, err = c.take(ctx)
+	if err != nil {
+		return nil, errors.WithStackTrace(err)
+	}
+
+	c.changeStreamUsages(1)
+	defer c.changeStreamUsages(-1)
+
+	s, err = cc.NewStream(ctx, desc, method, opts...)
 
 	if err != nil {
 		if wrapping {
@@ -496,13 +439,13 @@ func (c *conn) NewStream(
 				),
 			)
 		}
-		return s, err
+		return s, errors.WithStackTrace(err)
 	}
 
 	return &grpcClientStream{
-		c:        c,
-		s:        s,
-		wrapping: wrapping,
+		ClientStream: s,
+		c:            c,
+		wrapping:     wrapping,
 		onDone: func(ctx context.Context) {
 			cancel()
 		},

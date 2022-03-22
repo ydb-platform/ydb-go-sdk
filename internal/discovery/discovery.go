@@ -49,7 +49,7 @@ func New(
 
 	curr, err = c.Discover(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	crudExplorer.Lock()

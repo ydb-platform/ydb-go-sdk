@@ -128,11 +128,11 @@ func (c *client) ListResource(
 		),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	return result.GetResourcePaths(), nil
 }
@@ -156,11 +156,11 @@ func (c *client) DescribeResource(
 		),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	resource := &ratelimiter.Resource{
@@ -234,8 +234,8 @@ func (c *client) AcquireResource(
 	}
 
 	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {
-		return ratelimiterErrors.NewAcquire(amount, err)
+		return errors.WithStackTrace(ratelimiterErrors.NewAcquire(amount, err))
 	}
 
-	return err
+	return errors.WithStackTrace(err)
 }

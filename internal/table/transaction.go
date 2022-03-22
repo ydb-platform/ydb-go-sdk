@@ -110,14 +110,14 @@ func (tx *transaction) CommitTx(
 		t.Trailer(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),
 		result,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	return scanner.NewUnary(
 		nil,
@@ -156,7 +156,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		},
 		t.Trailer(),
 	)
-	return err
+	return errors.WithStackTrace(err)
 }
 
 func (tx *transaction) txc() *table.TransactionControl {

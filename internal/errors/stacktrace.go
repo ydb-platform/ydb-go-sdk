@@ -20,6 +20,9 @@ func WithSkipDepth(skipDepth int) withStackTraceOption {
 
 // WithStackTrace is a wrapper over original err with file:line identification
 func WithStackTrace(err error, opts ...withStackTraceOption) error {
+	if err == nil {
+		return nil
+	}
 	options := withStackTraceOptions{}
 	for _, o := range opts {
 		o(&options)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
@@ -113,11 +114,11 @@ func (c *client) DescribeNode(
 		},
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStackTrace(err)
 	}
 	return scheme.InnerConvertEntry(result.GetSelf()), &coordination.NodeConfig{
 		Path:                     result.GetConfig().GetPath(),

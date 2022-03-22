@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -41,9 +42,10 @@ func (s *rawConverter) Path() string {
 func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
 	for sp := 0; sp < s.stack.size(); sp++ {
 		if sp > 0 {
-			m, err := io.WriteString(w, ".")
+			var m int
+			m, err = io.WriteString(w, ".")
 			if err != nil {
-				return n, err
+				return n, errors.WithStackTrace(err)
 			}
 			n += int64(m)
 		}
@@ -52,9 +54,10 @@ func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
 		if s == "" {
 			s = strconv.Itoa(x.i)
 		}
-		m, err := io.WriteString(w, s)
+		var m int
+		m, err = io.WriteString(w, s)
 		if err != nil {
-			return n, err
+			return n, errors.WithStackTrace(err)
 		}
 		n += int64(m)
 	}
