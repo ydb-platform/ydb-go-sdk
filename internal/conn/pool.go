@@ -134,6 +134,7 @@ func (p *pool) Release(ctx context.Context) error {
 
 func (p *pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-p.done:

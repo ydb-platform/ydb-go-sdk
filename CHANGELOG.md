@@ -1,3 +1,6 @@
+* Added `config.ExcludeGRPCCodesForPessimization()` opttion for exclude some grpc codes from pessimization rules 
+* Refactored pessimization node conditions
+* Added closing of ticker in `conn.Conn.connParker`
 * Removed `config.WithSharedPool` and usages it
 * Removed `conn.Creator` interface and usage it
 * Removed unnecessary options append in `ydb.With`
