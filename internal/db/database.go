@@ -76,7 +76,7 @@ func New(
 
 	db.discovery, err = builder.New(
 		ctx,
-		pool.Create(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
+		pool.Get(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
 		db.cluster,
 		db.config.Trace(),
 		opts...,
