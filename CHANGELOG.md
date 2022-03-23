@@ -1,3 +1,4 @@
+## v3.16.9
 * Refactored internal operation and transport errors
 
 ## v3.16.8
