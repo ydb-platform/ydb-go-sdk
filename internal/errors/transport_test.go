@@ -74,7 +74,7 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorCanceled)),
-			pessimize: false,
+			pessimize: true,
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorUnknown)),
@@ -82,23 +82,23 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorInvalidArgument)),
-			pessimize: false,
+			pessimize: true,
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorDeadlineExceeded)),
-			pessimize: false,
+			pessimize: true,
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorNotFound)),
-			pessimize: false,
+			pessimize: true,
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorAlreadyExists)),
-			pessimize: false,
+			pessimize: true,
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorPermissionDenied)),
-			pessimize: false,
+			pessimize: true,
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorResourceExhausted)),
@@ -106,7 +106,7 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorFailedPrecondition)),
-			pessimize: false,
+			pessimize: true,
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorAborted)),
@@ -118,7 +118,7 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorUnimplemented)),
-			pessimize: false,
+			pessimize: true,
 		},
 		{
 			error:     NewTransportError(WithTEReason(TransportErrorInternal)),
