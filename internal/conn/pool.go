@@ -15,15 +15,10 @@ import (
 )
 
 type Pool interface {
-	Creator
 	Getter
 	Taker
 	Releaser
 	Pessimizer
-}
-
-type Creator interface {
-	Create(endpoint endpoint.Endpoint) Conn // creates new detached conn applying pool config
 }
 
 type Getter interface {
@@ -54,10 +49,6 @@ type pool struct {
 	opts   []grpc.DialOption
 	conns  map[string]*conn
 	done   chan struct{}
-}
-
-func (p *pool) Create(endpoint endpoint.Endpoint) Conn {
-	return newConn(endpoint, p.config)
 }
 
 func (p *pool) Get(endpoint endpoint.Endpoint) Conn {

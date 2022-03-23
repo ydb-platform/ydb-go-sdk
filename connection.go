@@ -265,7 +265,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)
 	}
 
-	if c.pool == nil || !c.config.SharedPool() {
+	if c.pool == nil {
 		c.pool = conn.NewPool(
 			ctx,
 			c.config,

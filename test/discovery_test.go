@@ -45,6 +45,7 @@ func TestDiscovery(t *testing.T) {
 				t.Fatalf("unknown request type: %s", requestTypes[0])
 			}
 		}
+		parking = make(chan struct{})
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -97,7 +98,7 @@ func TestDiscovery(t *testing.T) {
 		ydb.WithTraceDriver(trace.Driver{
 			OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
 				return func(info trace.DriverConnParkDoneInfo) {
-					t.Fatal("unexpected parking")
+					parking <- struct{}{}
 				}
 			},
 		}),
@@ -116,5 +117,10 @@ func TestDiscovery(t *testing.T) {
 			t.Fatalf("Execute failed: %v", err)
 		}
 	})
-	time.Sleep(5 * time.Second)
+	t.Run("after parking", func(t *testing.T) {
+		<-parking // wait for parking conn
+		if _, err = db.Discovery().Discover(ctx); err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+	})
 }
