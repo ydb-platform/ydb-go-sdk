@@ -113,7 +113,7 @@ func (db *database) Invoke(
 	}
 
 	defer func() {
-		if err != nil && errors.MustPessimizeEndpoint(err) {
+		if err != nil && errors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
 			db.cluster.Pessimize(ctx, cc, err)
 		}
 	}()
@@ -143,7 +143,7 @@ func (db *database) NewStream(
 	}
 
 	defer func() {
-		if err != nil && errors.MustPessimizeEndpoint(err) {
+		if err != nil && errors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
 			db.cluster.Pessimize(ctx, cc, err)
 		}
 	}()
