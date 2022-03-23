@@ -304,14 +304,6 @@ func MustPessimizeEndpoint(err error, codes ...TransportErrorCode) bool {
 			codes,
 			TransportErrorResourceExhausted,
 			TransportErrorOutOfRange,
-			TransportErrorCanceled,
-			TransportErrorDeadlineExceeded,
-			TransportErrorInvalidArgument,
-			TransportErrorNotFound,
-			TransportErrorAlreadyExists,
-			TransportErrorFailedPrecondition,
-			TransportErrorUnimplemented,
-			TransportErrorPermissionDenied,
 		)...,
 	):
 		return true
