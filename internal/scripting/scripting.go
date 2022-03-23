@@ -52,12 +52,12 @@ func (c *client) Execute(
 	}()
 	response, err = c.service.ExecuteYql(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	return scanner.NewUnary(result.GetResultSets(), result.GetQueryStats()), nil
 }
@@ -135,7 +135,7 @@ func (c *client) StreamExecute(
 	)
 	defer func() {
 		if err != nil {
-			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
+			onIntermediate(err)(err)
 		}
 	}()
 
@@ -144,7 +144,7 @@ func (c *client) StreamExecute(
 	stream, err := c.service.StreamExecuteYql(ctx, request)
 	if err != nil {
 		cancel()
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	return scanner.NewStream(
@@ -158,12 +158,13 @@ func (c *client) StreamExecute(
 			}()
 			select {
 			case <-ctx.Done():
-				return nil, nil, ctx.Err()
+				return nil, nil, errors.WithStackTrace(ctx.Err())
 			default:
-				response, err := stream.Recv()
+				var response *Ydb_Scripting.ExecuteYqlPartialResponse
+				response, err = stream.Recv()
 				result := response.GetResult()
 				if result == nil || err != nil {
-					return nil, nil, err
+					return nil, nil, errors.WithStackTrace(err)
 				}
 				return result.GetResultSet(), result.GetQueryStats(), nil
 			}

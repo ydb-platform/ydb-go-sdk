@@ -29,9 +29,9 @@ func (s *lazyScripting) Execute(
 	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err = s.client.Execute(ctx, query, params)
-		return err
+		return errors.WithStackTrace(err)
 	})
-	return res, err
+	return res, errors.WithStackTrace(err)
 }
 
 func (s *lazyScripting) Explain(
@@ -42,9 +42,9 @@ func (s *lazyScripting) Explain(
 	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = s.client.Explain(ctx, query, mode)
-		return err
+		return errors.WithStackTrace(err)
 	})
-	return e, err
+	return e, errors.WithStackTrace(err)
 }
 
 func (s *lazyScripting) StreamExecute(
@@ -55,9 +55,9 @@ func (s *lazyScripting) StreamExecute(
 	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err = s.client.StreamExecute(ctx, query, params)
-		return err
+		return errors.WithStackTrace(err)
 	})
-	return res, err
+	return res, errors.WithStackTrace(err)
 }
 
 func (s *lazyScripting) Close(ctx context.Context) (err error) {

@@ -35,11 +35,7 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	err = c.ClientConn.UpdateState(state)
-	if err != nil {
-		err = errors.WithStackTrace(err)
-	}
-	return err
+	return errors.WithStackTrace(c.ClientConn.UpdateState(state))
 }
 
 func (d *dnsBuilder) Build(

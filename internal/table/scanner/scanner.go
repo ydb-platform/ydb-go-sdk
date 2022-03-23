@@ -237,7 +237,7 @@ func (s *scanner) writePathTo(w io.Writer) (n int64, err error) {
 	st := x.name
 	m, err := io.WriteString(w, st)
 	if err != nil {
-		return n, err
+		return n, errors.WithStackTrace(err)
 	}
 	n += int64(m)
 	return n, nil

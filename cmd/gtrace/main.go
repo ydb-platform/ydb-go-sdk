@@ -20,6 +20,8 @@ import (
 	"text/tabwriter"
 
 	_ "unsafe" // For go:linkname.
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
 //go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile
@@ -398,7 +400,7 @@ func buildFunc(info types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret
 	case *ast.FuncType:
 		result, err := buildFunc(info, traces, x)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStackTrace(err)
 		}
 		ret.Result = append(ret.Result, result)
 		return ret, nil
@@ -577,7 +579,7 @@ func scanBuildConstraints(r io.Reader) (cs []string, err error) {
 	for {
 		line, err := br.ReadBytes('\n')
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStackTrace(err)
 		}
 		line = bytes.TrimSpace(line)
 		if comm := bytes.TrimPrefix(line, []byte("//")); !bytes.Equal(comm, line) {

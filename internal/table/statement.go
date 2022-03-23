@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -54,7 +55,7 @@ func (s *statement) execute(
 		opts...,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStackTrace(err)
 	}
 	return s.session.executeQueryResult(res)
 }

@@ -39,10 +39,12 @@ func Register(param string, parser Parser) error {
 func Parse(dsn string) (options []config.Option, err error) {
 	uri, err := url.Parse(dsn)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 	if _, has := schemasSecure[uri.Scheme]; !has {
-		return nil, errors.WithStackTrace(fmt.Errorf("%w: %v", errSchemeNotValid, uri.Scheme))
+		return nil, errors.WithStackTrace(
+			fmt.Errorf("%w: %v", errSchemeNotValid, uri.Scheme),
+		)
 	}
 	options = append(
 		options,
@@ -54,7 +56,7 @@ func Parse(dsn string) (options []config.Option, err error) {
 			for _, v := range values {
 				var parsed []config.Option
 				if parsed, err = p(v); err != nil {
-					return nil, err
+					return nil, errors.WithStackTrace(err)
 				}
 				options = append(
 					options,
@@ -63,5 +65,5 @@ func Parse(dsn string) (options []config.Option, err error) {
 			}
 		}
 	}
-	return options, err
+	return options, nil
 }

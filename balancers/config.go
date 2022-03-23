@@ -57,7 +57,7 @@ func CreateFromConfig(config string) (balancer.Balancer, error) {
 	)
 
 	if err = json.Unmarshal([]byte(config), &c); err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	switch c.Type {

@@ -28,6 +28,12 @@ func New(
 	driverTrace trace.Driver,
 	opts ...config.Option,
 ) (_ discovery.Client, err error) {
+	defer func() {
+		if err != nil {
+			_ = cc.Release(ctx)
+		}
+	}()
+
 	c := &client{
 		cc:      cc,
 		config:  config.New(opts...),
@@ -43,7 +49,7 @@ func New(
 
 	curr, err = c.Discover(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	crudExplorer.Lock()

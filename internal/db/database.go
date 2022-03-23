@@ -20,7 +20,6 @@ type database struct {
 	config    config.Config
 	cluster   cluster.Cluster
 	discovery discovery.Client
-	cc        conn.Conn
 }
 
 func (db *database) Discovery() discovery.Client {
@@ -65,7 +64,6 @@ func New(
 	db := &database{
 		config:  c,
 		cluster: cluster.New(ctx, c, pool, c.Balancer()),
-		cc:      pool.Create(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
 	}
 
 	var cancel context.CancelFunc
@@ -78,13 +76,13 @@ func New(
 
 	db.discovery, err = builder.New(
 		ctx,
-		db.cc,
+		pool.Create(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
 		db.cluster,
 		db.config.Trace(),
 		opts...,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	return db, nil

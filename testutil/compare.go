@@ -116,7 +116,7 @@ func compareTuplesOrLists(l []*Ydb.TypedValue, r []*Ydb.TypedValue) (int, error)
 		rval := r[i]
 		cmp, err := compare(lval, rval)
 		if err != nil {
-			return 0, err
+			return 0, errors.WithStackTrace(err)
 		}
 		if cmp != 0 {
 			return cmp, nil
@@ -262,7 +262,7 @@ func compareDyNumber(l, r *Ydb.Value) (int, error) {
 	rr := r.GetTextValue()
 	lf, _, err := big.ParseFloat(ll, 10, 127, big.ToNearestEven)
 	if err != nil {
-		return 0, err
+		return 0, errors.WithStackTrace(err)
 	}
 	rf, _, err := big.ParseFloat(rr, 10, 127, big.ToNearestEven)
 	if err != nil {

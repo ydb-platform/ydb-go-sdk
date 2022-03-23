@@ -59,9 +59,9 @@ func (c *lazyCoordination) DescribeNode(
 	c.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		entry, config, err = c.client.DescribeNode(ctx, path)
-		return err
+		return errors.WithStackTrace(err)
 	})
-	return entry, config, err
+	return entry, config, errors.WithStackTrace(err)
 }
 
 func (c *lazyCoordination) Close(ctx context.Context) (err error) {

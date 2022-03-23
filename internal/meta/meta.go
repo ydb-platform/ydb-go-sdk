@@ -130,7 +130,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		if stringer, ok := m.credentials.(fmt.Stringer); ok {
 			return nil, errors.WithStackTrace(fmt.Errorf("%w: %s", err, stringer.String()))
 		}
-		return nil, err
+		return nil, errors.WithStackTrace(err)
 	}
 
 	md.Set(HeaderTicket, token)
@@ -141,7 +141,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 func (m *meta) Meta(ctx context.Context) (_ context.Context, err error) {
 	md, err := m.meta(ctx)
 	if err != nil {
-		return ctx, err
+		return ctx, errors.WithStackTrace(err)
 	}
 	return metadata.NewOutgoingContext(ctx, md), nil
 }

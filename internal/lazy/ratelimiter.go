@@ -85,9 +85,9 @@ func (r *lazyRatelimiter) ListResource(
 	r.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		paths, err = r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
-		return err
+		return errors.WithStackTrace(err)
 	})
-	return paths, err
+	return paths, errors.WithStackTrace(err)
 }
 
 func (r *lazyRatelimiter) DescribeResource(
@@ -98,9 +98,9 @@ func (r *lazyRatelimiter) DescribeResource(
 	r.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		resource, err = r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
-		return err
+		return errors.WithStackTrace(err)
 	})
-	return resource, err
+	return resource, errors.WithStackTrace(err)
 }
 
 func (r *lazyRatelimiter) AcquireResource(

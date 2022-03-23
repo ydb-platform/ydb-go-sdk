@@ -124,7 +124,7 @@ func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (table
 		ctx,
 		func(ctx context.Context) (err error) {
 			s, err = c.build(ctx)
-			return err
+			return errors.WithStackTrace(err)
 		},
 		retry.WithIdempotent(),
 		retry.WithID("CreateSession"),
@@ -142,7 +142,7 @@ func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (table
 			},
 		}),
 	)
-	return s, err
+	return s, errors.WithStackTrace(err)
 }
 
 func (c *client) isClosed() bool {
@@ -270,7 +270,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 		if r.s == nil && r.err == nil {
 			panic("ydb: abnormal result of client.createSession()")
 		}
-		return r.s, r.err
+		return r.s, errors.WithStackTrace(r.err)
 	case <-ctx.Done():
 		// read result from resCh for prevention of forgetting session
 		go func() {
@@ -317,10 +317,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		}
 		// got session or err is not recoverable
 		if s != nil || !isCreateSessionErrorRetriable(err) {
-			if err != nil {
-				err = errors.WithStackTrace(err)
-			}
-			return s, err
+			return s, errors.WithStackTrace(err)
 		}
 
 		// Third, we try to wait for a touched session - client is full.
@@ -338,9 +335,11 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		err = errors.WithStackTrace(fmt.Errorf("%w: attempts=%d", ErrNoProgress, i))
 	}
 	if err != nil {
-		err = errors.WithStackTrace(fmt.Errorf("%w: attempts=%d", err, i))
+		return s, errors.WithStackTrace(
+			fmt.Errorf("%w: attempts=%d", err, i),
+		)
 	}
-	return s, err
+	return s, nil
 }
 
 func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err error) {
@@ -437,7 +436,7 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 		_ = s.Close(ctx)
 	}
 
-	return err
+	return errors.WithStackTrace(err)
 }
 
 // Close deletes all stored sessions inside client.

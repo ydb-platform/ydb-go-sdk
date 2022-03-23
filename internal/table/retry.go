@@ -43,6 +43,11 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 		opts.SlowBackoff,
 		opts.Idempotent,
 		func(ctx context.Context, s table.Session) (err error) {
+			defer func() {
+				onIntermediate(err)
+				attempts++
+			}()
+
 			tx, err := s.BeginTransaction(ctx, opts.TxSettings)
 			if err != nil {
 				return errors.WithStackTrace(err)
@@ -55,12 +60,6 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 			}()
 
 			err = op(ctx, tx)
-
-			if attempts > 0 {
-				onIntermediate(err)
-			}
-
-			attempts++
 
 			if err != nil {
 				return err
@@ -91,16 +90,13 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 		opts.FastBackoff,
 		opts.SlowBackoff,
 		opts.Idempotent,
-		func(ctx context.Context, s table.Session) error {
-			err = op(ctx, s)
-
-			if attempts > 0 {
+		func(ctx context.Context, s table.Session) (err error) {
+			defer func() {
 				onIntermediate(err)
-			}
+				attempts++
+			}()
 
-			attempts++
-
-			return err
+			return op(ctx, s)
 		},
 	)
 }
