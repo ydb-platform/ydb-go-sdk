@@ -1,3 +1,5 @@
+* Removed unnecessary options append in `ydb.With`
+
 ## v3.16.7
 * Added closing `conn.Conn` if discovery client build failure
 * Added wrapping errors with stacktrace

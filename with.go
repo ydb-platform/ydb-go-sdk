@@ -13,20 +13,6 @@ var nextID = uint64(0)
 func (c *connection) With(ctx context.Context, opts ...Option) (Connection, error) {
 	id := atomic.AddUint64(&nextID, 1)
 
-	opts = append(
-		opts,
-		WithBalancer(
-			c.config.Balancer().Create(),
-		),
-		withOnClose(func(child *connection) {
-			c.childrenMtx.Lock()
-			defer c.childrenMtx.Unlock()
-
-			delete(c.children, id)
-		}),
-		withConnPool(c.pool),
-	)
-
 	child, err := New(
 		ctx,
 		append(
