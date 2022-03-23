@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
@@ -18,11 +17,8 @@ func (c *connection) With(ctx context.Context, opts ...Option) (Connection, erro
 		append(
 			append(
 				c.opts,
-				With(
-					config.WithSharedPool(), // force set to true prefer shared pool
-					config.WithBalancer(
-						c.config.Balancer().Create(),
-					),
+				WithBalancer(
+					c.config.Balancer().Create(),
 				),
 				withOnClose(func(child *connection) {
 					c.childrenMtx.Lock()

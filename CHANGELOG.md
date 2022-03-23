@@ -1,3 +1,4 @@
+* Removed `config.WithSharedPool` and usages it
 * Removed `conn.Creator` interface and usage it
 * Removed unnecessary options append in `ydb.With`
 
