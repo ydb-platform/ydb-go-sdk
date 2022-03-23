@@ -1,5 +1,6 @@
 * Added closing `conn.Conn` if discovery client build failure
 * Added wrapping errors with stacktrace
+* Added discharging banned state of `conn.Conn` on `cluster.Update` step
 
 ## v3.16.6
 * Rollback moving `meta.Meta` call to conn exclusively from `internal/db` and `internal/discovery`

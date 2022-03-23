@@ -374,6 +374,10 @@ func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		endpoint.WithLocalDC(e.LocalDC()),
 	)
 
+	if entry.Conn.GetState() == conn.Banned {
+		entry.Conn.SetState(conn.Online)
+	}
+
 	delete(c.endpoints, e.NodeID())
 	c.index[e.Address()] = entry
 
