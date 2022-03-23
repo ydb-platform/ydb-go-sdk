@@ -7,6 +7,10 @@ import (
 	"testing"
 	"time"
 
+	grpcCodes "google.golang.org/grpc/codes"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -20,13 +24,13 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorResourceExhausted),
+			errors.WithCode(grpcCodes.ResourceExhausted),
 		),
 		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorResourceExhausted),
+			errors.WithCode(grpcCodes.ResourceExhausted),
 		)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded)),
-		fmt.Errorf("wrap op error: %w", errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded))),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+		fmt.Errorf("wrap op error: %w", errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
 	} {
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
@@ -97,7 +101,7 @@ func TestRetryerBadSession(t *testing.T) {
 				cancel()
 			}
 			return errors.NewOpError(
-				errors.WithOEReason(errors.StatusBadSession),
+				errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 			)
 		},
 		table.Options{},
@@ -161,16 +165,16 @@ func TestRetryerSessionClosing(t *testing.T) {
 func TestRetryerImmediateReturn(t *testing.T) {
 	for _, testErr := range []error{
 		errors.NewOpError(
-			errors.WithOEReason(errors.StatusGenericError),
+			errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
 		),
 		fmt.Errorf("wrap op error: %w", errors.NewOpError(
-			errors.WithOEReason(errors.StatusGenericError),
+			errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
 		)),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorPermissionDenied),
+			errors.WithCode(grpcCodes.PermissionDenied),
 		),
 		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorPermissionDenied),
+			errors.WithCode(grpcCodes.PermissionDenied),
 		)),
 		errors.New("whoa"),
 	} {
@@ -231,76 +235,74 @@ func TestRetryContextDeadline(t *testing.T) {
 		io.EOF,
 		context.DeadlineExceeded,
 		fmt.Errorf("test error"),
+		errors.NewTransportError(),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorUnknownCode),
+			errors.WithCode(grpcCodes.Canceled),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorCanceled),
+			errors.WithCode(grpcCodes.Unknown),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorUnknown),
+			errors.WithCode(grpcCodes.InvalidArgument),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorInvalidArgument),
+			errors.WithCode(grpcCodes.DeadlineExceeded),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorDeadlineExceeded),
+			errors.WithCode(grpcCodes.NotFound),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorNotFound),
+			errors.WithCode(grpcCodes.AlreadyExists),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorAlreadyExists),
+			errors.WithCode(grpcCodes.PermissionDenied),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorPermissionDenied),
+			errors.WithCode(grpcCodes.ResourceExhausted),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorResourceExhausted),
+			errors.WithCode(grpcCodes.FailedPrecondition),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorFailedPrecondition),
+			errors.WithCode(grpcCodes.Aborted),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorAborted),
+			errors.WithCode(grpcCodes.OutOfRange),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorOutOfRange),
+			errors.WithCode(grpcCodes.Unimplemented),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorUnimplemented),
+			errors.WithCode(grpcCodes.Internal),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorInternal),
+			errors.WithCode(grpcCodes.Unavailable),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorUnavailable),
+			errors.WithCode(grpcCodes.DataLoss),
 		),
 		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorDataLoss),
+			errors.WithCode(grpcCodes.Unauthenticated),
 		),
-		errors.NewTransportError(
-			errors.WithTEReason(errors.TransportErrorUnauthenticated),
-		),
-		errors.NewOpError(errors.WithOEReason(errors.StatusUnknownStatus)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusBadRequest)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusUnauthorized)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusInternalError)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusAborted)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusUnavailable)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusOverloaded)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusSchemeError)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusGenericError)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusTimeout)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusBadSession)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusPreconditionFailed)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusAlreadyExists)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusNotFound)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusSessionExpired)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusCancelled)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusUndetermined)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusUnsupported)),
-		errors.NewOpError(errors.WithOEReason(errors.StatusSessionBusy)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_ABORTED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_SCHEME_ERROR)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_TIMEOUT)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_ALREADY_EXISTS)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_NOT_FOUND)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_CANCELLED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_UNDETERMINED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED)),
+		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY)),
 	}
 	client := &client{
 		cc: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
@@ -397,8 +399,8 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		{
 			error: &CustomError{
 				Err: errors.NewOpError(
-					errors.WithOEReason(
-						errors.StatusBadSession,
+					errors.WithStatusCode(
+						Ydb.StatusIds_BAD_SESSION,
 					),
 				),
 			},
@@ -410,8 +412,8 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				Err: fmt.Errorf(
 					"wrapped error: %w",
 					errors.NewOpError(
-						errors.WithOEReason(
-							errors.StatusBadSession,
+						errors.WithStatusCode(
+							Ydb.StatusIds_BAD_SESSION,
 						),
 					),
 				),
@@ -424,8 +426,8 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				Err: fmt.Errorf(
 					"wrapped error: %w",
 					errors.NewOpError(
-						errors.WithOEReason(
-							errors.StatusUnauthorized,
+						errors.WithStatusCode(
+							Ydb.StatusIds_UNAUTHORIZED,
 						),
 					),
 				),

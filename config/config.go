@@ -8,12 +8,11 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/net"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/resolver"
@@ -80,7 +79,7 @@ type Config interface {
 	UseDNSResolver() bool
 
 	// ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
-	ExcludeGRPCCodesForPessimization() []errors.TransportErrorCode
+	ExcludeGRPCCodesForPessimization() []grpcCodes.Code
 }
 
 // Config contains driver configuration options.
@@ -97,14 +96,14 @@ type config struct {
 	database                         string
 	requestsType                     string
 	userAgent                        string
-	excludeGRPCCodesForPessimization []errors.TransportErrorCode
+	excludeGRPCCodesForPessimization []grpcCodes.Code
 	grpcOptions                      []grpc.DialOption
 	credentials                      credentials.Credentials
 	tlsConfig                        *tls.Config
 	meta                             meta.Meta
 }
 
-func (c *config) ExcludeGRPCCodesForPessimization() []errors.TransportErrorCode {
+func (c *config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
@@ -275,16 +274,11 @@ func WithGrpcOptions(option ...grpc.DialOption) Option {
 	}
 }
 
-func ExcludeGRPCCodesForPessimization(codes ...codes.Code) Option {
+func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 	return func(c *config) {
 		c.excludeGRPCCodesForPessimization = append(
 			c.excludeGRPCCodesForPessimization,
-			func() (teCodes []errors.TransportErrorCode) {
-				for _, c := range codes {
-					teCodes = append(teCodes, errors.FromGRPCCode(c))
-				}
-				return teCodes
-			}()...,
+			codes...,
 		)
 	}
 }

@@ -189,7 +189,7 @@ func retryBackoff(
 		s        Session
 		i        int
 		attempts int
-		code     = int32(0)
+		code     = int64(0)
 	)
 	defer func() {
 		if s != nil {

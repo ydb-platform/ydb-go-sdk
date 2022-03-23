@@ -13,75 +13,51 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
 
-type TransportError struct {
-	Reason TransportErrorCode
-
+type transportError struct {
+	code    grpcCodes.Code
 	message string
 	err     error
 	details []interface{}
 	address string
 }
 
-func (e *TransportError) isYdbError() {}
+func (e *transportError) isYdbError() {}
 
-func (e *TransportError) Code() int32 {
-	return int32(e.Reason)
+func (e *transportError) Code() int32 {
+	return int32(e.code)
 }
 
-func (e *TransportError) Name() string {
-	return e.Reason.String()
+func (e *transportError) Name() string {
+	return e.code.String()
 }
 
-type teOpt func(te *TransportError)
+type teOpt func(te *transportError)
 
-func WithTEReason(reason TransportErrorCode) teOpt {
-	return func(te *TransportError) {
-		te.Reason = reason
+func WithCode(code grpcCodes.Code) teOpt {
+	return func(te *transportError) {
+		te.code = code
 	}
 }
 
-func WithTEAddress(address string) teOpt {
-	return func(te *TransportError) {
+func WithAddress(address string) teOpt {
+	return func(te *transportError) {
 		te.address = address
-	}
-}
-
-// WithTEError stores err into transport error
-func WithTEError(err error) teOpt {
-	return func(te *TransportError) {
-		te.err = err
-	}
-}
-
-// WithTEMessage stores message into transport error
-func WithTEMessage(message string) teOpt {
-	return func(te *TransportError) {
-		te.message = message
-	}
-}
-
-// WithTEOperation stores reason code into transport error from operation
-func WithTEOperation(operation operation) teOpt {
-	return func(te *TransportError) {
-		te.Reason = TransportErrorCode(operation.GetStatus())
 	}
 }
 
 // NewTransportError returns a new transport error with given options
 func NewTransportError(opts ...teOpt) error {
-	te := &TransportError{
-		Reason: TransportErrorUnknownCode,
-	}
+	te := &transportError{}
 	for _, f := range opts {
 		f(te)
 	}
 	return WithStackTrace(fmt.Errorf("%w", te), WithSkipDepth(1))
 }
 
-func (e *TransportError) Error() string {
+func (e *transportError) Error() string {
 	var b bytes.Buffer
 	b.WriteString("transport error: ")
-	b.WriteString(e.Reason.String())
+	b.WriteString(e.code.String())
 	if e.message != "" {
 		b.WriteString(", message: ")
 		b.WriteString(e.message)
@@ -102,7 +78,7 @@ func (e *TransportError) Error() string {
 	return b.String()
 }
 
-func (e *TransportError) Unwrap() error {
+func (e *transportError) Unwrap() error {
 	return e.err
 }
 
@@ -126,134 +102,54 @@ func dumpIssues(buf *bytes.Buffer, ms []*Ydb_Issue.IssueMessage) {
 	}
 }
 
-type TransportErrorCode int32
-
-func (t TransportErrorCode) String() string {
-	return transportErrorString(t)
-}
-
-func (t TransportErrorCode) OperationStatus() OperationStatus {
-	switch t {
+func (e *transportError) OperationStatus() OperationStatus {
+	switch e.code {
 	case
-		TransportErrorAborted,
-		TransportErrorResourceExhausted:
+		grpcCodes.Aborted,
+		grpcCodes.ResourceExhausted:
 		return OperationNotFinished
 	case
-		TransportErrorInternal,
-		TransportErrorCanceled,
-		TransportErrorUnavailable:
+		grpcCodes.Internal,
+		grpcCodes.Canceled,
+		grpcCodes.Unavailable:
 		return OperationStatusUndefined
 	default:
 		return OperationFinished
 	}
 }
 
-func (t TransportErrorCode) BackoffType() BackoffType {
-	switch t {
+func (e *transportError) BackoffType() BackoffType {
+	switch e.code {
 	case
-		TransportErrorInternal,
-		TransportErrorCanceled,
-		TransportErrorUnavailable:
+		grpcCodes.Internal,
+		grpcCodes.Canceled,
+		grpcCodes.Unavailable:
 		return BackoffTypeFastBackoff
 	case
-		TransportErrorResourceExhausted:
+		grpcCodes.ResourceExhausted:
 		return BackoffTypeSlowBackoff
 	default:
 		return BackoffTypeNoBackoff
 	}
 }
 
-func (t TransportErrorCode) MustDeleteSession() bool {
-	switch t {
+func (e *transportError) MustDeleteSession() bool {
+	switch e.code {
 	case
-		TransportErrorResourceExhausted,
-		TransportErrorOutOfRange:
+		grpcCodes.ResourceExhausted,
+		grpcCodes.OutOfRange:
 		return false
 	default:
 		return true
 	}
 }
 
-const (
-	TransportErrorUnknownCode TransportErrorCode = iota
-	TransportErrorCanceled
-	TransportErrorUnknown
-	TransportErrorInvalidArgument
-	TransportErrorDeadlineExceeded
-	TransportErrorNotFound
-	TransportErrorAlreadyExists
-	TransportErrorPermissionDenied
-	TransportErrorResourceExhausted
-	TransportErrorFailedPrecondition
-	TransportErrorAborted
-	TransportErrorOutOfRange
-	TransportErrorUnimplemented
-	TransportErrorInternal
-	TransportErrorUnavailable
-	TransportErrorDataLoss
-	TransportErrorUnauthenticated
-)
-
-var grpcCodesToTransportError = [...]TransportErrorCode{
-	grpcCodes.Canceled:           TransportErrorCanceled,
-	grpcCodes.Unknown:            TransportErrorUnknown,
-	grpcCodes.InvalidArgument:    TransportErrorInvalidArgument,
-	grpcCodes.DeadlineExceeded:   TransportErrorDeadlineExceeded,
-	grpcCodes.NotFound:           TransportErrorNotFound,
-	grpcCodes.AlreadyExists:      TransportErrorAlreadyExists,
-	grpcCodes.PermissionDenied:   TransportErrorPermissionDenied,
-	grpcCodes.ResourceExhausted:  TransportErrorResourceExhausted,
-	grpcCodes.FailedPrecondition: TransportErrorFailedPrecondition,
-	grpcCodes.Aborted:            TransportErrorAborted,
-	grpcCodes.OutOfRange:         TransportErrorOutOfRange,
-	grpcCodes.Unimplemented:      TransportErrorUnimplemented,
-	grpcCodes.Internal:           TransportErrorInternal,
-	grpcCodes.Unavailable:        TransportErrorUnavailable,
-	grpcCodes.DataLoss:           TransportErrorDataLoss,
-	grpcCodes.Unauthenticated:    TransportErrorUnauthenticated,
-}
-
-func FromGRPCCode(c grpcCodes.Code) TransportErrorCode {
-	if int(c) < len(grpcCodesToTransportError) {
-		return grpcCodesToTransportError[c]
-	}
-	return TransportErrorUnknownCode
-}
-
-var transportErrorToString = [...]string{
-	TransportErrorUnknownCode:        "unknown code",
-	TransportErrorCanceled:           "canceled",
-	TransportErrorUnknown:            "unknown",
-	TransportErrorInvalidArgument:    "invalid argument",
-	TransportErrorDeadlineExceeded:   "deadline exceeded",
-	TransportErrorNotFound:           "not found",
-	TransportErrorAlreadyExists:      "already exists",
-	TransportErrorPermissionDenied:   "permission denied",
-	TransportErrorResourceExhausted:  "resource exhausted",
-	TransportErrorFailedPrecondition: "failed precondition",
-	TransportErrorAborted:            "aborted",
-	TransportErrorOutOfRange:         "out of range",
-	TransportErrorUnimplemented:      "unimplemented",
-	TransportErrorInternal:           "internal",
-	TransportErrorUnavailable:        "unavailable",
-	TransportErrorDataLoss:           "data loss",
-	TransportErrorUnauthenticated:    "unauthenticated",
-}
-
-func transportErrorString(t TransportErrorCode) string {
-	if int(t) < len(transportErrorToString) {
-		return transportErrorToString[t]
-	}
-	return "unknown code"
-}
-
-// IsTransportError reports whether err is TransportError with given code as
-// the Reason.
-func IsTransportError(err error, codes ...TransportErrorCode) bool {
+// IsTransportError reports whether err is transportError with given grpc codes
+func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	if err == nil {
 		return false
 	}
-	var t *TransportError
+	var t *transportError
 	if !errors.As(err, &t) {
 		return false
 	}
@@ -261,7 +157,7 @@ func IsTransportError(err error, codes ...TransportErrorCode) bool {
 		return true
 	}
 	for _, code := range codes {
-		if t.Reason == code {
+		if t.code == code {
 			return true
 		}
 	}
@@ -272,14 +168,14 @@ func FromGRPCError(err error, opts ...teOpt) error {
 	if err == nil {
 		return nil
 	}
-	var t *TransportError
+	var t *transportError
 	if errors.As(err, &t) {
 		return err
 	}
 
 	if s, ok := grpcStatus.FromError(err); ok {
-		te := &TransportError{
-			Reason:  FromGRPCCode(s.Code()),
+		te := &transportError{
+			code:    s.Code(),
 			message: s.Message(),
 			err:     s.Err(),
 			details: s.Details(),
@@ -292,7 +188,7 @@ func FromGRPCError(err error, opts ...teOpt) error {
 	return err
 }
 
-func MustPessimizeEndpoint(err error, codes ...TransportErrorCode) bool {
+func MustPessimizeEndpoint(err error, codes ...grpcCodes.Code) bool {
 	switch {
 	case err == nil:
 		return false
@@ -302,8 +198,8 @@ func MustPessimizeEndpoint(err error, codes ...TransportErrorCode) bool {
 		err,
 		append(
 			codes,
-			TransportErrorResourceExhausted,
-			TransportErrorOutOfRange,
+			grpcCodes.ResourceExhausted,
+			grpcCodes.OutOfRange,
 		)...,
 	):
 		return true
@@ -311,4 +207,12 @@ func MustPessimizeEndpoint(err error, codes ...TransportErrorCode) bool {
 	default:
 		return false
 	}
+}
+
+func TransportError(err error) Error {
+	var t *transportError
+	if errors.As(err, &t) {
+		return t
+	}
+	return nil
 }

@@ -2,7 +2,9 @@ package errors
 
 import (
 	"bytes"
+	"errors"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
 
@@ -58,4 +60,22 @@ func (it IssueIterator) Get(i int) (issue Issue, nested IssueIterator) {
 		Code:     x.GetIssueCode(),
 		Severity: x.GetSeverity(),
 	}, nested
+}
+
+func IterateByIssues(err error, it func(message string, code Ydb.StatusIds_StatusCode, severity uint32)) {
+	var o *operationError
+	if !errors.As(err, &o) {
+		return
+	}
+	iterate(o.Issues(), it)
+}
+
+func iterate(
+	issues []*Ydb_Issue.IssueMessage,
+	it func(message string, code Ydb.StatusIds_StatusCode, severity uint32),
+) {
+	for _, issue := range issues {
+		it(issue.GetMessage(), Ydb.StatusIds_StatusCode(issue.GetIssueCode()), issue.GetSeverity())
+		iterate(issue.GetIssues(), it)
+	}
 }

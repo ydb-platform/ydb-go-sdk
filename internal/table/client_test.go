@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -1028,9 +1029,9 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	}
 
 	// Now fail the Keepalive() call from above.
-	keepaliveResult <- &errors.OperationError{
-		Reason: errors.StatusBadSession,
-	}
+	keepaliveResult <- errors.NewOpError(
+		errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+	)
 
 	// Block the keeper()'s deletion routine.
 	// While delete is not finished cond must not be fulfilled.
@@ -1123,16 +1124,18 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					// nolint:unparam
+					// nolint:nolintlint
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
 					// nolint:unparam
+					// nolint:nolintlint
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
-						return nil, &errors.OperationError{
-							Reason: errors.StatusBadSession,
-						}
+						return nil, errors.NewOpError(
+							errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+						)
 					},
 					testutil.TableDeleteSession: okHandler,
 				},

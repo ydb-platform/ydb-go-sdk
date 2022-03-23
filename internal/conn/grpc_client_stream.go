@@ -27,7 +27,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 			return errors.WithStackTrace(
 				errors.FromGRPCError(
 					err,
-					errors.WithTEAddress(s.c.Address()),
+					errors.WithAddress(s.c.Address()),
 				),
 			)
 		}
@@ -48,7 +48,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 			return errors.WithStackTrace(
 				errors.FromGRPCError(
 					err,
-					errors.WithTEAddress(s.c.Address()),
+					errors.WithAddress(s.c.Address()),
 				),
 			)
 		}
@@ -77,7 +77,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 			return errors.WithStackTrace(
 				errors.FromGRPCError(
 					err,
-					errors.WithTEAddress(s.c.Address()),
+					errors.WithAddress(s.c.Address()),
 				),
 			)
 		}
@@ -89,7 +89,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 			if s := operation.GetStatus(); s != Ydb.StatusIds_SUCCESS {
 				return errors.WithStackTrace(
 					errors.NewOpError(
-						errors.WithOEOperation(
+						errors.FromOperation(
 							operation,
 						),
 					),

@@ -1,110 +1,62 @@
 package ydb
 
 import (
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
-func IterateByIssues(err error, it func(message string, code uint32, severity uint32)) {
-	var o *errors.OperationError
-	if !errors.As(err, &o) {
-		return
-	}
-	issues := o.Issues()
-	iterate(issues, it)
-}
-
-func iterate(issues []*Ydb_Issue.IssueMessage, it func(message string, code uint32, severity uint32)) {
-	for _, issue := range issues {
-		it(issue.GetMessage(), issue.GetIssueCode(), issue.GetSeverity())
-		iterate(issue.GetIssues(), it)
-	}
+func IterateByIssues(err error, it func(message string, code Ydb.StatusIds_StatusCode, severity uint32)) {
+	errors.IterateByIssues(err, it)
 }
 
 func IsTimeoutError(err error) bool {
 	return errors.IsTimeoutError(err)
 }
 
-func IsTransportError(err error, codes ...int32) bool {
-	return errors.IsTransportError(
-		err,
-		func() (cc []errors.TransportErrorCode) {
-			for _, code := range codes {
-				cc = append(cc, errors.TransportErrorCode(code))
-			}
-			return cc
-		}()...,
-	)
+func IsTransportError(err error, codes ...grpcCodes.Code) bool {
+	return errors.IsTransportError(err, codes...)
 }
 
-func IsTransportErrorCancelled(err error) bool {
-	return IsTransportError(err, int32(errors.TransportErrorCanceled))
-}
+type Error errors.Error
 
-func IsTransportErrorResourceExhausted(err error) bool {
-	return IsTransportError(err, int32(errors.TransportErrorResourceExhausted))
-}
-
-type Error interface {
-	error
-
-	Code() int32
-	Name() string
-}
-
-func TransportErrorDescription(err error) Error {
-	var t *errors.TransportError
-	if errors.As(err, &t) {
-		return t
-	}
-	return nil
+func TransportError(err error) Error {
+	return errors.TransportError(err)
 }
 
 func IsYdbError(err error) bool {
-	return IsTransportError(err) || IsOperationError(err)
+	return errors.IsYdb(err)
 }
 
-func IsOperationError(err error, codes ...int32) bool {
-	return errors.IsOpError(
-		err,
-		func() (cc []errors.StatusCode) {
-			for _, code := range codes {
-				cc = append(cc, errors.StatusCode(code))
-			}
-			return cc
-		}()...,
-	)
+func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
+	return errors.IsOperationError(err, codes...)
 }
 
-func OperationErrorDescription(err error) Error {
-	var o *errors.OperationError
-	if errors.As(err, &o) {
-		return o
-	}
-	return nil
+func OperationError(err error) Error {
+	return errors.OperationError(err)
 }
 
 func IsOperationErrorOverloaded(err error) bool {
-	return IsOperationError(err, int32(errors.StatusOverloaded))
+	return IsOperationError(err, Ydb.StatusIds_OVERLOADED)
 }
 
 func IsOperationErrorUnavailable(err error) bool {
-	return IsOperationError(err, int32(errors.StatusUnavailable))
+	return IsOperationError(err, Ydb.StatusIds_UNAVAILABLE)
 }
 
 func IsOperationErrorAlreadyExistsError(err error) bool {
-	return IsOperationError(err, int32(errors.StatusAlreadyExists))
+	return IsOperationError(err, Ydb.StatusIds_ALREADY_EXISTS)
 }
 
 func IsOperationErrorNotFoundError(err error) bool {
-	return IsOperationError(err, int32(errors.StatusNotFound))
+	return IsOperationError(err, Ydb.StatusIds_NOT_FOUND)
 }
 
 func IsOperationErrorSchemeError(err error) bool {
-	return IsOperationError(err, int32(errors.StatusSchemeError))
+	return IsOperationError(err, Ydb.StatusIds_SCHEME_ERROR)
 }
 
 func IsRatelimiterAcquireError(err error) bool {
