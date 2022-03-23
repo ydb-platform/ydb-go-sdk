@@ -1,3 +1,4 @@
+## v3.16.8
 * Added `config.ExcludeGRPCCodesForPessimization()` opttion for exclude some grpc codes from pessimization rules 
 * Refactored pessimization node conditions
 * Added closing of ticker in `conn.Conn.connParker`
