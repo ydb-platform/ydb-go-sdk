@@ -3,21 +3,23 @@ package errors
 import (
 	"fmt"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
 func TestIsOperationError(t *testing.T) {
-	for _, code := range [...]StatusCode{
-		StatusBadRequest,
-		StatusBadSession,
+	for _, code := range [...]Ydb.StatusIds_StatusCode{
+		Ydb.StatusIds_BAD_REQUEST,
+		Ydb.StatusIds_BAD_SESSION,
 	} {
 		for _, err := range []error{
-			&OperationError{Reason: code},
-			NewOpError(WithOEReason(code)),
-			fmt.Errorf("wrapped: %w", &OperationError{Reason: code}),
+			&operationError{code: code},
+			NewOpError(WithStatusCode(code)),
+			fmt.Errorf("wrapped: %w", &operationError{code: code}),
 		} {
 			t.Run("", func(t *testing.T) {
-				if !IsOpError(err, code) {
-					t.Errorf("expected %v to be OperationError with code=%v", err, code)
+				if !IsOperationError(err, code) {
+					t.Errorf("expected %v to be operationError with code=%v", err, code)
 				}
 			})
 		}

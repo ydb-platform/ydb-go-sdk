@@ -355,7 +355,7 @@ func (c *conn) Invoke(
 			return errors.WithStackTrace(
 				errors.FromGRPCError(
 					err,
-					errors.WithTEAddress(c.Address()),
+					errors.WithAddress(c.Address()),
 				),
 			)
 		}
@@ -375,7 +375,7 @@ func (c *conn) Invoke(
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
 				return errors.WithStackTrace(
 					errors.NewOpError(
-						errors.WithOEOperation(
+						errors.FromOperation(
 							o.GetOperation(),
 						),
 					),
@@ -435,7 +435,7 @@ func (c *conn) NewStream(
 			return s, errors.WithStackTrace(
 				errors.FromGRPCError(
 					err,
-					errors.WithTEAddress(c.Address()),
+					errors.WithAddress(c.Address()),
 				),
 			)
 		}

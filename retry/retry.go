@@ -127,7 +127,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		i        int
 		attempts int
 
-		code           = int32(0)
+		code           = int64(0)
 		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id, h.idempotent)
 	)
 	defer func() {
@@ -170,38 +170,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 // Check returns retry mode for err.
 func Check(err error) (m retryMode) {
-	var te *errors.TransportError
-	var oe *errors.OperationError
-	var re *errors.RetryableError
-	switch {
-	case errors.As(err, &te):
-		return retryMode{
-			statusCode:      int32(te.Reason),
-			operationStatus: te.Reason.OperationStatus(),
-			backoff:         te.Reason.BackoffType(),
-			deleteSession:   te.Reason.MustDeleteSession(),
-		}
-	case errors.As(err, &oe):
-		return retryMode{
-			statusCode:      int32(oe.Reason),
-			operationStatus: oe.Reason.OperationStatus(),
-			backoff:         oe.Reason.BackoffType(),
-			deleteSession:   oe.Reason.MustDeleteSession(),
-		}
-	case errors.As(err, &re):
-		return retryMode{
-			statusCode:      -1,
-			operationStatus: errors.OperationNotFinished,
-			backoff:         re.BackoffType,
-			deleteSession:   re.MustDeleteSession,
-		}
-	default:
-		return retryMode{
-			statusCode:      -1,
-			operationStatus: errors.OperationFinished, // it's finish, not need any retry attempts
-			backoff:         errors.BackoffTypeNoBackoff,
-			deleteSession:   false,
-		}
+	statusCode, operationStatus, backoff, deleteSession := errors.Check(err)
+	return retryMode{
+		statusCode:      statusCode,
+		operationStatus: operationStatus,
+		backoff:         backoff,
+		deleteSession:   deleteSession,
 	}
 }
 
@@ -308,7 +282,7 @@ func max(a, b uint) uint {
 
 // retryMode reports whether operation is able retried and with which properties.
 type retryMode struct {
-	statusCode      int32
+	statusCode      int64
 	operationStatus errors.OperationStatus
 	backoff         errors.BackoffType
 	deleteSession   bool
@@ -325,7 +299,7 @@ func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
 	}
 }
 
-func (m retryMode) StatusCode() int32 { return m.statusCode }
+func (m retryMode) StatusCode() int64 { return m.statusCode }
 
 func (m retryMode) MustBackoff() bool { return m.backoff&errors.BackoffTypeBackoffAny != 0 }
 

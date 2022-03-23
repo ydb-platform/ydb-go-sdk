@@ -8,94 +8,20 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
 
-// StatusCode reports unsuccessful operation status code.
-type StatusCode int32
-
-func (e StatusCode) String() string {
-	return Ydb.StatusIds_StatusCode_name[int32(e)]
-}
-
-// Errors describing unsusccessful operation status.
-const (
-	StatusUnknownStatus      = StatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED)
-	StatusBadRequest         = StatusCode(Ydb.StatusIds_BAD_REQUEST)
-	StatusUnauthorized       = StatusCode(Ydb.StatusIds_UNAUTHORIZED)
-	StatusInternalError      = StatusCode(Ydb.StatusIds_INTERNAL_ERROR)
-	StatusAborted            = StatusCode(Ydb.StatusIds_ABORTED)
-	StatusUnavailable        = StatusCode(Ydb.StatusIds_UNAVAILABLE)
-	StatusOverloaded         = StatusCode(Ydb.StatusIds_OVERLOADED)
-	StatusSchemeError        = StatusCode(Ydb.StatusIds_SCHEME_ERROR)
-	StatusGenericError       = StatusCode(Ydb.StatusIds_GENERIC_ERROR)
-	StatusTimeout            = StatusCode(Ydb.StatusIds_TIMEOUT)
-	StatusBadSession         = StatusCode(Ydb.StatusIds_BAD_SESSION)
-	StatusPreconditionFailed = StatusCode(Ydb.StatusIds_PRECONDITION_FAILED)
-	StatusAlreadyExists      = StatusCode(Ydb.StatusIds_ALREADY_EXISTS)
-	StatusNotFound           = StatusCode(Ydb.StatusIds_NOT_FOUND)
-	StatusSessionExpired     = StatusCode(Ydb.StatusIds_SESSION_EXPIRED)
-	StatusCancelled          = StatusCode(Ydb.StatusIds_CANCELLED)
-	StatusUndetermined       = StatusCode(Ydb.StatusIds_UNDETERMINED)
-	StatusUnsupported        = StatusCode(Ydb.StatusIds_UNSUPPORTED)
-	StatusSessionBusy        = StatusCode(Ydb.StatusIds_SESSION_BUSY)
-)
-
-func statusCode(s Ydb.StatusIds_StatusCode) StatusCode {
-	switch s {
-	case Ydb.StatusIds_BAD_REQUEST:
-		return StatusBadRequest
-	case Ydb.StatusIds_UNAUTHORIZED:
-		return StatusUnauthorized
-	case Ydb.StatusIds_INTERNAL_ERROR:
-		return StatusInternalError
-	case Ydb.StatusIds_ABORTED:
-		return StatusAborted
-	case Ydb.StatusIds_UNAVAILABLE:
-		return StatusUnavailable
-	case Ydb.StatusIds_OVERLOADED:
-		return StatusOverloaded
-	case Ydb.StatusIds_SCHEME_ERROR:
-		return StatusSchemeError
-	case Ydb.StatusIds_GENERIC_ERROR:
-		return StatusGenericError
-	case Ydb.StatusIds_TIMEOUT:
-		return StatusTimeout
-	case Ydb.StatusIds_BAD_SESSION:
-		return StatusBadSession
-	case Ydb.StatusIds_PRECONDITION_FAILED:
-		return StatusPreconditionFailed
-	case Ydb.StatusIds_ALREADY_EXISTS:
-		return StatusAlreadyExists
-	case Ydb.StatusIds_NOT_FOUND:
-		return StatusNotFound
-	case Ydb.StatusIds_SESSION_EXPIRED:
-		return StatusSessionExpired
-	case Ydb.StatusIds_CANCELLED:
-		return StatusCancelled
-	case Ydb.StatusIds_UNDETERMINED:
-		return StatusUndetermined
-	case Ydb.StatusIds_UNSUPPORTED:
-		return StatusUnsupported
-	case Ydb.StatusIds_SESSION_BUSY:
-		return StatusSessionBusy
-	default:
-		return StatusUnknownStatus
-	}
-}
-
-// OperationError reports about operation fail.
-type OperationError struct {
-	Reason StatusCode
-
+// operationError reports about operation fail.
+type operationError struct {
+	code   Ydb.StatusIds_StatusCode
 	issues []*Ydb_Issue.IssueMessage
 }
 
-func (e *OperationError) isYdbError() {}
+func (e *operationError) isYdbError() {}
 
-func (e *OperationError) Code() int32 {
-	return int32(e.Reason)
+func (e *operationError) Code() int32 {
+	return int32(e.code)
 }
 
-func (e *OperationError) Name() string {
-	return e.Reason.String()
+func (e *operationError) Name() string {
+	return e.code.String()
 }
 
 type operation interface {
@@ -103,36 +29,36 @@ type operation interface {
 	GetIssues() []*Ydb_Issue.IssueMessage
 }
 
-// WithOEIssues is an option for construct operation error with issues list
-// WithOEIssues must use as `NewOpError(WithOEIssues(issues))`
-func WithOEIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
-	return func(oe *OperationError) {
+// WithIssues is an option for construct operation error with issues list
+// WithIssues must use as `NewOpError(WithIssues(issues))`
+func WithIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
+	return func(oe *operationError) {
 		oe.issues = issues
 	}
 }
 
-// WithOEReason is an option for construct operation error with reason code
-// WithOEReason must use as `NewOpError(WithOEReason(reason))`
-func WithOEReason(reason StatusCode) oeOpt {
-	return func(oe *OperationError) {
-		oe.Reason = reason
+// WithStatusCode is an option for construct operation error with reason code
+// WithStatusCode must use as `NewOpError(WithStatusCode(reason))`
+func WithStatusCode(code Ydb.StatusIds_StatusCode) oeOpt {
+	return func(oe *operationError) {
+		oe.code = code
 	}
 }
 
-// WithOEOperation is an option for construct operation error from operation
-// WithOEOperation must use as `NewOpError(WithOEOperation(operation))`
-func WithOEOperation(operation operation) oeOpt {
-	return func(oe *OperationError) {
-		oe.Reason = statusCode(operation.GetStatus())
+// FromOperation is an option for construct operation error from operation
+// FromOperation must use as `NewOpError(FromOperation(operation))`
+func FromOperation(operation operation) oeOpt {
+	return func(oe *operationError) {
+		oe.code = operation.GetStatus()
 		oe.issues = operation.GetIssues()
 	}
 }
 
-type oeOpt func(ops *OperationError)
+type oeOpt func(ops *operationError)
 
 func NewOpError(opts ...oeOpt) error {
-	oe := &OperationError{
-		Reason: StatusUnknownStatus,
+	oe := &operationError{
+		code: Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
 	}
 	for _, f := range opts {
 		f(oe)
@@ -140,17 +66,14 @@ func NewOpError(opts ...oeOpt) error {
 	return oe
 }
 
-func (e *OperationError) Issues() []*Ydb_Issue.IssueMessage {
+func (e *operationError) Issues() []*Ydb_Issue.IssueMessage {
 	return e.issues
 }
 
-func (e *OperationError) Error() string {
-	if len(e.issues) == 0 {
-		return e.Reason.String()
-	}
+func (e *operationError) Error() string {
 	var buf bytes.Buffer
 	buf.WriteString("operation error: ")
-	buf.WriteString(e.Reason.String())
+	buf.WriteString(e.code.String())
 	if len(e.issues) > 0 {
 		buf.WriteByte(':')
 		dumpIssues(&buf, e.issues)
@@ -158,9 +81,9 @@ func (e *OperationError) Error() string {
 	return buf.String()
 }
 
-// IsOpError reports whether err is OperationError with given code as the Reason.
-func IsOpError(err error, codes ...StatusCode) bool {
-	var op *OperationError
+// IsOperationError reports whether err is operationError with given status codes.
+func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
+	var op *operationError
 	if !errors.As(err, &op) {
 		return false
 	}
@@ -168,55 +91,63 @@ func IsOpError(err error, codes ...StatusCode) bool {
 		return true
 	}
 	for _, code := range codes {
-		if op.Reason == code {
+		if op.code == code {
 			return true
 		}
 	}
 	return false
 }
 
-func (e StatusCode) OperationStatus() OperationStatus {
-	switch e {
+func (e *operationError) OperationStatus() OperationStatus {
+	switch e.code {
 	case
-		StatusAborted,
-		StatusUnavailable,
-		StatusOverloaded,
-		StatusBadSession,
-		StatusSessionBusy:
+		Ydb.StatusIds_ABORTED,
+		Ydb.StatusIds_UNAVAILABLE,
+		Ydb.StatusIds_OVERLOADED,
+		Ydb.StatusIds_BAD_SESSION,
+		Ydb.StatusIds_SESSION_BUSY:
 		return OperationNotFinished
 	case
-		StatusUndetermined:
+		Ydb.StatusIds_UNDETERMINED:
 		return OperationStatusUndefined
 	default:
 		return OperationFinished
 	}
 }
 
-func (e StatusCode) BackoffType() BackoffType {
-	switch e {
+func (e *operationError) BackoffType() BackoffType {
+	switch e.code {
 	case
-		StatusOverloaded:
+		Ydb.StatusIds_OVERLOADED:
 		return BackoffTypeSlowBackoff
 	case
-		StatusAborted,
-		StatusUnavailable,
-		StatusCancelled,
-		StatusSessionBusy,
-		StatusUndetermined:
+		Ydb.StatusIds_ABORTED,
+		Ydb.StatusIds_UNAVAILABLE,
+		Ydb.StatusIds_CANCELLED,
+		Ydb.StatusIds_SESSION_BUSY,
+		Ydb.StatusIds_UNDETERMINED:
 		return BackoffTypeFastBackoff
 	default:
 		return BackoffTypeNoBackoff
 	}
 }
 
-func (e StatusCode) MustDeleteSession() bool {
-	switch e {
+func (e *operationError) MustDeleteSession() bool {
+	switch e.code {
 	case
-		StatusBadSession,
-		StatusSessionExpired,
-		StatusSessionBusy:
+		Ydb.StatusIds_BAD_SESSION,
+		Ydb.StatusIds_SESSION_EXPIRED,
+		Ydb.StatusIds_SESSION_BUSY:
 		return true
 	default:
 		return false
 	}
+}
+
+func OperationError(err error) Error {
+	var o *operationError
+	if errors.As(err, &o) {
+		return o
+	}
+	return nil
 }

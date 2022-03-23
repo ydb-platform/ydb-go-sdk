@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
@@ -155,12 +158,12 @@ func isCreateSessionErrorRetriable(err error) bool {
 	switch {
 	case
 		errors.Is(err, ErrSessionPoolOverflow),
-		errors.IsOpError(err, errors.StatusOverloaded),
+		errors.IsOperationError(err, Ydb.StatusIds_OVERLOADED),
 		errors.IsTransportError(
 			err,
-			errors.TransportErrorResourceExhausted,
-			errors.TransportErrorDeadlineExceeded,
-			errors.TransportErrorUnavailable,
+			grpcCodes.ResourceExhausted,
+			grpcCodes.DeadlineExceeded,
+			grpcCodes.Unavailable,
 		):
 		return true
 	default:
@@ -619,11 +622,11 @@ func (c *client) keeper(ctx context.Context) {
 							cluster.ErrClusterClosed,
 							cluster.ErrClusterEmpty,
 						),
-						errors.IsOpError(err, errors.StatusBadSession),
+						errors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION),
 						errors.IsTransportError(
 							err,
-							errors.TransportErrorDeadlineExceeded,
-							errors.TransportErrorUnavailable,
+							grpcCodes.DeadlineExceeded,
+							grpcCodes.Unavailable,
 						):
 						toDelete = append(toDelete, s)
 					default:

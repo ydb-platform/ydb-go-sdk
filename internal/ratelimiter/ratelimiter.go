@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_RateLimiter_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -233,7 +234,7 @@ func (c *client) AcquireResource(
 		return errors.WithStackTrace(fmt.Errorf("%w: %d", errUnknownAcquireType, acquireOptions.Type()))
 	}
 
-	if errors.IsOpError(err, errors.StatusTimeout, errors.StatusCancelled) {
+	if errors.IsOperationError(err, Ydb.StatusIds_TIMEOUT, Ydb.StatusIds_CANCELLED) {
 		return errors.WithStackTrace(ratelimiterErrors.NewAcquire(amount, err))
 	}
 

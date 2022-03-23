@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -56,7 +55,7 @@ func TestRatelimiter(t *testing.T) {
 	// drop node
 	err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
 	if err != nil {
-		if d := ydb.OperationErrorDescription(err); d != nil && d.Code() != int32(errors.StatusSchemeError) {
+		if !ydb.IsOperationErrorSchemeError(err) {
 			t.Fatal(err)
 		}
 	}

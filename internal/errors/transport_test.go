@@ -5,43 +5,47 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	grpcCodes "google.golang.org/grpc/codes"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
 func TestIsTransportError(t *testing.T) {
-	code := TransportErrorCanceled
+	code := grpcCodes.Canceled
 	for _, err := range []error{
-		&TransportError{Reason: code},
-		&TransportError{Reason: code, err: context.Canceled},
-		fmt.Errorf("wrapped: %w", &TransportError{Reason: code}),
+		&transportError{code: code},
+		&transportError{code: code, err: context.Canceled},
+		fmt.Errorf("wrapped: %w", &transportError{code: code}),
 	} {
 		t.Run("", func(t *testing.T) {
 			if !IsTransportError(err, code) {
-				t.Errorf("expected %v to be TransportError with code=%v", err, code)
+				t.Errorf("expected %v to be transportError with code=%v", err, code)
 			}
 		})
 	}
 }
 
 func TestIsNonTransportError(t *testing.T) {
-	code := TransportErrorCanceled
+	code := grpcCodes.Canceled
 	for _, err := range []error{
-		&TransportError{Reason: TransportErrorAborted},
-		&TransportError{Reason: TransportErrorAborted, err: context.Canceled},
-		fmt.Errorf("wrapped: %w", &TransportError{Reason: TransportErrorAborted}),
-		&OperationError{Reason: StatusBadRequest},
+		&transportError{code: grpcCodes.Aborted},
+		&transportError{code: grpcCodes.Aborted, err: context.Canceled},
+		fmt.Errorf("wrapped: %w", &transportError{code: grpcCodes.Aborted}),
+		&operationError{code: Ydb.StatusIds_BAD_REQUEST},
 	} {
 		t.Run("", func(t *testing.T) {
 			if IsTransportError(err, code) {
-				t.Errorf("expected %v not to be TransportError with code=%v", err, code)
+				t.Errorf("expected %v not to be transportError with code=%v", err, code)
 			}
 		})
 	}
 }
 
 func TestTransportErrorWrapsContextError(t *testing.T) {
-	err := fmt.Errorf("wrapped: %w", &TransportError{
-		Reason: TransportErrorCanceled,
-		err:    context.Canceled,
+	err := fmt.Errorf("wrapped: %w", &transportError{
+		code: grpcCodes.Canceled,
+		err:  context.Canceled,
 	})
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected %v to wrap deadline.Canceled", err)
@@ -49,15 +53,15 @@ func TestTransportErrorWrapsContextError(t *testing.T) {
 }
 
 func TestIsNonOperationError(t *testing.T) {
-	code := StatusBadRequest
+	code := Ydb.StatusIds_BAD_REQUEST
 	for _, err := range []error{
-		&OperationError{Reason: StatusTimeout},
-		fmt.Errorf("wrapped: %w", &OperationError{Reason: StatusTimeout}),
-		&TransportError{Reason: TransportErrorAborted},
+		&operationError{code: Ydb.StatusIds_TIMEOUT},
+		fmt.Errorf("wrapped: %w", &operationError{code: Ydb.StatusIds_TIMEOUT}),
+		&transportError{code: grpcCodes.Aborted},
 	} {
 		t.Run("", func(t *testing.T) {
-			if IsOpError(err, code) {
-				t.Errorf("expected %v not to be OperationError with code=%v", err, code)
+			if IsOperationError(err, code) {
+				t.Errorf("expected %v not to be operationError with code=%v", err, code)
 			}
 		})
 	}
@@ -69,71 +73,71 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 		pessimize bool
 	}{
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorUnknownCode)),
+			error:     NewTransportError(),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorCanceled)),
+			error:     NewTransportError(WithCode(grpcCodes.Canceled)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorUnknown)),
+			error:     NewTransportError(WithCode(grpcCodes.Unknown)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorInvalidArgument)),
+			error:     NewTransportError(WithCode(grpcCodes.InvalidArgument)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorDeadlineExceeded)),
+			error:     NewTransportError(WithCode(grpcCodes.DeadlineExceeded)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorNotFound)),
+			error:     NewTransportError(WithCode(grpcCodes.NotFound)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorAlreadyExists)),
+			error:     NewTransportError(WithCode(grpcCodes.AlreadyExists)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorPermissionDenied)),
+			error:     NewTransportError(WithCode(grpcCodes.PermissionDenied)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorResourceExhausted)),
+			error:     NewTransportError(WithCode(grpcCodes.ResourceExhausted)),
 			pessimize: false,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorFailedPrecondition)),
+			error:     NewTransportError(WithCode(grpcCodes.FailedPrecondition)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorAborted)),
+			error:     NewTransportError(WithCode(grpcCodes.Aborted)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorOutOfRange)),
+			error:     NewTransportError(WithCode(grpcCodes.OutOfRange)),
 			pessimize: false,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorUnimplemented)),
+			error:     NewTransportError(WithCode(grpcCodes.Unimplemented)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorInternal)),
+			error:     NewTransportError(WithCode(grpcCodes.Internal)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorUnavailable)),
+			error:     NewTransportError(WithCode(grpcCodes.Unavailable)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorDataLoss)),
+			error:     NewTransportError(WithCode(grpcCodes.DataLoss)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithTEReason(TransportErrorUnauthenticated)),
+			error:     NewTransportError(WithCode(grpcCodes.Unauthenticated)),
 			pessimize: true,
 		},
 		{

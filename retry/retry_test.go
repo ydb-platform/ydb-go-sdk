@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
@@ -168,9 +171,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorUnknownCode,
-			},
+			err:           errors.NewTransportError(),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -179,9 +180,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorCanceled,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.Canceled),
+			),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -190,9 +191,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorUnknown,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.Unknown),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -201,9 +202,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorInvalidArgument,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.InvalidArgument),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -212,9 +213,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorDeadlineExceeded,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.DeadlineExceeded),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -223,9 +224,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorNotFound,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.NotFound),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -234,9 +235,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorAlreadyExists,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.AlreadyExists),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -245,9 +246,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorPermissionDenied,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.PermissionDenied),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -256,9 +257,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorResourceExhausted,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.ResourceExhausted),
+			),
 			backoff:       errors.BackoffTypeSlowBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -267,9 +268,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorFailedPrecondition,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.FailedPrecondition),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -278,9 +279,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorAborted,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.Aborted),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -289,9 +290,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorOutOfRange,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.OutOfRange),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -300,9 +301,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorUnimplemented,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.Unimplemented),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -311,9 +312,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorInternal,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.Internal),
+			),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -322,9 +323,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorUnavailable,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.Unavailable),
+			),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -333,9 +334,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorDataLoss,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.DataLoss),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -344,9 +345,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.TransportError{
-				Reason: errors.TransportErrorUnauthenticated,
-			},
+			err: errors.NewTransportError(
+				errors.WithCode(grpcCodes.Unauthenticated),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -355,9 +356,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusUnknownStatus,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -366,9 +367,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusBadRequest,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -377,9 +378,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusUnauthorized,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -388,9 +389,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusInternalError,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -399,20 +400,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusAborted,
-			},
-			backoff:       errors.BackoffTypeFastBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: true,
-			},
-		},
-		{
-			err: &errors.OperationError{
-				Reason: errors.StatusUnavailable,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_ABORTED),
+			),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -421,9 +411,20 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusOverloaded,
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
+			),
+			backoff:       errors.BackoffTypeFastBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
 			},
+		},
+		{
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+			),
 			backoff:       errors.BackoffTypeSlowBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -432,9 +433,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusSchemeError,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_SCHEME_ERROR),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -443,9 +444,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusGenericError,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -454,9 +455,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusTimeout,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_TIMEOUT),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -465,9 +466,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusBadSession,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -476,9 +477,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusPreconditionFailed,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -487,9 +488,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusAlreadyExists,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_ALREADY_EXISTS),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -498,9 +499,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusNotFound,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_NOT_FOUND),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -509,9 +510,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusSessionExpired,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -520,9 +521,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusCancelled,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_CANCELLED),
+			),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -531,9 +532,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusUndetermined,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_UNDETERMINED),
+			),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -542,9 +543,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusUnsupported,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED),
+			),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
@@ -553,9 +554,9 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: &errors.OperationError{
-				Reason: errors.StatusSessionBusy,
-			},
+			err: errors.NewOpError(
+				errors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
+			),
 			backoff:       errors.BackoffTypeFastBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -632,8 +633,17 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		{
 			error: &CustomError{
 				Err: errors.NewOpError(
-					errors.WithOEReason(
-						errors.StatusBadSession,
+					errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+				),
+			},
+			retriable: true,
+		},
+		{
+			error: &CustomError{
+				Err: fmt.Errorf(
+					"wrapped error: %w",
+					errors.NewOpError(
+						errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 					),
 				),
 			},
@@ -644,22 +654,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				Err: fmt.Errorf(
 					"wrapped error: %w",
 					errors.NewOpError(
-						errors.WithOEReason(
-							errors.StatusBadSession,
-						),
-					),
-				),
-			},
-			retriable: true,
-		},
-		{
-			error: &CustomError{
-				Err: fmt.Errorf(
-					"wrapped error: %w",
-					errors.NewOpError(
-						errors.WithOEReason(
-							errors.StatusUnauthorized,
-						),
+						errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
 					),
 				),
 			},

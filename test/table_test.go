@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
@@ -201,6 +202,7 @@ func TestTable(t *testing.T) {
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
 			config.WithInternalDNSResolver(),
+			config.ExcludeGRPCCodesForPessimization(grpcCodes.DeadlineExceeded),
 			config.WithGrpcOptions(
 				grpc.WithUnaryInterceptor(func(
 					ctx context.Context,

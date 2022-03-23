@@ -5,17 +5,28 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	grpcCodes "google.golang.org/grpc/codes"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
+
+type Error interface {
+	error
+
+	Code() int32
+	Name() string
+}
 
 func IsTimeoutError(err error) bool {
 	switch {
 	case
-		IsOpError(
+		IsOperationError(
 			err,
-			StatusTimeout,
-			StatusCancelled,
+			Ydb.StatusIds_TIMEOUT,
+			Ydb.StatusIds_CANCELLED,
 		),
-		IsTransportError(err, TransportErrorCanceled, TransportErrorDeadlineExceeded),
+		IsTransportError(err, grpcCodes.Canceled, grpcCodes.DeadlineExceeded),
 		Is(
 			err,
 			context.DeadlineExceeded,
