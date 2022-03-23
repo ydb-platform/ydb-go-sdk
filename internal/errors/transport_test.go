@@ -62,3 +62,102 @@ func TestIsNonOperationError(t *testing.T) {
 		})
 	}
 }
+
+func TestMustPessimizeEndpoint(t *testing.T) {
+	for _, test := range []struct {
+		error     error
+		pessimize bool
+	}{
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorUnknownCode)),
+			pessimize: true,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorCanceled)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorUnknown)),
+			pessimize: true,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorInvalidArgument)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorDeadlineExceeded)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorNotFound)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorAlreadyExists)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorPermissionDenied)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorResourceExhausted)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorFailedPrecondition)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorAborted)),
+			pessimize: true,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorOutOfRange)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorUnimplemented)),
+			pessimize: false,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorInternal)),
+			pessimize: true,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorUnavailable)),
+			pessimize: true,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorDataLoss)),
+			pessimize: true,
+		},
+		{
+			error:     NewTransportError(WithTEReason(TransportErrorUnauthenticated)),
+			pessimize: true,
+		},
+		{
+			error:     context.Canceled,
+			pessimize: false,
+		},
+		{
+			error:     context.DeadlineExceeded,
+			pessimize: false,
+		},
+		{
+			error:     fmt.Errorf("user error"),
+			pessimize: false,
+		},
+	} {
+		err := errors.Unwrap(test.error)
+		if err == nil {
+			err = test.error
+		}
+		t.Run(err.Error(), func(t *testing.T) {
+			pessimize := MustPessimizeEndpoint(test.error)
+			if pessimize != test.pessimize {
+				t.Errorf("unexpected pessimization status for error `%v`: %t, exp: %t", test.error, pessimize, test.pessimize)
+			}
+		})
+	}
+}

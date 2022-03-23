@@ -109,6 +109,15 @@ func (c *conn) IsState(states ...State) bool {
 }
 
 func (c *conn) park(ctx context.Context) (err error) {
+	onDone := trace.DriverOnConnPark(
+		c.config.Trace(),
+		&ctx,
+		c.Endpoint(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -119,15 +128,6 @@ func (c *conn) park(ctx context.Context) (err error) {
 	if c.cc == nil {
 		return nil
 	}
-
-	onDone := trace.DriverOnConnPark(
-		c.config.Trace(),
-		&ctx,
-		c.Endpoint(),
-	)
-	defer func() {
-		onDone(err)
-	}()
 
 	err = c.close()
 
@@ -353,7 +353,7 @@ func (c *conn) Invoke(
 	if err != nil {
 		if wrapping {
 			return errors.WithStackTrace(
-				errors.MapGRPCError(
+				errors.FromGRPCError(
 					err,
 					errors.WithTEAddress(c.Address()),
 				),
@@ -433,7 +433,7 @@ func (c *conn) NewStream(
 	if err != nil {
 		if wrapping {
 			return s, errors.WithStackTrace(
-				errors.MapGRPCError(
+				errors.FromGRPCError(
 					err,
 					errors.WithTEAddress(c.Address()),
 				),

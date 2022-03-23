@@ -320,6 +320,7 @@ func transportErrorCode(c grpcCodes.Code) TransportErrorCode {
 }
 
 var transportErrorToString = [...]string{
+	TransportErrorUnknownCode:        "unknown code",
 	TransportErrorCanceled:           "canceled",
 	TransportErrorUnknown:            "unknown",
 	TransportErrorInvalidArgument:    "invalid argument",
@@ -366,7 +367,7 @@ func IsTransportError(err error, codes ...TransportErrorCode) bool {
 	return false
 }
 
-func MapGRPCError(err error, opts ...teOpt) error {
+func FromGRPCError(err error, opts ...teOpt) error {
 	if err == nil {
 		return nil
 	}
@@ -374,6 +375,7 @@ func MapGRPCError(err error, opts ...teOpt) error {
 	if errors.As(err, &t) {
 		return err
 	}
+
 	if s, ok := grpcStatus.FromError(err); ok {
 		te := &TransportError{
 			Reason:  transportErrorCode(s.Code()),
@@ -389,20 +391,30 @@ func MapGRPCError(err error, opts ...teOpt) error {
 	return err
 }
 
-func MustPessimizeEndpoint(err error) bool {
-	var te *TransportError
+func MustPessimizeEndpoint(err error, codes ...TransportErrorCode) bool {
 	switch {
 	case err == nil:
 		return false
-	case errors.As(err, &te):
-		switch te.Reason {
-		case
+
+	// all transport errors except selected codes
+	case IsTransportError(err) && !IsTransportError(
+		err,
+		append(
+			codes,
 			TransportErrorResourceExhausted,
-			TransportErrorOutOfRange:
-			return false
-		default:
-			return true
-		}
+			TransportErrorOutOfRange,
+			TransportErrorCanceled,
+			TransportErrorDeadlineExceeded,
+			TransportErrorInvalidArgument,
+			TransportErrorNotFound,
+			TransportErrorAlreadyExists,
+			TransportErrorFailedPrecondition,
+			TransportErrorUnimplemented,
+			TransportErrorPermissionDenied,
+		)...,
+	):
+		return true
+
 	default:
 		return false
 	}
