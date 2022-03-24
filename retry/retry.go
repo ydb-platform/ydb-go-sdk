@@ -126,7 +126,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts int
 
 		code           = int64(0)
-		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id, h.idempotent)
+		onIntermediate = trace.RetryOnRetry(h.trace, &ctx, h.id, h.idempotent)
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)

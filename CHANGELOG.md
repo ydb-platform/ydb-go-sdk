@@ -4,6 +4,7 @@
 * Fixed bug with unexpected changing of local datacenter flag in endpoint
 * Refactored errors wrapping (stackedError are not ydb error now, checking `errors.IsYdb(err)` with `errors.As` now)
 * Wrapped retry operation errors with `errors.WithStackTrace(err)`
+* Changed `trace.RetryLoopStartInfo.Context` type from `context.Context` to `*context.Context`
 
 ## v3.16.9
 * Refactored internal operation and transport errors
