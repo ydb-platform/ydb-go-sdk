@@ -22,7 +22,7 @@ import (
 // nolint:gofumpt
 // nolint:nolintlint
 var (
-	errUnknownAcquireType = fmt.Errorf("unknown acquire type")
+	errUnknownAcquireType = errors.New(fmt.Errorf("unknown acquire type"))
 )
 
 type client struct {

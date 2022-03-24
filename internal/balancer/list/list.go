@@ -2,13 +2,11 @@ package list
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
 type Element struct {
 	Index int
 	Conn  conn.Conn
-	Info  info.Info
 }
 
 type List []*Element
@@ -17,12 +15,6 @@ func (cs *List) Insert(cc conn.Conn) *Element {
 	e := &Element{
 		Index: len(*cs),
 		Conn:  cc,
-		Info: info.Info{
-			Address:    cc.Endpoint().Address(),
-			ID:         cc.Endpoint().NodeID(),
-			LoadFactor: cc.Endpoint().LoadFactor(),
-			Local:      cc.Endpoint().LocalDC(),
-		},
 	}
 	*cs = append(*cs, e)
 	return e

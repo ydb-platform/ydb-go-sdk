@@ -21,8 +21,8 @@ import (
 // nolint:gofumpt
 // nolint:nolintlint
 var (
-	// ErrAlreadyCommited returns if transaction Commit called twice
-	ErrAlreadyCommited = fmt.Errorf("already committed")
+	// errAlreadyCommited returns if transaction Commit called twice
+	errAlreadyCommited = errors.New(fmt.Errorf("already committed"))
 )
 
 type transaction struct {
@@ -67,7 +67,7 @@ func (tx *transaction) CommitTx(
 	opts ...options.CommitTransactionOption,
 ) (r result.Result, err error) {
 	if tx.committed {
-		return nil, errors.WithStackTrace(ErrAlreadyCommited)
+		return nil, errors.WithStackTrace(errAlreadyCommited)
 	}
 	defer func() {
 		if err == nil {

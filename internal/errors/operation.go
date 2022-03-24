@@ -30,7 +30,7 @@ type operation interface {
 }
 
 // WithIssues is an option for construct operation error with issues list
-// WithIssues must use as `NewOpError(WithIssues(issues))`
+// WithIssues must use as `Operation(WithIssues(issues))`
 func WithIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
 	return func(oe *operationError) {
 		oe.issues = issues
@@ -38,7 +38,7 @@ func WithIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
 }
 
 // WithStatusCode is an option for construct operation error with reason code
-// WithStatusCode must use as `NewOpError(WithStatusCode(reason))`
+// WithStatusCode must use as `Operation(WithStatusCode(reason))`
 func WithStatusCode(code Ydb.StatusIds_StatusCode) oeOpt {
 	return func(oe *operationError) {
 		oe.code = code
@@ -46,7 +46,7 @@ func WithStatusCode(code Ydb.StatusIds_StatusCode) oeOpt {
 }
 
 // FromOperation is an option for construct operation error from operation
-// FromOperation must use as `NewOpError(FromOperation(operation))`
+// FromOperation must use as `Operation(FromOperation(operation))`
 func FromOperation(operation operation) oeOpt {
 	return func(oe *operationError) {
 		oe.code = operation.GetStatus()
@@ -56,7 +56,7 @@ func FromOperation(operation operation) oeOpt {
 
 type oeOpt func(ops *operationError)
 
-func NewOpError(opts ...oeOpt) error {
+func Operation(opts ...oeOpt) error {
 	oe := &operationError{
 		code: Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
 	}

@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -32,12 +33,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						idempotent,
 					)
 				} else {
-					log := l.Warnf
-					m := retry.Check(info.Error)
-					if m.StatusCode() < 0 {
-						log = l.Debugf
+					f := l.Warnf
+					if !errors.IsYdb(info.Error) {
+						f = l.Debugf
 					}
-					log(`do attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+					m := retry.Check(info.Error)
+					f(`do attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
 						time.Since(start),
 						idempotent,
 						info.Error,
@@ -54,12 +55,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							info.Attempts,
 						)
 					} else {
-						log := l.Errorf
-						m := retry.Check(info.Error)
-						if m.StatusCode() < 0 {
-							log = l.Debugf
+						f := l.Errorf
+						if !errors.IsYdb(info.Error) {
+							f = l.Debugf
 						}
-						log(`do failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+						m := retry.Check(info.Error)
+						f(`do failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
 							time.Since(start),
 							idempotent,
 							info.Attempts,
@@ -91,12 +92,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						idempotent,
 					)
 				} else {
-					log := l.Warnf
-					m := retry.Check(info.Error)
-					if m.StatusCode() < 0 {
-						log = l.Debugf
+					f := l.Warnf
+					if !errors.IsYdb(info.Error) {
+						f = l.Debugf
 					}
-					log(`doTx attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+					m := retry.Check(info.Error)
+					f(`doTx attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
 						time.Since(start),
 						idempotent,
 						info.Error,
@@ -113,12 +114,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							info.Attempts,
 						)
 					} else {
-						log := l.Errorf
-						m := retry.Check(info.Error)
-						if m.StatusCode() < 0 {
-							log = l.Debugf
+						f := l.Warnf
+						if !errors.IsYdb(info.Error) {
+							f = l.Debugf
 						}
-						log(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+						m := retry.Check(info.Error)
+						f(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
 							time.Since(start),
 							idempotent,
 							info.Attempts,

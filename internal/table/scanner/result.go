@@ -119,13 +119,13 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 		if err = r.Err(); err != nil {
 			return errors.WithStackTrace(err)
 		}
-		return errors.WithStackTrace(io.EOF)
+		return io.EOF
 	}
 	s, stats, err := r.recv(ctx)
 	if err != nil {
 		r.Reset(nil)
 		if errors.Is(err, io.EOF) {
-			return errors.WithStackTrace(err)
+			return err
 		}
 		return r.errorf(0, "streamResult.NextResultSetErr(): %w", err)
 	}

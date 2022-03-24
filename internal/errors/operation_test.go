@@ -14,7 +14,7 @@ func TestIsOperationError(t *testing.T) {
 	} {
 		for _, err := range []error{
 			&operationError{code: code},
-			NewOpError(WithStatusCode(code)),
+			Operation(WithStatusCode(code)),
 			fmt.Errorf("wrapped: %w", &operationError{code: code}),
 		} {
 			t.Run("", func(t *testing.T) {

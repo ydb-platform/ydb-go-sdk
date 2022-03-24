@@ -2,7 +2,6 @@ package balancer
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
 // Element is an empty interface that holds some Balancer specific data.
@@ -20,9 +19,6 @@ type Balancer interface {
 
 	// Insert inserts new connection.
 	Insert(conn.Conn) Element
-
-	// Update updates previously inserted connection.
-	Update(Element, info.Info)
 
 	// Remove removes previously inserted connection.
 	Remove(Element) bool

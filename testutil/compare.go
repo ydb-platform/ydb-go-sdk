@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
-var ErrNotComparable = fmt.Errorf("not comparable")
+var ErrNotComparable = errors.New(fmt.Errorf("not comparable"))
 
 // Compare compares its operands.
 // It returns -1, 0, 1 if l < r, l == r, l > r. Returns error if types are not comparable.

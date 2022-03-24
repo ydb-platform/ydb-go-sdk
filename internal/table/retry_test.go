@@ -23,14 +23,14 @@ import (
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
 	for _, testErr := range []error{
 		// Errors leading to Wait repeat.
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.ResourceExhausted),
 		),
-		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
+		fmt.Errorf("wrap transport error: %w", errors.Transport(
 			errors.WithCode(grpcCodes.ResourceExhausted),
 		)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
-		fmt.Errorf("wrap op error: %w", errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+		fmt.Errorf("wrap op error: %w", errors.Operation(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
 	} {
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
@@ -100,7 +100,7 @@ func TestRetryerBadSession(t *testing.T) {
 			if i > maxRetryes {
 				cancel()
 			}
-			return errors.NewOpError(
+			return errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 			)
 		},
@@ -164,19 +164,19 @@ func TestRetryerSessionClosing(t *testing.T) {
 
 func TestRetryerImmediateReturn(t *testing.T) {
 	for _, testErr := range []error{
-		errors.NewOpError(
+		errors.Operation(
 			errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
 		),
-		fmt.Errorf("wrap op error: %w", errors.NewOpError(
+		fmt.Errorf("wrap op error: %w", errors.Operation(
 			errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
 		)),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.PermissionDenied),
 		),
-		fmt.Errorf("wrap transport error: %w", errors.NewTransportError(
+		fmt.Errorf("wrap transport error: %w", errors.Transport(
 			errors.WithCode(grpcCodes.PermissionDenied),
 		)),
-		errors.New("whoa"),
+		fmt.Errorf("whoa"),
 	} {
 		t.Run("", func(t *testing.T) {
 			defer func() {
@@ -235,74 +235,74 @@ func TestRetryContextDeadline(t *testing.T) {
 		io.EOF,
 		context.DeadlineExceeded,
 		fmt.Errorf("test error"),
-		errors.NewTransportError(),
-		errors.NewTransportError(
+		errors.Transport(),
+		errors.Transport(
 			errors.WithCode(grpcCodes.Canceled),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.Unknown),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.InvalidArgument),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.DeadlineExceeded),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.NotFound),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.AlreadyExists),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.PermissionDenied),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.ResourceExhausted),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.FailedPrecondition),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.Aborted),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.OutOfRange),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.Unimplemented),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.Internal),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.Unavailable),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.DataLoss),
 		),
-		errors.NewTransportError(
+		errors.Transport(
 			errors.WithCode(grpcCodes.Unauthenticated),
 		),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_ABORTED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_SCHEME_ERROR)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_TIMEOUT)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_ALREADY_EXISTS)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_NOT_FOUND)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_CANCELLED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_UNDETERMINED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED)),
-		errors.NewOpError(errors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_ABORTED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_SCHEME_ERROR)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_TIMEOUT)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_ALREADY_EXISTS)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_NOT_FOUND)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_CANCELLED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_UNDETERMINED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED)),
+		errors.Operation(errors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY)),
 	}
 	client := &client{
 		cc: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
@@ -398,7 +398,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		},
 		{
 			error: &CustomError{
-				Err: errors.NewOpError(
+				Err: errors.Operation(
 					errors.WithStatusCode(
 						Ydb.StatusIds_BAD_SESSION,
 					),
@@ -411,7 +411,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			error: &CustomError{
 				Err: fmt.Errorf(
 					"wrapped error: %w",
-					errors.NewOpError(
+					errors.Operation(
 						errors.WithStatusCode(
 							Ydb.StatusIds_BAD_SESSION,
 						),
@@ -425,7 +425,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			error: &CustomError{
 				Err: fmt.Errorf(
 					"wrapped error: %w",
-					errors.NewOpError(
+					errors.Operation(
 						errors.WithStatusCode(
 							Ydb.StatusIds_UNAUTHORIZED,
 						),

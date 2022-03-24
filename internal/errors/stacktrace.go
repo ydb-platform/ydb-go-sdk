@@ -52,8 +52,6 @@ type stackError struct {
 	err         error
 }
 
-func (e *stackError) isYdbError() {}
-
 func (e *stackError) Error() string {
 	return e.err.Error() + " at `" + e.stackRecord + "`"
 }

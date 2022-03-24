@@ -1,8 +1,12 @@
 package decimal
 
-import "fmt"
+import (
+	"fmt"
 
-var ErrSyntax = fmt.Errorf("invalid syntax")
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+)
+
+var errSyntax = errors.New(fmt.Errorf("invalid syntax"))
 
 type ParseError struct {
 	Err   error
@@ -21,7 +25,7 @@ func (p *ParseError) Unwrap() error {
 
 func syntaxError(s string) *ParseError {
 	return &ParseError{
-		Err:   ErrSyntax,
+		Err:   errSyntax,
 		Input: s,
 	}
 }

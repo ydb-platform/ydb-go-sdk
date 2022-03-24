@@ -3,7 +3,6 @@ package single
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
 func Balancer() balancer.Balancer {
@@ -22,6 +21,10 @@ func (b *single) Next() conn.Conn {
 	return b.conn
 }
 
+func (b *single) Conn() conn.Conn {
+	return b.conn
+}
+
 func (b *single) Insert(conn conn.Conn) balancer.Element {
 	if b.conn != nil {
 		panic("ydb: single Conn Balancer: double Insert()")
@@ -37,8 +40,6 @@ func (b *single) Remove(x balancer.Element) bool {
 	b.conn = nil
 	return true
 }
-
-func (b *single) Update(balancer.Element, info.Info) {}
 
 func (b *single) Contains(x balancer.Element) bool {
 	if x == nil {

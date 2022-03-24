@@ -3,41 +3,29 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"net"
-	"sync"
+	"sort"
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/keepalive"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestClusterFastRedial(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	listener := newStubListener()
-	server := grpc.NewServer()
-	go func() {
-		_ = server.Serve(listener)
-	}()
-
 	l, b := stub.Balancer()
 	c := &cluster{
-		config: config.New(),
-		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
-			return listener.Dial(ctx)
-		},
-		balancer:  b,
+		config: config.New(
+			config.WithBalancer(b),
+		),
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
 		pool:      conn.NewPool(ctx, config.New()),
@@ -80,21 +68,13 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ln := newStubListener()
-	srv := grpc.NewServer()
-	go func() {
-		_ = srv.Serve(ln)
-	}()
-
 	c := &cluster{
-		config: config.New(),
-		dial: func(ctx context.Context, address string) (*grpc.ClientConn, error) {
-			return ln.Dial(ctx)
-		},
-		balancer: func() balancer.Balancer {
-			_, b := stub.Balancer()
-			return b
-		}(),
+		config: config.New(
+			config.WithBalancer(func() balancer.Balancer {
+				_, b := stub.Balancer()
+				return b
+			}()),
+		),
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
 		pool:      conn.NewPool(ctx, config.New()),
@@ -193,75 +173,13 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	})
 }
 
-type stubListener struct {
-	C chan net.Conn // Client half of the connection.
-	S chan net.Conn // Server half of the connection.
-
-	once sync.Once
-	exit chan struct{}
-}
-
-func newStubListener() *stubListener {
-	return &stubListener{
-		C: make(chan net.Conn),
-		S: make(chan net.Conn, 1),
-
-		exit: make(chan struct{}),
-	}
-}
-
-func (ln *stubListener) Accept() (net.Conn, error) {
-	s, c := net.Pipe()
-	select {
-	case ln.C <- c:
-	case <-ln.exit:
-		return nil, errors.WithStackTrace(fmt.Errorf("closed"))
-	}
-	select {
-	case ln.S <- s:
-	default:
-	}
-	return s, nil
-}
-
-func (ln *stubListener) Addr() net.Addr {
-	return &net.TCPAddr{}
-}
-
-func (ln *stubListener) Close() error {
-	ln.once.Do(func() {
-		close(ln.exit)
-	})
-	return nil
-}
-
-func (ln *stubListener) Dial(ctx context.Context) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, "",
-		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-			select {
-			case <-ln.exit:
-				return nil, errors.WithStackTrace(fmt.Errorf("refused"))
-			case c := <-ln.C:
-				return c, nil
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		}),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:    time.Second,
-			Timeout: time.Second,
-		}),
-	)
-}
-
 func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []endpoint.Endpoint) {
 	SortEndpoints(curr)
 	SortEndpoints(next)
 	DiffEndpoints(curr, next,
 		func(i, j int) {
-			c.Update(ctx, next[j])
+			c.Remove(ctx, curr[i])
+			c.Insert(ctx, next[j])
 		},
 		func(i, j int) {
 			c.Insert(ctx, next[j])
@@ -369,6 +287,180 @@ func TestDiffEndpoint(t *testing.T) {
 			if eq != tc.eq || add != tc.add || del != tc.del {
 				t.Errorf("Got %d, %d, %d expected: %d, %d, %d", eq, add, del, tc.eq, tc.add, tc.del)
 			}
+		})
+	}
+}
+
+func TestEndpointSwitchLocalDCFlag(t *testing.T) {
+	var (
+		ctx               = context.Background()
+		curr              []endpoint.Endpoint
+		clusterEndpoints  = make(map[string]struct{})
+		balancerEndpoints = make(map[string]struct{})
+		c                 = New(
+			ctx,
+			config.New(
+				config.WithBalancer(
+					balancers.PreferLocalDC(
+						balancers.RoundRobin(),
+					),
+				),
+				config.WithTrace(trace.Driver{
+					OnClusterInsert: func(info trace.DriverClusterInsertStartInfo) func(trace.DriverClusterInsertDoneInfo) {
+						address := info.Endpoint.Address()
+						return func(info trace.DriverClusterInsertDoneInfo) {
+							clusterEndpoints[address] = struct{}{}
+							if info.Inserted {
+								balancerEndpoints[address] = struct{}{}
+							}
+						}
+					},
+					OnClusterRemove: func(info trace.DriverClusterRemoveStartInfo) func(trace.DriverClusterRemoveDoneInfo) {
+						address := info.Endpoint.Address()
+						return func(info trace.DriverClusterRemoveDoneInfo) {
+							delete(clusterEndpoints, address)
+							if info.Removed {
+								delete(balancerEndpoints, address)
+							}
+						}
+					},
+				}),
+			),
+			conn.NewPool(ctx, config.New()),
+		)
+	)
+	for _, test := range []struct {
+		name                      string
+		next                      []endpoint.Endpoint
+		expectedClusterEndpoints  []endpoint.Endpoint
+		expectedBalancerEndpoints []endpoint.Endpoint
+	}{
+		{
+			name: "init",
+			next: []endpoint.Endpoint{
+				endpoint.New("0:0", endpoint.WithLocalDC(true)),
+				endpoint.New("1:1", endpoint.WithLocalDC(false)),
+			},
+			expectedClusterEndpoints: []endpoint.Endpoint{
+				endpoint.New("0:0", endpoint.WithLocalDC(true)),
+				endpoint.New("1:1", endpoint.WithLocalDC(false)),
+			},
+			expectedBalancerEndpoints: []endpoint.Endpoint{
+				endpoint.New("0:0", endpoint.WithLocalDC(true)),
+			},
+		},
+		{
+			name: "first switch localDC flag",
+			next: []endpoint.Endpoint{
+				endpoint.New("0:0", endpoint.WithLocalDC(false)),
+				endpoint.New("1:1", endpoint.WithLocalDC(true)),
+			},
+			expectedClusterEndpoints: []endpoint.Endpoint{
+				endpoint.New("0:0", endpoint.WithLocalDC(false)),
+				endpoint.New("1:1", endpoint.WithLocalDC(true)),
+			},
+			expectedBalancerEndpoints: []endpoint.Endpoint{
+				endpoint.New("1:1", endpoint.WithLocalDC(true)),
+			},
+		},
+		{
+			name: "second switch localDC flag",
+			next: []endpoint.Endpoint{
+				endpoint.New("0:0", endpoint.WithLocalDC(true)),
+				endpoint.New("1:1", endpoint.WithLocalDC(false)),
+			},
+			expectedClusterEndpoints: []endpoint.Endpoint{
+				endpoint.New("0:0", endpoint.WithLocalDC(true)),
+				endpoint.New("1:1", endpoint.WithLocalDC(false)),
+			},
+			expectedBalancerEndpoints: []endpoint.Endpoint{
+				endpoint.New("0:0", endpoint.WithLocalDC(true)),
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			SortEndpoints(test.next)
+			DiffEndpoints(
+				curr,
+				test.next,
+				func(i, j int) {
+					c.Remove(
+						ctx,
+						curr[i],
+						WithoutLock(),
+					)
+					c.Insert(
+						ctx,
+						test.next[j],
+						WithoutLock(),
+					)
+				},
+				func(i, j int) {
+					c.Insert(
+						ctx,
+						test.next[j],
+						WithoutLock(),
+					)
+				},
+				func(i, j int) {
+					c.Remove(
+						ctx,
+						curr[i],
+						WithoutLock(),
+					)
+				},
+			)
+			{
+				v1 := fmt.Sprintf(
+					"%v",
+					func() (addrs []string) {
+						for addr := range clusterEndpoints {
+							addrs = append(addrs, addr)
+						}
+						sort.Strings(addrs)
+						return addrs
+					}(),
+				)
+				v2 := fmt.Sprintf(
+					"%v",
+					func() (addrs []string) {
+						for _, e := range test.expectedClusterEndpoints {
+							addrs = append(addrs, e.Address())
+						}
+						sort.Strings(addrs)
+						return addrs
+					}(),
+				)
+				if v1 != v2 {
+					t.Fatalf("unexpected cluster endpoints: %v, exp: %v", v1, v2)
+				}
+			}
+			{
+				v1 := fmt.Sprintf(
+					"%v",
+					func() (addrs []string) {
+						for addr := range balancerEndpoints {
+							addrs = append(addrs, addr)
+						}
+						sort.Strings(addrs)
+						return addrs
+					}(),
+				)
+				v2 := fmt.Sprintf(
+					"%v",
+					func() (addrs []string) {
+						for _, e := range test.expectedBalancerEndpoints {
+							addrs = append(addrs, e.Address())
+						}
+						sort.Strings(addrs)
+						return addrs
+					}(),
+				)
+				if v1 != v2 {
+					t.Fatalf("unexpected balancer endpoints: %v, exp: %v", v1, v2)
+				}
+			}
+			curr = test.next
 		})
 	}
 }

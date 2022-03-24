@@ -5,7 +5,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
 type testBalancer struct{}
@@ -22,7 +21,7 @@ func (t testBalancer) Insert(conn conn.Conn) balancer.Element {
 	panic("unexpected call")
 }
 
-func (t testBalancer) Update(element balancer.Element, info info.Info) {
+func (t testBalancer) Update(element balancer.Element) {
 	panic("unexpected call")
 }
 

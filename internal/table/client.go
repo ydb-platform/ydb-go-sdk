@@ -23,21 +23,21 @@ import (
 )
 
 var (
-	// ErrSessionPoolClosed returned by a client instance to indicate
+	// errSessionPoolClosed returned by a client instance to indicate
 	// that client is closed and not able to complete requested operation.
-	ErrSessionPoolClosed = fmt.Errorf("session pool is closed")
+	errSessionPoolClosed = errors.New(fmt.Errorf("session pool is closed"))
 
-	// ErrSessionPoolOverflow returned by a client instance to indicate
+	// errSessionPoolOverflow returned by a client instance to indicate
 	// that the client is full and requested operation is not able to complete.
-	ErrSessionPoolOverflow = fmt.Errorf("session pool overflow")
+	errSessionPoolOverflow = errors.New(fmt.Errorf("session pool overflow"))
 
-	// ErrSessionShutdown returned by a client instance to indicate that
+	// errSessionShutdown returned by a client instance to indicate that
 	// requested session is under shutdown.
-	ErrSessionShutdown = fmt.Errorf("session under shutdown")
+	errSessionShutdown = errors.New(fmt.Errorf("session under shutdown"))
 
-	// ErrNoProgress returned by a client instance to indicate that
+	// errNoProgress returned by a client instance to indicate that
 	// operation could not be completed.
-	ErrNoProgress = fmt.Errorf("no progress")
+	errNoProgress = errors.New(fmt.Errorf("no progress"))
 )
 
 // SessionBuilder is the interface that holds logic of creating sessions.
@@ -135,7 +135,7 @@ func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (table
 		retry.WithSlowBackoff(options.SlowBackoff),
 		retry.WithTrace(trace.Retry{
 			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				onIntermediate := trace.TableOnCreateSession(c.config.Trace(), &info.Context)
+				onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context)
 				return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 					onDone := onIntermediate(info.Error)
 					return func(info trace.RetryLoopDoneInfo) {
@@ -157,7 +157,7 @@ func (c *client) isClosed() bool {
 func isCreateSessionErrorRetriable(err error) bool {
 	switch {
 	case
-		errors.Is(err, ErrSessionPoolOverflow),
+		errors.Is(err, errSessionPoolOverflow),
 		errors.IsOperationError(err, Ydb.StatusIds_OVERLOADED),
 		errors.IsTransportError(
 			err,
@@ -197,7 +197,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 	c.mu.Unlock()
 
 	if !enoughSpace {
-		return nil, errors.WithStackTrace(ErrSessionPoolOverflow)
+		return nil, errors.WithStackTrace(errSessionPoolOverflow)
 	}
 
 	resCh := make(chan createSessionResult, 1) // for non-block write
@@ -301,7 +301,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
 		if c.isClosed() {
-			return nil, errors.WithStackTrace(ErrSessionPoolClosed)
+			return nil, errors.WithStackTrace(errSessionPoolClosed)
 		}
 
 		// First, we try to get session from idle
@@ -335,7 +335,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		}
 	}
 	if s == nil && err == nil {
-		err = errors.WithStackTrace(fmt.Errorf("%w: attempts=%d", ErrNoProgress, i))
+		err = errors.WithStackTrace(fmt.Errorf("%w: attempts=%d", errNoProgress, i))
 	}
 	if err != nil {
 		return s, errors.WithStackTrace(
@@ -395,9 +395,9 @@ func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 
 // Put returns session to the client for further reuse.
 // If client is already closed Put() calls s.Close(ctx) and returns
-// ErrSessionPoolClosed.
+// errSessionPoolClosed.
 // If client is overflow calls s.Close(ctx) and returns
-// ErrSessionPoolOverflow.
+// errSessionPoolOverflow.
 //
 // Note that Put() must be called only once after being created or received by
 // Get() or Take() calls. In other way it will produce unexpected behavior or
@@ -412,13 +412,13 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 
 	switch {
 	case c.closed:
-		err = errors.WithStackTrace(ErrSessionPoolClosed)
+		err = errors.WithStackTrace(errSessionPoolClosed)
 
 	case c.idle.Len() >= c.limit:
-		err = errors.WithStackTrace(ErrSessionPoolOverflow)
+		err = errors.WithStackTrace(errSessionPoolOverflow)
 
 	case s.isClosing():
-		err = errors.WithStackTrace(ErrSessionShutdown)
+		err = errors.WithStackTrace(errSessionShutdown)
 
 	default:
 		if !c.notify(s) {
@@ -523,7 +523,7 @@ func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
 	if c.isClosed() {
-		return errors.WithStackTrace(ErrSessionPoolClosed)
+		return errors.WithStackTrace(errSessionPoolClosed)
 	}
 	opts = append(opts, table.WithTrace(c.config.Trace()))
 	return do(
@@ -536,7 +536,7 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
 	if c.isClosed() {
-		return errors.WithStackTrace(ErrSessionPoolClosed)
+		return errors.WithStackTrace(errSessionPoolClosed)
 	}
 	return doTx(
 		ctx,

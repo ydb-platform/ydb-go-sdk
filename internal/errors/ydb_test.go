@@ -4,6 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	grpcCodes "google.golang.org/grpc/codes"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
 func TestIsYdb(t *testing.T) {
@@ -12,16 +16,44 @@ func TestIsYdb(t *testing.T) {
 		isYdbError bool
 	}{
 		{
-			error:      WithStackTrace(fmt.Errorf("TestError")),
+			error:      nil,
+			isYdbError: false,
+		},
+		{
+			error:      Operation(WithStatusCode(Ydb.StatusIds_BAD_SESSION)),
 			isYdbError: true,
 		},
 		{
-			error:      WithStackTrace(fmt.Errorf("TestError%s", "Printf")),
+			error:      Transport(WithCode(grpcCodes.DeadlineExceeded)),
 			isYdbError: true,
 		},
 		{
-			error:      WithStackTrace(fmt.Errorf("TestError%s", "Printf")),
+			error:      RetryableError(fmt.Errorf("")),
+			isYdbError: false,
+		},
+		{
+			error:      WithStackTrace(Operation(WithStatusCode(Ydb.StatusIds_BAD_SESSION))),
 			isYdbError: true,
+		},
+		{
+			error:      WithStackTrace(Transport(WithCode(grpcCodes.DeadlineExceeded))),
+			isYdbError: true,
+		},
+		{
+			error:      WithStackTrace(RetryableError(fmt.Errorf(""))),
+			isYdbError: false,
+		},
+		{
+			error:      WithStackTrace(WithStackTrace(Operation(WithStatusCode(Ydb.StatusIds_BAD_SESSION)))),
+			isYdbError: true,
+		},
+		{
+			error:      WithStackTrace(WithStackTrace(Transport(WithCode(grpcCodes.DeadlineExceeded)))),
+			isYdbError: true,
+		},
+		{
+			error:      WithStackTrace(WithStackTrace(RetryableError(fmt.Errorf("")))),
+			isYdbError: false,
 		},
 		{
 			error:      fmt.Errorf("TestError%s", "Printf"),
@@ -31,8 +63,16 @@ func TestIsYdb(t *testing.T) {
 			error:      errors.New("TestError"),
 			isYdbError: false,
 		},
+		{
+			error:      New(fmt.Errorf("TestError%s", "Printf")),
+			isYdbError: true,
+		},
+		{
+			error:      New(errors.New("TestError")),
+			isYdbError: true,
+		},
 	} {
-		t.Run(test.error.Error(), func(t *testing.T) {
+		t.Run("", func(t *testing.T) {
 			if IsYdb(test.error) != test.isYdbError {
 				t.Fatalf("unexpected check ydb error: %v, want: %v", IsYdb(test.error), test.isYdbError)
 			}

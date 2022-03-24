@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -29,12 +30,12 @@ func Retry(l Logger, details trace.Details) (t trace.Retry) {
 						time.Since(start),
 					)
 				} else {
-					log := l.Warnf
-					m := retry.Check(info.Error)
-					if m.StatusCode() < 0 {
-						log = l.Debugf
+					f := l.Errorf
+					if !errors.IsYdb(info.Error) {
+						f = l.Debugf
 					}
-					log(`retry attempt failed {id:"%s",latency:"%v",error:"%s",retryable:%v,code:%d,deleteSession:%v}`,
+					m := retry.Check(info.Error)
+					f(`retry attempt failed {id:"%s",latency:"%v",error:"%s",retryable:%v,code:%d,deleteSession:%v}`,
 						id,
 						time.Since(start),
 						info.Error,
@@ -51,12 +52,12 @@ func Retry(l Logger, details trace.Details) (t trace.Retry) {
 							info.Attempts,
 						)
 					} else {
-						log := l.Errorf
-						m := retry.Check(info.Error)
-						if m.StatusCode() < 0 {
-							log = l.Debugf
+						f := l.Errorf
+						if !errors.IsYdb(info.Error) {
+							f = l.Debugf
 						}
-						log(`retry failed {id:"%s",latency:"%v",attempts:%v,error:"%s",retryable:%v,code:%d,deleteSession:%v}`,
+						m := retry.Check(info.Error)
+						f(`retry failed {id:"%s",latency:"%v",attempts:%v,error:"%s",retryable:%v,code:%d,deleteSession:%v}`,
 							id,
 							time.Since(start),
 							info.Attempts,

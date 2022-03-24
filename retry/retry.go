@@ -33,7 +33,7 @@ var (
 // if retryOperation returns nil - retry loop will break
 type retryOperation func(context.Context) (err error)
 
-type retryableErrorOption func(e *errors.RetryableError)
+type retryableErrorOption errors.RetryableErrorOption
 
 const (
 	BackoffTypeNoBackoff   = errors.BackoffTypeNoBackoff
@@ -42,25 +42,23 @@ const (
 )
 
 func WithBackoff(t errors.BackoffType) retryableErrorOption {
-	return func(e *errors.RetryableError) {
-		e.BackoffType = t
-	}
+	return retryableErrorOption(errors.WithBackoff(t))
 }
 
 func WithDeleteSession() retryableErrorOption {
-	return func(e *errors.RetryableError) {
-		e.MustDeleteSession = true
-	}
+	return retryableErrorOption(errors.WithDeleteSession())
 }
 
 func RetryableError(err error, opts ...retryableErrorOption) error {
-	re := &errors.RetryableError{
-		Err: err,
-	}
-	for _, o := range opts {
-		o(re)
-	}
-	return re
+	return errors.RetryableError(
+		err,
+		func() (retryableErrorOptions []errors.RetryableErrorOption) {
+			for _, o := range opts {
+				retryableErrorOptions = append(retryableErrorOptions, errors.RetryableErrorOption(o))
+			}
+			return retryableErrorOptions
+		}()...,
+	)
 }
 
 type retryOptionsHolder struct {
@@ -128,7 +126,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts int
 
 		code           = int64(0)
-		onIntermediate = trace.RetryOnRetry(h.trace, ctx, h.id, h.idempotent)
+		onIntermediate = trace.RetryOnRetry(h.trace, &ctx, h.id, h.idempotent)
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -154,11 +152,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if !m.MustRetry(h.idempotent) {
-				return
+				return errors.WithStackTrace(err)
 			}
 
 			if e := Wait(ctx, h.fastBackoff, h.slowBackoff, m, i); e != nil {
-				return
+				return errors.WithStackTrace(err)
 			}
 
 			code = m.StatusCode()

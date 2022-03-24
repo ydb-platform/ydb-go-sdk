@@ -4,22 +4,23 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
+
+type Info interface {
+	NodeID() uint32
+	Address() string
+	LocalDC() bool
+	Location() string
+	LastUpdated() time.Time
+	LoadFactor() float32
+}
 
 type Endpoint interface {
 	fmt.Stringer
 
-	Info() info.Info
-	Copy() Endpoint
+	Info
 
-	NodeID() uint32
-	Address() string
-	Location() string
-	LocalDC() bool
-	LoadFactor() float32
-	LastUpdated() time.Time
+	Copy() Endpoint
 
 	Touch(opts ...option)
 }
@@ -62,17 +63,6 @@ func (e *endpoint) String() string {
 		e.loadFactor,
 		e.lastUpdated.Format(time.RFC3339),
 	)
-}
-
-func (e *endpoint) Info() info.Info {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	return info.Info{
-		ID:         e.id,
-		Address:    e.address,
-		LoadFactor: e.loadFactor,
-		Local:      e.local,
-	}
 }
 
 func (e *endpoint) NodeID() uint32 {

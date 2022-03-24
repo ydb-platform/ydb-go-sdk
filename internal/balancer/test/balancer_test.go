@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/stub"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
 func isEvenConn(c conn.Conn) bool {
@@ -39,10 +38,10 @@ func TestMulti(t *testing.T) {
 		it(cs1)
 		it(cs2)
 	}
-	forEachConn := func(it func(conn.Conn, info.Info)) {
+	forEachConn := func(it func(conn.Conn)) {
 		forEachList(func(cs *list.List) {
 			for _, e := range *cs {
-				it(e.Conn, e.Info)
+				it(e.Conn)
 			}
 		})
 	}
@@ -52,6 +51,7 @@ func TestMulti(t *testing.T) {
 	)
 	const n = 100
 	var (
+		cc = make([]conn.Conn, n)
 		es = make([]balancer.Element, n)
 		el = make(map[conn.Conn]balancer.Element, n)
 	)
@@ -60,6 +60,7 @@ func TestMulti(t *testing.T) {
 		e := m.Insert(c)
 		es[i] = e
 		el[c] = e
+		cc[i] = c
 	}
 	forEachList(func(cs *list.List) {
 		if act, exp := len(*cs), n/2; act != exp {
@@ -70,12 +71,10 @@ func TestMulti(t *testing.T) {
 		}
 	})
 	for i := 0; i < n; i++ {
-		m.Update(es[i], info.Info{
-			LoadFactor: 1,
-		})
+		cc[i].Endpoint().Touch(endpoint.WithLoadFactor(1))
 	}
-	forEachConn(func(conn conn.Conn, info info.Info) {
-		if act, exp := info.LoadFactor, float32(1); act != exp {
+	forEachConn(func(conn conn.Conn) {
+		if act, exp := conn.Endpoint().LoadFactor(), float32(1); act != exp {
 			t.Errorf(
 				"unexpected load factor: %f; want %f",
 				act, exp,
