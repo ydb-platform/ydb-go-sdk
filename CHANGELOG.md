@@ -1,3 +1,7 @@
+* Refactored `cluster.Cluster` and `balancer.Balancer` interfaces (removed `Update` method)
+* Replaced `cluster.Update` with `cluster.Remove` and `cluster.Insert` calls
+* Fixed bug with unexpected changing of local datacenter flag in endpoint
+
 ## v3.16.9
 * Refactored internal operation and transport errors
 

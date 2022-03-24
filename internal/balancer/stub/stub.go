@@ -6,13 +6,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
 type stubBalancer struct {
 	OnNext      func() conn.Conn
 	OnInsert    func(conn.Conn) balancer.Element
-	OnUpdate    func(balancer.Element, info.Info)
 	OnRemove    func(balancer.Element) bool
 	OnPessimize func(context.Context, balancer.Element) error
 	OnContains  func(balancer.Element) bool
@@ -39,10 +37,6 @@ func Balancer() (*list.List, balancer.Balancer) {
 			e := x.(*list.Element)
 			cs.Remove(e)
 			return true
-		},
-		OnUpdate: func(x balancer.Element, info info.Info) {
-			e := x.(*list.Element)
-			e.Info = info
 		},
 		OnPessimize: func(ctx context.Context, x balancer.Element) error {
 			e := x.(*list.Element)
@@ -75,12 +69,6 @@ func (s stubBalancer) Insert(c conn.Conn) balancer.Element {
 		return f(c)
 	}
 	return nil
-}
-
-func (s stubBalancer) Update(el balancer.Element, i info.Info) {
-	if f := s.OnUpdate; f != nil {
-		f(el, i)
-	}
 }
 
 func (s stubBalancer) Remove(el balancer.Element) bool {

@@ -107,6 +107,7 @@ type EndpointInfo interface {
 	Address() string
 	LocalDC() bool
 	Location() string
+	LoadFactor() float32
 	LastUpdated() time.Time
 }
 

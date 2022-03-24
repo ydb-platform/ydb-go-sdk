@@ -3,7 +3,6 @@ package multi
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 )
 
 func Balancer(opts ...Option) balancer.Balancer {
@@ -80,14 +79,6 @@ func (m *multi) Insert(conn conn.Conn) balancer.Element {
 		return h
 	}
 	return nil
-}
-
-func (m *multi) Update(x balancer.Element, info info.Info) {
-	for i, h := range x.(multiHandle).elements {
-		if h != nil {
-			m.balancer[i].Update(h, info)
-		}
-	}
 }
 
 func (m *multi) Remove(x balancer.Element) (removed bool) {

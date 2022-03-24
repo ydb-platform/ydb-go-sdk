@@ -8,10 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -36,10 +33,8 @@ var (
 type cluster struct {
 	config config.Config
 	pool   conn.Pool
-	dial   func(context.Context, string) (*grpc.ClientConn, error)
 
 	balancerMtx sync.RWMutex
-	balancer    balancer.Balancer
 
 	explorer repeater.Repeater
 
@@ -72,7 +67,7 @@ func (c *cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 	c.balancerMtx.Lock()
 	defer c.balancerMtx.Unlock()
 
-	if !c.balancer.Contains(entry.Handle) {
+	if !c.config.Balancer().Contains(entry.Handle) {
 		return
 	}
 
@@ -132,18 +127,19 @@ func parseOptions(opts ...crudOption) *crudOptionsHolder {
 	return h
 }
 
-type CRUD interface {
-	// Insert inserts endpoint to cluster
-	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
-
-	// Update updates endpoint in cluster
-	Update(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
-
-	// Remove removes endpoint from cluster
-	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
-
+type Getter interface {
 	// Get gets conn from cluster
 	Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, err error)
+}
+
+type Inserter interface {
+	// Insert inserts endpoint to cluster
+	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
+}
+
+type Remover interface {
+	// Remove removes endpoint from cluster
+	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
 }
 
 type Explorer interface {
@@ -151,15 +147,18 @@ type Explorer interface {
 	Force()
 }
 
-type CRUDExplorerLocker interface {
-	CRUD
+type InserterRemoverExplorerLocker interface {
+	Inserter
+	Remover
 	Explorer
 	sync.Locker
 }
 
 type Cluster interface {
 	closer.Closer
-	CRUD
+	Getter
+	Inserter
+	Remover
 	Explorer
 	sync.Locker
 	conn.Pessimizer
@@ -169,7 +168,6 @@ func New(
 	ctx context.Context,
 	config config.Config,
 	pool conn.Pool,
-	balancer balancer.Balancer,
 ) Cluster {
 	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)
 	defer func() {
@@ -181,7 +179,6 @@ func New(
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
 		pool:      pool,
-		balancer:  balancer,
 	}
 }
 
@@ -288,7 +285,7 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	c.balancerMtx.RLock()
 	defer c.balancerMtx.RUnlock()
 
-	cc = c.balancer.Next()
+	cc = c.config.Balancer().Next()
 	if cc == nil {
 		return nil, errors.WithStackTrace(ErrClusterEmpty)
 	}
@@ -318,16 +315,11 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 	cc = c.pool.Get(e)
 
-	_, has := c.index[e.Address()]
-	if has {
-		panic("ydb: can't insert already existing endpoint")
-	}
-
 	cc.Endpoint().Touch()
 
 	entry := entry.Entry{Conn: cc}
 
-	inserted = entry.InsertInto(c.balancer, &c.balancerMtx)
+	inserted = entry.InsertInto(c.config.Balancer(), &c.balancerMtx)
 
 	c.index[e.Address()] = entry
 
@@ -336,64 +328,6 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 	}
 
 	return cc
-}
-
-// Update updates existing connection's runtime stats such that load factor and others.
-func (c *cluster) Update(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
-	onDone := trace.DriverOnClusterUpdate(c.config.Trace(), &ctx, e.Copy())
-	defer func() {
-		if cc != nil {
-			onDone(cc.GetState())
-		} else {
-			onDone(conn.Unknown)
-		}
-	}()
-
-	options := parseOptions(opts...)
-	if options.withLock {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-	}
-
-	if c.closed {
-		return
-	}
-
-	entry, has := c.index[e.Address()]
-	if !has {
-		panic("ydb: can't update not-existing endpoint")
-	}
-	if entry.Conn == nil {
-		panic("ydb: cluster entry with nil conn")
-	}
-
-	entry.Conn.Endpoint().Touch(
-		endpoint.WithLocation(e.Location()),
-		endpoint.WithID(e.NodeID()),
-		endpoint.WithLoadFactor(e.LoadFactor()),
-		endpoint.WithLocalDC(e.LocalDC()),
-	)
-
-	if entry.Conn.GetState() == conn.Banned {
-		entry.Conn.SetState(conn.Online)
-	}
-
-	delete(c.endpoints, e.NodeID())
-	c.index[e.Address()] = entry
-
-	if e.NodeID() > 0 {
-		c.endpoints[e.NodeID()] = entry.Conn
-	}
-
-	c.balancerMtx.Lock()
-	defer c.balancerMtx.Unlock()
-
-	if entry.Handle != nil {
-		// entry.Handle may be nil because endpoint may be no in balancer
-		c.balancer.Update(entry.Handle, e.Info())
-	}
-
-	return entry.Conn
 }
 
 // Remove removes and closes previously inserted connection.
@@ -425,7 +359,7 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		_ = entry.Conn.Release(ctx)
 	}()
 
-	removed = entry.RemoveFrom(c.balancer, &c.balancerMtx)
+	removed = entry.RemoveFrom(c.config.Balancer(), &c.balancerMtx)
 
 	delete(c.index, e.Address())
 	delete(c.endpoints, e.NodeID())
@@ -434,7 +368,10 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
-	return strings.Compare(a.Address(), b.Address())
+	return strings.Compare(
+		a.Address(),
+		b.Address(),
+	)
 }
 
 func SortEndpoints(es []endpoint.Endpoint) {

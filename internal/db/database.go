@@ -63,7 +63,7 @@ func New(
 
 	db := &database{
 		config:  c,
-		cluster: cluster.New(ctx, c, pool, c.Balancer()),
+		cluster: cluster.New(ctx, c, pool),
 	}
 
 	var cancel context.CancelFunc

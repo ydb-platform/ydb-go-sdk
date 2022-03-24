@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint/info"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 )
 
@@ -80,17 +79,10 @@ func (r *roundRobin) Insert(conn conn.Conn) balancer.Element {
 	return e
 }
 
-func (r *roundRobin) Update(el balancer.Element, info info.Info) {
-	e := el.(*list.Element)
-	e.Info = info
-	r.updateMinMax(e.Conn)
-	r.belt = r.distribute()
-}
-
 func (r *roundRobin) Remove(x balancer.Element) bool {
 	el := x.(*list.Element)
 	r.conns.Remove(el)
-	r.inspectMinMax(el.Info)
+	r.inspectMinMax(el.Conn.Endpoint().LoadFactor())
 	r.belt = r.distribute()
 	return true
 }
@@ -120,13 +112,13 @@ func (r *roundRobin) updateMinMax(cc conn.Conn) {
 	}
 }
 
-func (r *roundRobin) inspectMinMax(info info.Info) {
-	if r.min != info.LoadFactor && r.max != info.LoadFactor {
+func (r *roundRobin) inspectMinMax(loadFactor float32) {
+	if r.min != loadFactor && r.max != loadFactor {
 		return
 	}
 	var def bool
 	for _, x := range r.conns {
-		load := x.Info.LoadFactor
+		load := x.Conn.Endpoint().LoadFactor()
 		if !def {
 			r.min = load
 			r.max = load
@@ -156,7 +148,7 @@ func (r *roundRobin) spread(f func(float32) int32) []int {
 	fill := func(state conn.State) (filled bool) {
 		for _, x := range r.conns {
 			if x.Conn.GetState() == state {
-				d := f(x.Info.LoadFactor)
+				d := f(x.Conn.Endpoint().LoadFactor())
 				dist = append(dist, d)
 				index = append(index, x.Index)
 				filled = true

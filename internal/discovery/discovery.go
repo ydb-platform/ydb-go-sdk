@@ -24,7 +24,7 @@ import (
 func New(
 	ctx context.Context,
 	cc conn.Conn,
-	crudExplorer cluster.CRUDExplorerLocker,
+	crudExplorer cluster.InserterRemoverExplorerLocker,
 	driverTrace trace.Driver,
 	opts ...config.Option,
 ) (_ discovery.Client, err error) {
@@ -82,8 +82,12 @@ func New(
 
 				cluster.DiffEndpoints(curr, next,
 					func(i, j int) {
-						// Endpoints are equal, but we still need to update metadata (e.g., load factor).
-						crudExplorer.Update(
+						crudExplorer.Remove(
+							ctx,
+							curr[i],
+							cluster.WithoutLock(),
+						)
+						crudExplorer.Insert(
 							ctx,
 							next[j],
 							cluster.WithoutLock(),
