@@ -3,6 +3,7 @@
 * Removed `trace.Driver.OnClusterUpdate` event
 * Fixed bug with unexpected changing of local datacenter flag in endpoint
 * Refactored errors wrapping (stackedError are not ydb error now, checking `errors.IsYdb(err)` with `errors.As` now)
+* Wrapped retry operation errors with `errors.WithStackTrace(err)`
 
 ## v3.16.9
 * Refactored internal operation and transport errors

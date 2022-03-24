@@ -152,11 +152,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if !m.MustRetry(h.idempotent) {
-				return
+				return errors.WithStackTrace(err)
 			}
 
 			if e := Wait(ctx, h.fastBackoff, h.slowBackoff, m, i); e != nil {
-				return
+				return errors.WithStackTrace(err)
 			}
 
 			code = m.StatusCode()

@@ -62,7 +62,7 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 			err = op(ctx, tx)
 
 			if err != nil {
-				return err
+				return errors.WithStackTrace(err)
 			}
 
 			_, err = tx.CommitTx(ctx, opts.TxCommitOptions...)
@@ -96,7 +96,13 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 				attempts++
 			}()
 
-			return op(ctx, s)
+			err = op(ctx, s)
+
+			if err != nil {
+				return errors.WithStackTrace(err)
+			}
+
+			return nil
 		},
 	)
 }
@@ -236,11 +242,11 @@ func retryBackoff(
 			}
 
 			if !m.MustRetry(isOperationIdempotent) {
-				return
+				return errors.WithStackTrace(err)
 			}
 
 			if retry.Wait(ctx, fastBackoff, slowBackoff, m, i) != nil {
-				return
+				return errors.WithStackTrace(err)
 			}
 
 			code = m.StatusCode()
