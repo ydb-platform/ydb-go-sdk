@@ -171,7 +171,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err:           errors.NewTransportError(),
+			err:           errors.Transport(),
 			backoff:       errors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
@@ -180,7 +180,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.Canceled),
 			),
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -191,7 +191,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.Unknown),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -202,7 +202,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.InvalidArgument),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -213,7 +213,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.DeadlineExceeded),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -224,7 +224,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.NotFound),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -235,7 +235,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.AlreadyExists),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -246,7 +246,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.PermissionDenied),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -257,7 +257,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.ResourceExhausted),
 			),
 			backoff:       errors.BackoffTypeSlowBackoff,
@@ -268,7 +268,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.FailedPrecondition),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -279,7 +279,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.Aborted),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -290,7 +290,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.OutOfRange),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -301,7 +301,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.Unimplemented),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -312,7 +312,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.Internal),
 			),
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -323,7 +323,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.Unavailable),
 			),
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -334,7 +334,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.DataLoss),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -345,7 +345,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewTransportError(
+			err: errors.Transport(
 				errors.WithCode(grpcCodes.Unauthenticated),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -356,7 +356,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -367,7 +367,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -378,7 +378,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -389,7 +389,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -400,7 +400,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_ABORTED),
 			),
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -411,7 +411,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
 			),
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -422,7 +422,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
 			),
 			backoff:       errors.BackoffTypeSlowBackoff,
@@ -433,7 +433,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_SCHEME_ERROR),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -444,7 +444,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -455,7 +455,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_TIMEOUT),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -466,7 +466,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -477,7 +477,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -488,7 +488,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_ALREADY_EXISTS),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -499,7 +499,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_NOT_FOUND),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -510,7 +510,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -521,7 +521,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_CANCELLED),
 			),
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -532,7 +532,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_UNDETERMINED),
 			),
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -543,7 +543,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED),
 			),
 			backoff:       errors.BackoffTypeNoBackoff,
@@ -554,7 +554,7 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.NewOpError(
+			err: errors.Operation(
 				errors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
 			),
 			backoff:       errors.BackoffTypeFastBackoff,
@@ -632,7 +632,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		},
 		{
 			error: &CustomError{
-				Err: errors.NewOpError(
+				Err: errors.Operation(
 					errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 				),
 			},
@@ -642,7 +642,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			error: &CustomError{
 				Err: fmt.Errorf(
 					"wrapped error: %w",
-					errors.NewOpError(
+					errors.Operation(
 						errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 					),
 				),
@@ -653,7 +653,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			error: &CustomError{
 				Err: fmt.Errorf(
 					"wrapped error: %w",
-					errors.NewOpError(
+					errors.Operation(
 						errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
 					),
 				),

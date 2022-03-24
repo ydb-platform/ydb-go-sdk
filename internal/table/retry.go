@@ -133,9 +133,9 @@ func SingleSession(s Session) SessionProvider {
 }
 
 var (
-	errNoSession         = fmt.Errorf("no session")
-	errUnexpectedSession = fmt.Errorf("unexpected session")
-	errSessionOverflow   = fmt.Errorf("session overflow")
+	errNoSession         = errors.New(fmt.Errorf("no session"))
+	errUnexpectedSession = errors.New(fmt.Errorf("unexpected session"))
+	errSessionOverflow   = errors.New(fmt.Errorf("session overflow"))
 )
 
 type singleSession struct {

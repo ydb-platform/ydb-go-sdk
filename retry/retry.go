@@ -33,7 +33,7 @@ var (
 // if retryOperation returns nil - retry loop will break
 type retryOperation func(context.Context) (err error)
 
-type retryableErrorOption func(e *errors.RetryableError)
+type retryableErrorOption errors.RetryableErrorOption
 
 const (
 	BackoffTypeNoBackoff   = errors.BackoffTypeNoBackoff
@@ -42,25 +42,23 @@ const (
 )
 
 func WithBackoff(t errors.BackoffType) retryableErrorOption {
-	return func(e *errors.RetryableError) {
-		e.BackoffType = t
-	}
+	return retryableErrorOption(errors.WithBackoff(t))
 }
 
 func WithDeleteSession() retryableErrorOption {
-	return func(e *errors.RetryableError) {
-		e.MustDeleteSession = true
-	}
+	return retryableErrorOption(errors.WithDeleteSession())
 }
 
 func RetryableError(err error, opts ...retryableErrorOption) error {
-	re := &errors.RetryableError{
-		Err: err,
-	}
-	for _, o := range opts {
-		o(re)
-	}
-	return re
+	return errors.RetryableError(
+		err,
+		func() (retryableErrorOptions []errors.RetryableErrorOption) {
+			for _, o := range opts {
+				retryableErrorOptions = append(retryableErrorOptions, errors.RetryableErrorOption(o))
+			}
+			return retryableErrorOptions
+		}()...,
+	)
 }
 
 type retryOptionsHolder struct {

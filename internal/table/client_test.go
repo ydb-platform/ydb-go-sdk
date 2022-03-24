@@ -232,10 +232,10 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			const timeout = time.Second
 			select {
 			case err := <-got:
-				if !errors.Is(err, ErrSessionPoolClosed) {
+				if !errors.Is(err, errSessionPoolClosed) {
 					t.Fatalf(
 						"unexpected error: %v; want %v",
-						err, ErrSessionPoolClosed,
+						err, errSessionPoolClosed,
 					)
 				}
 			case <-time.After(timeout):
@@ -312,10 +312,10 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatalf("unexpected session close")
 	}
 
-	if err := p.Put(context.Background(), s3); !errors.Is(err, ErrSessionPoolClosed) {
+	if err := p.Put(context.Background(), s3); !errors.Is(err, errSessionPoolClosed) {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
-			err, ErrSessionPoolClosed,
+			err, errSessionPoolClosed,
 		)
 	}
 	wg.Wait()
@@ -368,7 +368,7 @@ func TestRaceWgClosed(t *testing.T) {
 								return nil
 							},
 						)
-						if errors.Is(err, ErrSessionPoolClosed) {
+						if errors.Is(err, errSessionPoolClosed) {
 							return
 						}
 					}
@@ -565,8 +565,8 @@ func TestSessionPoolPutInFull(t *testing.T) {
 		t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
 	}
 
-	if err := p.Put(context.Background(), simpleSession(t)); !errors.Is(err, ErrSessionPoolOverflow) {
-		t.Fatalf("unexpected error on put session into full client: %v, wand: %v", err, ErrSessionPoolOverflow)
+	if err := p.Put(context.Background(), simpleSession(t)); !errors.Is(err, errSessionPoolOverflow) {
+		t.Fatalf("unexpected error on put session into full client: %v, wand: %v", err, errSessionPoolOverflow)
 	}
 }
 
@@ -1029,7 +1029,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	}
 
 	// Now fail the Keepalive() call from above.
-	keepaliveResult <- errors.NewOpError(
+	keepaliveResult <- errors.Operation(
 		errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 	)
 
@@ -1133,7 +1133,7 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 					// nolint:unparam
 					// nolint:nolintlint
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
-						return nil, errors.NewOpError(
+						return nil, errors.Operation(
 							errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 						)
 					},

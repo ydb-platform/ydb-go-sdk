@@ -21,8 +21,8 @@ var (
 		"grpcs": true,
 		"grpc":  false,
 	}
-	errSchemeNotValid = fmt.Errorf("schema not valid")
-	errParserExists   = fmt.Errorf("already exists parser. newest parser replaced old. param")
+	errSchemeNotValid = errors.New(fmt.Errorf("schema not valid"))
+	errParserExists   = errors.New(fmt.Errorf("already exists parser. newest parser replaced old. param"))
 )
 
 type Parser func(value string) ([]config.Option, error)

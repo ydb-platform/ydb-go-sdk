@@ -9,7 +9,7 @@ func Check(err error) (
 ) {
 	var te *transportError
 	var oe *operationError
-	var re *RetryableError
+	var re *retryableError
 	switch {
 	case As(err, &te):
 		return int64(te.code),
@@ -24,8 +24,8 @@ func Check(err error) (
 	case As(err, &re):
 		return -1,
 			OperationNotFinished,
-			re.BackoffType,
-			re.MustDeleteSession
+			re.backoffType,
+			re.mustDeleteSession
 	default:
 		return -1,
 			OperationFinished, // it's finished, not need any retry attempts

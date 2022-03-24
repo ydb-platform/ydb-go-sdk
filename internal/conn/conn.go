@@ -20,9 +20,9 @@ import (
 
 var (
 	// errOperationNotReady specified error when operation is not ready
-	errOperationNotReady = fmt.Errorf("operation is not ready yet")
+	errOperationNotReady = errors.New(fmt.Errorf("operation is not ready yet"))
 	// errClosedConnection specified error when connection are closed early
-	errClosedConnection = fmt.Errorf("connection closed early")
+	errClosedConnection = errors.New(fmt.Errorf("connection closed early"))
 )
 
 type Conn interface {
@@ -374,7 +374,7 @@ func (c *conn) Invoke(
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
 				return errors.WithStackTrace(
-					errors.NewOpError(
+					errors.Operation(
 						errors.FromOperation(
 							o.GetOperation(),
 						),

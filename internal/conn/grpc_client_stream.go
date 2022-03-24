@@ -88,7 +88,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		if operation, ok := m.(wrap.StreamOperationResponse); ok {
 			if s := operation.GetStatus(); s != Ydb.StatusIds_SUCCESS {
 				return errors.WithStackTrace(
-					errors.NewOpError(
+					errors.Operation(
 						errors.FromOperation(
 							operation,
 						),

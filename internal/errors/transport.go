@@ -45,8 +45,8 @@ func WithAddress(address string) teOpt {
 	}
 }
 
-// NewTransportError returns a new transport error with given options
-func NewTransportError(opts ...teOpt) error {
+// Transport returns a new transport error with given options
+func Transport(opts ...teOpt) error {
 	te := &transportError{}
 	for _, f := range opts {
 		f(te)

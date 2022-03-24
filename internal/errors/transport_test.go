@@ -73,71 +73,71 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 		pessimize bool
 	}{
 		{
-			error:     NewTransportError(),
+			error:     Transport(),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.Canceled)),
+			error:     Transport(WithCode(grpcCodes.Canceled)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.Unknown)),
+			error:     Transport(WithCode(grpcCodes.Unknown)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.InvalidArgument)),
+			error:     Transport(WithCode(grpcCodes.InvalidArgument)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.DeadlineExceeded)),
+			error:     Transport(WithCode(grpcCodes.DeadlineExceeded)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.NotFound)),
+			error:     Transport(WithCode(grpcCodes.NotFound)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.AlreadyExists)),
+			error:     Transport(WithCode(grpcCodes.AlreadyExists)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.PermissionDenied)),
+			error:     Transport(WithCode(grpcCodes.PermissionDenied)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.ResourceExhausted)),
+			error:     Transport(WithCode(grpcCodes.ResourceExhausted)),
 			pessimize: false,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.FailedPrecondition)),
+			error:     Transport(WithCode(grpcCodes.FailedPrecondition)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.Aborted)),
+			error:     Transport(WithCode(grpcCodes.Aborted)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.OutOfRange)),
+			error:     Transport(WithCode(grpcCodes.OutOfRange)),
 			pessimize: false,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.Unimplemented)),
+			error:     Transport(WithCode(grpcCodes.Unimplemented)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.Internal)),
+			error:     Transport(WithCode(grpcCodes.Internal)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.Unavailable)),
+			error:     Transport(WithCode(grpcCodes.Unavailable)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.DataLoss)),
+			error:     Transport(WithCode(grpcCodes.DataLoss)),
 			pessimize: true,
 		},
 		{
-			error:     NewTransportError(WithCode(grpcCodes.Unauthenticated)),
+			error:     Transport(WithCode(grpcCodes.Unauthenticated)),
 			pessimize: true,
 		},
 		{

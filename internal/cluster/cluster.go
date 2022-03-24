@@ -24,10 +24,10 @@ const (
 
 var (
 	// ErrClusterClosed returned when requested on a closed cluster.
-	ErrClusterClosed = fmt.Errorf("cluster closed")
+	ErrClusterClosed = errors.New(fmt.Errorf("cluster closed"))
 
 	// ErrClusterEmpty returned when no connections left in cluster.
-	ErrClusterEmpty = fmt.Errorf("cluster empty")
+	ErrClusterEmpty = errors.New(fmt.Errorf("cluster empty"))
 )
 
 type cluster struct {

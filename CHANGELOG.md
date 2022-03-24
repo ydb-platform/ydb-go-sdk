@@ -1,6 +1,7 @@
 * Refactored `cluster.Cluster` and `balancer.Balancer` interfaces (removed `Update` method)
 * Replaced `cluster.Update` with `cluster.Remove` and `cluster.Insert` calls
 * Fixed bug with unexpected changing of local datacenter flag in endpoint
+* Refactored errors wrapping (stackedError are not ydb error now, checking `errors.IsYdb(err)` with `errors.As` now)
 
 ## v3.16.9
 * Refactored internal operation and transport errors

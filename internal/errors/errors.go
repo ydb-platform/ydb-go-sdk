@@ -3,7 +3,6 @@ package errors
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 
 	grpcCodes "google.golang.org/grpc/codes"
@@ -81,10 +80,4 @@ func Is(err error, targets ...error) bool {
 		}
 	}
 	return false
-}
-
-// New is a proxy to errors.New
-// This need to single import errors
-func New(text string) error {
-	return WithStackTrace(fmt.Errorf("%w", errors.New(text)), WithSkipDepth(1))
 }

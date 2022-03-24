@@ -17,7 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 )
 
-var ErrNotImplemented = fmt.Errorf("testutil: not implemented")
+var ErrNotImplemented = errors.New(fmt.Errorf("testutil: not implemented"))
 
 type MethodCode uint
 
