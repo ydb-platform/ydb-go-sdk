@@ -50,7 +50,6 @@ type (
 		OnClusterClose  func(DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo)
 		OnClusterGet    func(DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo)
 		OnClusterInsert func(DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo)
-		OnClusterUpdate func(DriverClusterUpdateStartInfo) func(DriverClusterUpdateDoneInfo)
 		OnClusterRemove func(DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo)
 		OnPessimizeNode func(DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo)
 
@@ -123,17 +122,6 @@ type (
 	DriverClusterInsertDoneInfo struct {
 		Inserted bool
 		State    ConnState
-	}
-	DriverClusterUpdateStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Endpoint EndpointInfo
-	}
-	DriverClusterUpdateDoneInfo struct {
-		State ConnState
 	}
 	DriverClusterRemoveStartInfo struct {
 		// Context make available context in trace callback function.

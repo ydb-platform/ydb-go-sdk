@@ -1,5 +1,6 @@
 * Refactored `cluster.Cluster` and `balancer.Balancer` interfaces (removed `Update` method)
 * Replaced `cluster.Update` with `cluster.Remove` and `cluster.Insert` calls
+* Removed `trace.Driver.OnClusterUpdate` event
 * Fixed bug with unexpected changing of local datacenter flag in endpoint
 * Refactored errors wrapping (stackedError are not ydb error now, checking `errors.IsYdb(err)` with `errors.As` now)
 

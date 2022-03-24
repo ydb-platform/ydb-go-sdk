@@ -479,30 +479,6 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		}
 	}
 	switch {
-	case t.OnClusterUpdate == nil:
-		ret.OnClusterUpdate = x.OnClusterUpdate
-	case x.OnClusterUpdate == nil:
-		ret.OnClusterUpdate = t.OnClusterUpdate
-	default:
-		h1 := t.OnClusterUpdate
-		h2 := x.OnClusterUpdate
-		ret.OnClusterUpdate = func(d DriverClusterUpdateStartInfo) func(DriverClusterUpdateDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverClusterUpdateDoneInfo) {
-					r1(d)
-					r2(d)
-				}
-			}
-		}
-	}
-	switch {
 	case t.OnClusterRemove == nil:
 		ret.OnClusterRemove = x.OnClusterRemove
 	case x.OnClusterRemove == nil:
@@ -896,21 +872,6 @@ func (t Driver) onClusterInsert(d DriverClusterInsertStartInfo) func(DriverClust
 	}
 	return res
 }
-func (t Driver) onClusterUpdate(d DriverClusterUpdateStartInfo) func(DriverClusterUpdateDoneInfo) {
-	fn := t.OnClusterUpdate
-	if fn == nil {
-		return func(DriverClusterUpdateDoneInfo) {
-			return
-		}
-	}
-	res := fn(d)
-	if res == nil {
-		return func(DriverClusterUpdateDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t Driver) onClusterRemove(d DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo) {
 	fn := t.OnClusterRemove
 	if fn == nil {
@@ -1189,17 +1150,6 @@ func DriverOnClusterInsert(t Driver, c *context.Context, endpoint EndpointInfo) 
 	return func(inserted bool, state ConnState) {
 		var p DriverClusterInsertDoneInfo
 		p.Inserted = inserted
-		p.State = state
-		res(p)
-	}
-}
-func DriverOnClusterUpdate(t Driver, c *context.Context, endpoint EndpointInfo) func(state ConnState) {
-	var p DriverClusterUpdateStartInfo
-	p.Context = c
-	p.Endpoint = endpoint
-	res := t.onClusterUpdate(p)
-	return func(state ConnState) {
-		var p DriverClusterUpdateDoneInfo
 		p.State = state
 		res(p)
 	}

@@ -471,20 +471,6 @@ func Driver(log Logger, details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
-		t.OnClusterUpdate = func(info trace.DriverClusterUpdateStartInfo) func(trace.DriverClusterUpdateDoneInfo) {
-			endpoint := info.Endpoint.String()
-			log.Debugf(`update start {endpoint:%v}`,
-				endpoint,
-			)
-			start := time.Now()
-			return func(info trace.DriverClusterUpdateDoneInfo) {
-				log.Infof(`update done {endpoint:%v,latency:"%v",state:"%s"}`,
-					endpoint,
-					time.Since(start),
-					info.State,
-				)
-			}
-		}
 		t.OnPessimizeNode = func(info trace.DriverPessimizeNodeStartInfo) func(trace.DriverPessimizeNodeDoneInfo) {
 			endpoint := info.Endpoint.String()
 			log.Warnf(`pessimize start {endpoint:%v,cause:"%s"}`,
