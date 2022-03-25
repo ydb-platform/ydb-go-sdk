@@ -86,10 +86,13 @@ func WithConnectionString(connectionString string) Option {
 			}
 			issues = append(issues, err)
 		}
-		return errors.NewWithIssues(
-			"parse connection string '"+connectionString+"' failed:",
-			issues...,
-		)
+		if len(issues) > 0 {
+			return errors.WithStackTrace(errors.NewWithIssues(
+				"parse connection string '"+connectionString+"' failed:",
+				issues...,
+			))
+		}
+		return nil
 	}
 }
 

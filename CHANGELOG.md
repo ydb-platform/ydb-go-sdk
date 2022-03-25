@@ -1,3 +1,5 @@
+* Added stacktrace to errors with issues
+
 ## v3.16.10
 * Refactored `cluster.Cluster` and `balancer.Balancer` interfaces (removed `Update` method)
 * Replaced `cluster.Update` with `cluster.Remove` and `cluster.Insert` calls

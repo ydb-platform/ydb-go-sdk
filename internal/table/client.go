@@ -495,10 +495,7 @@ func (c *client) Close(ctx context.Context) (err error) {
 	c.wgClosed.Wait()
 
 	if len(issues) > 0 {
-		return errors.WithStackTrace(errors.NewWithIssues(
-			"table client closed with issues",
-			issues...,
-		))
+		return errors.WithStackTrace(errors.NewWithIssues("table client closed with issues", issues...))
 	}
 
 	return nil

@@ -80,7 +80,7 @@ func (c *conn) Release(ctx context.Context) (err error) {
 	}
 
 	if len(issues) > 0 {
-		return errors.NewWithIssues("conn released with issues", issues...)
+		return errors.WithStackTrace(errors.NewWithIssues("conn released with issues", issues...))
 	}
 
 	return nil

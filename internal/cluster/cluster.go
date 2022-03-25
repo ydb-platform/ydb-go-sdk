@@ -239,7 +239,7 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 	}
 
 	if len(issues) > 0 {
-		return errors.NewWithIssues("cluster closed with issues", issues...)
+		return errors.WithStackTrace(errors.NewWithIssues("cluster closed with issues", issues...))
 	}
 
 	return nil
