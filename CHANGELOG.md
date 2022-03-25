@@ -1,3 +1,4 @@
+## v3.16.11
 * Added stacktrace to errors with issues
 
 ## v3.16.10
