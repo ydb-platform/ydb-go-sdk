@@ -39,10 +39,10 @@ jobs:
             echo "CHANGELOG empty"
             exit 1;
           fi;
-          echo "CHANGELOG=$CHANGELOG"
           MAJOR=$(cat $VERSION_FILE | grep VersionMajor | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
           MINOR=$(cat $VERSION_FILE | grep VersionMinor | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
           PATCH=$(cat $VERSION_FILE | grep VersionPatch | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
+          LAST_TAG="v$MAJOR.$MINOR.$PATCH";
           if [ "$VERSION_CHANGE" = "MINOR" ]
           then
             MINOR=$((MINOR+1));
@@ -71,6 +71,7 @@ jobs:
           fi;
           git tag $TAG
           git push --tags && git push
+          CHANGELOG='$CHANGELOG\n\nFull Changelog: [$LAST_TAG...$TAG](https://github.com/ydb-platform/ydb-go-sdk/compare/$LAST_TAG...$TAG)'
           if [ "$RELEASE_CANDIDATE" = true ]
           then
             gh release create -d $TAG -t "$TAG" --notes "$CHANGELOG"
