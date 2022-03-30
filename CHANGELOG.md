@@ -1,3 +1,5 @@
+* Added full changelog link to github release description 
+
 ## v3.16.11
 * Added stacktrace to errors with issues
 
