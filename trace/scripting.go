@@ -10,7 +10,6 @@ import (
 
 type (
 	//gtrace:gen
-	//gtrace:set Shortcut
 	Scripting struct {
 		OnExecute       func(ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo)
 		OnStreamExecute func(

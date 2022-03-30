@@ -13,7 +13,6 @@ import (
 
 type (
 	//gtrace:gen
-	//gtrace:set Shortcut
 	Driver struct {
 		// Driver runtime events
 		OnInit  func(DriverInitStartInfo) func(DriverInitDoneInfo)

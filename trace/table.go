@@ -11,7 +11,6 @@ import (
 type (
 	// Table contains options for tracing table client activity.
 	//gtrace:gen
-	//gtrace:set Shortcut
 	Table struct {
 		// Client events
 		OnInit          func(TableInitStartInfo) func(TableInitDoneInfo)

@@ -8,7 +8,6 @@ import "context"
 
 type (
 	//gtrace:gen
-	//gtrace:set Shortcut
 	Discovery struct {
 		OnDiscover func(DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo)
 		OnWhoAmI   func(DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo)

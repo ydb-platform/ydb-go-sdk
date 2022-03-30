@@ -4,579 +4,748 @@ package trace
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"runtime/debug"
 )
 
 // Compose returns a new Table which has functional fields composed
 // both from t and x.
 func (t Table) Compose(x Table) (ret Table) {
-	switch {
-	case t.OnInit == nil:
-		ret.OnInit = x.OnInit
-	case x.OnInit == nil:
-		ret.OnInit = t.OnInit
-	default:
+	{
 		h1 := t.OnInit
 		h2 := x.OnInit
 		ret.OnInit = func(t TableInitStartInfo) func(TableInitDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableInitDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableInitDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableInitDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnClose == nil:
-		ret.OnClose = x.OnClose
-	case x.OnClose == nil:
-		ret.OnClose = t.OnClose
-	default:
+	{
 		h1 := t.OnClose
 		h2 := x.OnClose
 		ret.OnClose = func(t TableCloseStartInfo) func(TableCloseDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableCloseDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableCloseDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableCloseDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnDo == nil:
-		ret.OnDo = x.OnDo
-	case x.OnDo == nil:
-		ret.OnDo = t.OnDo
-	default:
+	{
 		h1 := t.OnDo
 		h2 := x.OnDo
 		ret.OnDo = func(t TableDoStartInfo) func(TableDoIntermediateInfo) func(TableDoDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
-					r11 := r1(info)
-					r21 := r2(info)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(t TableDoDoneInfo) {
-							r11(t)
-							r21(t)
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableDoIntermediateInfo) func(TableDoDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				var r2, r3 func(TableDoDoneInfo)
+				if r != nil {
+					r2 = r(info)
+				}
+				if r1 != nil {
+					r3 = r1(info)
+				}
+				return func(t TableDoDoneInfo) {
+					defer func() {
+						if e := recover(); e != nil {
+							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
 						}
+					}()
+					if r2 != nil {
+						r2(t)
+					}
+					if r3 != nil {
+						r3(t)
 					}
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnDoTx == nil:
-		ret.OnDoTx = x.OnDoTx
-	case x.OnDoTx == nil:
-		ret.OnDoTx = t.OnDoTx
-	default:
+	{
 		h1 := t.OnDoTx
 		h2 := x.OnDoTx
 		ret.OnDoTx = func(t TableDoTxStartInfo) func(TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
-					r11 := r1(info)
-					r21 := r2(info)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(t TableDoTxDoneInfo) {
-							r11(t)
-							r21(t)
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableDoTxIntermediateInfo) func(TableDoTxDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				var r2, r3 func(TableDoTxDoneInfo)
+				if r != nil {
+					r2 = r(info)
+				}
+				if r1 != nil {
+					r3 = r1(info)
+				}
+				return func(t TableDoTxDoneInfo) {
+					defer func() {
+						if e := recover(); e != nil {
+							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
 						}
+					}()
+					if r2 != nil {
+						r2(t)
+					}
+					if r3 != nil {
+						r3(t)
 					}
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnCreateSession == nil:
-		ret.OnCreateSession = x.OnCreateSession
-	case x.OnCreateSession == nil:
-		ret.OnCreateSession = t.OnCreateSession
-	default:
+	{
 		h1 := t.OnCreateSession
 		h2 := x.OnCreateSession
 		ret.OnCreateSession = func(t TableCreateSessionStartInfo) func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
-					r11 := r1(info)
-					r21 := r2(info)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(t TableCreateSessionDoneInfo) {
-							r11(t)
-							r21(t)
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				var r2, r3 func(TableCreateSessionDoneInfo)
+				if r != nil {
+					r2 = r(info)
+				}
+				if r1 != nil {
+					r3 = r1(info)
+				}
+				return func(t TableCreateSessionDoneInfo) {
+					defer func() {
+						if e := recover(); e != nil {
+							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
 						}
+					}()
+					if r2 != nil {
+						r2(t)
+					}
+					if r3 != nil {
+						r3(t)
 					}
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionNew == nil:
-		ret.OnSessionNew = x.OnSessionNew
-	case x.OnSessionNew == nil:
-		ret.OnSessionNew = t.OnSessionNew
-	default:
+	{
 		h1 := t.OnSessionNew
 		h2 := x.OnSessionNew
 		ret.OnSessionNew = func(t TableSessionNewStartInfo) func(TableSessionNewDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableSessionNewDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableSessionNewDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableSessionNewDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionDelete == nil:
-		ret.OnSessionDelete = x.OnSessionDelete
-	case x.OnSessionDelete == nil:
-		ret.OnSessionDelete = t.OnSessionDelete
-	default:
+	{
 		h1 := t.OnSessionDelete
 		h2 := x.OnSessionDelete
 		ret.OnSessionDelete = func(t TableSessionDeleteStartInfo) func(TableSessionDeleteDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableSessionDeleteDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableSessionDeleteDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableSessionDeleteDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionKeepAlive == nil:
-		ret.OnSessionKeepAlive = x.OnSessionKeepAlive
-	case x.OnSessionKeepAlive == nil:
-		ret.OnSessionKeepAlive = t.OnSessionKeepAlive
-	default:
+	{
 		h1 := t.OnSessionKeepAlive
 		h2 := x.OnSessionKeepAlive
 		ret.OnSessionKeepAlive = func(t TableKeepAliveStartInfo) func(TableKeepAliveDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableKeepAliveDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableKeepAliveDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableKeepAliveDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionQueryPrepare == nil:
-		ret.OnSessionQueryPrepare = x.OnSessionQueryPrepare
-	case x.OnSessionQueryPrepare == nil:
-		ret.OnSessionQueryPrepare = t.OnSessionQueryPrepare
-	default:
+	{
 		h1 := t.OnSessionQueryPrepare
 		h2 := x.OnSessionQueryPrepare
 		ret.OnSessionQueryPrepare = func(t TablePrepareDataQueryStartInfo) func(TablePrepareDataQueryDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TablePrepareDataQueryDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TablePrepareDataQueryDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TablePrepareDataQueryDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionQueryExecute == nil:
-		ret.OnSessionQueryExecute = x.OnSessionQueryExecute
-	case x.OnSessionQueryExecute == nil:
-		ret.OnSessionQueryExecute = t.OnSessionQueryExecute
-	default:
+	{
 		h1 := t.OnSessionQueryExecute
 		h2 := x.OnSessionQueryExecute
 		ret.OnSessionQueryExecute = func(t TableExecuteDataQueryStartInfo) func(TableExecuteDataQueryDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableExecuteDataQueryDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableExecuteDataQueryDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableExecuteDataQueryDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionQueryExplain == nil:
-		ret.OnSessionQueryExplain = x.OnSessionQueryExplain
-	case x.OnSessionQueryExplain == nil:
-		ret.OnSessionQueryExplain = t.OnSessionQueryExplain
-	default:
+	{
 		h1 := t.OnSessionQueryExplain
 		h2 := x.OnSessionQueryExplain
 		ret.OnSessionQueryExplain = func(t TableExplainQueryStartInfo) func(TableExplainQueryDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableExplainQueryDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableExplainQueryDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableExplainQueryDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionQueryStreamExecute == nil:
-		ret.OnSessionQueryStreamExecute = x.OnSessionQueryStreamExecute
-	case x.OnSessionQueryStreamExecute == nil:
-		ret.OnSessionQueryStreamExecute = t.OnSessionQueryStreamExecute
-	default:
+	{
 		h1 := t.OnSessionQueryStreamExecute
 		h2 := x.OnSessionQueryStreamExecute
 		ret.OnSessionQueryStreamExecute = func(t TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
-					r11 := r1(t)
-					r21 := r2(t)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(t TableSessionQueryStreamExecuteDoneInfo) {
-							r11(t)
-							r21(t)
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				var r2, r3 func(TableSessionQueryStreamExecuteDoneInfo)
+				if r != nil {
+					r2 = r(t)
+				}
+				if r1 != nil {
+					r3 = r1(t)
+				}
+				return func(t TableSessionQueryStreamExecuteDoneInfo) {
+					defer func() {
+						if e := recover(); e != nil {
+							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
 						}
+					}()
+					if r2 != nil {
+						r2(t)
+					}
+					if r3 != nil {
+						r3(t)
 					}
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionQueryStreamRead == nil:
-		ret.OnSessionQueryStreamRead = x.OnSessionQueryStreamRead
-	case x.OnSessionQueryStreamRead == nil:
-		ret.OnSessionQueryStreamRead = t.OnSessionQueryStreamRead
-	default:
+	{
 		h1 := t.OnSessionQueryStreamRead
 		h2 := x.OnSessionQueryStreamRead
 		ret.OnSessionQueryStreamRead = func(t TableSessionQueryStreamReadStartInfo) func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-					r11 := r1(t)
-					r21 := r2(t)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(t TableSessionQueryStreamReadDoneInfo) {
-							r11(t)
-							r21(t)
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				var r2, r3 func(TableSessionQueryStreamReadDoneInfo)
+				if r != nil {
+					r2 = r(t)
+				}
+				if r1 != nil {
+					r3 = r1(t)
+				}
+				return func(t TableSessionQueryStreamReadDoneInfo) {
+					defer func() {
+						if e := recover(); e != nil {
+							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
 						}
+					}()
+					if r2 != nil {
+						r2(t)
+					}
+					if r3 != nil {
+						r3(t)
 					}
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionTransactionBegin == nil:
-		ret.OnSessionTransactionBegin = x.OnSessionTransactionBegin
-	case x.OnSessionTransactionBegin == nil:
-		ret.OnSessionTransactionBegin = t.OnSessionTransactionBegin
-	default:
+	{
 		h1 := t.OnSessionTransactionBegin
 		h2 := x.OnSessionTransactionBegin
 		ret.OnSessionTransactionBegin = func(t TableSessionTransactionBeginStartInfo) func(TableSessionTransactionBeginDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableSessionTransactionBeginDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableSessionTransactionBeginDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableSessionTransactionBeginDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionTransactionCommit == nil:
-		ret.OnSessionTransactionCommit = x.OnSessionTransactionCommit
-	case x.OnSessionTransactionCommit == nil:
-		ret.OnSessionTransactionCommit = t.OnSessionTransactionCommit
-	default:
+	{
 		h1 := t.OnSessionTransactionCommit
 		h2 := x.OnSessionTransactionCommit
 		ret.OnSessionTransactionCommit = func(t TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableSessionTransactionCommitDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableSessionTransactionCommitDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableSessionTransactionCommitDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnSessionTransactionRollback == nil:
-		ret.OnSessionTransactionRollback = x.OnSessionTransactionRollback
-	case x.OnSessionTransactionRollback == nil:
-		ret.OnSessionTransactionRollback = t.OnSessionTransactionRollback
-	default:
+	{
 		h1 := t.OnSessionTransactionRollback
 		h2 := x.OnSessionTransactionRollback
 		ret.OnSessionTransactionRollback = func(t TableSessionTransactionRollbackStartInfo) func(TableSessionTransactionRollbackDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TableSessionTransactionRollbackDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TableSessionTransactionRollbackDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableSessionTransactionRollbackDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnPoolStateChange == nil:
-		ret.OnPoolStateChange = x.OnPoolStateChange
-	case x.OnPoolStateChange == nil:
-		ret.OnPoolStateChange = t.OnPoolStateChange
-	default:
+	{
 		h1 := t.OnPoolStateChange
 		h2 := x.OnPoolStateChange
 		ret.OnPoolStateChange = func(t TablePooStateChangeInfo) {
-			h1(t)
-			h2(t)
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			if h1 != nil {
+				h1(t)
+			}
+			if h2 != nil {
+				h2(t)
+			}
 		}
 	}
-	switch {
-	case t.OnPoolSessionNew == nil:
-		ret.OnPoolSessionNew = x.OnPoolSessionNew
-	case x.OnPoolSessionNew == nil:
-		ret.OnPoolSessionNew = t.OnPoolSessionNew
-	default:
+	{
 		h1 := t.OnPoolSessionNew
 		h2 := x.OnPoolSessionNew
 		ret.OnPoolSessionNew = func(t TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TablePoolSessionNewDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TablePoolSessionNewDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TablePoolSessionNewDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnPoolSessionClose == nil:
-		ret.OnPoolSessionClose = x.OnPoolSessionClose
-	case x.OnPoolSessionClose == nil:
-		ret.OnPoolSessionClose = t.OnPoolSessionClose
-	default:
+	{
 		h1 := t.OnPoolSessionClose
 		h2 := x.OnPoolSessionClose
 		ret.OnPoolSessionClose = func(t TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TablePoolSessionCloseDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TablePoolSessionCloseDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TablePoolSessionCloseDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnPoolPut == nil:
-		ret.OnPoolPut = x.OnPoolPut
-	case x.OnPoolPut == nil:
-		ret.OnPoolPut = t.OnPoolPut
-	default:
+	{
 		h1 := t.OnPoolPut
 		h2 := x.OnPoolPut
 		ret.OnPoolPut = func(t TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TablePoolPutDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TablePoolPutDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TablePoolPutDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnPoolGet == nil:
-		ret.OnPoolGet = x.OnPoolGet
-	case x.OnPoolGet == nil:
-		ret.OnPoolGet = t.OnPoolGet
-	default:
+	{
 		h1 := t.OnPoolGet
 		h2 := x.OnPoolGet
 		ret.OnPoolGet = func(t TablePoolGetStartInfo) func(TablePoolGetDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TablePoolGetDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TablePoolGetDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TablePoolGetDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnPoolWait == nil:
-		ret.OnPoolWait = x.OnPoolWait
-	case x.OnPoolWait == nil:
-		ret.OnPoolWait = t.OnPoolWait
-	default:
+	{
 		h1 := t.OnPoolWait
 		h2 := x.OnPoolWait
 		ret.OnPoolWait = func(t TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo) {
-			r1 := h1(t)
-			r2 := h2(t)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(t TablePoolWaitDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(TablePoolWaitDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TablePoolWaitDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
 					r1(t)
-					r2(t)
 				}
 			}
 		}

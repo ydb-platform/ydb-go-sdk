@@ -4,41 +4,54 @@ package trace
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"runtime/debug"
 )
 
 // Compose returns a new Retry which has functional fields composed
 // both from t and x.
 func (t Retry) Compose(x Retry) (ret Retry) {
-	switch {
-	case t.OnRetry == nil:
-		ret.OnRetry = x.OnRetry
-	case x.OnRetry == nil:
-		ret.OnRetry = t.OnRetry
-	default:
+	{
 		h1 := t.OnRetry
 		h2 := x.OnRetry
 		ret.OnRetry = func(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
-			r1 := h1(r)
-			r2 := h2(r)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
-					r11 := r1(r)
-					r21 := r2(r)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(r RetryLoopDoneInfo) {
-							r11(r)
-							r21(r)
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r1, r2 func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
+			if h1 != nil {
+				r1 = h1(r)
+			}
+			if h2 != nil {
+				r2 = h2(r)
+			}
+			return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				var r3, r4 func(RetryLoopDoneInfo)
+				if r1 != nil {
+					r3 = r1(r)
+				}
+				if r2 != nil {
+					r4 = r2(r)
+				}
+				return func(r RetryLoopDoneInfo) {
+					defer func() {
+						if e := recover(); e != nil {
+							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
 						}
+					}()
+					if r3 != nil {
+						r3(r)
+					}
+					if r4 != nil {
+						r4(r)
 					}
 				}
 			}

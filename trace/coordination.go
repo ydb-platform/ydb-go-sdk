@@ -6,6 +6,5 @@ package trace
 
 type (
 	//gtrace:gen
-	//gtrace:set Shortcut
 	Coordination struct{}
 )

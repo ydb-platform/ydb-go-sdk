@@ -146,7 +146,6 @@ func main() {
 				Context:  buildCtx,
 				Output:   f,
 				BuildTag: buildTag,
-				Stub:     true,
 			})
 		}
 	} else {
@@ -154,7 +153,6 @@ func main() {
 			Context:  buildCtx,
 			Output:   os.Stdout,
 			BuildTag: buildTag,
-			Stub:     true,
 		})
 	}
 
@@ -303,7 +301,6 @@ func main() {
 	for _, item := range items {
 		t := &Trace{
 			Name: item.Ident.Name,
-			Flag: item.Flag,
 		}
 		p.Traces = append(p.Traces, t)
 		traces[item.Ident.Name] = t
@@ -346,7 +343,6 @@ func main() {
 			t.Hooks = append(t.Hooks, Hook{
 				Name: name,
 				Func: f,
-				Flag: item.GenConfig.Flag | config.Flag,
 			})
 		}
 	}
@@ -460,7 +456,6 @@ type Package struct {
 type Trace struct {
 	Name   string
 	Hooks  []Hook
-	Flag   GenFlag
 	Nested bool
 }
 
@@ -469,12 +464,15 @@ func (*Trace) isFuncResult() bool { return true }
 type Hook struct {
 	Name string
 	Func *Func
-	Flag GenFlag
 }
 
 type Param struct {
 	Name string // Might be empty.
 	Type types.Type
+}
+
+func (p Param) String() string {
+	return p.Name + " " + p.Type.String()
 }
 
 type FuncResult interface {
@@ -498,19 +496,7 @@ func (f GenFlag) Has(x GenFlag) bool {
 	return f&x != 0
 }
 
-const (
-	// nolint:deadcode
-	GenZero GenFlag = 1 << iota >> 1
-	GenShortcut
-	GenShortcutPublic
-	GenContext
-
-	// nolint:deadcode
-	GenAll = ^GenFlag(0)
-)
-
 type GenConfig struct {
-	Flag GenFlag
 }
 
 func TrimConfigComment(text string) (string, bool) {
@@ -525,29 +511,8 @@ func (g *GenConfig) ParseComment(text string) (err error) {
 	prefix, text := split(text, ' ')
 	switch prefix {
 	case "gen":
-	case "set":
-		return g.ParseParameter(text)
 	default:
 		return fmt.Errorf("unknown prefix: %q", prefix)
-	}
-	return nil
-}
-
-func (g *GenConfig) ParseParameter(text string) (err error) {
-	text = strings.TrimSpace(text)
-	param, _ := split(text, '=')
-	if param == "" {
-		return nil
-	}
-	switch param {
-	case "shortcut":
-		g.Flag |= GenShortcut
-	case "Shortcut", "SHORTCUT":
-		g.Flag |= GenShortcutPublic
-	case "context":
-		g.Flag |= GenContext
-	default:
-		return fmt.Errorf("unexpected parameter: %q", param)
 	}
 	return nil
 }

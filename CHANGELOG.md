@@ -1,3 +1,6 @@
+* Added panic recover on trace calls in `Compose` call step with print stacktrace to `os.Stderr` and `os.Exit(1)`
+* Removed `trace.Context{Driver,Retry,Table}` and `trace.With{Driver,Retry,Table}` as redundant
+
 ## v3.16.12
 * Fixed bug with check acquire error over `ydb.IsRatelimiterAcquireError`
 * Added full changelog link to github release description 

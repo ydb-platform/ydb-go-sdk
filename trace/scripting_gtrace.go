@@ -4,114 +4,148 @@ package trace
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"runtime/debug"
 )
 
 // Compose returns a new Scripting which has functional fields composed
 // both from t and x.
 func (t Scripting) Compose(x Scripting) (ret Scripting) {
-	switch {
-	case t.OnExecute == nil:
-		ret.OnExecute = x.OnExecute
-	case x.OnExecute == nil:
-		ret.OnExecute = t.OnExecute
-	default:
+	{
 		h1 := t.OnExecute
 		h2 := x.OnExecute
 		ret.OnExecute = func(s ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s ScriptingExecuteDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(ScriptingExecuteDoneInfo)
+			if h1 != nil {
+				r = h1(s)
+			}
+			if h2 != nil {
+				r1 = h2(s)
+			}
+			return func(s ScriptingExecuteDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(s)
+				}
+				if r1 != nil {
 					r1(s)
-					r2(s)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnStreamExecute == nil:
-		ret.OnStreamExecute = x.OnStreamExecute
-	case x.OnStreamExecute == nil:
-		ret.OnStreamExecute = t.OnStreamExecute
-	default:
+	{
 		h1 := t.OnStreamExecute
 		h2 := x.OnStreamExecute
 		ret.OnStreamExecute = func(s ScriptingStreamExecuteStartInfo) func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
-					r11 := r1(s)
-					r21 := r2(s)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(s ScriptingStreamExecuteDoneInfo) {
-							r11(s)
-							r21(s)
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo)
+			if h1 != nil {
+				r = h1(s)
+			}
+			if h2 != nil {
+				r1 = h2(s)
+			}
+			return func(s ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				var r2, r3 func(ScriptingStreamExecuteDoneInfo)
+				if r != nil {
+					r2 = r(s)
+				}
+				if r1 != nil {
+					r3 = r1(s)
+				}
+				return func(s ScriptingStreamExecuteDoneInfo) {
+					defer func() {
+						if e := recover(); e != nil {
+							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
 						}
+					}()
+					if r2 != nil {
+						r2(s)
+					}
+					if r3 != nil {
+						r3(s)
 					}
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnExplain == nil:
-		ret.OnExplain = x.OnExplain
-	case x.OnExplain == nil:
-		ret.OnExplain = t.OnExplain
-	default:
+	{
 		h1 := t.OnExplain
 		h2 := x.OnExplain
 		ret.OnExplain = func(s ScriptingExplainStartInfo) func(ScriptingExplainDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s ScriptingExplainDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(ScriptingExplainDoneInfo)
+			if h1 != nil {
+				r = h1(s)
+			}
+			if h2 != nil {
+				r1 = h2(s)
+			}
+			return func(s ScriptingExplainDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(s)
+				}
+				if r1 != nil {
 					r1(s)
-					r2(s)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnClose == nil:
-		ret.OnClose = x.OnClose
-	case x.OnClose == nil:
-		ret.OnClose = t.OnClose
-	default:
+	{
 		h1 := t.OnClose
 		h2 := x.OnClose
 		ret.OnClose = func(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo) {
-			r1 := h1(s)
-			r2 := h2(s)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(s ScriptingCloseDoneInfo) {
+			defer func() {
+				if e := recover(); e != nil {
+					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				}
+			}()
+			var r, r1 func(ScriptingCloseDoneInfo)
+			if h1 != nil {
+				r = h1(s)
+			}
+			if h2 != nil {
+				r1 = h2(s)
+			}
+			return func(s ScriptingCloseDoneInfo) {
+				defer func() {
+					if e := recover(); e != nil {
+						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					}
+				}()
+				if r != nil {
+					r(s)
+				}
+				if r1 != nil {
 					r1(s)
-					r2(s)
 				}
 			}
 		}
