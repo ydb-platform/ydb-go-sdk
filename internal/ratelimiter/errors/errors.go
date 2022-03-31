@@ -32,7 +32,7 @@ func NewAcquire(amoount uint64, err error) ratelimiter.AcquireError {
 }
 
 func IsAcquireError(err error) bool {
-	ae := acquireError{}
+	var ae *acquireError
 	return errors.As(err, &ae)
 }
 
