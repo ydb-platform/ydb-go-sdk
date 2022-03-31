@@ -1,3 +1,4 @@
+## v3.16.12
 * Fixed bug with check acquire error over `ydb.IsRatelimiterAcquireError`
 * Added full changelog link to github release description 
 
