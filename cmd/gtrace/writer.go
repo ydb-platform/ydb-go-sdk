@@ -391,9 +391,9 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 			args := w.funcParams(fn.Params)
 			w.funcResults(fn)
 			w.line(`{`)
-			w.line("defer func() {")
+			w.line(`if options.recoverPanic {`)
 			w.block(func() {
-				w.line(`if options.recoverPanic {`)
+				w.line("defer func() {")
 				w.block(func() {
 					w.line("if e := recover(); e != nil {")
 					w.block(func() {
@@ -410,9 +410,9 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 					})
 					w.line("}")
 				})
-				w.line("}")
+				w.line("}()")
 			})
-			w.line("}()")
+			w.line("}")
 			var (
 				r1 string
 				r2 string

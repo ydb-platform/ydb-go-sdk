@@ -54,8 +54,8 @@ func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 		h1 := t.OnRetry
 		h2 := x.OnRetry
 		ret.OnRetry = func(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -64,8 +64,8 @@ func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r1, r2 func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
 			if h1 != nil {
 				r1 = h1(r)
@@ -74,8 +74,8 @@ func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 				r2 = h2(r)
 			}
 			return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -84,8 +84,8 @@ func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				var r3, r4 func(RetryLoopDoneInfo)
 				if r1 != nil {
 					r3 = r1(r)
@@ -94,8 +94,8 @@ func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 					r4 = r2(r)
 				}
 				return func(r RetryLoopDoneInfo) {
-					defer func() {
-						if options.recoverPanic {
+					if options.recoverPanic {
+						defer func() {
 							if e := recover(); e != nil {
 								if options.recoverPanicWriter != nil {
 									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -104,8 +104,8 @@ func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 									os.Exit(*options.exitCodeOnPanic)
 								}
 							}
-						}
-					}()
+						}()
+					}
 					if r3 != nil {
 						r3(r)
 					}

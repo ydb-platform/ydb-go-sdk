@@ -54,8 +54,8 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 		h1 := t.OnDiscover
 		h2 := x.OnDiscover
 		ret.OnDiscover = func(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -64,8 +64,8 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(DiscoveryDiscoverDoneInfo)
 			if h1 != nil {
 				r = h1(d)
@@ -74,8 +74,8 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 				r1 = h2(d)
 			}
 			return func(d DiscoveryDiscoverDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -84,8 +84,8 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(d)
 				}
@@ -99,8 +99,8 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 		h1 := t.OnWhoAmI
 		h2 := x.OnWhoAmI
 		ret.OnWhoAmI = func(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -109,8 +109,8 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(DiscoveryWhoAmIDoneInfo)
 			if h1 != nil {
 				r = h1(d)
@@ -119,8 +119,8 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 				r1 = h2(d)
 			}
 			return func(d DiscoveryWhoAmIDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -129,8 +129,8 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(d)
 				}

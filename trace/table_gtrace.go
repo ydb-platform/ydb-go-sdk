@@ -54,8 +54,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnInit
 		h2 := x.OnInit
 		ret.OnInit = func(t TableInitStartInfo) func(TableInitDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -64,8 +64,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableInitDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -74,8 +74,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableInitDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -84,8 +84,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -99,8 +99,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnClose
 		h2 := x.OnClose
 		ret.OnClose = func(t TableCloseStartInfo) func(TableCloseDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -109,8 +109,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableCloseDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -119,8 +119,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableCloseDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -129,8 +129,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -144,8 +144,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnDo
 		h2 := x.OnDo
 		ret.OnDo = func(t TableDoStartInfo) func(TableDoIntermediateInfo) func(TableDoDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -154,8 +154,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableDoIntermediateInfo) func(TableDoDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -164,8 +164,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -174,8 +174,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				var r2, r3 func(TableDoDoneInfo)
 				if r != nil {
 					r2 = r(info)
@@ -184,8 +184,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 					r3 = r1(info)
 				}
 				return func(t TableDoDoneInfo) {
-					defer func() {
-						if options.recoverPanic {
+					if options.recoverPanic {
+						defer func() {
 							if e := recover(); e != nil {
 								if options.recoverPanicWriter != nil {
 									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -194,8 +194,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 									os.Exit(*options.exitCodeOnPanic)
 								}
 							}
-						}
-					}()
+						}()
+					}
 					if r2 != nil {
 						r2(t)
 					}
@@ -210,8 +210,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnDoTx
 		h2 := x.OnDoTx
 		ret.OnDoTx = func(t TableDoTxStartInfo) func(TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -220,8 +220,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableDoTxIntermediateInfo) func(TableDoTxDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -230,8 +230,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -240,8 +240,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				var r2, r3 func(TableDoTxDoneInfo)
 				if r != nil {
 					r2 = r(info)
@@ -250,8 +250,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 					r3 = r1(info)
 				}
 				return func(t TableDoTxDoneInfo) {
-					defer func() {
-						if options.recoverPanic {
+					if options.recoverPanic {
+						defer func() {
 							if e := recover(); e != nil {
 								if options.recoverPanicWriter != nil {
 									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -260,8 +260,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 									os.Exit(*options.exitCodeOnPanic)
 								}
 							}
-						}
-					}()
+						}()
+					}
 					if r2 != nil {
 						r2(t)
 					}
@@ -276,8 +276,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnCreateSession
 		h2 := x.OnCreateSession
 		ret.OnCreateSession = func(t TableCreateSessionStartInfo) func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -286,8 +286,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -296,8 +296,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -306,8 +306,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				var r2, r3 func(TableCreateSessionDoneInfo)
 				if r != nil {
 					r2 = r(info)
@@ -316,8 +316,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 					r3 = r1(info)
 				}
 				return func(t TableCreateSessionDoneInfo) {
-					defer func() {
-						if options.recoverPanic {
+					if options.recoverPanic {
+						defer func() {
 							if e := recover(); e != nil {
 								if options.recoverPanicWriter != nil {
 									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -326,8 +326,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 									os.Exit(*options.exitCodeOnPanic)
 								}
 							}
-						}
-					}()
+						}()
+					}
 					if r2 != nil {
 						r2(t)
 					}
@@ -342,8 +342,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionNew
 		h2 := x.OnSessionNew
 		ret.OnSessionNew = func(t TableSessionNewStartInfo) func(TableSessionNewDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -352,8 +352,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableSessionNewDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -362,8 +362,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableSessionNewDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -372,8 +372,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -387,8 +387,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionDelete
 		h2 := x.OnSessionDelete
 		ret.OnSessionDelete = func(t TableSessionDeleteStartInfo) func(TableSessionDeleteDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -397,8 +397,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableSessionDeleteDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -407,8 +407,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableSessionDeleteDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -417,8 +417,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -432,8 +432,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionKeepAlive
 		h2 := x.OnSessionKeepAlive
 		ret.OnSessionKeepAlive = func(t TableKeepAliveStartInfo) func(TableKeepAliveDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -442,8 +442,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableKeepAliveDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -452,8 +452,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableKeepAliveDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -462,8 +462,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -477,8 +477,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionQueryPrepare
 		h2 := x.OnSessionQueryPrepare
 		ret.OnSessionQueryPrepare = func(t TablePrepareDataQueryStartInfo) func(TablePrepareDataQueryDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -487,8 +487,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TablePrepareDataQueryDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -497,8 +497,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TablePrepareDataQueryDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -507,8 +507,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -522,8 +522,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionQueryExecute
 		h2 := x.OnSessionQueryExecute
 		ret.OnSessionQueryExecute = func(t TableExecuteDataQueryStartInfo) func(TableExecuteDataQueryDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -532,8 +532,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableExecuteDataQueryDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -542,8 +542,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableExecuteDataQueryDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -552,8 +552,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -567,8 +567,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionQueryExplain
 		h2 := x.OnSessionQueryExplain
 		ret.OnSessionQueryExplain = func(t TableExplainQueryStartInfo) func(TableExplainQueryDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -577,8 +577,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableExplainQueryDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -587,8 +587,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableExplainQueryDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -597,8 +597,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -612,8 +612,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionQueryStreamExecute
 		h2 := x.OnSessionQueryStreamExecute
 		ret.OnSessionQueryStreamExecute = func(t TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -622,8 +622,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -632,8 +632,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -642,8 +642,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				var r2, r3 func(TableSessionQueryStreamExecuteDoneInfo)
 				if r != nil {
 					r2 = r(t)
@@ -652,8 +652,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 					r3 = r1(t)
 				}
 				return func(t TableSessionQueryStreamExecuteDoneInfo) {
-					defer func() {
-						if options.recoverPanic {
+					if options.recoverPanic {
+						defer func() {
 							if e := recover(); e != nil {
 								if options.recoverPanicWriter != nil {
 									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -662,8 +662,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 									os.Exit(*options.exitCodeOnPanic)
 								}
 							}
-						}
-					}()
+						}()
+					}
 					if r2 != nil {
 						r2(t)
 					}
@@ -678,8 +678,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionQueryStreamRead
 		h2 := x.OnSessionQueryStreamRead
 		ret.OnSessionQueryStreamRead = func(t TableSessionQueryStreamReadStartInfo) func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -688,8 +688,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -698,8 +698,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -708,8 +708,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				var r2, r3 func(TableSessionQueryStreamReadDoneInfo)
 				if r != nil {
 					r2 = r(t)
@@ -718,8 +718,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 					r3 = r1(t)
 				}
 				return func(t TableSessionQueryStreamReadDoneInfo) {
-					defer func() {
-						if options.recoverPanic {
+					if options.recoverPanic {
+						defer func() {
 							if e := recover(); e != nil {
 								if options.recoverPanicWriter != nil {
 									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -728,8 +728,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 									os.Exit(*options.exitCodeOnPanic)
 								}
 							}
-						}
-					}()
+						}()
+					}
 					if r2 != nil {
 						r2(t)
 					}
@@ -744,8 +744,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionTransactionBegin
 		h2 := x.OnSessionTransactionBegin
 		ret.OnSessionTransactionBegin = func(t TableSessionTransactionBeginStartInfo) func(TableSessionTransactionBeginDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -754,8 +754,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableSessionTransactionBeginDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -764,8 +764,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableSessionTransactionBeginDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -774,8 +774,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -789,8 +789,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionTransactionCommit
 		h2 := x.OnSessionTransactionCommit
 		ret.OnSessionTransactionCommit = func(t TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -799,8 +799,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableSessionTransactionCommitDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -809,8 +809,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableSessionTransactionCommitDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -819,8 +819,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -834,8 +834,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnSessionTransactionRollback
 		h2 := x.OnSessionTransactionRollback
 		ret.OnSessionTransactionRollback = func(t TableSessionTransactionRollbackStartInfo) func(TableSessionTransactionRollbackDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -844,8 +844,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TableSessionTransactionRollbackDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -854,8 +854,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TableSessionTransactionRollbackDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -864,8 +864,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -879,8 +879,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnPoolStateChange
 		h2 := x.OnPoolStateChange
 		ret.OnPoolStateChange = func(t TablePooStateChangeInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -889,8 +889,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			if h1 != nil {
 				h1(t)
 			}
@@ -903,8 +903,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnPoolSessionNew
 		h2 := x.OnPoolSessionNew
 		ret.OnPoolSessionNew = func(t TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -913,8 +913,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TablePoolSessionNewDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -923,8 +923,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TablePoolSessionNewDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -933,8 +933,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -948,8 +948,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnPoolSessionClose
 		h2 := x.OnPoolSessionClose
 		ret.OnPoolSessionClose = func(t TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -958,8 +958,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TablePoolSessionCloseDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -968,8 +968,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TablePoolSessionCloseDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -978,8 +978,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -993,8 +993,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnPoolPut
 		h2 := x.OnPoolPut
 		ret.OnPoolPut = func(t TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -1003,8 +1003,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TablePoolPutDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -1013,8 +1013,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TablePoolPutDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -1023,8 +1023,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -1038,8 +1038,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnPoolGet
 		h2 := x.OnPoolGet
 		ret.OnPoolGet = func(t TablePoolGetStartInfo) func(TablePoolGetDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -1048,8 +1048,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TablePoolGetDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -1058,8 +1058,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TablePoolGetDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -1068,8 +1068,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}
@@ -1083,8 +1083,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		h1 := t.OnPoolWait
 		h2 := x.OnPoolWait
 		ret.OnPoolWait = func(t TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -1093,8 +1093,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(TablePoolWaitDoneInfo)
 			if h1 != nil {
 				r = h1(t)
@@ -1103,8 +1103,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 				r1 = h2(t)
 			}
 			return func(t TablePoolWaitDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -1113,8 +1113,8 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(t)
 				}

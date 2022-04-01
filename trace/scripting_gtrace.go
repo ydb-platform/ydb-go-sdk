@@ -54,8 +54,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 		h1 := t.OnExecute
 		h2 := x.OnExecute
 		ret.OnExecute = func(s ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -64,8 +64,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(ScriptingExecuteDoneInfo)
 			if h1 != nil {
 				r = h1(s)
@@ -74,8 +74,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 				r1 = h2(s)
 			}
 			return func(s ScriptingExecuteDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -84,8 +84,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(s)
 				}
@@ -99,8 +99,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 		h1 := t.OnStreamExecute
 		h2 := x.OnStreamExecute
 		ret.OnStreamExecute = func(s ScriptingStreamExecuteStartInfo) func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -109,8 +109,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo)
 			if h1 != nil {
 				r = h1(s)
@@ -119,8 +119,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 				r1 = h2(s)
 			}
 			return func(s ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -129,8 +129,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				var r2, r3 func(ScriptingStreamExecuteDoneInfo)
 				if r != nil {
 					r2 = r(s)
@@ -139,8 +139,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 					r3 = r1(s)
 				}
 				return func(s ScriptingStreamExecuteDoneInfo) {
-					defer func() {
-						if options.recoverPanic {
+					if options.recoverPanic {
+						defer func() {
 							if e := recover(); e != nil {
 								if options.recoverPanicWriter != nil {
 									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -149,8 +149,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 									os.Exit(*options.exitCodeOnPanic)
 								}
 							}
-						}
-					}()
+						}()
+					}
 					if r2 != nil {
 						r2(s)
 					}
@@ -165,8 +165,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 		h1 := t.OnExplain
 		h2 := x.OnExplain
 		ret.OnExplain = func(s ScriptingExplainStartInfo) func(ScriptingExplainDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -175,8 +175,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(ScriptingExplainDoneInfo)
 			if h1 != nil {
 				r = h1(s)
@@ -185,8 +185,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 				r1 = h2(s)
 			}
 			return func(s ScriptingExplainDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -195,8 +195,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(s)
 				}
@@ -210,8 +210,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 		h1 := t.OnClose
 		h2 := x.OnClose
 		ret.OnClose = func(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo) {
-			defer func() {
-				if options.recoverPanic {
+			if options.recoverPanic {
+				defer func() {
 					if e := recover(); e != nil {
 						if options.recoverPanicWriter != nil {
 							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -220,8 +220,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 							os.Exit(*options.exitCodeOnPanic)
 						}
 					}
-				}
-			}()
+				}()
+			}
 			var r, r1 func(ScriptingCloseDoneInfo)
 			if h1 != nil {
 				r = h1(s)
@@ -230,8 +230,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 				r1 = h2(s)
 			}
 			return func(s ScriptingCloseDoneInfo) {
-				defer func() {
-					if options.recoverPanic {
+				if options.recoverPanic {
+					defer func() {
 						if e := recover(); e != nil {
 							if options.recoverPanicWriter != nil {
 								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
@@ -240,8 +240,8 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 								os.Exit(*options.exitCodeOnPanic)
 							}
 						}
-					}
-				}()
+					}()
+				}
 				if r != nil {
 					r(s)
 				}
