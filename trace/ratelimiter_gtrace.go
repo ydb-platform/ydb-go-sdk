@@ -2,39 +2,18 @@
 
 package trace
 
-import (
-	"io"
-)
-
 // ratelimiterComposeOptions is a holder of options
 type ratelimiterComposeOptions struct {
-	recoverPanic       bool
-	exitCodeOnPanic    *int
-	recoverPanicWriter io.Writer
+	panicCallback func(e interface{})
 }
 
 // RatelimiterOption specified Ratelimiter compose option
 type RatelimiterComposeOption func(o *ratelimiterComposeOptions)
 
-// WithRatelimiterRecoverPanic specified behavior on panic - recover or not
-func WithRatelimiterRecoverPanic(b bool) RatelimiterComposeOption {
+// WithRatelimiterPanicCallback specified behavior on panic
+func WithRatelimiterPanicCallback(cb func(e interface{})) RatelimiterComposeOption {
 	return func(o *ratelimiterComposeOptions) {
-		o.recoverPanic = b
-	}
-}
-
-// WithRatelimiterRecoverPanicWriter specified writer for print panic details
-func WithRatelimiterRecoverPanicWriter(w io.Writer) RatelimiterComposeOption {
-	return func(o *ratelimiterComposeOptions) {
-		o.recoverPanicWriter = w
-	}
-}
-
-// WithRatelimiterExitCodeOnPanic specified code for exit on panic
-// If nil - no exiting on panic
-func WithRatelimiterExitCodeOnPanic(code *int) RatelimiterComposeOption {
-	return func(o *ratelimiterComposeOptions) {
-		o.exitCodeOnPanic = code
+		o.panicCallback = cb
 	}
 }
 

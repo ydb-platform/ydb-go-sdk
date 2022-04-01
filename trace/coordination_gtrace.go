@@ -2,39 +2,18 @@
 
 package trace
 
-import (
-	"io"
-)
-
 // coordinationComposeOptions is a holder of options
 type coordinationComposeOptions struct {
-	recoverPanic       bool
-	exitCodeOnPanic    *int
-	recoverPanicWriter io.Writer
+	panicCallback func(e interface{})
 }
 
 // CoordinationOption specified Coordination compose option
 type CoordinationComposeOption func(o *coordinationComposeOptions)
 
-// WithCoordinationRecoverPanic specified behavior on panic - recover or not
-func WithCoordinationRecoverPanic(b bool) CoordinationComposeOption {
+// WithCoordinationPanicCallback specified behavior on panic
+func WithCoordinationPanicCallback(cb func(e interface{})) CoordinationComposeOption {
 	return func(o *coordinationComposeOptions) {
-		o.recoverPanic = b
-	}
-}
-
-// WithCoordinationRecoverPanicWriter specified writer for print panic details
-func WithCoordinationRecoverPanicWriter(w io.Writer) CoordinationComposeOption {
-	return func(o *coordinationComposeOptions) {
-		o.recoverPanicWriter = w
-	}
-}
-
-// WithCoordinationExitCodeOnPanic specified code for exit on panic
-// If nil - no exiting on panic
-func WithCoordinationExitCodeOnPanic(code *int) CoordinationComposeOption {
-	return func(o *coordinationComposeOptions) {
-		o.exitCodeOnPanic = code
+		o.panicCallback = cb
 	}
 }
 

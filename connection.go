@@ -2,7 +2,6 @@ package ydb
 
 import (
 	"context"
-	"io"
 	"os"
 	"sync"
 
@@ -93,9 +92,7 @@ type connection struct {
 	childrenMtx sync.Mutex
 	onClose     []func(c *connection)
 
-	recoverPanic       bool
-	exitCodeOnPanic    *int
-	recoverPanicWriter io.Writer
+	panicCallback func(e interface{})
 }
 
 func (c *connection) Close(ctx context.Context) error {

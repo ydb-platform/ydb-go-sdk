@@ -1,9 +1,7 @@
-* Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}PanicRecovery` options
-* Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}PanicRecoveryWriter` options
-* Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}ExitCodeOnPanic` options
-* Added `ydb.WithPanicRecovery`, `ydb.WithPanicRecoveryWriter` and `ydb.WithExitCodeOnPanic` options
+* Refactored gtrace tool for generate `Compose` options
 * Added panic recover on trace calls in `Compose` call step
-* Removed `trace.Context{Driver,Retry,Table}` and `trace.With{Driver,Retry,Table}` as redundant
+* Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}PanicCallback` options
+* Added `ydb.WithPanicCallback` option
 
 ## v3.16.12
 * Fixed bug with check acquire error over `ydb.IsRatelimiterAcquireError`

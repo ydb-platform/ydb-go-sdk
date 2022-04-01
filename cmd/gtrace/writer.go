@@ -198,34 +198,6 @@ func (w *Writer) funcImports(dst []dep, fn *Func) []dep {
 }
 
 func (w *Writer) traceImports(dst []dep, t *Trace) []dep {
-	dst = append(
-		dst,
-		dep{
-			pkgPath: "io",
-			pkgName: "io",
-			typName: "io.Writer",
-		},
-	)
-	if len(t.Hooks) > 0 {
-		dst = append(
-			dst,
-			dep{
-				pkgPath: "fmt",
-				pkgName: "fmt",
-				typName: "Sprintf",
-			},
-			dep{
-				pkgPath: "os",
-				pkgName: "os",
-				typName: "os.Stderr",
-			},
-			dep{
-				pkgPath: "runtime/debug",
-				pkgName: "debug",
-				typName: "Stack",
-			},
-		)
-	}
 	for _, h := range t.Hooks {
 		dst = w.funcImports(dst, h.Func)
 	}
@@ -349,11 +321,7 @@ func (w *Writer) compose(trace *Trace) {
 		w.line(`(`, ret, ` `, trace.Name, `) {`)
 		w.block(func() {
 			if len(trace.Hooks) > 0 {
-				w.line(`options := `, unexported(trace.Name), `ComposeOptions{`)
-				w.block(func() {
-					w.line(`recoverPanicWriter: os.Stderr,`)
-				})
-				w.line(`}`)
+				w.line(`options := `, unexported(trace.Name), `ComposeOptions{}`)
 				w.line(`for _, opt := range opts {`)
 				w.block(func() {
 					w.line(`opt(&options)`)
@@ -391,22 +359,13 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 			args := w.funcParams(fn.Params)
 			w.funcResults(fn)
 			w.line(`{`)
-			w.line(`if options.recoverPanic {`)
+			w.line(`if options.panicCallback != nil {`)
 			w.block(func() {
 				w.line("defer func() {")
 				w.block(func() {
 					w.line("if e := recover(); e != nil {")
 					w.block(func() {
-						w.line(`if options.recoverPanicWriter != nil {`)
-						w.block(func() {
-							w.line(`fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())`)
-						})
-						w.line("}")
-						w.line("if options.exitCodeOnPanic != nil {")
-						w.block(func() {
-							w.line(`os.Exit(*options.exitCodeOnPanic)`)
-						})
-						w.line("}")
+						w.line(`options.panicCallback(e)`)
 					})
 					w.line("}")
 				})
@@ -467,9 +426,7 @@ func (w *Writer) options(trace *Trace) {
 		w.line(fmt.Sprintf(`// %sComposeOptions is a holder of options`, unexported(trace.Name)))
 		w.line(fmt.Sprintf(`type %sComposeOptions struct {`, unexported(trace.Name)))
 		w.block(func() {
-			w.line(`recoverPanic       bool`)
-			w.line(`exitCodeOnPanic    *int`)
-			w.line(`recoverPanicWriter io.Writer`)
+			w.line(`panicCallback func(e interface{})`)
 		})
 		w.line(`}`)
 		_ = w.bw.WriteByte('\n')
@@ -480,39 +437,12 @@ func (w *Writer) options(trace *Trace) {
 		_ = w.bw.WriteByte('\n')
 	})
 	w.newScope(func() {
-		w.line(fmt.Sprintf(`// With%sRecoverPanic specified behavior on panic - recover or not`, trace.Name))
-		w.line(fmt.Sprintf(`func With%sRecoverPanic(b bool) %sComposeOption {`, trace.Name, trace.Name))
+		w.line(fmt.Sprintf(`// With%sPanicCallback specified behavior on panic`, trace.Name))
+		w.line(fmt.Sprintf(`func With%sPanicCallback(cb func(e interface{})) %sComposeOption {`, trace.Name, trace.Name))
 		w.block(func() {
 			w.line(fmt.Sprintf(`return func(o *%sComposeOptions) {`, unexported(trace.Name)))
 			w.block(func() {
-				w.line(`o.recoverPanic = b`)
-			})
-			w.line(`}`)
-		})
-		w.line(`}`)
-		_ = w.bw.WriteByte('\n')
-	})
-	w.newScope(func() {
-		w.line(fmt.Sprintf(`// With%sRecoverPanicWriter specified writer for print panic details`, trace.Name))
-		w.line(fmt.Sprintf(`func With%sRecoverPanicWriter(w io.Writer) %sComposeOption {`, trace.Name, trace.Name))
-		w.block(func() {
-			w.line(fmt.Sprintf(`return func(o *%sComposeOptions) {`, unexported(trace.Name)))
-			w.block(func() {
-				w.line(`o.recoverPanicWriter = w`)
-			})
-			w.line(`}`)
-		})
-		w.line(`}`)
-		_ = w.bw.WriteByte('\n')
-	})
-	w.newScope(func() {
-		w.line(fmt.Sprintf(`// With%sExitCodeOnPanic specified code for exit on panic`, trace.Name))
-		w.line(`// If nil - no exiting on panic`)
-		w.line(fmt.Sprintf(`func With%sExitCodeOnPanic(code *int) %sComposeOption {`, trace.Name, trace.Name))
-		w.block(func() {
-			w.line(fmt.Sprintf(`return func(o *%sComposeOptions) {`, unexported(trace.Name)))
-			w.block(func() {
-				w.line(`o.exitCodeOnPanic = code`)
+				w.line(`o.panicCallback = cb`)
 			})
 			w.line(`}`)
 		})

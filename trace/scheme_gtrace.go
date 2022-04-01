@@ -2,39 +2,18 @@
 
 package trace
 
-import (
-	"io"
-)
-
 // schemeComposeOptions is a holder of options
 type schemeComposeOptions struct {
-	recoverPanic       bool
-	exitCodeOnPanic    *int
-	recoverPanicWriter io.Writer
+	panicCallback func(e interface{})
 }
 
 // SchemeOption specified Scheme compose option
 type SchemeComposeOption func(o *schemeComposeOptions)
 
-// WithSchemeRecoverPanic specified behavior on panic - recover or not
-func WithSchemeRecoverPanic(b bool) SchemeComposeOption {
+// WithSchemePanicCallback specified behavior on panic
+func WithSchemePanicCallback(cb func(e interface{})) SchemeComposeOption {
 	return func(o *schemeComposeOptions) {
-		o.recoverPanic = b
-	}
-}
-
-// WithSchemeRecoverPanicWriter specified writer for print panic details
-func WithSchemeRecoverPanicWriter(w io.Writer) SchemeComposeOption {
-	return func(o *schemeComposeOptions) {
-		o.recoverPanicWriter = w
-	}
-}
-
-// WithSchemeExitCodeOnPanic specified code for exit on panic
-// If nil - no exiting on panic
-func WithSchemeExitCodeOnPanic(code *int) SchemeComposeOption {
-	return func(o *schemeComposeOptions) {
-		o.exitCodeOnPanic = code
+		o.panicCallback = cb
 	}
 }
 

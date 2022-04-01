@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -353,27 +352,12 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithRecoverPanic specified flag for use panic recover on calls user-defined funcs
-func WithRecoverPanic() Option {
+// WithPanicCallback specified behavior on panic
+// Warning: WithPanicCallback must be defined on start of all options
+// (before `WithTrace{Driver,Table,Scheme,Scripting,Coordination,Ratelimiter}` and other options)
+func WithPanicCallback(cb func(e interface{})) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.recoverPanic = true
-		return nil
-	}
-}
-
-// WithRecoverPanicWriter specified `io.Writer` for logging panic details
-func WithRecoverPanicWriter(w io.Writer) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.recoverPanicWriter = w
-		return nil
-	}
-}
-
-// WithExitCodeOnPanic specified code for exit on panic
-// If nil - no exiting on panic
-func WithExitCodeOnPanic(code int) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.exitCodeOnPanic = &code
+		c.panicCallback = cb
 		return nil
 	}
 }
@@ -387,9 +371,7 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option {
 				t,
 				append(
 					[]trace.TableComposeOption{
-						trace.WithTableRecoverPanic(c.recoverPanic),
-						trace.WithTableRecoverPanicWriter(c.recoverPanicWriter),
-						trace.WithTableExitCodeOnPanic(c.exitCodeOnPanic),
+						trace.WithTablePanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,
@@ -408,9 +390,7 @@ func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption)
 				t,
 				append(
 					[]trace.ScriptingComposeOption{
-						trace.WithScriptingRecoverPanic(c.recoverPanic),
-						trace.WithScriptingRecoverPanicWriter(c.recoverPanicWriter),
-						trace.WithScriptingExitCodeOnPanic(c.exitCodeOnPanic),
+						trace.WithScriptingPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,
@@ -429,9 +409,7 @@ func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 				t,
 				append(
 					[]trace.SchemeComposeOption{
-						trace.WithSchemeRecoverPanic(c.recoverPanic),
-						trace.WithSchemeRecoverPanicWriter(c.recoverPanicWriter),
-						trace.WithSchemeExitCodeOnPanic(c.exitCodeOnPanic),
+						trace.WithSchemePanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,
@@ -450,9 +428,7 @@ func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationCompo
 				t,
 				append(
 					[]trace.CoordinationComposeOption{
-						trace.WithCoordinationRecoverPanic(c.recoverPanic),
-						trace.WithCoordinationRecoverPanicWriter(c.recoverPanicWriter),
-						trace.WithCoordinationExitCodeOnPanic(c.exitCodeOnPanic),
+						trace.WithCoordinationPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,
@@ -471,9 +447,7 @@ func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeO
 				t,
 				append(
 					[]trace.RatelimiterComposeOption{
-						trace.WithRatelimiterRecoverPanic(c.recoverPanic),
-						trace.WithRatelimiterRecoverPanicWriter(c.recoverPanicWriter),
-						trace.WithRatelimiterExitCodeOnPanic(c.exitCodeOnPanic),
+						trace.WithRatelimiterPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,
@@ -499,9 +473,7 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 				t,
 				append(
 					[]trace.DiscoveryComposeOption{
-						trace.WithDiscoveryRecoverPanic(c.recoverPanic),
-						trace.WithDiscoveryRecoverPanicWriter(c.recoverPanicWriter),
-						trace.WithDiscoveryExitCodeOnPanic(c.exitCodeOnPanic),
+						trace.WithDiscoveryPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,

@@ -4,49 +4,26 @@ package trace
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"os"
-	"runtime/debug"
 )
 
 // discoveryComposeOptions is a holder of options
 type discoveryComposeOptions struct {
-	recoverPanic       bool
-	exitCodeOnPanic    *int
-	recoverPanicWriter io.Writer
+	panicCallback func(e interface{})
 }
 
 // DiscoveryOption specified Discovery compose option
 type DiscoveryComposeOption func(o *discoveryComposeOptions)
 
-// WithDiscoveryRecoverPanic specified behavior on panic - recover or not
-func WithDiscoveryRecoverPanic(b bool) DiscoveryComposeOption {
+// WithDiscoveryPanicCallback specified behavior on panic
+func WithDiscoveryPanicCallback(cb func(e interface{})) DiscoveryComposeOption {
 	return func(o *discoveryComposeOptions) {
-		o.recoverPanic = b
-	}
-}
-
-// WithDiscoveryRecoverPanicWriter specified writer for print panic details
-func WithDiscoveryRecoverPanicWriter(w io.Writer) DiscoveryComposeOption {
-	return func(o *discoveryComposeOptions) {
-		o.recoverPanicWriter = w
-	}
-}
-
-// WithDiscoveryExitCodeOnPanic specified code for exit on panic
-// If nil - no exiting on panic
-func WithDiscoveryExitCodeOnPanic(code *int) DiscoveryComposeOption {
-	return func(o *discoveryComposeOptions) {
-		o.exitCodeOnPanic = code
+		o.panicCallback = cb
 	}
 }
 
 // Compose returns a new Discovery which has functional fields composed both from t and x.
 func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Discovery) {
-	options := discoveryComposeOptions{
-		recoverPanicWriter: os.Stderr,
-	}
+	options := discoveryComposeOptions{}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -54,15 +31,10 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 		h1 := t.OnDiscover
 		h2 := x.OnDiscover
 		ret.OnDiscover = func(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -74,15 +46,10 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 				r1 = h2(d)
 			}
 			return func(d DiscoveryDiscoverDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -99,15 +66,10 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 		h1 := t.OnWhoAmI
 		h2 := x.OnWhoAmI
 		ret.OnWhoAmI = func(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -119,15 +81,10 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 				r1 = h2(d)
 			}
 			return func(d DiscoveryWhoAmIDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}

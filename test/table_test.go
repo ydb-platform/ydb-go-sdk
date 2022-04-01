@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -245,9 +246,10 @@ func TestTable(t *testing.T) {
 			ydb.WithErrWriter(os.Stdout),
 			ydb.WithMinLevel(log.WARN),
 		),
-		ydb.WithRecoverPanic(),
-		ydb.WithRecoverPanicWriter(os.Stderr),
-		ydb.WithExitCodeOnPanic(1),
+		ydb.WithPanicCallback(func(e interface{}) {
+			fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())
+			os.Exit(1)
+		}),
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
 				trace.Table{

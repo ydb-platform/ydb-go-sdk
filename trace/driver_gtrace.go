@@ -4,49 +4,26 @@ package trace
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"os"
-	"runtime/debug"
 )
 
 // driverComposeOptions is a holder of options
 type driverComposeOptions struct {
-	recoverPanic       bool
-	exitCodeOnPanic    *int
-	recoverPanicWriter io.Writer
+	panicCallback func(e interface{})
 }
 
 // DriverOption specified Driver compose option
 type DriverComposeOption func(o *driverComposeOptions)
 
-// WithDriverRecoverPanic specified behavior on panic - recover or not
-func WithDriverRecoverPanic(b bool) DriverComposeOption {
+// WithDriverPanicCallback specified behavior on panic
+func WithDriverPanicCallback(cb func(e interface{})) DriverComposeOption {
 	return func(o *driverComposeOptions) {
-		o.recoverPanic = b
-	}
-}
-
-// WithDriverRecoverPanicWriter specified writer for print panic details
-func WithDriverRecoverPanicWriter(w io.Writer) DriverComposeOption {
-	return func(o *driverComposeOptions) {
-		o.recoverPanicWriter = w
-	}
-}
-
-// WithDriverExitCodeOnPanic specified code for exit on panic
-// If nil - no exiting on panic
-func WithDriverExitCodeOnPanic(code *int) DriverComposeOption {
-	return func(o *driverComposeOptions) {
-		o.exitCodeOnPanic = code
+		o.panicCallback = cb
 	}
 }
 
 // Compose returns a new Driver which has functional fields composed both from t and x.
 func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
-	options := driverComposeOptions{
-		recoverPanicWriter: os.Stderr,
-	}
+	options := driverComposeOptions{}
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -54,15 +31,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnInit
 		h2 := x.OnInit
 		ret.OnInit = func(d DriverInitStartInfo) func(DriverInitDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -74,15 +46,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverInitDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -99,15 +66,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnClose
 		h2 := x.OnClose
 		ret.OnClose = func(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -119,15 +81,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverCloseDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -144,15 +101,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnNetRead
 		h2 := x.OnNetRead
 		ret.OnNetRead = func(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -164,15 +116,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverNetReadDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -189,15 +136,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnNetWrite
 		h2 := x.OnNetWrite
 		ret.OnNetWrite = func(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -209,15 +151,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverNetWriteDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -234,15 +171,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnNetDial
 		h2 := x.OnNetDial
 		ret.OnNetDial = func(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -254,15 +186,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverNetDialDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -279,15 +206,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnNetClose
 		h2 := x.OnNetClose
 		ret.OnNetClose = func(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -299,15 +221,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverNetCloseDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -324,15 +241,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnResolve
 		h2 := x.OnResolve
 		ret.OnResolve = func(d DriverResolveStartInfo) func(DriverResolveDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -344,15 +256,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverResolveDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -369,15 +276,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnStateChange
 		h2 := x.OnConnStateChange
 		ret.OnConnStateChange = func(d DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -389,15 +291,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverConnStateChangeDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -414,15 +311,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnInvoke
 		h2 := x.OnConnInvoke
 		ret.OnConnInvoke = func(d DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -434,15 +326,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverConnInvokeDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -459,15 +346,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnNewStream
 		h2 := x.OnConnNewStream
 		ret.OnConnNewStream = func(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -479,15 +361,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -499,15 +376,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 					r3 = r1(d)
 				}
 				return func(d DriverConnNewStreamDoneInfo) {
-					if options.recoverPanic {
+					if options.panicCallback != nil {
 						defer func() {
 							if e := recover(); e != nil {
-								if options.recoverPanicWriter != nil {
-									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-								}
-								if options.exitCodeOnPanic != nil {
-									os.Exit(*options.exitCodeOnPanic)
-								}
+								options.panicCallback(e)
 							}
 						}()
 					}
@@ -525,15 +397,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnTake
 		h2 := x.OnConnTake
 		ret.OnConnTake = func(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -545,15 +412,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverConnTakeDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -570,15 +432,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnUsagesChange
 		h2 := x.OnConnUsagesChange
 		ret.OnConnUsagesChange = func(d DriverConnUsagesChangeInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -594,15 +451,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnStreamUsagesChange
 		h2 := x.OnConnStreamUsagesChange
 		ret.OnConnStreamUsagesChange = func(d DriverConnStreamUsagesChangeInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -618,15 +470,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnPark
 		h2 := x.OnConnPark
 		ret.OnConnPark = func(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -638,15 +485,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverConnParkDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -663,15 +505,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnClose
 		h2 := x.OnConnClose
 		ret.OnConnClose = func(d DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -683,15 +520,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverConnCloseDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -708,15 +540,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnConnRelease
 		h2 := x.OnConnRelease
 		ret.OnConnRelease = func(d DriverConnReleaseStartInfo) func(DriverConnReleaseDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -728,15 +555,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverConnReleaseDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -753,15 +575,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnClusterInit
 		h2 := x.OnClusterInit
 		ret.OnClusterInit = func(d DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -773,15 +590,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverClusterInitDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -798,15 +610,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnClusterClose
 		h2 := x.OnClusterClose
 		ret.OnClusterClose = func(d DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -818,15 +625,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverClusterCloseDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -843,15 +645,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnClusterGet
 		h2 := x.OnClusterGet
 		ret.OnClusterGet = func(d DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -863,15 +660,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverClusterGetDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -888,15 +680,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnClusterInsert
 		h2 := x.OnClusterInsert
 		ret.OnClusterInsert = func(d DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -908,15 +695,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverClusterInsertDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -933,15 +715,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnClusterRemove
 		h2 := x.OnClusterRemove
 		ret.OnClusterRemove = func(d DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -953,15 +730,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverClusterRemoveDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -978,15 +750,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnPessimizeNode
 		h2 := x.OnPessimizeNode
 		ret.OnPessimizeNode = func(d DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -998,15 +765,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverPessimizeNodeDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -1023,15 +785,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnRepeaterWakeUp
 		h2 := x.OnRepeaterWakeUp
 		ret.OnRepeaterWakeUp = func(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -1043,15 +800,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverRepeaterTickDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
@@ -1068,15 +820,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		h1 := t.OnGetCredentials
 		h2 := x.OnGetCredentials
 		ret.OnGetCredentials = func(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
-			if options.recoverPanic {
+			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
-						if options.recoverPanicWriter != nil {
-							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-						}
-						if options.exitCodeOnPanic != nil {
-							os.Exit(*options.exitCodeOnPanic)
-						}
+						options.panicCallback(e)
 					}
 				}()
 			}
@@ -1088,15 +835,10 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverGetCredentialsDoneInfo) {
-				if options.recoverPanic {
+				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
-							if options.recoverPanicWriter != nil {
-								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
-							}
-							if options.exitCodeOnPanic != nil {
-								os.Exit(*options.exitCodeOnPanic)
-							}
+							options.panicCallback(e)
 						}
 					}()
 				}
