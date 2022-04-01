@@ -195,16 +195,14 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			mustGetSession(t, p)
 
 			go func() {
-				_, err := p.Get(
-					trace.WithTable(
-						context.Background(),
-						trace.Table{
-							OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
-								get <- struct{}{}
-								return nil
-							},
+				_, err := p.get(
+					context.Background(),
+					withTrace(trace.Table{
+						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
+							get <- struct{}{}
+							return nil
 						},
-					),
+					}),
 				)
 				got <- err
 			}()
@@ -326,7 +324,7 @@ func TestSessionPoolClose(t *testing.T) {
 }
 
 func TestRaceWgClosed(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	defer func() {
@@ -622,20 +620,18 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				}
 			}
 			go func() {
-				session, err := p.Get(
-					trace.WithTable(
-						context.Background(),
-						trace.Table{
-							OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
-								get <- struct{}{}
-								return nil
-							},
-							OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
-								wait <- struct{}{}
-								return nil
-							},
+				session, err := p.get(
+					context.Background(),
+					withTrace(trace.Table{
+						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
+							get <- struct{}{}
+							return nil
 						},
-					),
+						OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
+							wait <- struct{}{}
+							return nil
+						},
+					}),
 				)
 				got <- sessionAndError{session, err}
 			}()
@@ -1239,17 +1235,7 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 func mustCreateSession(t *testing.T, p *client) Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	s, err := p.createSession(trace.WithTable(
-		context.Background(),
-		trace.Table{
-			OnPoolSessionNew: func(info trace.TablePoolSessionNewStartInfo) func(trace.TablePoolSessionNewDoneInfo) {
-				wg.Add(1)
-				return func(info trace.TablePoolSessionNewDoneInfo) {
-					wg.Done()
-				}
-			},
-		},
-	))
+	s, err := p.createSession(context.Background())
 	if err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
@@ -1272,27 +1258,7 @@ func mustPutSession(t *testing.T, p *client, s Session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Put(
-		trace.WithTable(
-			context.Background(),
-			trace.Table{
-				OnPoolPut: func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
-					wg.Add(1)
-					return func(info trace.TablePoolPutDoneInfo) {
-						wg.Done()
-					}
-				},
-				OnPoolSessionClose: func(
-					info trace.TablePoolSessionCloseStartInfo,
-				) func(
-					doneInfo trace.TablePoolSessionCloseDoneInfo,
-				) {
-					wg.Add(1)
-					return func(info trace.TablePoolSessionCloseDoneInfo) {
-						wg.Done()
-					}
-				},
-			},
-		),
+		context.Background(),
 		s,
 	); err != nil {
 		t.Helper()
@@ -1303,23 +1269,7 @@ func mustPutSession(t *testing.T, p *client, s Session) {
 func mustClose(t *testing.T, p *client) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	if err := p.Close(
-		trace.WithTable(
-			context.Background(),
-			trace.Table{
-				OnPoolSessionClose: func(
-					info trace.TablePoolSessionCloseStartInfo,
-				) func(
-					doneInfo trace.TablePoolSessionCloseDoneInfo,
-				) {
-					wg.Add(1)
-					return func(info trace.TablePoolSessionCloseDoneInfo) {
-						wg.Done()
-					}
-				},
-			},
-		),
-	); err != nil {
+	if err := p.Close(context.Background()); err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
 	}
