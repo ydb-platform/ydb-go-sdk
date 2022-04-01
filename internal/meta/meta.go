@@ -120,7 +120,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 
 	var token string
 
-	getCredentialsDone := trace.DriverOnGetCredentials(trace.ContextDriver(ctx).Compose(m.trace), &ctx)
+	getCredentialsDone := trace.DriverOnGetCredentials(m.trace, &ctx)
 	defer func() {
 		getCredentialsDone(token, err)
 	}()

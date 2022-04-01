@@ -51,7 +51,7 @@ func New(
 	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {
 	onDone := trace.DriverOnInit(
-		trace.ContextDriver(ctx).Compose(c.Trace()),
+		c.Trace(),
 		&ctx,
 		c.Endpoint(),
 		c.Database(),

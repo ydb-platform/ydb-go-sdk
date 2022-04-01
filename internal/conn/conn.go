@@ -176,7 +176,7 @@ func (c *conn) GetState() (s State) {
 
 func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	onDone := trace.DriverOnConnTake(
-		trace.ContextDriver(ctx).Compose(c.config.Trace()),
+		c.config.Trace(),
 		&ctx,
 		c.endpoint.Copy(),
 	)
@@ -328,7 +328,7 @@ func (c *conn) Invoke(
 		issues   []trace.Issue
 		wrapping = needWrapping(ctx)
 		onDone   = trace.DriverOnConnInvoke(
-			trace.ContextDriver(ctx).Compose(c.config.Trace()),
+			c.config.Trace(),
 			&ctx,
 			c.endpoint,
 			trace.Method(method),
@@ -395,7 +395,7 @@ func (c *conn) NewStream(
 ) (_ grpc.ClientStream, err error) {
 	var (
 		streamRecv = trace.DriverOnConnNewStream(
-			trace.ContextDriver(ctx).Compose(c.config.Trace()),
+			c.config.Trace(),
 			&ctx,
 			c.endpoint.Copy(),
 			trace.Method(method),

@@ -2,24 +2,6 @@ package trace
 
 import "context"
 
-type driverContextKey struct{}
-
-// WithDriver returns deadline which has associated Driver with it.
-func WithDriver(ctx context.Context, t Driver) context.Context {
-	return context.WithValue(ctx,
-		driverContextKey{},
-		ContextDriver(ctx).Compose(t),
-	)
-}
-
-// ContextDriver returns Driver associated with ctx.
-// If there is no Driver associated with ctx then zero value
-// of Driver is returned.
-func ContextDriver(ctx context.Context) Driver {
-	t, _ := ctx.Value(driverContextKey{}).(Driver)
-	return t
-}
-
 type retryContextKey struct{}
 
 // WithRetry returns deadline which has associated Retry with it.

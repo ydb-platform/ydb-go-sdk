@@ -342,7 +342,7 @@ func defaultConfig() (c *config) {
 					return builder.New(
 						ctx,
 						address,
-						trace.ContextDriver(ctx).Compose(c.trace),
+						c.trace,
 					)
 				},
 			),
