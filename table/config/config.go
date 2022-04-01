@@ -150,9 +150,9 @@ func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-func WithTrace(trace trace.Table) Option {
+func WithTrace(trace trace.Table, opts ...trace.TableComposeOption) Option {
 	return func(c *config) {
-		c.trace = c.trace.Compose(trace)
+		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 

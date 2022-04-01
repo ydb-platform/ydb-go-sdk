@@ -1,6 +1,6 @@
 package trace
 
-// tool gtrace used from ./cmd/gtrace
+// tool gtrace used from ./internal/cmd/gtrace
 
 //go:generate gtrace
 
@@ -12,8 +12,8 @@ import (
 )
 
 type (
-	//gtrace:gen
-	//gtrace:set Shortcut
+	// Driver specified trace of common driver activity.
+	// gtrace:gen
 	Driver struct {
 		// Driver runtime events
 		OnInit  func(DriverInitStartInfo) func(DriverInitDoneInfo)

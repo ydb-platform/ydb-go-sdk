@@ -6,570 +6,847 @@ import (
 	"context"
 )
 
-// Compose returns a new Driver which has functional fields composed
-// both from t and x.
-func (t Driver) Compose(x Driver) (ret Driver) {
-	switch {
-	case t.OnInit == nil:
-		ret.OnInit = x.OnInit
-	case x.OnInit == nil:
-		ret.OnInit = t.OnInit
-	default:
+// driverComposeOptions is a holder of options
+type driverComposeOptions struct {
+	panicCallback func(e interface{})
+}
+
+// DriverOption specified Driver compose option
+type DriverComposeOption func(o *driverComposeOptions)
+
+// WithDriverPanicCallback specified behavior on panic
+func WithDriverPanicCallback(cb func(e interface{})) DriverComposeOption {
+	return func(o *driverComposeOptions) {
+		o.panicCallback = cb
+	}
+}
+
+// Compose returns a new Driver which has functional fields composed both from t and x.
+func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
+	options := driverComposeOptions{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	{
 		h1 := t.OnInit
 		h2 := x.OnInit
 		ret.OnInit = func(d DriverInitStartInfo) func(DriverInitDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverInitDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverInitDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverInitDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnClose == nil:
-		ret.OnClose = x.OnClose
-	case x.OnClose == nil:
-		ret.OnClose = t.OnClose
-	default:
+	{
 		h1 := t.OnClose
 		h2 := x.OnClose
 		ret.OnClose = func(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverCloseDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnNetRead == nil:
-		ret.OnNetRead = x.OnNetRead
-	case x.OnNetRead == nil:
-		ret.OnNetRead = t.OnNetRead
-	default:
+	{
 		h1 := t.OnNetRead
 		h2 := x.OnNetRead
 		ret.OnNetRead = func(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverNetReadDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverNetReadDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverNetReadDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnNetWrite == nil:
-		ret.OnNetWrite = x.OnNetWrite
-	case x.OnNetWrite == nil:
-		ret.OnNetWrite = t.OnNetWrite
-	default:
+	{
 		h1 := t.OnNetWrite
 		h2 := x.OnNetWrite
 		ret.OnNetWrite = func(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverNetWriteDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverNetWriteDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverNetWriteDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnNetDial == nil:
-		ret.OnNetDial = x.OnNetDial
-	case x.OnNetDial == nil:
-		ret.OnNetDial = t.OnNetDial
-	default:
+	{
 		h1 := t.OnNetDial
 		h2 := x.OnNetDial
 		ret.OnNetDial = func(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverNetDialDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverNetDialDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverNetDialDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnNetClose == nil:
-		ret.OnNetClose = x.OnNetClose
-	case x.OnNetClose == nil:
-		ret.OnNetClose = t.OnNetClose
-	default:
+	{
 		h1 := t.OnNetClose
 		h2 := x.OnNetClose
 		ret.OnNetClose = func(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverNetCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverNetCloseDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverNetCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnResolve == nil:
-		ret.OnResolve = x.OnResolve
-	case x.OnResolve == nil:
-		ret.OnResolve = t.OnResolve
-	default:
+	{
 		h1 := t.OnResolve
 		h2 := x.OnResolve
 		ret.OnResolve = func(d DriverResolveStartInfo) func(DriverResolveDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverResolveDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverResolveDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverResolveDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnConnStateChange == nil:
-		ret.OnConnStateChange = x.OnConnStateChange
-	case x.OnConnStateChange == nil:
-		ret.OnConnStateChange = t.OnConnStateChange
-	default:
+	{
 		h1 := t.OnConnStateChange
 		h2 := x.OnConnStateChange
 		ret.OnConnStateChange = func(d DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverConnStateChangeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnStateChangeDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnStateChangeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnConnInvoke == nil:
-		ret.OnConnInvoke = x.OnConnInvoke
-	case x.OnConnInvoke == nil:
-		ret.OnConnInvoke = t.OnConnInvoke
-	default:
+	{
 		h1 := t.OnConnInvoke
 		h2 := x.OnConnInvoke
 		ret.OnConnInvoke = func(d DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverConnInvokeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnInvokeDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnInvokeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnConnNewStream == nil:
-		ret.OnConnNewStream = x.OnConnNewStream
-	case x.OnConnNewStream == nil:
-		ret.OnConnNewStream = t.OnConnNewStream
-	default:
+	{
 		h1 := t.OnConnNewStream
 		h2 := x.OnConnNewStream
 		ret.OnConnNewStream = func(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
-					r11 := r1(d)
-					r21 := r2(d)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(d DriverConnNewStreamDoneInfo) {
-							r11(d)
-							r21(d)
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
 						}
+					}()
+				}
+				var r2, r3 func(DriverConnNewStreamDoneInfo)
+				if r != nil {
+					r2 = r(d)
+				}
+				if r1 != nil {
+					r3 = r1(d)
+				}
+				return func(d DriverConnNewStreamDoneInfo) {
+					if options.panicCallback != nil {
+						defer func() {
+							if e := recover(); e != nil {
+								options.panicCallback(e)
+							}
+						}()
+					}
+					if r2 != nil {
+						r2(d)
+					}
+					if r3 != nil {
+						r3(d)
 					}
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnConnTake == nil:
-		ret.OnConnTake = x.OnConnTake
-	case x.OnConnTake == nil:
-		ret.OnConnTake = t.OnConnTake
-	default:
+	{
 		h1 := t.OnConnTake
 		h2 := x.OnConnTake
 		ret.OnConnTake = func(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverConnTakeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnTakeDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnTakeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnConnUsagesChange == nil:
-		ret.OnConnUsagesChange = x.OnConnUsagesChange
-	case x.OnConnUsagesChange == nil:
-		ret.OnConnUsagesChange = t.OnConnUsagesChange
-	default:
+	{
 		h1 := t.OnConnUsagesChange
 		h2 := x.OnConnUsagesChange
 		ret.OnConnUsagesChange = func(d DriverConnUsagesChangeInfo) {
-			h1(d)
-			h2(d)
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(d)
+			}
+			if h2 != nil {
+				h2(d)
+			}
 		}
 	}
-	switch {
-	case t.OnConnStreamUsagesChange == nil:
-		ret.OnConnStreamUsagesChange = x.OnConnStreamUsagesChange
-	case x.OnConnStreamUsagesChange == nil:
-		ret.OnConnStreamUsagesChange = t.OnConnStreamUsagesChange
-	default:
+	{
 		h1 := t.OnConnStreamUsagesChange
 		h2 := x.OnConnStreamUsagesChange
 		ret.OnConnStreamUsagesChange = func(d DriverConnStreamUsagesChangeInfo) {
-			h1(d)
-			h2(d)
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(d)
+			}
+			if h2 != nil {
+				h2(d)
+			}
 		}
 	}
-	switch {
-	case t.OnConnPark == nil:
-		ret.OnConnPark = x.OnConnPark
-	case x.OnConnPark == nil:
-		ret.OnConnPark = t.OnConnPark
-	default:
+	{
 		h1 := t.OnConnPark
 		h2 := x.OnConnPark
 		ret.OnConnPark = func(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverConnParkDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnParkDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnParkDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnConnClose == nil:
-		ret.OnConnClose = x.OnConnClose
-	case x.OnConnClose == nil:
-		ret.OnConnClose = t.OnConnClose
-	default:
+	{
 		h1 := t.OnConnClose
 		h2 := x.OnConnClose
 		ret.OnConnClose = func(d DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverConnCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnCloseDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnConnRelease == nil:
-		ret.OnConnRelease = x.OnConnRelease
-	case x.OnConnRelease == nil:
-		ret.OnConnRelease = t.OnConnRelease
-	default:
+	{
 		h1 := t.OnConnRelease
 		h2 := x.OnConnRelease
 		ret.OnConnRelease = func(d DriverConnReleaseStartInfo) func(DriverConnReleaseDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverConnReleaseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnReleaseDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnReleaseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnClusterInit == nil:
-		ret.OnClusterInit = x.OnClusterInit
-	case x.OnClusterInit == nil:
-		ret.OnClusterInit = t.OnClusterInit
-	default:
+	{
 		h1 := t.OnClusterInit
 		h2 := x.OnClusterInit
 		ret.OnClusterInit = func(d DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverClusterInitDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverClusterInitDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverClusterInitDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnClusterClose == nil:
-		ret.OnClusterClose = x.OnClusterClose
-	case x.OnClusterClose == nil:
-		ret.OnClusterClose = t.OnClusterClose
-	default:
+	{
 		h1 := t.OnClusterClose
 		h2 := x.OnClusterClose
 		ret.OnClusterClose = func(d DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverClusterCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverClusterCloseDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverClusterCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnClusterGet == nil:
-		ret.OnClusterGet = x.OnClusterGet
-	case x.OnClusterGet == nil:
-		ret.OnClusterGet = t.OnClusterGet
-	default:
+	{
 		h1 := t.OnClusterGet
 		h2 := x.OnClusterGet
 		ret.OnClusterGet = func(d DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverClusterGetDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverClusterGetDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverClusterGetDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnClusterInsert == nil:
-		ret.OnClusterInsert = x.OnClusterInsert
-	case x.OnClusterInsert == nil:
-		ret.OnClusterInsert = t.OnClusterInsert
-	default:
+	{
 		h1 := t.OnClusterInsert
 		h2 := x.OnClusterInsert
 		ret.OnClusterInsert = func(d DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverClusterInsertDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverClusterInsertDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverClusterInsertDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnClusterRemove == nil:
-		ret.OnClusterRemove = x.OnClusterRemove
-	case x.OnClusterRemove == nil:
-		ret.OnClusterRemove = t.OnClusterRemove
-	default:
+	{
 		h1 := t.OnClusterRemove
 		h2 := x.OnClusterRemove
 		ret.OnClusterRemove = func(d DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverClusterRemoveDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverClusterRemoveDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverClusterRemoveDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnPessimizeNode == nil:
-		ret.OnPessimizeNode = x.OnPessimizeNode
-	case x.OnPessimizeNode == nil:
-		ret.OnPessimizeNode = t.OnPessimizeNode
-	default:
+	{
 		h1 := t.OnPessimizeNode
 		h2 := x.OnPessimizeNode
 		ret.OnPessimizeNode = func(d DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverPessimizeNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverPessimizeNodeDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverPessimizeNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnRepeaterWakeUp == nil:
-		ret.OnRepeaterWakeUp = x.OnRepeaterWakeUp
-	case x.OnRepeaterWakeUp == nil:
-		ret.OnRepeaterWakeUp = t.OnRepeaterWakeUp
-	default:
+	{
 		h1 := t.OnRepeaterWakeUp
 		h2 := x.OnRepeaterWakeUp
 		ret.OnRepeaterWakeUp = func(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverRepeaterTickDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverRepeaterTickDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverRepeaterTickDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnGetCredentials == nil:
-		ret.OnGetCredentials = x.OnGetCredentials
-	case x.OnGetCredentials == nil:
-		ret.OnGetCredentials = t.OnGetCredentials
-	default:
+	{
 		h1 := t.OnGetCredentials
 		h2 := x.OnGetCredentials
 		ret.OnGetCredentials = func(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DriverGetCredentialsDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverGetCredentialsDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverGetCredentialsDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}

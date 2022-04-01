@@ -1,11 +1,11 @@
 package trace
 
-// tool gtrace used from ./cmd/gtrace
+// tool gtrace used from ./internal/cmd/gtrace
 
 //go:generate gtrace
 
 type (
-	//gtrace:gen
-	//gtrace:set Shortcut
+	// Ratelimiter specified trace of ratelimiter client activity.
+	// gtrace:gen
 	Ratelimiter struct{}
 )

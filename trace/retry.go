@@ -1,6 +1,6 @@
 package trace
 
-// tool gtrace used from ./cmd/gtrace
+// tool gtrace used from ./internal/cmd/gtrace
 
 //go:generate gtrace
 
@@ -9,8 +9,8 @@ import (
 )
 
 type (
-	//gtrace:gen
-	//gtrace:set Shortcut
+	// Retry specified trace of retry call activity.
+	// gtrace:gen
 	Retry struct {
 		OnRetry func(RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
 	}

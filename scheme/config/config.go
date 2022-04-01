@@ -46,9 +46,9 @@ func (c *config) OperationCancelAfter() time.Duration {
 
 type Option func(c *config)
 
-func WithTrace(trace trace.Scheme) Option {
+func WithTrace(trace trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 	return func(c *config) {
-		c.trace = c.trace.Compose(trace)
+		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 

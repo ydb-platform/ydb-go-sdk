@@ -1,6 +1,6 @@
 package trace
 
-// tool gtrace used from ./cmd/gtrace
+// tool gtrace used from ./internal/cmd/gtrace
 
 //go:generate gtrace
 
@@ -9,8 +9,8 @@ import (
 )
 
 type (
-	//gtrace:gen
-	//gtrace:set Shortcut
+	// Scripting specified trace of scripting client activity.
+	// gtrace:gen
 	Scripting struct {
 		OnExecute       func(ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo)
 		OnStreamExecute func(

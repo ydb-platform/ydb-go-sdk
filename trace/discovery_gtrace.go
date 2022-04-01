@@ -6,53 +6,93 @@ import (
 	"context"
 )
 
-// Compose returns a new Discovery which has functional fields composed
-// both from t and x.
-func (t Discovery) Compose(x Discovery) (ret Discovery) {
-	switch {
-	case t.OnDiscover == nil:
-		ret.OnDiscover = x.OnDiscover
-	case x.OnDiscover == nil:
-		ret.OnDiscover = t.OnDiscover
-	default:
+// discoveryComposeOptions is a holder of options
+type discoveryComposeOptions struct {
+	panicCallback func(e interface{})
+}
+
+// DiscoveryOption specified Discovery compose option
+type DiscoveryComposeOption func(o *discoveryComposeOptions)
+
+// WithDiscoveryPanicCallback specified behavior on panic
+func WithDiscoveryPanicCallback(cb func(e interface{})) DiscoveryComposeOption {
+	return func(o *discoveryComposeOptions) {
+		o.panicCallback = cb
+	}
+}
+
+// Compose returns a new Discovery which has functional fields composed both from t and x.
+func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Discovery) {
+	options := discoveryComposeOptions{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	{
 		h1 := t.OnDiscover
 		h2 := x.OnDiscover
 		ret.OnDiscover = func(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DiscoveryDiscoverDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DiscoveryDiscoverDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DiscoveryDiscoverDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}
 	}
-	switch {
-	case t.OnWhoAmI == nil:
-		ret.OnWhoAmI = x.OnWhoAmI
-	case x.OnWhoAmI == nil:
-		ret.OnWhoAmI = t.OnWhoAmI
-	default:
+	{
 		h1 := t.OnWhoAmI
 		h2 := x.OnWhoAmI
 		ret.OnWhoAmI = func(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
-			r1 := h1(d)
-			r2 := h2(d)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(d DiscoveryWhoAmIDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DiscoveryWhoAmIDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DiscoveryWhoAmIDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
 					r1(d)
-					r2(d)
 				}
 			}
 		}

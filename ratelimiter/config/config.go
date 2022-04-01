@@ -46,9 +46,9 @@ func (c *config) OperationCancelAfter() time.Duration {
 
 type Option func(c *config)
 
-func WithTrace(trace trace.Ratelimiter) Option {
+func WithTrace(trace trace.Ratelimiter, opts ...trace.RatelimiterComposeOption) Option {
 	return func(c *config) {
-		c.trace = c.trace.Compose(trace)
+		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 

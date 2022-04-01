@@ -4,14 +4,13 @@ import (
 	"context"
 )
 
-// tool gtrace used from ./cmd/gtrace
+// tool gtrace used from ./internal/cmd/gtrace
 
 //go:generate gtrace
 
 type (
-	// Table contains options for tracing table client activity.
-	//gtrace:gen
-	//gtrace:set Shortcut
+	// Table specified trace of table client activity.
+	// gtrace:gen
 	Table struct {
 		// Client events
 		OnInit          func(TableInitStartInfo) func(TableInitDoneInfo)

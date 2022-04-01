@@ -2,13 +2,13 @@ package trace
 
 import "context"
 
-// tool gtrace used from ./cmd/gtrace
+// tool gtrace used from ./internal/cmd/gtrace
 
 //go:generate gtrace
 
 type (
-	//gtrace:gen
-	//gtrace:set Shortcut
+	// Discovery specified trace of discovery client activity.
+	// gtrace:gen
 	Discovery struct {
 		OnDiscover func(DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo)
 		OnWhoAmI   func(DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo)

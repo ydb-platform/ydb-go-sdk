@@ -238,9 +238,9 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 }
 
 // WithTraceDriver returns deadline which has associated Driver with it.
-func WithTraceDriver(trace trace.Driver) Option {
+func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithTrace(trace))
+		c.options = append(c.options, config.WithTrace(trace, opts...))
 		return nil
 	}
 }
@@ -352,42 +352,107 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithTraceTable returns table trace option
-func WithTraceTable(trace trace.Table) Option {
+// WithPanicCallback specified behavior on panic
+// Warning: WithPanicCallback must be defined on start of all options
+// (before `WithTrace{Driver,Table,Scheme,Scripting,Coordination,Ratelimiter}` and other options)
+func WithPanicCallback(cb func(e interface{})) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithTrace(trace))
+		c.panicCallback = cb
+		return nil
+	}
+}
+
+// WithTraceTable returns table trace option
+func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(
+			c.tableOptions,
+			tableConfig.WithTrace(
+				t,
+				append(
+					[]trace.TableComposeOption{
+						trace.WithTablePanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
 
 // WithTraceScripting scripting trace option
-func WithTraceScripting(trace trace.Scripting) Option {
+func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.scriptingOptions = append(c.scriptingOptions, scriptingConfig.WithTrace(trace))
+		c.scriptingOptions = append(
+			c.scriptingOptions,
+			scriptingConfig.WithTrace(
+				t,
+				append(
+					[]trace.ScriptingComposeOption{
+						trace.WithScriptingPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
 
 // WithTraceScheme returns scheme trace option
-func WithTraceScheme(trace trace.Scheme) Option {
+func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.schemeOptions = append(c.schemeOptions, schemeConfig.WithTrace(trace))
+		c.schemeOptions = append(
+			c.schemeOptions,
+			schemeConfig.WithTrace(
+				t,
+				append(
+					[]trace.SchemeComposeOption{
+						trace.WithSchemePanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
 
 // WithTraceCoordination returns coordination trace option
-func WithTraceCoordination(trace trace.Coordination) Option {
+func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.coordinationOptions = append(c.coordinationOptions, coordinationConfig.WithTrace(trace))
+		c.coordinationOptions = append(
+			c.coordinationOptions,
+			coordinationConfig.WithTrace(
+				t,
+				append(
+					[]trace.CoordinationComposeOption{
+						trace.WithCoordinationPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
 
 // WithTraceRatelimiter returns ratelimiter trace option
-func WithTraceRatelimiter(trace trace.Ratelimiter) Option {
+func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.ratelimiterOptions = append(c.ratelimiterOptions, ratelimiterConfig.WithTrace(trace))
+		c.ratelimiterOptions = append(
+			c.ratelimiterOptions,
+			ratelimiterConfig.WithTrace(
+				t,
+				append(
+					[]trace.RatelimiterComposeOption{
+						trace.WithRatelimiterPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
@@ -400,9 +465,20 @@ func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 }
 
 // WithTraceDiscovery returns discovery trace option
-func WithTraceDiscovery(trace trace.Discovery) Option {
+func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithTrace(trace))
+		c.discoveryOptions = append(
+			c.discoveryOptions,
+			discoveryConfig.WithTrace(
+				t,
+				append(
+					[]trace.DiscoveryComposeOption{
+						trace.WithDiscoveryPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }

@@ -6,39 +6,73 @@ import (
 	"context"
 )
 
-// Compose returns a new Retry which has functional fields composed
-// both from t and x.
-func (t Retry) Compose(x Retry) (ret Retry) {
-	switch {
-	case t.OnRetry == nil:
-		ret.OnRetry = x.OnRetry
-	case x.OnRetry == nil:
-		ret.OnRetry = t.OnRetry
-	default:
+// retryComposeOptions is a holder of options
+type retryComposeOptions struct {
+	panicCallback func(e interface{})
+}
+
+// RetryOption specified Retry compose option
+type RetryComposeOption func(o *retryComposeOptions)
+
+// WithRetryPanicCallback specified behavior on panic
+func WithRetryPanicCallback(cb func(e interface{})) RetryComposeOption {
+	return func(o *retryComposeOptions) {
+		o.panicCallback = cb
+	}
+}
+
+// Compose returns a new Retry which has functional fields composed both from t and x.
+func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
+	options := retryComposeOptions{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	{
 		h1 := t.OnRetry
 		h2 := x.OnRetry
 		ret.OnRetry = func(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
-			r1 := h1(r)
-			r2 := h2(r)
-			switch {
-			case r1 == nil:
-				return r2
-			case r2 == nil:
-				return r1
-			default:
-				return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
-					r11 := r1(r)
-					r21 := r2(r)
-					switch {
-					case r11 == nil:
-						return r21
-					case r21 == nil:
-						return r11
-					default:
-						return func(r RetryLoopDoneInfo) {
-							r11(r)
-							r21(r)
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r1, r2 func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
+			if h1 != nil {
+				r1 = h1(r)
+			}
+			if h2 != nil {
+				r2 = h2(r)
+			}
+			return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
 						}
+					}()
+				}
+				var r3, r4 func(RetryLoopDoneInfo)
+				if r1 != nil {
+					r3 = r1(r)
+				}
+				if r2 != nil {
+					r4 = r2(r)
+				}
+				return func(r RetryLoopDoneInfo) {
+					if options.panicCallback != nil {
+						defer func() {
+							if e := recover(); e != nil {
+								options.panicCallback(e)
+							}
+						}()
+					}
+					if r3 != nil {
+						r3(r)
+					}
+					if r4 != nil {
+						r4(r)
 					}
 				}
 			}
