@@ -242,7 +242,7 @@ func TestTable(t *testing.T) {
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
-			ydb.WithErrWriter(os.Stderr),
+			ydb.WithErrWriter(os.Stdout),
 			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithTraceTable(
