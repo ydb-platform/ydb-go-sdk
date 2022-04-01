@@ -114,7 +114,6 @@ func WithSlowBackoff(b Backoff) retryOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err error) {
 	h := &retryOptionsHolder{
-		trace:       trace.ContextRetry(ctx),
 		fastBackoff: FastBackoff,
 		slowBackoff: SlowBackoff,
 	}

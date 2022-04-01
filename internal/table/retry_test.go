@@ -17,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
@@ -212,7 +211,6 @@ func TestRetryerImmediateReturn(t *testing.T) {
 // We are testing all suspentions of custom operation func against to all deadline
 // timeouts - all sub-tests must have latency less than timeouts (+tolerance)
 func TestRetryContextDeadline(t *testing.T) {
-	tolerance := 10 * time.Millisecond
 	timeouts := []time.Duration{
 		50 * time.Millisecond,
 		100 * time.Millisecond,
@@ -318,31 +316,8 @@ func TestRetryContextDeadline(t *testing.T) {
 			t.Run(fmt.Sprintf("Timeout=%v,Sleep=%v", timeout, sleep), func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
-				start := time.Now()
 				_ = do(
-					trace.WithRetry(
-						ctx,
-						trace.Retry{
-							OnRetry: func(
-								info trace.RetryLoopStartInfo,
-							) func(
-								intermediateInfo trace.RetryLoopIntermediateInfo,
-							) func(
-								trace.RetryLoopDoneInfo,
-							) {
-								return func(
-									info trace.RetryLoopIntermediateInfo,
-								) func(trace.RetryLoopDoneInfo) {
-									return func(info trace.RetryLoopDoneInfo) {
-										latency := time.Since(start)
-										if latency-timeouts[i] > tolerance {
-											t.Errorf("unexpected latency: %v", latency)
-										}
-									}
-								}
-							},
-						},
-					),
+					ctx,
 					p,
 					func(ctx context.Context, _ table.Session) error {
 						select {
