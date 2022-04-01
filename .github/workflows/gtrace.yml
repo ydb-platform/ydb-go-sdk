@@ -31,15 +31,3 @@ jobs:
     - name: Build
       run: |
         go install ./cmd/gtrace
-
-    - name: Remove committed codegen file for recreate with gtrace on next step
-      run: |
-        rm ./cmd/gtrace/internal/test/*_gtrace.go
-
-    - name: Generate
-      run: |
-        cd ./cmd/gtrace/internal/test/ && go generate
-
-    - name: Test
-      run: |
-        go test -v ./cmd/gtrace/internal/test/

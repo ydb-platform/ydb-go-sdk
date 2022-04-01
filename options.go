@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -238,9 +239,9 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 }
 
 // WithTraceDriver returns deadline which has associated Driver with it.
-func WithTraceDriver(trace trace.Driver) Option {
+func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.options = append(c.options, config.WithTrace(trace))
+		c.options = append(c.options, config.WithTrace(trace, opts...))
 		return nil
 	}
 }
@@ -352,42 +353,132 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithTraceTable returns table trace option
-func WithTraceTable(trace trace.Table) Option {
+// WithRecoverPanic specified flag for use panic recover on calls user-defined funcs
+func WithRecoverPanic() Option {
 	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithTrace(trace))
+		c.recoverPanic = true
+		return nil
+	}
+}
+
+// WithRecoverPanicWriter specified `io.Writer` for logging panic details
+func WithRecoverPanicWriter(w io.Writer) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.recoverPanicWriter = w
+		return nil
+	}
+}
+
+// WithExitCodeOnPanic specified code for exit on panic
+// If nil - no exiting on panic
+func WithExitCodeOnPanic(code int) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.exitCodeOnPanic = &code
+		return nil
+	}
+}
+
+// WithTraceTable returns table trace option
+func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(
+			c.tableOptions,
+			tableConfig.WithTrace(
+				t,
+				append(
+					[]trace.TableComposeOption{
+						trace.WithTableRecoverPanic(c.recoverPanic),
+						trace.WithTableRecoverPanicWriter(c.recoverPanicWriter),
+						trace.WithTableExitCodeOnPanic(c.exitCodeOnPanic),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
 
 // WithTraceScripting scripting trace option
-func WithTraceScripting(trace trace.Scripting) Option {
+func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.scriptingOptions = append(c.scriptingOptions, scriptingConfig.WithTrace(trace))
+		c.scriptingOptions = append(
+			c.scriptingOptions,
+			scriptingConfig.WithTrace(
+				t,
+				append(
+					[]trace.ScriptingComposeOption{
+						trace.WithScriptingRecoverPanic(c.recoverPanic),
+						trace.WithScriptingRecoverPanicWriter(c.recoverPanicWriter),
+						trace.WithScriptingExitCodeOnPanic(c.exitCodeOnPanic),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
 
 // WithTraceScheme returns scheme trace option
-func WithTraceScheme(trace trace.Scheme) Option {
+func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.schemeOptions = append(c.schemeOptions, schemeConfig.WithTrace(trace))
+		c.schemeOptions = append(
+			c.schemeOptions,
+			schemeConfig.WithTrace(
+				t,
+				append(
+					[]trace.SchemeComposeOption{
+						trace.WithSchemeRecoverPanic(c.recoverPanic),
+						trace.WithSchemeRecoverPanicWriter(c.recoverPanicWriter),
+						trace.WithSchemeExitCodeOnPanic(c.exitCodeOnPanic),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
 
 // WithTraceCoordination returns coordination trace option
-func WithTraceCoordination(trace trace.Coordination) Option {
+func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.coordinationOptions = append(c.coordinationOptions, coordinationConfig.WithTrace(trace))
+		c.coordinationOptions = append(
+			c.coordinationOptions,
+			coordinationConfig.WithTrace(
+				t,
+				append(
+					[]trace.CoordinationComposeOption{
+						trace.WithCoordinationRecoverPanic(c.recoverPanic),
+						trace.WithCoordinationRecoverPanicWriter(c.recoverPanicWriter),
+						trace.WithCoordinationExitCodeOnPanic(c.exitCodeOnPanic),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
 
 // WithTraceRatelimiter returns ratelimiter trace option
-func WithTraceRatelimiter(trace trace.Ratelimiter) Option {
+func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.ratelimiterOptions = append(c.ratelimiterOptions, ratelimiterConfig.WithTrace(trace))
+		c.ratelimiterOptions = append(
+			c.ratelimiterOptions,
+			ratelimiterConfig.WithTrace(
+				t,
+				append(
+					[]trace.RatelimiterComposeOption{
+						trace.WithRatelimiterRecoverPanic(c.recoverPanic),
+						trace.WithRatelimiterRecoverPanicWriter(c.recoverPanicWriter),
+						trace.WithRatelimiterExitCodeOnPanic(c.exitCodeOnPanic),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }
@@ -400,9 +491,22 @@ func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 }
 
 // WithTraceDiscovery returns discovery trace option
-func WithTraceDiscovery(trace trace.Discovery) Option {
+func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithTrace(trace))
+		c.discoveryOptions = append(
+			c.discoveryOptions,
+			discoveryConfig.WithTrace(
+				t,
+				append(
+					[]trace.DiscoveryComposeOption{
+						trace.WithDiscoveryRecoverPanic(c.recoverPanic),
+						trace.WithDiscoveryRecoverPanicWriter(c.recoverPanicWriter),
+						trace.WithDiscoveryExitCodeOnPanic(c.exitCodeOnPanic),
+					},
+					opts...,
+				)...,
+			),
+		)
 		return nil
 	}
 }

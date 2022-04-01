@@ -5,6 +5,7 @@ package trace
 //go:generate gtrace
 
 type (
-	//gtrace:gen
+	// Coordination specified trace of coordination client activity.
+	// gtrace:gen
 	Coordination struct{}
 )

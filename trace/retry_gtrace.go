@@ -5,20 +5,65 @@ package trace
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 )
 
-// Compose returns a new Retry which has functional fields composed
-// both from t and x.
-func (t Retry) Compose(x Retry) (ret Retry) {
+// retryComposeOptions is a holder of options
+type retryComposeOptions struct {
+	recoverPanic       bool
+	exitCodeOnPanic    *int
+	recoverPanicWriter io.Writer
+}
+
+// RetryOption specified Retry compose option
+type RetryComposeOption func(o *retryComposeOptions)
+
+// WithRetryRecoverPanic specified behavior on panic - recover or not
+func WithRetryRecoverPanic(b bool) RetryComposeOption {
+	return func(o *retryComposeOptions) {
+		o.recoverPanic = b
+	}
+}
+
+// WithRetryRecoverPanicWriter specified writer for print panic details
+func WithRetryRecoverPanicWriter(w io.Writer) RetryComposeOption {
+	return func(o *retryComposeOptions) {
+		o.recoverPanicWriter = w
+	}
+}
+
+// WithRetryExitCodeOnPanic specified code for exit on panic
+// If nil - no exiting on panic
+func WithRetryExitCodeOnPanic(code *int) RetryComposeOption {
+	return func(o *retryComposeOptions) {
+		o.exitCodeOnPanic = code
+	}
+}
+
+// Compose returns a new Retry which has functional fields composed both from t and x.
+func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
+	options := retryComposeOptions{
+		recoverPanicWriter: os.Stderr,
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
 	{
 		h1 := t.OnRetry
 		h2 := x.OnRetry
 		ret.OnRetry = func(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r1, r2 func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
@@ -30,8 +75,15 @@ func (t Retry) Compose(x Retry) (ret Retry) {
 			}
 			return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				var r3, r4 func(RetryLoopDoneInfo)
@@ -43,8 +95,15 @@ func (t Retry) Compose(x Retry) (ret Retry) {
 				}
 				return func(r RetryLoopDoneInfo) {
 					defer func() {
-						if e := recover(); e != nil {
-							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+						if options.recoverPanic {
+							if e := recover(); e != nil {
+								if options.recoverPanicWriter != nil {
+									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+								}
+								if options.exitCodeOnPanic != nil {
+									os.Exit(*options.exitCodeOnPanic)
+								}
+							}
 						}
 					}()
 					if r3 != nil {

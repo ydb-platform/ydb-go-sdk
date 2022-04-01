@@ -12,7 +12,8 @@ import (
 )
 
 type (
-	//gtrace:gen
+	// Driver specified trace of common driver activity.
+	// gtrace:gen
 	Driver struct {
 		// Driver runtime events
 		OnInit  func(DriverInitStartInfo) func(DriverInitDoneInfo)

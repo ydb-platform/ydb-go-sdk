@@ -5,6 +5,7 @@ package trace
 //go:generate gtrace
 
 type (
-	//gtrace:gen
+	// Scheme specified trace of scheme client activity.
+	// gtrace:gen
 	Scheme struct{}
 )

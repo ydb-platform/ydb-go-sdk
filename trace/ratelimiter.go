@@ -5,6 +5,7 @@ package trace
 //go:generate gtrace
 
 type (
-	//gtrace:gen
+	// Ratelimiter specified trace of ratelimiter client activity.
+	// gtrace:gen
 	Ratelimiter struct{}
 )

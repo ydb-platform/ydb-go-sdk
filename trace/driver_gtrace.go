@@ -5,20 +5,65 @@ package trace
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 )
 
-// Compose returns a new Driver which has functional fields composed
-// both from t and x.
-func (t Driver) Compose(x Driver) (ret Driver) {
+// driverComposeOptions is a holder of options
+type driverComposeOptions struct {
+	recoverPanic       bool
+	exitCodeOnPanic    *int
+	recoverPanicWriter io.Writer
+}
+
+// DriverOption specified Driver compose option
+type DriverComposeOption func(o *driverComposeOptions)
+
+// WithDriverRecoverPanic specified behavior on panic - recover or not
+func WithDriverRecoverPanic(b bool) DriverComposeOption {
+	return func(o *driverComposeOptions) {
+		o.recoverPanic = b
+	}
+}
+
+// WithDriverRecoverPanicWriter specified writer for print panic details
+func WithDriverRecoverPanicWriter(w io.Writer) DriverComposeOption {
+	return func(o *driverComposeOptions) {
+		o.recoverPanicWriter = w
+	}
+}
+
+// WithDriverExitCodeOnPanic specified code for exit on panic
+// If nil - no exiting on panic
+func WithDriverExitCodeOnPanic(code *int) DriverComposeOption {
+	return func(o *driverComposeOptions) {
+		o.exitCodeOnPanic = code
+	}
+}
+
+// Compose returns a new Driver which has functional fields composed both from t and x.
+func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
+	options := driverComposeOptions{
+		recoverPanicWriter: os.Stderr,
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
 	{
 		h1 := t.OnInit
 		h2 := x.OnInit
 		ret.OnInit = func(d DriverInitStartInfo) func(DriverInitDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverInitDoneInfo)
@@ -30,8 +75,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverInitDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -48,8 +100,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnClose
 		ret.OnClose = func(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverCloseDoneInfo)
@@ -61,8 +120,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverCloseDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -79,8 +145,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnNetRead
 		ret.OnNetRead = func(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverNetReadDoneInfo)
@@ -92,8 +165,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverNetReadDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -110,8 +190,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnNetWrite
 		ret.OnNetWrite = func(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverNetWriteDoneInfo)
@@ -123,8 +210,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverNetWriteDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -141,8 +235,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnNetDial
 		ret.OnNetDial = func(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverNetDialDoneInfo)
@@ -154,8 +255,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverNetDialDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -172,8 +280,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnNetClose
 		ret.OnNetClose = func(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverNetCloseDoneInfo)
@@ -185,8 +300,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverNetCloseDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -203,8 +325,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnResolve
 		ret.OnResolve = func(d DriverResolveStartInfo) func(DriverResolveDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverResolveDoneInfo)
@@ -216,8 +345,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverResolveDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -234,8 +370,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnStateChange
 		ret.OnConnStateChange = func(d DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverConnStateChangeDoneInfo)
@@ -247,8 +390,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverConnStateChangeDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -265,8 +415,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnInvoke
 		ret.OnConnInvoke = func(d DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverConnInvokeDoneInfo)
@@ -278,8 +435,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverConnInvokeDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -296,8 +460,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnNewStream
 		ret.OnConnNewStream = func(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo)
@@ -309,8 +480,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				var r2, r3 func(DriverConnNewStreamDoneInfo)
@@ -322,8 +500,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 				}
 				return func(d DriverConnNewStreamDoneInfo) {
 					defer func() {
-						if e := recover(); e != nil {
-							os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+						if options.recoverPanic {
+							if e := recover(); e != nil {
+								if options.recoverPanicWriter != nil {
+									fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+								}
+								if options.exitCodeOnPanic != nil {
+									os.Exit(*options.exitCodeOnPanic)
+								}
+							}
 						}
 					}()
 					if r2 != nil {
@@ -341,8 +526,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnTake
 		ret.OnConnTake = func(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverConnTakeDoneInfo)
@@ -354,8 +546,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverConnTakeDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -372,8 +571,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnUsagesChange
 		ret.OnConnUsagesChange = func(d DriverConnUsagesChangeInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			if h1 != nil {
@@ -389,8 +595,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnStreamUsagesChange
 		ret.OnConnStreamUsagesChange = func(d DriverConnStreamUsagesChangeInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			if h1 != nil {
@@ -406,8 +619,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnPark
 		ret.OnConnPark = func(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverConnParkDoneInfo)
@@ -419,8 +639,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverConnParkDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -437,8 +664,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnClose
 		ret.OnConnClose = func(d DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverConnCloseDoneInfo)
@@ -450,8 +684,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverConnCloseDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -468,8 +709,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnConnRelease
 		ret.OnConnRelease = func(d DriverConnReleaseStartInfo) func(DriverConnReleaseDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverConnReleaseDoneInfo)
@@ -481,8 +729,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverConnReleaseDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -499,8 +754,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnClusterInit
 		ret.OnClusterInit = func(d DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverClusterInitDoneInfo)
@@ -512,8 +774,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverClusterInitDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -530,8 +799,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnClusterClose
 		ret.OnClusterClose = func(d DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverClusterCloseDoneInfo)
@@ -543,8 +819,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverClusterCloseDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -561,8 +844,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnClusterGet
 		ret.OnClusterGet = func(d DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverClusterGetDoneInfo)
@@ -574,8 +864,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverClusterGetDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -592,8 +889,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnClusterInsert
 		ret.OnClusterInsert = func(d DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverClusterInsertDoneInfo)
@@ -605,8 +909,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverClusterInsertDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -623,8 +934,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnClusterRemove
 		ret.OnClusterRemove = func(d DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverClusterRemoveDoneInfo)
@@ -636,8 +954,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverClusterRemoveDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -654,8 +979,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnPessimizeNode
 		ret.OnPessimizeNode = func(d DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverPessimizeNodeDoneInfo)
@@ -667,8 +999,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverPessimizeNodeDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -685,8 +1024,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnRepeaterWakeUp
 		ret.OnRepeaterWakeUp = func(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverRepeaterTickDoneInfo)
@@ -698,8 +1044,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverRepeaterTickDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -716,8 +1069,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 		h2 := x.OnGetCredentials
 		ret.OnGetCredentials = func(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DriverGetCredentialsDoneInfo)
@@ -729,8 +1089,15 @@ func (t Driver) Compose(x Driver) (ret Driver) {
 			}
 			return func(d DriverGetCredentialsDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {

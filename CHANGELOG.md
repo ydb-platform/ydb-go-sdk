@@ -1,4 +1,8 @@
-* Added panic recover on trace calls in `Compose` call step with print stacktrace to `os.Stderr` and `os.Exit(1)`
+* Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}PanicRecovery` options
+* Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}PanicRecoveryWriter` options
+* Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}ExitCodeOnPanic` options
+* Added `ydb.WithPanicRecovery`, `ydb.WithPanicRecoveryWriter` and `ydb.WithExitCodeOnPanic` options
+* Added panic recover on trace calls in `Compose` call step
 * Removed `trace.Context{Driver,Retry,Table}` and `trace.With{Driver,Retry,Table}` as redundant
 
 ## v3.16.12

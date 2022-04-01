@@ -245,6 +245,9 @@ func TestTable(t *testing.T) {
 			ydb.WithErrWriter(os.Stdout),
 			ydb.WithMinLevel(log.WARN),
 		),
+		ydb.WithRecoverPanic(),
+		ydb.WithRecoverPanicWriter(os.Stderr),
+		ydb.WithExitCodeOnPanic(1),
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
 				trace.Table{

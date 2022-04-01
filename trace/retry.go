@@ -9,7 +9,8 @@ import (
 )
 
 type (
-	//gtrace:gen
+	// Retry specified trace of retry call activity.
+	// gtrace:gen
 	Retry struct {
 		OnRetry func(RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
 	}

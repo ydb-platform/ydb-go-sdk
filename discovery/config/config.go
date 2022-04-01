@@ -118,9 +118,9 @@ func WithMeta(meta meta.Meta) Option {
 	}
 }
 
-func WithTrace(trace trace.Discovery) Option {
+func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
 	return func(c *config) {
-		c.trace = c.trace.Compose(trace)
+		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 

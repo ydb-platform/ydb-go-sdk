@@ -15,10 +15,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
-	"text/tabwriter"
-
 	_ "unsafe" // For go:linkname.
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
@@ -30,41 +27,6 @@ func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
 
 // nolint:gocyclo
 func main() {
-	var (
-		verbose    bool
-		suffix     string
-		stubSuffix string
-		write      bool
-		buildTag   string
-	)
-	flag.BoolVar(&verbose,
-		"v", false,
-		"output debug info",
-	)
-	flag.BoolVar(&write,
-		"w", false,
-		"write trace to file",
-	)
-	flag.StringVar(&suffix,
-		"file-suffix", "_gtrace",
-		"suffix for generated go files",
-	)
-	flag.StringVar(&stubSuffix,
-		"stub-file-suffix", "_stub",
-		"suffix for generated stub go files",
-	)
-	flag.StringVar(&buildTag,
-		"tag", "",
-		"build tag which needs to be passed to enable tracing",
-	)
-	flag.Parse()
-
-	if verbose {
-		log.SetFlags(log.Lshortfile)
-	} else {
-		log.SetFlags(0)
-	}
-
 	var (
 		// Reports whether we were called from go:generate.
 		isGoGenerate bool
@@ -93,38 +55,19 @@ func main() {
 		log.SetPrefix("[" + prefix + "] ")
 	}
 	buildCtx := build.Default
-	if verbose {
-		var sb strings.Builder
-		prettyPrint(&sb, buildCtx)
-		log.Printf("build context:\n%s", sb.String())
-	}
 	buildPkg, err := buildCtx.ImportDir(workDir, build.IgnoreVendor)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	srcFilePath := filepath.Join(workDir, gofile)
-	if verbose {
-		log.Printf("source file: %s", srcFilePath)
-		log.Printf("package files: %v", buildPkg.GoFiles)
-	}
 
 	var writers []*Writer
-	// nolint:nestif
-	if isGoGenerate || write {
+	if isGoGenerate {
 		// We should respect Go suffixes like `_linux.go`.
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
-		if verbose {
-			log.Printf(
-				"split os/args tags of %q: %q %q %q",
-				gofile, name, tags, ext,
-			)
-		}
 		openFile := func(name string) (*os.File, func()) {
 			p := filepath.Join(workDir, name)
-			if verbose {
-				log.Printf("destination file path: %+v", p)
-			}
 			var f *os.File
 			f, err = os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 			if err != nil {
@@ -132,27 +75,16 @@ func main() {
 			}
 			return f, func() { f.Close() }
 		}
-		f, clean := openFile(name + suffix + tags + ext)
+		f, clean := openFile(name + "_gtrace" + tags + ext)
 		defer clean()
 		writers = append(writers, &Writer{
-			Context:  buildCtx,
-			Output:   f,
-			BuildTag: buildTag,
+			Context: buildCtx,
+			Output:  f,
 		})
-		if buildTag != "" {
-			f, clean := openFile(name + suffix + stubSuffix + tags + ext)
-			defer clean()
-			writers = append(writers, &Writer{
-				Context:  buildCtx,
-				Output:   f,
-				BuildTag: buildTag,
-			})
-		}
 	} else {
 		writers = append(writers, &Writer{
-			Context:  buildCtx,
-			Output:   os.Stdout,
-			BuildTag: buildTag,
+			Context: buildCtx,
+			Output:  os.Stdout,
 		})
 	}
 
@@ -165,15 +97,8 @@ func main() {
 	fset := token.NewFileSet()
 	for _, name := range buildPkg.GoFiles {
 		base, _, _ := splitOSArchTags(&buildCtx, name)
-		if isGenerated(base, suffix) {
-			// Skip gtrace generated files.
-			if verbose {
-				log.Printf("skipped package file: %q", name)
-			}
+		if isGenerated(base, "_gtrace") {
 			continue
-		}
-		if verbose {
-			log.Printf("parsing package file: %q", name)
 		}
 		var file *os.File
 		file, err = os.Open(filepath.Join(workDir, name))
@@ -225,18 +150,7 @@ func main() {
 			depth int
 			item  *GenItem
 		)
-		logf := func(s string, args ...interface{}) {
-			if !verbose {
-				return
-			}
-			log.Print(
-				strings.Repeat(" ", depth*4),
-				fmt.Sprintf(s, args...),
-			)
-		}
 		ast.Inspect(astFile, func(n ast.Node) (next bool) {
-			logf("%T", n)
-
 			if n == nil {
 				item = nil
 				depth--
@@ -249,39 +163,26 @@ func main() {
 			}()
 
 			switch v := n.(type) {
-			case
-				*ast.FuncDecl,
-				*ast.ValueSpec:
+			case *ast.FuncDecl, *ast.ValueSpec:
 				return false
 
 			case *ast.Ident:
-				logf("ident %q", v.Name)
 				if item != nil {
 					item.Ident = v
 				}
 				return false
 
 			case *ast.CommentGroup:
-				for i, c := range v.List {
-					logf("#%d comment %q", i, c.Text)
-
-					text, ok := TrimConfigComment(c.Text)
-					if ok {
+				for _, c := range v.List {
+					if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
 						if item == nil {
 							item = &GenItem{}
-						}
-						if err := item.ParseComment(text); err != nil {
-							log.Fatalf(
-								"malformed comment string: %q: %v",
-								text, err,
-							)
 						}
 					}
 				}
 				return false
 
 			case *ast.StructType:
-				logf("struct %+v", v)
 				if item != nil {
 					item.StructType = v
 					items = append(items, item)
@@ -323,22 +224,6 @@ func main() {
 					name, err,
 				)
 				continue
-			}
-			var config GenConfig
-			if doc := field.Doc; doc != nil {
-				for _, line := range doc.List {
-					text, ok := TrimConfigComment(line.Text)
-					if !ok {
-						continue
-					}
-					err := config.ParseComment(text)
-					if err != nil {
-						log.Fatalf(
-							"malformed comment string: %q: %v",
-							text, err,
-						)
-					}
-				}
 			}
 			t.Hooks = append(t.Hooks, Hook{
 				Name: name,
@@ -496,39 +381,9 @@ func (f GenFlag) Has(x GenFlag) bool {
 	return f&x != 0
 }
 
-type GenConfig struct {
-}
-
-func TrimConfigComment(text string) (string, bool) {
-	s := strings.TrimPrefix(text, "//gtrace:")
-	if text != s {
-		return s, true
-	}
-	return "", false
-}
-
-func (g *GenConfig) ParseComment(text string) (err error) {
-	prefix, text := split(text, ' ')
-	switch prefix {
-	case "gen":
-	default:
-		return fmt.Errorf("unknown prefix: %q", prefix)
-	}
-	return nil
-}
-
 type GenItem struct {
-	GenConfig
 	Ident      *ast.Ident
 	StructType *ast.StructType
-}
-
-func split(s string, c byte) (s1, s2 string) {
-	i := strings.IndexByte(s, c)
-	if i == -1 {
-		return s, ""
-	}
-	return s[:i], s[i+1:]
 }
 
 func rsplit(s string, c byte) (s1, s2 string) {
@@ -559,22 +414,6 @@ func scanBuildConstraints(r io.Reader) (cs []string, err error) {
 		}
 	}
 	return cs, nil
-}
-
-func prettyPrint(w io.Writer, x interface{}) {
-	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-	t := reflect.TypeOf(x)
-	v := reflect.ValueOf(x)
-	for i := 0; i < t.NumField(); i++ {
-		if v.Field(i).IsZero() {
-			continue
-		}
-		fmt.Fprintf(tw, "%s:\t%v\n",
-			t.Field(i).Name,
-			v.Field(i),
-		)
-	}
-	tw.Flush()
 }
 
 func isGenerated(base, suffix string) bool {

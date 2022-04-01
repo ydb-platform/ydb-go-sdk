@@ -2,8 +2,43 @@
 
 package trace
 
-// Compose returns a new Coordination which has functional fields composed
-// both from t and x.
-func (t Coordination) Compose(x Coordination) (ret Coordination) {
+import (
+	"io"
+)
+
+// coordinationComposeOptions is a holder of options
+type coordinationComposeOptions struct {
+	recoverPanic       bool
+	exitCodeOnPanic    *int
+	recoverPanicWriter io.Writer
+}
+
+// CoordinationOption specified Coordination compose option
+type CoordinationComposeOption func(o *coordinationComposeOptions)
+
+// WithCoordinationRecoverPanic specified behavior on panic - recover or not
+func WithCoordinationRecoverPanic(b bool) CoordinationComposeOption {
+	return func(o *coordinationComposeOptions) {
+		o.recoverPanic = b
+	}
+}
+
+// WithCoordinationRecoverPanicWriter specified writer for print panic details
+func WithCoordinationRecoverPanicWriter(w io.Writer) CoordinationComposeOption {
+	return func(o *coordinationComposeOptions) {
+		o.recoverPanicWriter = w
+	}
+}
+
+// WithCoordinationExitCodeOnPanic specified code for exit on panic
+// If nil - no exiting on panic
+func WithCoordinationExitCodeOnPanic(code *int) CoordinationComposeOption {
+	return func(o *coordinationComposeOptions) {
+		o.exitCodeOnPanic = code
+	}
+}
+
+// Compose returns a new Coordination which has functional fields composed both from t and x.
+func (t Coordination) Compose(x Coordination, opts ...CoordinationComposeOption) (ret Coordination) {
 	return ret
 }

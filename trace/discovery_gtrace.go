@@ -5,20 +5,65 @@ package trace
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 )
 
-// Compose returns a new Discovery which has functional fields composed
-// both from t and x.
-func (t Discovery) Compose(x Discovery) (ret Discovery) {
+// discoveryComposeOptions is a holder of options
+type discoveryComposeOptions struct {
+	recoverPanic       bool
+	exitCodeOnPanic    *int
+	recoverPanicWriter io.Writer
+}
+
+// DiscoveryOption specified Discovery compose option
+type DiscoveryComposeOption func(o *discoveryComposeOptions)
+
+// WithDiscoveryRecoverPanic specified behavior on panic - recover or not
+func WithDiscoveryRecoverPanic(b bool) DiscoveryComposeOption {
+	return func(o *discoveryComposeOptions) {
+		o.recoverPanic = b
+	}
+}
+
+// WithDiscoveryRecoverPanicWriter specified writer for print panic details
+func WithDiscoveryRecoverPanicWriter(w io.Writer) DiscoveryComposeOption {
+	return func(o *discoveryComposeOptions) {
+		o.recoverPanicWriter = w
+	}
+}
+
+// WithDiscoveryExitCodeOnPanic specified code for exit on panic
+// If nil - no exiting on panic
+func WithDiscoveryExitCodeOnPanic(code *int) DiscoveryComposeOption {
+	return func(o *discoveryComposeOptions) {
+		o.exitCodeOnPanic = code
+	}
+}
+
+// Compose returns a new Discovery which has functional fields composed both from t and x.
+func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Discovery) {
+	options := discoveryComposeOptions{
+		recoverPanicWriter: os.Stderr,
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
 	{
 		h1 := t.OnDiscover
 		h2 := x.OnDiscover
 		ret.OnDiscover = func(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DiscoveryDiscoverDoneInfo)
@@ -30,8 +75,15 @@ func (t Discovery) Compose(x Discovery) (ret Discovery) {
 			}
 			return func(d DiscoveryDiscoverDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {
@@ -48,8 +100,15 @@ func (t Discovery) Compose(x Discovery) (ret Discovery) {
 		h2 := x.OnWhoAmI
 		ret.OnWhoAmI = func(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
 			defer func() {
-				if e := recover(); e != nil {
-					os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+				if options.recoverPanic {
+					if e := recover(); e != nil {
+						if options.recoverPanicWriter != nil {
+							fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+						}
+						if options.exitCodeOnPanic != nil {
+							os.Exit(*options.exitCodeOnPanic)
+						}
+					}
 				}
 			}()
 			var r, r1 func(DiscoveryWhoAmIDoneInfo)
@@ -61,8 +120,15 @@ func (t Discovery) Compose(x Discovery) (ret Discovery) {
 			}
 			return func(d DiscoveryWhoAmIDoneInfo) {
 				defer func() {
-					if e := recover(); e != nil {
-						os.Stderr.WriteString(fmt.Sprintf("panic recovered:%v:\n%s", e, debug.Stack()))
+					if options.recoverPanic {
+						if e := recover(); e != nil {
+							if options.recoverPanicWriter != nil {
+								fmt.Fprintf(options.recoverPanicWriter, "panic recovered:%v:\n%s", e, debug.Stack())
+							}
+							if options.exitCodeOnPanic != nil {
+								os.Exit(*options.exitCodeOnPanic)
+							}
+						}
 					}
 				}()
 				if r != nil {

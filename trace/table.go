@@ -9,8 +9,8 @@ import (
 //go:generate gtrace
 
 type (
-	// Table contains options for tracing table client activity.
-	//gtrace:gen
+	// Table specified trace of table client activity.
+	// gtrace:gen
 	Table struct {
 		// Client events
 		OnInit          func(TableInitStartInfo) func(TableInitDoneInfo)

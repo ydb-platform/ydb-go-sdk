@@ -7,7 +7,8 @@ import "context"
 //go:generate gtrace
 
 type (
-	//gtrace:gen
+	// Discovery specified trace of discovery client activity.
+	// gtrace:gen
 	Discovery struct {
 		OnDiscover func(DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo)
 		OnWhoAmI   func(DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo)

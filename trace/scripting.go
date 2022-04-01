@@ -9,7 +9,8 @@ import (
 )
 
 type (
-	//gtrace:gen
+	// Scripting specified trace of scripting client activity.
+	// gtrace:gen
 	Scripting struct {
 		OnExecute       func(ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo)
 		OnStreamExecute func(

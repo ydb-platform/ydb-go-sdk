@@ -2,8 +2,43 @@
 
 package trace
 
-// Compose returns a new Scheme which has functional fields composed
-// both from t and x.
-func (t Scheme) Compose(x Scheme) (ret Scheme) {
+import (
+	"io"
+)
+
+// schemeComposeOptions is a holder of options
+type schemeComposeOptions struct {
+	recoverPanic       bool
+	exitCodeOnPanic    *int
+	recoverPanicWriter io.Writer
+}
+
+// SchemeOption specified Scheme compose option
+type SchemeComposeOption func(o *schemeComposeOptions)
+
+// WithSchemeRecoverPanic specified behavior on panic - recover or not
+func WithSchemeRecoverPanic(b bool) SchemeComposeOption {
+	return func(o *schemeComposeOptions) {
+		o.recoverPanic = b
+	}
+}
+
+// WithSchemeRecoverPanicWriter specified writer for print panic details
+func WithSchemeRecoverPanicWriter(w io.Writer) SchemeComposeOption {
+	return func(o *schemeComposeOptions) {
+		o.recoverPanicWriter = w
+	}
+}
+
+// WithSchemeExitCodeOnPanic specified code for exit on panic
+// If nil - no exiting on panic
+func WithSchemeExitCodeOnPanic(code *int) SchemeComposeOption {
+	return func(o *schemeComposeOptions) {
+		o.exitCodeOnPanic = code
+	}
+}
+
+// Compose returns a new Scheme which has functional fields composed both from t and x.
+func (t Scheme) Compose(x Scheme, opts ...SchemeComposeOption) (ret Scheme) {
 	return ret
 }

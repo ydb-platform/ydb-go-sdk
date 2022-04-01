@@ -202,9 +202,9 @@ func WithCertificate(certificate *x509.Certificate) Option {
 	}
 }
 
-func WithTrace(trace trace.Driver) Option {
+func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option {
 	return func(c *config) {
-		c.trace = c.trace.Compose(trace)
+		c.trace = c.trace.Compose(t, opts...)
 	}
 }
 
