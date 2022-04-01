@@ -2,7 +2,7 @@ package trace
 
 import "context"
 
-// tool gtrace used from ./cmd/gtrace
+// tool gtrace used from ./internal/cmd/gtrace
 
 //go:generate gtrace
 
