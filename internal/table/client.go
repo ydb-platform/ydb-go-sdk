@@ -62,7 +62,7 @@ func newClient(
 	builder SessionBuilder,
 	config config.Config,
 ) *client {
-	onDone := trace.TableOnInit(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+	onDone := trace.TableOnInit(config.Trace(), &ctx)
 	if builder == nil {
 		builder = func(ctx context.Context) (s Session, err error) {
 			return newSession(ctx, cc, config)
@@ -213,7 +213,7 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 			c.config.CreateSessionTimeout(),
 		)
 
-		onDone := trace.TableOnPoolSessionNew(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+		onDone := trace.TableOnPoolSessionNew(c.config.Trace(), &ctx)
 
 		defer func() {
 			onDone(s, err)
@@ -285,15 +285,28 @@ func (c *client) createSession(ctx context.Context) (s Session, err error) {
 	}
 }
 
-// Get returns first idle session from the client and removes it from
-// there. If no items stored in client it creates new one returns it.
-func (c *client) Get(ctx context.Context) (s Session, err error) {
+type getOptions struct {
+	t trace.Table
+}
+
+type getOption func(o *getOptions)
+
+func withTrace(t trace.Table) getOption {
+	return func(o *getOptions) {
+		o.t = o.t.Compose(t)
+	}
+}
+
+func (c *client) get(ctx context.Context, opts ...getOption) (s Session, err error) {
 	var (
 		i = 0
-		t = c.config.Trace().Compose(trace.ContextTable(ctx))
+		o = getOptions{t: c.config.Trace()}
 	)
+	for _, opt := range opts {
+		opt(&o)
+	}
 
-	onDone := trace.TableOnPoolGet(t, &ctx)
+	onDone := trace.TableOnPoolGet(o.t, &ctx)
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -329,7 +342,7 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		// are less than maximum amount of touched session. That is, we want to
 		// be fair here and not to lock more goroutines than we could ship
 		// session to.
-		s, err = c.waitFromCh(ctx, t)
+		s, err = c.waitFromCh(ctx, o.t)
 		if err != nil {
 			err = errors.WithStackTrace(err)
 		}
@@ -343,6 +356,12 @@ func (c *client) Get(ctx context.Context) (s Session, err error) {
 		)
 	}
 	return s, nil
+}
+
+// Get returns first idle session from the client and removes it from
+// there. If no items stored in client it creates new one returns it.
+func (c *client) Get(ctx context.Context) (s Session, err error) {
+	return c.get(ctx)
 }
 
 func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err error) {
@@ -403,7 +422,7 @@ func (c *client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
 func (c *client) Put(ctx context.Context, s Session) (err error) {
-	onDone := trace.TableOnPoolPut(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
+	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx, s)
 	defer func() {
 		onDone(err)
 	}()
@@ -447,7 +466,7 @@ func (c *client) Put(ctx context.Context, s Session) (err error) {
 // It returns first error occurred during stale sessions' deletion.
 // Note that even on error it calls Close() on each session.
 func (c *client) Close(ctx context.Context) (err error) {
-	onDone := trace.TableOnClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+	onDone := trace.TableOnClose(c.config.Trace(), &ctx)
 	defer func() {
 		onDone(err)
 	}()
@@ -851,7 +870,7 @@ func (c *client) closeSession(ctx context.Context, s Session, opts ...closeSessi
 	}
 
 	if h.withTrace {
-		onDone := trace.TableOnPoolSessionClose(c.config.Trace().Compose(trace.ContextTable(ctx)), &ctx, s)
+		onDone := trace.TableOnPoolSessionClose(c.config.Trace(), &ctx, s)
 		defer onDone()
 	}
 

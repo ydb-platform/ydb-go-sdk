@@ -89,7 +89,7 @@ func (s *session) isClosing() bool {
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (s Session, err error) {
-	onDone := trace.TableOnSessionNew(config.Trace().Compose(trace.ContextTable(ctx)), &ctx)
+	onDone := trace.TableOnSessionNew(config.Trace(), &ctx)
 	defer func() {
 		onDone(s, err)
 	}()

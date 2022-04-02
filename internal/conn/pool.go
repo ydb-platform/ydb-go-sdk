@@ -91,7 +91,7 @@ func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
 	}
 
 	trace.DriverOnPessimizeNode(
-		trace.ContextDriver(ctx).Compose(p.config.Trace()),
+		p.config.Trace(),
 		&ctx,
 		e,
 		cc.GetState(),

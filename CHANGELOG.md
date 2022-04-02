@@ -1,4 +1,5 @@
-* Refactored gtrace tool for generate `Compose` options
+* Removed redundant `trace.With{Table,Driver,Retry}` and `trace.Context{Table,Driver,Retry}` funcs 
+* Refactored tool `gtrace` for generate `Compose` options
 * Added panic recover on trace calls in `Compose` call step
 * Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}PanicCallback` options
 * Added `ydb.WithPanicCallback` option
