@@ -1,5 +1,5 @@
 * Removed redundant `trace.With{Table,Driver,Retry}` and `trace.Context{Table,Driver,Retry}` funcs 
-* Moved `gtrace` tool from `./cmt/gtrace` to `internal/cmd/gtrace`
+* Moved `gtrace` tool from `./cmt/gtrace` to `./internal/cmd/gtrace`
 * Refactored `gtrace` tool for generate `Compose` options
 * Added panic recover on trace calls in `Compose` call step
 * Added `trace.With{Discovery,Driver,Coordination,Ratelimiter,Table,Scheme,Scripting}PanicCallback` options
