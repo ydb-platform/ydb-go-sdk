@@ -1,3 +1,4 @@
+## v3.17.0
 * Removed redundant `trace.With{Table,Driver,Retry}` and `trace.Context{Table,Driver,Retry}` funcs 
 * Moved `gtrace` tool from `./cmt/gtrace` to `./internal/cmd/gtrace`
 * Refactored `gtrace` tool for generate `Compose` options
