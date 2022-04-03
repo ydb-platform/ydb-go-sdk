@@ -1,3 +1,5 @@
+* Add go 1.18 to test matrix
+
 ## v3.17.0
 * Removed redundant `trace.With{Table,Driver,Retry}` and `trace.Context{Table,Driver,Retry}` funcs 
 * Moved `gtrace` tool from `./cmt/gtrace` to `./internal/cmd/gtrace`
