@@ -30,7 +30,6 @@ import (
 // is not requested types, then res.err() become non-nil.
 // After that, NextResultSet(), NextRow() will return false.
 type result interface {
-
 	// HasNextResultSet reports whether result set may be advanced.
 	// It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
 	// without advancing the result set.

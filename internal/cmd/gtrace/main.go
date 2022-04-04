@@ -69,6 +69,8 @@ func main() {
 		openFile := func(name string) (*os.File, func()) {
 			p := filepath.Join(workDir, name)
 			var f *os.File
+			// nolint: gofumpt
+			// nolint: nolintlint
 			f, err = os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 			if err != nil {
 				log.Fatal(err)
