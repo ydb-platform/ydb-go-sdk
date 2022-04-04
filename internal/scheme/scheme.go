@@ -37,6 +37,7 @@ func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
 		&Ydb_Scheme.MakeDirectoryRequest{
 			Path: path,
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -52,6 +53,7 @@ func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
 		&Ydb_Scheme.RemoveDirectoryRequest{
 			Path: path,
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -73,6 +75,7 @@ func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directo
 		&Ydb_Scheme.ListDirectoryRequest{
 			Path: path,
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -102,6 +105,7 @@ func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 		&Ydb_Scheme.DescribePathRequest{
 			Path: path,
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -131,6 +135,7 @@ func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...sch
 			Actions:          desc.actions,
 			ClearPermissions: desc.clear,
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,

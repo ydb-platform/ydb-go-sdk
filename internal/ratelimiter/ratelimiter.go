@@ -58,6 +58,7 @@ func (c *client) CreateResource(
 			}},
 		},
 		OperationParams: operation.Params(
+			ctx,
 			c.config.OperationTimeout(),
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -83,6 +84,7 @@ func (c *client) AlterResource(
 			}},
 		},
 		OperationParams: operation.Params(
+			ctx,
 			c.config.OperationTimeout(),
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -100,6 +102,7 @@ func (c *client) DropResource(
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 		OperationParams: operation.Params(
+			ctx,
 			c.config.OperationTimeout(),
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -123,6 +126,7 @@ func (c *client) ListResource(
 		ResourcePath:         resourcePath,
 		Recursive:            recursive,
 		OperationParams: operation.Params(
+			ctx,
 			c.config.OperationTimeout(),
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -151,6 +155,7 @@ func (c *client) DescribeResource(
 		CoordinationNodePath: coordinationNodePath,
 		ResourcePath:         resourcePath,
 		OperationParams: operation.Params(
+			ctx,
 			c.config.OperationTimeout(),
 			c.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -208,6 +213,7 @@ func (c *client) AcquireResource(
 					Required: amount,
 				},
 				OperationParams: operation.Params(
+					ctx,
 					acquireOptions.OperationTimeout(),
 					acquireOptions.OperationCancelAfter(),
 					operation.ModeSync,
@@ -224,6 +230,7 @@ func (c *client) AcquireResource(
 					Used: amount,
 				},
 				OperationParams: operation.Params(
+					ctx,
 					acquireOptions.OperationTimeout(),
 					acquireOptions.OperationCancelAfter(),
 					operation.ModeSync,

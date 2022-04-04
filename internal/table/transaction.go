@@ -88,6 +88,7 @@ func (tx *transaction) CommitTx(
 			SessionId: tx.s.id,
 			TxId:      tx.id,
 			OperationParams: operation.Params(
+				ctx,
 				tx.s.config.OperationTimeout(),
 				tx.s.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -149,6 +150,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 			SessionId: tx.s.id,
 			TxId:      tx.id,
 			OperationParams: operation.Params(
+				ctx,
 				tx.s.config.OperationTimeout(),
 				tx.s.config.OperationCancelAfter(),
 				operation.ModeSync,
