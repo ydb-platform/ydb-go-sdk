@@ -39,6 +39,7 @@ func (c *client) Execute(
 			Script:     query,
 			Parameters: params.Params(),
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -84,6 +85,7 @@ func (c *client) Explain(
 			Script: query,
 			Mode:   mode2mode(mode),
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -127,6 +129,7 @@ func (c *client) StreamExecute(
 			Script:     query,
 			Parameters: params.Params(),
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,

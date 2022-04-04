@@ -200,6 +200,7 @@ func TestTable(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.WithUserAgent("tx"),
 		ydb.With(
+			config.WithOperationTimeout(123),
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
 			config.WithInternalDNSResolver(),

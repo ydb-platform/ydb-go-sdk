@@ -102,6 +102,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 		ctx,
 		&Ydb_Table.CreateSessionRequest{
 			OperationParams: operation.Params(
+				ctx,
 				config.OperationTimeout(),
 				config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -179,6 +180,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 		&Ydb_Table.DeleteSessionRequest{
 			SessionId: s.id,
 			OperationParams: operation.Params(
+				ctx,
 				s.config.OperationTimeout(),
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -209,6 +211,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 		&Ydb_Table.KeepAliveRequest{
 			SessionId: s.id,
 			OperationParams: operation.Params(
+				ctx,
 				s.config.OperationTimeout(),
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -245,6 +248,7 @@ func (s *session) CreateTable(
 		SessionId: s.id,
 		Path:      path,
 		OperationParams: operation.Params(
+			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -277,6 +281,7 @@ func (s *session) DescribeTable(
 		SessionId: s.id,
 		Path:      path,
 		OperationParams: operation.Params(
+			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -413,6 +418,7 @@ func (s *session) DropTable(
 		SessionId: s.id,
 		Path:      path,
 		OperationParams: operation.Params(
+			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -441,6 +447,7 @@ func (s *session) AlterTable(
 		SessionId: s.id,
 		Path:      path,
 		OperationParams: operation.Params(
+			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -470,6 +477,7 @@ func (s *session) CopyTable(
 		SourcePath:      src,
 		DestinationPath: dst,
 		OperationParams: operation.Params(
+			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -523,6 +531,7 @@ func (s *session) Explain(
 			SessionId: s.id,
 			YqlText:   query,
 			OperationParams: operation.Params(
+				ctx,
 				s.config.OperationTimeout(),
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -573,6 +582,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 			SessionId: s.id,
 			YqlText:   query,
 			OperationParams: operation.Params(
+				ctx,
 				s.config.OperationTimeout(),
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -672,6 +682,7 @@ func (s *session) executeDataQuery(
 		Parameters: params.Params(),
 		Query:      &query.query,
 		OperationParams: operation.Params(
+			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -710,6 +721,7 @@ func (s *session) ExecuteSchemeQuery(
 		SessionId: s.id,
 		YqlText:   query,
 		OperationParams: operation.Params(
+			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -739,6 +751,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 	)
 	request := Ydb_Table.DescribeTableOptionsRequest{
 		OperationParams: operation.Params(
+			ctx,
 			s.config.OperationTimeout(),
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
@@ -1034,6 +1047,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 			Table: table,
 			Rows:  value.ToYDB(rows),
 			OperationParams: operation.Params(
+				ctx,
 				s.config.OperationTimeout(),
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -1071,6 +1085,7 @@ func (s *session) BeginTransaction(
 			SessionId:  s.id,
 			TxSettings: tx.Settings(),
 			OperationParams: operation.Params(
+				ctx,
 				s.config.OperationTimeout(),
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,

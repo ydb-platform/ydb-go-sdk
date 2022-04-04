@@ -42,6 +42,7 @@ func (c *client) CreateNode(ctx context.Context, path string, config coordinatio
 				RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
 			},
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -65,6 +66,7 @@ func (c *client) AlterNode(ctx context.Context, path string, config coordination
 				RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
 			},
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -80,6 +82,7 @@ func (c *client) DropNode(ctx context.Context, path string) (err error) {
 		&Ydb_Coordination.DropNodeRequest{
 			Path: path,
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
@@ -107,6 +110,7 @@ func (c *client) DescribeNode(
 		&Ydb_Coordination.DescribeNodeRequest{
 			Path: path,
 			OperationParams: operation.Params(
+				ctx,
 				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
