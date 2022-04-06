@@ -39,7 +39,7 @@ func TestScripting(t *testing.T) {
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
-			ydb.WithErrWriter(os.Stderr),
+			ydb.WithErrWriter(os.Stdout),
 			ydb.WithMinLevel(log.TRACE),
 		),
 		ydb.WithUserAgent("scripting"),
