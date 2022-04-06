@@ -1,3 +1,4 @@
+## v3.18.1
 * Added `conn.Ping(ctx)` method for check availability of `conn.Conn`
 * Refactored `cluster.Cluster.Get(ctx)` to return only available connection (instead of returning any connection from balancer)
 * Added address to error description thrown from `conn.take()`
