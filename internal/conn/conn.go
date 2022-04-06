@@ -212,7 +212,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, errors.WithStackTrace(fmt.Errorf("%w: %s", err, address))
 	}
 
 	c.cc = cc

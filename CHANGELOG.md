@@ -1,4 +1,6 @@
+* Added address to error description which thrown from `conn.take()`
 * Renamed package `internal/db` to `internal/database` for exclude collisions with variable name `db`
+
 
 ## v3.18.0
 * Added `go1.18` to test matrix
