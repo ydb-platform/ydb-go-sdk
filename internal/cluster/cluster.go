@@ -282,15 +282,14 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 		}
 	}
 
-	c.balancerMtx.RLock()
-	defer c.balancerMtx.RUnlock()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, errors.WithStackTrace(ctx.Err())
 		default:
+			c.balancerMtx.RLock()
 			cc = c.config.Balancer().Next()
+			c.balancerMtx.RUnlock()
 			if cc == nil {
 				return nil, errors.WithStackTrace(ErrClusterEmpty)
 			}
