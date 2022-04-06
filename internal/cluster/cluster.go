@@ -28,6 +28,9 @@ var (
 
 	// ErrClusterEmpty returned when no connections left in cluster.
 	ErrClusterEmpty = errors.New(fmt.Errorf("cluster empty"))
+
+	// ErrNoAvailableConns returned when cluster have no available connections
+	ErrNoAvailableConns = errors.New(fmt.Errorf("no available conns"))
 )
 
 type cluster struct {
@@ -285,12 +288,20 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	c.balancerMtx.RLock()
 	defer c.balancerMtx.RUnlock()
 
-	cc = c.config.Balancer().Next()
-	if cc == nil {
-		return nil, errors.WithStackTrace(ErrClusterEmpty)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, errors.WithStackTrace(ErrNoAvailableConns)
+		default:
+			cc = c.config.Balancer().Next()
+			if cc == nil {
+				return nil, errors.WithStackTrace(ErrClusterEmpty)
+			}
+			if err = cc.Ping(ctx); err == nil {
+				return cc, nil
+			}
+		}
 	}
-
-	return cc, nil
 }
 
 // Insert inserts new connection into the cluster.
