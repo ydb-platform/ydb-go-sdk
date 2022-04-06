@@ -253,10 +253,6 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	defer cancel()
 
 	options := parseOptions(opts...)
-	if options.withLock {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-	}
 
 	if c.closed {
 		return nil, errors.WithStackTrace(ErrClusterClosed)
@@ -272,7 +268,13 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	}()
 
 	if e, ok := ContextEndpoint(ctx); ok {
+		if options.withLock {
+			c.mu.RLock()
+		}
 		cc, ok = c.endpoints[e.NodeID()]
+		if options.withLock {
+			c.mu.RUnlock()
+		}
 		if ok && cc.IsState(
 			conn.Created,
 			conn.Online,
