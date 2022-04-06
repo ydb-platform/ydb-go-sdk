@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -16,53 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
-
-func TestClusterFastRedial(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	l, b := stub.Balancer()
-	c := &cluster{
-		config: config.New(
-			config.WithBalancer(b),
-		),
-		index:     make(map[string]entry.Entry),
-		endpoints: make(map[uint32]conn.Conn),
-		pool:      conn.NewPool(ctx, config.New()),
-	}
-
-	pingConnects := func(size int) chan struct{} {
-		done := make(chan struct{})
-		go func() {
-			for i := 0; i < size*10; i++ {
-				cc, err := c.Get(context.Background())
-				// enforce close bad connects to track them
-				if err == nil && c != nil && cc.Endpoint().Address() == "bad:0" {
-					_ = c.Remove(ctx, cc.Endpoint())
-				}
-			}
-			close(done)
-		}()
-		return done
-	}
-
-	ne := []endpoint.Endpoint{
-		endpoint.New("foo:0"),
-		endpoint.New("bad:0"),
-	}
-	mergeEndpointIntoCluster(
-		ctx,
-		c,
-		[]endpoint.Endpoint{},
-		ne,
-	)
-	select {
-	case <-pingConnects(len(ne)):
-
-	case <-time.After(time.Second * 15):
-		t.Fatalf("Time limit exceeded while %d endpoints in balance. Wait channel used", len(*l))
-	}
-}
 
 func TestClusterMergeEndpoints(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
