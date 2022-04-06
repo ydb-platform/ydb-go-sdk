@@ -21,8 +21,12 @@ import (
 var (
 	// errOperationNotReady specified error when operation is not ready
 	errOperationNotReady = errors.New(fmt.Errorf("operation is not ready yet"))
+
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = errors.New(fmt.Errorf("connection closed early"))
+
+	// errUnavailableConnection specified error when connection are closed early
+	errUnavailableConnection = errors.New(fmt.Errorf("connection unavailable"))
 )
 
 type Conn interface {
@@ -32,6 +36,7 @@ type Conn interface {
 
 	LastUsage() time.Time
 
+	Ping(ctx context.Context) error
 	IsState(states ...State) bool
 	GetState() State
 	SetState(State) State
@@ -55,6 +60,17 @@ type conn struct {
 	streamUsages int32
 	lastUsage    time.Time
 	onClose      []func(*conn)
+}
+
+func (c *conn) Ping(ctx context.Context) error {
+	cc, err := c.take(ctx)
+	if err != nil {
+		return errors.WithStackTrace(err)
+	}
+	if !isAvailable(cc) {
+		return errors.WithStackTrace(errUnavailableConnection)
+	}
+	return nil
 }
 
 func (c *conn) Release(ctx context.Context) (err error) {
@@ -212,7 +228,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, errors.WithStackTrace(fmt.Errorf("dial %s failed: %w", address, err))
 	}
 
 	c.cc = cc
@@ -267,6 +283,10 @@ func isBroken(raw *grpc.ClientConn) bool {
 	}
 	s := raw.GetState()
 	return s == connectivity.Shutdown || s == connectivity.TransientFailure
+}
+
+func isAvailable(raw *grpc.ClientConn) bool {
+	return raw != nil && raw.GetState() == connectivity.Ready
 }
 
 // conn must be locked

@@ -1,4 +1,7 @@
-* Renamed package `internal/db` to `internal/database` for exclude collisions with variable name `db`
+* Added `conn.Ping(ctx)` method for check availability of `conn.Conn`
+* Refactored `cluster.Cluster.Get(ctx)` to return only available connection (instead of returning any connection from balancer)
+* Added address to error description thrown from `conn.take()`
+* Renamed package `internal/db` to `internal/database` to exclude collisions with variable name `db`
 
 ## v3.18.0
 * Added `go1.18` to test matrix

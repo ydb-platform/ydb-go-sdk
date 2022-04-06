@@ -129,7 +129,7 @@ func parseOptions(opts ...crudOption) *crudOptionsHolder {
 
 type Getter interface {
 	// Get gets conn from cluster
-	Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, err error)
+	Get(ctx context.Context) (cc conn.Conn, err error)
 }
 
 type Inserter interface {
@@ -247,16 +247,10 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
-func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, err error) {
+func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
-
-	options := parseOptions(opts...)
-	if options.withLock {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-	}
 
 	if c.closed {
 		return nil, errors.WithStackTrace(ErrClusterClosed)
@@ -272,7 +266,9 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	}()
 
 	if e, ok := ContextEndpoint(ctx); ok {
+		c.mu.RLock()
 		cc, ok = c.endpoints[e.NodeID()]
+		c.mu.RUnlock()
 		if ok && cc.IsState(
 			conn.Created,
 			conn.Online,
@@ -282,15 +278,22 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 		}
 	}
 
-	c.balancerMtx.RLock()
-	defer c.balancerMtx.RUnlock()
-
-	cc = c.config.Balancer().Next()
-	if cc == nil {
-		return nil, errors.WithStackTrace(ErrClusterEmpty)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, errors.WithStackTrace(ctx.Err())
+		default:
+			c.balancerMtx.RLock()
+			cc = c.config.Balancer().Next()
+			c.balancerMtx.RUnlock()
+			if cc == nil {
+				return nil, errors.WithStackTrace(ErrClusterEmpty)
+			}
+			if err = cc.Ping(ctx); err == nil {
+				return cc, nil
+			}
+		}
 	}
-
-	return cc, nil
 }
 
 // Insert inserts new connection into the cluster.
