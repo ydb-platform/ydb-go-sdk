@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -12,13 +12,13 @@ import (
 )
 
 type lazyTable struct {
-	db      db.Connection
+	db      database.Connection
 	options []config.Option
 	client  table.Client
 	m       sync.Mutex
 }
 
-func Table(db db.Connection, options []config.Option) table.Client {
+func Table(db database.Connection, options []config.Option) table.Client {
 	return &lazyTable{
 		db:      db,
 		options: options,

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
@@ -14,13 +14,13 @@ import (
 )
 
 type lazyRatelimiter struct {
-	db      db.Connection
+	db      database.Connection
 	options []config.Option
 	client  ratelimiter.Client
 	m       sync.Mutex
 }
 
-func Ratelimiter(db db.Connection, options []config.Option) ratelimiter.Client {
+func Ratelimiter(db database.Connection, options []config.Option) ratelimiter.Client {
 	return &lazyRatelimiter{
 		db:      db,
 		options: options,

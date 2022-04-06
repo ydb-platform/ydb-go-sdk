@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -34,7 +34,7 @@ import (
 // Interface and list of clients may be changed in the future
 type Connection interface {
 	closer.Closer
-	db.Info
+	database.Info
 	grpc.ClientConnInterface
 
 	// Table returns table client
@@ -86,7 +86,7 @@ type connection struct {
 	pool conn.Pool
 
 	mtx sync.Mutex
-	db  db.Connection
+	db  database.Connection
 
 	children    map[uint64]Connection
 	childrenMtx sync.Mutex
@@ -274,7 +274,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)
 	}
 
-	c.db, err = db.New(
+	c.db, err = database.New(
 		ctx,
 		c.config,
 		c.pool,

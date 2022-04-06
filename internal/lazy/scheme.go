@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -13,13 +13,13 @@ import (
 )
 
 type lazyScheme struct {
-	db      db.Connection
+	db      database.Connection
 	options []config.Option
 	client  scheme.Client
 	m       sync.Mutex
 }
 
-func Scheme(db db.Connection, options []config.Option) scheme.Client {
+func Scheme(db database.Connection, options []config.Option) scheme.Client {
 	return &lazyScheme{
 		db:      db,
 		options: options,

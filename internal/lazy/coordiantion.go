@@ -7,20 +7,20 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/db"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
 type lazyCoordination struct {
-	db      db.Connection
+	db      database.Connection
 	options []config.Option
 	client  coordination.Client
 	m       sync.Mutex
 }
 
-func Coordination(db db.Connection, options []config.Option) coordination.Client {
+func Coordination(db database.Connection, options []config.Option) coordination.Client {
 	return &lazyCoordination{
 		db:      db,
 		options: options,
