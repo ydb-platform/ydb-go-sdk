@@ -228,7 +228,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, errors.WithStackTrace(fmt.Errorf("%w: %s", err, address))
+		return nil, errors.WithStackTrace(fmt.Errorf("dial %s failed: %w", address, err))
 	}
 
 	c.cc = cc
@@ -286,11 +286,7 @@ func isBroken(raw *grpc.ClientConn) bool {
 }
 
 func isAvailable(raw *grpc.ClientConn) bool {
-	if raw == nil {
-		return false
-	}
-	s := raw.GetState()
-	return s == connectivity.Ready
+	return raw != nil && raw.GetState() == connectivity.Ready
 }
 
 // conn must be locked
