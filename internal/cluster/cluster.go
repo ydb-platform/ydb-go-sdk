@@ -129,7 +129,7 @@ func parseOptions(opts ...crudOption) *crudOptionsHolder {
 
 type Getter interface {
 	// Get gets conn from cluster
-	Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, err error)
+	Get(ctx context.Context) (cc conn.Conn, err error)
 }
 
 type Inserter interface {
@@ -247,12 +247,10 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
-func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, err error) {
+func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
-
-	options := parseOptions(opts...)
 
 	if c.closed {
 		return nil, errors.WithStackTrace(ErrClusterClosed)
@@ -268,13 +266,9 @@ func (c *cluster) Get(ctx context.Context, opts ...crudOption) (cc conn.Conn, er
 	}()
 
 	if e, ok := ContextEndpoint(ctx); ok {
-		if options.withLock {
-			c.mu.RLock()
-		}
+		c.mu.RLock()
 		cc, ok = c.endpoints[e.NodeID()]
-		if options.withLock {
-			c.mu.RUnlock()
-		}
+		c.mu.RUnlock()
 		if ok && cc.IsState(
 			conn.Created,
 			conn.Online,
