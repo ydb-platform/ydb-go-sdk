@@ -252,6 +252,9 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
 
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	if c.closed {
 		return nil, errors.WithStackTrace(ErrClusterClosed)
 	}
@@ -266,9 +269,7 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	}()
 
 	if e, ok := ContextEndpoint(ctx); ok {
-		c.mu.RLock()
 		cc, ok = c.endpoints[e.NodeID()]
-		c.mu.RUnlock()
 		if ok && cc.IsState(
 			conn.Created,
 			conn.Online,

@@ -76,7 +76,7 @@ func (m Method) Service() (s string) {
 	return
 }
 
-// Issue interface
+// Issue declare interface of operation error issues
 type Issue interface {
 	GetMessage() string
 	GetIssueCode() uint32
