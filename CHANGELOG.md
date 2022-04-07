@@ -1,3 +1,4 @@
+## v3.18.2
 * Refactored balancers (makes concurrent-safe)
 * Excluded separate balancers lock from cluster
 * Refactored `cluster.Cluster` interface (`Insert` and `Remove` returning nothing now) 
