@@ -7,25 +7,18 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/ydb-platform/ydb-go-sdk/v3)](https://goreportcard.com/report/github.com/ydb-platform/ydb-go-sdk/v3)
 [![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/branch/master/graph/badge.svg?precision=2)](https://app.codecov.io/gh/ydb-platform/ydb-go-sdk)
 
-> YDB API client written in Go.
-
-[godoc](https://godoc.org/github.com/ydb-platform/ydb-go-sdk/v3/)
+> `YDB` driver which provides `table`, `discovery`, `coordination`, `ratelimiter`, `scheme` and `scripting` API client implementations for `YDB`.
 
 ## Table of contents
-1. [Overview](#Overview)
-2. [Prerequisites](#Prerequisites)
-3. [Installation](#Installation)
-4. [Usage](#Usage)
-5. [Credentials](#Credentials)
-6. [Environment variables](#Environ)
-7. [Ecosystem of debug tools](#Debug)
-8. [Examples](#Examples)
-9. [About semantic versioning](#SemVer)
-10. [About expected go1.18 changes](#go1.18)
-
-## Overview <a name="Overview"></a>
-
-Currently package ydb provides `table`, `discovery`, `coordination`, `ratelimiter`, `scheme` and `scripting` API client implementations for `YDB`.
+1. [Prerequisites](#Prerequisites)
+2. [Installation](#Installation)
+3. [Usage](#Usage)
+4. [Credentials](#Credentials)
+5. [Environment variables](#Environ)
+6. [Ecosystem of debug tools](#Debug)
+7. [Examples](#Examples)
+8. [About semantic versioning](#SemVer)
+9. [About expected go1.18 changes](#go1.18)
 
 ## Prerequisites <a name="Prerequisites"></a>
 
