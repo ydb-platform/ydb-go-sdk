@@ -18,6 +18,7 @@ import (
 // routine – that is, not a runtime metric) and interprets it as inversion of
 // weight.
 type roundRobin struct {
+	mu    sync.RWMutex
 	min   float32
 	max   float32
 	belt  []int
@@ -46,7 +47,6 @@ func RandomChoice() balancer.Balancer {
 
 type randomChoice struct {
 	roundRobin
-	m sync.Mutex
 }
 
 func (r *randomChoice) Create() balancer.Balancer {
@@ -54,6 +54,8 @@ func (r *randomChoice) Create() balancer.Balancer {
 }
 
 func (r *roundRobin) Next() conn.Conn {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if n := len(r.conns); n == 0 {
 		return nil
 	}
@@ -63,16 +65,18 @@ func (r *roundRobin) Next() conn.Conn {
 }
 
 func (r *randomChoice) Next() conn.Conn {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if n := len(r.conns); n == 0 {
 		return nil
 	}
-	r.m.Lock()
 	i := r.belt[r.r.Int(len(r.belt))]
-	r.m.Unlock()
 	return r.conns[i].Conn
 }
 
 func (r *roundRobin) Insert(conn conn.Conn) balancer.Element {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	e := r.conns.Insert(conn)
 	r.updateMinMax(e.Conn)
 	r.belt = r.distribute()
@@ -80,6 +84,8 @@ func (r *roundRobin) Insert(conn conn.Conn) balancer.Element {
 }
 
 func (r *roundRobin) Remove(x balancer.Element) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	el := x.(*list.Element)
 	r.conns.Remove(el)
 	r.inspectMinMax(el.Conn.Endpoint().LoadFactor())
@@ -88,6 +94,8 @@ func (r *roundRobin) Remove(x balancer.Element) bool {
 }
 
 func (r *roundRobin) Contains(x balancer.Element) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if x == nil {
 		return false
 	}
@@ -98,6 +106,7 @@ func (r *roundRobin) Contains(x balancer.Element) bool {
 	return r.conns.Contains(el)
 }
 
+// r.mu must be held
 func (r *roundRobin) updateMinMax(cc conn.Conn) {
 	if len(r.conns) == 1 {
 		r.min = cc.Endpoint().LoadFactor()
@@ -112,6 +121,7 @@ func (r *roundRobin) updateMinMax(cc conn.Conn) {
 	}
 }
 
+// r.mu must be held
 func (r *roundRobin) inspectMinMax(loadFactor float32) {
 	if r.min != loadFactor && r.max != loadFactor {
 		return
@@ -133,6 +143,7 @@ func (r *roundRobin) inspectMinMax(loadFactor float32) {
 	}
 }
 
+// r.mu must be held
 func (r *roundRobin) distribute() []int {
 	return r.spread(distribution(
 		r.min, int32(len(r.conns)),
@@ -140,6 +151,7 @@ func (r *roundRobin) distribute() []int {
 	))
 }
 
+// r.mu must be held
 func (r *roundRobin) spread(f func(float32) int32) []int {
 	var (
 		dist  = make([]int32, 0, len(r.conns))
@@ -243,14 +255,4 @@ func (h *distItemsHeap) Pop() interface{} {
 	x := p[n-1]
 	*h = p[:n-1]
 	return x
-}
-
-func IsRoundRobin(i interface{}) bool {
-	_, ok := i.(*roundRobin)
-	return ok
-}
-
-func IsRandomChoice(i interface{}) bool {
-	_, ok := i.(*randomChoice)
-	return ok
 }

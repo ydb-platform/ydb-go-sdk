@@ -132,8 +132,8 @@ type (
 		Endpoint EndpointInfo
 	}
 	DriverClusterRemoveDoneInfo struct {
-		State   ConnState
 		Removed bool
+		State   ConnState
 	}
 	DriverConnStateChangeStartInfo struct {
 		Endpoint EndpointInfo

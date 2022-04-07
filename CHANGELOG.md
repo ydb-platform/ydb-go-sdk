@@ -1,3 +1,11 @@
+* Refactored balancers (makes concurrent-safe)
+* Excluded separate balancers lock from cluster
+* Refactored `cluster.Cluster` interface (`Insert` and `Remove` returning nothing now) 
+* Replaced unsafe `cluster.close` boolean flag to `cluster.done` chan for listening close event
+* Added internal checker `cluster.isClosed()` for check cluster state
+* Extracted getting available conn from balancer to internal helper `cluster.get` (called inside `cluster.Get` as last effort)
+* Added checking `conn.Conn` availability with `conn.Ping()` in prefer nodeID case
+
 ## v3.18.1
 * Added `conn.Ping(ctx)` method for check availability of `conn.Conn`
 * Refactored `cluster.Cluster.Get(ctx)` to return only available connection (instead of returning any connection from balancer)
