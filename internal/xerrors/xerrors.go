@@ -54,7 +54,7 @@ func HideEOF(err error) error {
 	return err
 }
 
-// As is a proxy to xerrors.As
+// As is a proxy to errors.As
 // This need to single import errors
 func As(err error, targets ...interface{}) bool {
 	if err == nil {
@@ -68,7 +68,7 @@ func As(err error, targets ...interface{}) bool {
 	return false
 }
 
-// Is is a improved proxy to xerrors.Is
+// Is is a improved proxy to errors.Is
 // This need to single import errors
 func Is(err error, targets ...error) bool {
 	if len(targets) == 0 {
