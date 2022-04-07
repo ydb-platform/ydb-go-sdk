@@ -41,7 +41,7 @@ func New(
 	}
 
 	if c.config.Interval() <= 0 {
-		_ = crudExplorer.Insert(ctx, cc.Endpoint())
+		crudExplorer.Insert(ctx, cc.Endpoint())
 		return c, nil
 	}
 
