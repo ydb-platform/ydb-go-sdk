@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -27,7 +28,13 @@ type SessionProvider interface {
 	CloseSession(ctx context.Context, s Session) error
 }
 
-func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts table.Options) (err error) {
+func doTx(
+	ctx context.Context,
+	c SessionProvider,
+	config config.Config,
+	op table.TxOperation,
+	opts table.Options,
+) (err error) {
 	attempts, onIntermediate := 0, trace.TableOnDoTx(
 		opts.Trace,
 		&ctx,
@@ -59,7 +66,16 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 				}
 			}()
 
-			err = op(ctx, tx)
+			err = func() error {
+				if panicCallback := config.PanicCallback(); panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							panicCallback(e)
+						}
+					}()
+				}
+				return op(ctx, tx)
+			}()
 
 			if err != nil {
 				return errors.WithStackTrace(err)
@@ -75,7 +91,13 @@ func doTx(ctx context.Context, c SessionProvider, op table.TxOperation, opts tab
 	)
 }
 
-func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.Options) (err error) {
+func do(
+	ctx context.Context,
+	c SessionProvider,
+	config config.Config,
+	op table.Operation,
+	opts table.Options,
+) (err error) {
 	attempts, onIntermediate := 0, trace.TableOnDo(
 		opts.Trace,
 		&ctx,
@@ -96,7 +118,16 @@ func do(ctx context.Context, c SessionProvider, op table.Operation, opts table.O
 				attempts++
 			}()
 
-			err = op(ctx, s)
+			err = func() error {
+				if panicCallback := config.PanicCallback(); panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							panicCallback(e)
+						}
+					}()
+				}
+				return op(ctx, s)
+			}()
 
 			if err != nil {
 				return errors.WithStackTrace(err)

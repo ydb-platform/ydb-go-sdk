@@ -545,6 +545,7 @@ func (c *client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	return do(
 		ctx,
 		c,
+		c.config,
 		op,
 		retryOptions(c.config.Trace(), opts...),
 	)
@@ -557,6 +558,7 @@ func (c *client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 	return doTx(
 		ctx,
 		c,
+		c.config,
 		op,
 		retryOptions(c.config.Trace(), opts...),
 	)

@@ -80,6 +80,10 @@ type Config interface {
 	// If DeleteTimeout is less than or equal to zero then the
 	// DefaultSessionPoolDeleteTimeout is used.
 	DeleteTimeout() time.Duration
+
+	// PanicCallback returns user-defined panic callback
+	// If nil - panic callback not defined
+	PanicCallback() func(e interface{})
 }
 
 func New(opts ...Option) Config {
@@ -134,6 +138,12 @@ func WithKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	}
 }
 
+func WithPanicCallback(cb func(e interface{})) Option {
+	return func(c *config) {
+		c.panicCallback = cb
+	}
+}
+
 func WithCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(c *config) {
 		if createSessionTimeout > 0 {
@@ -181,6 +191,12 @@ type config struct {
 	deleteTimeout          time.Duration
 
 	trace trace.Table
+
+	panicCallback func(e interface{})
+}
+
+func (c *config) PanicCallback() func(e interface{}) {
+	return c.panicCallback
 }
 
 func (c *config) Trace() trace.Table {

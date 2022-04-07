@@ -23,6 +23,10 @@ type Config interface {
 
 	// Trace defines trace over scripting client calls
 	Trace() trace.Scripting
+
+	// PanicCallback returns user-defined panic callback
+	// If nil - panic callback not defined
+	PanicCallback() func(e interface{})
 }
 
 type config struct {
@@ -30,6 +34,12 @@ type config struct {
 	operationCancelAfter time.Duration
 
 	trace trace.Scripting
+
+	panicCallback func(e interface{})
+}
+
+func (c *config) PanicCallback() func(e interface{}) {
+	return c.panicCallback
 }
 
 func (c *config) Trace() trace.Scripting {
@@ -61,6 +71,12 @@ func WithOperationTimeout(operationTimeout time.Duration) Option {
 func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 	return func(c *config) {
 		c.operationCancelAfter = operationCancelAfter
+	}
+}
+
+func WithPanicCallback(cb func(e interface{})) Option {
+	return func(c *config) {
+		c.panicCallback = cb
 	}
 }
 

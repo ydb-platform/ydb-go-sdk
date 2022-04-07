@@ -61,48 +61,58 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 	)
 }
 
-type retryOptionsHolder struct {
+type retryOptions struct {
 	id          string
 	trace       trace.Retry
 	idempotent  bool
 	fastBackoff Backoff
 	slowBackoff Backoff
+
+	panicCallback func(e interface{})
 }
 
-type retryOption func(h *retryOptionsHolder)
+type retryOption func(h *retryOptions)
 
 // WithID returns id option
 func WithID(id string) retryOption {
-	return func(h *retryOptionsHolder) {
+	return func(h *retryOptions) {
 		h.id = id
 	}
 }
 
 // WithTrace returns trace option
 func WithTrace(trace trace.Retry) retryOption {
-	return func(h *retryOptionsHolder) {
+	return func(h *retryOptions) {
 		h.trace = trace
 	}
 }
 
-// WithIdempotent returns idempotent trace option
+// WithIdempotent returns idempotent option
 func WithIdempotent() retryOption {
-	return func(h *retryOptionsHolder) {
+	return func(h *retryOptions) {
 		h.idempotent = true
 	}
 }
 
-// WithFastBackoff returns fast backoff trace option
+// WithFastBackoff returns fast backoff option
 func WithFastBackoff(b Backoff) retryOption {
-	return func(h *retryOptionsHolder) {
+	return func(h *retryOptions) {
 		h.fastBackoff = b
 	}
 }
 
-// WithSlowBackoff returns fast backoff trace option
+// WithSlowBackoff returns slow backoff option
 func WithSlowBackoff(b Backoff) retryOption {
-	return func(h *retryOptionsHolder) {
+	return func(h *retryOptions) {
 		h.slowBackoff = b
+	}
+}
+
+// WithPanicCallback returns panic callback option
+// If not defined - panic would not intercept with driver
+func WithPanicCallback(panicCallback func(e interface{})) retryOption {
+	return func(h *retryOptions) {
+		h.panicCallback = panicCallback
 	}
 }
 
@@ -113,19 +123,19 @@ func WithSlowBackoff(b Backoff) retryOption {
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err error) {
-	h := &retryOptionsHolder{
+	options := &retryOptions{
 		fastBackoff: FastBackoff,
 		slowBackoff: SlowBackoff,
 	}
 	for _, o := range opts {
-		o(h)
+		o(options)
 	}
 	var (
 		i        int
 		attempts int
 
 		code           = int64(0)
-		onIntermediate = trace.RetryOnRetry(h.trace, &ctx, h.id, h.idempotent)
+		onIntermediate = trace.RetryOnRetry(options.trace, &ctx, options.id, options.idempotent)
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -138,7 +148,16 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			return errors.WithStackTrace(ctx.Err())
 
 		default:
-			err = op(ctx)
+			err = func() error {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				return op(ctx)
+			}()
 
 			if err == nil {
 				return
@@ -150,11 +169,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 				i = 0
 			}
 
-			if !m.MustRetry(h.idempotent) {
+			if !m.MustRetry(options.idempotent) {
 				return errors.WithStackTrace(err)
 			}
 
-			if e := Wait(ctx, h.fastBackoff, h.slowBackoff, m, i); e != nil {
+			if e := Wait(ctx, options.fastBackoff, options.slowBackoff, m, i); e != nil {
 				return errors.WithStackTrace(err)
 			}
 
