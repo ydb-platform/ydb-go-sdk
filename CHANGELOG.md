@@ -1,3 +1,4 @@
+## v3.18.4
 * Renamed internal packages `errors`, `net` and `resolver` to `xerrors`, `xnet` and `xresolver` for excluding ambiguous interpretation
 * Renamed internal error wrapper `xerrors.New` to `xerrors.Wrap`
 
