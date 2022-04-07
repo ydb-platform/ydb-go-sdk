@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -38,7 +38,7 @@ func (r *lazyRatelimiter) Close(ctx context.Context) (err error) {
 	}()
 	err = r.client.Close(ctx)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }
@@ -85,9 +85,9 @@ func (r *lazyRatelimiter) ListResource(
 	r.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		paths, err = r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	})
-	return paths, errors.WithStackTrace(err)
+	return paths, xerrors.WithStackTrace(err)
 }
 
 func (r *lazyRatelimiter) DescribeResource(
@@ -98,9 +98,9 @@ func (r *lazyRatelimiter) DescribeResource(
 	r.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		resource, err = r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	})
-	return resource, errors.WithStackTrace(err)
+	return resource, xerrors.WithStackTrace(err)
 }
 
 func (r *lazyRatelimiter) AcquireResource(

@@ -3,10 +3,10 @@ package decimal
 import (
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errSyntax = errors.New(fmt.Errorf("invalid syntax"))
+var errSyntax = xerrors.Wrap(fmt.Errorf("invalid syntax"))
 
 type ParseError struct {
 	Err   error

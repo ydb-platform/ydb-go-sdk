@@ -12,9 +12,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -237,7 +237,7 @@ func (s *scanner) writePathTo(w io.Writer) (n int64, err error) {
 	st := x.name
 	m, err := io.WriteString(w, st)
 	if err != nil {
-		return n, errors.WithStackTrace(err)
+		return n, xerrors.WithStackTrace(err)
 	}
 	n += int64(m)
 	return n, nil
@@ -1033,7 +1033,7 @@ func (s *scanner) errorf(depth int, f string, args ...interface{}) error {
 	if s.err != nil {
 		return s.err
 	}
-	s.err = errors.WithStackTrace(fmt.Errorf(f, args...), errors.WithSkipDepth(depth+1))
+	s.err = xerrors.WithStackTrace(fmt.Errorf(f, args...), xerrors.WithSkipDepth(depth+1))
 	return s.err
 }
 

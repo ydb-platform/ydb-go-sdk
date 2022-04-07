@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
@@ -29,9 +29,9 @@ func (s *lazyScripting) Execute(
 	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err = s.client.Execute(ctx, query, params)
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	})
-	return res, errors.WithStackTrace(err)
+	return res, xerrors.WithStackTrace(err)
 }
 
 func (s *lazyScripting) Explain(
@@ -42,9 +42,9 @@ func (s *lazyScripting) Explain(
 	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = s.client.Explain(ctx, query, mode)
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	})
-	return e, errors.WithStackTrace(err)
+	return e, xerrors.WithStackTrace(err)
 }
 
 func (s *lazyScripting) StreamExecute(
@@ -55,9 +55,9 @@ func (s *lazyScripting) StreamExecute(
 	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err = s.client.StreamExecute(ctx, query, params)
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	})
-	return res, errors.WithStackTrace(err)
+	return res, xerrors.WithStackTrace(err)
 }
 
 func (s *lazyScripting) Close(ctx context.Context) (err error) {
@@ -71,7 +71,7 @@ func (s *lazyScripting) Close(ctx context.Context) (err error) {
 	}()
 	err = s.client.Close(ctx)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }

@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 )
@@ -51,7 +51,7 @@ func (t *lazyTable) Close(ctx context.Context) (err error) {
 	}()
 	err = t.client.Close(ctx)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }

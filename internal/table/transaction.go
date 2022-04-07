@@ -9,9 +9,9 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -22,7 +22,7 @@ import (
 // nolint:nolintlint
 var (
 	// errAlreadyCommited returns if transaction Commit called twice
-	errAlreadyCommited = errors.New(fmt.Errorf("already committed"))
+	errAlreadyCommited = xerrors.Wrap(fmt.Errorf("already committed"))
 )
 
 type transaction struct {
@@ -67,7 +67,7 @@ func (tx *transaction) CommitTx(
 	opts ...options.CommitTransactionOption,
 ) (r result.Result, err error) {
 	if tx.committed {
-		return nil, errors.WithStackTrace(errAlreadyCommited)
+		return nil, xerrors.WithStackTrace(errAlreadyCommited)
 	}
 	defer func() {
 		if err == nil {
@@ -111,14 +111,14 @@ func (tx *transaction) CommitTx(
 		t.Trailer(),
 	)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),
 		result,
 	)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	return scanner.NewUnary(
 		nil,
@@ -158,7 +158,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		},
 		t.Trailer(),
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 func (tx *transaction) txc() *table.TransactionControl {

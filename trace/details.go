@@ -66,8 +66,8 @@ var (
 	details = map[Details]string{
 		DriverEvents:            "ydb.driver",
 		DriverClusterEvents:     "ydb.driver.cluster",
-		DriverNetEvents:         "ydb.driver.net",
-		DriverResolverEvents:    "ydb.driver.resolver",
+		DriverNetEvents:         "ydb.driver.xnet",
+		DriverResolverEvents:    "ydb.driver.xresolver",
 		DriverRepeaterEvents:    "ydb.driver.repeater",
 		DriverConnEvents:        "ydb.driver.conn",
 		DriverCredentialsEvents: "ydb.driver.credentials",

@@ -17,8 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
@@ -87,7 +87,7 @@ func WithConnectionString(connectionString string) Option {
 			issues = append(issues, err)
 		}
 		if len(issues) > 0 {
-			return errors.WithStackTrace(errors.NewWithIssues(
+			return xerrors.WithStackTrace(xerrors.NewWithIssues(
 				"parse connection string '"+connectionString+"' failed:",
 				issues...,
 			))
@@ -99,7 +99,7 @@ func WithConnectionString(connectionString string) Option {
 func RegisterParser(param string, parser func(value string) ([]config.Option, error)) (err error) {
 	err = dsn.Register(param, parser)
 	if err != nil {
-		return errors.WithStackTrace(fmt.Errorf("%w: %s", err, param))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %s", err, param))
 	}
 	return nil
 }
@@ -183,7 +183,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 	return func(ctx context.Context, c *connection) error {
 		creds, err := createCredentials(ctx)
 		if err != nil {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 		c.options = append(c.options, config.WithCredentials(creds))
 		return nil
@@ -223,7 +223,7 @@ func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		for _, o := range opts {
 			if err := o(ctx, c); err != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 		}
 		return nil
@@ -257,16 +257,16 @@ func WithCertificatesFromFile(caFile string) Option {
 		if len(caFile) > 0 && caFile[0] == '~' {
 			home, err := os.UserHomeDir()
 			if err != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
 		bytes, err := ioutil.ReadFile(filepath.Clean(caFile))
 		if err != nil {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 		if err = WithCertificatesFromPem(bytes)(ctx, c); err != nil {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 		return nil
 	}
@@ -295,7 +295,7 @@ func WithCertificatesFromPem(bytes []byte) Option {
 			}
 			return
 		}(bytes); !ok {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 		return nil
 	}

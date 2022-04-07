@@ -13,20 +13,20 @@ import (
 	"google.golang.org/grpc/connectivity"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
 	// errOperationNotReady specified error when operation is not ready
-	errOperationNotReady = errors.New(fmt.Errorf("operation is not ready yet"))
+	errOperationNotReady = xerrors.Wrap(fmt.Errorf("operation is not ready yet"))
 
 	// errClosedConnection specified error when connection are closed early
-	errClosedConnection = errors.New(fmt.Errorf("connection closed early"))
+	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
 
 	// errUnavailableConnection specified error when connection are closed early
-	errUnavailableConnection = errors.New(fmt.Errorf("connection unavailable"))
+	errUnavailableConnection = xerrors.Wrap(fmt.Errorf("connection unavailable"))
 )
 
 type Conn interface {
@@ -65,10 +65,10 @@ type conn struct {
 func (c *conn) Ping(ctx context.Context) error {
 	cc, err := c.take(ctx)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 	if !isAvailable(cc) {
-		return errors.WithStackTrace(errUnavailableConnection)
+		return xerrors.WithStackTrace(errUnavailableConnection)
 	}
 	return nil
 }
@@ -96,7 +96,7 @@ func (c *conn) Release(ctx context.Context) (err error) {
 	}
 
 	if len(issues) > 0 {
-		return errors.WithStackTrace(errors.NewWithIssues("conn released with issues", issues...))
+		return xerrors.WithStackTrace(xerrors.NewWithIssues("conn released with issues", issues...))
 	}
 
 	return nil
@@ -148,7 +148,7 @@ func (c *conn) park(ctx context.Context) (err error) {
 	err = c.close()
 
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -202,7 +202,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}()
 
 	if c.isClosed() {
-		return nil, errors.WithStackTrace(errClosedConnection)
+		return nil, xerrors.WithStackTrace(errClosedConnection)
 	}
 
 	c.mtx.Lock()
@@ -222,13 +222,13 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	address := c.endpoint.Address()
 	if c.config.UseDNSResolver() {
-		// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
+		// prepend "ydb" scheme for grpc dns-xresolver to find the proper scheme
 		address = "ydb:///" + address
 	}
 
 	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, errors.WithStackTrace(fmt.Errorf("dial %s failed: %w", address, err))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("dial %s failed: %w", address, err))
 	}
 
 	c.cc = cc
@@ -297,7 +297,7 @@ func (c *conn) close() (err error) {
 	err = c.cc.Close()
 	c.cc = nil
 	c.setState(Offline)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *conn) isClosed() bool {
@@ -333,7 +333,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		f(c)
 	}
 
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *conn) Invoke(
@@ -362,7 +362,7 @@ func (c *conn) Invoke(
 
 	cc, err = c.take(ctx)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	c.changeUsages(1)
@@ -372,14 +372,14 @@ func (c *conn) Invoke(
 
 	if err != nil {
 		if wrapping {
-			return errors.WithStackTrace(
-				errors.FromGRPCError(
+			return xerrors.WithStackTrace(
+				xerrors.FromGRPCError(
 					err,
-					errors.WithAddress(c.Address()),
+					xerrors.WithAddress(c.Address()),
 				),
 			)
 		}
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	if o, ok := res.(response.Response); ok {
@@ -390,12 +390,12 @@ func (c *conn) Invoke(
 		if wrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return errors.WithStackTrace(errOperationNotReady)
+				return xerrors.WithStackTrace(errOperationNotReady)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return errors.WithStackTrace(
-					errors.Operation(
-						errors.FromOperation(
+				return xerrors.WithStackTrace(
+					xerrors.Operation(
+						xerrors.FromOperation(
 							o.GetOperation(),
 						),
 					),
@@ -442,7 +442,7 @@ func (c *conn) NewStream(
 
 	cc, err = c.take(ctx)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	c.changeStreamUsages(1)
@@ -452,14 +452,14 @@ func (c *conn) NewStream(
 
 	if err != nil {
 		if wrapping {
-			return s, errors.WithStackTrace(
-				errors.FromGRPCError(
+			return s, xerrors.WithStackTrace(
+				xerrors.FromGRPCError(
 					err,
-					errors.WithAddress(c.Address()),
+					xerrors.WithAddress(c.Address()),
 				),
 			)
 		}
-		return s, errors.WithStackTrace(err)
+		return s, xerrors.WithStackTrace(err)
 	}
 
 	return &grpcClientStream{

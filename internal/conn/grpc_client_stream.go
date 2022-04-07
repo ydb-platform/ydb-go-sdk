@@ -6,8 +6,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -24,14 +24,14 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return errors.WithStackTrace(
-				errors.FromGRPCError(
+			return xerrors.WithStackTrace(
+				xerrors.FromGRPCError(
 					err,
-					errors.WithAddress(s.c.Address()),
+					xerrors.WithAddress(s.c.Address()),
 				),
 			)
 		}
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -45,14 +45,14 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return errors.WithStackTrace(
-				errors.FromGRPCError(
+			return xerrors.WithStackTrace(
+				xerrors.FromGRPCError(
 					err,
-					errors.WithAddress(s.c.Address()),
+					xerrors.WithAddress(s.c.Address()),
 				),
 			)
 		}
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -63,9 +63,9 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	defer s.c.changeStreamUsages(-1)
 
 	defer func() {
-		onDone := s.recv(errors.HideEOF(err))
+		onDone := s.recv(xerrors.HideEOF(err))
 		if err != nil {
-			onDone(s.c.GetState(), errors.HideEOF(err))
+			onDone(s.c.GetState(), xerrors.HideEOF(err))
 			s.onDone(s.ClientStream.Context())
 		}
 	}()
@@ -74,22 +74,22 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return errors.WithStackTrace(
-				errors.FromGRPCError(
+			return xerrors.WithStackTrace(
+				xerrors.FromGRPCError(
 					err,
-					errors.WithAddress(s.c.Address()),
+					xerrors.WithAddress(s.c.Address()),
 				),
 			)
 		}
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	if s.wrapping {
 		if operation, ok := m.(wrap.StreamOperationResponse); ok {
 			if s := operation.GetStatus(); s != Ydb.StatusIds_SUCCESS {
-				return errors.WithStackTrace(
-					errors.Operation(
-						errors.FromOperation(
+				return xerrors.WithStackTrace(
+					xerrors.Operation(
+						xerrors.FromOperation(
 							operation,
 						),
 					),

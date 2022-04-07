@@ -1,4 +1,4 @@
-package errors
+package xerrors
 
 type retryableError struct {
 	err               error

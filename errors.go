@@ -5,39 +5,39 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
 func IterateByIssues(err error, it func(message string, code Ydb.StatusIds_StatusCode, severity uint32)) {
-	errors.IterateByIssues(err, it)
+	xerrors.IterateByIssues(err, it)
 }
 
 func IsTimeoutError(err error) bool {
-	return errors.IsTimeoutError(err)
+	return xerrors.IsTimeoutError(err)
 }
 
 func IsTransportError(err error, codes ...grpcCodes.Code) bool {
-	return errors.IsTransportError(err, codes...)
+	return xerrors.IsTransportError(err, codes...)
 }
 
-type Error errors.Error
+type Error xerrors.Error
 
 func TransportError(err error) Error {
-	return errors.TransportError(err)
+	return xerrors.TransportError(err)
 }
 
 func IsYdbError(err error) bool {
-	return errors.IsYdb(err)
+	return xerrors.IsYdb(err)
 }
 
 func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
-	return errors.IsOperationError(err, codes...)
+	return xerrors.IsOperationError(err, codes...)
 }
 
 func OperationError(err error) Error {
-	return errors.OperationError(err)
+	return xerrors.OperationError(err)
 }
 
 func IsOperationErrorOverloaded(err error) bool {

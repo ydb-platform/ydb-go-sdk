@@ -8,11 +8,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var ErrNotComparable = errors.New(fmt.Errorf("not comparable"))
+var ErrNotComparable = xerrors.Wrap(fmt.Errorf("not comparable"))
 
 // Compare compares its operands.
 // It returns -1, 0, 1 if l < r, l == r, l > r. Returns error if types are not comparable.
@@ -79,7 +79,7 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 }
 
 func notComparableError(l interface{}, r interface{}) error {
-	return errors.WithStackTrace(fmt.Errorf("%w: %v and %v", ErrNotComparable, l, r), errors.WithSkipDepth(1))
+	return xerrors.WithStackTrace(fmt.Errorf("%w: %v and %v", ErrNotComparable, l, r), xerrors.WithSkipDepth(1))
 }
 
 func comparePrimitives(t Ydb.Type_PrimitiveTypeId, l *Ydb.Value, r *Ydb.Value) (int, error) {
@@ -116,7 +116,7 @@ func compareTuplesOrLists(l []*Ydb.TypedValue, r []*Ydb.TypedValue) (int, error)
 		rval := r[i]
 		cmp, err := compare(lval, rval)
 		if err != nil {
-			return 0, errors.WithStackTrace(err)
+			return 0, xerrors.WithStackTrace(err)
 		}
 		if cmp != 0 {
 			return cmp, nil
@@ -262,7 +262,7 @@ func compareDyNumber(l, r *Ydb.Value) (int, error) {
 	rr := r.GetTextValue()
 	lf, _, err := big.ParseFloat(ll, 10, 127, big.ToNearestEven)
 	if err != nil {
-		return 0, errors.WithStackTrace(err)
+		return 0, xerrors.WithStackTrace(err)
 	}
 	rf, _, err := big.ParseFloat(rr, 10, 127, big.ToNearestEven)
 	if err != nil {

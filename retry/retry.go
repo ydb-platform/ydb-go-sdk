@@ -5,8 +5,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -33,28 +33,28 @@ var (
 // if retryOperation returns nil - retry loop will break
 type retryOperation func(context.Context) (err error)
 
-type retryableErrorOption errors.RetryableErrorOption
+type retryableErrorOption xerrors.RetryableErrorOption
 
 const (
-	BackoffTypeNoBackoff   = errors.BackoffTypeNoBackoff
-	BackoffTypeFastBackoff = errors.BackoffTypeFastBackoff
-	BackoffTypeSlowBackoff = errors.BackoffTypeSlowBackoff
+	BackoffTypeNoBackoff   = xerrors.BackoffTypeNoBackoff
+	BackoffTypeFastBackoff = xerrors.BackoffTypeFastBackoff
+	BackoffTypeSlowBackoff = xerrors.BackoffTypeSlowBackoff
 )
 
-func WithBackoff(t errors.BackoffType) retryableErrorOption {
-	return retryableErrorOption(errors.WithBackoff(t))
+func WithBackoff(t xerrors.BackoffType) retryableErrorOption {
+	return retryableErrorOption(xerrors.WithBackoff(t))
 }
 
 func WithDeleteSession() retryableErrorOption {
-	return retryableErrorOption(errors.WithDeleteSession())
+	return retryableErrorOption(xerrors.WithDeleteSession())
 }
 
 func RetryableError(err error, opts ...retryableErrorOption) error {
-	return errors.RetryableError(
+	return xerrors.RetryableError(
 		err,
-		func() (retryableErrorOptions []errors.RetryableErrorOption) {
+		func() (retryableErrorOptions []xerrors.RetryableErrorOption) {
 			for _, o := range opts {
-				retryableErrorOptions = append(retryableErrorOptions, errors.RetryableErrorOption(o))
+				retryableErrorOptions = append(retryableErrorOptions, xerrors.RetryableErrorOption(o))
 			}
 			return retryableErrorOptions
 		}()...,
@@ -145,7 +145,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return errors.WithStackTrace(ctx.Err())
+			return xerrors.WithStackTrace(ctx.Err())
 
 		default:
 			err = func() error {
@@ -170,11 +170,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if !m.MustRetry(options.idempotent) {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 
 			if e := Wait(ctx, options.fastBackoff, options.slowBackoff, m, i); e != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 
 			code = m.StatusCode()
@@ -186,7 +186,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 // Check returns retry mode for err.
 func Check(err error) (m retryMode) {
-	statusCode, operationStatus, backoff, deleteSession := errors.Check(err)
+	statusCode, operationStatus, backoff, deleteSession := xerrors.Check(err)
 	return retryMode{
 		statusCode:      statusCode,
 		operationStatus: operationStatus,
@@ -198,11 +198,11 @@ func Check(err error) (m retryMode) {
 func Wait(ctx context.Context, fastBackoff Backoff, slowBackoff Backoff, m retryMode, i int) error {
 	var b Backoff
 	switch m.BackoffType() {
-	case errors.BackoffTypeNoBackoff:
+	case xerrors.BackoffTypeNoBackoff:
 		return nil
-	case errors.BackoffTypeFastBackoff:
+	case xerrors.BackoffTypeFastBackoff:
 		b = fastBackoff
-	case errors.BackoffTypeSlowBackoff:
+	case xerrors.BackoffTypeSlowBackoff:
 		b = slowBackoff
 	}
 	return waitBackoff(ctx, b, i)
@@ -229,7 +229,7 @@ type logBackoff struct {
 	JitterLimit float64
 
 	// generator of jitter
-	r rand.Rand
+	r xrand.Rand
 }
 
 type option func(b *logBackoff)
@@ -254,7 +254,7 @@ func withJitterLimit(jitterLimit float64) option {
 
 func newBackoff(opts ...option) logBackoff {
 	b := logBackoff{
-		r: rand.New(rand.WithLock()),
+		r: xrand.New(xrand.WithLock()),
 	}
 	for _, o := range opts {
 		o(&b)
@@ -299,16 +299,16 @@ func max(a, b uint) uint {
 // retryMode reports whether operation is able retried and with which properties.
 type retryMode struct {
 	statusCode      int64
-	operationStatus errors.OperationStatus
-	backoff         errors.BackoffType
+	operationStatus xerrors.OperationStatus
+	backoff         xerrors.BackoffType
 	deleteSession   bool
 }
 
 func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
 	switch m.operationStatus {
-	case errors.OperationFinished:
+	case xerrors.OperationFinished:
 		return false
-	case errors.OperationStatusUndefined:
+	case xerrors.OperationStatusUndefined:
 		return isOperationIdempotent
 	default:
 		return true
@@ -317,9 +317,9 @@ func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
 
 func (m retryMode) StatusCode() int64 { return m.statusCode }
 
-func (m retryMode) MustBackoff() bool { return m.backoff&errors.BackoffTypeBackoffAny != 0 }
+func (m retryMode) MustBackoff() bool { return m.backoff&xerrors.BackoffTypeBackoffAny != 0 }
 
-func (m retryMode) BackoffType() errors.BackoffType { return m.backoff }
+func (m retryMode) BackoffType() xerrors.BackoffType { return m.backoff }
 
 func (m retryMode) MustDeleteSession() bool { return m.deleteSession }
 
@@ -339,7 +339,7 @@ type Backoff interface {
 func waitBackoff(ctx context.Context, b Backoff, i int) error {
 	if b == nil {
 		if err := ctx.Err(); err != nil {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 		return nil
 	}
@@ -348,7 +348,7 @@ func waitBackoff(ctx context.Context, b Backoff, i int) error {
 		return nil
 	case <-ctx.Done():
 		if err := ctx.Err(); err != nil {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 		return nil
 	}

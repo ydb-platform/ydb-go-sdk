@@ -14,10 +14,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var ErrNotImplemented = errors.New(fmt.Errorf("testutil: not implemented"))
+var ErrNotImplemented = xerrors.Wrap(fmt.Errorf("testutil: not implemented"))
 
 type MethodCode uint
 
@@ -240,11 +240,11 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) clusterOption {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
 				result, err := handler(args)
 				if err != nil {
-					return errors.WithStackTrace(err)
+					return xerrors.WithStackTrace(err)
 				}
 				anyResult, err := anypb.New(result)
 				if err != nil {
-					return errors.WithStackTrace(err)
+					return xerrors.WithStackTrace(err)
 				}
 				setField(
 					"Operation",
@@ -350,7 +350,7 @@ type ClientStream struct {
 
 func (s *ClientStream) Header() (metadata.MD, error) {
 	if s.OnHeader == nil {
-		return nil, errors.WithStackTrace(ErrNotImplemented)
+		return nil, xerrors.WithStackTrace(ErrNotImplemented)
 	}
 	return s.OnHeader()
 }
@@ -364,7 +364,7 @@ func (s *ClientStream) Trailer() metadata.MD {
 
 func (s *ClientStream) CloseSend() error {
 	if s.OnCloseSend == nil {
-		return errors.WithStackTrace(ErrNotImplemented)
+		return xerrors.WithStackTrace(ErrNotImplemented)
 	}
 	return s.OnCloseSend()
 }
@@ -378,14 +378,14 @@ func (s *ClientStream) Context() context.Context {
 
 func (s *ClientStream) SendMsg(m interface{}) error {
 	if s.OnSendMsg == nil {
-		return errors.WithStackTrace(ErrNotImplemented)
+		return xerrors.WithStackTrace(ErrNotImplemented)
 	}
 	return s.OnSendMsg(m)
 }
 
 func (s *ClientStream) RecvMsg(m interface{}) error {
 	if s.OnRecvMsg == nil {
-		return errors.WithStackTrace(ErrNotImplemented)
+		return xerrors.WithStackTrace(ErrNotImplemented)
 	}
 	return s.OnRecvMsg(m)
 }

@@ -9,8 +9,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 )
@@ -44,7 +44,7 @@ func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
 			),
 		},
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
@@ -60,7 +60,7 @@ func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
 			),
 		},
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directory, error) {
@@ -83,11 +83,11 @@ func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directo
 		},
 	)
 	if err != nil {
-		return d, errors.WithStackTrace(err)
+		return d, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return d, errors.WithStackTrace(err)
+		return d, xerrors.WithStackTrace(err)
 	}
 	d.From(result.Self)
 	d.Children = make([]scheme.Entry, len(result.Children))
@@ -113,11 +113,11 @@ func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 		},
 	)
 	if err != nil {
-		return e, errors.WithStackTrace(err)
+		return e, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return e, errors.WithStackTrace(err)
+		return e, xerrors.WithStackTrace(err)
 	}
 	e.From(result.Self)
 	return e, nil
@@ -142,7 +142,7 @@ func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...sch
 			),
 		},
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 func putEntry(dst []scheme.Entry, src []*Ydb_Scheme.Entry) {

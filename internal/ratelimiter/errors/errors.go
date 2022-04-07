@@ -3,7 +3,7 @@ package errors
 import (
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
@@ -33,12 +33,12 @@ func NewAcquire(amoount uint64, err error) ratelimiter.AcquireError {
 
 func IsAcquireError(err error) bool {
 	var ae *acquireError
-	return errors.As(err, &ae)
+	return xerrors.As(err, &ae)
 }
 
 func ToAcquireError(err error) ratelimiter.AcquireError {
 	var ae *acquireError
-	if errors.As(err, &ae) {
+	if xerrors.As(err, &ae) {
 		return ae
 	}
 	return nil

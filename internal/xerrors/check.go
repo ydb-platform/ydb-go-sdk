@@ -1,4 +1,4 @@
-package errors
+package xerrors
 
 // Check returns retry mode for err.
 func Check(err error) (

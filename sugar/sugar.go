@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -34,12 +34,12 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 		if ydb.IsOperationErrorSchemeError(err) {
 			err = db.Scheme().MakeDirectory(ctx, sub)
 			if err != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 			info, err = db.Scheme().DescribePath(ctx, sub)
 		}
 		if err != nil {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 		switch info.Type {
 		case
@@ -47,7 +47,7 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 			scheme.EntryDirectory:
 			// OK
 		default:
-			return errors.WithStackTrace(fmt.Errorf("entry %q exists but it is a %s",
+			return xerrors.WithStackTrace(fmt.Errorf("entry %q exists but it is a %s",
 				sub, info.Type,
 			))
 		}
@@ -69,13 +69,13 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 		var err error
 		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 			dir, err = db.Scheme().ListDirectory(ctx, p)
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}, retry.WithIdempotent())
 		if ydb.IsOperationErrorSchemeError(err) {
 			return nil
 		}
 		if err != nil {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 
 		for _, child := range dir.Children {
@@ -86,13 +86,13 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 			switch child.Type {
 			case scheme.EntryDirectory:
 				if err = list(i+1, pt); err != nil {
-					return errors.WithStackTrace(err)
+					return xerrors.WithStackTrace(err)
 				}
 				err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 					return db.Scheme().RemoveDirectory(ctx, pt)
 				}, retry.WithIdempotent())
 				if err != nil {
-					return errors.WithStackTrace(err)
+					return xerrors.WithStackTrace(err)
 				}
 
 			case scheme.EntryTable:
@@ -100,7 +100,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 					return session.DropTable(ctx, pt)
 				})
 				if err != nil {
-					return errors.WithStackTrace(err)
+					return xerrors.WithStackTrace(err)
 				}
 
 			default:

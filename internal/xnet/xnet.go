@@ -1,11 +1,11 @@
-package net
+package xnet
 
 import (
 	"context"
 	"fmt"
 	"net"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -22,7 +22,7 @@ func New(ctx context.Context, address string, t trace.Driver) (_ net.Conn, err e
 	}()
 	cc, err := (&net.Dialer{}).DialContext(ctx, "tcp", address)
 	if err != nil {
-		return nil, errors.WithStackTrace(fmt.Errorf("%w: %s", err, address))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %s", err, address))
 	}
 	return &conn{
 		Conn:    cc,
@@ -38,7 +38,7 @@ func (c *conn) Read(b []byte) (n int, err error) {
 	}()
 	n, err = c.Conn.Read(b)
 	if err != nil {
-		return n, errors.WithStackTrace(err)
+		return n, xerrors.WithStackTrace(err)
 	}
 	return n, nil
 }
@@ -50,7 +50,7 @@ func (c *conn) Write(b []byte) (n int, err error) {
 	}()
 	n, err = c.Conn.Write(b)
 	if err != nil {
-		return n, errors.WithStackTrace(err)
+		return n, xerrors.WithStackTrace(err)
 	}
 	return n, nil
 }
@@ -62,7 +62,7 @@ func (c *conn) Close() (err error) {
 	}()
 	err = c.Conn.Close()
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }

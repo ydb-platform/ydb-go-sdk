@@ -17,11 +17,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -110,14 +110,14 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 		},
 	)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),
 		&result,
 	)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	return &session{
 		id:           result.GetSessionId(),
@@ -187,7 +187,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 			),
 		},
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 // KeepAlive keeps idle session alive.
@@ -264,7 +264,7 @@ func (s *session) CreateTable(
 		&request,
 		t.Trailer(),
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 // DescribeTable describes table at given path.
@@ -295,14 +295,14 @@ func (s *session) DescribeTable(
 		&request,
 	)
 	if err != nil {
-		return desc, errors.WithStackTrace(err)
+		return desc, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),
 		&result,
 	)
 	if err != nil {
-		return desc, errors.WithStackTrace(err)
+		return desc, xerrors.WithStackTrace(err)
 	}
 
 	cs := make(
@@ -434,7 +434,7 @@ func (s *session) DropTable(
 		&request,
 		t.Trailer(),
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 // AlterTable modifies schema of table at given path with given options.
@@ -463,7 +463,7 @@ func (s *session) AlterTable(
 		&request,
 		t.Trailer(),
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 // CopyTable creates copy of table at given path.
@@ -493,7 +493,7 @@ func (s *session) CopyTable(
 		&request,
 		t.Trailer(),
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 // Explain explains data query represented by text.
@@ -632,7 +632,7 @@ func (s *session) Execute(
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
 	if err != nil {
-		return nil, nil, errors.WithStackTrace(err)
+		return nil, nil, xerrors.WithStackTrace(err)
 	}
 	if keepInCache(request) && result.QueryMeta != nil {
 		queryID := result.QueryMeta.Id
@@ -702,13 +702,13 @@ func (s *session) executeDataQuery(
 		t.Trailer(),
 	)
 	if err != nil {
-		return nil, nil, errors.WithStackTrace(err)
+		return nil, nil, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),
 		result,
 	)
-	return request, result, errors.WithStackTrace(err)
+	return request, result, xerrors.WithStackTrace(err)
 }
 
 // ExecuteSchemeQuery executes scheme query.
@@ -737,7 +737,7 @@ func (s *session) ExecuteSchemeQuery(
 		&request,
 		t.Trailer(),
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 // DescribeTableOptions describes supported table options.
@@ -899,7 +899,7 @@ func (s *session) StreamReadTable(
 	)
 	defer func() {
 		if err != nil {
-			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
+			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 		}
 	}()
 
@@ -916,7 +916,7 @@ func (s *session) StreamReadTable(
 
 	if err != nil {
 		cancel()
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if checkHintSessionClose(stream.Trailer()) {
@@ -930,24 +930,24 @@ func (s *session) StreamReadTable(
 			err error,
 		) {
 			defer func() {
-				onIntermediate(errors.HideEOF(err))
+				onIntermediate(xerrors.HideEOF(err))
 			}()
 			select {
 			case <-ctx.Done():
-				return nil, nil, errors.WithStackTrace(ctx.Err())
+				return nil, nil, xerrors.WithStackTrace(ctx.Err())
 			default:
 				var response *Ydb_Table.ReadTableResponse
 				response, err = stream.Recv()
 				result := response.GetResult()
 				if result == nil || err != nil {
-					return nil, nil, errors.WithStackTrace(err)
+					return nil, nil, xerrors.WithStackTrace(err)
 				}
 				return result.GetResultSet(), nil, nil
 			}
 		},
 		func(err error) error {
 			cancel()
-			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
+			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
 	), nil
@@ -983,7 +983,7 @@ func (s *session) StreamExecuteScanQuery(
 	)
 	defer func() {
 		if err != nil {
-			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
+			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 		}
 	}()
 
@@ -1000,7 +1000,7 @@ func (s *session) StreamExecuteScanQuery(
 
 	if err != nil {
 		cancel()
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if checkHintSessionClose(stream.Trailer()) {
@@ -1014,24 +1014,24 @@ func (s *session) StreamExecuteScanQuery(
 			err error,
 		) {
 			defer func() {
-				onIntermediate(errors.HideEOF(err))
+				onIntermediate(xerrors.HideEOF(err))
 			}()
 			select {
 			case <-ctx.Done():
-				return nil, nil, errors.WithStackTrace(ctx.Err())
+				return nil, nil, xerrors.WithStackTrace(ctx.Err())
 			default:
 				var response *Ydb_Table.ExecuteScanQueryPartialResponse
 				response, err = stream.Recv()
 				result := response.GetResult()
 				if result == nil || err != nil {
-					return nil, nil, errors.WithStackTrace(err)
+					return nil, nil, xerrors.WithStackTrace(err)
 				}
 				return result.GetResultSet(), result.GetQueryStats(), nil
 			}
 		},
 		func(err error) error {
 			cancel()
-			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
+			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
 	), nil
@@ -1055,7 +1055,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 		},
 		t.Trailer(),
 	)
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }
 
 // BeginTransaction begins new transaction within given session with given
@@ -1094,7 +1094,7 @@ func (s *session) BeginTransaction(
 		t.Trailer(),
 	)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(
 		response.GetOperation().GetResult().GetValue(),

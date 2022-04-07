@@ -13,8 +13,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -24,10 +24,10 @@ const (
 
 var (
 	// ErrClusterClosed returned when requested on a closed cluster.
-	ErrClusterClosed = errors.New(fmt.Errorf("cluster closed"))
+	ErrClusterClosed = xerrors.Wrap(fmt.Errorf("cluster closed"))
 
 	// ErrClusterEmpty returned when no connections left in cluster.
-	ErrClusterEmpty = errors.New(fmt.Errorf("cluster empty"))
+	ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
 )
 
 type cluster struct {
@@ -239,7 +239,7 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 	}
 
 	if len(issues) > 0 {
-		return errors.WithStackTrace(errors.NewWithIssues("cluster closed with issues", issues...))
+		return xerrors.WithStackTrace(xerrors.NewWithIssues("cluster closed with issues", issues...))
 	}
 
 	return nil
@@ -249,13 +249,13 @@ func (c *cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 	for {
 		select {
 		case <-c.done:
-			return nil, errors.WithStackTrace(ErrClusterClosed)
+			return nil, xerrors.WithStackTrace(ErrClusterClosed)
 		case <-ctx.Done():
-			return nil, errors.WithStackTrace(ctx.Err())
+			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
 			cc = c.config.Balancer().Next()
 			if cc == nil {
-				return nil, errors.WithStackTrace(ErrClusterEmpty)
+				return nil, xerrors.WithStackTrace(ErrClusterEmpty)
 			}
 			if err = cc.Ping(ctx); err == nil {
 				return cc, nil
@@ -272,7 +272,7 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	defer cancel()
 
 	if c.isClosed() {
-		return nil, errors.WithStackTrace(ErrClusterClosed)
+		return nil, xerrors.WithStackTrace(ErrClusterClosed)
 	}
 
 	onDone := trace.DriverOnClusterGet(c.config.Trace(), &ctx)

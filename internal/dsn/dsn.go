@@ -5,7 +5,7 @@ import (
 	"net/url"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var (
@@ -21,8 +21,8 @@ var (
 		"grpcs": true,
 		"grpc":  false,
 	}
-	errSchemeNotValid = errors.New(fmt.Errorf("schema not valid"))
-	errParserExists   = errors.New(fmt.Errorf("already exists parser. newest parser replaced old. param"))
+	errSchemeNotValid = xerrors.Wrap(fmt.Errorf("schema not valid"))
+	errParserExists   = xerrors.Wrap(fmt.Errorf("already exists parser. newest parser replaced old. param"))
 )
 
 type Parser func(value string) ([]config.Option, error)
@@ -31,7 +31,7 @@ func Register(param string, parser Parser) error {
 	_, has := parsers[param]
 	parsers[param] = parser
 	if has {
-		return errors.WithStackTrace(fmt.Errorf("%w: %v", errParserExists, param))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %v", errParserExists, param))
 	}
 	return nil
 }
@@ -39,10 +39,10 @@ func Register(param string, parser Parser) error {
 func Parse(dsn string) (options []config.Option, err error) {
 	uri, err := url.Parse(dsn)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	if _, has := schemasSecure[uri.Scheme]; !has {
-		return nil, errors.WithStackTrace(
+		return nil, xerrors.WithStackTrace(
 			fmt.Errorf("%w: %v", errSchemeNotValid, uri.Scheme),
 		)
 	}
@@ -56,7 +56,7 @@ func Parse(dsn string) (options []config.Option, err error) {
 			for _, v := range values {
 				var parsed []config.Option
 				if parsed, err = p(v); err != nil {
-					return nil, errors.WithStackTrace(err)
+					return nil, xerrors.WithStackTrace(err)
 				}
 				options = append(
 					options,

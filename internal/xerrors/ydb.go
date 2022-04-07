@@ -1,4 +1,4 @@
-package errors
+package xerrors
 
 import "errors"
 
@@ -21,7 +21,7 @@ func (e *ydbError) Error() string {
 	return e.err.Error()
 }
 
-// New makes internal ydb error
-func New(err error) error {
+// Wrap makes internal ydb error
+func Wrap(err error) error {
 	return &ydbError{err: err}
 }

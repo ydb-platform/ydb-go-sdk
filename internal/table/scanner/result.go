@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
@@ -117,14 +117,14 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
 	if r.isClosed() {
 		if err = r.Err(); err != nil {
-			return errors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
 		return io.EOF
 	}
 	s, stats, err := r.recv(ctx)
 	if err != nil {
 		r.Reset(nil)
-		if errors.Is(err, io.EOF) {
+		if xerrors.Is(err, io.EOF) {
 			return err
 		}
 		return r.errorf(0, "streamResult.NextResultSetErr(): %w", err)

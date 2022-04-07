@@ -12,7 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 func TestLogBackoff(t *testing.T) {
@@ -121,16 +121,16 @@ func TestRetryModes(t *testing.T) {
 		nonIdempotentOperation bool // after an error we must retry non-idempotent operation or no
 	}
 	type Case struct {
-		err           error              // given error
-		backoff       errors.BackoffType // no backoff (=== no operationStatus), fast backoff, slow backoff
-		deleteSession bool               // close session and delete from pool
+		err           error               // given error
+		backoff       xerrors.BackoffType // no backoff (=== no operationStatus), fast backoff, slow backoff
+		deleteSession bool                // close session and delete from pool
 		canRetry      CanRetry
 	}
 	errs := []Case{
 		{
 			// retryer given unknown error - we will not operationStatus and will close session
 			err:           fmt.Errorf("unknown error"),
-			backoff:       errors.BackoffTypeNoBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -140,7 +140,7 @@ func TestRetryModes(t *testing.T) {
 		{
 			// golang context deadline exceeded
 			err:           context.DeadlineExceeded,
-			backoff:       errors.BackoffTypeNoBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -150,7 +150,7 @@ func TestRetryModes(t *testing.T) {
 		{
 			// golang context canceled
 			err:           context.Canceled,
-			backoff:       errors.BackoffTypeNoBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -162,8 +162,8 @@ func TestRetryModes(t *testing.T) {
 			// ignore SA1019
 			// We want to check internal grpc error on chaos monkey testing
 			// nolint:nolintlint
-			err:           errors.FromGRPCError(grpc.ErrClientConnClosing),
-			backoff:       errors.BackoffTypeFastBackoff,
+			err:           xerrors.FromGRPCError(grpc.ErrClientConnClosing),
+			backoff:       xerrors.BackoffTypeFastBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -171,8 +171,8 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err:           errors.Transport(),
-			backoff:       errors.BackoffTypeNoBackoff,
+			err:           xerrors.Transport(),
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -180,142 +180,10 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.Canceled),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.Canceled),
 			),
-			backoff:       errors.BackoffTypeFastBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.Unknown),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.InvalidArgument),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.DeadlineExceeded),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.NotFound),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.AlreadyExists),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.PermissionDenied),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.ResourceExhausted),
-			),
-			backoff:       errors.BackoffTypeSlowBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: true,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.FailedPrecondition),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.Aborted),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: true,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.OutOfRange),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.Unimplemented),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.Internal),
-			),
-			backoff:       errors.BackoffTypeFastBackoff,
+			backoff:       xerrors.BackoffTypeFastBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -323,21 +191,10 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.Unavailable),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.Unknown),
 			),
-			backoff:       errors.BackoffTypeFastBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.DataLoss),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -345,10 +202,10 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Transport(
-				errors.WithCode(grpcCodes.Unauthenticated),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.InvalidArgument),
 			),
-			backoff:       errors.BackoffTypeNoBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -356,54 +213,54 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.DeadlineExceeded),
 			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
 				nonIdempotentOperation: false,
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.NotFound),
 			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
 				nonIdempotentOperation: false,
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.AlreadyExists),
 			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
 				nonIdempotentOperation: false,
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.PermissionDenied),
 			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
 				nonIdempotentOperation: false,
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_ABORTED),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.ResourceExhausted),
 			),
-			backoff:       errors.BackoffTypeFastBackoff,
+			backoff:       xerrors.BackoffTypeSlowBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -411,109 +268,10 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.FailedPrecondition),
 			),
-			backoff:       errors.BackoffTypeFastBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: true,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
-			),
-			backoff:       errors.BackoffTypeSlowBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: true,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_SCHEME_ERROR),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_TIMEOUT),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: true,
-			canRetry: CanRetry{
-				idempotentOperation:    true,
-				nonIdempotentOperation: true,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_ALREADY_EXISTS),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_NOT_FOUND),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
-			deleteSession: false,
-			canRetry: CanRetry{
-				idempotentOperation:    false,
-				nonIdempotentOperation: false,
-			},
-		},
-		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED),
-			),
-			backoff:       errors.BackoffTypeNoBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -521,10 +279,21 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_CANCELLED),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.Aborted),
 			),
-			backoff:       errors.BackoffTypeFastBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
+		},
+		{
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.OutOfRange),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -532,10 +301,241 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_UNDETERMINED),
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.Unimplemented),
 			),
-			backoff:       errors.BackoffTypeFastBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.Internal),
+			),
+			backoff:       xerrors.BackoffTypeFastBackoff,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.Unavailable),
+			),
+			backoff:       xerrors.BackoffTypeFastBackoff,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.DataLoss),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Transport(
+				xerrors.WithCode(grpcCodes.Unauthenticated),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_ABORTED),
+			),
+			backoff:       xerrors.BackoffTypeFastBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
+			),
+			backoff:       xerrors.BackoffTypeFastBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
+			),
+			backoff:       xerrors.BackoffTypeSlowBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_SCHEME_ERROR),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_TIMEOUT),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_ALREADY_EXISTS),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_NOT_FOUND),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED),
+			),
+			backoff:       xerrors.BackoffTypeNoBackoff,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_CANCELLED),
+			),
+			backoff:       xerrors.BackoffTypeFastBackoff,
+			deleteSession: false,
+			canRetry: CanRetry{
+				idempotentOperation:    false,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_UNDETERMINED),
+			),
+			backoff:       xerrors.BackoffTypeFastBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -543,10 +543,10 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED),
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED),
 			),
-			backoff:       errors.BackoffTypeNoBackoff,
+			backoff:       xerrors.BackoffTypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -554,10 +554,10 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 		{
-			err: errors.Operation(
-				errors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
+			err: xerrors.Operation(
+				xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
 			),
-			backoff:       errors.BackoffTypeFastBackoff,
+			backoff:       xerrors.BackoffTypeFastBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -632,8 +632,8 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		},
 		{
 			error: &CustomError{
-				Err: errors.Operation(
-					errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+				Err: xerrors.Operation(
+					xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 				),
 			},
 			retriable: true,
@@ -642,8 +642,8 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			error: &CustomError{
 				Err: fmt.Errorf(
 					"wrapped error: %w",
-					errors.Operation(
-						errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+					xerrors.Operation(
+						xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 					),
 				),
 			},
@@ -653,8 +653,8 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			error: &CustomError{
 				Err: fmt.Errorf(
 					"wrapped error: %w",
-					errors.Operation(
-						errors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
+					xerrors.Operation(
+						xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
 					),
 				),
 			},

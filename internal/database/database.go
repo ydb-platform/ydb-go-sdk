@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -38,7 +38,7 @@ func (db *database) Close(ctx context.Context) (err error) {
 	}
 
 	if len(issues) > 0 {
-		return errors.WithStackTrace(errors.NewWithIssues("database close failed", issues...))
+		return xerrors.WithStackTrace(xerrors.NewWithIssues("database close failed", issues...))
 	}
 
 	return nil
@@ -82,7 +82,7 @@ func New(
 		opts...,
 	)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return db, nil
@@ -109,23 +109,23 @@ func (db *database) Invoke(
 ) error {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	defer func() {
-		if err != nil && errors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
+		if err != nil && xerrors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
 			db.cluster.Pessimize(ctx, cc, err)
 		}
 	}()
 
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	err = cc.Invoke(ctx, method, args, reply, opts...)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -139,24 +139,24 @@ func (db *database) NewStream(
 ) (grpc.ClientStream, error) {
 	cc, err := db.cluster.Get(ctx)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	defer func() {
-		if err != nil && errors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
+		if err != nil && xerrors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
 			db.cluster.Pessimize(ctx, cc, err)
 		}
 	}()
 
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	var client grpc.ClientStream
 	client, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return client, nil

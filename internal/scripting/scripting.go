@@ -11,10 +11,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -53,12 +53,12 @@ func (c *client) Execute(
 	}()
 	response, err = c.service.ExecuteYql(ctx, request)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	return scanner.NewUnary(result.GetResultSets(), result.GetQueryStats()), nil
 }
@@ -147,7 +147,7 @@ func (c *client) StreamExecute(
 	stream, err := c.service.StreamExecuteYql(ctx, request)
 	if err != nil {
 		cancel()
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return scanner.NewStream(
@@ -157,24 +157,24 @@ func (c *client) StreamExecute(
 			err error,
 		) {
 			defer func() {
-				onIntermediate(errors.HideEOF(err))
+				onIntermediate(xerrors.HideEOF(err))
 			}()
 			select {
 			case <-ctx.Done():
-				return nil, nil, errors.WithStackTrace(ctx.Err())
+				return nil, nil, xerrors.WithStackTrace(ctx.Err())
 			default:
 				var response *Ydb_Scripting.ExecuteYqlPartialResponse
 				response, err = stream.Recv()
 				result := response.GetResult()
 				if result == nil || err != nil {
-					return nil, nil, errors.WithStackTrace(err)
+					return nil, nil, xerrors.WithStackTrace(err)
 				}
 				return result.GetResultSet(), result.GetQueryStats(), nil
 			}
 		},
 		func(err error) error {
 			cancel()
-			onIntermediate(errors.HideEOF(err))(errors.HideEOF(err))
+			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
 	), nil
