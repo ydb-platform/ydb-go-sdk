@@ -515,7 +515,7 @@ func TestTable(t *testing.T) {
 	}
 	t.Logf("> table stream_query created\n")
 	var (
-		upsertRowsCount = 40000
+		upsertRowsCount = 100000
 		sum             uint64
 	)
 

@@ -355,9 +355,16 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 // WithPanicCallback specified behavior on panic
 // Warning: WithPanicCallback must be defined on start of all options
 // (before `WithTrace{Driver,Table,Scheme,Scripting,Coordination,Ratelimiter}` and other options)
-func WithPanicCallback(cb func(e interface{})) Option {
+// If not defined - panic would not intercept with driver
+func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.panicCallback = cb
+		c.panicCallback = panicCallback
+		c.tableOptions = append(c.tableOptions, tableConfig.WithPanicCallback(panicCallback))
+		c.coordinationOptions = append(c.coordinationOptions, coordinationConfig.WithPanicCallback(panicCallback))
+		c.schemeOptions = append(c.schemeOptions, schemeConfig.WithPanicCallback(panicCallback))
+		c.ratelimiterOptions = append(c.ratelimiterOptions, ratelimiterConfig.WithPanicCallback(panicCallback))
+		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithPanicCallback(panicCallback))
+		c.tableOptions = append(c.tableOptions, tableConfig.WithPanicCallback(panicCallback))
 		return nil
 	}
 }

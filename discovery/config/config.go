@@ -45,6 +45,10 @@ type Config interface {
 
 	// Meta is an option which contains meta information about database connection
 	Meta() meta.Meta
+
+	// PanicCallback returns user-defined panic callback
+	// If nil - panic callback not defined
+	PanicCallback() func(e interface{})
 }
 
 type config struct {
@@ -58,6 +62,12 @@ type config struct {
 
 	interval time.Duration
 	trace    trace.Discovery
+
+	panicCallback func(e interface{})
+}
+
+func (c *config) PanicCallback() func(e interface{}) {
+	return c.panicCallback
 }
 
 func (c *config) Meta() meta.Meta {
@@ -143,6 +153,12 @@ func WithInterval(interval time.Duration) Option {
 		} else {
 			c.interval = interval
 		}
+	}
+}
+
+func WithPanicCallback(cb func(e interface{})) Option {
+	return func(c *config) {
+		c.panicCallback = cb
 	}
 }
 

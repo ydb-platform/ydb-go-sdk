@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
@@ -43,6 +44,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 				err := do(
 					ctx,
 					p,
+					config.New(),
 					func(ctx context.Context, _ table.Session) error {
 						return testErr
 					},
@@ -93,6 +95,7 @@ func TestRetryerBadSession(t *testing.T) {
 	err := do(
 		ctx,
 		p,
+		config.New(),
 		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
 			i++
@@ -137,6 +140,7 @@ func TestRetryerSessionClosing(t *testing.T) {
 		err := do(
 			context.Background(),
 			p,
+			config.New(),
 			func(ctx context.Context, s table.Session) error {
 				sessions = append(sessions, s)
 				s.(*session).SetStatus(options.SessionClosing)
@@ -189,6 +193,7 @@ func TestRetryerImmediateReturn(t *testing.T) {
 			err := do(
 				context.Background(),
 				p,
+				config.New(),
 				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
@@ -319,6 +324,7 @@ func TestRetryContextDeadline(t *testing.T) {
 				_ = do(
 					ctx,
 					p,
+					config.New(),
 					func(ctx context.Context, _ table.Session) error {
 						select {
 						case <-ctx.Done():
@@ -416,14 +422,20 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				i        = 0
 				sessions = make(map[table.Session]int)
 			)
-			err := do(ctx, p, func(ctx context.Context, s table.Session) (err error) {
-				sessions[s]++
-				i++
-				if i < limit {
-					return test.error
-				}
-				return nil
-			}, table.Options{})
+			err := do(
+				ctx,
+				p,
+				config.New(),
+				func(ctx context.Context, s table.Session) (err error) {
+					sessions[s]++
+					i++
+					if i < limit {
+						return test.error
+					}
+					return nil
+				},
+				table.Options{},
+			)
 			// nolint:nestif
 			if test.retriable {
 				if i != limit {

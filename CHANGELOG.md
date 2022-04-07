@@ -1,3 +1,6 @@
+* Added `WithPanicCallback` option to all service configs (discovery, coordination, ratelimiter, scheme, scripting, table) and auto-applying from `ydb.WithPanicCallback`
+* Added panic recovering (if defined `ydb.WithPanicCallback` option) which thrown from retry operation
+
 ## v3.18.2
 * Refactored balancers (makes concurrent-safe)
 * Excluded separate balancers lock from cluster
