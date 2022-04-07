@@ -77,11 +77,6 @@ The straightforward example of querying data may look similar to this:
    db, err := ydb.New(
       ctx,
       ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-      ydb.WithDialTimeout(3 * time.Second),
-      ydb.WithCertificatesFromFile("~/.ydb/CA.pem"),
-      ydb.WithSessionPoolIdleThreshold(time.Second * 5),
-      ydb.WithSessionPoolKeepAliveMinSize(-1),
-      ydb.WithDiscoveryInterval(5 * time.Second),
       ydb.WithAccessTokenCredentials(os.GetEnv("YDB_ACCESS_TOKEN_CREDENTIALS")),
    )
    if err != nil {
