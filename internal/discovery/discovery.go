@@ -16,8 +16,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -49,7 +49,7 @@ func New(
 
 	curr, err = c.Discover(ctx)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	crudExplorer.Lock()
@@ -71,7 +71,7 @@ func New(
 			func(ctx context.Context) (err error) {
 				next, err = c.Discover(ctx)
 				if err != nil {
-					return errors.WithStackTrace(err)
+					return xerrors.WithStackTrace(err)
 				}
 
 				// NOTE: curr endpoints must be sorted here.
@@ -149,17 +149,17 @@ func (c *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 	ctx, err = c.config.Meta().Meta(ctx)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	response, err = c.service.ListEndpoints(ctx, &request)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	location = result.GetSelfLocation()
@@ -197,17 +197,17 @@ func (c *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 
 	ctx, err = c.config.Meta().Meta(ctx)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	response, err = c.service.WhoAmI(ctx, &request)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &whoAmIResultResult)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &discovery.WhoAmI{

@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/list"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 // roundRobin is an implementation of weighted round-robin balancing algorithm.
@@ -24,7 +24,7 @@ type roundRobin struct {
 	belt  []int
 	next  int32
 	conns list.List
-	r     rand.Rand
+	r     xrand.Rand
 }
 
 func (r *roundRobin) Create() balancer.Balancer {
@@ -33,14 +33,14 @@ func (r *roundRobin) Create() balancer.Balancer {
 
 func RoundRobin() balancer.Balancer {
 	return &roundRobin{
-		r: rand.New(rand.WithLock()),
+		r: xrand.New(xrand.WithLock()),
 	}
 }
 
 func RandomChoice() balancer.Balancer {
 	return &randomChoice{
 		roundRobin: roundRobin{
-			r: rand.New(rand.WithLock()),
+			r: xrand.New(xrand.WithLock()),
 		},
 	}
 }

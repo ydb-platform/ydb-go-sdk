@@ -10,7 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -126,7 +126,7 @@ func (p *pool) Release(ctx context.Context) error {
 	}
 
 	if len(issues) > 0 {
-		return errors.WithStackTrace(errors.NewWithIssues("connection pool close failed", issues...))
+		return xerrors.WithStackTrace(xerrors.NewWithIssues("connection pool close failed", issues...))
 	}
 
 	return nil

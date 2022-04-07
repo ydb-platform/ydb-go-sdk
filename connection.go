@@ -16,8 +16,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
@@ -151,7 +151,7 @@ func (c *connection) Close(ctx context.Context) error {
 	}
 
 	if len(issues) > 0 {
-		return errors.WithStackTrace(errors.NewWithIssues("close failed", issues...))
+		return xerrors.WithStackTrace(xerrors.NewWithIssues("close failed", issues...))
 	}
 
 	return nil
@@ -248,7 +248,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	for _, opt := range opts {
 		err = opt(ctx, c)
 		if err != nil {
-			return nil, errors.WithStackTrace(err)
+			return nil, xerrors.WithStackTrace(err)
 		}
 	}
 	c.config = config.New(c.options...)
@@ -292,7 +292,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)...,
 	)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	c.table = lazy.Table(

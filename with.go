@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var nextID = uint64(0)
@@ -32,7 +32,7 @@ func (c *connection) With(ctx context.Context, opts ...Option) (Connection, erro
 		)...,
 	)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	c.childrenMtx.Lock()

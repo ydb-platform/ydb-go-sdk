@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -128,9 +128,9 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	token, err = m.credentials.Token(ctx)
 	if err != nil {
 		if stringer, ok := m.credentials.(fmt.Stringer); ok {
-			return nil, errors.WithStackTrace(fmt.Errorf("%w: %s", err, stringer.String()))
+			return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %s", err, stringer.String()))
 		}
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	md.Set(HeaderTicket, token)
@@ -141,7 +141,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 func (m *meta) Meta(ctx context.Context) (_ context.Context, err error) {
 	md, err := m.meta(ctx)
 	if err != nil {
-		return ctx, errors.WithStackTrace(err)
+		return ctx, xerrors.WithStackTrace(err)
 	}
 	return metadata.NewOutgoingContext(ctx, md), nil
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
@@ -57,7 +57,7 @@ func doTx(
 
 			tx, err := s.BeginTransaction(ctx, opts.TxSettings)
 			if err != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 
 			defer func() {
@@ -78,12 +78,12 @@ func doTx(
 			}()
 
 			if err != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 
 			_, err = tx.CommitTx(ctx, opts.TxCommitOptions...)
 			if err != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 
 			return nil
@@ -130,7 +130,7 @@ func do(
 			}()
 
 			if err != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 
 			return nil
@@ -147,14 +147,14 @@ var _ SessionProvider = SessionProviderFunc{}
 
 func (f SessionProviderFunc) Get(ctx context.Context) (Session, error) {
 	if f.OnGet == nil {
-		return nil, errors.WithStackTrace(errNoSession)
+		return nil, xerrors.WithStackTrace(errNoSession)
 	}
 	return f.OnGet(ctx)
 }
 
 func (f SessionProviderFunc) Put(ctx context.Context, s Session) error {
 	if f.OnPut == nil {
-		return errors.WithStackTrace(testutil.ErrNotImplemented)
+		return xerrors.WithStackTrace(testutil.ErrNotImplemented)
 	}
 	return f.OnPut(ctx, s)
 }
@@ -170,9 +170,9 @@ func SingleSession(s Session) SessionProvider {
 }
 
 var (
-	errNoSession         = errors.New(fmt.Errorf("no session"))
-	errUnexpectedSession = errors.New(fmt.Errorf("unexpected session"))
-	errSessionOverflow   = errors.New(fmt.Errorf("session overflow"))
+	errNoSession         = xerrors.Wrap(fmt.Errorf("no session"))
+	errUnexpectedSession = xerrors.Wrap(fmt.Errorf("unexpected session"))
+	errSessionOverflow   = xerrors.Wrap(fmt.Errorf("session overflow"))
 )
 
 type singleSession struct {
@@ -186,7 +186,7 @@ func (s *singleSession) Close(ctx context.Context) error {
 
 func (s *singleSession) Get(context.Context) (Session, error) {
 	if s.empty {
-		return nil, errors.WithStackTrace(errNoSession)
+		return nil, xerrors.WithStackTrace(errNoSession)
 	}
 	s.empty = true
 	return s.s, nil
@@ -194,10 +194,10 @@ func (s *singleSession) Get(context.Context) (Session, error) {
 
 func (s *singleSession) Put(_ context.Context, x Session) error {
 	if x != s.s {
-		return errors.WithStackTrace(errUnexpectedSession)
+		return xerrors.WithStackTrace(errUnexpectedSession)
 	}
 	if !s.empty {
-		return errors.WithStackTrace(errSessionOverflow)
+		return xerrors.WithStackTrace(errSessionOverflow)
 	}
 	s.empty = false
 	return nil
@@ -205,10 +205,10 @@ func (s *singleSession) Put(_ context.Context, x Session) error {
 
 func (s *singleSession) CloseSession(ctx context.Context, x Session) error {
 	if x != s.s {
-		return errors.WithStackTrace(errUnexpectedSession)
+		return xerrors.WithStackTrace(errUnexpectedSession)
 	}
 	if !s.empty {
-		return errors.WithStackTrace(errSessionOverflow)
+		return xerrors.WithStackTrace(errSessionOverflow)
 	}
 	s.empty = true
 	return x.Close(ctx)
@@ -237,7 +237,7 @@ func retryBackoff(
 		attempts++
 		select {
 		case <-ctx.Done():
-			return errors.WithStackTrace(ctx.Err())
+			return xerrors.WithStackTrace(ctx.Err())
 
 		default:
 			if s == nil {
@@ -246,7 +246,7 @@ func retryBackoff(
 					panic("both of session and error are nil")
 				}
 				if err != nil {
-					return errors.WithStackTrace(err)
+					return xerrors.WithStackTrace(err)
 				}
 			}
 
@@ -273,11 +273,11 @@ func retryBackoff(
 			}
 
 			if !m.MustRetry(isOperationIdempotent) {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 
 			if retry.Wait(ctx, fastBackoff, slowBackoff, m, i) != nil {
-				return errors.WithStackTrace(err)
+				return xerrors.WithStackTrace(err)
 			}
 
 			code = m.StatusCode()

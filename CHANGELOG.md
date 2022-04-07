@@ -1,3 +1,5 @@
+* Renamed internal packages `errors`, `net` and `resolver` to `xerrors`, `xnet` and `xresolver` for exclude ambiguous interpretation
+
 ## v3.18.3
 * Added `WithPanicCallback` option to all service configs (discovery, coordination, ratelimiter, scheme, scripting, table) and auto-applying from `ydb.WithPanicCallback`
 * Added panic recovering (if defined `ydb.WithPanicCallback` option) which thrown from retry operation

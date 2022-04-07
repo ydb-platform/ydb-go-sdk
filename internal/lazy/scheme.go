@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
@@ -48,7 +48,7 @@ func (s *lazyScheme) Close(ctx context.Context) (err error) {
 	}()
 	err = s.client.Close(ctx)
 	if err != nil {
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }
@@ -65,9 +65,9 @@ func (s *lazyScheme) DescribePath(ctx context.Context, path string) (e scheme.En
 	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = s.client.DescribePath(ctx, path)
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}, retry.WithIdempotent())
-	return e, errors.WithStackTrace(err)
+	return e, xerrors.WithStackTrace(err)
 }
 
 func (s *lazyScheme) MakeDirectory(ctx context.Context, path string) (err error) {
@@ -81,9 +81,9 @@ func (s *lazyScheme) ListDirectory(ctx context.Context, path string) (d scheme.D
 	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		d, err = s.client.ListDirectory(ctx, path)
-		return errors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}, retry.WithIdempotent())
-	return d, errors.WithStackTrace(err)
+	return d, xerrors.WithStackTrace(err)
 }
 
 func (s *lazyScheme) RemoveDirectory(ctx context.Context, path string) (err error) {

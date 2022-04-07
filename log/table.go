@@ -3,7 +3,7 @@ package log
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -34,7 +34,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					)
 				} else {
 					f := l.Warnf
-					if !errors.IsYdb(info.Error) {
+					if !xerrors.IsYdb(info.Error) {
 						f = l.Debugf
 					}
 					m := retry.Check(info.Error)
@@ -56,7 +56,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						)
 					} else {
 						f := l.Errorf
-						if !errors.IsYdb(info.Error) {
+						if !xerrors.IsYdb(info.Error) {
 							f = l.Debugf
 						}
 						m := retry.Check(info.Error)
@@ -93,7 +93,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					)
 				} else {
 					f := l.Warnf
-					if !errors.IsYdb(info.Error) {
+					if !xerrors.IsYdb(info.Error) {
 						f = l.Debugf
 					}
 					m := retry.Check(info.Error)
@@ -115,7 +115,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						)
 					} else {
 						f := l.Warnf
-						if !errors.IsYdb(info.Error) {
+						if !xerrors.IsYdb(info.Error) {
 							f = l.Debugf
 						}
 						m := retry.Check(info.Error)

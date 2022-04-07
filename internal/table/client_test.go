@@ -16,8 +16,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -54,7 +54,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 	defer func() {
 		_ = p.Close(context.Background())
 	}()
-	r := rand.New(rand.WithLock())
+	r := xrand.New(xrand.WithLock())
 	errCh := make(chan error, limit*10)
 	fn := func(wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -230,7 +230,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			const timeout = time.Second
 			select {
 			case err := <-got:
-				if !errors.Is(err, errSessionPoolClosed) {
+				if !xerrors.Is(err, errSessionPoolClosed) {
 					t.Fatalf(
 						"unexpected error: %v; want %v",
 						err, errSessionPoolClosed,
@@ -310,7 +310,7 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatalf("unexpected session close")
 	}
 
-	if err := p.Put(context.Background(), s3); !errors.Is(err, errSessionPoolClosed) {
+	if err := p.Put(context.Background(), s3); !xerrors.Is(err, errSessionPoolClosed) {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
 			err, errSessionPoolClosed,
@@ -366,7 +366,7 @@ func TestRaceWgClosed(t *testing.T) {
 								return nil
 							},
 						)
-						if errors.Is(err, errSessionPoolClosed) {
+						if xerrors.Is(err, errSessionPoolClosed) {
 							return
 						}
 					}
@@ -563,7 +563,7 @@ func TestSessionPoolPutInFull(t *testing.T) {
 		t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
 	}
 
-	if err := p.Put(context.Background(), simpleSession(t)); !errors.Is(err, errSessionPoolOverflow) {
+	if err := p.Put(context.Background(), simpleSession(t)); !xerrors.Is(err, errSessionPoolOverflow) {
 		t.Fatalf("unexpected error on put session into full client: %v, wand: %v", err, errSessionPoolOverflow)
 	}
 }
@@ -612,7 +612,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			{
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
-				if _, err := p.Get(ctx); !errors.Is(err, context.Canceled) {
+				if _, err := p.Get(ctx); !xerrors.Is(err, context.Canceled) {
 					t.Fatalf(
 						"unexpected error: %v; want %v",
 						err, context.Canceled,
@@ -1025,8 +1025,8 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	}
 
 	// Now fail the Keepalive() call from above.
-	keepaliveResult <- errors.Operation(
-		errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+	keepaliveResult <- xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 	)
 
 	// Block the keeper()'s deletion routine.
@@ -1129,8 +1129,8 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 					// nolint:unparam
 					// nolint:nolintlint
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
-						return nil, errors.Operation(
-							errors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+						return nil, xerrors.Operation(
+							xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 						)
 					},
 					testutil.TableDeleteSession: okHandler,

@@ -3,7 +3,7 @@ package types
 import (
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -303,7 +303,7 @@ func TestIncompatiblePrimitives(t *testing.T) {
 	if err == nil {
 		t.Errorf("WithStackTrace expected")
 	}
-	if !errors.Is(err, testutil.ErrNotComparable) {
+	if !xerrors.Is(err, testutil.ErrNotComparable) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
@@ -314,7 +314,7 @@ func TestIncompatibleTuples(t *testing.T) {
 	_, err := Compare(l, r)
 	if err == nil {
 		t.Error("WithStackTrace expected")
-	} else if !errors.Is(err, testutil.ErrNotComparable) {
+	} else if !xerrors.Is(err, testutil.ErrNotComparable) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }

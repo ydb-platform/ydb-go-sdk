@@ -14,8 +14,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/net"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/resolver"
+	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/xnet"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -299,7 +299,7 @@ func New(opts ...Option) Config {
 		c.grpcOptions = append(
 			c.grpcOptions,
 			grpc.WithResolvers(
-				resolver.New("ydb", c.trace),
+				xresolver.New("ydb", c.trace),
 			),
 		)
 	}

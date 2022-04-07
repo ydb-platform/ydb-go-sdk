@@ -1,4 +1,4 @@
-package errors
+package xerrors
 
 import (
 	"errors"
@@ -64,11 +64,11 @@ func TestIsYdb(t *testing.T) {
 			isYdbError: false,
 		},
 		{
-			error:      New(fmt.Errorf("TestError%s", "Printf")),
+			error:      Wrap(fmt.Errorf("TestError%s", "Printf")),
 			isYdbError: true,
 		},
 		{
-			error:      New(errors.New("TestError")),
+			error:      Wrap(errors.New("TestError")),
 			isYdbError: true,
 		},
 	} {

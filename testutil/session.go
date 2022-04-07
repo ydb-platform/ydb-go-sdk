@@ -5,7 +5,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 type (
@@ -25,9 +25,9 @@ func WithServiceID(serviceID uint32) sessionIDOption {
 
 func SessionID(opts ...sessionIDOption) string {
 	h := &sessionIDHolder{
-		serviceID: uint32(rand.New().Int64(math.MaxUint32)),
-		nodeID:    uint32(rand.New().Int64(math.MaxUint32)),
-		hash:      strconv.FormatInt(rand.New().Int64(math.MaxInt64), 16),
+		serviceID: uint32(xrand.New().Int64(math.MaxUint32)),
+		nodeID:    uint32(xrand.New().Int64(math.MaxUint32)),
+		hash:      strconv.FormatInt(xrand.New().Int64(math.MaxInt64), 16),
 	}
 	for _, o := range opts {
 		o(h)

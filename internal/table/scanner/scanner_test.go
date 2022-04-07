@@ -9,8 +9,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/rand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -18,7 +18,7 @@ import (
 )
 
 // nolint:gocyclo
-func valueFromPrimitiveTypeID(c *column, r rand.Rand) (*Ydb.Value, interface{}) {
+func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{}) {
 	rv := r.Int64(math.MaxInt16)
 	switch c.typeID {
 	case Ydb.Type_BOOL:
@@ -469,7 +469,7 @@ func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [
 		)
 	}
 
-	r := rand.New(rand.WithLock())
+	r := xrand.New(xrand.WithLock())
 	testValues = make([][]indexed.RequiredOrOptional, count)
 	for i := 0; i < count; i++ {
 		var items []*Ydb.Value

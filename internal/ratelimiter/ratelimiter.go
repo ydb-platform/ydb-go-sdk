@@ -11,10 +11,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_RateLimiter"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 )
@@ -22,7 +22,7 @@ import (
 // nolint:gofumpt
 // nolint:nolintlint
 var (
-	errUnknownAcquireType = errors.New(fmt.Errorf("unknown acquire type"))
+	errUnknownAcquireType = xerrors.Wrap(fmt.Errorf("unknown acquire type"))
 )
 
 type client struct {
@@ -133,11 +133,11 @@ func (c *client) ListResource(
 		),
 	})
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	return result.GetResourcePaths(), nil
 }
@@ -162,11 +162,11 @@ func (c *client) DescribeResource(
 		),
 	})
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
 	if err != nil {
-		return nil, errors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	resource := &ratelimiter.Resource{
@@ -238,12 +238,12 @@ func (c *client) AcquireResource(
 			},
 		)
 	default:
-		return errors.WithStackTrace(fmt.Errorf("%w: %d", errUnknownAcquireType, acquireOptions.Type()))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %d", errUnknownAcquireType, acquireOptions.Type()))
 	}
 
-	if errors.IsOperationError(err, Ydb.StatusIds_TIMEOUT, Ydb.StatusIds_CANCELLED) {
-		return errors.WithStackTrace(ratelimiterErrors.NewAcquire(amount, err))
+	if xerrors.IsOperationError(err, Ydb.StatusIds_TIMEOUT, Ydb.StatusIds_CANCELLED) {
+		return xerrors.WithStackTrace(ratelimiterErrors.NewAcquire(amount, err))
 	}
 
-	return errors.WithStackTrace(err)
+	return xerrors.WithStackTrace(err)
 }

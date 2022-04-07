@@ -1,4 +1,4 @@
-package rand
+package xrand
 
 import (
 	"math"

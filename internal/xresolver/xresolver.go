@@ -1,9 +1,9 @@
-package resolver
+package xresolver
 
 import (
 	"google.golang.org/grpc/resolver"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -35,7 +35,7 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	return errors.WithStackTrace(c.ClientConn.UpdateState(state))
+	return xerrors.WithStackTrace(c.ClientConn.UpdateState(state))
 }
 
 func (d *dnsBuilder) Build(
