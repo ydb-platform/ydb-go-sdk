@@ -1,3 +1,4 @@
+## v3.18.5
 * Fixed duplicating `WithPanicCallback` proxying to table config options
 * Fixed comments for `xerrros.Is` and `xerrros.As` 
 
