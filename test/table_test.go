@@ -6,7 +6,6 @@ package test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -27,7 +26,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -113,14 +111,6 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 	s.Lock()
 	s.inFlight += delta
 	s.Unlock()
-}
-
-type customError struct {
-	text string
-}
-
-func (e *customError) Error() string {
-	return e.text
 }
 
 // nolint:gocyclo
@@ -248,7 +238,7 @@ func TestTable(t *testing.T) {
 			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {
-			fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())
+			_, _ = fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())
 			os.Exit(1)
 		}),
 		ydb.WithTraceTable(
@@ -325,325 +315,237 @@ func TestTable(t *testing.T) {
 		_ = db.Close(ctx)
 	}()
 
-	t.Run("IsTraceError/Do", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
-			func(ctx context.Context, s table.Session) error {
-				return &customError{
-					text: "custom error",
-				}
-			},
-			table.WithTrace(
-				trace.Table{
-					OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-						return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-							if info.Error != nil {
-								m := retry.Check(info.Error)
-								if m.StatusCode() >= 0 {
-									t.Fatalf("unexpected error: %v", err)
-								}
-							}
-							return func(info trace.TableDoDoneInfo) {
-								m := retry.Check(info.Error)
-								if m.StatusCode() >= 0 {
-									t.Fatalf("unexpected error: %v", err)
-								}
-							}
-						}
+	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
+		// hack for wait pool initializing
+		return nil
+	}); err != nil {
+		t.Fatalf("pool not initialized: %+v", err)
+	} else if s.min() < 0 || s.max() != limit {
+		t.Fatalf("pool sizes not applied: %+v", s)
+	}
+
+	// prepare scheme
+	err = sugar.RemoveRecursive(ctx, db, folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = sugar.MakeRecursive(ctx, db, folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = describeTableOptions(ctx, t, db.Table())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = createTables(ctx, db.Table(), path.Join(db.Name(), folder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = describeTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = describeTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "seasons"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = describeTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "episodes"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// fill data
+	if err = fill(ctx, t, db, folder); err != nil {
+		t.Fatalf("fillQuery failed: %v\n", err)
+	}
+
+	// upsert with transaction
+	if err = db.Table().DoTx(
+		ctx,
+		func(ctx context.Context, tx table.TransactionActor) (err error) {
+			var (
+				res   result.Result
+				views uint64
+			)
+			// select current value of `views`
+			res, err = tx.Execute(
+				ctx,
+				render(
+					querySelect,
+					templateConfig{
+						TablePathPrefix: path.Join(db.Name(), folder),
 					},
-				},
-			),
-		); err != nil {
-			var e *customError
-			if !errors.As(err, &e) {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		}
-	})
-
-	t.Run("IsTraceError/DoTx", func(t *testing.T) {
-		if err = db.Table().DoTx(
-			ctx,
-			func(ctx context.Context, tx table.TransactionActor) error {
-				return &customError{
-					text: "custom error",
-				}
-			},
-			table.WithTrace(
-				trace.Table{
-					OnDoTx: func(
-						info trace.TableDoTxStartInfo,
-					) func(
-						info trace.TableDoTxIntermediateInfo,
-					) func(
-						trace.TableDoTxDoneInfo,
-					) {
-						return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
-							m := retry.Check(info.Error)
-							if m.StatusCode() >= 0 {
-								t.Fatalf("unexpected error: %v", err)
-							}
-							return func(info trace.TableDoTxDoneInfo) {
-								m := retry.Check(info.Error)
-								if m.StatusCode() >= 0 {
-									t.Fatalf("unexpected error: %v", err)
-								}
-							}
-						}
-					},
-				},
-			),
-			table.WithTxSettings(
-				table.TxSettings(
-					table.WithSerializableReadWrite(),
 				),
-			),
-		); err != nil {
-			var e *customError
-			if !errors.As(err, &e) {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		}
-	})
-
-	t.Run("ping", func(t *testing.T) {
-		if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
-			// hack for wait pool initializing
-			return nil
-		}); err != nil {
-			t.Fatalf("pool not initialized: %+v", err)
-		}
-	})
-
-	t.Run("pool init checking", func(t *testing.T) {
-		if s.min() < 0 || s.max() != limit {
-			t.Fatalf("pool sizes not applied: %+v", s)
-		}
-	})
-
-	t.Run("main logic", func(t *testing.T) {
-		// prepare scheme
-		err = sugar.RemoveRecursive(ctx, db, folder)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = sugar.MakeRecursive(ctx, db, folder)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = describeTableOptions(ctx, db.Table())
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = createTables(ctx, db.Table(), path.Join(db.Name(), folder))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "series"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "seasons"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "episodes"))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// fill data
-		if err = fill(ctx, db, folder); err != nil {
-			t.Fatalf("fillQuery failed: %v\n", err)
-		}
-
-		// upsert with transaction
-		if err = db.Table().DoTx(
-			ctx,
-			func(ctx context.Context, tx table.TransactionActor) (err error) {
-				var (
-					res   result.Result
-					views uint64
-				)
-				// select current value of `views`
-				res, err = tx.Execute(
-					ctx,
-					render(
-						querySelect,
-						templateConfig{
-							TablePathPrefix: path.Join(db.Name(), folder),
-						},
-					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
-					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
-					),
-				)
-				if err != nil {
-					return err
-				}
-				if err = res.NextResultSetErr(ctx); err != nil {
-					return err
-				}
-				if !res.NextRow() {
-					return fmt.Errorf("nothing rows")
-				}
-				if err = res.ScanNamed(
-					named.OptionalWithDefault("views", &views),
-				); err != nil {
-					return err
-				}
-				if err = res.Err(); err != nil {
-					return err
-				}
-				if err = res.Close(); err != nil {
-					return err
-				}
-				// increment `views`
-				res, err = tx.Execute(
-					ctx,
-					render(
-						queryUpsert,
-						templateConfig{
-							TablePathPrefix: path.Join(db.Name(), folder),
-						},
-					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
-						table.ValueParam("$views", types.Uint64Value(views+1)), // increment views
-					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
-					),
-				)
-				if err != nil {
-					return err
-				}
-				if err = res.Err(); err != nil {
-					return err
-				}
-				return res.Close()
-			},
-			table.WithTxSettings(
-				table.TxSettings(
-					table.WithSerializableReadWrite(),
+				table.NewQueryParameters(
+					table.ValueParam("$seriesID", types.Uint64Value(1)),
+					table.ValueParam("$seasonID", types.Uint64Value(1)),
+					table.ValueParam("$episodeID", types.Uint64Value(1)),
 				),
-			),
-		); err != nil {
-			t.Fatalf("tx failed: %v\n", err)
-		}
-		// select upserted data
-		if err = db.Table().Do(
-			ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				var (
-					res   result.Result
-					views uint64
-				)
-				// select current value of `views`
-				_, res, err = s.Execute(
-					ctx,
-					table.TxControl(
-						table.BeginTx(
-							table.WithOnlineReadOnly(),
-						),
-						table.CommitTx(),
-					),
-					render(
-						querySelect,
-						templateConfig{
-							TablePathPrefix: path.Join(db.Name(), folder),
-						},
-					),
-					table.NewQueryParameters(
-						table.ValueParam("$seriesID", types.Uint64Value(1)),
-						table.ValueParam("$seasonID", types.Uint64Value(1)),
-						table.ValueParam("$episodeID", types.Uint64Value(1)),
-					),
-					options.WithQueryCachePolicy(
-						options.WithQueryCachePolicyKeepInCache(),
-					),
-				)
-				if err != nil {
-					return err
-				}
-				if !res.NextResultSet(ctx, "views") {
-					return fmt.Errorf("nothing result sets")
-				}
-				if !res.NextRow() {
-					return fmt.Errorf("nothing result rows")
-				}
-				if err = res.ScanWithDefaults(&views); err != nil {
-					return err
-				}
-				if err = res.Err(); err != nil {
-					return err
-				}
-				if err = res.Close(); err != nil {
-					return err
-				}
-				if views != 1 {
-					return fmt.Errorf("unexpected views value: %d", views)
-				}
-				return nil
-			},
-		); err != nil {
-			t.Fatalf("tx failed: %v\n", err)
-		}
-
-		// multiple result sets
-		// - create table
-		fmt.Printf("> creating table stream_query...\n")
-		if err = db.Table().Do(
-			ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				return s.ExecuteSchemeQuery(
-					ctx,
-					`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
-				)
-			},
-		); err != nil {
-			t.Fatalf("create table failed: %v\n", err)
-		}
-		fmt.Printf("> table stream_query created\n")
-		var (
-			upsertRowsCount = 40000
-			sum             uint64
-		)
-
-		// - upsert data
-		fmt.Printf("> preparing values to upsert...\n")
-		values := make([]types.Value, 0, upsertRowsCount)
-		for i := 0; i < upsertRowsCount; i++ {
-			sum += uint64(i)
-			values = append(
-				values,
-				types.StructValue(
-					types.StructFieldValue("val", types.Int32Value(int32(i))),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
 				),
 			)
-		}
-		fmt.Printf("> values to upsert prepared\n")
-
-		fmt.Printf("> upserting prepared values...\n")
-		if err = db.Table().Do(
-			ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				_, _, err = s.Execute(
-					ctx,
-					table.TxControl(
-						table.BeginTx(
-							table.WithSerializableReadWrite(),
-						),
-						table.CommitTx(),
+			if err != nil {
+				return err
+			}
+			if err = res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("nothing rows")
+			}
+			if err = res.ScanNamed(
+				named.OptionalWithDefault("views", &views),
+			); err != nil {
+				return err
+			}
+			if err = res.Err(); err != nil {
+				return err
+			}
+			if err = res.Close(); err != nil {
+				return err
+			}
+			// increment `views`
+			res, err = tx.Execute(
+				ctx,
+				render(
+					queryUpsert,
+					templateConfig{
+						TablePathPrefix: path.Join(db.Name(), folder),
+					},
+				),
+				table.NewQueryParameters(
+					table.ValueParam("$seriesID", types.Uint64Value(1)),
+					table.ValueParam("$seasonID", types.Uint64Value(1)),
+					table.ValueParam("$episodeID", types.Uint64Value(1)),
+					table.ValueParam("$views", types.Uint64Value(views+1)), // increment views
+				),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
+				),
+			)
+			if err != nil {
+				return err
+			}
+			if err = res.Err(); err != nil {
+				return err
+			}
+			return res.Close()
+		},
+		table.WithTxSettings(
+			table.TxSettings(
+				table.WithSerializableReadWrite(),
+			),
+		),
+	); err != nil {
+		t.Fatalf("tx failed: %v\n", err)
+	}
+	// select upserted data
+	if err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			var (
+				res   result.Result
+				views uint64
+			)
+			// select current value of `views`
+			_, res, err = s.Execute(
+				ctx,
+				table.TxControl(
+					table.BeginTx(
+						table.WithOnlineReadOnly(),
 					),
-					`
+					table.CommitTx(),
+				),
+				render(
+					querySelect,
+					templateConfig{
+						TablePathPrefix: path.Join(db.Name(), folder),
+					},
+				),
+				table.NewQueryParameters(
+					table.ValueParam("$seriesID", types.Uint64Value(1)),
+					table.ValueParam("$seasonID", types.Uint64Value(1)),
+					table.ValueParam("$episodeID", types.Uint64Value(1)),
+				),
+				options.WithQueryCachePolicy(
+					options.WithQueryCachePolicyKeepInCache(),
+				),
+			)
+			if err != nil {
+				return err
+			}
+			if !res.NextResultSet(ctx, "views") {
+				return fmt.Errorf("nothing result sets")
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("nothing result rows")
+			}
+			if err = res.ScanWithDefaults(&views); err != nil {
+				return err
+			}
+			if err = res.Err(); err != nil {
+				return err
+			}
+			if err = res.Close(); err != nil {
+				return err
+			}
+			if views != 1 {
+				return fmt.Errorf("unexpected views value: %d", views)
+			}
+			return nil
+		},
+	); err != nil {
+		t.Fatalf("tx failed: %v\n", err)
+	}
+
+	// multiple result sets
+	// - create table
+	t.Logf("> creating table stream_query...\n")
+	if err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			return s.ExecuteSchemeQuery(
+				ctx,
+				`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
+			)
+		},
+	); err != nil {
+		t.Fatalf("create table failed: %v\n", err)
+	}
+	t.Logf("> table stream_query created\n")
+	var (
+		upsertRowsCount = 40000
+		sum             uint64
+	)
+
+	// - upsert data
+	t.Logf("> preparing values to upsert...\n")
+	values := make([]types.Value, 0, upsertRowsCount)
+	for i := 0; i < upsertRowsCount; i++ {
+		sum += uint64(i)
+		values = append(
+			values,
+			types.StructValue(
+				types.StructFieldValue("val", types.Int32Value(int32(i))),
+			),
+		)
+	}
+	t.Logf("> values to upsert prepared\n")
+
+	t.Logf("> upserting prepared values...\n")
+	if err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			_, _, err = s.Execute(
+				ctx,
+				table.TxControl(
+					table.BeginTx(
+						table.WithSerializableReadWrite(),
+					),
+					table.CommitTx(),
+				),
+				`
 						DECLARE $values AS List<Struct<
 							val: Int32,
 						> >;
@@ -653,131 +555,130 @@ func TestTable(t *testing.T) {
 						FROM
 							AS_TABLE($values);            
 						`,
-					table.NewQueryParameters(
-						table.ValueParam(
-							"$values",
-							types.ListValue(values...),
-						),
+				table.NewQueryParameters(
+					table.ValueParam(
+						"$values",
+						types.ListValue(values...),
 					),
-				)
-				return err
-			},
-		); err != nil {
-			t.Fatalf("upsert failed: %v\n", err)
-		}
-		fmt.Printf("> prepared values upserted\n")
+				),
+			)
+			return err
+		},
+	); err != nil {
+		t.Fatalf("upsert failed: %v\n", err)
+	}
+	t.Logf("> prepared values upserted\n")
 
-		// - scan select
-		fmt.Printf("> scan-selecting values...\n")
-		if err = db.Table().Do(
-			ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				res, err := s.StreamExecuteScanQuery(
-					ctx,
-					`
+	// - scan select
+	t.Logf("> scan-selecting values...\n")
+	if err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			res, err := s.StreamExecuteScanQuery(
+				ctx,
+				`
 							SELECT val FROM stream_query;
 						`,
-					table.NewQueryParameters(),
-				)
-				if err != nil {
-					return err
-				}
-				var (
-					resultSetsCount = 0
-					rowsCount       = 0
-					checkSum        uint64
-				)
-				for res.NextResultSet(ctx, "val") {
-					resultSetsCount++
-					for res.NextRow() {
-						rowsCount++
-						var val *int32
-						err = res.Scan(&val)
-						if err != nil {
-							return err
-						}
-						checkSum += uint64(*val)
+				table.NewQueryParameters(),
+			)
+			if err != nil {
+				return err
+			}
+			var (
+				resultSetsCount = 0
+				rowsCount       = 0
+				checkSum        uint64
+			)
+			for res.NextResultSet(ctx, "val") {
+				resultSetsCount++
+				for res.NextRow() {
+					rowsCount++
+					var val *int32
+					err = res.Scan(&val)
+					if err != nil {
+						return err
 					}
-				}
-				if rowsCount != upsertRowsCount {
-					return fmt.Errorf("wrong rows count: %v", rowsCount)
-				}
-
-				if sum != checkSum {
-					return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
-				}
-
-				if resultSetsCount <= 1 {
-					return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
-				}
-
-				return res.Err()
-			},
-		); err != nil {
-			t.Fatalf("scan select failed: %v\n", err)
-		}
-		fmt.Printf("> values selected\n")
-		// shutdown existing sessions
-		urls := os.Getenv("YDB_SHUTDOWN_URLS")
-		if len(urls) > 0 {
-			fmt.Printf("> shutdowning existing sessions...\n")
-			for _, url := range strings.Split(urls, ",") {
-				// nolint:gosec
-				_, err = http.Get(url)
-				if err != nil {
-					t.Fatalf("failed to send request: %v", err)
+					checkSum += uint64(*val)
 				}
 			}
-			atomic.StoreUint32(&shutdowned, 1)
-			fmt.Printf("> existing sessions shutdowned\n")
-		}
+			if rowsCount != upsertRowsCount {
+				return fmt.Errorf("wrong rows count: %v", rowsCount)
+			}
 
-		// select concurrently
-		fmt.Printf("> concurrent quering...\n")
-		wg := sync.WaitGroup{}
+			if sum != checkSum {
+				return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
+			}
 
-		for i := 0; i < limit; i++ {
-			wg.Add(3)
-			// ExecuteDataQuery
-			go func() {
-				defer wg.Done()
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-						executeDataQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
-					}
-				}
-			}()
-			// ExecuteScanQuery
-			go func() {
-				defer wg.Done()
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-						executeScanQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
-					}
-				}
-			}()
-			// StreamReadTable
-			go func() {
-				defer wg.Done()
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-						streamReadTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
-					}
-				}
-			}()
+			if resultSetsCount <= 1 {
+				return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
+			}
+
+			return res.Err()
+		},
+	); err != nil {
+		t.Fatalf("scan select failed: %v\n", err)
+	}
+	t.Logf("> values selected\n")
+	// shutdown existing sessions
+	urls := os.Getenv("YDB_SHUTDOWN_URLS")
+	if len(urls) > 0 {
+		t.Logf("> shutdowning existing sessions...\n")
+		for _, url := range strings.Split(urls, ",") {
+			// nolint:gosec
+			_, err = http.Get(url)
+			if err != nil {
+				t.Fatalf("failed to send request: %v", err)
+			}
 		}
-		wg.Wait()
-		fmt.Printf("> concurrent quering done\n")
-	})
+		atomic.StoreUint32(&shutdowned, 1)
+		t.Logf("> existing sessions shutdowned\n")
+	}
+
+	// select concurrently
+	t.Logf("> concurrent quering...\n")
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < limit; i++ {
+		wg.Add(3)
+		// ExecuteDataQuery
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					executeDataQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
+				}
+			}
+		}()
+		// ExecuteScanQuery
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					executeScanQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
+				}
+			}
+		}()
+		// StreamReadTable
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					streamReadTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	t.Logf("> concurrent quering done\n")
 }
 
 func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
@@ -802,14 +703,14 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 			defer func() {
 				_ = res.Close()
 			}()
-			fmt.Printf("> read_table:\n")
+			t.Logf("> read_table:\n")
 			for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 				for res.NextRow() {
 					err = res.Scan(&id, &title, &date)
 					if err != nil {
 						return err
 					}
-					fmt.Printf("  > %d %s %s\n", *id, *title, date.String())
+					t.Logf("  > %d %s %s\n", *id, *title, date.String())
 				}
 			}
 			if err = res.Err(); err != nil {
@@ -821,7 +722,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 				if !ok {
 					break
 				}
-				fmt.Printf(
+				t.Logf(
 					"# phase #%d: took %s\n",
 					i, phase.Duration(),
 				)
@@ -830,7 +731,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 					if !ok {
 						break
 					}
-					fmt.Printf(
+					t.Logf(
 						"#  accessed %s: read=(%drows, %dbytes)\n",
 						tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
 					)
@@ -840,7 +741,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 		},
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
-		t.Fatalf("read table error: %+v", err)
+		t.Errorf("read table error: %+v", err)
 	}
 }
 
@@ -894,7 +795,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			defer func() {
 				_ = res.Close()
 			}()
-			fmt.Printf("> select_simple_transaction:\n")
+			t.Logf("> select_simple_transaction:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanNamed(
@@ -905,7 +806,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 					if err != nil {
 						return err
 					}
-					fmt.Printf(
+					t.Logf(
 						"  > %d %s %s\n",
 						*id, *title, *date,
 					)
@@ -915,7 +816,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 		},
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
-		t.Fatalf("select simple error: %+v", err)
+		t.Errorf("select simple error: %+v", err)
 	}
 }
 
@@ -960,21 +861,21 @@ func executeScanQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			defer func() {
 				_ = res.Close()
 			}()
-			fmt.Printf("> scan_query_select:\n")
+			t.Logf("> scan_query_select:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
 					if err != nil {
 						return err
 					}
-					fmt.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
+					t.Logf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
 				}
 			}
 			return res.Err()
 		},
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
-		t.Fatalf("scan query error: %+v", err)
+		t.Errorf("scan query error: %+v", err)
 	}
 }
 
@@ -1209,7 +1110,7 @@ var (
 	`))
 )
 
-func describeTableOptions(ctx context.Context, c table.Client) error {
+func describeTableOptions(ctx context.Context, t *testing.T, c table.Client) error {
 	var desc options.TableOptionsDescription
 	err := c.Do(
 		ctx,
@@ -1224,34 +1125,34 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	fmt.Println("> describe_options:")
 
 	for i, p := range desc.TableProfilePresets {
-		fmt.Printf("  > TableProfilePresets: %d/%d: %+v\n", i+1, len(desc.TableProfilePresets), p)
+		t.Logf("  > TableProfilePresets: %d/%d: %+v\n", i+1, len(desc.TableProfilePresets), p)
 	}
 	for i, p := range desc.StoragePolicyPresets {
-		fmt.Printf("  > StoragePolicyPresets: %d/%d: %+v\n", i+1, len(desc.StoragePolicyPresets), p)
+		t.Logf("  > StoragePolicyPresets: %d/%d: %+v\n", i+1, len(desc.StoragePolicyPresets), p)
 	}
 	for i, p := range desc.CompactionPolicyPresets {
-		fmt.Printf("  > CompactionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CompactionPolicyPresets), p)
+		t.Logf("  > CompactionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CompactionPolicyPresets), p)
 	}
 	for i, p := range desc.PartitioningPolicyPresets {
-		fmt.Printf("  > PartitioningPolicyPresets: %d/%d: %+v\n", i+1, len(desc.PartitioningPolicyPresets), p)
+		t.Logf("  > PartitioningPolicyPresets: %d/%d: %+v\n", i+1, len(desc.PartitioningPolicyPresets), p)
 	}
 	for i, p := range desc.ExecutionPolicyPresets {
-		fmt.Printf("  > ExecutionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ExecutionPolicyPresets), p)
+		t.Logf("  > ExecutionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ExecutionPolicyPresets), p)
 	}
 	for i, p := range desc.ReplicationPolicyPresets {
-		fmt.Printf("  > ReplicationPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ReplicationPolicyPresets), p)
+		t.Logf("  > ReplicationPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ReplicationPolicyPresets), p)
 	}
 	for i, p := range desc.CachingPolicyPresets {
-		fmt.Printf("  > CachingPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CachingPolicyPresets), p)
+		t.Logf("  > CachingPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CachingPolicyPresets), p)
 	}
 
 	return nil
 }
 
-func fill(ctx context.Context, db ydb.Connection, folder string) error {
-	fmt.Printf("> filling tables\n")
+func fill(ctx context.Context, t *testing.T, db ydb.Connection, folder string) error {
+	t.Logf("> filling tables\n")
 	defer func() {
-		fmt.Printf("> filling tables done\n")
+		t.Logf("> filling tables done\n")
 	}()
 	// prepare write transaction.
 	writeTx := table.TxControl(
@@ -1331,7 +1232,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 	return err
 }
 
-func describeTable(ctx context.Context, c table.Client, path string) (err error) {
+func describeTable(ctx context.Context, t *testing.T, c table.Client, path string) (err error) {
 	err = c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -1339,12 +1240,12 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 			if err != nil {
 				return
 			}
-			fmt.Printf("> describe table: %s\n", path)
+			t.Logf("> describe table: %s\n", path)
 			for _, c := range desc.Columns {
-				fmt.Printf("  > column, name: %s, %s\n", c.Type, c.Name)
+				t.Logf("  > column, name: %s, %s\n", c.Type, c.Name)
 			}
 			for i, keyRange := range desc.KeyRanges {
-				fmt.Printf("  > key range %d: %s\n", i, keyRange.String())
+				t.Logf("  > key range %d: %s\n", i, keyRange.String())
 			}
 			return
 		},

@@ -34,26 +34,32 @@ type cluster struct {
 	config config.Config
 	pool   conn.Pool
 
-	balancerMtx sync.RWMutex
-
-	explorer repeater.Repeater
-
+	mu        sync.RWMutex
+	explorer  repeater.Repeater
 	index     map[string]entry.Entry
 	endpoints map[uint32]conn.Conn // only one endpoint by node ID
 
-	mu     sync.RWMutex
-	closed bool
+	done chan struct{}
+}
+
+func (c *cluster) isClosed() bool {
+	select {
+	case <-c.done:
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 	c.pool.Pessimize(ctx, cc, cause)
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.closed {
+	if c.isClosed() {
 		return
 	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	entry, has := c.index[cc.Endpoint().Address()]
 	if !has {
@@ -63,9 +69,6 @@ func (c *cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 	if entry.Handle == nil {
 		return
 	}
-
-	c.balancerMtx.Lock()
-	defer c.balancerMtx.Unlock()
 
 	if !c.config.Balancer().Contains(entry.Handle) {
 		return
@@ -134,12 +137,12 @@ type Getter interface {
 
 type Inserter interface {
 	// Insert inserts endpoint to cluster
-	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
+	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption)
 }
 
 type Remover interface {
 	// Remove removes endpoint from cluster
-	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption) conn.Conn
+	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption)
 }
 
 type Explorer interface {
@@ -175,6 +178,7 @@ func New(
 	}()
 
 	return &cluster{
+		done:      make(chan struct{}),
 		config:    config,
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
@@ -183,17 +187,15 @@ func New(
 }
 
 func (c *cluster) Close(ctx context.Context) (err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.closed {
-		return
-	}
+	defer close(c.done)
 
 	onDone := trace.DriverOnClusterClose(c.config.Trace(), &ctx)
 	defer func() {
 		onDone(err)
 	}()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if c.explorer != nil {
 		c.explorer.Stop()
@@ -206,8 +208,6 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 			WithoutLock(),
 		)
 	}
-
-	c.closed = true
 
 	var issues []error
 	if len(c.index) > 0 {
@@ -245,6 +245,25 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 	return nil
 }
 
+func (c *cluster) get(ctx context.Context) (cc conn.Conn, err error) {
+	for {
+		select {
+		case <-c.done:
+			return nil, errors.WithStackTrace(ErrClusterClosed)
+		case <-ctx.Done():
+			return nil, errors.WithStackTrace(ctx.Err())
+		default:
+			cc = c.config.Balancer().Next()
+			if cc == nil {
+				return nil, errors.WithStackTrace(ErrClusterEmpty)
+			}
+			if err = cc.Ping(ctx); err == nil {
+				return cc, nil
+			}
+		}
+	}
+}
+
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
@@ -252,10 +271,7 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.closed {
+	if c.isClosed() {
 		return nil, errors.WithStackTrace(ErrClusterClosed)
 	}
 
@@ -269,42 +285,32 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	}()
 
 	if e, ok := ContextEndpoint(ctx); ok {
+		c.mu.RLock()
 		cc, ok = c.endpoints[e.NodeID()]
+		c.mu.RUnlock()
 		if ok && cc.IsState(
 			conn.Created,
 			conn.Online,
 			conn.Offline,
 		) {
-			return cc, nil
-		}
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, errors.WithStackTrace(ctx.Err())
-		default:
-			c.balancerMtx.RLock()
-			cc = c.config.Balancer().Next()
-			c.balancerMtx.RUnlock()
-			if cc == nil {
-				return nil, errors.WithStackTrace(ErrClusterEmpty)
-			}
 			if err = cc.Ping(ctx); err == nil {
 				return cc, nil
 			}
 		}
 	}
+
+	return c.get(ctx)
 }
 
 // Insert inserts new connection into the cluster.
-func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
+func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) {
 	var (
 		onDone   = trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e.Copy())
 		inserted = false
+		state    conn.State
 	)
 	defer func() {
-		onDone(inserted, cc.GetState())
+		onDone(inserted, state)
 	}()
 
 	options := parseOptions(opts...)
@@ -313,17 +319,20 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		defer c.mu.Unlock()
 	}
 
-	if c.closed {
-		return nil
+	if c.isClosed() {
+		return
 	}
 
-	cc = c.pool.Get(e)
+	cc := c.pool.Get(e)
 
 	cc.Endpoint().Touch()
 
-	entry := entry.Entry{Conn: cc}
+	entry := entry.Entry{
+		Conn:   cc,
+		Handle: c.config.Balancer().Insert(cc),
+	}
 
-	inserted = entry.InsertInto(c.config.Balancer(), &c.balancerMtx)
+	inserted = entry.Handle != nil
 
 	c.index[e.Address()] = entry
 
@@ -331,17 +340,20 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		c.endpoints[e.NodeID()] = cc
 	}
 
-	return cc
+	state = cc.GetState()
 }
 
 // Remove removes and closes previously inserted connection.
-func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) (cc conn.Conn) {
+func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) {
 	var (
 		onDone  = trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e.Copy())
-		removed = false
+		address = e.Address()
+		nodeID  = e.NodeID()
+		removed bool
+		state   conn.State
 	)
 	defer func() {
-		onDone(cc.GetState(), removed)
+		onDone(removed, state)
 	}()
 
 	options := parseOptions(opts...)
@@ -350,11 +362,11 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		defer c.mu.Unlock()
 	}
 
-	if c.closed {
+	if c.isClosed() {
 		return
 	}
 
-	entry, has := c.index[e.Address()]
+	entry, has := c.index[address]
 	if !has {
 		panic("ydb: can't remove not-existing endpoint")
 	}
@@ -363,12 +375,15 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 		_ = entry.Conn.Release(ctx)
 	}()
 
-	removed = entry.RemoveFrom(c.config.Balancer(), &c.balancerMtx)
+	if entry.Handle != nil {
+		removed = c.config.Balancer().Remove(entry.Handle)
+		entry.Handle = nil
+	}
 
-	delete(c.index, e.Address())
-	delete(c.endpoints, e.NodeID())
+	delete(c.index, address)
+	delete(c.endpoints, nodeID)
 
-	return entry.Conn
+	state = entry.Conn.GetState()
 }
 
 func compareEndpoints(a, b endpoint.Endpoint) int {
