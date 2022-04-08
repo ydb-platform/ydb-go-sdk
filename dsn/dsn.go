@@ -10,8 +10,8 @@ import (
 //   ctx,
 //   ydb.WithConnectionString(
 //     New("endpoint", "database").WithSecure(false).String(),
-// ),
-//)
+//   ),
+// )
 
 // DSN helps to make connection string from separated endpoint and database
 type DSN interface {

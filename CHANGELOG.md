@@ -1,8 +1,10 @@
+* Simplified README.md for godoc documentation in pkg.go.dev
+
 ## v3.19.0
 * Added public package `dsn` for making piped data source name (connection string)
 * Marked `ydb.WithEndpoint`, `ydb.WithDatabase`, `ydb.WithSecure`, `ydb.WithInsecure` options as deprecated
 * Moved `ydb.RegisterParser` to package `dsn`
-* Added version into all error and warm log messages
+* Added version into all error and warn log messages
 
 ## v3.18.5
 * Fixed duplicating `WithPanicCallback` proxying to table config options
