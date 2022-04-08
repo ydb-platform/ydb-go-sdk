@@ -3,34 +3,119 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Table makes trace.Table with internal logging
+// Table makes trace.Table with logging events from details
 // nolint:gocyclo
 func Table(l Logger, details trace.Details) (t trace.Table) {
+	if details&trace.TableEvents == 0 {
+		return
+	}
 	l = l.WithName(`table`)
-	// nolint:nestif
-	if details&trace.TableEvents != 0 {
-		t.OnDo = func(
-			info trace.TableDoStartInfo,
-		) func(
-			info trace.TableDoIntermediateInfo,
-		) func(
-			trace.TableDoDoneInfo,
-		) {
-			idempotent := info.Idempotent
-			l.Tracef(`do start {idempotent:%t}`,
-				idempotent,
-			)
-			start := time.Now()
-			return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+	t.OnDo = func(
+		info trace.TableDoStartInfo,
+	) func(
+		info trace.TableDoIntermediateInfo,
+	) func(
+		trace.TableDoDoneInfo,
+	) {
+		idempotent := info.Idempotent
+		l.Tracef(`do start {idempotent:%t}`,
+			idempotent,
+		)
+		start := time.Now()
+		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+			if info.Error == nil {
+				l.Tracef(`do attempt done {latency:"%v",idempotent:%t}`,
+					time.Since(start),
+					idempotent,
+				)
+			} else {
+				f := l.Warnf
+				if !xerrors.IsYdb(info.Error) {
+					f = l.Debugf
+				}
+				m := retry.Check(info.Error)
+				f(`do attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t,version:"%s"}`,
+					time.Since(start),
+					idempotent,
+					info.Error,
+					m.MustRetry(idempotent),
+					m.StatusCode(),
+					m.MustDeleteSession(),
+					meta.Version,
+				)
+			}
+			return func(info trace.TableDoDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`do attempt done {latency:"%v",idempotent:%t}`,
+					l.Tracef(`do done {latency:"%v",idempotent:%t,attempts:%d}`,
 						time.Since(start),
 						idempotent,
+						info.Attempts,
+					)
+				} else {
+					f := l.Errorf
+					if !xerrors.IsYdb(info.Error) {
+						f = l.Debugf
+					}
+					m := retry.Check(info.Error)
+					f(`do failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+						time.Since(start),
+						idempotent,
+						info.Attempts,
+						info.Error,
+						m.MustRetry(idempotent),
+						m.StatusCode(),
+						m.MustDeleteSession(),
+					)
+				}
+			}
+		}
+	}
+	t.OnDoTx = func(
+		info trace.TableDoTxStartInfo,
+	) func(
+		info trace.TableDoTxIntermediateInfo,
+	) func(
+		trace.TableDoTxDoneInfo,
+	) {
+		idempotent := info.Idempotent
+		l.Tracef(`doTx start {idempotent:%t}`,
+			idempotent,
+		)
+		start := time.Now()
+		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
+			if info.Error == nil {
+				l.Tracef(`doTx attempt done {latency:"%v",idempotent:%t}`,
+					time.Since(start),
+					idempotent,
+				)
+			} else {
+				f := l.Warnf
+				if !xerrors.IsYdb(info.Error) {
+					f = l.Debugf
+				}
+				m := retry.Check(info.Error)
+				f(`doTx attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t,version:"%s"}`,
+					time.Since(start),
+					idempotent,
+					info.Error,
+					m.MustRetry(idempotent),
+					m.StatusCode(),
+					m.MustDeleteSession(),
+					meta.Version,
+				)
+			}
+			return func(info trace.TableDoTxDoneInfo) {
+				if info.Error == nil {
+					l.Tracef(`doTx done {latency:"%v",idempotent:%t,attempts:%d}`,
+						time.Since(start),
+						idempotent,
+						info.Attempts,
 					)
 				} else {
 					f := l.Warnf
@@ -38,135 +123,57 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						f = l.Debugf
 					}
 					m := retry.Check(info.Error)
-					f(`do attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+					// nolint: lll
+					f(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t,version:"%s"}`,
 						time.Since(start),
 						idempotent,
+						info.Attempts,
 						info.Error,
 						m.MustRetry(idempotent),
 						m.StatusCode(),
 						m.MustDeleteSession(),
+						meta.Version,
 					)
-				}
-				return func(info trace.TableDoDoneInfo) {
-					if info.Error == nil {
-						l.Tracef(`do done {latency:"%v",idempotent:%t,attempts:%d}`,
-							time.Since(start),
-							idempotent,
-							info.Attempts,
-						)
-					} else {
-						f := l.Errorf
-						if !xerrors.IsYdb(info.Error) {
-							f = l.Debugf
-						}
-						m := retry.Check(info.Error)
-						f(`do failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
-							time.Since(start),
-							idempotent,
-							info.Attempts,
-							info.Error,
-							m.MustRetry(idempotent),
-							m.StatusCode(),
-							m.MustDeleteSession(),
-						)
-					}
 				}
 			}
 		}
-		t.OnDoTx = func(
-			info trace.TableDoTxStartInfo,
-		) func(
-			info trace.TableDoTxIntermediateInfo,
-		) func(
-			trace.TableDoTxDoneInfo,
-		) {
-			idempotent := info.Idempotent
-			l.Tracef(`doTx start {idempotent:%t}`,
-				idempotent,
-			)
-			start := time.Now()
-			return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`doTx attempt done {latency:"%v",idempotent:%t}`,
-						time.Since(start),
-						idempotent,
-					)
-				} else {
-					f := l.Warnf
-					if !xerrors.IsYdb(info.Error) {
-						f = l.Debugf
-					}
-					m := retry.Check(info.Error)
-					f(`doTx attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
-						time.Since(start),
-						idempotent,
-						info.Error,
-						m.MustRetry(idempotent),
-						m.StatusCode(),
-						m.MustDeleteSession(),
-					)
-				}
-				return func(info trace.TableDoTxDoneInfo) {
-					if info.Error == nil {
-						l.Tracef(`doTx done {latency:"%v",idempotent:%t,attempts:%d}`,
-							time.Since(start),
-							idempotent,
-							info.Attempts,
-						)
-					} else {
-						f := l.Warnf
-						if !xerrors.IsYdb(info.Error) {
-							f = l.Debugf
-						}
-						m := retry.Check(info.Error)
-						f(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
-							time.Since(start),
-							idempotent,
-							info.Attempts,
-							info.Error,
-							m.MustRetry(idempotent),
-							m.StatusCode(),
-							m.MustDeleteSession(),
-						)
-					}
-				}
+	}
+	t.OnCreateSession = func(
+		info trace.TableCreateSessionStartInfo,
+	) func(
+		info trace.TableCreateSessionIntermediateInfo,
+	) func(
+		trace.TableCreateSessionDoneInfo,
+	) {
+		l.Tracef(`create session start`)
+		start := time.Now()
+		return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
+			if info.Error == nil {
+				l.Tracef(`create session intermediate {latency:"%v"}`,
+					time.Since(start),
+				)
+			} else {
+				l.Errorf(`create session intermediate {latency:"%v",error:"%v",version:"%s"}`,
+					time.Since(start),
+					info.Error,
+					meta.Version,
+				)
 			}
-		}
-		t.OnCreateSession = func(
-			info trace.TableCreateSessionStartInfo,
-		) func(
-			info trace.TableCreateSessionIntermediateInfo,
-		) func(
-			trace.TableCreateSessionDoneInfo,
-		) {
-			l.Tracef(`create session start`)
-			start := time.Now()
-			return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
+			return func(info trace.TableCreateSessionDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`create session intermediate {latency:"%v"}`,
+					l.Tracef(`create session done {latency:"%v",attempts:%d,session:{id:"%s",status:"%s"}}`,
 						time.Since(start),
+						info.Attempts,
+						info.Session.ID(),
+						info.Session.Status(),
 					)
 				} else {
-					l.Errorf(`create session intermediate {latency:"%v",error:"%v"}`,
+					l.Errorf(`create session failed {latency:"%v",attempts:%d,error:"%v",version:"%s"}`,
 						time.Since(start),
+						info.Attempts,
 						info.Error,
+						meta.Version,
 					)
-				}
-				return func(info trace.TableCreateSessionDoneInfo) {
-					if info.Error == nil {
-						l.Tracef(`create session done {latency:"%v",attempts:%d,session:{id:"%s",status:"%s"}}`,
-							time.Since(start),
-							info.Attempts,
-							info.Session.ID(),
-							info.Session.Status(),
-						)
-					} else {
-						l.Errorf(`create session failed {latency:"%v",attempts:%d,error:"%v"}`,
-							time.Since(start),
-							info.Attempts,
-							info.Error,
-						)
-					}
 				}
 			}
 		}
@@ -187,14 +194,16 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								info.Session.ID(),
 							)
 						} else {
-							l.Warnf(`create done without session {latency:"%v"}`,
+							l.Warnf(`create done without session {latency:"%v",version:"%s"}`,
 								time.Since(start),
+								meta.Version,
 							)
 						}
 					} else {
-						l.Warnf(`create failed {latency:"%v",error:"%v"}`,
+						l.Warnf(`create failed {latency:"%v",error:"%v",version:"%s"}`,
 							time.Since(start),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -214,11 +223,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							session.Status(),
 						)
 					} else {
-						l.Warnf(`delete failed {latency:"%v",id:"%s",status:"%s",error:"%v"}`,
+						l.Warnf(`delete failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -238,11 +248,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							session.Status(),
 						)
 					} else {
-						l.Warnf(`keep-alive failed {latency:"%v",id:"%s",status:"%s",error:"%v"}`,
+						l.Warnf(`keep-alive failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -277,12 +288,13 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								info.Result,
 							)
 						} else {
-							l.Errorf(`prepare failed {latency:"%v",id:"%s",status:"%s",query:"%s",error:"%v"}`,
+							l.Errorf(`prepare failed {latency:"%v",id:"%s",status:"%s",query:"%s",error:"%v",version:"%s"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
 								query,
 								info.Error,
+								meta.Version,
 							)
 						}
 					}
@@ -305,8 +317,8 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					return func(info trace.TableExecuteDataQueryDoneInfo) {
 						if info.Error == nil {
 							tx := info.Tx
-							l.Debugf(
-								`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
+							// nolint: lll
+							l.Debugf(`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -317,7 +329,8 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								info.Result.Err(),
 							)
 						} else {
-							l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v"}`,
+							// nolint: lll
+							l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v",version:"%s"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -325,6 +338,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								params,
 								info.Prepared,
 								info.Error,
+								meta.Version,
 							)
 						}
 					}
@@ -358,8 +372,9 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						if info.Error == nil {
 							l.Tracef(`stream execute intermediate`)
 						} else {
-							l.Warnf(`stream execute intermediate failed {error:"%v"}`,
+							l.Warnf(`stream execute intermediate failed {error:"%v",version:"%s"}`,
 								info.Error,
+								meta.Version,
 							)
 						}
 						return func(info trace.TableSessionQueryStreamExecuteDoneInfo) {
@@ -372,13 +387,15 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 									params,
 								)
 							} else {
-								l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v"}`,
+								// nolint: lll
+								l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v",version:"%s"}`,
 									time.Since(start),
 									session.ID(),
 									session.Status(),
 									query,
 									params,
 									info.Error,
+									meta.Version,
 								)
 							}
 						}
@@ -405,8 +422,9 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						if info.Error == nil {
 							l.Tracef(`intermediate`)
 						} else {
-							l.Warnf(`intermediate failed {error:"%v"}`,
+							l.Warnf(`intermediate failed {error:"%v",version:"%s"}`,
 								info.Error,
+								meta.Version,
 							)
 						}
 						return func(info trace.TableSessionQueryStreamReadDoneInfo) {
@@ -417,11 +435,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 									session.Status(),
 								)
 							} else {
-								l.Errorf(`read failed {latency:"%v",id:"%s",status:"%s",error:"%v"}`,
+								l.Errorf(`read failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
 									time.Since(start),
 									session.ID(),
 									session.Status(),
 									info.Error,
+									meta.Version,
 								)
 							}
 						}
@@ -452,11 +471,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							info.Tx.ID(),
 						)
 					} else {
-						l.Warnf(`begin failed {latency:"%v",id:"%s",status:"%s",error:"%v"}`,
+						l.Warnf(`begin failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -483,12 +503,13 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							tx.ID(),
 						)
 					} else {
-						l.Errorf(`commit failed {latency:"%v",id:"%s",status:"%s",tx:"%s",error:"%v"}`,
+						l.Errorf(`commit failed {latency:"%v",id:"%s",status:"%s",tx:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							tx.ID(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -515,12 +536,13 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							tx.ID(),
 						)
 					} else {
-						l.Errorf(`rollback failed {latency:"%v",id:"%s",status:"%s",tx:"%s",error:"%v"}`,
+						l.Errorf(`rollback failed {latency:"%v",id:"%s",status:"%s",tx:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							tx.ID(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -552,15 +574,19 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							time.Since(start),
 						)
 					} else {
-						l.Errorf(`close failed {latency:"%v",error:"%v"}`,
+						l.Errorf(`close failed {latency:"%v",error:"%v",version:"%s"}`,
 							time.Since(start),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
 			}
 			t.OnPoolStateChange = func(info trace.TablePooStateChangeInfo) {
-				l.Infof(`state changed {size:%d,event:"%s"}`, info.Size, info.Event)
+				l.Infof(`state changed {size:%d,event:"%s"}`,
+					info.Size,
+					info.Event,
+				)
 			}
 		}
 		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
@@ -580,9 +606,10 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							)
 						}
 					} else {
-						l.Errorf(`create failed {latency:"%v",error:"%v"}`,
+						l.Errorf(`create failed {latency:"%v",error:"%v",version:"%s"}`,
 							time.Since(start),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -619,11 +646,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							session.Status(),
 						)
 					} else {
-						l.Errorf(`put failed {latency:"%v",id:"%s",status:"%s",error:"%v"}`,
+						l.Errorf(`put failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -641,10 +669,11 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							info.Attempts,
 						)
 					} else {
-						l.Warnf(`get failed {latency:"%v",attempts:%d,error:"%v"}`,
+						l.Warnf(`get failed {latency:"%v",attempts:%d,error:"%v",version:"%s"}`,
 							time.Since(start),
 							info.Attempts,
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
