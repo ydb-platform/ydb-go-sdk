@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// Scripting returns trace.Scripting with logging events from details
 func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
 	if details&trace.ScriptingEvents == 0 {
 		return
@@ -23,9 +24,10 @@ func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
 					info.Result.Err(),
 				)
 			} else {
-				l.Errorf(`execute failed {latency:"%v",error:"%s"}`,
+				l.Errorf(`execute failed {latency:"%v",error:"%s",version:"%s"}`,
 					time.Since(start),
 					info.Error,
+					meta.Version,
 				)
 			}
 		}
@@ -40,9 +42,10 @@ func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
 					info.Plan,
 				)
 			} else {
-				l.Errorf(`explain failed {latency:"%v",error:"%s"}`,
+				l.Errorf(`explain failed {latency:"%v",error:"%s",version:"%s"}`,
 					time.Since(start),
 					info.Error,
+					meta.Version,
 				)
 			}
 		}
@@ -82,11 +85,12 @@ func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
 						params,
 					)
 				} else {
-					l.Errorf(`stream execute failed {latency:"%v",query:"%s",params:"%s",error:"%v"}`,
+					l.Errorf(`stream execute failed {latency:"%v",query:"%s",params:"%s",error:"%v",version:"%s"}`,
 						time.Since(start),
 						query,
 						params,
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -101,9 +105,10 @@ func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
 					time.Since(start),
 				)
 			} else {
-				l.Errorf(`close failed {latency:"%v",error:"%s"}`,
+				l.Errorf(`close failed {latency:"%v",error:"%s",version:"%s"}`,
 					time.Since(start),
 					info.Error,
+					meta.Version,
 				)
 			}
 		}

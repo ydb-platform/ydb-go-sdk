@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Table makes trace.Table with internal logging
+// Table makes trace.Table with logging events from details
 // nolint:gocyclo
 func Table(l Logger, details trace.Details) (t trace.Table) {
 	if details&trace.TableEvents == 0 {
@@ -153,9 +153,10 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					time.Since(start),
 				)
 			} else {
-				l.Errorf(`create session intermediate {latency:"%v",error:"%v"}`,
+				l.Errorf(`create session intermediate {latency:"%v",error:"%v",version:"%s"}`,
 					time.Since(start),
 					info.Error,
+					meta.Version,
 				)
 			}
 			return func(info trace.TableCreateSessionDoneInfo) {
@@ -167,10 +168,11 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						info.Session.Status(),
 					)
 				} else {
-					l.Errorf(`create session failed {latency:"%v",attempts:%d,error:"%v"}`,
+					l.Errorf(`create session failed {latency:"%v",attempts:%d,error:"%v",version:"%s"}`,
 						time.Since(start),
 						info.Attempts,
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -286,12 +288,13 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								info.Result,
 							)
 						} else {
-							l.Errorf(`prepare failed {latency:"%v",id:"%s",status:"%s",query:"%s",error:"%v"}`,
+							l.Errorf(`prepare failed {latency:"%v",id:"%s",status:"%s",query:"%s",error:"%v",version:"%s"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
 								query,
 								info.Error,
+								meta.Version,
 							)
 						}
 					}
@@ -326,7 +329,8 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								info.Result.Err(),
 							)
 						} else {
-							l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v"}`,
+							// nolint: lll
+							l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v",version:"%s"}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -334,6 +338,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								params,
 								info.Prepared,
 								info.Error,
+								meta.Version,
 							)
 						}
 					}
@@ -382,13 +387,15 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 									params,
 								)
 							} else {
-								l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v"}`,
+								// nolint: lll
+								l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v",version:"%s"}`,
 									time.Since(start),
 									session.ID(),
 									session.Status(),
 									query,
 									params,
 									info.Error,
+									meta.Version,
 								)
 							}
 						}
@@ -428,11 +435,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 									session.Status(),
 								)
 							} else {
-								l.Errorf(`read failed {latency:"%v",id:"%s",status:"%s",error:"%v"}`,
+								l.Errorf(`read failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
 									time.Since(start),
 									session.ID(),
 									session.Status(),
 									info.Error,
+									meta.Version,
 								)
 							}
 						}
@@ -495,12 +503,13 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							tx.ID(),
 						)
 					} else {
-						l.Errorf(`commit failed {latency:"%v",id:"%s",status:"%s",tx:"%s",error:"%v"}`,
+						l.Errorf(`commit failed {latency:"%v",id:"%s",status:"%s",tx:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							tx.ID(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -527,12 +536,13 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							tx.ID(),
 						)
 					} else {
-						l.Errorf(`rollback failed {latency:"%v",id:"%s",status:"%s",tx:"%s",error:"%v"}`,
+						l.Errorf(`rollback failed {latency:"%v",id:"%s",status:"%s",tx:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							tx.ID(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -564,9 +574,10 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							time.Since(start),
 						)
 					} else {
-						l.Errorf(`close failed {latency:"%v",error:"%v"}`,
+						l.Errorf(`close failed {latency:"%v",error:"%v",version:"%s"}`,
 							time.Since(start),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -592,9 +603,10 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							)
 						}
 					} else {
-						l.Errorf(`create failed {latency:"%v",error:"%v"}`,
+						l.Errorf(`create failed {latency:"%v",error:"%v",version:"%s"}`,
 							time.Since(start),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -631,11 +643,12 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 							session.Status(),
 						)
 					} else {
-						l.Errorf(`put failed {latency:"%v",id:"%s",status:"%s",error:"%v"}`,
+						l.Errorf(`put failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}

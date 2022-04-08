@@ -1,6 +1,8 @@
 package xerrors
 
-import "errors"
+import (
+	"errors"
+)
 
 type isYdbError interface {
 	isYdbError()

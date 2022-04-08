@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Driver makes trace.Driver with internal logging
+// Driver makes trace.Driver with logging events from details
 func Driver(l Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverEvents == 0 {
 		return
@@ -107,10 +107,11 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						address,
 					)
 				} else {
-					l.Errorf(`dial failed {latency:"%v",address:"%s",error:"%s"}`,
+					l.Errorf(`dial failed {latency:"%v",address:"%s",error:"%s",version:"%s"}`,
 						time.Since(start),
 						address,
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -402,11 +403,12 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Errorf(`repeater wake up fail {name:"%s",event:"%s",latency:"%v",error:"%v"}`,
+					l.Errorf(`repeater wake up fail {name:"%s",event:"%s",latency:"%v",error:"%v",version:"%s"}`,
 						name,
 						event,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -433,9 +435,10 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Errorf(`close failed {latency:"%v",error:"%s"}`,
+					l.Errorf(`close failed {latency:"%v",error:"%s",version:"%s"}`,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -517,10 +520,11 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						Secret(info.Token),
 					)
 				} else {
-					l.Errorf(`get failed {latency:"%v",token:"%s",error:"%s"}`,
+					l.Errorf(`get failed {latency:"%v",token:"%s",error:"%s",version:"%s"}`,
 						time.Since(start),
 						Secret(info.Token),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}

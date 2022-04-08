@@ -3,9 +3,11 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// Discovery makes trace.Discovery with logging events from details
 func Discovery(l Logger, details trace.Details) (t trace.Discovery) {
 	if details&trace.DiscoveryEvents == 0 {
 		return
@@ -28,9 +30,10 @@ func Discovery(l Logger, details trace.Details) (t trace.Discovery) {
 					endpoints,
 				)
 			} else {
-				l.Errorf(`discover failed {latency:"%v",error:"%s"}`,
+				l.Errorf(`discover failed {latency:"%v",error:"%s",version:"%s"}`,
 					time.Since(start),
 					info.Error,
+					meta.Version,
 				)
 			}
 		}
@@ -46,9 +49,10 @@ func Discovery(l Logger, details trace.Details) (t trace.Discovery) {
 					info.Groups,
 				)
 			} else {
-				l.Errorf(`whoAmI failed {latency:"%v",error:"%s"}`,
+				l.Errorf(`whoAmI failed {latency:"%v",error:"%s",version:"%s"}`,
 					time.Since(start),
 					info.Error,
+					meta.Version,
 				)
 			}
 		}
