@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -69,6 +68,8 @@ func WithRequestsType(requestsType string) Option {
 }
 
 // WithConnectionString accept connection string like 'grpc[s]://{endpoint}/?database={database}'
+// Warning: WithConnectionString will be removed at next major release
+// (connection string will be required string param of ydb.New)
 func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *connection) error {
 		var (
@@ -96,14 +97,6 @@ func WithConnectionString(connectionString string) Option {
 	}
 }
 
-func RegisterParser(param string, parser func(value string) ([]config.Option, error)) (err error) {
-	err = dsn.Register(param, parser)
-	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %s", err, param))
-	}
-	return nil
-}
-
 // WithConnectionTTL defines duration for parking idle connections
 // Warning: if defined WithSessionPoolIdleThreshold - idleThreshold must be less than connectionTTL
 func WithConnectionTTL(ttl time.Duration) Option {
@@ -113,6 +106,8 @@ func WithConnectionTTL(ttl time.Duration) Option {
 	}
 }
 
+// WithEndpoint defines endpoint option
+// Deprecated: use WithConnectionString or dsn package instead
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithEndpoint(endpoint))
@@ -120,6 +115,8 @@ func WithEndpoint(endpoint string) Option {
 	}
 }
 
+// WithDatabase defines database option
+// Deprecated: use WithConnectionString or dsn package instead
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithDatabase(database))
@@ -127,6 +124,8 @@ func WithDatabase(database string) Option {
 	}
 }
 
+// WithSecure defines secure option
+// Deprecated: use WithConnectionString or dsn package instead
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(secure))
@@ -134,6 +133,8 @@ func WithSecure(secure bool) Option {
 	}
 }
 
+// WithInsecure defines secure option
+// Deprecated: use WithConnectionString or dsn package instead
 func WithInsecure() Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(false))
