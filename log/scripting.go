@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -68,8 +69,9 @@ func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
 			if info.Error == nil {
 				l.Tracef(`stream execute intermediate`)
 			} else {
-				l.Warnf(`stream execute intermediate failed {error:"%v"}`,
+				l.Warnf(`stream execute intermediate failed {error:"%v",version:"%s"}`,
 					info.Error,
+					meta.Version,
 				)
 			}
 			return func(info trace.ScriptingStreamExecuteDoneInfo) {

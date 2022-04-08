@@ -34,10 +34,11 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						addresses,
 					)
 				} else {
-					l.Warnf(`update failed {target:"%s",resolved:%v,error:"%v"}`,
+					l.Warnf(`update failed {target:"%s",resolved:%v,error:"%v",version:"%s"}`,
 						target,
 						addresses,
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -61,11 +62,12 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						info.Received,
 					)
 				} else {
-					l.Warnf(`read failed {latency:"%v",address:"%s",received:%d,error:"%s"}`,
+					l.Warnf(`read failed {latency:"%v",address:"%s",received:%d,error:"%s",version:"%s"}`,
 						time.Since(start),
 						address,
 						info.Received,
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -82,11 +84,12 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						info.Sent,
 					)
 				} else {
-					l.Warnf(`write failed {latency:"%v",address:"%s",sent:%d,error:"%s"}`,
+					l.Warnf(`write failed {latency:"%v",address:"%s",sent:%d,error:"%s",version:"%s"}`,
 						time.Since(start),
 						address,
 						info.Sent,
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -125,10 +128,11 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						address,
 					)
 				} else {
-					l.Warnf(`close failed {latency:"%v",address:"%s",error:"%s"}`,
+					l.Warnf(`close failed {latency:"%v",address:"%s",error:"%s",version:"%s"}`,
 						time.Since(start),
 						address,
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -157,13 +161,13 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Warnf(
-						`init failed {endpoint:"%s",database:"%s",secure:%t,latency:"%v",error:"%s"}`,
+					l.Warnf(`init failed {endpoint:"%s",database:"%s",secure:%t,latency:"%v",error:"%s",version:"%s"}`,
 						endpoint,
 						database,
 						secure,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -178,10 +182,10 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Warnf(
-						`close failed {latency:"%v",error:"%s"}`,
+					l.Warnf(`close failed {latency:"%v",error:"%s",version:"%s"}`,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -204,10 +208,11 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Warnf(`take failed {endpoint:%v,latency:"%v",error:"%s"}`,
+					l.Warnf(`take failed {endpoint:%v,latency:"%v",error:"%s",version:"%s"}`,
 						endpoint,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -235,9 +240,10 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						endpoint,
 					)
 				} else {
-					l.Warnf(`release conn failed {endpoint:%v,error:"%s"}`,
+					l.Warnf(`release conn failed {endpoint:%v,error:"%s",version:"%s"}`,
 						endpoint,
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -270,10 +276,11 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Warnf(`conn park fail {endpoint:%v,latency:"%v",error:"%s"}`,
+					l.Warnf(`conn park fail {endpoint:%v,latency:"%v",error:"%s",version:"%s"}`,
 						endpoint,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -291,10 +298,11 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Warnf(`conn close fail {endpoint:%v,latency:"%v",error:"%s"}`,
+					l.Warnf(`conn close fail {endpoint:%v,latency:"%v",error:"%s",version:"%s"}`,
 						endpoint,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -315,11 +323,12 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Warnf(`invoke failed {endpoint:%v,method:"%s",latency:"%v",error:"%s"}`,
+					l.Warnf(`invoke failed {endpoint:%v,method:"%s",latency:"%v",error:"%s",version:"%s"}`,
 						endpoint,
 						method,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -346,11 +355,12 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						time.Since(start),
 					)
 				} else {
-					l.Warnf(`streaming intermediate fail {endpoint:%v,method:"%s",latency:"%v",error:"%s"}`,
+					l.Warnf(`streaming intermediate fail {endpoint:%v,method:"%s",latency:"%v",error:"%s",version:"%s"}`,
 						endpoint,
 						method,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 				return func(info trace.DriverConnNewStreamDoneInfo) {
@@ -361,11 +371,12 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 							time.Since(start),
 						)
 					} else {
-						l.Warnf(`streaming done {endpoint:%v,method:"%s",latency:"%v",error:"%s"}`,
+						l.Warnf(`streaming done {endpoint:%v,method:"%s",latency:"%v",error:"%s",version:"%s"}`,
 							endpoint,
 							method,
 							time.Since(start),
 							info.Error,
+							meta.Version,
 						)
 					}
 				}
@@ -439,9 +450,10 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						info.Endpoint.String(),
 					)
 				} else {
-					l.Warnf(`get failed {latency:"%v",error:"%s"}`,
+					l.Warnf(`get failed {latency:"%v",error:"%s",version:"%s"}`,
 						time.Since(start),
 						info.Error,
+						meta.Version,
 					)
 				}
 			}
@@ -476,16 +488,18 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 		}
 		t.OnPessimizeNode = func(info trace.DriverPessimizeNodeStartInfo) func(trace.DriverPessimizeNodeDoneInfo) {
 			endpoint := info.Endpoint.String()
-			l.Warnf(`pessimize start {endpoint:%v,cause:"%s"}`,
+			l.Warnf(`pessimize start {endpoint:%v,cause:"%s",version:"%s"}`,
 				endpoint,
 				info.Cause,
+				meta.Version,
 			)
 			start := time.Now()
 			return func(info trace.DriverPessimizeNodeDoneInfo) {
-				l.Warnf(`pessimize done {endpoint:%v,latency:"%v",state:"%s"}`,
+				l.Warnf(`pessimize done {endpoint:%v,latency:"%v",state:"%s",version:"%s"}`,
 					endpoint,
 					time.Since(start),
 					info.State,
+					meta.Version,
 				)
 			}
 		}
