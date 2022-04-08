@@ -11,26 +11,108 @@ import (
 // Table makes trace.Table with internal logging
 // nolint:gocyclo
 func Table(l Logger, details trace.Details) (t trace.Table) {
+	if details&trace.TableEvents == 0 {
+		return
+	}
 	l = l.WithName(`table`)
-	// nolint:nestif
-	if details&trace.TableEvents != 0 {
-		t.OnDo = func(
-			info trace.TableDoStartInfo,
-		) func(
-			info trace.TableDoIntermediateInfo,
-		) func(
-			trace.TableDoDoneInfo,
-		) {
-			idempotent := info.Idempotent
-			l.Tracef(`do start {idempotent:%t}`,
-				idempotent,
-			)
-			start := time.Now()
-			return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+	t.OnDo = func(
+		info trace.TableDoStartInfo,
+	) func(
+		info trace.TableDoIntermediateInfo,
+	) func(
+		trace.TableDoDoneInfo,
+	) {
+		idempotent := info.Idempotent
+		l.Tracef(`do start {idempotent:%t}`,
+			idempotent,
+		)
+		start := time.Now()
+		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+			if info.Error == nil {
+				l.Tracef(`do attempt done {latency:"%v",idempotent:%t}`,
+					time.Since(start),
+					idempotent,
+				)
+			} else {
+				f := l.Warnf
+				if !xerrors.IsYdb(info.Error) {
+					f = l.Debugf
+				}
+				m := retry.Check(info.Error)
+				f(`do attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+					time.Since(start),
+					idempotent,
+					info.Error,
+					m.MustRetry(idempotent),
+					m.StatusCode(),
+					m.MustDeleteSession(),
+				)
+			}
+			return func(info trace.TableDoDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`do attempt done {latency:"%v",idempotent:%t}`,
+					l.Tracef(`do done {latency:"%v",idempotent:%t,attempts:%d}`,
 						time.Since(start),
 						idempotent,
+						info.Attempts,
+					)
+				} else {
+					f := l.Errorf
+					if !xerrors.IsYdb(info.Error) {
+						f = l.Debugf
+					}
+					m := retry.Check(info.Error)
+					f(`do failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+						time.Since(start),
+						idempotent,
+						info.Attempts,
+						info.Error,
+						m.MustRetry(idempotent),
+						m.StatusCode(),
+						m.MustDeleteSession(),
+					)
+				}
+			}
+		}
+	}
+	t.OnDoTx = func(
+		info trace.TableDoTxStartInfo,
+	) func(
+		info trace.TableDoTxIntermediateInfo,
+	) func(
+		trace.TableDoTxDoneInfo,
+	) {
+		idempotent := info.Idempotent
+		l.Tracef(`doTx start {idempotent:%t}`,
+			idempotent,
+		)
+		start := time.Now()
+		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
+			if info.Error == nil {
+				l.Tracef(`doTx attempt done {latency:"%v",idempotent:%t}`,
+					time.Since(start),
+					idempotent,
+				)
+			} else {
+				f := l.Warnf
+				if !xerrors.IsYdb(info.Error) {
+					f = l.Debugf
+				}
+				m := retry.Check(info.Error)
+				f(`doTx attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+					time.Since(start),
+					idempotent,
+					info.Error,
+					m.MustRetry(idempotent),
+					m.StatusCode(),
+					m.MustDeleteSession(),
+				)
+			}
+			return func(info trace.TableDoTxDoneInfo) {
+				if info.Error == nil {
+					l.Tracef(`doTx done {latency:"%v",idempotent:%t,attempts:%d}`,
+						time.Since(start),
+						idempotent,
+						info.Attempts,
 					)
 				} else {
 					f := l.Warnf
@@ -38,135 +120,53 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						f = l.Debugf
 					}
 					m := retry.Check(info.Error)
-					f(`do attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
+					f(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
 						time.Since(start),
 						idempotent,
+						info.Attempts,
 						info.Error,
 						m.MustRetry(idempotent),
 						m.StatusCode(),
 						m.MustDeleteSession(),
 					)
 				}
-				return func(info trace.TableDoDoneInfo) {
-					if info.Error == nil {
-						l.Tracef(`do done {latency:"%v",idempotent:%t,attempts:%d}`,
-							time.Since(start),
-							idempotent,
-							info.Attempts,
-						)
-					} else {
-						f := l.Errorf
-						if !xerrors.IsYdb(info.Error) {
-							f = l.Debugf
-						}
-						m := retry.Check(info.Error)
-						f(`do failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
-							time.Since(start),
-							idempotent,
-							info.Attempts,
-							info.Error,
-							m.MustRetry(idempotent),
-							m.StatusCode(),
-							m.MustDeleteSession(),
-						)
-					}
-				}
 			}
 		}
-		t.OnDoTx = func(
-			info trace.TableDoTxStartInfo,
-		) func(
-			info trace.TableDoTxIntermediateInfo,
-		) func(
-			trace.TableDoTxDoneInfo,
-		) {
-			idempotent := info.Idempotent
-			l.Tracef(`doTx start {idempotent:%t}`,
-				idempotent,
-			)
-			start := time.Now()
-			return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`doTx attempt done {latency:"%v",idempotent:%t}`,
-						time.Since(start),
-						idempotent,
-					)
-				} else {
-					f := l.Warnf
-					if !xerrors.IsYdb(info.Error) {
-						f = l.Debugf
-					}
-					m := retry.Check(info.Error)
-					f(`doTx attempt failed {latency:"%v",idempotent:%t,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
-						time.Since(start),
-						idempotent,
-						info.Error,
-						m.MustRetry(idempotent),
-						m.StatusCode(),
-						m.MustDeleteSession(),
-					)
-				}
-				return func(info trace.TableDoTxDoneInfo) {
-					if info.Error == nil {
-						l.Tracef(`doTx done {latency:"%v",idempotent:%t,attempts:%d}`,
-							time.Since(start),
-							idempotent,
-							info.Attempts,
-						)
-					} else {
-						f := l.Warnf
-						if !xerrors.IsYdb(info.Error) {
-							f = l.Debugf
-						}
-						m := retry.Check(info.Error)
-						f(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t}`,
-							time.Since(start),
-							idempotent,
-							info.Attempts,
-							info.Error,
-							m.MustRetry(idempotent),
-							m.StatusCode(),
-							m.MustDeleteSession(),
-						)
-					}
-				}
+	}
+	t.OnCreateSession = func(
+		info trace.TableCreateSessionStartInfo,
+	) func(
+		info trace.TableCreateSessionIntermediateInfo,
+	) func(
+		trace.TableCreateSessionDoneInfo,
+	) {
+		l.Tracef(`create session start`)
+		start := time.Now()
+		return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
+			if info.Error == nil {
+				l.Tracef(`create session intermediate {latency:"%v"}`,
+					time.Since(start),
+				)
+			} else {
+				l.Errorf(`create session intermediate {latency:"%v",error:"%v"}`,
+					time.Since(start),
+					info.Error,
+				)
 			}
-		}
-		t.OnCreateSession = func(
-			info trace.TableCreateSessionStartInfo,
-		) func(
-			info trace.TableCreateSessionIntermediateInfo,
-		) func(
-			trace.TableCreateSessionDoneInfo,
-		) {
-			l.Tracef(`create session start`)
-			start := time.Now()
-			return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
+			return func(info trace.TableCreateSessionDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`create session intermediate {latency:"%v"}`,
+					l.Tracef(`create session done {latency:"%v",attempts:%d,session:{id:"%s",status:"%s"}}`,
 						time.Since(start),
+						info.Attempts,
+						info.Session.ID(),
+						info.Session.Status(),
 					)
 				} else {
-					l.Errorf(`create session intermediate {latency:"%v",error:"%v"}`,
+					l.Errorf(`create session failed {latency:"%v",attempts:%d,error:"%v"}`,
 						time.Since(start),
+						info.Attempts,
 						info.Error,
 					)
-				}
-				return func(info trace.TableCreateSessionDoneInfo) {
-					if info.Error == nil {
-						l.Tracef(`create session done {latency:"%v",attempts:%d,session:{id:"%s",status:"%s"}}`,
-							time.Since(start),
-							info.Attempts,
-							info.Session.ID(),
-							info.Session.Status(),
-						)
-					} else {
-						l.Errorf(`create session failed {latency:"%v",attempts:%d,error:"%v"}`,
-							time.Since(start),
-							info.Attempts,
-							info.Error,
-						)
-					}
 				}
 			}
 		}

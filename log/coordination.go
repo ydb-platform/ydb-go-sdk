@@ -5,9 +5,9 @@ import (
 )
 
 func Coordination(l Logger, details trace.Details) (t trace.Coordination) {
-	if details&trace.CoordinationEvents != 0 {
-		// nolint:staticcheck
-		l = l.WithName(`coordination`)
+	if details&trace.CoordinationEvents == 0 {
+		return
 	}
+	_ = l.WithName(`coordination`)
 	return t
 }
