@@ -74,7 +74,9 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 		}
 		t.OnNetWrite = func(info trace.DriverNetWriteStartInfo) func(trace.DriverNetWriteDoneInfo) {
 			address := info.Address
-			l.Tracef(`write start {address:"%s"}`, address)
+			l.Tracef(`write start {address:"%s"}`,
+				address,
+			)
 			start := time.Now()
 			return func(info trace.DriverNetWriteDoneInfo) {
 				if info.Error == nil {

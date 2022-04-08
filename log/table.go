@@ -317,8 +317,8 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					return func(info trace.TableExecuteDataQueryDoneInfo) {
 						if info.Error == nil {
 							tx := info.Tx
-							l.Debugf(
-								`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
+							// nolint: lll
+							l.Debugf(`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
 								time.Since(start),
 								session.ID(),
 								session.Status(),
@@ -583,7 +583,10 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 				}
 			}
 			t.OnPoolStateChange = func(info trace.TablePooStateChangeInfo) {
-				l.Infof(`state changed {size:%d,event:"%s"}`, info.Size, info.Event)
+				l.Infof(`state changed {size:%d,event:"%s"}`,
+					info.Size,
+					info.Event,
+				)
 			}
 		}
 		if details&trace.TablePoolSessionLifeCycleEvents != 0 {

@@ -24,7 +24,10 @@ func Retry(l Logger, details trace.Details) (t trace.Retry) {
 	) {
 		id := info.ID
 		idempotent := info.Idempotent
-		l.Tracef(`retry start {id:"%s",idempotent:%v}`, id, idempotent)
+		l.Tracef(`retry start {id:"%s",idempotent:%v}`,
+			id,
+			idempotent,
+		)
 		start := time.Now()
 		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
