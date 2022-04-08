@@ -1,3 +1,6 @@
+* Added public package `dsn` for making piped data source name (connection string)
+* Marked `ydb.WithEndpoint`, `ydb.WithDatabase`, `ydb.WithSecure`, `ydb.WithInsecure` options as deprecated
+* Moved `ydb.RegisterParser` to package `dsn`
 * Added version into all error and warm log messages
 
 ## v3.18.5
