@@ -15,7 +15,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 	l = l.WithName(`driver`)
 	if details&trace.DriverResolverEvents != 0 {
 		// nolint:govet
-		l := l.WithName(`xresolver`)
+		l := l.WithName(`resolver`)
 		t.OnResolve = func(
 			info trace.DriverResolveStartInfo,
 		) func(
@@ -47,7 +47,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 	// nolint:nestif
 	if details&trace.DriverNetEvents != 0 {
 		// nolint:govet
-		l := l.WithName(`xnet`)
+		l := l.WithName(`net`)
 		t.OnNetRead = func(info trace.DriverNetReadStartInfo) func(trace.DriverNetReadDoneInfo) {
 			address := info.Address
 			l.Tracef(`read start {address:"%s"}`,
