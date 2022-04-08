@@ -1,3 +1,4 @@
+## v3.19.1
 * Simplified README.md for godoc documentation in pkg.go.dev
 
 ## v3.19.0
