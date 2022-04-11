@@ -279,6 +279,14 @@ func TxControl(opts ...TxControlOption) *TransactionControl {
 	return c
 }
 
+// DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
+func DefaultTxControl() *TransactionControl {
+	return TxControl(
+		BeginTx(WithSerializableReadWrite()),
+		CommitTx(),
+	)
+}
+
 // QueryParameters
 
 type (
