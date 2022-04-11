@@ -10,25 +10,33 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )
 
-// IterateByIssues helps to iterate over internal issues of operation error
+// IterateByIssues helps to iterate over internal issues of operation error.
 func IterateByIssues(err error, it func(message string, code Ydb.StatusIds_StatusCode, severity uint32)) {
 	xerrors.IterateByIssues(err, it)
 }
 
-// IsTimeoutError checks whether given err is a some timeout error (context, transport or operation)
+// IsTimeoutError checks whether given err is a some timeout error (context, transport or operation).
 func IsTimeoutError(err error) bool {
 	return xerrors.IsTimeoutError(err)
 }
 
-// IsTransportError checks whether given err is a transport (grpc) error
+// IsTransportError checks whether given err is a transport (grpc) error.
 func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	return xerrors.IsTransportError(err, codes...)
 }
 
-// Error is an interface of error which reports about error code and error name
-type Error xerrors.Error
+// Error is an interface of error which reports about error code and error name.
+type Error interface {
+	error
 
-// TransportError checks when given error is a transport error and returns description of transport error
+	// Code reports the error code
+	Code() int32
+
+	// Name reports the name of error
+	Name() string
+}
+
+// TransportError checks when given error is a transport error and returns description of transport error.
 func TransportError(err error) Error {
 	return xerrors.TransportError(err)
 }
@@ -38,14 +46,14 @@ func IsYdbError(err error) bool {
 	return xerrors.IsYdb(err)
 }
 
-// IsOperationError reports whether any error is an operation error with one of passed codes
-// If codes not defined IsOperationError returns true on error is an operation error
+// IsOperationError reports whether any error is an operation error with one of passed codes.
+// If codes not defined IsOperationError returns true on error is an operation error.
 func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 	return xerrors.IsOperationError(err, codes...)
 }
 
-// OperationError returns operation error description
-// If given err is not an operation error - returns nil
+// OperationError returns operation error description.
+// If given err is not an operation error - returns nil.
 func OperationError(err error) Error {
 	return xerrors.OperationError(err)
 }
@@ -80,7 +88,7 @@ func IsRatelimiterAcquireError(err error) bool {
 	return ratelimiterErrors.IsAcquireError(err)
 }
 
-// ToRatelimiterAcquireError casts given err to ratelimiter.AcquireError
+// ToRatelimiterAcquireError casts given err to ratelimiter.AcquireError.
 // If given err is not ratelimiter acquire error - returns nil
 func ToRatelimiterAcquireError(err error) ratelimiter.AcquireError {
 	return ratelimiterErrors.ToAcquireError(err)

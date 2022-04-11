@@ -10,10 +10,14 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
+// Error is an interface of error which reports about error code and error name.
 type Error interface {
 	error
 
+	// Code reports the error code
 	Code() int32
+
+	// Name reports the name of error
 	Name() string
 }
 

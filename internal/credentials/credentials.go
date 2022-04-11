@@ -12,9 +12,9 @@ import (
 // not send any token meta information during request.
 var errNoCredentials = xerrors.Wrap(fmt.Errorf("ydb: credentials: no credentials"))
 
-// Credentials is an interface that contains options used to authorize a
-// client.
+// Credentials is an interface of YDB credentials required for connect with YDB
 type Credentials interface {
+	// Token must return actual token or error
 	Token(context.Context) (string, error)
 }
 
