@@ -625,6 +625,10 @@ func (s *session) Execute(
 	q := new(dataQuery)
 	q.initFromText(query)
 
+	if params == nil {
+		params = table.NewQueryParameters()
+	}
+
 	onDone := trace.TableOnSessionQueryExecute(s.config.Trace(), &ctx, s, q, params)
 	defer func() {
 		onDone(txr, true, r, err)

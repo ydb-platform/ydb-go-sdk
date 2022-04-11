@@ -223,7 +223,7 @@ func (c *connection) Scripting() scripting.Client {
 	return c.scripting
 }
 
-// New connects to name and return name runtime holder
+// New connects to database and return driver runtime holder
 func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c := &connection{
 		opts:     opts,
