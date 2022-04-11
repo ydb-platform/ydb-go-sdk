@@ -131,7 +131,8 @@ func parseOptions(opts ...crudOption) *crudOptionsHolder {
 }
 
 type Getter interface {
-	// Get gets conn from cluster
+	// Get returns next available connection.
+	// It returns error on given deadline cancellation or when cluster become closed.
 	Get(ctx context.Context) (cc conn.Conn, err error)
 }
 
@@ -268,6 +269,8 @@ func (c *cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	var cancel context.CancelFunc
+	// without client context deadline lock limited on MaxGetConnTimeout
+	// cluster endpoints cannot be updated at this time
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
 
@@ -284,10 +287,12 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 		}
 	}()
 
+	// wait lock for read during Get
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	if e, ok := ContextEndpoint(ctx); ok {
-		c.mu.RLock()
 		cc, ok = c.endpoints[e.NodeID()]
-		c.mu.RUnlock()
 		if ok && cc.IsState(
 			conn.Created,
 			conn.Online,

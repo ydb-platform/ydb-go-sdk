@@ -1,3 +1,5 @@
+* Fixed locking of cluster during call `cluster.Get`
+
 ## v3.19.1
 * Simplified README.md for godoc documentation in pkg.go.dev
 
