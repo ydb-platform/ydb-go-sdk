@@ -189,6 +189,7 @@ type (
 	TxOption func(*txDesc)
 )
 
+// TxSettings returns transaction settings
 func TxSettings(opts ...TxOption) *TransactionSettings {
 	s := new(TransactionSettings)
 	for _, opt := range opts {
@@ -197,6 +198,7 @@ func TxSettings(opts ...TxOption) *TransactionSettings {
 	return s
 }
 
+// BeginTx returns begin transaction control option
 func BeginTx(opts ...TxOption) TxControlOption {
 	return func(d *txControlDesc) {
 		s := TxSettings(opts...)
@@ -214,6 +216,7 @@ func WithTx(t Transaction) TxControlOption {
 	}
 }
 
+// CommitTx returns commit transaction control option
 func CommitTx() TxControlOption {
 	return func(d *txControlDesc) {
 		d.CommitTx = true
@@ -271,6 +274,7 @@ func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
 	return &t.desc
 }
 
+// TxControl makes transaction control from given options
 func TxControl(opts ...TxControlOption) *TransactionControl {
 	c := new(TransactionControl)
 	for _, opt := range opts {
