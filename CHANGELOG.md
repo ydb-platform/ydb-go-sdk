@@ -1,3 +1,5 @@
+* Fixed gofumpt linter issue on `credentials/credentials.go`
+
 ## v3.20.0
 * Added `table.DefaultTxControl()` transaction control creator with serializable read-write isolation mode and auto-commit
 * Fixed passing nil query parameters
