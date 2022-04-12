@@ -15,7 +15,7 @@ import (
 type lazyScheme struct {
 	db      database.Connection
 	options []config.Option
-	client  scheme.Client
+	c       scheme.Client
 	m       sync.Mutex
 }
 
@@ -31,64 +31,60 @@ func (s *lazyScheme) ModifyPermissions(
 	path string,
 	opts ...scheme.PermissionsOption,
 ) (err error) {
-	s.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return s.client.ModifyPermissions(ctx, path, opts...)
+		return s.client().ModifyPermissions(ctx, path, opts...)
 	})
 }
 
 func (s *lazyScheme) Close(ctx context.Context) (err error) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	if s.client == nil {
+	if s.c == nil {
 		return nil
 	}
 	defer func() {
-		s.client = nil
+		s.c = nil
 	}()
-	err = s.client.Close(ctx)
+	err = s.c.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }
 
-func (s *lazyScheme) init() {
-	s.m.Lock()
-	if s.client == nil {
-		s.client = builder.New(s.db, s.options)
-	}
-	s.m.Unlock()
-}
-
 func (s *lazyScheme) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
-	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		e, err = s.client.DescribePath(ctx, path)
+		e, err = s.client().DescribePath(ctx, path)
 		return xerrors.WithStackTrace(err)
 	}, retry.WithIdempotent())
 	return e, xerrors.WithStackTrace(err)
 }
 
 func (s *lazyScheme) MakeDirectory(ctx context.Context, path string) (err error) {
-	s.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return s.client.MakeDirectory(ctx, path)
+		return s.client().MakeDirectory(ctx, path)
 	})
 }
 
 func (s *lazyScheme) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
-	s.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		d, err = s.client.ListDirectory(ctx, path)
+		d, err = s.client().ListDirectory(ctx, path)
 		return xerrors.WithStackTrace(err)
 	}, retry.WithIdempotent())
 	return d, xerrors.WithStackTrace(err)
 }
 
 func (s *lazyScheme) RemoveDirectory(ctx context.Context, path string) (err error) {
-	s.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return s.client.RemoveDirectory(ctx, path)
+		return s.client().RemoveDirectory(ctx, path)
 	})
+}
+
+func (s *lazyScheme) client() scheme.Client {
+	s.m.Lock()
+	defer s.m.Unlock()
+	if s.c == nil {
+		s.c = builder.New(s.db, s.options)
+	}
+	return s.c
 }

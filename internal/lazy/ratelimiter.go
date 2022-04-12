@@ -16,7 +16,7 @@ import (
 type lazyRatelimiter struct {
 	db      database.Connection
 	options []config.Option
-	client  ratelimiter.Client
+	c       ratelimiter.Client
 	m       sync.Mutex
 }
 
@@ -30,13 +30,13 @@ func Ratelimiter(db database.Connection, options []config.Option) ratelimiter.Cl
 func (r *lazyRatelimiter) Close(ctx context.Context) (err error) {
 	r.m.Lock()
 	defer r.m.Unlock()
-	if r.client == nil {
+	if r.c == nil {
 		return nil
 	}
 	defer func() {
-		r.client = nil
+		r.c = nil
 	}()
-	err = r.client.Close(ctx)
+	err = r.c.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -48,9 +48,8 @@ func (r *lazyRatelimiter) CreateResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	r.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return r.client.CreateResource(ctx, coordinationNodePath, resource)
+		return r.client().CreateResource(ctx, coordinationNodePath, resource)
 	})
 }
 
@@ -59,9 +58,8 @@ func (r *lazyRatelimiter) AlterResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
-	r.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return r.client.AlterResource(ctx, coordinationNodePath, resource)
+		return r.client().AlterResource(ctx, coordinationNodePath, resource)
 	})
 }
 
@@ -70,9 +68,8 @@ func (r *lazyRatelimiter) DropResource(
 	coordinationNodePath string,
 	resourcePath string,
 ) (err error) {
-	r.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return r.client.DropResource(ctx, coordinationNodePath, resourcePath)
+		return r.client().DropResource(ctx, coordinationNodePath, resourcePath)
 	})
 }
 
@@ -82,9 +79,8 @@ func (r *lazyRatelimiter) ListResource(
 	resourcePath string,
 	recursive bool,
 ) (paths []string, err error) {
-	r.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		paths, err = r.client.ListResource(ctx, coordinationNodePath, resourcePath, recursive)
+		paths, err = r.client().ListResource(ctx, coordinationNodePath, resourcePath, recursive)
 		return xerrors.WithStackTrace(err)
 	})
 	return paths, xerrors.WithStackTrace(err)
@@ -95,9 +91,8 @@ func (r *lazyRatelimiter) DescribeResource(
 	coordinationNodePath string,
 	resourcePath string,
 ) (resource *ratelimiter.Resource, err error) {
-	r.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		resource, err = r.client.DescribeResource(ctx, coordinationNodePath, resourcePath)
+		resource, err = r.client().DescribeResource(ctx, coordinationNodePath, resourcePath)
 		return xerrors.WithStackTrace(err)
 	})
 	return resource, xerrors.WithStackTrace(err)
@@ -110,16 +105,16 @@ func (r *lazyRatelimiter) AcquireResource(
 	amount uint64,
 	opts ...options.AcquireOption,
 ) (err error) {
-	r.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return r.client.AcquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...)
+		return r.client().AcquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...)
 	})
 }
 
-func (r *lazyRatelimiter) init() {
+func (r *lazyRatelimiter) client() ratelimiter.Client {
 	r.m.Lock()
-	if r.client == nil {
-		r.client = builder.New(r.db, r.options)
+	defer r.m.Unlock()
+	if r.c == nil {
+		r.c = builder.New(r.db, r.options)
 	}
-	r.m.Unlock()
+	return r.c
 }

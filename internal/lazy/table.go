@@ -14,7 +14,7 @@ import (
 type lazyTable struct {
 	db      database.Connection
 	options []config.Option
-	client  table.Client
+	c       table.Client
 	m       sync.Mutex
 }
 
@@ -26,40 +26,38 @@ func Table(db database.Connection, options []config.Option) table.Client {
 }
 
 func (t *lazyTable) CreateSession(ctx context.Context, opts ...table.Option) (s table.ClosableSession, err error) {
-	t.init(ctx)
-	return t.client.CreateSession(ctx, opts...)
+	return t.client(ctx).CreateSession(ctx, opts...)
 }
 
 func (t *lazyTable) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
-	t.init(ctx)
-	return t.client.Do(ctx, op, opts...)
+	return t.client(ctx).Do(ctx, op, opts...)
 }
 
 func (t *lazyTable) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
-	t.init(ctx)
-	return t.client.DoTx(ctx, op, opts...)
+	return t.client(ctx).DoTx(ctx, op, opts...)
 }
 
 func (t *lazyTable) Close(ctx context.Context) (err error) {
 	t.m.Lock()
 	defer t.m.Unlock()
-	if t.client == nil {
+	if t.c == nil {
 		return nil
 	}
 	defer func() {
-		t.client = nil
+		t.c = nil
 	}()
-	err = t.client.Close(ctx)
+	err = t.c.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }
 
-func (t *lazyTable) init(ctx context.Context) {
+func (t *lazyTable) client(ctx context.Context) table.Client {
 	t.m.Lock()
-	if t.client == nil {
-		t.client = builder.New(ctx, t.db, t.options...)
+	defer t.m.Unlock()
+	if t.c == nil {
+		t.c = builder.New(ctx, t.db, t.options...)
 	}
-	t.m.Unlock()
+	return t.c
 }

@@ -1,3 +1,5 @@
+* Fixed race condition on lazy clients first call
+
 ## v3.20.1
 * Fixed gofumpt linter issue on `credentials/credentials.go`
 

@@ -16,7 +16,7 @@ import (
 type lazyCoordination struct {
 	db      database.Connection
 	options []config.Option
-	client  coordination.Client
+	c       coordination.Client
 	m       sync.Mutex
 }
 
@@ -28,23 +28,20 @@ func Coordination(db database.Connection, options []config.Option) coordination.
 }
 
 func (c *lazyCoordination) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
-	c.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return c.client.CreateNode(ctx, path, config)
+		return c.client().CreateNode(ctx, path, config)
 	})
 }
 
 func (c *lazyCoordination) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
-	c.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return c.client.AlterNode(ctx, path, config)
+		return c.client().AlterNode(ctx, path, config)
 	})
 }
 
 func (c *lazyCoordination) DropNode(ctx context.Context, path string) (err error) {
-	c.init()
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return c.client.DropNode(ctx, path)
+		return c.client().DropNode(ctx, path)
 	})
 }
 
@@ -56,9 +53,8 @@ func (c *lazyCoordination) DescribeNode(
 	config *coordination.NodeConfig,
 	err error,
 ) {
-	c.init()
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		entry, config, err = c.client.DescribeNode(ctx, path)
+		entry, config, err = c.client().DescribeNode(ctx, path)
 		return xerrors.WithStackTrace(err)
 	})
 	return entry, config, xerrors.WithStackTrace(err)
@@ -67,23 +63,24 @@ func (c *lazyCoordination) DescribeNode(
 func (c *lazyCoordination) Close(ctx context.Context) (err error) {
 	c.m.Lock()
 	defer c.m.Unlock()
-	if c.client == nil {
+	if c.c == nil {
 		return nil
 	}
 	defer func() {
-		c.client = nil
+		c.c = nil
 	}()
-	err = c.client.Close(ctx)
+	err = c.c.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }
 
-func (c *lazyCoordination) init() {
+func (c *lazyCoordination) client() coordination.Client {
 	c.m.Lock()
-	if c.client == nil {
-		c.client = builder.New(c.db, c.options)
+	defer c.m.Unlock()
+	if c.c == nil {
+		c.c = builder.New(c.db, c.options)
 	}
-	c.m.Unlock()
+	return c.c
 }
