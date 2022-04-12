@@ -1,3 +1,4 @@
+## v3.20.2
 * Fixed race condition on lazy clients first call
 
 ## v3.20.1
