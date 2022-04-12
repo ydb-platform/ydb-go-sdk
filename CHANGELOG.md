@@ -1,3 +1,4 @@
+## v3.20.1
 * Fixed gofumpt linter issue on `credentials/credentials.go`
 
 ## v3.20.0
