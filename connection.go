@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
@@ -36,7 +35,6 @@ import (
 // This interface is central part for access to various systems
 // embedded to ydb through one configured connection method.
 type Connection interface {
-	closer.Closer
 	database.Info
 	grpc.ClientConnInterface
 
