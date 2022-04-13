@@ -58,7 +58,7 @@ func WithRequestsType(requestsType string) Option {
 // WithConnectionString accept connection string like
 //  grpc[s]://{endpoint}/?database={database}
 //
-// Deprecated: WithConnectionString will be removed at next major release
+// Warning: WithConnectionString will be removed at next major release
 // (connection string will be required string param of ydb.New)
 func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *connection) error {
