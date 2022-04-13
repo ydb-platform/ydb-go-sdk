@@ -86,7 +86,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
 		return res.Err()
-	}, retry.WithIdempotent()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 	// StreamExecute
@@ -123,7 +123,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
 		return res.Err()
-	}, retry.WithIdempotent()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("StreamExecute failed: %v", err)
 	}
 	// ExplainPlan
@@ -140,7 +140,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("empty plan")
 		}
 		return nil
-	}, retry.WithIdempotent()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("Explain failed: %v", err)
 	}
 	// ExplainValidate
@@ -157,7 +157,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected parameter types")
 		}
 		return nil
-	}, retry.WithIdempotent()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("Explain failed: %v", err)
 	}
 }

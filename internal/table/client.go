@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"sync"
 	"time"
 
@@ -129,10 +130,10 @@ func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (table
 			s, err = c.build(ctx)
 			return xerrors.WithStackTrace(err)
 		},
-		retry.WithIdempotent(),
+		retry.WithIdempotent(true),
 		retry.WithID("CreateSession"),
-		retry.WithFastBackoff(options.FastBackoff),
-		retry.WithSlowBackoff(options.SlowBackoff),
+		retry.WithInternalFastBackoff(options.FastBackoff),
+		retry.WithInternalSlowBackoff(options.SlowBackoff),
 		retry.WithTrace(trace.Retry{
 			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 				onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context)
@@ -523,8 +524,8 @@ func (c *client) Close(ctx context.Context) (err error) {
 func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
 	options := table.Options{
 		Trace:       trace,
-		FastBackoff: retry.FastBackoff,
-		SlowBackoff: retry.SlowBackoff,
+		FastBackoff: backoff.Fast,
+		SlowBackoff: backoff.Slow,
 	}
 	for _, o := range opts {
 		o(&options)

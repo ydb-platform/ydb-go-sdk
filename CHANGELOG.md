@@ -1,3 +1,5 @@
+* Refactored package `retry` (moved `retryBackoff` and `retryMode` implementations to `internal`)
+
 ## v3.20.2
 * Fixed race condition on lazy clients first call
 

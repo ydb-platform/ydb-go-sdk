@@ -1,7 +1,7 @@
 package table
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -10,8 +10,8 @@ type Options struct {
 	Idempotent      bool
 	TxSettings      *TransactionSettings
 	TxCommitOptions []options.CommitTransactionOption
-	FastBackoff     retry.Backoff
-	SlowBackoff     retry.Backoff
+	FastBackoff     backoff.Backoff
+	SlowBackoff     backoff.Backoff
 	Trace           trace.Table
 }
 

@@ -56,7 +56,7 @@ func (s *lazyScheme) DescribePath(ctx context.Context, path string) (e scheme.En
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = s.client().DescribePath(ctx, path)
 		return xerrors.WithStackTrace(err)
-	}, retry.WithIdempotent())
+	}, retry.WithIdempotent(true))
 	return e, xerrors.WithStackTrace(err)
 }
 
@@ -70,7 +70,7 @@ func (s *lazyScheme) ListDirectory(ctx context.Context, path string) (d scheme.D
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		d, err = s.client().ListDirectory(ctx, path)
 		return xerrors.WithStackTrace(err)
-	}, retry.WithIdempotent())
+	}, retry.WithIdempotent(true))
 	return d, xerrors.WithStackTrace(err)
 }
 

@@ -135,7 +135,7 @@ func TestConnection(t *testing.T) {
 				return
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
 	})
@@ -186,7 +186,7 @@ func TestConnection(t *testing.T) {
 				)
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
 	})
@@ -229,7 +229,7 @@ func TestConnection(t *testing.T) {
 				)
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("Stream execute failed: %v", err)
 		}
 	})
@@ -283,7 +283,7 @@ func TestConnection(t *testing.T) {
 				)
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("Stream execute failed: %v", err)
 		}
 	})
@@ -310,7 +310,7 @@ func TestConnection(t *testing.T) {
 				)
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("check export failed: %v", err)
 		}
 	})

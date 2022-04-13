@@ -8,17 +8,20 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
 // Error is an interface of error which reports about error code and error name.
 type Error interface {
 	error
 
-	// Code reports the error code
 	Code() int32
-
-	// Name reports the name of error
 	Name() string
+	OperationStatus() operation.Status
+	BackoffType() backoff.Type
+	MustDeleteSession() bool
 }
 
 func IsTimeoutError(err error) bool {
@@ -60,16 +63,18 @@ func HideEOF(err error) error {
 
 // As is a proxy to errors.As
 // This need to single import errors
-func As(err error, targets ...interface{}) bool {
+func As(err error, targets ...interface{}) (ok bool) {
 	if err == nil {
 		return false
 	}
 	for _, t := range targets {
 		if errors.As(err, t) {
-			return true
+			if !ok {
+				ok = true
+			}
 		}
 	}
-	return false
+	return ok
 }
 
 // Is is a improved proxy to errors.Is

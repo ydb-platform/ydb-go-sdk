@@ -11,6 +11,9 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
 type transportError struct {
@@ -102,34 +105,34 @@ func dumpIssues(buf *bytes.Buffer, ms []*Ydb_Issue.IssueMessage) {
 	}
 }
 
-func (e *transportError) OperationStatus() OperationStatus {
+func (e *transportError) OperationStatus() operation.Status {
 	switch e.code {
 	case
 		grpcCodes.Aborted,
 		grpcCodes.ResourceExhausted:
-		return OperationNotFinished
+		return operation.NotFinished
 	case
 		grpcCodes.Internal,
 		grpcCodes.Canceled,
 		grpcCodes.Unavailable:
-		return OperationStatusUndefined
+		return operation.Undefined
 	default:
-		return OperationFinished
+		return operation.Finished
 	}
 }
 
-func (e *transportError) BackoffType() BackoffType {
+func (e *transportError) BackoffType() backoff.Type {
 	switch e.code {
 	case
 		grpcCodes.Internal,
 		grpcCodes.Canceled,
 		grpcCodes.Unavailable:
-		return BackoffTypeFastBackoff
+		return backoff.TypeFastBackoff
 	case
 		grpcCodes.ResourceExhausted:
-		return BackoffTypeSlowBackoff
+		return backoff.TypeSlowBackoff
 	default:
-		return BackoffTypeNoBackoff
+		return backoff.TypeNoBackoff
 	}
 }
 
