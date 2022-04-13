@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"strconv"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -122,8 +124,20 @@ func New(
 	return c, nil
 }
 
+type configurer interface {
+	Endpoint() string
+	Database() string
+	Secure() bool
+	OperationTimeout() time.Duration
+	OperationCancelAfter() time.Duration
+	Trace() trace.Discovery
+	Interval() time.Duration
+	Meta() meta.Meta
+	PanicCallback() func(e interface{})
+}
+
 type client struct {
-	config  config.Config
+	config  configurer
 	service Ydb_Discovery_V1.DiscoveryServiceClient
 	cc      conn.Conn
 }

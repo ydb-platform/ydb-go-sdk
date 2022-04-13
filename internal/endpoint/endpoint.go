@@ -16,12 +16,10 @@ type Info interface {
 }
 
 type Endpoint interface {
-	fmt.Stringer
-
 	Info
 
+	String() string
 	Copy() Endpoint
-
 	Touch(opts ...option)
 }
 

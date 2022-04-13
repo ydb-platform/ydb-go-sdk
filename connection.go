@@ -32,31 +32,25 @@ import (
 
 // Connection interface provide access to YDB service clients
 // Interface and list of clients may be changed in the future
+//
+// This interface is central part for access to various systems
+// embedded to ydb through one configured connection method.
 type Connection interface {
 	closer.Closer
 	database.Info
 	grpc.ClientConnInterface
 
-	// Table returns table client
+	Close(ctx context.Context) error
+
+	// Method for accessing subsystems
 	Table() table.Client
-
-	// Scheme returns scheme client
 	Scheme() scheme.Client
-
-	// Coordination returns coordination client
 	Coordination() coordination.Client
-
-	// Ratelimiter returns rate limiter client
 	Ratelimiter() ratelimiter.Client
-
-	// Discovery returns discovery client
 	Discovery() discovery.Client
-
-	// Scripting returns scripting client
 	Scripting() scripting.Client
 
-	// With returns Connection specified with custom options
-	// Options provide options replacement for all clients taked from new Connection
+	// Make copy with additional options
 	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
@@ -105,49 +99,31 @@ func (c *connection) Close(ctx context.Context) error {
 		}
 	}()
 
-	var (
-		issues   []error
-		children = make([]Connection, 0, len(c.children))
-	)
-
 	c.childrenMtx.Lock()
-	for _, child := range c.children {
-		children = append(children, child)
-	}
+	children := c.children
+	c.children = nil
 	c.childrenMtx.Unlock()
 
+	childrenClosers := make([]func(context.Context) error, 0, len(children))
 	for _, child := range children {
-		if err := child.Close(ctx); err != nil {
+		childrenClosers = append(childrenClosers, child.Close)
+	}
+
+	selfClosers := []func(context.Context) error{
+		c.ratelimiter.Close,
+		c.coordination.Close,
+		c.scheme.Close,
+		c.table.Close,
+		c.scripting.Close,
+		c.db.Close,
+		c.pool.Release,
+	}
+
+	var issues []error
+	for _, closer := range append(childrenClosers, selfClosers...) {
+		if err := closer(ctx); err != nil {
 			issues = append(issues, err)
 		}
-	}
-
-	if err := c.ratelimiter.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.coordination.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.scheme.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.table.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.scripting.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.db.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.pool.Release(ctx); err != nil {
-		issues = append(issues, err)
 	}
 
 	if len(issues) > 0 {
