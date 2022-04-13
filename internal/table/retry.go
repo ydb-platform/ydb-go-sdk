@@ -223,9 +223,7 @@ func retryBackoff(
 	isOperationIdempotent bool,
 	op table.Operation,
 ) (err error) {
-	var (
-		s Session
-	)
+	var s Session
 	defer func() {
 		if s != nil {
 			_ = p.Put(ctx, s)
