@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -23,20 +24,29 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var DefaultDiscoveryInterval = time.Minute
+
+type InserterRemoverExplorerLocker interface {
+	cluster.Inserter
+	cluster.Remover
+	cluster.Explorer
+	sync.Locker
+}
+
 func New(
 	ctx context.Context,
 	cc conn.Conn,
-	crudExplorer cluster.InserterRemoverExplorerLocker,
+	crudExplorer InserterRemoverExplorerLocker,
 	driverTrace trace.Driver,
 	opts ...config.Option,
-) (_ discovery.Client, err error) {
+) (_ *Client, err error) {
 	defer func() {
 		if err != nil {
 			_ = cc.Release(ctx)
 		}
 	}()
 
-	c := &client{
+	c := &Client{
 		cc:      cc,
 		config:  config.New(opts...),
 		service: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
@@ -136,13 +146,16 @@ type configurer interface {
 	PanicCallback() func(e interface{})
 }
 
-type client struct {
+var _ discovery.Client = &Client{}
+
+type Client struct {
 	config  configurer
 	service Ydb_Discovery_V1.DiscoveryServiceClient
 	cc      conn.Conn
 }
 
-func (c *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
+// Discover cluster endpoints
+func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	var (
 		onDone  = trace.DiscoveryOnDiscover(c.config.Trace(), &ctx, c.config.Endpoint(), c.config.Database())
 		request = Ydb_Discovery.ListEndpointsRequest{
@@ -194,7 +207,7 @@ func (c *client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	return endpoints, nil
 }
 
-func (c *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
+func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
 		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx)
 		request            = Ydb_Discovery.WhoAmIRequest{}
@@ -230,6 +243,6 @@ func (c *client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 	}, nil
 }
 
-func (c *client) Close(ctx context.Context) error {
+func (c *Client) Close(ctx context.Context) error {
 	return c.cc.Release(ctx)
 }

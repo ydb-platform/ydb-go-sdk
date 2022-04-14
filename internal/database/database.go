@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"sync"
 
 	"google.golang.org/grpc"
 
@@ -10,15 +11,27 @@ import (
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	int_discovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+type clusterConnector interface {
+	Close(ctx context.Context) error
+	Get(ctx context.Context) (cc conn.Conn, err error)
+	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...cluster.CrudOption)
+	Pessimize(ctx context.Context, cc conn.Conn, cause error)
+
+	// For discovery build
+	cluster.Inserter
+	cluster.Explorer
+	sync.Locker
+}
+
 type database struct {
 	config    config.Config
-	cluster   cluster.Cluster
+	cluster   clusterConnector
 	discovery discovery.Client
 }
 
@@ -74,7 +87,7 @@ func New(
 	}
 	defer cancel()
 
-	db.discovery, err = builder.New(
+	db.discovery, err = int_discovery.New(
 		ctx,
 		pool.Get(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
 		db.cluster,

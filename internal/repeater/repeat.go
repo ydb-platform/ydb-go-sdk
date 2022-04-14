@@ -24,9 +24,10 @@ type repeater struct {
 	// Task is a function that must be executed periodically.
 	task func(context.Context) error
 
-	stop  chan struct{}
-	done  chan struct{}
-	force chan struct{}
+	runCtx context.Context
+	stop   context.CancelFunc
+	done   chan struct{}
+	force  chan struct{}
 }
 
 type option func(r *repeater)
@@ -64,10 +65,11 @@ func New(
 ) Repeater {
 	r := &repeater{
 		task:  task,
-		stop:  make(chan struct{}),
 		done:  make(chan struct{}),
 		force: make(chan struct{}),
 	}
+
+	r.runCtx, r.stop = context.WithCancel(context.Background())
 
 	for _, o := range opts {
 		o(r)
@@ -84,7 +86,7 @@ func New(
 
 // Stop stops to execute its task.
 func (r *repeater) Stop() {
-	close(r.stop)
+	r.stop()
 }
 
 func (r *repeater) Force() {
@@ -125,7 +127,7 @@ func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-r.stop:
+		case <-r.runCtx.Done():
 			return
 		case <-time.After(interval):
 			r.wakeUp(ctx, eventTick)

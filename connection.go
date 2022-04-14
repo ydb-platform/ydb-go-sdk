@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 
@@ -228,10 +229,10 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.config = config.New(c.options...)
 
 	if c.config.Endpoint() == "" {
-		panic("empty dial address")
+		return nil, xerrors.WithStackTrace(errors.New("configuration: empty dial address"))
 	}
 	if c.config.Database() == "" {
-		panic("empty database")
+		return nil, xerrors.WithStackTrace(errors.New("configuration: empty database"))
 	}
 
 	if single.IsSingle(c.config.Balancer()) {
