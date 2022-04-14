@@ -134,22 +134,19 @@ func New(
 	return c, nil
 }
 
-type configurer interface {
+type clientConfig interface {
 	Endpoint() string
 	Database() string
 	Secure() bool
-	OperationTimeout() time.Duration
-	OperationCancelAfter() time.Duration
 	Trace() trace.Discovery
 	Interval() time.Duration
 	Meta() meta.Meta
-	PanicCallback() func(e interface{})
 }
 
 var _ discovery.Client = &Client{}
 
 type Client struct {
-	config  configurer
+	config  clientConfig
 	service Ydb_Discovery_V1.DiscoveryServiceClient
 	cc      conn.Conn
 }
