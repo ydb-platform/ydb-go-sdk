@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -134,19 +133,10 @@ func New(
 	return c, nil
 }
 
-type clientConfig interface {
-	Endpoint() string
-	Database() string
-	Secure() bool
-	Trace() trace.Discovery
-	Interval() time.Duration
-	Meta() meta.Meta
-}
-
 var _ discovery.Client = &Client{}
 
 type Client struct {
-	config  clientConfig
+	config  config.Config
 	service Ydb_Discovery_V1.DiscoveryServiceClient
 	cc      conn.Conn
 }

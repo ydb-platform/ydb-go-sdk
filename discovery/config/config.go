@@ -11,7 +11,7 @@ const (
 	DefaultInterval = time.Minute
 )
 
-type config struct {
+type Config struct {
 	endpoint string
 	database string
 	secure   bool
@@ -26,61 +26,71 @@ type config struct {
 	panicCallback func(e interface{})
 }
 
-func (c *config) PanicCallback() func(e interface{}) {
+func New(opts ...Option) Config {
+	c := Config{
+		interval: DefaultInterval,
+	}
+	for _, o := range opts {
+		o(&c)
+	}
+	return c
+}
+
+func (c *Config) PanicCallback() func(e interface{}) {
 	return c.panicCallback
 }
 
-func (c *config) Meta() meta.Meta {
+func (c *Config) Meta() meta.Meta {
 	return c.meta
 }
 
-func (c *config) OperationTimeout() time.Duration {
+func (c *Config) OperationTimeout() time.Duration {
 	return c.operationTimeout
 }
 
-func (c *config) OperationCancelAfter() time.Duration {
+func (c *Config) OperationCancelAfter() time.Duration {
 	return c.operationCancelAfter
 }
 
-func (c *config) Interval() time.Duration {
+func (c *Config) Interval() time.Duration {
 	return c.interval
 }
 
-func (c *config) Endpoint() string {
+func (c *Config) Endpoint() string {
 	return c.endpoint
 }
 
-func (c *config) Database() string {
+func (c *Config) Database() string {
 	return c.database
 }
 
-func (c *config) Secure() bool {
+func (c *Config) Secure() bool {
 	return c.secure
 }
 
-func (c *config) Trace() trace.Discovery {
+func (c *Config) Trace() trace.Discovery {
 	return c.trace
 }
 
-type Option func(c *config)
+type Option func(c *Config)
 
 // WithEndpoint set a required starting endpoint for connect
 func WithEndpoint(endpoint string) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.endpoint = endpoint
 	}
 }
 
 // WithDatabase set a required database name.
 func WithDatabase(database string) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.database = database
 	}
 }
 
 // WithSecure set flag for secure connection
 func WithSecure(ssl bool) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.secure = ssl
 	}
 }
@@ -89,14 +99,14 @@ func WithSecure(ssl bool) Option {
 //
 // This option add meta information about database connection
 func WithMeta(meta meta.Meta) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.meta = meta
 	}
 }
 
 // WithTrace configures discovery client calls tracing
 func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
@@ -108,7 +118,7 @@ func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Opti
 //
 // If OperationTimeout is zero then no timeout is used.
 func WithOperationTimeout(operationTimeout time.Duration) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.operationTimeout = operationTimeout
 	}
 }
@@ -120,7 +130,7 @@ func WithOperationTimeout(operationTimeout time.Duration) Option {
 //
 // If OperationCancelAfter is zero then no timeout is used.
 func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.operationCancelAfter = operationCancelAfter
 	}
 }
@@ -131,7 +141,7 @@ func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 //
 // If Interval is negative, then no background discovery prepared.
 func WithInterval(interval time.Duration) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		if interval <= 0 {
 			c.interval = 0
 		} else {
@@ -144,17 +154,7 @@ func WithInterval(interval time.Duration) Option {
 //
 // nil will turn off callback
 func WithPanicCallback(cb func(e interface{})) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.panicCallback = cb
 	}
-}
-
-func New(opts ...Option) *config {
-	c := &config{
-		interval: DefaultInterval,
-	}
-	for _, o := range opts {
-		o(c)
-	}
-	return c
 }
