@@ -164,7 +164,7 @@ func TestRetryModes(t *testing.T) {
 			// We want to check internal grpc error on chaos monkey testing
 			// nolint:nolintlint
 			err:           xerrors.FromGRPCError(grpc.ErrClientConnClosing),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -184,7 +184,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Canceled),
 			),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -261,7 +261,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.ResourceExhausted),
 			),
-			backoff:       backoff.TypeSlowBackoff,
+			backoff:       backoff.TypeSlow,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -316,7 +316,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Internal),
 			),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -327,7 +327,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Unavailable),
 			),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -404,7 +404,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_ABORTED),
 			),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -415,7 +415,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
 			),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -426,7 +426,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
 			),
-			backoff:       backoff.TypeSlowBackoff,
+			backoff:       backoff.TypeSlow,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -525,7 +525,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_CANCELLED),
 			),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -536,7 +536,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_UNDETERMINED),
 			),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -558,7 +558,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
 			),
-			backoff:       backoff.TypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,

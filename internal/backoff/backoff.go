@@ -39,23 +39,23 @@ var (
 
 // logBackoff contains logarithmic Backoff policy.
 type logBackoff struct {
-	// SlotDuration is a size of a single time slot used in Backoff Delay
+	// slotDuration is a size of a single time slot used in Backoff Delay
 	// calculation.
-	// If SlotDuration is less or equal to zero, then the time.Second value is
+	// If slotDuration is less or equal to zero, then the time.Second value is
 	// used.
-	SlotDuration time.Duration
+	slotDuration time.Duration
 
-	// Ceiling is a maximum degree of Backoff Delay growth.
-	// If Ceiling is less or equal to zero, then the default ceiling of 1 is
+	// ceiling is a maximum degree of Backoff Delay growth.
+	// If ceiling is less or equal to zero, then the default ceiling of 1 is
 	// used.
-	Ceiling uint
+	ceiling uint
 
-	// JitterLimit controls fixed and random portions of Backoff Delay.
+	// jitterLimit controls fixed and random portions of Backoff Delay.
 	// Its value can be in range [0, 1].
-	// If JitterLimit is non zero, then the Backoff Delay will be equal to (F + R),
+	// If jitterLimit is non zero, then the Backoff Delay will be equal to (F + R),
 	// where F is a result of multiplication of this value and calculated Delay
 	// duration D; and R is a random sized part from [0,(D - F)].
-	JitterLimit float64
+	jitterLimit float64
 
 	// generator of jitter
 	r xrand.Rand
@@ -65,19 +65,19 @@ type option func(b *logBackoff)
 
 func WithSlotDuration(slotDuration time.Duration) option {
 	return func(b *logBackoff) {
-		b.SlotDuration = slotDuration
+		b.slotDuration = slotDuration
 	}
 }
 
 func WithCeiling(ceiling uint) option {
 	return func(b *logBackoff) {
-		b.Ceiling = ceiling
+		b.ceiling = ceiling
 	}
 }
 
 func WithJitterLimit(jitterLimit float64) option {
 	return func(b *logBackoff) {
-		b.JitterLimit = jitterLimit
+		b.jitterLimit = jitterLimit
 	}
 }
 
@@ -98,13 +98,13 @@ func (b logBackoff) Wait(n int) <-chan time.Time {
 
 // Delay returns mapping of i to Delay.
 func (b logBackoff) Delay(i int) time.Duration {
-	s := b.SlotDuration
+	s := b.slotDuration
 	if s <= 0 {
 		s = time.Second
 	}
-	n := 1 << min(uint(i), max(1, b.Ceiling))
+	n := 1 << min(uint(i), max(1, b.ceiling))
 	d := s * time.Duration(n)
-	f := time.Duration(math.Min(1, math.Abs(b.JitterLimit)) * float64(d))
+	f := time.Duration(math.Min(1, math.Abs(b.jitterLimit)) * float64(d))
 	if f == d {
 		return f
 	}

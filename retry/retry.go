@@ -13,13 +13,15 @@ import (
 
 var (
 	// FastBackoff is a default fast backoff object
+	//
 	// Deprecated: don't use explicit it, will be removed at next major release.
-	// Use retry.WithFastBackoff retry option for redefine default fast backoff instead
+	// Use retry.Backoff constructor instead
 	FastBackoff = backoff.Fast
 
 	// SlowBackoff is a default fast backoff object
+	//
 	// Deprecated: don't use explicit it, will be removed at next major release.
-	// Use retry.WithSlowBackoff retry option for redefine default slow backoff instead
+	// Use retry.Backoff constructor instead
 	SlowBackoff = backoff.Slow
 )
 
@@ -32,8 +34,8 @@ type retryableErrorOption xerrors.RetryableErrorOption
 
 const (
 	BackoffTypeNoBackoff   = backoff.TypeNoBackoff
-	BackoffTypeFastBackoff = backoff.TypeFastBackoff
-	BackoffTypeSlowBackoff = backoff.TypeSlowBackoff
+	BackoffTypeFastBackoff = backoff.TypeFast
+	BackoffTypeSlowBackoff = backoff.TypeSlow
 )
 
 // WithBackoff makes retryable error option with custom backoff type
@@ -86,44 +88,31 @@ func WithTrace(trace trace.Retry) retryOption {
 	}
 }
 
-// WithIdempotent returns idempotent option
+// WithIdempotent applies idempotent flag to retry operation
 func WithIdempotent(idempotent bool) retryOption {
 	return func(h *retryOptions) {
 		h.idempotent = idempotent
 	}
 }
 
+// Backoff makes backoff with custom params
+func Backoff(slotDuration time.Duration, ceiling uint, jitterLimit float64) backoff.Backoff {
+	return backoff.New(
+		backoff.WithSlotDuration(slotDuration),
+		backoff.WithCeiling(ceiling),
+		backoff.WithJitterLimit(jitterLimit),
+	)
+}
+
 // WithFastBackoff replaces default fast backoff
-func WithFastBackoff(slotDuration time.Duration, ceiling uint, jitterLimit float64) retryOption {
-	return func(h *retryOptions) {
-		h.fastBackoff = backoff.New(
-			backoff.WithSlotDuration(slotDuration),
-			backoff.WithCeiling(ceiling),
-			backoff.WithJitterLimit(jitterLimit),
-		)
-	}
-}
-
-// WithSlowBackoff replaces default slow backoff
-func WithSlowBackoff(slotDuration time.Duration, ceiling uint, jitterLimit float64) retryOption {
-	return func(h *retryOptions) {
-		h.slowBackoff = backoff.New(
-			backoff.WithSlotDuration(slotDuration),
-			backoff.WithCeiling(ceiling),
-			backoff.WithJitterLimit(jitterLimit),
-		)
-	}
-}
-
-// WithInternalFastBackoff replaces default fast backoff
-func WithInternalFastBackoff(b backoff.Backoff) retryOption {
+func WithFastBackoff(b backoff.Backoff) retryOption {
 	return func(h *retryOptions) {
 		h.fastBackoff = b
 	}
 }
 
-// WithInternalSlowBackoff replaces default slow backoff
-func WithInternalSlowBackoff(b backoff.Backoff) retryOption {
+// WithSlowBackoff replaces default slow backoff
+func WithSlowBackoff(b backoff.Backoff) retryOption {
 	return func(h *retryOptions) {
 		h.slowBackoff = b
 	}

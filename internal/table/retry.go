@@ -262,8 +262,8 @@ func retryBackoff(
 
 			return xerrors.WithStackTrace(err)
 		},
-		retry.WithInternalFastBackoff(fastBackoff),
-		retry.WithInternalSlowBackoff(slowBackoff),
+		retry.WithFastBackoff(fastBackoff),
+		retry.WithSlowBackoff(slowBackoff),
 		retry.WithIdempotent(isOperationIdempotent),
 	)
 }

@@ -33,9 +33,9 @@ func Wait(ctx context.Context, fastBackoff backoff.Backoff, slowBackoff backoff.
 	switch t {
 	case backoff.TypeNoBackoff:
 		return nil
-	case backoff.TypeFastBackoff:
+	case backoff.TypeFast:
 		b = fastBackoff
-	case backoff.TypeSlowBackoff:
+	case backoff.TypeSlow:
 		b = slowBackoff
 	}
 	return waitBackoff(ctx, b, i)

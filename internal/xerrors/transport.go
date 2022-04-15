@@ -127,10 +127,10 @@ func (e *transportError) BackoffType() backoff.Type {
 		grpcCodes.Internal,
 		grpcCodes.Canceled,
 		grpcCodes.Unavailable:
-		return backoff.TypeFastBackoff
+		return backoff.TypeFast
 	case
 		grpcCodes.ResourceExhausted:
-		return backoff.TypeSlowBackoff
+		return backoff.TypeSlow
 	default:
 		return backoff.TypeNoBackoff
 	}

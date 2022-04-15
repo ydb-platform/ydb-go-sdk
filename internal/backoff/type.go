@@ -9,19 +9,19 @@ type Type uint8
 const (
 	TypeNoBackoff Type = 1 << iota >> 1
 
-	TypeFastBackoff
-	TypeSlowBackoff
+	TypeFast
+	TypeSlow
 
-	TypeAny = TypeFastBackoff | TypeSlowBackoff
+	TypeAny = TypeFast | TypeSlow
 )
 
 func (b Type) String() string {
 	switch b {
 	case TypeNoBackoff:
 		return "immediately"
-	case TypeFastBackoff:
+	case TypeFast:
 		return "fast backoff"
-	case TypeSlowBackoff:
+	case TypeSlow:
 		return "slow backoff"
 	case TypeAny:
 		return "any backoff"

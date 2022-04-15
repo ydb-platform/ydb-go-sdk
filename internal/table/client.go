@@ -132,8 +132,8 @@ func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (table
 		},
 		retry.WithIdempotent(true),
 		retry.WithID("CreateSession"),
-		retry.WithInternalFastBackoff(options.FastBackoff),
-		retry.WithInternalSlowBackoff(options.SlowBackoff),
+		retry.WithFastBackoff(options.FastBackoff),
+		retry.WithSlowBackoff(options.SlowBackoff),
 		retry.WithTrace(trace.Retry{
 			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 				onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context)

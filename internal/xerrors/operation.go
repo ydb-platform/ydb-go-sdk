@@ -122,14 +122,14 @@ func (e *operationError) BackoffType() backoff.Type {
 	switch e.code {
 	case
 		Ydb.StatusIds_OVERLOADED:
-		return backoff.TypeSlowBackoff
+		return backoff.TypeSlow
 	case
 		Ydb.StatusIds_ABORTED,
 		Ydb.StatusIds_UNAVAILABLE,
 		Ydb.StatusIds_CANCELLED,
 		Ydb.StatusIds_SESSION_BUSY,
 		Ydb.StatusIds_UNDETERMINED:
-		return backoff.TypeFastBackoff
+		return backoff.TypeFast
 	default:
 		return backoff.TypeNoBackoff
 	}
