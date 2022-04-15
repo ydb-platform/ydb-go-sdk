@@ -5,6 +5,9 @@
 ![lint](https://github.com/ydb-platform/ydb-go-sdk/workflows/lint/badge.svg?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ydb-platform/ydb-go-sdk/v3)](https://goreportcard.com/report/github.com/ydb-platform/ydb-go-sdk/v3)
 [![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/branch/master/graph/badge.svg?precision=2)](https://app.codecov.io/gh/ydb-platform/ydb-go-sdk)
+[![time tracker](https://wakatime.com/badge/github/ydb-platform/ydb-go-sdk.svg)](https://wakatime.com/badge/ydb-platform/ydb-go-sdk)
+![Code lines](https://sloc.xyz/github/ydb-platform/ydb-go-sdk/?category=code)
+![Comments](https://sloc.xyz/github/ydb-platform/ydb-go-sdk/?category=comments)
 
 Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme` and `scripting` clients for `YDB`. 
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and ACID transactions.
