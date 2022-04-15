@@ -40,6 +40,4 @@ jobs:
           message: |
             ### API Changes
 
-            <pre>
             ${{ steps.gorelease.outputs.report }}
-            </pre>
