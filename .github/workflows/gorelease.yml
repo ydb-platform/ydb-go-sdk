@@ -23,16 +23,21 @@ jobs:
           path: |
             ~/go/bin/gorelease
           key: ${{ runner.os }}-gorelease
-      - name: Gorelease
-        id: gorelease
+      - name: Install gorelease
         run: |
           test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
-          OUTPUT=$(gorelease || exit 0)
-          OUTPUT="${OUTPUT//'%'/'%25'}"
-          OUTPUT="${OUTPUT//$'\n'/'%0A'}"
-          OUTPUT="${OUTPUT//$'\r'/'%0D'}"
+      - name: Install egrep
+        run: |
+          which egrep || apt install egrep
+      - name: Check API changes
+        id: gorelease
+        run: |
+          OUTPUT="$(gorelease || exit 0)"
+          OUTPUT="$(echo $OUTPUT | egrep -v '^.*from .*\/internal\/.* to .*\/internal\/.*$')"
           echo "::set-output name=report::$OUTPUT"
+          exit 0
       - name: Comment Report
+        if: always()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -41,3 +46,9 @@ jobs:
             ### API Changes
 
             ${{ steps.gorelease.outputs.report }}
+
+      - name: Check breaking changes
+        run: |
+          if [[ ${{ steps.gorelease.outputs.report }} == *"Incompatible changes were detected"* ]]; then
+            exit 1
+          fi
