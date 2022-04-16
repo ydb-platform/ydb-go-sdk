@@ -2,8 +2,6 @@ package retry
 
 import (
 	"context"
-	"time"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
@@ -11,56 +9,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var (
-	// FastBackoff is a default fast backoff object
-	//
-	// Deprecated: don't use explicit it, will be removed at next major release.
-	// Use retry.Backoff constructor instead
-	FastBackoff = backoff.Fast
-
-	// SlowBackoff is a default fast backoff object
-	//
-	// Deprecated: don't use explicit it, will be removed at next major release.
-	// Use retry.Backoff constructor instead
-	SlowBackoff = backoff.Slow
-)
-
 // retryOperation is the interface that holds an operation for retry.
 // if retryOperation returns not nil - operation will retry
 // if retryOperation returns nil - retry loop will break
 type retryOperation func(context.Context) (err error)
-
-type retryableErrorOption xerrors.RetryableErrorOption
-
-const (
-	BackoffTypeNoBackoff   = backoff.TypeNoBackoff
-	BackoffTypeFastBackoff = backoff.TypeFast
-	BackoffTypeSlowBackoff = backoff.TypeSlow
-)
-
-// WithBackoff makes retryable error option with custom backoff type
-func WithBackoff(t backoff.Type) retryableErrorOption {
-	return retryableErrorOption(xerrors.WithBackoff(t))
-}
-
-// WithDeleteSession makes retryable error option with delete session flag
-func WithDeleteSession() retryableErrorOption {
-	return retryableErrorOption(xerrors.WithDeleteSession())
-}
-
-// RetryableError makes retryable error from options
-// RetryableError provides retrying on custom errors
-func RetryableError(err error, opts ...retryableErrorOption) error {
-	return xerrors.Retryable(
-		err,
-		func() (retryableErrorOptions []xerrors.RetryableErrorOption) {
-			for _, o := range opts {
-				retryableErrorOptions = append(retryableErrorOptions, xerrors.RetryableErrorOption(o))
-			}
-			return retryableErrorOptions
-		}()...,
-	)
-}
 
 type retryOptions struct {
 	id          string
@@ -74,7 +26,7 @@ type retryOptions struct {
 
 type retryOption func(h *retryOptions)
 
-// WithID returns id option
+// WithID applies id for identification call Retry in trace.Retry.OnRetry
 func WithID(id string) retryOption {
 	return func(h *retryOptions) {
 		h.id = id
@@ -93,15 +45,6 @@ func WithIdempotent(idempotent bool) retryOption {
 	return func(h *retryOptions) {
 		h.idempotent = idempotent
 	}
-}
-
-// Backoff makes backoff with custom params
-func Backoff(slotDuration time.Duration, ceiling uint, jitterLimit float64) backoff.Backoff {
-	return backoff.New(
-		backoff.WithSlotDuration(slotDuration),
-		backoff.WithCeiling(ceiling),
-		backoff.WithJitterLimit(jitterLimit),
-	)
 }
 
 // WithFastBackoff replaces default fast backoff
@@ -127,10 +70,15 @@ func WithPanicCallback(panicCallback func(e interface{})) retryOption {
 }
 
 // Retry provide the best effort fo retrying operation
+//
 // Retry implements internal busy loop until one of the following conditions is met:
-// - deadline was canceled or deadlined
+//
+// - context was canceled or deadlined
+//
 // - retry operation returned nil as error
+//
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
+//
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err error) {
 	options := &retryOptions{

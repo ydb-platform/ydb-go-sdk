@@ -5,16 +5,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
-type Mode interface {
-	MustRetry(isOperationIdempotent bool) bool
-	StatusCode() int64
-	MustBackoff() bool
-	BackoffType() backoff.Type
-	MustDeleteSession() bool
-}
-
 // Mode reports whether operation is able retried and with which properties.
-type mode struct {
+type Mode struct {
 	statusCode      int64
 	operationStatus operation.Status
 	backoff         backoff.Type
@@ -22,7 +14,7 @@ type mode struct {
 }
 
 func NewMode(statusCode int64, operationStatus operation.Status, backoff backoff.Type, deleteSession bool) Mode {
-	return mode{
+	return Mode{
 		statusCode:      statusCode,
 		operationStatus: operationStatus,
 		backoff:         backoff,
@@ -30,7 +22,7 @@ func NewMode(statusCode int64, operationStatus operation.Status, backoff backoff
 	}
 }
 
-func (m mode) MustRetry(isOperationIdempotent bool) bool {
+func (m Mode) MustRetry(isOperationIdempotent bool) bool {
 	switch m.operationStatus {
 	case operation.Finished:
 		return false
@@ -41,10 +33,10 @@ func (m mode) MustRetry(isOperationIdempotent bool) bool {
 	}
 }
 
-func (m mode) StatusCode() int64 { return m.statusCode }
+func (m Mode) StatusCode() int64 { return m.statusCode }
 
-func (m mode) MustBackoff() bool { return m.backoff&backoff.TypeAny != 0 }
+func (m Mode) MustBackoff() bool { return m.backoff&backoff.TypeAny != 0 }
 
-func (m mode) BackoffType() backoff.Type { return m.backoff }
+func (m Mode) BackoffType() backoff.Type { return m.backoff }
 
-func (m mode) MustDeleteSession() bool { return m.deleteSession }
+func (m Mode) MustDeleteSession() bool { return m.deleteSession }
