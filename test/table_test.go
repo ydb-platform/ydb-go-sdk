@@ -184,9 +184,9 @@ func TestTable(t *testing.T) {
 		}
 	)
 
-	db, err := ydb.New(
+	db, err := ydb.Open(
 		ctx,
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.WithUserAgent("tx"),
 		ydb.With(

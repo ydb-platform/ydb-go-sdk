@@ -1,3 +1,6 @@
+* Added `ydb.Open` method with required param connection string 
+* Marked `ydb.New` method as deprecated
+* Refactored package `dsn`
 * Refactored package `retry` (moved `retryBackoff` and `retryMode` implementations to `internal`)
 
 ## v3.20.2

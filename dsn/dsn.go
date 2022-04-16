@@ -1,25 +1,11 @@
 package dsn
 
-import (
-	"fmt"
-)
-
 // Usage of this package
 //
-// db, err := ydb.New(
+// db, err := ydb.Open(
 //   ctx,
-//   ydb.WithConnectionString(
-//     New("endpoint", "database").WithSecure(false).String(),
-//   ),
+//   dsn.Make("endpoint", "database", dsn.WithSecure(false)),
 // )
-
-// DSN helps to make connection string from separated endpoint and database
-type DSN interface {
-	fmt.Stringer
-
-	// WithSecure makes new DSN from current DSN with passed secure flag
-	WithSecure(secure bool) DSN
-}
 
 type connectionString struct {
 	endpoint string
@@ -27,27 +13,28 @@ type connectionString struct {
 	secure   bool
 }
 
-func (cs *connectionString) String() (s string) {
-	s = "grpc"
-	if cs.secure {
-		s += "s"
-	}
-	return s + "://" + cs.endpoint + "/?database=" + cs.database
-}
+type option func(cs *connectionString)
 
-func (cs *connectionString) WithSecure(secure bool) DSN {
-	return &connectionString{
-		secure:   secure,
-		endpoint: cs.endpoint,
-		database: cs.database,
+// WithSecure changes default secure flag
+func WithSecure(secure bool) option {
+	return func(cs *connectionString) {
+		cs.secure = secure
 	}
 }
 
-// New makes secured DSN with endpoint and database
-func New(endpoint, database string) DSN {
-	return &connectionString{
+// Make makes connection string by endpoint, database and options
+func Make(endpoint, database string, opts ...option) (s string) {
+	cs := connectionString{
 		endpoint: endpoint,
 		database: database,
 		secure:   true,
 	}
+	for _, o := range opts {
+		o(&cs)
+	}
+	s = "grpc"
+	if cs.secure {
+		s += "s"
+	}
+	return s + ":///" + cs.endpoint + "/?database=" + cs.database
 }

@@ -223,8 +223,32 @@ func (c *connection) Scripting() scripting.Client {
 	return c.scripting
 }
 
+// Open connects to database by DSN and return driver runtime holder
+//
+// DSN accept connection string like
+//
+//   "grpc[s]://{endpoint}/?database={database}"
+//
+func Open(ctx context.Context, dsn string, opts ...Option) (_ Connection, err error) {
+	return open(
+		ctx,
+		append(
+			[]Option{
+				WithConnectionString(dsn),
+			},
+			opts...,
+		)...,
+	)
+}
+
 // New connects to database and return driver runtime holder
+//
+// Deprecated: use Open with required param connectionString instead
 func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
+	return open(ctx, opts...)
+}
+
+func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c := &connection{
 		opts:     opts,
 		children: make(map[uint64]Connection),
