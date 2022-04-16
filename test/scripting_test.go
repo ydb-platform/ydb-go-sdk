@@ -69,13 +69,13 @@ func TestScripting(t *testing.T) {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"),
-				retry.WithBackoff(retry.BackoffTypeNoBackoff),
+				retry.WithBackoff(retry.TypeNoBackoff),
 			)
 		}
 		if !res.NextRow() {
 			return retry.RetryableError(
 				fmt.Errorf("no rows"),
-				retry.WithBackoff(retry.BackoffTypeSlowBackoff),
+				retry.WithBackoff(retry.TypeSlowBackoff),
 			)
 		}
 		var sum int32
@@ -105,14 +105,14 @@ func TestScripting(t *testing.T) {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"),
-				retry.WithBackoff(retry.BackoffTypeNoBackoff),
+				retry.WithBackoff(retry.TypeNoBackoff),
 				retry.WithDeleteSession(),
 			)
 		}
 		if !res.NextRow() {
 			return retry.RetryableError(
 				fmt.Errorf("no rows"),
-				retry.WithBackoff(retry.BackoffTypeFastBackoff),
+				retry.WithBackoff(retry.TypeFastBackoff),
 			)
 		}
 		var sum int32

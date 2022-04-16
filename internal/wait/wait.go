@@ -11,12 +11,6 @@ import (
 // expiration.
 // It returns non-nil error if and only if deadline expiration branch wins.
 func waitBackoff(ctx context.Context, b backoff.Backoff, i int) error {
-	if b == nil {
-		if err := ctx.Err(); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-		return nil
-	}
 	select {
 	case <-b.Wait(i):
 		return nil
