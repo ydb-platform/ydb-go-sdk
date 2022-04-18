@@ -20,7 +20,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	c := &cluster{
+	c := &Cluster{
 		config: config.New(
 			config.WithBalancer(func() balancer.Balancer {
 				_, b := stub.Balancer()
@@ -125,7 +125,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	})
 }
 
-func mergeEndpointIntoCluster(ctx context.Context, c *cluster, curr, next []endpoint.Endpoint) {
+func mergeEndpointIntoCluster(ctx context.Context, c *Cluster, curr, next []endpoint.Endpoint) {
 	SortEndpoints(curr)
 	SortEndpoints(next)
 	DiffEndpoints(curr, next,
