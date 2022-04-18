@@ -3,6 +3,7 @@ package config
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -12,44 +13,29 @@ const (
 )
 
 type Config struct {
+	config.Common
+
 	endpoint string
 	database string
 	secure   bool
 	meta     meta.Meta
 
-	operationTimeout     time.Duration
-	operationCancelAfter time.Duration
-
 	interval time.Duration
 	trace    trace.Discovery
-
-	panicCallback func(e interface{})
 }
 
-func New(opts ...Option) Config {
-	c := Config{
+func New(opts ...Option) *Config {
+	c := &Config{
 		interval: DefaultInterval,
 	}
 	for _, o := range opts {
-		o(&c)
+		o(c)
 	}
 	return c
 }
 
-func (c *Config) PanicCallback() func(e interface{}) {
-	return c.panicCallback
-}
-
 func (c *Config) Meta() meta.Meta {
 	return c.meta
-}
-
-func (c *Config) OperationTimeout() time.Duration {
-	return c.operationTimeout
-}
-
-func (c *Config) OperationCancelAfter() time.Duration {
-	return c.operationCancelAfter
 }
 
 func (c *Config) Interval() time.Duration {
@@ -73,6 +59,13 @@ func (c *Config) Trace() trace.Discovery {
 }
 
 type Option func(c *Config)
+
+// With applies common configuration params
+func With(config config.Common) Option {
+	return func(c *Config) {
+		c.Common = config
+	}
+}
 
 // WithEndpoint set a required starting endpoint for connect
 func WithEndpoint(endpoint string) Option {
@@ -111,30 +104,6 @@ func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Opti
 	}
 }
 
-// WithOperationTimeout define the maximum amount of time a YDB server will process
-// an operation. After timeout exceeds YDB will try to cancel operation and
-// regardless of the cancellation appropriate error will be returned to
-// the client.
-//
-// If OperationTimeout is zero then no timeout is used.
-func WithOperationTimeout(operationTimeout time.Duration) Option {
-	return func(c *Config) {
-		c.operationTimeout = operationTimeout
-	}
-}
-
-// WithOperationCancelAfter set the maximum amount of time a YDB server will process an
-// operation. After timeout exceeds YDB will try to cancel operation and if
-// it succeeds appropriate error will be returned to the client; otherwise
-// processing will be continued.
-//
-// If OperationCancelAfter is zero then no timeout is used.
-func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
-	return func(c *Config) {
-		c.operationCancelAfter = operationCancelAfter
-	}
-}
-
 // WithInterval set the frequency of background tasks of ydb endpoints discovery.
 //
 // If Interval is zero then the DefaultInterval is used.
@@ -147,14 +116,5 @@ func WithInterval(interval time.Duration) Option {
 		} else {
 			c.interval = interval
 		}
-	}
-}
-
-// WithPanicCallback adds user-defined panic callback
-//
-// nil will turn off callback
-func WithPanicCallback(cb func(e interface{})) Option {
-	return func(c *Config) {
-		c.panicCallback = cb
 	}
 }

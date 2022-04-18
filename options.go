@@ -375,12 +375,7 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.panicCallback = panicCallback
-		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithPanicCallback(panicCallback))
-		c.coordinationOptions = append(c.coordinationOptions, coordinationConfig.WithPanicCallback(panicCallback))
-		c.ratelimiterOptions = append(c.ratelimiterOptions, ratelimiterConfig.WithPanicCallback(panicCallback))
-		c.schemeOptions = append(c.schemeOptions, schemeConfig.WithPanicCallback(panicCallback))
-		c.scriptingOptions = append(c.scriptingOptions, scriptingConfig.WithPanicCallback(panicCallback))
-		c.tableOptions = append(c.tableOptions, tableConfig.WithPanicCallback(panicCallback))
+		c.options = append(c.options, config.WithPanicCallback(panicCallback))
 		return nil
 	}
 }

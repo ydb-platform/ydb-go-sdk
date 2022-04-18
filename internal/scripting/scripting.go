@@ -24,7 +24,7 @@ import (
 )
 
 type client struct {
-	config  config.Config
+	config  *config.Config
 	service Ydb_Scripting_V1.ScriptingServiceClient
 }
 

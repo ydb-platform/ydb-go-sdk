@@ -32,7 +32,7 @@ type SessionProvider interface {
 func doTx(
 	ctx context.Context,
 	c SessionProvider,
-	config config.Config,
+	config *config.Config,
 	op table.TxOperation,
 	opts table.Options,
 ) (err error) {
@@ -95,7 +95,7 @@ func doTx(
 func do(
 	ctx context.Context,
 	c SessionProvider,
-	config config.Config,
+	config *config.Config,
 	op table.Operation,
 	opts table.Options,
 ) (err error) {

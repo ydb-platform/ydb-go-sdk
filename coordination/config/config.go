@@ -1,87 +1,42 @@
 package config
 
 import (
-	"time"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Config interface {
-	// OperationTimeout is the maximum amount of time a YDB server will process
-	// an operation. After timeout exceeds YDB will try to cancel operation and
-	// regardless of the cancellation appropriate error will be returned to
-	// the client.
-	// If OperationTimeout is zero then no timeout is used.
-	OperationTimeout() time.Duration
+// Config is an configuration of coordination client
+//
+// nolint: maligned
+type Config struct {
+	config.Common
 
-	// OperationCancelAfter is the maximum amount of time a YDB server will process an
-	// operation. After timeout exceeds YDB will try to cancel operation and if
-	// it succeeds appropriate error will be returned to the client; otherwise
-	// processing will be continued.
-	// If OperationCancelAfter is zero then no timeout is used.
-	OperationCancelAfter() time.Duration
-
-	// Trace defines trace over coordination client calls
-	Trace() trace.Coordination
-
-	// PanicCallback returns user-defined panic callback
-	// If nil - panic callback not defined
-	PanicCallback() func(e interface{})
-}
-
-type config struct {
 	trace trace.Coordination
-
-	operationTimeout     time.Duration
-	operationCancelAfter time.Duration
-
-	panicCallback func(e interface{})
 }
 
-func (c *config) PanicCallback() func(e interface{}) {
-	return c.panicCallback
-}
-
-func (c *config) Trace() trace.Coordination {
+// Trace returns trace over coordination client calls
+func (c *Config) Trace() trace.Coordination {
 	return c.trace
 }
 
-func (c *config) OperationTimeout() time.Duration {
-	return c.operationTimeout
-}
+type Option func(c *Config)
 
-func (c *config) OperationCancelAfter() time.Duration {
-	return c.operationCancelAfter
-}
-
-type Option func(c *config)
-
+// WithTrace appends coordination trace to early defined traces
 func WithTrace(trace trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 
-func WithOperationTimeout(operationTimeout time.Duration) Option {
-	return func(c *config) {
-		c.operationTimeout = operationTimeout
+// With applies common configuration params
+func With(config config.Common) Option {
+	return func(c *Config) {
+		c.Common = config
 	}
 }
 
-func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
-	return func(c *config) {
-		c.operationCancelAfter = operationCancelAfter
-	}
-}
-
-func WithPanicCallback(cb func(e interface{})) Option {
-	return func(c *config) {
-		c.panicCallback = cb
-	}
-}
-
-func New(opts ...Option) Config {
-	c := &config{}
+func New(opts ...Option) *Config {
+	c := &Config{}
 	for _, o := range opts {
 		o(c)
 	}

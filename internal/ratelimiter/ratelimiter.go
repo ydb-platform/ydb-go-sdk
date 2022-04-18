@@ -26,7 +26,7 @@ var (
 )
 
 type client struct {
-	config  config.Config
+	config  *config.Config
 	service Ydb_RateLimiter_V1.RateLimiterServiceClient
 }
 

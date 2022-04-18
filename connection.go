@@ -285,14 +285,13 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		c.config,
 		c.pool,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]discoveryConfig.Option{
+				discoveryConfig.With(c.config.Common),
 				discoveryConfig.WithEndpoint(c.Endpoint()),
 				discoveryConfig.WithDatabase(c.Name()),
 				discoveryConfig.WithSecure(c.Secure()),
 				discoveryConfig.WithMeta(c.config.Meta()),
-				discoveryConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				discoveryConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
 			},
 			c.discoveryOptions...,
 		)...,
@@ -304,10 +303,9 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.table = lazy.Table(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]tableConfig.Option{
-				tableConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				tableConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				tableConfig.With(c.config.Common),
 			},
 			c.tableOptions...,
 		),
@@ -316,10 +314,9 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.scheme = lazy.Scheme(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]schemeConfig.Option{
-				schemeConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				schemeConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				schemeConfig.With(c.config.Common),
 			},
 			c.schemeOptions...,
 		),
@@ -328,10 +325,9 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.scripting = lazy.Scripting(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]scriptingConfig.Option{
-				scriptingConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				scriptingConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				scriptingConfig.With(c.config.Common),
 			},
 			c.scriptingOptions...,
 		),
@@ -340,10 +336,9 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.coordination = lazy.Coordination(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]coordinationConfig.Option{
-				coordinationConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				coordinationConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				coordinationConfig.With(c.config.Common),
 			},
 			c.coordinationOptions...,
 		),
@@ -352,10 +347,9 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.ratelimiter = lazy.Ratelimiter(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]ratelimiterConfig.Option{
-				ratelimiterConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				ratelimiterConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				ratelimiterConfig.With(c.config.Common),
 			},
 			c.ratelimiterOptions...,
 		),

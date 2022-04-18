@@ -1,5 +1,10 @@
 * Refactored `config.Config`
 * Refactored `discovery/config.Config`
+* Refactored `coordination/config.Config`
+* Refactored `scheme/config.Config`
+* Refactored `scripting/config.Config`
+* Refactored `table/config.Config`
+* Refactored `ratelimiter/config.Config`
 * Added `ydb.Open` method with required param connection string 
 * Marked `ydb.New` method as deprecated
 * Refactored package `dsn`

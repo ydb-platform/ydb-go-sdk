@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/xnet"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
@@ -21,9 +22,9 @@ import (
 
 // Config contains driver configuration.
 type Config struct {
+	config.Common
+
 	trace                            trace.Driver
-	operationTimeout                 time.Duration
-	operationCancelAfter             time.Duration
 	dialTimeout                      time.Duration
 	connectionTTL                    time.Duration
 	balancer                         balancer.Balancer
@@ -105,24 +106,6 @@ func (c *Config) Trace() trace.Driver {
 	return c.trace
 }
 
-// OperationTimeout is the maximum amount of time a YDB server will process
-// an operation. After timeout exceeds YDB will try to cancel operation and
-// regardless of the cancellation appropriate error will be returned to
-// the client.
-// If OperationTimeout is zero then no timeout is used.
-func (c *Config) OperationTimeout() time.Duration {
-	return c.operationTimeout
-}
-
-// OperationCancelAfter is the maximum amount of time a YDB server will process an
-// operation. After timeout exceeds YDB will try to cancel operation and if
-// it succeeds appropriate error will be returned to the client; otherwise
-// processing will be continued.
-// If OperationCancelAfter is zero then no timeout is used.
-func (c *Config) OperationCancelAfter() time.Duration {
-	return c.operationCancelAfter
-}
-
 // Balancer is an optional configuration related to selected balancer.
 // That is, some balancing methods allow to be configured.
 func (c *Config) Balancer() balancer.Balancer {
@@ -194,15 +177,34 @@ func WithCredentials(credentials credentials.Credentials) Option {
 	}
 }
 
+// WithOperationTimeout defines the maximum amount of time a YDB server will process
+// an operation. After timeout exceeds YDB will try to cancel operation and
+// regardless of the cancellation appropriate error will be returned to
+// the client.
+//
+// If OperationTimeout is zero then no timeout is used.
 func WithOperationTimeout(operationTimeout time.Duration) Option {
 	return func(c *Config) {
-		c.operationTimeout = operationTimeout
+		config.SetOperationTimeout(&c.Common, operationTimeout)
 	}
 }
 
+// WithOperationCancelAfter sets the maximum amount of time a YDB server will process an
+// operation. After timeout exceeds YDB will try to cancel operation and if
+// it succeeds appropriate error will be returned to the client; otherwise
+// processing will be continued.
+//
+// If OperationCancelAfter is zero then no timeout is used.
 func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 	return func(c *Config) {
-		c.operationCancelAfter = operationCancelAfter
+		config.SetOperationCancelAfter(&c.Common, operationCancelAfter)
+	}
+}
+
+// WithPanicCallback applies panic callback to config
+func WithPanicCallback(panicCallback func(e interface{})) Option {
+	return func(c *Config) {
+		config.SetPanicCallback(&c.Common, panicCallback)
 	}
 }
 

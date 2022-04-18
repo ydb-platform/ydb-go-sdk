@@ -17,7 +17,7 @@ import (
 )
 
 type client struct {
-	config  config.Config
+	config  *config.Config
 	service Ydb_Coordination_V1.CoordinationServiceClient
 }
 

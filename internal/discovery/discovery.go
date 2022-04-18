@@ -136,7 +136,7 @@ func New(
 var _ discovery.Client = &Client{}
 
 type Client struct {
-	config  config.Config
+	config  *config.Config
 	service Ydb_Discovery_V1.DiscoveryServiceClient
 	cc      conn.Conn
 }

@@ -40,7 +40,7 @@ import (
 type session struct {
 	id           string
 	tableService Ydb_Table_V1.TableServiceClient
-	config       config.Config
+	config       *config.Config
 
 	closedMtx sync.RWMutex
 	closed    bool
@@ -88,7 +88,7 @@ func (s *session) isClosing() bool {
 	return s.status == options.SessionClosing
 }
 
-func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (s Session, err error) {
+func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (s Session, err error) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx)
 	defer func() {
 		onDone(s, err)
