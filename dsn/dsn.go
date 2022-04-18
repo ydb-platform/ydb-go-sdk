@@ -23,6 +23,8 @@ func WithSecure(secure bool) option {
 }
 
 // Make makes connection string by endpoint, database and options
+//
+// Options provides additional parameters of DSN
 func Make(endpoint, database string, opts ...option) (s string) {
 	cs := connectionString{
 		endpoint: endpoint,
@@ -36,5 +38,5 @@ func Make(endpoint, database string, opts ...option) (s string) {
 	if cs.secure {
 		s += "s"
 	}
-	return s + ":///" + cs.endpoint + "/?database=" + cs.database
+	return s + "://" + cs.endpoint + "/?database=" + cs.database
 }
