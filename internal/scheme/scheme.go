@@ -10,13 +10,13 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 )
 
 type client struct {
-	config  *config.Config
+	config  config.Config
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 

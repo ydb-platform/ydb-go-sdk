@@ -24,37 +24,37 @@ type Config struct {
 	trace    trace.Discovery
 }
 
-func New(opts ...Option) *Config {
-	c := &Config{
+func New(opts ...Option) Config {
+	c := Config{
 		interval: DefaultInterval,
 	}
 	for _, o := range opts {
-		o(c)
+		o(&c)
 	}
 	return c
 }
 
-func (c *Config) Meta() meta.Meta {
+func (c Config) Meta() meta.Meta {
 	return c.meta
 }
 
-func (c *Config) Interval() time.Duration {
+func (c Config) Interval() time.Duration {
 	return c.interval
 }
 
-func (c *Config) Endpoint() string {
+func (c Config) Endpoint() string {
 	return c.endpoint
 }
 
-func (c *Config) Database() string {
+func (c Config) Database() string {
 	return c.database
 }
 
-func (c *Config) Secure() bool {
+func (c Config) Secure() bool {
 	return c.secure
 }
 
-func (c *Config) Trace() trace.Discovery {
+func (c Config) Trace() trace.Discovery {
 	return c.trace
 }
 

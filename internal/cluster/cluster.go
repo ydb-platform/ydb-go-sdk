@@ -32,7 +32,7 @@ var (
 type Cluster struct {
 	sync.RWMutex
 
-	config *config.Config
+	config config.Config
 	pool   conn.Pool
 
 	explorer  repeater.Repeater
@@ -147,7 +147,7 @@ type Explorer interface {
 
 func New(
 	ctx context.Context,
-	config *config.Config,
+	config config.Config,
 	pool conn.Pool,
 ) *Cluster {
 	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)

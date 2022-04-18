@@ -15,10 +15,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -61,7 +61,7 @@ func newClient(
 	ctx context.Context,
 	cc grpc.ClientConnInterface,
 	builder SessionBuilder,
-	config *config.Config,
+	config config.Config,
 ) *client {
 	onDone := trace.TableOnInit(config.Trace(), &ctx)
 	if builder == nil {
@@ -100,7 +100,7 @@ type client struct {
 	// It must not be nil.
 	build             SessionBuilder
 	cc                grpc.ClientConnInterface
-	config            *config.Config
+	config            config.Config
 	index             map[Session]sessionInfo
 	createInProgress  int           // KIKIMR-9163: in-create-process counter
 	limit             int           // Upper bound for client size.

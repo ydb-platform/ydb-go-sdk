@@ -6,10 +6,10 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 )
 
 type lazyScheme struct {

@@ -13,10 +13,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -136,7 +136,7 @@ func New(
 var _ discovery.Client = &Client{}
 
 type Client struct {
-	config  *config.Config
+	config  config.Config
 	service Ydb_Discovery_V1.DiscoveryServiceClient
 	cc      conn.Conn
 }

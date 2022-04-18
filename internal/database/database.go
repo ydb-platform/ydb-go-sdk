@@ -8,10 +8,10 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	int_discovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -30,7 +30,7 @@ type clusterConnector interface {
 }
 
 type database struct {
-	config    *config.Config
+	config    config.Config
 	cluster   clusterConnector
 	discovery discovery.Client
 }
@@ -59,7 +59,7 @@ func (db *database) Close(ctx context.Context) (err error) {
 
 func New(
 	ctx context.Context,
-	c *config.Config,
+	c config.Config,
 	pool conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {

@@ -15,7 +15,7 @@ type Config struct {
 }
 
 // Trace returns trace over ratelimiter calls
-func (c *Config) Trace() trace.Ratelimiter {
+func (c Config) Trace() trace.Ratelimiter {
 	return c.trace
 }
 
@@ -35,10 +35,10 @@ func With(config config.Common) Option {
 	}
 }
 
-func New(opts ...Option) *Config {
-	c := &Config{}
+func New(opts ...Option) Config {
+	c := Config{}
 	for _, o := range opts {
-		o(c)
+		o(&c)
 	}
 	return c
 }

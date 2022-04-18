@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
-	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"

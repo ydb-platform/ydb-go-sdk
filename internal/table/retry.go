@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -32,7 +32,7 @@ type SessionProvider interface {
 func doTx(
 	ctx context.Context,
 	c SessionProvider,
-	config *config.Config,
+	config config.Config,
 	op table.TxOperation,
 	opts table.Options,
 ) (err error) {
@@ -95,7 +95,7 @@ func doTx(
 func do(
 	ctx context.Context,
 	c SessionProvider,
-	config *config.Config,
+	config config.Config,
 	op table.Operation,
 	opts table.Options,
 ) (err error) {

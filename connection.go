@@ -10,23 +10,23 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
-	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
+	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
+	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
+	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
-	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
-	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -64,7 +64,7 @@ type Connection interface {
 type connection struct {
 	opts []Option
 
-	config  *config.Config
+	config  config.Config
 	options []config.Option
 
 	table        table.Client

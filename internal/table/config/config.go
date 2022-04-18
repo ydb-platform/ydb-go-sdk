@@ -17,10 +17,10 @@ const (
 	DefaultIdleKeepAliveThreshold          = 2
 )
 
-func New(opts ...Option) *Config {
+func New(opts ...Option) Config {
 	c := defaults()
 	for _, o := range opts {
-		o(c)
+		o(&c)
 	}
 	return c
 }
@@ -142,14 +142,14 @@ type Config struct {
 }
 
 // Trace defines trace over table client calls
-func (c *Config) Trace() trace.Table {
+func (c Config) Trace() trace.Table {
 	return c.trace
 }
 
 // SizeLimit is an upper bound of pooled sessions.
 // If SizeLimit is less than or equal to zero then the
 // DefaultSessionPoolSizeLimit variable is used as a limit.
-func (c *Config) SizeLimit() int {
+func (c Config) SizeLimit() int {
 	return c.sizeLimit
 }
 
@@ -157,7 +157,7 @@ func (c *Config) SizeLimit() int {
 // the excess idle ones will be closed and removed after IdleKeepAliveThreshold is reached for each of them.
 // If KeepAliveMinSize is less than zero, then no sessions will be preserved
 // If KeepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
-func (c *Config) KeepAliveMinSize() int {
+func (c Config) KeepAliveMinSize() int {
 	return c.keepAliveMinSize
 }
 
@@ -167,7 +167,7 @@ func (c *Config) KeepAliveMinSize() int {
 // If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
 // be removed ever.
 // If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
-func (c *Config) IdleKeepAliveThreshold() int {
+func (c Config) IdleKeepAliveThreshold() int {
 	return c.idleKeepAliveThreshold
 }
 
@@ -178,33 +178,33 @@ func (c *Config) IdleKeepAliveThreshold() int {
 // If IdleThreshold is less than zero then there is no idle limit.
 // If IdleThreshold is zero, then the DefaultSessionPoolIdleThreshold value
 // is used.
-func (c *Config) IdleThreshold() time.Duration {
+func (c Config) IdleThreshold() time.Duration {
 	return c.idleThreshold
 }
 
 // KeepAliveTimeout limits maximum time spent on KeepAlive request
 // If KeepAliveTimeout is less than or equal to zero then the
 // DefaultSessionPoolKeepAliveTimeout is used.
-func (c *Config) KeepAliveTimeout() time.Duration {
+func (c Config) KeepAliveTimeout() time.Duration {
 	return c.keepAliveTimeout
 }
 
 // CreateSessionTimeout limits maximum time spent on Create session request
 // If CreateSessionTimeout is less than or equal to zero then the
 // DefaultSessionPoolCreateSessionTimeout is used.
-func (c *Config) CreateSessionTimeout() time.Duration {
+func (c Config) CreateSessionTimeout() time.Duration {
 	return c.createSessionTimeout
 }
 
 // DeleteTimeout limits maximum time spent on Delete request
 // If DeleteTimeout is less than or equal to zero then the
 // DefaultSessionPoolDeleteTimeout is used.
-func (c *Config) DeleteTimeout() time.Duration {
+func (c Config) DeleteTimeout() time.Duration {
 	return c.deleteTimeout
 }
 
-func defaults() *Config {
-	return &Config{
+func defaults() Config {
+	return Config{
 		sizeLimit:              DefaultSessionPoolSizeLimit,
 		keepAliveMinSize:       DefaultKeepAliveMinSize,
 		idleKeepAliveThreshold: DefaultIdleKeepAliveThreshold,

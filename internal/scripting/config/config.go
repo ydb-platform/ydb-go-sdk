@@ -5,24 +5,21 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Config is an configuration of coordination client
-//
-// nolint: maligned
 type Config struct {
 	config.Common
 
-	trace trace.Coordination
+	trace trace.Scripting
 }
 
-// Trace returns trace over coordination client calls
-func (c *Config) Trace() trace.Coordination {
+// Trace defines trace over scripting client calls
+func (c Config) Trace() trace.Scripting {
 	return c.trace
 }
 
 type Option func(c *Config)
 
-// WithTrace appends coordination trace to early defined traces
-func WithTrace(trace trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
+// WithTrace appends scripting trace to early added traces
+func WithTrace(trace trace.Scripting, opts ...trace.ScriptingComposeOption) Option {
 	return func(c *Config) {
 		c.trace = c.trace.Compose(trace, opts...)
 	}
@@ -35,10 +32,10 @@ func With(config config.Common) Option {
 	}
 }
 
-func New(opts ...Option) *Config {
-	c := &Config{}
+func New(opts ...Option) Config {
+	c := Config{}
 	for _, o := range opts {
-		o(c)
+		o(&c)
 	}
 	return c
 }

@@ -42,43 +42,43 @@ type Config struct {
 }
 
 // ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
-func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
+func (c Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
 // UseDNSResolver is a flag about using dns-resolving or not
-func (c *Config) UseDNSResolver() bool {
+func (c Config) UseDNSResolver() bool {
 	return c.dnsResolver
 }
 
 // GrpcDialOptions is an custom client grpc dial options which will appends to
 // default grpc dial options
-func (c *Config) GrpcDialOptions() []grpc.DialOption {
+func (c Config) GrpcDialOptions() []grpc.DialOption {
 	return c.grpcOptions
 }
 
 // Meta is an internal option which contains meta information about database connection
-func (c *Config) Meta() meta.Meta {
+func (c Config) Meta() meta.Meta {
 	return c.meta
 }
 
 // ConnectionTTL is a time to live of a connection
 // If ConnectionTTL is zero then TTL is not used.
-func (c *Config) ConnectionTTL() time.Duration {
+func (c Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
 
 // Secure is an flag for secure connection
-func (c *Config) Secure() bool {
+func (c Config) Secure() bool {
 	return c.secure
 }
 
 // Endpoint is a required starting endpoint for connect
-func (c *Config) Endpoint() string {
+func (c Config) Endpoint() string {
 	return c.endpoint
 }
 
-func (c *Config) TLSConfig() *tls.Config {
+func (c Config) TLSConfig() *tls.Config {
 	return c.tlsConfig
 }
 
@@ -86,35 +86,35 @@ func (c *Config) TLSConfig() *tls.Config {
 // complete.
 //
 // If DialTimeout is zero then no timeout is used.
-func (c *Config) DialTimeout() time.Duration {
+func (c Config) DialTimeout() time.Duration {
 	return c.dialTimeout
 }
 
 // Database is a required database name.
-func (c *Config) Database() string {
+func (c Config) Database() string {
 	return c.database
 }
 
 // Credentials is an ydb client credentials.
 // In most cases Credentials are required.
-func (c *Config) Credentials() credentials.Credentials {
+func (c Config) Credentials() credentials.Credentials {
 	return c.credentials
 }
 
 // Trace contains driver tracing options.
-func (c *Config) Trace() trace.Driver {
+func (c Config) Trace() trace.Driver {
 	return c.trace
 }
 
 // Balancer is an optional configuration related to selected balancer.
 // That is, some balancing methods allow to be configured.
-func (c *Config) Balancer() balancer.Balancer {
+func (c Config) Balancer() balancer.Balancer {
 	return c.balancer
 }
 
 // RequestsType set an additional type hint to all requests.
 // It is needed only for debug purposes and advanced cases.
-func (c *Config) RequestsType() string {
+func (c Config) RequestsType() string {
 	return c.requestsType
 }
 
@@ -253,10 +253,10 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 	}
 }
 
-func New(opts ...Option) *Config {
+func New(opts ...Option) Config {
 	c := defaultConfig()
 	for _, o := range opts {
-		o(c)
+		o(&c)
 	}
 	c.grpcOptions = append(
 		c.grpcOptions,
@@ -298,8 +298,8 @@ func certPool() (certPool *x509.CertPool) {
 	return
 }
 
-func defaultConfig() (c *Config) {
-	return &Config{
+func defaultConfig() (c Config) {
+	return Config{
 		balancer: balancers.Default(),
 		secure:   true,
 		tlsConfig: &tls.Config{

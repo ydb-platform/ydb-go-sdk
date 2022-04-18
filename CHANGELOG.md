@@ -1,14 +1,14 @@
-* Refactored `config.Config`
-* Refactored `discovery/config.Config`
-* Refactored `coordination/config.Config`
-* Refactored `scheme/config.Config`
-* Refactored `scripting/config.Config`
-* Refactored `table/config.Config`
-* Refactored `ratelimiter/config.Config`
-* Added `ydb.Open` method with required param connection string 
+* Added `ydb.Open` method with required param connection string
 * Marked `ydb.New` method as deprecated
 * Refactored package `dsn`
 * Refactored package `retry` (moved `retryBackoff` and `retryMode` implementations to `internal`)
+* Refactored `config.Config`
+* Moved `discovery/config` to `internal/discovery/config`
+* Moved `coordination/config` to `internal/coordination/config`
+* Moved `scheme/config` to `internal/scheme/config`
+* Moved `scripting/config` to `internal/scripting/config`
+* Moved `table/config` to `internal/table/config`
+* Moved `ratelimiter/config` to `internal/ratelimiter/config`
 
 ## v3.20.2
 * Fixed race condition on lazy clients first call
