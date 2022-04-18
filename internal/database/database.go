@@ -30,7 +30,7 @@ type clusterConnector interface {
 }
 
 type database struct {
-	config    config.Config
+	config    *config.Config
 	cluster   clusterConnector
 	discovery discovery.Client
 }
@@ -59,7 +59,7 @@ func (db *database) Close(ctx context.Context) (err error) {
 
 func New(
 	ctx context.Context,
-	c config.Config,
+	c *config.Config,
 	pool conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {

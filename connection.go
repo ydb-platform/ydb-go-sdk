@@ -36,8 +36,16 @@ import (
 // This interface is central part for access to various systems
 // embedded to ydb through one configured connection method.
 type Connection interface {
-	database.Info
 	grpc.ClientConnInterface
+
+	// Endpoint returns initial endpoint
+	Endpoint() string
+
+	// Name returns database name
+	Name() string
+
+	// Secure returns true if database connection is secure
+	Secure() bool
 
 	Close(ctx context.Context) error
 
@@ -56,7 +64,7 @@ type Connection interface {
 type connection struct {
 	opts []Option
 
-	config  config.Config
+	config  *config.Config
 	options []config.Option
 
 	table        table.Client
@@ -99,16 +107,15 @@ func (c *connection) Close(ctx context.Context) error {
 	}()
 
 	c.childrenMtx.Lock()
-	children := c.children
+	closers := make([]func(context.Context) error, 0, len(c.children)+7)
+	for _, child := range c.children {
+		closers = append(closers, child.Close)
+	}
 	c.children = nil
 	c.childrenMtx.Unlock()
 
-	childrenClosers := make([]func(context.Context) error, 0, len(children))
-	for _, child := range children {
-		childrenClosers = append(childrenClosers, child.Close)
-	}
-
-	selfClosers := []func(context.Context) error{
+	closers = append(
+		closers,
 		c.ratelimiter.Close,
 		c.coordination.Close,
 		c.scheme.Close,
@@ -116,10 +123,10 @@ func (c *connection) Close(ctx context.Context) error {
 		c.scripting.Close,
 		c.db.Close,
 		c.pool.Release,
-	}
+	)
 
 	var issues []error
-	for _, closer := range append(childrenClosers, selfClosers...) {
+	for _, closer := range closers {
 		if err := closer(ctx); err != nil {
 			issues = append(issues, err)
 		}

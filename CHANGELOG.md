@@ -1,3 +1,5 @@
+* Refactored `config.Config`
+* Refactored `discovery/config.Config`
 * Added `ydb.Open` method with required param connection string 
 * Marked `ydb.New` method as deprecated
 * Refactored package `dsn`
