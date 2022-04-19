@@ -40,6 +40,7 @@ jobs:
         image: cr.yandex/yc/yandex-docker-local-ydb:latest
         ports:
           - 2135:2135
+          - 2136:2136
           - 8765:8765
         volumes:
           - /tmp/ydb_certs:/ydb_certs
@@ -63,6 +64,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Wait database available
+        run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
         run: go test -race -coverpkg=./... -coverprofile table.txt -covermode atomic ./test/table_test.go
       - name: Upload coverage to Codecov
@@ -81,6 +84,7 @@ jobs:
         image: cr.yandex/yc/yandex-docker-local-ydb:latest
         ports:
           - 2135:2135
+          - 2136:2136
           - 8765:8765
         volumes:
           - /tmp/ydb_certs:/ydb_certs
@@ -102,6 +106,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Wait database available
+        run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
         run: go test -race -coverpkg=./... -coverprofile ratelimiter.txt -covermode atomic ./test/ratelimiter_test.go
         shell: bash
@@ -121,6 +127,7 @@ jobs:
         image: cr.yandex/yc/yandex-docker-local-ydb:latest
         ports:
           - 2135:2135
+          - 2136:2136
           - 8765:8765
         volumes:
           - /tmp/ydb_certs:/ydb_certs
@@ -142,6 +149,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Wait database available
+        run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
         run: go test -race -coverpkg=./... -coverprofile scripting.txt -covermode atomic ./test/scripting_test.go
       - name: Upload coverage to Codecov
@@ -160,6 +169,7 @@ jobs:
         image: cr.yandex/yc/yandex-docker-local-ydb:latest
         ports:
           - 2135:2135
+          - 2136:2136
           - 8765:8765
         volumes:
           - /tmp/ydb_certs:/ydb_certs
@@ -181,6 +191,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Wait database available
+        run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
         run: go test -race -coverpkg=./... -coverprofile discovery.txt -covermode atomic ./test/discovery_test.go
       - name: Upload coverage to Codecov
@@ -199,6 +211,7 @@ jobs:
         image: cr.yandex/yc/yandex-docker-local-ydb:latest
         ports:
           - 2135:2135
+          - 2136:2136
           - 8765:8765
         volumes:
           - /tmp/ydb_certs:/ydb_certs
@@ -220,6 +233,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Wait database available
+        run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
         run: go test -race -coverpkg=./... -coverprofile connection.txt -covermode atomic ./test/connection_test.go
       - name: Upload coverage to Codecov
