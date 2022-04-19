@@ -30,7 +30,7 @@ jobs:
       - name: Check API changes
         id: gorelease
         run: |
-          OUTPUT=$(gorelease || true);
+          OUTPUT=$(gorelease -base=master || true);
           OUTPUT=$(echo "$OUTPUT" | egrep -v "^.*from .*\/internal\/.* to .*\/internal\/.*$");
           OUTPUT="${OUTPUT//'%'/'%25'}"
           OUTPUT="${OUTPUT//$'\n'/'%0A'}"
