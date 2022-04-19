@@ -277,35 +277,22 @@ var testData = [...]struct {
 	},
 	{
 		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(0.2)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(1)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(1)),
+			endpoint.New("foo:0"),
+			endpoint.New("bar:0"),
+			endpoint.New("baz:0"),
 		},
-		repeat: 1000,
+		repeat: 999,
 		exp: map[string]int{
-			"foo:0": 600,
-			"bar:0": 200,
-			"baz:0": 200,
+			"foo:0": 333,
+			"bar:0": 333,
+			"baz:0": 333,
 		},
 	},
 	{
 		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(1)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(0.1)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(0.9)),
-		},
-		repeat: 1000,
-		exp: map[string]int{
-			"foo:0": 200,
-			"bar:0": 600,
-			"baz:0": 200,
-		},
-	},
-	{
-		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(0.25)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(1)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(1)),
+			endpoint.New("foo:0"),
+			endpoint.New("bar:0"),
+			endpoint.New("baz:0"),
 		},
 		del: []endpoint.Endpoint{
 			endpoint.New("foo:0"),
@@ -318,54 +305,24 @@ var testData = [...]struct {
 	},
 	{
 		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(1)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(0.25)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(0.25)),
-		},
-		del: []endpoint.Endpoint{
 			endpoint.New("foo:0"),
-		},
-		repeat: 1000,
-		exp: map[string]int{
-			"bar:0": 500,
-			"baz:0": 500,
-		},
-	},
-	{
-		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(1)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(0.75)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(0.25)),
+			endpoint.New("bar:0"),
+			endpoint.New("baz:0"),
 		},
 		del: []endpoint.Endpoint{
 			endpoint.New("bar:0"),
 		},
 		repeat: 1200,
 		exp: map[string]int{
-			"foo:0": 400,
-			"baz:0": 800,
+			"foo:0": 600,
+			"baz:0": 600,
 		},
 	},
 	{
 		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
-		},
-		del: []endpoint.Endpoint{
+			endpoint.New("foo:0"),
+			endpoint.New("bar:0"),
 			endpoint.New("baz:0"),
-		},
-		repeat: 1000,
-		exp: map[string]int{
-			"foo:0": 500,
-			"bar:0": 500,
-		},
-	},
-	{
-		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
 		},
 		del: []endpoint.Endpoint{
 			endpoint.New("foo:0"),
@@ -377,9 +334,9 @@ var testData = [...]struct {
 	},
 	{
 		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
+			endpoint.New("foo:0"),
+			endpoint.New("bar:0"),
+			endpoint.New("baz:0"),
 		},
 		banned: map[string]struct{}{
 			"foo:0": {},
@@ -393,9 +350,9 @@ var testData = [...]struct {
 	},
 	{
 		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
+			endpoint.New("foo:0"),
+			endpoint.New("bar:0"),
+			endpoint.New("baz:0"),
 		},
 		banned: map[string]struct{}{
 			"foo:0": {},
@@ -409,9 +366,9 @@ var testData = [...]struct {
 	},
 	{
 		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(0)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(0)),
+			endpoint.New("foo:0"),
+			endpoint.New("bar:0"),
+			endpoint.New("baz:0"),
 		},
 		banned: map[string]struct{}{
 			"foo:0": {},
@@ -428,28 +385,9 @@ var testData = [...]struct {
 	},
 	{
 		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(10)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(20)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(30)),
-		},
-		banned: map[string]struct{}{
-			"foo:0": {},
-			"bar:0": {},
-			"baz:0": {},
-		},
-		repeat: 150,
-		err:    true,
-		exp: map[string]int{
-			"foo:0": 75,
-			"bar:0": 50,
-			"baz:0": 25,
-		},
-	},
-	{
-		add: []endpoint.Endpoint{
-			endpoint.New("foo:0", endpoint.WithLoadFactor(10)),
-			endpoint.New("bar:0", endpoint.WithLoadFactor(20)),
-			endpoint.New("baz:0", endpoint.WithLoadFactor(30)),
+			endpoint.New("foo:0"),
+			endpoint.New("bar:0"),
+			endpoint.New("baz:0"),
 		},
 		banned: map[string]struct{}{
 			"foo:0": {},
@@ -458,8 +396,8 @@ var testData = [...]struct {
 		err:    true,
 		exp: map[string]int{
 			"foo:0": 0,
-			"bar:0": 100,
-			"baz:0": 50,
+			"bar:0": 75,
+			"baz:0": 75,
 		},
 	},
 }

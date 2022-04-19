@@ -9,9 +9,12 @@ import (
 type Rand interface {
 	Int64(max int64) int64
 	Int(max int) int
+	Shuffle(n int, swap func(i, j int))
 }
 
 type r struct {
+	source int64
+
 	m   *sync.Mutex
 	max int64
 
@@ -32,15 +35,23 @@ func WithMax(max int64) option {
 	}
 }
 
+func WithSource(source int64) option {
+	return func(r *r) {
+		r.source = source
+	}
+}
+
 func New(opts ...option) Rand {
 	r := &r{
-		max: math.MaxInt64,
+		max:    math.MaxInt64,
+		source: math.MaxInt64,
 	}
 	for _, o := range opts {
 		o(r)
 	}
+
 	// nolint:gosec
-	r.r = rand.New(rand.NewSource(math.MaxInt64))
+	r.r = rand.New(rand.NewSource(r.source))
 	return r
 }
 
@@ -49,6 +60,7 @@ func (r *r) int64n(max int64) int64 {
 		r.m.Lock()
 		defer r.m.Unlock()
 	}
+
 	return r.r.Int63n(max)
 }
 
@@ -58,4 +70,13 @@ func (r *r) Int64(max int64) int64 {
 
 func (r *r) Int(max int) int {
 	return int(r.int64n(int64(max)))
+}
+
+func (r *r) Shuffle(n int, swap func(i, j int)) {
+	if r.m != nil {
+		r.m.Lock()
+		defer r.m.Unlock()
+	}
+
+	r.r.Shuffle(n, swap)
 }

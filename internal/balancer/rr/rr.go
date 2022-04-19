@@ -1,7 +1,6 @@
 package rr
 
 import (
-	"container/heap"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -12,19 +11,50 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
-// roundRobin is an implementation of weighted round-robin balancing algorithm.
-//
-// It relies on connection's load factor (usually obtained by discovery
-// routine – that is, not a runtime metric) and interprets it as inversion of
-// weight.
-type roundRobin struct {
+var randomSources = xrand.New(xrand.WithLock())
+
+type baseBalancer struct {
 	mu    sync.RWMutex
-	min   float32
-	max   float32
-	belt  []int
-	next  int32
 	conns list.List
-	r     xrand.Rand
+}
+
+func (r *baseBalancer) Contains(x balancer.Element) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if x == nil {
+		return false
+	}
+
+	el, ok := x.(*list.Element)
+	if !ok {
+		return false
+	}
+
+	return r.conns.Contains(el)
+}
+
+func (r *baseBalancer) Insert(conn conn.Conn) balancer.Element {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	e := r.conns.Insert(conn)
+	return e
+}
+
+func (r *baseBalancer) Remove(x balancer.Element) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	el := x.(*list.Element)
+	r.conns.Remove(el)
+	return true
+}
+
+type roundRobin struct {
+	baseBalancer
+
+	next uint64
 }
 
 func (r *roundRobin) Create() balancer.Balancer {
@@ -33,226 +63,90 @@ func (r *roundRobin) Create() balancer.Balancer {
 
 func RoundRobin() balancer.Balancer {
 	return &roundRobin{
-		r: xrand.New(xrand.WithLock()),
+		// random start need to prevent overload first nodes
+		next: uint64(randomSources.Int64(math.MaxInt64)),
 	}
+}
+
+func (r *roundRobin) Next() conn.Conn {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	connCount := len(r.conns)
+
+	for _, bannedIsOk := range []bool{false, true} {
+		for i := 0; i < connCount; i++ {
+			index := int(atomic.AddUint64(&r.next, 1) % uint64(connCount))
+			c := r.conns[index].Conn
+			if isOkConnection(c, bannedIsOk) {
+				return c
+			}
+		}
+	}
+
+	return nil
+}
+
+type randomChoice struct {
+	baseBalancer
+
+	rand xrand.Rand
 }
 
 func RandomChoice() balancer.Balancer {
 	return &randomChoice{
-		roundRobin: roundRobin{
-			r: xrand.New(xrand.WithLock()),
-		},
+		rand: xrand.New(xrand.WithLock(), xrand.WithSource(randomSources.Int64(math.MaxInt64))),
 	}
-}
-
-type randomChoice struct {
-	roundRobin
 }
 
 func (r *randomChoice) Create() balancer.Balancer {
 	return RandomChoice()
 }
 
-func (r *roundRobin) Next() conn.Conn {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if n := len(r.conns); n == 0 {
-		return nil
-	}
-	d := int(atomic.AddInt32(&r.next, 1)) % len(r.belt)
-	i := r.belt[d]
-	return r.conns[i].Conn
-}
-
 func (r *randomChoice) Next() conn.Conn {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if n := len(r.conns); n == 0 {
+
+	connCount := len(r.conns)
+
+	if connCount == 0 {
+		// return for empty list need for prevent panic in fast path
 		return nil
 	}
-	i := r.belt[r.r.Int(len(r.belt))]
-	return r.conns[i].Conn
-}
 
-func (r *roundRobin) Insert(conn conn.Conn) balancer.Element {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	e := r.conns.Insert(conn)
-	r.updateMinMax(e.Conn)
-	r.belt = r.distribute()
-	return e
-}
+	// fast path
+	if c := r.conns[r.rand.Int(connCount)].Conn; isOkConnection(c, false) {
+		return c
+	}
 
-func (r *roundRobin) Remove(x balancer.Element) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	el := x.(*list.Element)
-	r.conns.Remove(el)
-	r.inspectMinMax(el.Conn.Endpoint().LoadFactor())
-	r.belt = r.distribute()
-	return true
-}
+	// shuffled indexes slices need for guarantee about every connection will check
+	indexes := make([]int, connCount)
+	for index := range indexes {
+		indexes[index] = index
+	}
+	r.rand.Shuffle(connCount, func(i, j int) {
+		indexes[i], indexes[j] = indexes[j], indexes[i]
+	})
 
-func (r *roundRobin) Contains(x balancer.Element) bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if x == nil {
-		return false
-	}
-	el, ok := x.(*list.Element)
-	if !ok {
-		return false
-	}
-	return r.conns.Contains(el)
-}
-
-// r.mu must be held
-func (r *roundRobin) updateMinMax(cc conn.Conn) {
-	if len(r.conns) == 1 {
-		r.min = cc.Endpoint().LoadFactor()
-		r.max = cc.Endpoint().LoadFactor()
-		return
-	}
-	if cc.Endpoint().LoadFactor() < r.min {
-		r.min = cc.Endpoint().LoadFactor()
-	}
-	if cc.Endpoint().LoadFactor() > r.max {
-		r.max = cc.Endpoint().LoadFactor()
-	}
-}
-
-// r.mu must be held
-func (r *roundRobin) inspectMinMax(loadFactor float32) {
-	if r.min != loadFactor && r.max != loadFactor {
-		return
-	}
-	var def bool
-	for _, x := range r.conns {
-		load := x.Conn.Endpoint().LoadFactor()
-		if !def {
-			r.min = load
-			r.max = load
-			def = true
-		}
-		if load < r.min {
-			r.min = load
-		}
-		if load > r.max {
-			r.max = load
-		}
-	}
-}
-
-// r.mu must be held
-func (r *roundRobin) distribute() []int {
-	return r.spread(distribution(
-		r.min, int32(len(r.conns)),
-		r.max, 1,
-	))
-}
-
-// r.mu must be held
-func (r *roundRobin) spread(f func(float32) int32) []int {
-	var (
-		dist  = make([]int32, 0, len(r.conns))
-		index = make([]int, 0, len(r.conns))
-	)
-	fill := func(state conn.State) (filled bool) {
-		for _, x := range r.conns {
-			if x.Conn.GetState() == state {
-				d := f(x.Conn.Endpoint().LoadFactor())
-				dist = append(dist, d)
-				index = append(index, x.Index)
-				filled = true
+	for _, bannedIsOk := range []bool{false, true} {
+		for _, index := range indexes {
+			c := r.conns[index].Conn
+			if isOkConnection(c, bannedIsOk) {
+				return c
 			}
 		}
-		return filled
 	}
-	for _, s := range [...]conn.State{
-		conn.Created,
-		conn.Online,
-		conn.Banned,
-		conn.Offline,
-		conn.Destroyed,
-	} {
-		if fill(s) {
-			return genBelt(index, dist)
-		}
-	}
+
 	return nil
 }
 
-func genBelt(index []int, weight []int32) (r []int) {
-	h := make(distItemsHeap, len(weight))
-	for i, w := range weight {
-		h[i] = newDistItem(index[i], w)
+func isOkConnection(c conn.Conn, bannedIsOk bool) bool {
+	state := c.GetState()
+	if state == conn.Online || state == conn.Created {
+		return true
 	}
-	heap.Init(&h)
-	for len(h) > 0 {
-		x := heap.Pop(&h).(*distItem)
-		r = append(r, x.index())
-		if x.tick() {
-			heap.Push(&h, x)
-		}
+	if bannedIsOk && state == conn.Banned {
+		return true
 	}
-	return
-}
-
-func distribution(x1 float32, y1 int32, x2 float32, y2 int32) (f func(float32) int32) {
-	if x1 == x2 {
-		f = func(float32) int32 { return 1 }
-	} else {
-		a := float32(y2-y1) / (x2 - x1)
-		b := float32(y1) - a*x1
-		f = func(x float32) int32 {
-			return int32(math.Round(float64(a*x + b)))
-		}
-	}
-	return f
-}
-
-type distItem struct {
-	i     int
-	step  float64
-	value float64
-}
-
-// newDistItem creates new distribution item.
-// w must be greater than zero.
-func newDistItem(i int, w int32) *distItem {
-	step := 1 / float64(w)
-	return &distItem{
-		i:     i,
-		step:  step,
-		value: step,
-	}
-}
-
-func (x *distItem) tick() bool {
-	x.value += x.step
-	return x.value <= 1
-}
-
-func (x *distItem) index() int {
-	return x.i
-}
-
-type distItemsHeap []*distItem
-
-func (h distItemsHeap) Len() int { return len(h) }
-
-func (h distItemsHeap) Less(i, j int) bool { return h[i].value < h[j].value }
-
-func (h distItemsHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-
-func (h *distItemsHeap) Push(x interface{}) {
-	*h = append(*h, x.(*distItem))
-}
-
-func (h *distItemsHeap) Pop() interface{} {
-	p := *h
-	n := len(p)
-	x := p[n-1]
-	*h = p[:n-1]
-	return x
+	return false
 }
