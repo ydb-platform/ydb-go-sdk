@@ -26,7 +26,7 @@ func DSN(endpoint, database string, secure bool) (s string) {
 	cs := connectionString{
 		endpoint: endpoint,
 		database: database,
-		secure:   true,
+		secure:   secure,
 	}
 	return cs.Build()
 }

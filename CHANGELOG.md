@@ -1,5 +1,5 @@
-* Remove accounting load factor (unused field) in balancers
-* Used anonymous credentials by default
+* Removed accounting load factor (unused field) in balancers
+* Enabled by default anonymous credentials
 * Enabled by default internal dns resolver
 * Removed from defaults `grpc.WithBlock()` option
 * Added `ydb.Open` method with required param connection string
