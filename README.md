@@ -15,7 +15,7 @@ Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme` and `scri
 
 * connect to YDB
     ```
-    db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local", ydb.WithAnonymousCredentials())
+    db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
     if err != nil {
         log.Fatal(err)
     }
