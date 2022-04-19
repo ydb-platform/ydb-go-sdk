@@ -83,7 +83,6 @@ func TestConnection(t *testing.T) {
 		ydb.WithUserAgent(userAgent),
 		ydb.WithRequestsType(requestType),
 		ydb.With(
-			config.WithInternalDNSResolver(),
 			config.WithGrpcOptions(
 				grpc.WithUnaryInterceptor(func(
 					ctx context.Context,

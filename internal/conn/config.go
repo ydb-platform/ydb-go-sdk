@@ -13,5 +13,4 @@ type Config interface {
 	Trace() trace.Driver
 	ConnectionTTL() time.Duration
 	GrpcDialOptions() []grpc.DialOption
-	UseDNSResolver() bool
 }

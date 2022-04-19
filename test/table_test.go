@@ -193,7 +193,6 @@ func TestTable(t *testing.T) {
 			config.WithOperationTimeout(123),
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
-			config.WithInternalDNSResolver(),
 			config.ExcludeGRPCCodesForPessimization(grpcCodes.DeadlineExceeded),
 			config.WithGrpcOptions(
 				grpc.WithUnaryInterceptor(func(

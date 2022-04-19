@@ -220,11 +220,8 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		defer cancel()
 	}
 
-	address := c.endpoint.Address()
-	if c.config.UseDNSResolver() {
-		// prepend "ydb" scheme for grpc dns-xresolver to find the proper scheme
-		address = "ydb:///" + address
-	}
+	// prepend "ydb" scheme for grpc dns-xresolver to find the proper scheme
+	address := "ydb:///" + c.endpoint.Address()
 
 	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
 	if err != nil {

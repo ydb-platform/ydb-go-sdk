@@ -99,7 +99,7 @@ func WithConnectionTTL(ttl time.Duration) Option {
 
 // WithEndpoint defines endpoint option
 //
-// Deprecated: use WithConnectionString or dsn package instead
+// Warning: use WithConnectionString or dsn package instead
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithEndpoint(endpoint))
@@ -109,7 +109,7 @@ func WithEndpoint(endpoint string) Option {
 
 // WithDatabase defines database option
 //
-// Deprecated: use WithConnectionString or dsn package instead
+// Warning: use WithConnectionString or dsn package instead
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithDatabase(database))
@@ -119,7 +119,7 @@ func WithDatabase(database string) Option {
 
 // WithSecure defines secure option
 //
-// Deprecated: use WithConnectionString or dsn package instead
+// Warning: use WithConnectionString or dsn package instead
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(secure))
@@ -129,7 +129,7 @@ func WithSecure(secure bool) Option {
 
 // WithInsecure defines secure option
 //
-// Deprecated: use WithConnectionString or dsn package instead
+// Warning: use WithConnectionString or dsn package instead
 func WithInsecure() Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(false))

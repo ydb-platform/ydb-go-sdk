@@ -1,3 +1,5 @@
+* Enabled by default internal dns resolver
+* Removed from defaults `grpc.WithBlock()` option
 * Added `ydb.Open` method with required param connection string
 * Marked `ydb.New` method as deprecated
 * Removed package `dsn`

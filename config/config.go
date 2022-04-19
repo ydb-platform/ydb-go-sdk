@@ -29,7 +29,6 @@ type Config struct {
 	connectionTTL                    time.Duration
 	balancer                         balancer.Balancer
 	secure                           bool
-	dnsResolver                      bool
 	endpoint                         string
 	database                         string
 	requestsType                     string
@@ -44,11 +43,6 @@ type Config struct {
 // ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
 func (c Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
-}
-
-// UseDNSResolver is a flag about using dns-resolving or not
-func (c Config) UseDNSResolver() bool {
-	return c.dnsResolver
 }
 
 // GrpcDialOptions is an custom client grpc dial options which will appends to
@@ -120,13 +114,11 @@ func (c Config) RequestsType() string {
 
 type Option func(c *Config)
 
-// WithInternalDNSResolver disable dns-resolving before dialing
-// If dns-resolving are disabled - dial used FQDN as address
-// If dns-resolving are enabled - dial used IP-address
+// WithInternalDNSResolver
+//
+// Deprecated: already used internal dns-resolver
 func WithInternalDNSResolver() Option {
-	return func(c *Config) {
-		c.dnsResolver = true
-	}
+	return func(c *Config) {}
 }
 
 func WithEndpoint(endpoint string) Option {
@@ -265,14 +257,6 @@ func New(opts ...Option) Config {
 			c.tlsConfig,
 		),
 	)
-	if c.dnsResolver {
-		c.grpcOptions = append(
-			c.grpcOptions,
-			grpc.WithResolvers(
-				xresolver.New("ydb", c.trace),
-			),
-		)
-	}
 	c.meta = meta.New(
 		c.database,
 		c.credentials,
@@ -326,7 +310,12 @@ func defaultConfig() (c Config) {
 				grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
 				grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
 			),
-			grpc.WithBlock(),
+			grpc.WithResolvers(
+				xresolver.New("", c.trace),
+				xresolver.New("ydb", c.trace),
+				xresolver.New("grpc", c.trace),
+				xresolver.New("grpcs", c.trace),
+			),
 		},
 	}
 }
