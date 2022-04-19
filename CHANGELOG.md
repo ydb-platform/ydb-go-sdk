@@ -1,8 +1,9 @@
 * Added `ydb.Open` method with required param connection string
 * Marked `ydb.New` method as deprecated
-* Refactored package `dsn`
+* Removed package `dsn`
+* Added `sugar.DSN` helper for make dsn (connection string)
 * Refactored package `retry` (moved `retryBackoff` and `retryMode` implementations to `internal`)
-* Refactored `config.Config`
+* Refactored `config.Config` (remove interface `Config`, renamed private struct `config` to `Config`)
 * Moved `discovery/config` to `internal/discovery/config`
 * Moved `coordination/config` to `internal/coordination/config`
 * Moved `scheme/config` to `internal/scheme/config`
