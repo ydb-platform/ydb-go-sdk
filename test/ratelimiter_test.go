@@ -26,9 +26,9 @@ const (
 func TestRatelimiter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*4)
 	defer cancel()
-	db, err := ydb.New(
+	db, err := ydb.Open(
 		ctx,
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*2),

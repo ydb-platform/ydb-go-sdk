@@ -1,3 +1,18 @@
+* Enabled by default internal dns resolver
+* Removed from defaults `grpc.WithBlock()` option
+* Added `ydb.Open` method with required param connection string
+* Marked `ydb.New` method as deprecated
+* Removed package `dsn`
+* Added `sugar.DSN` helper for make dsn (connection string)
+* Refactored package `retry` (moved `retryBackoff` and `retryMode` implementations to `internal`)
+* Refactored `config.Config` (remove interface `Config`, renamed private struct `config` to `Config`)
+* Moved `discovery/config` to `internal/discovery/config`
+* Moved `coordination/config` to `internal/coordination/config`
+* Moved `scheme/config` to `internal/scheme/config`
+* Moved `scripting/config` to `internal/scripting/config`
+* Moved `table/config` to `internal/table/config`
+* Moved `ratelimiter/config` to `internal/ratelimiter/config`
+
 ## v3.20.2
 * Fixed race condition on lazy clients first call
 

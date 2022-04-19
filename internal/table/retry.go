@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -217,29 +218,20 @@ func (s *singleSession) CloseSession(ctx context.Context, x Session) error {
 func retryBackoff(
 	ctx context.Context,
 	p SessionProvider,
-	fastBackoff retry.Backoff,
-	slowBackoff retry.Backoff,
+	fastBackoff backoff.Backoff,
+	slowBackoff backoff.Backoff,
 	isOperationIdempotent bool,
 	op table.Operation,
 ) (err error) {
-	var (
-		s        Session
-		i        int
-		attempts int
-		code     = int64(0)
-	)
+	var s Session
 	defer func() {
 		if s != nil {
 			_ = p.Put(ctx, s)
 		}
 	}()
-	for ; ; i++ {
-		attempts++
-		select {
-		case <-ctx.Done():
-			return xerrors.WithStackTrace(ctx.Err())
-
-		default:
+	return retry.Retry(
+		ctx,
+		func(ctx context.Context) (err error) {
 			if s == nil {
 				s, err = p.Get(ctx)
 				if s == nil && err == nil {
@@ -263,24 +255,15 @@ func retryBackoff(
 
 			m := retry.Check(err)
 
-			if m.StatusCode() != code {
-				i = 0
-			}
-
 			if m.MustDeleteSession() && s != nil {
 				_ = p.CloseSession(ctx, s)
 				s = nil
 			}
 
-			if !m.MustRetry(isOperationIdempotent) {
-				return xerrors.WithStackTrace(err)
-			}
-
-			if retry.Wait(ctx, fastBackoff, slowBackoff, m, i) != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			code = m.StatusCode()
-		}
-	}
+			return xerrors.WithStackTrace(err)
+		},
+		retry.WithFastBackoff(fastBackoff),
+		retry.WithSlowBackoff(slowBackoff),
+		retry.WithIdempotent(isOperationIdempotent),
+	)
 }

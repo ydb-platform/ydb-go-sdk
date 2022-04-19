@@ -1,5 +1,5 @@
 # This script is provided by github.com/bool64/dev.
-name: gorelease
+name: breaking
 on:
   pull_request:
 env:
@@ -23,21 +23,27 @@ jobs:
           path: |
             ~/go/bin/gorelease
           key: ${{ runner.os }}-gorelease
-      - name: Gorelease
+      - name: Install gorelease
+        run: test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
+      - name: Install egrep
+        run: which egrep || apt install egrep
+      - name: Check API changes
         id: gorelease
         run: |
-          test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
-          OUTPUT=$(gorelease || exit 0)
+          OUTPUT=$(gorelease || true);
+          OUTPUT=$(echo "$OUTPUT" | egrep -v "^.*from .*\/internal\/.* to .*\/internal\/.*$");
           OUTPUT="${OUTPUT//'%'/'%25'}"
           OUTPUT="${OUTPUT//$'\n'/'%0A'}"
           OUTPUT="${OUTPUT//$'\r'/'%0D'}"
-          echo "::set-output name=report::$OUTPUT"
+          echo "::set-output name=report::$OUTPUT";
       - name: Comment Report
+        if: always()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           header: gorelease
           message: |
             ### API Changes
-
+            
             ${{ steps.gorelease.outputs.report }}
+

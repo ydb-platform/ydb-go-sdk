@@ -70,7 +70,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 			dir, err = db.Scheme().ListDirectory(ctx, p)
 			return xerrors.WithStackTrace(err)
-		}, retry.WithIdempotent())
+		}, retry.WithIdempotent(true))
 		if ydb.IsOperationErrorSchemeError(err) {
 			return nil
 		}
@@ -90,7 +90,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 				}
 				err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 					return db.Scheme().RemoveDirectory(ctx, pt)
-				}, retry.WithIdempotent())
+				}, retry.WithIdempotent(true))
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}

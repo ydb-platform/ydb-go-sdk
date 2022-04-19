@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"errors"
 	"os"
 	"sync"
 
@@ -9,54 +10,54 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
-	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
+	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
+	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
+	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
-	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
-	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Connection interface provide access to YDB service clients
 // Interface and list of clients may be changed in the future
+//
+// This interface is central part for access to various systems
+// embedded to ydb through one configured connection method.
 type Connection interface {
-	closer.Closer
-	database.Info
 	grpc.ClientConnInterface
 
-	// Table returns table client
+	// Endpoint returns initial endpoint
+	Endpoint() string
+
+	// Name returns database name
+	Name() string
+
+	// Secure returns true if database connection is secure
+	Secure() bool
+
+	Close(ctx context.Context) error
+
+	// Method for accessing subsystems
 	Table() table.Client
-
-	// Scheme returns scheme client
 	Scheme() scheme.Client
-
-	// Coordination returns coordination client
 	Coordination() coordination.Client
-
-	// Ratelimiter returns rate limiter client
 	Ratelimiter() ratelimiter.Client
-
-	// Discovery returns discovery client
 	Discovery() discovery.Client
-
-	// Scripting returns scripting client
 	Scripting() scripting.Client
 
-	// With returns Connection specified with custom options
-	// Options provide options replacement for all clients taked from new Connection
+	// Make copy with additional options
 	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
@@ -105,49 +106,30 @@ func (c *connection) Close(ctx context.Context) error {
 		}
 	}()
 
-	var (
-		issues   []error
-		children = make([]Connection, 0, len(c.children))
-	)
-
 	c.childrenMtx.Lock()
+	closers := make([]func(context.Context) error, 0, len(c.children)+7)
 	for _, child := range c.children {
-		children = append(children, child)
+		closers = append(closers, child.Close)
 	}
+	c.children = nil
 	c.childrenMtx.Unlock()
 
-	for _, child := range children {
-		if err := child.Close(ctx); err != nil {
+	closers = append(
+		closers,
+		c.ratelimiter.Close,
+		c.coordination.Close,
+		c.scheme.Close,
+		c.table.Close,
+		c.scripting.Close,
+		c.db.Close,
+		c.pool.Release,
+	)
+
+	var issues []error
+	for _, closer := range closers {
+		if err := closer(ctx); err != nil {
 			issues = append(issues, err)
 		}
-	}
-
-	if err := c.ratelimiter.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.coordination.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.scheme.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.table.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.scripting.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.db.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err := c.pool.Release(ctx); err != nil {
-		issues = append(issues, err)
 	}
 
 	if len(issues) > 0 {
@@ -223,8 +205,33 @@ func (c *connection) Scripting() scripting.Client {
 	return c.scripting
 }
 
+// Open connects to database by DSN and return driver runtime holder
+//
+// DSN accept connection string like
+//
+//   "grpc[s]://{endpoint}/?database={database}"
+//
+// See `sugar.DSN` helper for make dsn from endpoint and database
+func Open(ctx context.Context, dsn string, opts ...Option) (_ Connection, err error) {
+	return open(
+		ctx,
+		append(
+			[]Option{
+				WithConnectionString(dsn),
+			},
+			opts...,
+		)...,
+	)
+}
+
 // New connects to database and return driver runtime holder
+//
+// Deprecated: use Open with required param connectionString instead
 func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
+	return open(ctx, opts...)
+}
+
+func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c := &connection{
 		opts:     opts,
 		children: make(map[uint64]Connection),
@@ -254,10 +261,10 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.config = config.New(c.options...)
 
 	if c.config.Endpoint() == "" {
-		panic("empty dial address")
+		return nil, xerrors.WithStackTrace(errors.New("configuration: empty dial address"))
 	}
 	if c.config.Database() == "" {
-		panic("empty database")
+		return nil, xerrors.WithStackTrace(errors.New("configuration: empty database"))
 	}
 
 	if single.IsSingle(c.config.Balancer()) {
@@ -279,14 +286,13 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		c.config,
 		c.pool,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]discoveryConfig.Option{
+				discoveryConfig.With(c.config.Common),
 				discoveryConfig.WithEndpoint(c.Endpoint()),
 				discoveryConfig.WithDatabase(c.Name()),
 				discoveryConfig.WithSecure(c.Secure()),
 				discoveryConfig.WithMeta(c.config.Meta()),
-				discoveryConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				discoveryConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
 			},
 			c.discoveryOptions...,
 		)...,
@@ -298,10 +304,9 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.table = lazy.Table(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]tableConfig.Option{
-				tableConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				tableConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				tableConfig.With(c.config.Common),
 			},
 			c.tableOptions...,
 		),
@@ -310,10 +315,9 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.scheme = lazy.Scheme(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]schemeConfig.Option{
-				schemeConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				schemeConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				schemeConfig.With(c.config.Common),
 			},
 			c.schemeOptions...,
 		),
@@ -322,10 +326,9 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.scripting = lazy.Scripting(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]scriptingConfig.Option{
-				scriptingConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				scriptingConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				scriptingConfig.With(c.config.Common),
 			},
 			c.scriptingOptions...,
 		),
@@ -334,10 +337,9 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.coordination = lazy.Coordination(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]coordinationConfig.Option{
-				coordinationConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				coordinationConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				coordinationConfig.With(c.config.Common),
 			},
 			c.coordinationOptions...,
 		),
@@ -346,10 +348,9 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	c.ratelimiter = lazy.Ratelimiter(
 		c.db,
 		append(
-			// prepend config params from root config
+			// prepend common params from root config
 			[]ratelimiterConfig.Option{
-				ratelimiterConfig.WithOperationTimeout(c.config.OperationTimeout()),
-				ratelimiterConfig.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+				ratelimiterConfig.With(c.config.Common),
 			},
 			c.ratelimiterOptions...,
 		),

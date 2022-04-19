@@ -6,9 +6,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 )
 
 type lazyTable struct {

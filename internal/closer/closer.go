@@ -4,8 +4,7 @@ import (
 	"context"
 )
 
-// Closer is the interface that wraps the basic Close method.
+// Closer is the interface that for ydb variang of close with context.
 type Closer interface {
-	// Close closes table client
 	Close(ctx context.Context) error
 }

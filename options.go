@@ -10,37 +10,24 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
+	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
+	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
+	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter/config"
-	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/scheme/config"
-	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/scripting/config"
-	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// Option contains configuration values for Connection
 type Option func(ctx context.Context, c *connection) error
-
-func withOnClose(onClose func(c *connection)) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.onClose = append(c.onClose, onClose)
-		return nil
-	}
-}
-
-func withConnPool(pool conn.Pool) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.pool = pool
-		return pool.Take(ctx)
-	}
-}
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
@@ -53,6 +40,7 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+// WithUserAgent add provided user agent value to all api requests
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithUserAgent(userAgent))
@@ -67,9 +55,11 @@ func WithRequestsType(requestsType string) Option {
 	}
 }
 
-// WithConnectionString accept connection string like 'grpc[s]://{endpoint}/?database={database}'
+// WithConnectionString accept connection string like
+//  grpc[s]://{endpoint}/?database={database}
+//
 // Warning: WithConnectionString will be removed at next major release
-// (connection string will be required string param of ydb.New)
+// (connection string will be required string param of ydb.Open)
 func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *connection) error {
 		var (
@@ -98,6 +88,7 @@ func WithConnectionString(connectionString string) Option {
 }
 
 // WithConnectionTTL defines duration for parking idle connections
+//
 // Warning: if defined WithSessionPoolIdleThreshold - idleThreshold must be less than connectionTTL
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
@@ -107,7 +98,8 @@ func WithConnectionTTL(ttl time.Duration) Option {
 }
 
 // WithEndpoint defines endpoint option
-// Deprecated: use WithConnectionString or dsn package instead
+//
+// Warning: use WithConnectionString or dsn package instead
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithEndpoint(endpoint))
@@ -116,7 +108,8 @@ func WithEndpoint(endpoint string) Option {
 }
 
 // WithDatabase defines database option
-// Deprecated: use WithConnectionString or dsn package instead
+//
+// Warning: use WithConnectionString or dsn package instead
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithDatabase(database))
@@ -125,7 +118,8 @@ func WithDatabase(database string) Option {
 }
 
 // WithSecure defines secure option
-// Deprecated: use WithConnectionString or dsn package instead
+//
+// Warning: use WithConnectionString or dsn package instead
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(secure))
@@ -134,7 +128,8 @@ func WithSecure(secure bool) Option {
 }
 
 // WithInsecure defines secure option
-// Deprecated: use WithConnectionString or dsn package instead
+//
+// Warning: use WithConnectionString or dsn package instead
 func WithInsecure() Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(false))
@@ -142,6 +137,7 @@ func WithInsecure() Option {
 	}
 }
 
+// WithMinTLSVersion set minimum TLS version acceptable for connections
 func WithMinTLSVersion(minVersion uint16) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithMinTLSVersion(minVersion))
@@ -156,6 +152,8 @@ func WithTLSSInsecureSkipVerify() Option {
 	}
 }
 
+// WithLogger add enables logging for selected tracing events.
+// See trace package documentation for details.
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 	loggerOpts := make([]logger.Option, 0, len(opts))
 	for _, o := range opts {
@@ -174,12 +172,14 @@ func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 	)
 }
 
+// WithAnonymousCredentials force to make requests withou authentication.
 func WithAnonymousCredentials() Option {
 	return WithCredentials(
 		credentials.NewAnonymousCredentials(credentials.WithSourceInfo("ydb.WithAnonymousCredentials()")),
 	)
 }
 
+// WithCreateCredentialsFunc add callback funcion to provide requests credentials
 func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (credentials.Credentials, error)) Option {
 	return func(ctx context.Context, c *connection) error {
 		creds, err := createCredentials(ctx)
@@ -206,6 +206,7 @@ func WithBalancer(balancer balancer.Balancer) Option {
 	}
 }
 
+// WithDialTimeout sets timeout for establishing new connection to cluster
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithDialTimeout(timeout))
@@ -213,6 +214,8 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
+// With collects additional configuration options.
+// This option does not replace collected option, instead it will appen provided options.
 func With(options ...config.Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, options...)
@@ -220,6 +223,7 @@ func With(options ...config.Option) Option {
 	}
 }
 
+// MergeOptions concatentaes provided options to one cumulative value.
 func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		for _, o := range opts {
@@ -231,6 +235,7 @@ func MergeOptions(opts ...Option) Option {
 	}
 }
 
+// WithDiscoveryInterval sets interval between cluster discovery calls.
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))
@@ -246,6 +251,7 @@ func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Opti
 	}
 }
 
+// WithCertificate provides custom CA certificate.
 func WithCertificate(cert *x509.Certificate) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithCertificate(cert))
@@ -253,6 +259,7 @@ func WithCertificate(cert *x509.Certificate) Option {
 	}
 }
 
+// WithCertificate provides filepath to load custom CA certificates.
 func WithCertificatesFromFile(caFile string) Option {
 	return func(ctx context.Context, c *connection) error {
 		if len(caFile) > 0 && caFile[0] == '~' {
@@ -273,6 +280,7 @@ func WithCertificatesFromFile(caFile string) Option {
 	}
 }
 
+// WithCertificate provides PEM encoded custom CA certificates.
 func WithCertificatesFromPem(bytes []byte) Option {
 	return func(ctx context.Context, c *connection) error {
 		if ok, err := func(bytes []byte) (ok bool, err error) {
@@ -302,6 +310,8 @@ func WithCertificatesFromPem(bytes []byte) Option {
 	}
 }
 
+// WithTableConfigOption collects additional configuration options for table.Client.
+// This option does not replace collected option, instead it will appen provided options.
 func WithTableConfigOption(option tableConfig.Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, option)
@@ -309,6 +319,7 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 	}
 }
 
+// WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
@@ -316,6 +327,7 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	}
 }
 
+// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveMinSize(keepAliveMinSize))
@@ -332,6 +344,7 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
+// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveTimeout(keepAliveTimeout))
@@ -339,6 +352,7 @@ func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	}
 }
 
+// WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
@@ -346,6 +360,7 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 	}
 }
 
+// WithSessionPoolDeleteTimeout set timeout to gracefully close deleting session in table.Client
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
@@ -360,12 +375,7 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.panicCallback = panicCallback
-		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithPanicCallback(panicCallback))
-		c.coordinationOptions = append(c.coordinationOptions, coordinationConfig.WithPanicCallback(panicCallback))
-		c.ratelimiterOptions = append(c.ratelimiterOptions, ratelimiterConfig.WithPanicCallback(panicCallback))
-		c.schemeOptions = append(c.schemeOptions, schemeConfig.WithPanicCallback(panicCallback))
-		c.scriptingOptions = append(c.scriptingOptions, scriptingConfig.WithPanicCallback(panicCallback))
-		c.tableOptions = append(c.tableOptions, tableConfig.WithPanicCallback(panicCallback))
+		c.options = append(c.options, config.WithPanicCallback(panicCallback))
 		return nil
 	}
 }
@@ -465,6 +475,7 @@ func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeO
 	}
 }
 
+// WithRatelimiterOptions returns reatelimiter option
 func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.ratelimiterOptions = append(c.ratelimiterOptions, opts...)
@@ -472,7 +483,7 @@ func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 	}
 }
 
-// WithTraceDiscovery returns discovery trace option
+// WithTraceDiscovery adds configured discovery tracer to Connection
 func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.discoveryOptions = append(
@@ -488,5 +499,21 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 			),
 		)
 		return nil
+	}
+}
+
+// Private technical options for correct copies processing
+
+func withOnClose(onClose func(c *connection)) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.onClose = append(c.onClose, onClose)
+		return nil
+	}
+}
+
+func withConnPool(pool conn.Pool) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.pool = pool
+		return pool.Take(ctx)
 	}
 }

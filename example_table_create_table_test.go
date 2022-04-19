@@ -13,8 +13,8 @@ import (
 
 func Example_tableCreateTable() {
 	ctx := context.Background()
-	db, err := ydb.New(ctx,
-		ydb.WithConnectionString("grpcs://localhost:2135/?database=/local"),
+	db, err := ydb.Open(ctx,
+		"grpcs://localhost:2135/?database=/local",
 		ydb.WithAnonymousCredentials(),
 	)
 	if err != nil {

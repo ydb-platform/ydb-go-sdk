@@ -12,12 +12,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -129,7 +130,7 @@ func (c *client) CreateSession(ctx context.Context, opts ...table.Option) (table
 			s, err = c.build(ctx)
 			return xerrors.WithStackTrace(err)
 		},
-		retry.WithIdempotent(),
+		retry.WithIdempotent(true),
 		retry.WithID("CreateSession"),
 		retry.WithFastBackoff(options.FastBackoff),
 		retry.WithSlowBackoff(options.SlowBackoff),
@@ -523,8 +524,8 @@ func (c *client) Close(ctx context.Context) (err error) {
 func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
 	options := table.Options{
 		Trace:       trace,
-		FastBackoff: retry.FastBackoff,
-		SlowBackoff: retry.SlowBackoff,
+		FastBackoff: backoff.Fast,
+		SlowBackoff: backoff.Slow,
 	}
 	for _, o := range opts {
 		o(&options)

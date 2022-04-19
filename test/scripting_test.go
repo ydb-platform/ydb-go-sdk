@@ -24,9 +24,9 @@ import (
 func TestScripting(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	db, err := ydb.New(
+	db, err := ydb.Open(
 		ctx,
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*2),
@@ -69,13 +69,13 @@ func TestScripting(t *testing.T) {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"),
-				retry.WithBackoff(retry.BackoffTypeNoBackoff),
+				retry.WithBackoff(retry.TypeNoBackoff),
 			)
 		}
 		if !res.NextRow() {
 			return retry.RetryableError(
 				fmt.Errorf("no rows"),
-				retry.WithBackoff(retry.BackoffTypeSlowBackoff),
+				retry.WithBackoff(retry.TypeSlowBackoff),
 			)
 		}
 		var sum int32
@@ -86,7 +86,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
 		return res.Err()
-	}, retry.WithIdempotent()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 	// StreamExecute
@@ -105,14 +105,14 @@ func TestScripting(t *testing.T) {
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
 				fmt.Errorf("no result sets"),
-				retry.WithBackoff(retry.BackoffTypeNoBackoff),
+				retry.WithBackoff(retry.TypeNoBackoff),
 				retry.WithDeleteSession(),
 			)
 		}
 		if !res.NextRow() {
 			return retry.RetryableError(
 				fmt.Errorf("no rows"),
-				retry.WithBackoff(retry.BackoffTypeFastBackoff),
+				retry.WithBackoff(retry.TypeFastBackoff),
 			)
 		}
 		var sum int32
@@ -123,7 +123,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
 		return res.Err()
-	}, retry.WithIdempotent()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("StreamExecute failed: %v", err)
 	}
 	// ExplainPlan
@@ -140,7 +140,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("empty plan")
 		}
 		return nil
-	}, retry.WithIdempotent()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("Explain failed: %v", err)
 	}
 	// ExplainValidate
@@ -157,7 +157,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected parameter types")
 		}
 		return nil
-	}, retry.WithIdempotent()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("Explain failed: %v", err)
 	}
 }

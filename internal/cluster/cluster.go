@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -30,11 +29,12 @@ var (
 	ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
 )
 
-type cluster struct {
+type Cluster struct {
+	sync.RWMutex
+
 	config config.Config
 	pool   conn.Pool
 
-	mu        sync.RWMutex
 	explorer  repeater.Repeater
 	index     map[string]entry.Entry
 	endpoints map[uint32]conn.Conn // only one endpoint by node ID
@@ -42,7 +42,7 @@ type cluster struct {
 	done chan struct{}
 }
 
-func (c *cluster) isClosed() bool {
+func (c *Cluster) isClosed() bool {
 	select {
 	case <-c.done:
 		return true
@@ -51,15 +51,16 @@ func (c *cluster) isClosed() bool {
 	}
 }
 
-func (c *cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
+// Pessimize connection in underling pool
+func (c *Cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 	c.pool.Pessimize(ctx, cc, cause)
 
 	if c.isClosed() {
 		return
 	}
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.RWMutex.RLock()
+	defer c.RWMutex.RUnlock()
 
 	entry, has := c.index[cc.Endpoint().Address()]
 	if !has {
@@ -92,19 +93,12 @@ func (c *cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 	}
 }
 
-func (c *cluster) Lock() {
-	c.mu.Lock()
-}
-
-func (c *cluster) Unlock() {
-	c.mu.Unlock()
-}
-
-func (c *cluster) Force() {
+// Force reexpore cluster
+func (c *Cluster) Force() {
 	c.explorer.Force()
 }
 
-func (c *cluster) SetExplorer(repeater repeater.Repeater) {
+func (c *Cluster) SetExplorer(repeater repeater.Repeater) {
 	c.explorer = repeater
 }
 
@@ -112,15 +106,15 @@ type crudOptionsHolder struct {
 	withLock bool
 }
 
-type crudOption func(h *crudOptionsHolder)
+type CrudOption func(h *crudOptionsHolder)
 
-func WithoutLock() crudOption {
+func WithoutLock() CrudOption {
 	return func(h *crudOptionsHolder) {
 		h.withLock = false
 	}
 }
 
-func parseOptions(opts ...crudOption) *crudOptionsHolder {
+func parseOptions(opts ...CrudOption) *crudOptionsHolder {
 	h := &crudOptionsHolder{
 		withLock: true,
 	}
@@ -138,12 +132,12 @@ type Getter interface {
 
 type Inserter interface {
 	// Insert inserts endpoint to cluster
-	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption)
+	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...CrudOption)
 }
 
 type Remover interface {
 	// Remove removes endpoint from cluster
-	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...crudOption)
+	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...CrudOption)
 }
 
 type Explorer interface {
@@ -151,34 +145,17 @@ type Explorer interface {
 	Force()
 }
 
-type InserterRemoverExplorerLocker interface {
-	Inserter
-	Remover
-	Explorer
-	sync.Locker
-}
-
-type Cluster interface {
-	closer.Closer
-	Getter
-	Inserter
-	Remover
-	Explorer
-	sync.Locker
-	conn.Pessimizer
-}
-
 func New(
 	ctx context.Context,
 	config config.Config,
 	pool conn.Pool,
-) Cluster {
+) *Cluster {
 	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)
 	defer func() {
 		onDone(pool.Take(ctx))
 	}()
 
-	return &cluster{
+	return &Cluster{
 		done:      make(chan struct{}),
 		config:    config,
 		index:     make(map[string]entry.Entry),
@@ -187,7 +164,7 @@ func New(
 	}
 }
 
-func (c *cluster) Close(ctx context.Context) (err error) {
+func (c *Cluster) Close(ctx context.Context) (err error) {
 	defer close(c.done)
 
 	onDone := trace.DriverOnClusterClose(c.config.Trace(), &ctx)
@@ -195,8 +172,8 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.RWMutex.Lock()
+	defer c.RWMutex.Unlock()
 
 	if c.explorer != nil {
 		c.explorer.Stop()
@@ -246,7 +223,7 @@ func (c *cluster) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func (c *cluster) get(ctx context.Context) (cc conn.Conn, err error) {
+func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 	for {
 		select {
 		case <-c.done:
@@ -267,7 +244,7 @@ func (c *cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
-func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
+func (c *Cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	var cancel context.CancelFunc
 	// without client context deadline lock limited on MaxGetConnTimeout
 	// cluster endpoints cannot be updated at this time
@@ -288,8 +265,8 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	}()
 
 	// wait lock for read during Get
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.RWMutex.RLock()
+	defer c.RWMutex.RUnlock()
 
 	if e, ok := ContextEndpoint(ctx); ok {
 		cc, ok = c.endpoints[e.NodeID()]
@@ -308,7 +285,7 @@ func (c *cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 }
 
 // Insert inserts new connection into the cluster.
-func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) {
+func (c *Cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...CrudOption) {
 	var (
 		onDone   = trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e.Copy())
 		inserted = false
@@ -320,8 +297,8 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 	options := parseOptions(opts...)
 	if options.withLock {
-		c.mu.Lock()
-		defer c.mu.Unlock()
+		c.RWMutex.Lock()
+		defer c.RWMutex.Unlock()
 	}
 
 	if c.isClosed() {
@@ -349,7 +326,7 @@ func (c *cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 }
 
 // Remove removes and closes previously inserted connection.
-func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudOption) {
+func (c *Cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...CrudOption) {
 	var (
 		onDone  = trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e.Copy())
 		address = e.Address()
@@ -363,8 +340,8 @@ func (c *cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...crudO
 
 	options := parseOptions(opts...)
 	if options.withLock {
-		c.mu.Lock()
-		defer c.mu.Unlock()
+		c.RWMutex.Lock()
+		defer c.RWMutex.Unlock()
 	}
 
 	if c.isClosed() {

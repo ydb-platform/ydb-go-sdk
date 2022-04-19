@@ -12,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -23,15 +24,15 @@ func TestLogBackoff(t *testing.T) {
 	}
 	for _, test := range []struct {
 		name    string
-		backoff logBackoff
+		backoff backoff.Backoff
 		exp     []exp
 		seeds   int64
 	}{
 		{
-			backoff: newBackoff(
-				withSlotDuration(time.Second),
-				withCeiling(3),
-				withJitterLimit(0),
+			backoff: backoff.New(
+				backoff.WithSlotDuration(time.Second),
+				backoff.WithCeiling(3),
+				backoff.WithJitterLimit(0),
 			),
 			exp: []exp{
 				{gte: 0, lte: time.Second},     // 1 << min(0, 3)
@@ -45,10 +46,10 @@ func TestLogBackoff(t *testing.T) {
 			seeds: 1000,
 		},
 		{
-			backoff: newBackoff(
-				withSlotDuration(time.Second),
-				withCeiling(3),
-				withJitterLimit(0.5),
+			backoff: backoff.New(
+				backoff.WithSlotDuration(time.Second),
+				backoff.WithCeiling(3),
+				backoff.WithJitterLimit(0.5),
 			),
 			exp: []exp{
 				{gte: 500 * time.Millisecond, lte: time.Second}, // 1 << min(0, 3)
@@ -62,10 +63,10 @@ func TestLogBackoff(t *testing.T) {
 			seeds: 1000,
 		},
 		{
-			backoff: newBackoff(
-				withSlotDuration(time.Second),
-				withCeiling(3),
-				withJitterLimit(1),
+			backoff: backoff.New(
+				backoff.WithSlotDuration(time.Second),
+				backoff.WithCeiling(3),
+				backoff.WithJitterLimit(1),
 			),
 			exp: []exp{
 				{eq: time.Second},     // 1 << min(0, 3)
@@ -87,7 +88,7 @@ func TestLogBackoff(t *testing.T) {
 				rand.Seed(seed)
 
 				for n, exp := range test.exp {
-					act := test.backoff.delay(n)
+					act := test.backoff.Delay(n)
 					if exp := exp.eq; exp != 0 {
 						if exp != act {
 							t.Fatalf(
@@ -121,16 +122,16 @@ func TestRetryModes(t *testing.T) {
 		nonIdempotentOperation bool // after an error we must retry non-idempotent operation or no
 	}
 	type Case struct {
-		err           error               // given error
-		backoff       xerrors.BackoffType // no backoff (=== no operationStatus), fast backoff, slow backoff
-		deleteSession bool                // close session and delete from pool
+		err           error        // given error
+		backoff       backoff.Type // no backoff (=== no operationStatus), fast backoff, slow backoff
+		deleteSession bool         // close session and delete from pool
 		canRetry      CanRetry
 	}
 	errs := []Case{
 		{
 			// retryer given unknown error - we will not operationStatus and will close session
 			err:           fmt.Errorf("unknown error"),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -140,7 +141,7 @@ func TestRetryModes(t *testing.T) {
 		{
 			// golang context deadline exceeded
 			err:           context.DeadlineExceeded,
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -150,7 +151,7 @@ func TestRetryModes(t *testing.T) {
 		{
 			// golang context canceled
 			err:           context.Canceled,
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -163,7 +164,7 @@ func TestRetryModes(t *testing.T) {
 			// We want to check internal grpc error on chaos monkey testing
 			// nolint:nolintlint
 			err:           xerrors.FromGRPCError(grpc.ErrClientConnClosing),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -172,7 +173,7 @@ func TestRetryModes(t *testing.T) {
 		},
 		{
 			err:           xerrors.Transport(),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -183,7 +184,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Canceled),
 			),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -194,7 +195,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Unknown),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -205,7 +206,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.InvalidArgument),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -216,7 +217,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.DeadlineExceeded),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -227,7 +228,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.NotFound),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -238,7 +239,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.AlreadyExists),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -249,7 +250,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.PermissionDenied),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -260,7 +261,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.ResourceExhausted),
 			),
-			backoff:       xerrors.BackoffTypeSlowBackoff,
+			backoff:       backoff.TypeSlow,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -271,7 +272,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.FailedPrecondition),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -282,7 +283,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Aborted),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -293,7 +294,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.OutOfRange),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -304,7 +305,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Unimplemented),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -315,7 +316,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Internal),
 			),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -326,7 +327,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Unavailable),
 			),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -337,7 +338,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.DataLoss),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -348,7 +349,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Unauthenticated),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -359,7 +360,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -370,7 +371,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_BAD_REQUEST),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -381,7 +382,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -392,7 +393,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -403,7 +404,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_ABORTED),
 			),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -414,7 +415,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE),
 			),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -425,7 +426,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED),
 			),
-			backoff:       xerrors.BackoffTypeSlowBackoff,
+			backoff:       backoff.TypeSlow,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -436,7 +437,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_SCHEME_ERROR),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -447,7 +448,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -458,7 +459,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_TIMEOUT),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -469,7 +470,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -480,7 +481,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_PRECONDITION_FAILED),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -491,7 +492,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_ALREADY_EXISTS),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -502,7 +503,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_NOT_FOUND),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -513,7 +514,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_SESSION_EXPIRED),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -524,7 +525,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_CANCELLED),
 			),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -535,7 +536,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_UNDETERMINED),
 			),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -546,7 +547,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED),
 			),
-			backoff:       xerrors.BackoffTypeNoBackoff,
+			backoff:       backoff.TypeNoBackoff,
 			deleteSession: false,
 			canRetry: CanRetry{
 				idempotentOperation:    false,
@@ -557,7 +558,7 @@ func TestRetryModes(t *testing.T) {
 			err: xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
 			),
-			backoff:       xerrors.BackoffTypeFastBackoff,
+			backoff:       backoff.TypeFast,
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
@@ -582,17 +583,17 @@ func TestRetryModes(t *testing.T) {
 					test.canRetry.nonIdempotentOperation,
 				)
 			}
-			if m.backoff != test.backoff {
+			if m.BackoffType() != test.backoff {
 				t.Errorf(
 					"unexpected backoff status: %v, want: %v",
-					m.backoff,
+					m.BackoffType(),
 					test.backoff,
 				)
 			}
-			if m.deleteSession != test.deleteSession {
+			if m.MustDeleteSession() != test.deleteSession {
 				t.Errorf(
 					"unexpected delete session status: %v, want: %v",
-					m.deleteSession,
+					m.MustDeleteSession(),
 					test.deleteSession,
 				)
 			}

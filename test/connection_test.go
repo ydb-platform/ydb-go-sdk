@@ -62,9 +62,9 @@ func TestConnection(t *testing.T) {
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	db, err := ydb.New(
+	db, err := ydb.Open(
 		ctx,
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*2),
@@ -83,7 +83,6 @@ func TestConnection(t *testing.T) {
 		ydb.WithUserAgent(userAgent),
 		ydb.WithRequestsType(requestType),
 		ydb.With(
-			config.WithInternalDNSResolver(),
 			config.WithGrpcOptions(
 				grpc.WithUnaryInterceptor(func(
 					ctx context.Context,
@@ -135,7 +134,7 @@ func TestConnection(t *testing.T) {
 				return
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
 	})
@@ -186,7 +185,7 @@ func TestConnection(t *testing.T) {
 				)
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("Execute failed: %v", err)
 		}
 	})
@@ -229,7 +228,7 @@ func TestConnection(t *testing.T) {
 				)
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("Stream execute failed: %v", err)
 		}
 	})
@@ -283,7 +282,7 @@ func TestConnection(t *testing.T) {
 				)
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("Stream execute failed: %v", err)
 		}
 	})
@@ -310,7 +309,7 @@ func TestConnection(t *testing.T) {
 				)
 			}
 			return nil
-		}, retry.WithIdempotent()); err != nil {
+		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("check export failed: %v", err)
 		}
 	})

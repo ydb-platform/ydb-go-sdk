@@ -12,7 +12,7 @@ var nextID = uint64(0)
 func (c *connection) With(ctx context.Context, opts ...Option) (Connection, error) {
 	id := atomic.AddUint64(&nextID, 1)
 
-	child, err := New(
+	child, err := open(
 		ctx,
 		append(
 			append(

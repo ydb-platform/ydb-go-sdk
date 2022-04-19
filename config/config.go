@@ -13,85 +13,22 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/xnet"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Config contains driver configuration options.
-type Config interface {
-	// Endpoint is a required starting endpoint for connect
-	Endpoint() string
+// Config contains driver configuration.
+type Config struct {
+	config.Common
 
-	// Database is a required database name.
-	Database() string
-
-	// Secure is an flag for secure connection
-	Secure() bool
-
-	// Credentials is an ydb client credentials.
-	// In most cases Credentials are required.
-	Credentials() credentials.Credentials
-
-	// Trace contains driver tracing options.
-	Trace() trace.Driver
-
-	// OperationTimeout is the maximum amount of time a YDB server will process
-	// an operation. After timeout exceeds YDB will try to cancel operation and
-	// regardless of the cancellation appropriate error will be returned to
-	// the client.
-	// If OperationTimeout is zero then no timeout is used.
-	OperationTimeout() time.Duration
-
-	// OperationCancelAfter is the maximum amount of time a YDB server will process an
-	// operation. After timeout exceeds YDB will try to cancel operation and if
-	// it succeeds appropriate error will be returned to the client; otherwise
-	// processing will be continued.
-	// If OperationCancelAfter is zero then no timeout is used.
-	OperationCancelAfter() time.Duration
-
-	// Balancer is an optional configuration related to selected balancer.
-	// That is, some balancing methods allow to be configured.
-	Balancer() balancer.Balancer
-
-	// RequestsType set an additional type hint to all requests.
-	// It is needed only for debug purposes and advanced cases.
-	RequestsType() string
-
-	// DialTimeout is the maximum amount of time a dial will wait for a connect to
-	// complete.
-	// If DialTimeout is zero then no timeout is used.
-	DialTimeout() time.Duration
-
-	// GrpcDialOptions is an custom client grpc dial options which will appends to
-	// default grpc dial options
-	GrpcDialOptions() []grpc.DialOption
-
-	// ConnectionTTL is a time to live of a connection
-	// If ConnectionTTL is zero then TTL is not used.
-	ConnectionTTL() time.Duration
-
-	// Meta is an option which contains meta information about database connection
-	Meta() meta.Meta
-
-	// UseDNSResolver is a flag about using dns-resolving or not
-	UseDNSResolver() bool
-
-	// ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
-	ExcludeGRPCCodesForPessimization() []grpcCodes.Code
-}
-
-// Config contains driver configuration options.
-type config struct {
 	trace                            trace.Driver
-	operationTimeout                 time.Duration
-	operationCancelAfter             time.Duration
 	dialTimeout                      time.Duration
 	connectionTTL                    time.Duration
 	balancer                         balancer.Balancer
 	secure                           bool
-	dnsResolver                      bool
 	endpoint                         string
 	database                         string
 	requestsType                     string
@@ -103,179 +40,204 @@ type config struct {
 	meta                             meta.Meta
 }
 
-func (c *config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
+// ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
+func (c Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
-func (c *config) UseDNSResolver() bool {
-	return c.dnsResolver
-}
-
-func (c *config) GrpcDialOptions() []grpc.DialOption {
+// GrpcDialOptions is an custom client grpc dial options which will appends to
+// default grpc dial options
+func (c Config) GrpcDialOptions() []grpc.DialOption {
 	return c.grpcOptions
 }
 
-func (c *config) Meta() meta.Meta {
+// Meta is an internal option which contains meta information about database connection
+func (c Config) Meta() meta.Meta {
 	return c.meta
 }
 
-func (c *config) ConnectionTTL() time.Duration {
+// ConnectionTTL is a time to live of a connection
+// If ConnectionTTL is zero then TTL is not used.
+func (c Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
 
-func (c *config) Secure() bool {
+// Secure is an flag for secure connection
+func (c Config) Secure() bool {
 	return c.secure
 }
 
-func (c *config) Endpoint() string {
+// Endpoint is a required starting endpoint for connect
+func (c Config) Endpoint() string {
 	return c.endpoint
 }
 
-func (c *config) TLSConfig() *tls.Config {
+func (c Config) TLSConfig() *tls.Config {
 	return c.tlsConfig
 }
 
-func (c *config) DialTimeout() time.Duration {
+// DialTimeout is the maximum amount of time a dial will wait for a connect to
+// complete.
+//
+// If DialTimeout is zero then no timeout is used.
+func (c Config) DialTimeout() time.Duration {
 	return c.dialTimeout
 }
 
-func (c *config) Database() string {
+// Database is a required database name.
+func (c Config) Database() string {
 	return c.database
 }
 
-func (c *config) Credentials() credentials.Credentials {
+// Credentials is an ydb client credentials.
+// In most cases Credentials are required.
+func (c Config) Credentials() credentials.Credentials {
 	return c.credentials
 }
 
-func (c *config) Trace() trace.Driver {
+// Trace contains driver tracing options.
+func (c Config) Trace() trace.Driver {
 	return c.trace
 }
 
-func (c *config) OperationTimeout() time.Duration {
-	return c.operationTimeout
-}
-
-func (c *config) OperationCancelAfter() time.Duration {
-	return c.operationCancelAfter
-}
-
-func (c *config) Balancer() balancer.Balancer {
+// Balancer is an optional configuration related to selected balancer.
+// That is, some balancing methods allow to be configured.
+func (c Config) Balancer() balancer.Balancer {
 	return c.balancer
 }
 
-func (c *config) RequestsType() string {
+// RequestsType set an additional type hint to all requests.
+// It is needed only for debug purposes and advanced cases.
+func (c Config) RequestsType() string {
 	return c.requestsType
 }
 
-type Option func(c *config)
+type Option func(c *Config)
 
-// WithInternalDNSResolver disable dns-resolving before dialing
-// If dns-resolving are disabled - dial used FQDN as address
-// If dns-resolving are enabled - dial used IP-address
+// WithInternalDNSResolver
+//
+// Deprecated: already used internal dns-resolver
 func WithInternalDNSResolver() Option {
-	return func(c *config) {
-		c.dnsResolver = true
-	}
+	return func(c *Config) {}
 }
 
 func WithEndpoint(endpoint string) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.endpoint = endpoint
 	}
 }
 
 func WithSecure(secure bool) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.secure = secure
 	}
 }
 
 func WithDatabase(database string) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.database = database
 	}
 }
 
 func WithCertificate(certificate *x509.Certificate) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.tlsConfig.RootCAs.AddCert(certificate)
 	}
 }
 
 func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.trace = c.trace.Compose(t, opts...)
 	}
 }
 
 func WithUserAgent(userAgent string) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.userAgent = userAgent
 	}
 }
 
 func WithConnectionTTL(ttl time.Duration) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.connectionTTL = ttl
 	}
 }
 
 func WithCredentials(credentials credentials.Credentials) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.credentials = credentials
 	}
 }
 
+// WithOperationTimeout defines the maximum amount of time a YDB server will process
+// an operation. After timeout exceeds YDB will try to cancel operation and
+// regardless of the cancellation appropriate error will be returned to
+// the client.
+//
+// If OperationTimeout is zero then no timeout is used.
 func WithOperationTimeout(operationTimeout time.Duration) Option {
-	return func(c *config) {
-		c.operationTimeout = operationTimeout
+	return func(c *Config) {
+		config.SetOperationTimeout(&c.Common, operationTimeout)
 	}
 }
 
+// WithOperationCancelAfter sets the maximum amount of time a YDB server will process an
+// operation. After timeout exceeds YDB will try to cancel operation and if
+// it succeeds appropriate error will be returned to the client; otherwise
+// processing will be continued.
+//
+// If OperationCancelAfter is zero then no timeout is used.
 func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
-	return func(c *config) {
-		c.operationCancelAfter = operationCancelAfter
+	return func(c *Config) {
+		config.SetOperationCancelAfter(&c.Common, operationCancelAfter)
+	}
+}
+
+// WithPanicCallback applies panic callback to config
+func WithPanicCallback(panicCallback func(e interface{})) Option {
+	return func(c *Config) {
+		config.SetPanicCallback(&c.Common, panicCallback)
 	}
 }
 
 func WithDialTimeout(timeout time.Duration) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.dialTimeout = timeout
 	}
 }
 
 func WithBalancer(balancer balancer.Balancer) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.balancer = balancer
 	}
 }
 
 func WithRequestsType(requestsType string) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.requestsType = requestsType
 	}
 }
 
 func WithMinTLSVersion(minVersion uint16) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.tlsConfig.MinVersion = minVersion
 	}
 }
 
 func WithTLSSInsecureSkipVerify() Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.tlsConfig.InsecureSkipVerify = true
 	}
 }
 
 func WithGrpcOptions(option ...grpc.DialOption) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.grpcOptions = append(c.grpcOptions, option...)
 	}
 }
 
 func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
-	return func(c *config) {
+	return func(c *Config) {
 		c.excludeGRPCCodesForPessimization = append(
 			c.excludeGRPCCodesForPessimization,
 			codes...,
@@ -286,7 +248,7 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 func New(opts ...Option) Config {
 	c := defaultConfig()
 	for _, o := range opts {
-		o(c)
+		o(&c)
 	}
 	c.grpcOptions = append(
 		c.grpcOptions,
@@ -295,14 +257,6 @@ func New(opts ...Option) Config {
 			c.tlsConfig,
 		),
 	)
-	if c.dnsResolver {
-		c.grpcOptions = append(
-			c.grpcOptions,
-			grpc.WithResolvers(
-				xresolver.New("ydb", c.trace),
-			),
-		)
-	}
 	c.meta = meta.New(
 		c.database,
 		c.credentials,
@@ -328,8 +282,8 @@ func certPool() (certPool *x509.CertPool) {
 	return
 }
 
-func defaultConfig() (c *config) {
-	return &config{
+func defaultConfig() (c Config) {
+	return Config{
 		balancer: balancers.Default(),
 		secure:   true,
 		tlsConfig: &tls.Config{
@@ -356,7 +310,12 @@ func defaultConfig() (c *config) {
 				grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
 				grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
 			),
-			grpc.WithBlock(),
+			grpc.WithResolvers(
+				xresolver.New("", c.trace),
+				xresolver.New("ydb", c.trace),
+				xresolver.New("grpc", c.trace),
+				xresolver.New("grpcs", c.trace),
+			),
 		},
 	}
 }

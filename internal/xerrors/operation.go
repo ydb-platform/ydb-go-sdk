@@ -6,9 +6,12 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
-// operationError reports about operation fail.
+// operationError reports about operationStatus fail.
 type operationError struct {
 	code   Ydb.StatusIds_StatusCode
 	issues []*Ydb_Issue.IssueMessage
@@ -24,12 +27,12 @@ func (e *operationError) Name() string {
 	return e.code.String()
 }
 
-type operation interface {
+type operationStatus interface {
 	GetStatus() Ydb.StatusIds_StatusCode
 	GetIssues() []*Ydb_Issue.IssueMessage
 }
 
-// WithIssues is an option for construct operation error with issues list
+// WithIssues is an option for construct operationStatus error with issues list
 // WithIssues must use as `Operation(WithIssues(issues))`
 func WithIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
 	return func(oe *operationError) {
@@ -37,7 +40,7 @@ func WithIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
 	}
 }
 
-// WithStatusCode is an option for construct operation error with reason code
+// WithStatusCode is an option for construct operationStatus error with reason code
 // WithStatusCode must use as `Operation(WithStatusCode(reason))`
 func WithStatusCode(code Ydb.StatusIds_StatusCode) oeOpt {
 	return func(oe *operationError) {
@@ -45,9 +48,9 @@ func WithStatusCode(code Ydb.StatusIds_StatusCode) oeOpt {
 	}
 }
 
-// FromOperation is an option for construct operation error from operation
-// FromOperation must use as `Operation(FromOperation(operation))`
-func FromOperation(operation operation) oeOpt {
+// FromOperation is an option for construct operationStatus error from operationStatus
+// FromOperation must use as `Operation(FromOperation(operationStatus))`
+func FromOperation(operation operationStatus) oeOpt {
 	return func(oe *operationError) {
 		oe.code = operation.GetStatus()
 		oe.issues = operation.GetIssues()
@@ -72,7 +75,7 @@ func (e *operationError) Issues() []*Ydb_Issue.IssueMessage {
 
 func (e *operationError) Error() string {
 	var buf bytes.Buffer
-	buf.WriteString("operation error: ")
+	buf.WriteString("operationStatus error: ")
 	buf.WriteString(e.code.String())
 	if len(e.issues) > 0 {
 		buf.WriteByte(':')
@@ -98,7 +101,7 @@ func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 	return false
 }
 
-func (e *operationError) OperationStatus() OperationStatus {
+func (e *operationError) OperationStatus() operation.Status {
 	switch e.code {
 	case
 		Ydb.StatusIds_ABORTED,
@@ -106,29 +109,29 @@ func (e *operationError) OperationStatus() OperationStatus {
 		Ydb.StatusIds_OVERLOADED,
 		Ydb.StatusIds_BAD_SESSION,
 		Ydb.StatusIds_SESSION_BUSY:
-		return OperationNotFinished
+		return operation.NotFinished
 	case
 		Ydb.StatusIds_UNDETERMINED:
-		return OperationStatusUndefined
+		return operation.Undefined
 	default:
-		return OperationFinished
+		return operation.Finished
 	}
 }
 
-func (e *operationError) BackoffType() BackoffType {
+func (e *operationError) BackoffType() backoff.Type {
 	switch e.code {
 	case
 		Ydb.StatusIds_OVERLOADED:
-		return BackoffTypeSlowBackoff
+		return backoff.TypeSlow
 	case
 		Ydb.StatusIds_ABORTED,
 		Ydb.StatusIds_UNAVAILABLE,
 		Ydb.StatusIds_CANCELLED,
 		Ydb.StatusIds_SESSION_BUSY,
 		Ydb.StatusIds_UNDETERMINED:
-		return BackoffTypeFastBackoff
+		return backoff.TypeFast
 	default:
-		return BackoffTypeNoBackoff
+		return backoff.TypeNoBackoff
 	}
 }
 

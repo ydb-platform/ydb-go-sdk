@@ -32,7 +32,7 @@ type Error interface {
 	// Code reports the error code
 	Code() int32
 
-	// Name reports the name of error
+	// Name reports the short name of error
 	Name() string
 }
 
