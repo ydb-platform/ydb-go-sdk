@@ -284,6 +284,9 @@ func certPool() (certPool *x509.CertPool) {
 
 func defaultConfig() (c Config) {
 	return Config{
+		credentials: credentials.NewAnonymousCredentials(
+			credentials.WithSourceInfo("default"),
+		),
 		balancer: balancers.Default(),
 		secure:   true,
 		tlsConfig: &tls.Config{
