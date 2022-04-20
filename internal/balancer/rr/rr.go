@@ -141,12 +141,12 @@ func (r *randomChoice) Next() conn.Conn {
 }
 
 func isOkConnection(c conn.Conn, bannedIsOk bool) bool {
-	state := c.GetState()
-	if state == conn.Online || state == conn.Created {
+	switch c.GetState() {
+	case conn.Online, conn.Created, conn.Offline:
 		return true
+	case conn.Banned:
+		return bannedIsOk
+	default:
+		return false
 	}
-	if bannedIsOk && state == conn.Banned {
-		return true
-	}
-	return false
 }
