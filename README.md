@@ -14,41 +14,42 @@ Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme` and `scri
 ## Example Usage <a name="example"></a>
 
 * connect to YDB
-    ```
-    db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
-    if err != nil {
-        log.Fatal(err)
-    }
-    ```
+```golang
+db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+if err != nil {
+    log.Fatal(err)
+}
+```
 * execute `SELECT` query
-    ```
-    const query = `SELECT 42 as id, "myStr" as myStr;`
-    
-    // Do retry operation on errors with best effort
-    queryErr := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-        _, res, err := s.Execute(ctx, table.DefaultTxControl(), query, nil)
-        if err != nil {
-            return err
-        }
-        defer res.Close()
-        if err = res.NextResultSetErr(ctx); err != nil {
-            return err 
-        }
-        for res.NextRow() {
-            var id    int32   
-            var myStr string 
-            err = res.ScanNamed(named.Required("id", &id),named.OptionalWithDefault("myStr", &myStr))
-            if err != nil {
-                log.Fatal(err)
-            }
-			log.Printf("id=%v, myStr='%s'\n", id, myStr)
-        }
-        return res.Err() // for driver retry if not nil
-    })
-    if queryErr != nil {
-        log.Fatal(queryErr)
+ ```golang
+const query = `SELECT 42 as id, "myStr" as myStr;`
+
+// Do retry operation on errors with best effort
+queryErr := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+    _, res, err := s.Execute(ctx, table.DefaultTxControl(), query, nil)
+    if err != nil {
+        return err
     }
-    ```
+    defer res.Close()
+    if err = res.NextResultSetErr(ctx); err != nil {
+        return err 
+    }
+    for res.NextRow() {
+        var id    int32   
+        var myStr string 
+        err = res.ScanNamed(named.Required("id", &id),named.OptionalWithDefault("myStr", &myStr))
+        if err != nil {
+            log.Fatal(err)
+        }
+        log.Printf("id=%v, myStr='%s'\n", id, myStr)
+    }
+    return res.Err() // for driver retry if not nil
+})
+if queryErr != nil {
+    log.Fatal(queryErr)
+}
+```
+
 More examples of usage placed in [examples](https://github.com/ydb-platform/ydb-go-examples) repository.
 
 ## Credentials <a name="credentials"></a>
@@ -59,36 +60,34 @@ Driver contains two options for making simple `credentials.Credentials`:
 
 Another variants of `credentials.Credentials` object provides with external packages:
 
-Package | Type | Description                                                                                                                                                                                 | Link of example usage
---- | --- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| ---
-[ydb-go-yc](https://github.com/ydb-platform/ydb-go-yc) | credentials | credentials provider for Yandex.Cloud | [yc.WithServiceAccountKeyFileCredentials](https://github.com/ydb-platform/ydb-go-yc/blob/master/internal/cmd/connect/main.go#L22) [yc.WithInternalCA](https://github.com/ydb-platform/ydb-go-yc/blob/master/internal/cmd/connect/main.go#L22) [yc.WithMetadataCredentials](https://github.com/ydb-platform/ydb-go-yc/blob/master/internal/cmd/connect/main.go#L24)
-[ydb-go-yc-metadata](https://github.com/ydb-platform/ydb-go-yc-metadata) | credentials | metadata credentials provider for Yandex.Cloud | [yc.WithInternalCA](https://github.com/ydb-platform/ydb-go-yc-metadata/blob/master/options.go#L23) [yc.WithCredentials](https://github.com/ydb-platform/ydb-go-yc-metadata/blob/master/options.go#L17)
-[ydb-go-sdk-auth-environ](https://github.com/ydb-platform/ydb-go-sdk-auth-environ) | credentials | create credentials from environ | [ydbEnviron.WithEnvironCredentials](https://github.com/ydb-platform/ydb-go-sdk-auth-environ/blob/master/env.go#L11)
+| Package                                                                            | Type        | Description                                    | Link of example usage                                                                                                                                                                                                                                                                                                                                              |
+|------------------------------------------------------------------------------------|-------------|------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [ydb-go-yc](https://github.com/ydb-platform/ydb-go-yc)                             | credentials | credentials provider for Yandex.Cloud          | [yc.WithServiceAccountKeyFileCredentials](https://github.com/ydb-platform/ydb-go-yc/blob/master/internal/cmd/connect/main.go#L22) [yc.WithInternalCA](https://github.com/ydb-platform/ydb-go-yc/blob/master/internal/cmd/connect/main.go#L22) [yc.WithMetadataCredentials](https://github.com/ydb-platform/ydb-go-yc/blob/master/internal/cmd/connect/main.go#L24) |
+| [ydb-go-yc-metadata](https://github.com/ydb-platform/ydb-go-yc-metadata)           | credentials | metadata credentials provider for Yandex.Cloud | [yc.WithInternalCA](https://github.com/ydb-platform/ydb-go-yc-metadata/blob/master/options.go#L23) [yc.WithCredentials](https://github.com/ydb-platform/ydb-go-yc-metadata/blob/master/options.go#L17)                                                                                                                                                             |
+| [ydb-go-sdk-auth-environ](https://github.com/ydb-platform/ydb-go-sdk-auth-environ) | credentials | create credentials from environ                | [ydbEnviron.WithEnvironCredentials](https://github.com/ydb-platform/ydb-go-sdk-auth-environ/blob/master/env.go#L11)                                                                                                                                                                                                                                                |
 
 ## Ecosystem of debug tools over `ydb-go-sdk` <a name="debug"></a>
 
 Package `ydb-go-sdk` provide debugging over trace events in package `trace`.
 Next packages provide debug tooling:
 
-Package | Type | Description                                                                                                                                                                                 | Link of example usage
---- | --- |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| ---
-[ydb-go-sdk-zap](https://github.com/ydb-platform/ydb-go-sdk-zap) | logging | logging ydb-go-sdk events with zap package                                                                                                                                                  | [ydbZap.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-zap/blob/master/internal/cmd/bench/main.go#L64)
-[ydb-go-sdk-zerolog](https://github.com/ydb-platform/ydb-go-sdk-zap) | logging | logging ydb-go-sdk events with zerolog package                                                                                                                                              | [ydbZerolog.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-zerolog/blob/master/internal/cmd/bench/main.go#L47)
-[ydb-go-sdk-metrics](https://github.com/ydb-platform/ydb-go-sdk-metrics) | metrics | common metrics of ydb-go-sdk. Package declare interfaces such as `Registry`, `GaugeVec` and `Gauge` and use it for traces                           |
-[ydb-go-sdk-prometheus](https://github.com/ydb-platform/ydb-go-sdk-prometheus) | metrics | prometheus wrapper over [ydb-go-sdk-metrics](https://github.com/ydb-platform/ydb-go-sdk-metrics) | [ydbPrometheus.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-prometheus/blob/master/internal/cmd/bench/main.go#L56)
-[ydb-go-sdk-opentracing](https://github.com/ydb-platform/ydb-go-sdk-opentracing) | tracing | opentracing plugin for trace internal ydb-go-sdk calls | [ydbOpentracing.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-opentracing/blob/master/internal/cmd/bench/main.go#L86)
+| Package                                                                          | Type    | Description                                                                                                               | Link of example usage                                                                                                          |
+|----------------------------------------------------------------------------------|---------|---------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| [ydb-go-sdk-zap](https://github.com/ydb-platform/ydb-go-sdk-zap)                 | logging | logging ydb-go-sdk events with zap package                                                                                | [ydbZap.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-zap/blob/master/internal/cmd/bench/main.go#L64)                 |
+| [ydb-go-sdk-zerolog](https://github.com/ydb-platform/ydb-go-sdk-zap)             | logging | logging ydb-go-sdk events with zerolog package                                                                            | [ydbZerolog.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-zerolog/blob/master/internal/cmd/bench/main.go#L47)         |
+| [ydb-go-sdk-metrics](https://github.com/ydb-platform/ydb-go-sdk-metrics)         | metrics | common metrics of ydb-go-sdk. Package declare interfaces such as `Registry`, `GaugeVec` and `Gauge` and use it for traces |                                                                                                                                |
+| [ydb-go-sdk-prometheus](https://github.com/ydb-platform/ydb-go-sdk-prometheus)   | metrics | prometheus wrapper over [ydb-go-sdk-metrics](https://github.com/ydb-platform/ydb-go-sdk-metrics)                          | [ydbPrometheus.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-prometheus/blob/master/internal/cmd/bench/main.go#L56)   |
+| [ydb-go-sdk-opentracing](https://github.com/ydb-platform/ydb-go-sdk-opentracing) | tracing | opentracing plugin for trace internal ydb-go-sdk calls                                                                    | [ydbOpentracing.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-opentracing/blob/master/internal/cmd/bench/main.go#L86) |
 
 ## Environment variables <a name="environ"></a>
 
 `ydb-go-sdk` supports next environment variables  which redefines default behavior of driver
 
-Name | Type | Default | Description
---- | --- | --- | ---
-`YDB_SSL_ROOT_CERTIFICATES_FILE` | `string` | | path to certificates file
-`YDB_LOG_SEVERITY_LEVEL` | `string` | `quiet` | severity logging level of internal driver logger. Supported: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `quiet`
-`YDB_LOG_NO_COLOR` | `bool` | `false` | set any non empty value to disable colouring logs with internal driver logger
-`GRPC_GO_LOG_VERBOSITY_LEVEL` | `integer` | | set to `99` to see grpc logs
-`GRPC_GO_LOG_SEVERITY_LEVEL` | `string` | | set to `info` to see grpc logs
-
-
+| Name                             | Type      | Default | Description                                                                                                              |
+|----------------------------------|-----------|---------|--------------------------------------------------------------------------------------------------------------------------|
+| `YDB_SSL_ROOT_CERTIFICATES_FILE` | `string`  |         | path to certificates file                                                                                                |
+| `YDB_LOG_SEVERITY_LEVEL`         | `string`  | `quiet` | severity logging level of internal driver logger. Supported: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `quiet` |
+| `YDB_LOG_NO_COLOR`               | `bool`    | `false` | set any non empty value to disable colouring logs with internal driver logger                                            |
+| `GRPC_GO_LOG_VERBOSITY_LEVEL`    | `integer` |         | set to `99` to see grpc logs                                                                                             |
+| `GRPC_GO_LOG_SEVERITY_LEVEL`     | `string`  |         | set to `info` to see grpc logs                                                                                           |
 
