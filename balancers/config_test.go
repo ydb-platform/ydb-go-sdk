@@ -9,7 +9,7 @@ import (
 
 type testBalancer struct{}
 
-func (t testBalancer) Create() balancer.Balancer {
+func (t testBalancer) Create([]conn.Conn) balancer.Balancer {
 	panic("unexpected call")
 }
 

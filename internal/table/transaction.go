@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ctxbalancer"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -106,7 +106,7 @@ func (tx *transaction) CommitTx(
 	defer t.processHints()
 
 	response, err = tx.s.tableService.CommitTransaction(
-		cluster.WithEndpoint(ctx, tx.s),
+		ctxbalancer.WithEndpoint(ctx, tx.s),
 		request,
 		t.Trailer(),
 	)
@@ -145,7 +145,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	defer t.processHints()
 
 	_, err = tx.s.tableService.RollbackTransaction(
-		cluster.WithEndpoint(ctx, tx.s),
+		ctxbalancer.WithEndpoint(ctx, tx.s),
 		&Ydb_Table.RollbackTransactionRequest{
 			SessionId: tx.s.id,
 			TxId:      tx.id,

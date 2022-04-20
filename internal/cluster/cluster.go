@@ -3,16 +3,16 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ctxbalancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/multi"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -30,15 +30,15 @@ var (
 )
 
 type Cluster struct {
-	sync.RWMutex
+	config   config.Config
+	pool     conn.Pool
+	balancer balancer.Balancer
 
-	config config.Config
-	pool   conn.Pool
-
-	explorer  repeater.Repeater
+	conns     []conn.Conn
 	index     map[string]entry.Entry
 	endpoints map[uint32]conn.Conn // only one endpoint by node ID
 
+	m    sync.Mutex
 	done chan struct{}
 }
 
@@ -54,106 +54,42 @@ func (c *Cluster) isClosed() bool {
 // Pessimize connection in underling pool
 func (c *Cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 	c.pool.Pessimize(ctx, cc, cause)
-
-	if c.isClosed() {
-		return
-	}
-
-	c.RWMutex.RLock()
-	defer c.RWMutex.RUnlock()
-
-	entry, has := c.index[cc.Endpoint().Address()]
-	if !has {
-		return
-	}
-
-	if entry.Handle == nil {
-		return
-	}
-
-	if !c.config.Balancer().Contains(entry.Handle) {
-		return
-	}
-
-	if c.explorer == nil {
-		return
-	}
-
-	// count ratio (banned/all)
-	online := 0
-	for _, entry = range c.index {
-		if entry.Conn != nil && entry.Conn.GetState() == conn.Online {
-			online++
-		}
-	}
-
-	// more than half connections banned - re-discover now
-	if online*2 < len(c.index) {
-		c.explorer.Force()
-	}
 }
 
-// Force reexpore cluster
-func (c *Cluster) Force() {
-	c.explorer.Force()
-}
-
-func (c *Cluster) SetExplorer(repeater repeater.Repeater) {
-	c.explorer = repeater
-}
-
-type crudOptionsHolder struct {
-	withLock bool
-}
-
-type CrudOption func(h *crudOptionsHolder)
-
-func WithoutLock() CrudOption {
-	return func(h *crudOptionsHolder) {
-		h.withLock = false
-	}
-}
-
-func parseOptions(opts ...CrudOption) *crudOptionsHolder {
-	h := &crudOptionsHolder{
-		withLock: true,
-	}
-	for _, o := range opts {
-		o(h)
-	}
-	return h
-}
-
-type Getter interface {
-	// Get returns next available connection.
-	// It returns error on given deadline cancellation or when cluster become closed.
-	Get(ctx context.Context) (cc conn.Conn, err error)
-}
-
-type Inserter interface {
-	// Insert inserts endpoint to cluster
-	Insert(ctx context.Context, endpoint endpoint.Endpoint, opts ...CrudOption)
-}
-
-type Remover interface {
-	// Remove removes endpoint from cluster
-	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...CrudOption)
-}
-
-type Explorer interface {
-	SetExplorer(repeater repeater.Repeater)
-	Force()
+// Unpessimize connection in underling pool
+func (c *Cluster) Unpessimize(ctx context.Context, cc conn.Conn) {
+	c.pool.Unpessimize(ctx, cc)
 }
 
 func New(
 	ctx context.Context,
 	config config.Config,
 	pool conn.Pool,
+	endpoints []endpoint.Endpoint,
 ) *Cluster {
 	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)
 	defer func() {
 		onDone(pool.Take(ctx))
 	}()
+
+	conns := make([]conn.Conn, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		conns = append(conns, pool.Get(endpoint))
+	}
+
+	parkBanned(ctx, conns)
+
+	clusterBalancer := multi.Balancer(
+		// check conn from context at first place
+		multi.WithBalancer(ctxbalancer.Balancer(conns), func(cc conn.Conn) bool {
+			return true
+		}),
+
+		// then use common balancers from config
+		multi.WithBalancer(config.Balancer().Create(conns), func(cc conn.Conn) bool {
+			return true
+		}),
+	)
 
 	return &Cluster{
 		done:      make(chan struct{}),
@@ -161,59 +97,27 @@ func New(
 		index:     make(map[string]entry.Entry),
 		endpoints: make(map[uint32]conn.Conn),
 		pool:      pool,
+		balancer:  clusterBalancer,
 	}
 }
 
 func (c *Cluster) Close(ctx context.Context) (err error) {
-	defer close(c.done)
+	close(c.done)
 
 	onDone := trace.DriverOnClusterClose(c.config.Trace(), &ctx)
 	defer func() {
 		onDone(err)
 	}()
 
-	c.RWMutex.Lock()
-	defer c.RWMutex.Unlock()
-
-	if c.explorer != nil {
-		c.explorer.Stop()
-	}
-
-	for _, entry := range c.index {
-		c.Remove(
-			ctx,
-			entry.Conn.Endpoint(),
-			WithoutLock(),
-		)
-	}
+	c.m.Lock()
+	defer c.m.Unlock()
 
 	var issues []error
-	if len(c.index) > 0 {
-		issues = append(issues, fmt.Errorf(
-			"non empty index after remove all entries: %v",
-			func() (endpoints []string) {
-				for e := range c.index {
-					endpoints = append(endpoints, e)
-				}
-				return endpoints
-			}(),
-		))
-	}
 
-	if len(c.endpoints) > 0 {
-		issues = append(issues, fmt.Errorf(
-			"non empty nodes after remove all entries: %v",
-			func() (nodes []uint32) {
-				for e := range c.endpoints {
-					nodes = append(nodes, e)
-				}
-				return nodes
-			}(),
-		))
-	}
-
-	if err = c.pool.Release(ctx); err != nil {
-		issues = append(issues, err)
+	for _, conn := range c.conns {
+		if err := conn.Release(ctx); err != nil {
+			issues = append(issues, err)
+		}
 	}
 
 	if len(issues) > 0 {
@@ -231,9 +135,18 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			cc = c.config.Balancer().Next()
+			cc = c.config.Balancer().Next(ctx, false)
+
 			if cc == nil {
-				return nil, xerrors.WithStackTrace(ErrClusterEmpty)
+				cc = c.config.Balancer().Next(ctx, true)
+			}
+
+			if cc == nil {
+				err := ErrClusterEmpty
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					err = ctxErr
+				}
+				return nil, xerrors.WithStackTrace(err)
 			}
 			if err = cc.Ping(ctx); err == nil {
 				return cc, nil
@@ -245,15 +158,15 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *Cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
+	if c.isClosed() {
+		return nil, xerrors.WithStackTrace(ErrClusterClosed)
+	}
+
 	var cancel context.CancelFunc
 	// without client context deadline lock limited on MaxGetConnTimeout
 	// cluster endpoints cannot be updated at this time
 	ctx, cancel = context.WithTimeout(ctx, MaxGetConnTimeout)
 	defer cancel()
-
-	if c.isClosed() {
-		return nil, xerrors.WithStackTrace(ErrClusterClosed)
-	}
 
 	onDone := trace.DriverOnClusterGet(c.config.Trace(), &ctx)
 	defer func() {
@@ -264,155 +177,13 @@ func (c *Cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 		}
 	}()
 
-	// wait lock for read during Get
-	c.RWMutex.RLock()
-	defer c.RWMutex.RUnlock()
-
-	if e, ok := ContextEndpoint(ctx); ok {
-		cc, ok = c.endpoints[e.NodeID()]
-		if ok && cc.IsState(
-			conn.Created,
-			conn.Online,
-			conn.Offline,
-		) {
-			if err = cc.Ping(ctx); err == nil {
-				return cc, nil
-			}
-		}
-	}
-
 	return c.get(ctx)
 }
 
-// Insert inserts new connection into the cluster.
-func (c *Cluster) Insert(ctx context.Context, e endpoint.Endpoint, opts ...CrudOption) {
-	var (
-		onDone   = trace.DriverOnClusterInsert(c.config.Trace(), &ctx, e.Copy())
-		inserted = false
-		state    conn.State
-	)
-	defer func() {
-		onDone(inserted, state)
-	}()
-
-	options := parseOptions(opts...)
-	if options.withLock {
-		c.RWMutex.Lock()
-		defer c.RWMutex.Unlock()
-	}
-
-	if c.isClosed() {
-		return
-	}
-
-	cc := c.pool.Get(e)
-
-	cc.Endpoint().Touch()
-
-	entry := entry.Entry{
-		Conn:   cc,
-		Handle: c.config.Balancer().Insert(cc),
-	}
-
-	inserted = entry.Handle != nil
-
-	c.index[e.Address()] = entry
-
-	if e.NodeID() > 0 {
-		c.endpoints[e.NodeID()] = cc
-	}
-
-	state = cc.GetState()
-}
-
-// Remove removes and closes previously inserted connection.
-func (c *Cluster) Remove(ctx context.Context, e endpoint.Endpoint, opts ...CrudOption) {
-	var (
-		onDone  = trace.DriverOnClusterRemove(c.config.Trace(), &ctx, e.Copy())
-		address = e.Address()
-		nodeID  = e.NodeID()
-		removed bool
-		state   conn.State
-	)
-	defer func() {
-		onDone(removed, state)
-	}()
-
-	options := parseOptions(opts...)
-	if options.withLock {
-		c.RWMutex.Lock()
-		defer c.RWMutex.Unlock()
-	}
-
-	if c.isClosed() {
-		return
-	}
-
-	entry, has := c.index[address]
-	if !has {
-		panic("ydb: can't remove not-existing endpoint")
-	}
-
-	defer func() {
-		_ = entry.Conn.Release(ctx)
-	}()
-
-	if entry.Handle != nil {
-		removed = c.config.Balancer().Remove(entry.Handle)
-		entry.Handle = nil
-	}
-
-	delete(c.index, address)
-	delete(c.endpoints, nodeID)
-
-	state = entry.Conn.GetState()
-}
-
-func compareEndpoints(a, b endpoint.Endpoint) int {
-	return strings.Compare(
-		a.Address(),
-		b.Address(),
-	)
-}
-
-func SortEndpoints(es []endpoint.Endpoint) {
-	sort.Slice(es, func(i, j int) bool {
-		return compareEndpoints(es[i], es[j]) < 0
-	})
-}
-
-func DiffEndpoints(curr, next []endpoint.Endpoint, eq, add, del func(i, j int)) {
-	diffslice(
-		len(curr),
-		len(next),
-		func(i, j int) int {
-			return compareEndpoints(curr[i], next[j])
-		},
-		eq, add, del,
-	)
-}
-
-func diffslice(a, b int, cmp func(i, j int) int, eq, add, del func(i, j int)) {
-	var i, j int
-	for i < a && j < b {
-		c := cmp(i, j)
-		switch {
-		case c < 0:
-			del(i, j)
-			i++
-		case c > 0:
-			add(i, j)
-			j++
-		default:
-			eq(i, j)
-			i++
-			j++
+func parkBanned(ctx context.Context, conns []conn.Conn) {
+	for _, c := range conns {
+		if c.GetState() == conn.Banned {
+			_ = c.Park(ctx)
 		}
-	}
-	for ; i < a; i++ {
-		del(i, j)
-	}
-	for ; j < b; j++ {
-		add(i, j)
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/stub"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -23,7 +23,7 @@ func TestClusterMergeEndpoints(t *testing.T) {
 	c := &Cluster{
 		config: config.New(
 			config.WithBalancer(func() balancer.Balancer {
-				_, b := stub.Balancer()
+				_, b := mock.Balancer()
 				return b
 			}()),
 		),
@@ -123,23 +123,6 @@ func TestClusterMergeEndpoints(t *testing.T) {
 		// try endpoints, filter out bad ones to tracking
 		assert(t, ne)
 	})
-}
-
-func mergeEndpointIntoCluster(ctx context.Context, c *Cluster, curr, next []endpoint.Endpoint) {
-	SortEndpoints(curr)
-	SortEndpoints(next)
-	DiffEndpoints(curr, next,
-		func(i, j int) {
-			c.Remove(ctx, curr[i])
-			c.Insert(ctx, next[j])
-		},
-		func(i, j int) {
-			c.Insert(ctx, next[j])
-		},
-		func(i, j int) {
-			c.Remove(ctx, curr[i])
-		},
-	)
 }
 
 func TestDiffEndpoint(t *testing.T) {
@@ -279,6 +262,7 @@ func TestEndpointSwitchLocalDCFlag(t *testing.T) {
 				}),
 			),
 			conn.NewPool(ctx, config.New()),
+			nil, // TODO: actualize
 		)
 	)
 	for _, test := range []struct {
@@ -331,7 +315,6 @@ func TestEndpointSwitchLocalDCFlag(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			SortEndpoints(test.next)
 			DiffEndpoints(
 				curr,
 				test.next,

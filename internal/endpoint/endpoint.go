@@ -20,7 +20,7 @@ type Endpoint interface {
 
 	String() string
 	Copy() Endpoint
-	Touch(opts ...option)
+	Touch(opts ...Option)
 }
 
 type endpoint struct {
@@ -99,11 +99,11 @@ func (e *endpoint) LastUpdated() time.Time {
 	return e.lastUpdated
 }
 
-func (e *endpoint) Touch(opts ...option) {
+func (e *endpoint) Touch(opts ...Option) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for _, o := range append(
-		[]option{
+		[]Option{
 			withLastUpdated(time.Now()),
 		},
 		opts...,
@@ -112,45 +112,45 @@ func (e *endpoint) Touch(opts ...option) {
 	}
 }
 
-type option func(e *endpoint)
+type Option func(e *endpoint)
 
-func WithID(id uint32) option {
+func WithID(id uint32) Option {
 	return func(e *endpoint) {
 		e.id = id
 	}
 }
 
-func WithLocation(location string) option {
+func WithLocation(location string) Option {
 	return func(e *endpoint) {
 		e.location = location
 	}
 }
 
-func WithLocalDC(local bool) option {
+func WithLocalDC(local bool) Option {
 	return func(e *endpoint) {
 		e.local = local
 	}
 }
 
-func WithLoadFactor(loadFactor float32) option {
+func WithLoadFactor(loadFactor float32) Option {
 	return func(e *endpoint) {
 		e.loadFactor = loadFactor
 	}
 }
 
-func WithServices(services []string) option {
+func WithServices(services []string) Option {
 	return func(e *endpoint) {
 		e.services = append(e.services, services...)
 	}
 }
 
-func withLastUpdated(ts time.Time) option {
+func withLastUpdated(ts time.Time) Option {
 	return func(e *endpoint) {
 		e.lastUpdated = ts
 	}
 }
 
-func New(address string, opts ...option) Endpoint {
+func New(address string, opts ...Option) Endpoint {
 	e := &endpoint{
 		address:     address,
 		lastUpdated: time.Now(),

@@ -35,6 +35,7 @@ type Releaser interface {
 
 type Pessimizer interface {
 	Pessimize(ctx context.Context, cc Conn, cause error)
+	Unpessimize(ctx context.Context, cc Conn)
 }
 
 type PoolConfig interface {
@@ -99,6 +100,21 @@ func (p *pool) Pessimize(ctx context.Context, cc Conn, cause error) {
 	)(cc.SetState(Banned))
 }
 
+func (p *pool) Unpessimize(ctx context.Context, cc Conn) {
+	e := cc.Endpoint().Copy()
+
+	p.mtx.RLock()
+	defer p.mtx.RUnlock()
+
+	cc, ok := p.conns[e.Address()]
+	if !ok {
+		return
+	}
+
+	// TODO: tracing
+	cc.SetState(Online)
+}
+
 func (p *pool) Take(context.Context) error {
 	atomic.AddInt64(&p.usages, 1)
 	return nil
@@ -142,7 +158,7 @@ func (p *pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 		case <-ticker.C:
 			for _, c := range p.collectConns() {
 				if time.Since(c.LastUsage()) > ttl {
-					_ = c.park(ctx)
+					_ = c.Park(ctx)
 				}
 			}
 		}

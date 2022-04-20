@@ -1,7 +1,7 @@
 package multi
 
 import (
-	"sync"
+	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -15,94 +15,79 @@ func Balancer(opts ...Option) balancer.Balancer {
 	return m
 }
 
-type multiHandle struct {
-	elements []balancer.Element
-}
-
 type multi struct {
-	mu       sync.RWMutex
-	balancer []balancer.Balancer
-	filter   []func(conn.Conn) bool
+	balancers []balancer.Balancer
+	filters   []func(conn.Conn) bool
 }
 
-func (m *multi) Create() balancer.Balancer {
-	bb := make([]balancer.Balancer, len(m.balancer))
-	for i, b := range m.balancer {
-		bb[i] = b.Create()
+func (m *multi) Create(conns []conn.Conn) balancer.Balancer {
+	newBalancers := make([]balancer.Balancer, len(m.balancers))
+	for i, balancer := range m.balancers {
+		balancerConns := make([]conn.Conn, 0, len(conns))
+
+		filter := m.filters[i]
+		for _, conn := range conns {
+			if filter(conn) {
+				balancerConns = append(balancerConns, conn)
+			}
+		}
+		newBalancers[i] = balancer.Create(balancerConns)
 	}
+
 	return &multi{
-		balancer: bb,
-		filter:   m.filter,
+		balancers: newBalancers,
+		filters:   m.filters,
 	}
 }
 
-func WithBalancer(b balancer.Balancer, filter func(cc conn.Conn) bool) Option {
-	return func(m *multi) {
-		m.mu.Lock()
-		defer m.mu.Unlock()
-		m.balancer = append(m.balancer, b)
-		m.filter = append(m.filter, filter)
+func (m *multi) NeedRefresh(ctx context.Context) bool {
+	if ctx.Err() != nil {
+		return false
 	}
-}
+	ctx, ctxCancel := context.WithCancel(ctx)
+	defer ctxCancel()
 
-type Option func(*multi)
+	// buffered channel need for prevent wait goroutines leak after function exit
+	needRefreshChannels := make(chan bool, len(m.balancers))
 
-func (m *multi) Contains(x balancer.Element) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for i, h := range x.(multiHandle).elements {
-		if h != nil && m.balancer[i].Contains(h) {
-			return true
+	waitRefreshSignal := func(b balancer.Balancer) {
+		go func() {
+			needRefreshChannels <- b.NeedRefresh(ctx)
+		}()
+	}
+
+	for _, b := range m.balancers {
+		waitRefreshSignal(b)
+	}
+
+	for range m.balancers {
+		select {
+		case <-ctx.Done():
+			return false
+		case needRefresh := <-needRefreshChannels:
+			if needRefresh {
+				return true
+			}
 		}
 	}
+
 	return false
 }
 
-func (m *multi) Next() conn.Conn {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, b := range m.balancer {
-		if c := b.Next(); c != nil {
+func (m *multi) Next(ctx context.Context, allowBanned bool) conn.Conn {
+	for _, b := range m.balancers {
+		if c := b.Next(ctx, allowBanned); c != nil {
 			return c
 		}
 	}
 	return nil
 }
 
-func (m *multi) Insert(conn conn.Conn) balancer.Element {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	var (
-		n = len(m.filter)
-		h = multiHandle{
-			elements: make([]balancer.Element, n),
-		}
-		inserted = false
-	)
-
-	for i, f := range m.filter {
-		if f(conn) {
-			h.elements[i] = m.balancer[i].Insert(conn)
-			inserted = true
-		}
+func WithBalancer(b balancer.Balancer, filter func(cc conn.Conn) bool) Option {
+	return func(m *multi) {
+		m.balancers = append(m.balancers, b)
+		m.filters = append(m.filters, filter)
 	}
-	if inserted {
-		return h
-	}
-	return nil
 }
 
-func (m *multi) Remove(x balancer.Element) (removed bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for i, h := range x.(multiHandle).elements {
-		if h != nil {
-			if m.balancer[i].Remove(h) {
-				removed = true
-			}
-		}
-	}
-	return removed
-}
+type Option func(*multi)

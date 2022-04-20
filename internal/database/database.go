@@ -2,8 +2,10 @@ package database
 
 import (
 	"context"
-	"sync"
+	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -20,19 +22,39 @@ import (
 type clusterConnector interface {
 	Close(ctx context.Context) error
 	Get(ctx context.Context) (cc conn.Conn, err error)
-	Remove(ctx context.Context, endpoint endpoint.Endpoint, opts ...cluster.CrudOption)
 	Pessimize(ctx context.Context, cc conn.Conn, cause error)
-
-	// For discovery build
-	cluster.Inserter
-	cluster.Explorer
-	sync.Locker
+	Unpessimize(ctx context.Context, cc conn.Conn)
 }
 
 type database struct {
-	config    config.Config
-	cluster   clusterConnector
-	discovery discovery.Client
+	config            config.Config
+	discovery         discovery.Client
+	discoveryRepeater repeater.Repeater
+	connectionPool    conn.Pool
+	clusterPointer    atomic.Value
+}
+
+func (db *database) cluster() clusterConnector {
+	return db.clusterPointer.Load().(clusterConnector)
+}
+
+func (db *database) clusterSwap(cluster clusterConnector) clusterConnector {
+	oldCluster := db.clusterPointer.Swap(cluster)
+	if oldCluster == nil {
+		return nil
+	}
+	return oldCluster.(clusterConnector)
+}
+
+func (db *database) clusterDiscovery(ctx context.Context) error {
+	endpoints, err := db.discovery.Discover(ctx)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	newCluster := cluster.New(deadline.ContextWithoutDeadline(ctx), db.config, db.connectionPool, endpoints)
+	oldCluster := db.clusterSwap(newCluster)
+	return oldCluster.Close(ctx)
 }
 
 func (db *database) Discovery() discovery.Client {
@@ -42,11 +64,15 @@ func (db *database) Discovery() discovery.Client {
 func (db *database) Close(ctx context.Context) (err error) {
 	issues := make([]error, 0, 2)
 
+	if db.discoveryRepeater != nil {
+		db.discoveryRepeater.Stop()
+	}
+
 	if err = db.discovery.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 
-	if err = db.cluster.Close(ctx); err != nil {
+	if err = db.cluster().Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 
@@ -75,8 +101,34 @@ func New(
 	}()
 
 	db := &database{
-		config:  c,
-		cluster: cluster.New(ctx, c, pool),
+		config:         c,
+		connectionPool: pool,
+	}
+
+	discoveryEndpoint := endpoint.New(c.Endpoint())
+	discoveryConnection := pool.Get(discoveryEndpoint)
+
+	db.discovery = int_discovery.New(
+		discoveryConnection,
+		opts...,
+	)
+	if err = db.clusterDiscovery(ctx); err != nil {
+		return nil, err
+	}
+
+	if discoveryCfg := discoveryConfig.New(opts...); discoveryCfg.Interval() > 0 {
+		db.discoveryRepeater = repeater.New(deadline.ContextWithoutDeadline(ctx), discoveryCfg.Interval(),
+			func(ctx context.Context) (err error) {
+				ctx, cancel := context.WithTimeout(ctx, discoveryCfg.Interval())
+				defer cancel()
+
+				return db.clusterDiscovery(ctx)
+			},
+			repeater.WithName("discovery"),
+			repeater.WithTrace(db.config.Trace()),
+		)
+	} else {
+		db.clusterSwap(cluster.New(deadline.ContextWithoutDeadline(ctx), db.config, pool, []endpoint.Endpoint{discoveryEndpoint}))
 	}
 
 	var cancel context.CancelFunc
@@ -86,17 +138,6 @@ func New(
 		ctx, cancel = context.WithCancel(ctx)
 	}
 	defer cancel()
-
-	db.discovery, err = int_discovery.New(
-		ctx,
-		pool.Get(endpoint.New(c.Endpoint(), endpoint.WithLocalDC(true))),
-		db.cluster,
-		db.config.Trace(),
-		opts...,
-	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
 
 	return db, nil
 }
@@ -120,16 +161,12 @@ func (db *database) Invoke(
 	reply interface{},
 	opts ...grpc.CallOption,
 ) error {
-	cc, err := db.cluster.Get(ctx)
+	cc, err := db.cluster().Get(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	defer func() {
-		if err != nil && xerrors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
-			db.cluster.Pessimize(ctx, cc, err)
-		}
-	}()
+	defer db.handleConnRequestError(ctx, &err, cc)
 
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
@@ -150,16 +187,12 @@ func (db *database) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	cc, err := db.cluster.Get(ctx)
+	cc, err := db.cluster().Get(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	defer func() {
-		if err != nil && xerrors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
-			db.cluster.Pessimize(ctx, cc, err)
-		}
-	}()
+	defer db.handleConnRequestError(ctx, &err, cc)
 
 	ctx, err = db.config.Meta().Meta(ctx)
 	if err != nil {
@@ -173,4 +206,14 @@ func (db *database) NewStream(
 	}
 
 	return client, nil
+}
+
+func (db *database) handleConnRequestError(ctx context.Context, perr *error, cc conn.Conn) {
+	err := *perr
+	if err == nil && cc.GetState() == conn.Banned {
+		db.cluster().Unpessimize(ctx, cc)
+	}
+	if err != nil && xerrors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
+		db.cluster().Pessimize(ctx, cc, err)
+	}
 }

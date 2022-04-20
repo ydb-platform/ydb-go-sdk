@@ -36,6 +36,7 @@ type Conn interface {
 
 	LastUsage() time.Time
 
+	Park(ctx context.Context) (err error)
 	Ping(ctx context.Context) error
 	IsState(states ...State) bool
 	GetState() State
@@ -124,7 +125,7 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) park(ctx context.Context) (err error) {
+func (c *conn) Park(ctx context.Context) (err error) {
 	onDone := trace.DriverOnConnPark(
 		c.config.Trace(),
 		&ctx,

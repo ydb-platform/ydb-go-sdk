@@ -60,23 +60,21 @@ const (
 // New creates and begins to execute task periodically.
 func New(
 	ctx context.Context,
+	interval time.Duration,
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) Repeater {
 	r := &repeater{
-		task:  task,
-		done:  make(chan struct{}),
-		force: make(chan struct{}),
+		interval: interval,
+		task:     task,
+		done:     make(chan struct{}),
+		force:    make(chan struct{}),
 	}
 
 	r.runCtx, r.stop = context.WithCancel(context.Background())
 
 	for _, o := range opts {
 		o(r)
-	}
-
-	if r.interval <= 0 {
-		return nil
 	}
 
 	go r.worker(ctx, r.interval)
