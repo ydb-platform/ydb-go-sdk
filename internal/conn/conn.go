@@ -221,6 +221,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}
 
 	// prepend "ydb" scheme for grpc dns-xresolver to find the proper scheme
+	/// ydb:///", three slashes is ok. It need for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
 	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
