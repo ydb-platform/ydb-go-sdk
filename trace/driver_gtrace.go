@@ -1209,9 +1209,9 @@ func (t Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGet
 	}
 	return res
 }
-func DriverOnInit(t Driver, ctx *context.Context, endpoint string, database string, secure bool) func(error) {
+func DriverOnInit(t Driver, c *context.Context, endpoint string, database string, secure bool) func(error) {
 	var p DriverInitStartInfo
-	p.Context = ctx
+	p.Context = c
 	p.Endpoint = endpoint
 	p.Database = database
 	p.Secure = secure
@@ -1222,9 +1222,9 @@ func DriverOnInit(t Driver, ctx *context.Context, endpoint string, database stri
 		res(p)
 	}
 }
-func DriverOnClose(t Driver, ctx *context.Context) func(error) {
+func DriverOnClose(t Driver, c *context.Context) func(error) {
 	var p DriverCloseStartInfo
-	p.Context = ctx
+	p.Context = c
 	res := t.onClose(p)
 	return func(e error) {
 		var p DriverCloseDoneInfo

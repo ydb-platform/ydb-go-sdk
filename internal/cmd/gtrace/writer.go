@@ -357,8 +357,11 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 			w.capture(h1, h2)
 			w.code(`func`)
 			args := w.funcParams(fn.Params)
+			if fn.HasResult() {
+				w.code(` `)
+			}
 			w.funcResults(fn)
-			w.line(`{`)
+			w.line(` {`)
 			w.line(`if options.panicCallback != nil {`)
 			w.block(func() {
 				w.line("defer func() {")
@@ -454,33 +457,26 @@ func (w *Writer) options(trace *Trace) {
 func (w *Writer) hook(trace *Trace, hook Hook) {
 	w.newScope(func() {
 		t := w.declare("t")
-		x := w.declare("c") // For context's trace.
 		fn := w.declare("fn")
 
 		w.code(`func (`, t, ` `, trace.Name, `) `, unexported(hook.Name))
 
 		w.code(`(`)
-		var ctx string
 		var args []string
 		for i, p := range hook.Func.Params {
-			if i > 0 || ctx != "" {
+			if i > 0 {
 				w.code(`, `)
 			}
 			args = append(args, w.funcParam(p))
 		}
-		w.code(`) `)
+		w.code(`)`)
+		if hook.Func.HasResult() {
+			w.code(` `)
+		}
 		w.funcResultsFlags(hook.Func, docs)
-		w.line(`{`)
+		w.line(` {`)
 		w.block(func() {
-			if ctx != "" {
-				w.line(x, ` := Context`, trace.Name, `(`, ctx, `)`)
-				w.code(`var fn `)
-				w.funcSignature(hook.Func)
-				w.line()
-				w.composeHook(hook, t, x, fn)
-			} else {
-				w.line(fn, ` := `, t, `.`, hook.Name)
-			}
+			w.line(fn, ` := `, t, `.`, hook.Name)
 			w.line(`if `, fn, ` == nil {`)
 			w.block(func() {
 				w.zeroReturn(hook.Func)
@@ -519,8 +515,9 @@ func (w *Writer) hookFuncCall(fn *Func, name string, args []string) {
 			w.newScope(func() {
 				w.code(`return func`)
 				args := w.funcParams(r.Params)
+				w.code(` `)
 				w.funcResults(r)
-				w.line(`{`)
+				w.line(` {`)
 				w.block(func() {
 					w.hookFuncCall(r, res, args)
 				})
@@ -643,9 +640,12 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 			w.code(`, `)
 			w.code(names[i], ` `, w.typeString(p.Type))
 		}
-		w.code(`) `)
+		w.code(`)`)
+		if hook.Func.HasResult() {
+			w.code(` `)
+		}
 		w.shortcutFuncResultsFlags(hook.Func, docs)
-		w.line(`{`)
+		w.line(` {`)
 		w.block(func() {
 			for _, name := range names {
 				w.capture(name)
@@ -691,9 +691,12 @@ func (w *Writer) hookFuncShortcut(fn *Func, name string) {
 			}
 			w.code(names[i], ` `, w.typeString(p.Type))
 		}
-		w.code(`) `)
+		w.code(`)`)
+		if fn.HasResult() {
+			w.code(` `)
+		}
 		w.shortcutFuncResults(fn)
-		w.line(`{`)
+		w.line(` {`)
 		w.block(func() {
 			for _, name := range names {
 				w.capture(name)
@@ -732,7 +735,7 @@ func (w *Writer) zeroReturn(fn *Func) {
 	switch x := fn.Result[0].(type) {
 	case *Func:
 		w.funcSignature(x)
-		w.line(`{`)
+		w.line(` {`)
 		w.block(func() {
 			w.zeroReturn(x)
 		})
@@ -752,7 +755,7 @@ func (w *Writer) funcParams(params []Param) (vars []string) {
 		}
 		vars = append(vars, w.funcParam(p))
 	}
-	w.code(`) `)
+	w.code(`)`)
 	return
 }
 
@@ -814,8 +817,13 @@ func (w *Writer) funcSignatureFlags(fn *Func, flags flags) {
 			w.code(w.typeString(p.Type))
 		}
 	}
-	w.code(`) `)
-	w.funcResultsFlags(fn, flags)
+	w.code(`)`)
+	if fn.HasResult() {
+		if fn.isFuncResult() {
+			w.code(` `)
+		}
+		w.funcResultsFlags(fn, flags)
+	}
 }
 
 func (w *Writer) funcSignature(fn *Func) {
@@ -838,8 +846,13 @@ func (w *Writer) shortcutFuncSignFlags(fn *Func, flags flags) {
 			w.code(w.typeString(p.Type))
 		}
 	}
-	w.code(`) `)
-	w.shortcutFuncResultsFlags(fn, flags)
+	w.code(`)`)
+	if fn.HasResult() {
+		if fn.isFuncResult() {
+			w.code(` `)
+		}
+		w.shortcutFuncResultsFlags(fn, flags)
+	}
 }
 
 func (w *Writer) shortcutFuncResultsFlags(fn *Func, flags flags) {

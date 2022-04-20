@@ -1,3 +1,4 @@
+* Fixed gtrace tool generation code style bug with leading spaces 
 * Removed accounting load factor (unused field) in balancers
 * Enabled by default anonymous credentials
 * Enabled by default internal dns resolver
