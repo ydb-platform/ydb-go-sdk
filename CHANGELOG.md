@@ -1,5 +1,5 @@
-* Supported json.Unmarshaler type for scanning row to values 
-* Reimplement sugar.DSN with net/url
+* Supported `json.Unmarshaler` type for scanning row to values 
+* Reimplement `sugar.DSN` with `net/url`
 
 ## v3.21.0
 * Fixed gtrace tool generation code style bug with leading spaces
