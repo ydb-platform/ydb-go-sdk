@@ -31,34 +31,34 @@ func TestParseConnectionString(t *testing.T) {
 		error            error
 	}{
 		{
-			"grpc://ydb-ru.yandex.xnet:2135/?" +
+			"grpc://ydb-ru.yandex.net:2135/?" +
 				"database=/ru/home/gvit/mydb&token=123",
 			false,
-			"ydb-ru.yandex.xnet:2135",
+			"ydb-ru.yandex.net:2135",
 			"/ru/home/gvit/mydb",
 			"123",
 			nil,
 		},
 		{
-			"grpcs://ydb.serverless.yandexcloud.xnet:2135/?" +
+			"grpcs://ydb.serverless.yandexcloud.net:2135/?" +
 				"database=/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1&token=123",
 			true,
-			"ydb.serverless.yandexcloud.xnet:2135",
+			"ydb.serverless.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
 			"123",
 			nil,
 		},
 		{
-			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.xnet:2135/?" +
+			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/?" +
 				"database=/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv&token=123",
 			true,
-			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.xnet:2135",
+			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 			"123",
 			nil,
 		},
 		{
-			"abcd://ydb-ru.yandex.xnet:2135/?database=/ru/home/gvit/mydb",
+			"abcd://ydb-ru.yandex.net:2135/?database=/ru/home/gvit/mydb",
 			true,
 			"",
 			"",
