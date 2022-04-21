@@ -1,8 +1,10 @@
 package sugar
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 )
 
 func TestDSN(t *testing.T) {
@@ -39,9 +41,23 @@ func TestDSN(t *testing.T) {
 		},
 	} {
 		t.Run(test.dsn, func(t *testing.T) {
-			dsn := DSN(test.endpoint, test.database, test.secure)
-			if dsn != test.dsn {
-				t.Fatal(fmt.Sprintf("Unexpected result: %s, exp: %s", dsn, test.dsn))
+			s := DSN(test.endpoint, test.database, test.secure)
+			if s != test.dsn {
+				t.Fatalf("Unexpected result: %s, exp: %s", s, test.dsn)
+			}
+			opts, err := dsn.Parse(s)
+			if err != nil {
+				t.Fatalf("")
+			}
+			config := config.New(opts...)
+			if config.Endpoint() != test.endpoint {
+				t.Fatalf("Unexpected endpoint: %s, exp: %s", config.Endpoint(), test.endpoint)
+			}
+			if config.Database() != test.database {
+				t.Fatalf("Unexpected database: %s, exp: %s", config.Database(), test.database)
+			}
+			if config.Secure() != test.secure {
+				t.Fatalf("Unexpected secure flag: %v, exp: %v", config.Secure(), test.secure)
 			}
 		})
 	}

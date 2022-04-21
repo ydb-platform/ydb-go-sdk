@@ -2,7 +2,6 @@ package dsn
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -69,7 +68,7 @@ func TestParseConnectionString(t *testing.T) {
 		t.Run(test.connectionString, func(t *testing.T) {
 			options, err := Parse(test.connectionString)
 			if !xerrors.Is(err, test.error) {
-				t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
+				t.Fatalf("Received unexpected error:\n%+v", err)
 			}
 			config := config.New(options...)
 			testutil.Equal(t, test.secure, config.Secure())
@@ -79,7 +78,7 @@ func TestParseConnectionString(t *testing.T) {
 			if credentials := config.Credentials(); credentials != nil {
 				token, err = credentials.Token(context.Background())
 				if err != nil {
-					t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
+					t.Fatalf("Received unexpected error:\n%+v", err)
 				}
 			} else {
 				token = ""
