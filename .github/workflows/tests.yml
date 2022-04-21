@@ -272,7 +272,7 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile long-stream.txt -covermode atomic ./test/connection_test.go
+        run: go test -race -coverpkg=./... -coverprofile long-stream.txt -covermode atomic ./test/long_stream_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:

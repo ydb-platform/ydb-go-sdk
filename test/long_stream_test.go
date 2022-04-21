@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"io"
 	"os"
 	"testing"
@@ -26,7 +27,7 @@ func TestLongStream(t *testing.T) {
 		batchSize         = 1000
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*discoveryInterval)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*discoveryInterval)
 	defer cancel()
 
 	t.Run("make connection", func(t *testing.T) {
@@ -90,18 +91,16 @@ func TestLongStream(t *testing.T) {
 									table.WithSerializableReadWrite(),
 								),
 								table.CommitTx(),
-							),
-							`
-						DECLARE $values AS List<Struct<
-							val: Int32,
-						> >;
-						UPSERT INTO stream_query
-						SELECT
-							val 
-						FROM
-							AS_TABLE($values);            
-						`,
-							table.NewQueryParameters(
+							), `
+								DECLARE $values AS List<Struct<
+									val: Int32,
+								>>;
+								UPSERT INTO stream_query
+								SELECT
+									val 
+								FROM
+									AS_TABLE($values);            
+							`, table.NewQueryParameters(
 								table.ValueParam(
 									"$values",
 									types.ListValue(values...),
@@ -148,7 +147,7 @@ func TestLongStream(t *testing.T) {
 								if errors.Is(err, io.EOF) {
 									return
 								}
-								t.Fatal(err)
+								t.Fatalf("unexpected error: %v (rowsCount: %d, duration: %v)", err, rowsCount, time.Since(start))
 							}
 							for res.NextRow() {
 								rowsCount++
@@ -161,7 +160,48 @@ func TestLongStream(t *testing.T) {
 					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
 				}
 				if rowsCount != upsertRowsCount {
-					return fmt.Errorf("wrong rows count: %v (duration: %v)", rowsCount, time.Since(start))
+					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)", rowsCount, upsertRowsCount, time.Since(start))
+				}
+				return nil
+			},
+		); err != nil {
+			t.Fatalf("stream query failed: %v\n", err)
+		}
+	})
+
+	t.Run("stream read table", func(t *testing.T) {
+		if err = db.Table().Do(
+			ctx,
+			func(ctx context.Context, s table.Session) (err error) {
+				var (
+					start     = time.Now()
+					rowsCount = 0
+				)
+				res, err := s.StreamReadTable(ctx, "stream_query", options.ReadColumn("val"))
+				if err != nil {
+					return err
+				}
+				t.Run("receiving result sets", func(t *testing.T) {
+					for err == nil {
+						t.Run("", func(t *testing.T) {
+							if err = res.NextResultSetErr(ctx); err != nil {
+								if errors.Is(err, io.EOF) {
+									return
+								}
+								t.Fatalf("unexpected error: %v (rowsCount: %d, duration: %v)", err, rowsCount, time.Since(start))
+							}
+							for res.NextRow() {
+								rowsCount++
+							}
+							time.Sleep(discoveryInterval)
+						})
+					}
+				})
+				if err = res.Err(); err != nil {
+					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
+				}
+				if rowsCount != upsertRowsCount {
+					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)", rowsCount, upsertRowsCount, time.Since(start))
 				}
 				return nil
 			},
