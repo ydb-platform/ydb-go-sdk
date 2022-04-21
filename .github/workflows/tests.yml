@@ -238,3 +238,44 @@ jobs:
           file: ./connection.txt
           flags: connection,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
           name: connection
+  long-stream:
+    strategy:
+      matrix:
+        go-version: [1.17.x]
+        os: [ubuntu-latest]
+    services:
+      ydb:
+        image: cr.yandex/yc/yandex-docker-local-ydb:latest
+        ports:
+          - 2135:2135
+          - 2136:2136
+          - 8765:8765
+        volumes:
+          - /tmp/ydb_certs:/ydb_certs
+        env:
+          YDB_LOCAL_SURVIVE_RESTART: true
+          YDB_USE_IN_MEMORY_PDISKS: true
+        options: '-h localhost'
+    env:
+      OS: ${{ matrix.os }}
+      GO: ${{ matrix.go-version }}
+      YDB_CONNECTION_STRING: grpcs://localhost:2135/?database=/local
+      YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Wait database available
+        run: bash ./.github/scripts/wait-ydb-container.sh
+      - name: Test
+        run: go test -race -coverpkg=./... -coverprofile long-stream.txt -covermode atomic ./test/connection_test.go
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./long-stream.txt
+          flags: long-stream,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
+          name: long-stream
