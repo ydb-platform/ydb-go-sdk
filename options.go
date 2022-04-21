@@ -62,6 +62,9 @@ func WithRequestsType(requestsType string) Option {
 // Warning: WithConnectionString will be removed at next major release
 // (connection string will be required string param of ydb.Open)
 func WithConnectionString(connectionString string) Option {
+	if connectionString == "" {
+		return nil
+	}
 	return func(ctx context.Context, c *connection) error {
 		options, err := dsn.Parse(connectionString)
 		if err != nil {
