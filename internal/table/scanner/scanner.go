@@ -3,6 +3,7 @@ package scanner
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -994,6 +995,8 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 	case *string:
 		*v = ""
 	case *[]byte:
+		*v = nil
+	case *json.RawMessage:
 		*v = nil
 	case *[16]byte:
 		*v = [16]byte{}
