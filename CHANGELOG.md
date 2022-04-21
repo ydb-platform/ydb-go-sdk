@@ -1,3 +1,4 @@
+* Supported json.Unmarshaler type for scanning row to values 
 * Reimplement sugar.DSN with net/url
 
 ## v3.21.0

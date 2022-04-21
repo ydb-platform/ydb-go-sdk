@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"math"
 	"strconv"
 	"testing"
@@ -593,5 +594,114 @@ func TestScanNamed(t *testing.T) {
 				expected = expected[1:]
 			}
 		})
+	}
+}
+
+type jsonUnmarshaller struct {
+	bytes []byte
+}
+
+func (json *jsonUnmarshaller) UnmarshalJSON(bytes []byte) error {
+	json.bytes = bytes
+	return nil
+}
+
+var _ json.Unmarshaler = &jsonUnmarshaller{}
+
+func TestScanToJsonUnmarshaller(t *testing.T) {
+	s := initScanner()
+	for _, test := range []struct {
+		name    string
+		count   int
+		columns []*column
+		values  []indexed.RequiredOrOptional
+	}{
+		{
+			name:  "<optional JSONDocument, required JSON> to json.Unmarshaller",
+			count: 2,
+			columns: []*column{{
+				name:     "jsondocument",
+				typeID:   Ydb.Type_JSON_DOCUMENT,
+				optional: true,
+			}, {
+				name:   "json",
+				typeID: Ydb.Type_JSON,
+			}},
+			values: []indexed.RequiredOrOptional{
+				new(jsonUnmarshaller),
+				new(jsonUnmarshaller),
+			},
+		}, {
+			name:  "<required JSONDocument, optional JSON> to json.Unmarshaller",
+			count: 2,
+			columns: []*column{{
+				name:   "jsondocument",
+				typeID: Ydb.Type_JSON_DOCUMENT,
+			}, {
+				name:     "json",
+				typeID:   Ydb.Type_JSON,
+				optional: true,
+			}},
+			values: []indexed.RequiredOrOptional{
+				new(jsonUnmarshaller),
+				new(jsonUnmarshaller),
+			},
+		}, {
+			name:  "<optional JSONDocument, optional JSON> to json.Unmarshaller",
+			count: 2,
+			columns: []*column{{
+				name:     "jsondocument",
+				typeID:   Ydb.Type_JSON_DOCUMENT,
+				optional: true,
+			}, {
+				name:     "json",
+				typeID:   Ydb.Type_JSON,
+				optional: true,
+			}},
+			values: []indexed.RequiredOrOptional{
+				new(jsonUnmarshaller),
+				new(jsonUnmarshaller),
+			},
+		}, {
+			name:  "<required JSONDocument, required JSON> to json.Unmarshaller",
+			count: 2,
+			columns: []*column{{
+				name:   "jsondocument",
+				typeID: Ydb.Type_JSON_DOCUMENT,
+			}, {
+				name:   "json",
+				typeID: Ydb.Type_JSON,
+			}},
+			values: []indexed.RequiredOrOptional{
+				new(jsonUnmarshaller),
+				new(jsonUnmarshaller),
+			},
+		},
+	} {
+		set, _ := getResultSet(test.count, test.columns)
+		s.reset(set)
+		for s.NextRow() {
+			values := make([]indexed.RequiredOrOptional, 0, len(test.values))
+			for i, col := range test.columns {
+				if col.optional {
+					values = append(
+						values,
+						indexed.Optional(
+							test.values[i],
+						),
+					)
+				} else {
+					values = append(
+						values,
+						indexed.Required(
+							test.values[i],
+						),
+					)
+				}
+			}
+			if err := s.Scan(values...); err != nil {
+				t.Fatalf("test: %s; error: %s", test.name, err)
+			}
+		}
 	}
 }
