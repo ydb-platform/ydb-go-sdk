@@ -3,6 +3,7 @@ package scanner
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -717,6 +718,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
 	return true
 }
 
+// nolint: gocyclo
 func (s *scanner) scanRequired(value interface{}) {
 	switch v := value.(type) {
 	case *bool:
@@ -770,6 +772,19 @@ func (s *scanner) scanRequired(value interface{}) {
 		err := v.Scan(s.any())
 		if err != nil {
 			_ = s.errorf(0, "sql.Scanner error: %w", err)
+		}
+	case json.Unmarshaler:
+		var err error
+		switch s.getType() {
+		case types.TypeJSON:
+			err = v.UnmarshalJSON(s.converter.JSON())
+		case types.TypeJSONDocument:
+			err = v.UnmarshalJSON(s.converter.JSONDocument())
+		default:
+			_ = s.errorf(0, "ydb required type %T not unsupported for applying to json.Unmarshaler", s.getType())
+		}
+		if err != nil {
+			_ = s.errorf(0, "json.Unmarshaler error: %w", err)
 		}
 	default:
 		ok := s.trySetByteArray(v, false, false)
@@ -949,6 +964,20 @@ func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) 
 		if err != nil {
 			_ = s.errorf(0, "sql.Scanner error: %w", err)
 		}
+	case json.Unmarshaler:
+		s.unwrap()
+		var err error
+		switch s.getType() {
+		case types.TypeJSON:
+			err = v.UnmarshalJSON(s.converter.JSON())
+		case types.TypeJSONDocument:
+			err = v.UnmarshalJSON(s.converter.JSONDocument())
+		default:
+			_ = s.errorf(0, "ydb optional type %T not unsupported for applying to json.Unmarshaler", s.getType())
+		}
+		if err != nil {
+			_ = s.errorf(0, "json.Unmarshaler error: %w", err)
+		}
 	default:
 		s.unwrap()
 		ok := s.trySetByteArray(v, true, false)
@@ -1012,6 +1041,11 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf(0, "ydb.Scanner error: %w", err)
+		}
+	case json.Unmarshaler:
+		err := v.UnmarshalJSON(nil)
+		if err != nil {
+			_ = s.errorf(0, "json.Unmarshaler error: %w", err)
 		}
 	default:
 		ok := s.trySetByteArray(v, false, true)

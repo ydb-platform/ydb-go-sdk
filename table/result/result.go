@@ -92,7 +92,7 @@ type result interface {
 	//   time.Time
 	//   time.Duration
 	//   ydb.Value
-	// For custom types implement sql.Scanner interface.
+	// For custom types implement sql.Scanner or json.Unmarshaler interface.
 	// For optional types use double pointer construction.
 	// For unknown types use interface types.
 	// Supported scanning byte arrays of various length.
