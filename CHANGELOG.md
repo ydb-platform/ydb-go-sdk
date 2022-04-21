@@ -1,3 +1,4 @@
+* Supported for json.rawMessage when scanning rows
 * Reimplement sugar.DSN with net/url
 
 ## v3.21.0
