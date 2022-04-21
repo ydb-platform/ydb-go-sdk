@@ -253,9 +253,6 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		}
 	}
 	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
 		err = opt(ctx, c)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
