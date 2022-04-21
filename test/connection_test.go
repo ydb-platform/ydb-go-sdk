@@ -64,7 +64,8 @@ func TestConnection(t *testing.T) {
 	defer cancel()
 	db, err := ydb.Open(
 		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
+		"", // corner case for check replacement of endpoint+database+secure
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAnonymousCredentials(),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*2),

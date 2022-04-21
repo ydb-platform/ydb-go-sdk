@@ -1,5 +1,7 @@
+* Reimplement sugar.DSN with net/url
+
 ## v3.21.0
-* Fixed gtrace tool generation code style bug with leading spaces 
+* Fixed gtrace tool generation code style bug with leading spaces
 * Removed accounting load factor (unused field) in balancers
 * Enabled by default anonymous credentials
 * Enabled by default internal dns resolver
@@ -39,7 +41,7 @@
 
 ## v3.18.5
 * Fixed duplicating `WithPanicCallback` proxying to table config options
-* Fixed comments for `xerrros.Is` and `xerrros.As` 
+* Fixed comments for `xerrros.Is` and `xerrros.As`
 
 ## v3.18.4
 * Renamed internal packages `errors`, `net` and `resolver` to `xerrors`, `xnet` and `xresolver` for excluding ambiguous interpretation
@@ -52,7 +54,7 @@
 ## v3.18.2
 * Refactored balancers (makes concurrent-safe)
 * Excluded separate balancers lock from cluster
-* Refactored `cluster.Cluster` interface (`Insert` and `Remove` returning nothing now) 
+* Refactored `cluster.Cluster` interface (`Insert` and `Remove` returning nothing now)
 * Replaced unsafe `cluster.close` boolean flag to `cluster.done` chan for listening close event
 * Added internal checker `cluster.isClosed()` for check cluster state
 * Extracted getting available conn from balancer to internal helper `cluster.get` (called inside `cluster.Get` as last effort)
@@ -69,7 +71,7 @@
 * Added `ydb.WithOperationTimeout` and `ydb.WithOperationCancelAfter` context modifiers
 
 ## v3.17.0
-* Removed redundant `trace.With{Table,Driver,Retry}` and `trace.Context{Table,Driver,Retry}` funcs 
+* Removed redundant `trace.With{Table,Driver,Retry}` and `trace.Context{Table,Driver,Retry}` funcs
 * Moved `gtrace` tool from `./cmd/gtrace` to `./internal/cmd/gtrace`
 * Refactored `gtrace` tool for generate `Compose` options
 * Added panic recover on trace calls in `Compose` call step
@@ -78,7 +80,7 @@
 
 ## v3.16.12
 * Fixed bug with check acquire error over `ydb.IsRatelimiterAcquireError`
-* Added full changelog link to github release description 
+* Added full changelog link to github release description
 
 ## v3.16.11
 * Added stacktrace to errors with issues
@@ -96,7 +98,7 @@
 * Refactored internal operation and transport errors
 
 ## v3.16.8
-* Added `config.ExcludeGRPCCodesForPessimization()` opttion for exclude some grpc codes from pessimization rules 
+* Added `config.ExcludeGRPCCodesForPessimization()` opttion for exclude some grpc codes from pessimization rules
 * Refactored pessimization node conditions
 * Added closing of ticker in `conn.Conn.connParker`
 * Removed `config.WithSharedPool` and usages it
@@ -114,7 +116,7 @@
 
 ## v3.16.5
 * Added `config.SharedPool()` setting and `config.WithSharedPool()` option
-* Added management of shared pool flag on change dial timeout and credentials 
+* Added management of shared pool flag on change dial timeout and credentials
 * Removed explicit checks of conditions for use (or not) shared pool in `ydb.With()`
 * Renamed `internal/db` interfaces
 * Changed signature of `conn.Conn.Release` (added error as result)
@@ -132,7 +134,7 @@
 * Removed explicit call meta in `db.New()`
 
 ## v3.16.1
-* Added `WithMeta()` discovery config option 
+* Added `WithMeta()` discovery config option
 * Fixed bug with credentials on discovery
 
 ## v3.16.0
@@ -142,7 +144,7 @@
 ## v3.15.1
 * Removed all conditions for trace retry errors
 * Fixed background color of warn messages
-* Added to log messages additional information about error, such as retryable (or not), delete session (or not), etc. 
+* Added to log messages additional information about error, such as retryable (or not), delete session (or not), etc.
 
 ## v3.15.0
 * Added github action for publish release tags
@@ -151,7 +153,7 @@
 * Fixed race on check trailer on closing table grpc-stream
 * Refactored traces (start and done struct names have prefix about trace)
 * Replaced `errors.Error`, `errors.Errorf` and `errors.ErrorfSkip` to single `errors.WithStackTrace`
-* Refactored table client options 
+* Refactored table client options
 * Declared and implemented interface `errors.isYdbError` for checking ybd/non-ydb errors
 * Fixed double tracing table do events
 * Added `retry.WithFastBackoff` and `retry.WithFastBackoff` options
@@ -183,17 +185,17 @@
 * Fixed linter issues
 
 ## 3.13.2
-* Fixed race with read/write pool conns on closing conn 
+* Fixed race with read/write pool conns on closing conn
 
 ## 3.13.1
 * Improved error messages
 * Defended `cluster.balancer` with `sync.RWMutex` on `cluster.Insert`, `cluster.Update`, `cluster.Remove` and `cluster.Get`
 * Excluded `Close` and `Park` methods from `conn.Conn` interface
-* Fixed bug with `Multi` balancer `Create()` 
+* Fixed bug with `Multi` balancer `Create()`
 * Improved `errors.IsTransportError` (check a few transport error codes instead check single transport error code)
 * Improved `errors.Is` (check a few errors instead check single error)
 * Refactored YDB errors checking API on client-side
-* Implemented of scripting traces 
+* Implemented of scripting traces
 
 ## 3.13.0
 * Refactored `Connection` interface
@@ -209,7 +211,7 @@
 * Fixed bug with closing nil session in table retryer
 * Restored repeater `Force` call on pessimize event
 * Changed mutex type in `conn.Conn` from `sync.Mutex` to `sync.RWMutex` for exclude deadlocks
-* Reverted applying empty `discovery` results to `cluster` 
+* Reverted applying empty `discovery` results to `cluster`
 
 ## 3.12.0
 * Added `balancers.Prefer` and `balancers.PreferWithFallback` constructors
@@ -236,7 +238,7 @@
 ## 3.11.8
 * Added `trace.EndpointInfo.LastUpdated()` timestamp
 * Refactored `endpoint.Endpoint` (split to struct `endopint` and interface `Endpoint`)
-* Returned safe-thread copy of `endpoint.Endpoint` to trace callbacks 
+* Returned safe-thread copy of `endpoint.Endpoint` to trace callbacks
 * Added `endpoint.Endpoint.Touch()` func for refresh endpoint info
 * Added `conn.conn.onClose` slice for call optional funcs on close step
 * Added removing `conn.Conn` from `conn.Pool` on `conn.Conn.Close()` call
@@ -275,7 +277,7 @@
 * Removed `trace.Table.OnPoolTake` event (unused)
 * Refactored `trace.Details` matching by string pattern
 * Added resolver trace callback
-* Refactored initialization step of grpc dial options 
+* Refactored initialization step of grpc dial options
 * Added internal package `net` with `net.Conn` proxy object
 * Fixed closing proxy clients
 * Added `ydb.Connection.With(opts ...ydb.CustomOption)` for taking proxy `ydb.Connection` with some redefined options
@@ -319,7 +321,7 @@
 * Added `ydb.RegisterParser` method for registering external parser of connection string
 
 ## 3.8.12
-* Unwrap sub-tests called as `t.Run(...)` in integration tests 
+* Unwrap sub-tests called as `t.Run(...)` in integration tests
 * Updated `grpc` dependency (from `v1.38.0` to `v1.43.0`)
 * Updated `protobuf` dependency (from `v1.26.0` to `v1.27.1`)
 * Added internal retryers into `lazy.Ratelimiter`
@@ -390,7 +392,7 @@
 * Added `String()` method to `table.types.Type` interface
 * Added `With[Custom]UserAgent()` `Option` and `CustomOption` constructors
 * Refactored `log.Logger` interface and internal implementation
-* Added `retry.RetryableError()` for returns user-defined error which must be retryed 
+* Added `retry.RetryableError()` for returns user-defined error which must be retryed
 * Renamed internal type `internal.errors.OperationCompleted` to `internal.errors.OperationStatus`
 * Added `String()` method to `table.KeyRange` and `table.Value` types
 * Replaced creation of goroutine on each stream call to explicit call stream.Recv() on NextResultSet()
@@ -403,7 +405,7 @@
 
 ## 3.6.1
 * Switched closing cluster after closing all sub-services
-* Added windows and macOS runtimes to unit and integration tests 
+* Added windows and macOS runtimes to unit and integration tests
 
 ## 3.6.0
 * Added `config/balancer` package with popular balancers
@@ -448,7 +450,7 @@
 * Fixed `CGO` race on `Darwin` system when driver tried to expand tilde on certificates path
 * Removed `EnsurePathExists` and `CleanupDatabase` from API of `scheme.Client`
 * Added helpers `MakePath` and `CleanPath` to root of package `ydb-go-sdk`
-* Removed call `types.Scanner.UnmarshalYDB()` inside `scanner.setDefaults()` 
+* Removed call `types.Scanner.UnmarshalYDB()` inside `scanner.setDefaults()`
 * Added `DoTx()` API method into `table.Client`
 * Added `String()` method into `ConnectParams` for serialize params to connection string
 * Added early exit from Rollback for committed transaction
@@ -485,25 +487,25 @@
 ## 3.3.0
 * Stored node ID into `endpoint.Endpoint` struct
 * Simplified <Host,Port> in `endpoint.Endpoint` to single fqdn Address
-* On table session requests now preferred the endpoint by `ID` extracted from session `ID`. If 
+* On table session requests now preferred the endpoint by `ID` extracted from session `ID`. If
   endpoint by `ID` not found - using the endpoint from balancer
-* Upgraded internal logger for print colored messages 
+* Upgraded internal logger for print colored messages
 
 ## 3.2.7
 * Fixed compare endpoints func
 
 ## 3.2.6
-* Reverted `NodeID` as key for link between session and endpoint because yandex-cloud YDB 
-  installation not supported `Endpoint.ID` entity  
+* Reverted `NodeID` as key for link between session and endpoint because yandex-cloud YDB
+  installation not supported `Endpoint.ID` entity
 
 ## 3.2.5
-* Dropped endpoint.Addr entity as unused. After change link type between session and endpoint 
+* Dropped endpoint.Addr entity as unused. After change link type between session and endpoint
   to NodeID endpoint.Addr became unnecessary for internal logic of driver
 * Enabled integration test table pool health
 * Fixed race on session stream requests
 
 ## 3.2.4
-* Returned context error when context is done on `session.StreamExecuteScanQuery` 
+* Returned context error when context is done on `session.StreamExecuteScanQuery`
   and `session.StreamReadTable`
 
 ## 3.2.3
@@ -524,7 +526,7 @@
 * added internal leveled logger which implement interface `log.Logger`
 * supported environment variable `YDB_LOG_SEVERITY_LEVEL`
 * changed name of the field `RetryAttempts` to` Attempts` in the structure `trace.PoolGetDoneInfo`.
-  This change reduces back compatibility, but there are no external uses of v3 sdk, so this change is 
+  This change reduces back compatibility, but there are no external uses of v3 sdk, so this change is
   fine. We are sorry if this change broke your code
 
 ## 3.1.0

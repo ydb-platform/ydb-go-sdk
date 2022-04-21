@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -62,27 +63,16 @@ func WithRequestsType(requestsType string) Option {
 // (connection string will be required string param of ydb.Open)
 func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *connection) error {
-		var (
-			urls = []string{
-				connectionString,
-				"grpcs://" + connectionString,
-			}
-			issues = make([]error, 0, len(urls))
-		)
-		for _, url := range urls {
-			options, err := dsn.Parse(url)
-			if err == nil {
-				c.options = append(c.options, options...)
-				return nil
-			}
-			issues = append(issues, err)
+		if connectionString == "" {
+			return nil
 		}
-		if len(issues) > 0 {
-			return xerrors.WithStackTrace(xerrors.NewWithIssues(
-				"parse connection string '"+connectionString+"' failed:",
-				issues...,
-			))
+		options, err := dsn.Parse(connectionString)
+		if err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("parse connection string '%s' failed: %w", connectionString, err),
+			)
 		}
+		c.options = append(c.options, options...)
 		return nil
 	}
 }

@@ -2,7 +2,6 @@ package dsn
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -31,34 +30,34 @@ func TestParseConnectionString(t *testing.T) {
 		error            error
 	}{
 		{
-			"grpc://ydb-ru.yandex.xnet:2135/?" +
+			"grpc://ydb-ru.yandex.net:2135/?" +
 				"database=/ru/home/gvit/mydb&token=123",
 			false,
-			"ydb-ru.yandex.xnet:2135",
+			"ydb-ru.yandex.net:2135",
 			"/ru/home/gvit/mydb",
 			"123",
 			nil,
 		},
 		{
-			"grpcs://ydb.serverless.yandexcloud.xnet:2135/?" +
+			"grpcs://ydb.serverless.yandexcloud.net:2135/?" +
 				"database=/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1&token=123",
 			true,
-			"ydb.serverless.yandexcloud.xnet:2135",
+			"ydb.serverless.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
 			"123",
 			nil,
 		},
 		{
-			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.xnet:2135/?" +
+			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/?" +
 				"database=/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv&token=123",
 			true,
-			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.xnet:2135",
+			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 			"123",
 			nil,
 		},
 		{
-			"abcd://ydb-ru.yandex.xnet:2135/?database=/ru/home/gvit/mydb",
+			"abcd://ydb-ru.yandex.net:2135/?database=/ru/home/gvit/mydb",
 			true,
 			"",
 			"",
@@ -69,7 +68,7 @@ func TestParseConnectionString(t *testing.T) {
 		t.Run(test.connectionString, func(t *testing.T) {
 			options, err := Parse(test.connectionString)
 			if !xerrors.Is(err, test.error) {
-				t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
+				t.Fatalf("Received unexpected error:\n%+v", err)
 			}
 			config := config.New(options...)
 			testutil.Equal(t, test.secure, config.Secure())
@@ -79,7 +78,7 @@ func TestParseConnectionString(t *testing.T) {
 			if credentials := config.Credentials(); credentials != nil {
 				token, err = credentials.Token(context.Background())
 				if err != nil {
-					t.Fatal(fmt.Sprintf("Received unexpected error:\n%+v", err))
+					t.Fatalf("Received unexpected error:\n%+v", err)
 				}
 			} else {
 				token = ""
