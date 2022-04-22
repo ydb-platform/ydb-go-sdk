@@ -61,7 +61,7 @@ func (r *baseBalancer) checkNeedRefresh(failedConns *int) {
 type roundRobin struct {
 	baseBalancer
 
-	next int64
+	last int64
 }
 
 func (r *roundRobin) Create(conns []conn.Conn) balancer.Balancer {
@@ -75,10 +75,11 @@ func RoundRobin(conns []conn.Conn) balancer.Balancer {
 func RoundRobinWithStartPosition(conns []conn.Conn, index int) balancer.Balancer {
 	return &roundRobin{
 		baseBalancer: baseBalancer{
-			conns: conns,
+			conns:       conns,
+			needRefresh: make(chan struct{}),
 		},
 		// random start need to prevent overload first nodes
-		next: int64(index),
+		last: int64(index),
 	}
 }
 
@@ -102,9 +103,9 @@ func (r *roundRobin) Next(_ context.Context, allowBanned bool) conn.Conn {
 }
 
 func (r *roundRobin) nextStartIndex() int {
-	res := atomic.AddInt64(&r.next, 1) % int64(len(r.conns))
+	res := atomic.AddInt64(&r.last, 1) % int64(len(r.conns))
 	if res < 0 {
-		atomic.CompareAndSwapInt64(&r.next, res, 0)
+		atomic.CompareAndSwapInt64(&r.last, res, 0)
 		return r.nextStartIndex()
 	}
 	index := int(res) % len(r.conns)
@@ -119,8 +120,11 @@ type randomChoice struct {
 
 func RandomChoice(conns []conn.Conn) balancer.Balancer {
 	return &randomChoice{
-		baseBalancer: baseBalancer{conns: conns},
-		rand:         xrand.New(xrand.WithLock(), xrand.WithSource(randomSources.Int64(math.MaxInt64))),
+		baseBalancer: baseBalancer{
+			conns:       conns,
+			needRefresh: make(chan struct{}),
+		},
+		rand: xrand.New(xrand.WithLock(), xrand.WithSource(randomSources.Int64(math.MaxInt64))),
 	}
 }
 
@@ -162,15 +166,4 @@ func (r *randomChoice) Next(_ context.Context, allowBanned bool) conn.Conn {
 	}
 
 	return nil
-}
-
-func isOkConnection(c conn.Conn, bannedIsOk bool) bool {
-	state := c.GetState()
-	if state == conn.Online || state == conn.Created {
-		return true
-	}
-	if bannedIsOk && state == conn.Banned {
-		return true
-	}
-	return false
 }

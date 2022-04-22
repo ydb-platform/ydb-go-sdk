@@ -49,3 +49,14 @@ func TestCtxBalancer_Next(t *testing.T) {
 		}
 	})
 }
+
+func TestCtxBalancer_NeedRefresh(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		require.False(t, Balancer(nil).NeedRefresh(context.Background()))
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		b := Balancer([]conn.Conn{&mock.ConnMock{NodeID: 1}})
+		require.False(t, b.NeedRefresh(context.Background()))
+	})
+}
