@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -19,20 +20,12 @@ func tSleep() {
 func TestCreate(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		b := Balancer().(*multi)
-		if blen := len(b.balancers); blen != 0 {
-			t.Errorf("bad balancers len: %v", blen)
-		}
-		if flen := len(b.balancers); flen != 0 {
-			t.Errorf("bal filters len: %v", flen)
-		}
+		require.Empty(t, b.balancers)
+		require.Empty(t, b.filters)
 
 		b2 := b.Create(nil).(*multi)
-		if blen := len(b2.balancers); blen != 0 {
-			t.Errorf("bad balancers len: %v", blen)
-		}
-		if flen := len(b2.balancers); flen != 0 {
-			t.Errorf("bal filters len: %v", flen)
-		}
+		require.Empty(t, b2.balancers)
+		require.Empty(t, b2.filters)
 	})
 
 	t.Run("Filled", func(t *testing.T) {
@@ -71,58 +64,30 @@ func TestCreate(t *testing.T) {
 		}
 
 		b2 := b.Create(conns).(*multi)
-		if blen := len(b2.balancers); blen != 2 {
-			t.Errorf("bad balancers len: %v", blen)
-		}
-		if flen := len(b2.balancers); flen != 2 {
-			t.Errorf("bal filters len: %v", flen)
-		}
+		require.Len(t, b2.balancers, 2)
+		require.Len(t, b2.filters, 2)
 
 		// zero mock return balancer with nil oncreate
-		if b2.balancers[0].(*mock.BalancerMock).OnCreate != nil {
-			t.Errorf("failed to create balancer 0")
-		}
+		require.Nil(t, b2.balancers[0].(*mock.BalancerMock).OnCreate)
 
 		// first mock return balancer with non nil oncreate
-		if b2.balancers[1].(*mock.BalancerMock).OnCreate == nil {
-			t.Errorf("failed to create balancer 1")
-		}
+		require.NotNil(t, b2.balancers[1].(*mock.BalancerMock).OnCreate)
 
-		if len(conns0) != connCount/2 {
-			t.Errorf("bad len conns0")
-		}
+		require.Len(t, conns0, connCount/2)
 		for i := 0; i < len(conns0); i++ {
-			if strconv.Itoa(i*2) != conns0[i].Endpoint().Address() {
-				t.Errorf("bad endpoint address conns0[%v]: %v", i, conns0[i].Endpoint().Address())
-			}
+			require.Equal(t, strconv.Itoa(i*2), conns0[i].Endpoint().Address(), i)
 		}
 
-		if len(conns1) != connCount/2 {
-			t.Errorf("bad len conns1")
-		}
+		require.Len(t, conns1, connCount/2)
 		for i := 1; i < len(conns1); i++ {
-			if strconv.Itoa(i*2+1) != conns1[i].Endpoint().Address() {
-				t.Errorf("bad endpoint address conns1[%v]: %v", i, conns0[i].Endpoint().Address())
-			}
+			require.Equal(t, strconv.Itoa(i*2+1), conns1[i].Endpoint().Address(), i)
 		}
 
-		if flen := len(b2.filters); flen != 2 {
-			t.Errorf("failed flen: %v", flen)
-		}
-
-		if !b2.filters[0](conns[0]) {
-			t.Errorf("failed filter 0-0")
-		}
-		if b2.filters[0](conns[1]) {
-			t.Errorf("failed filter 0-1")
-		}
-
-		if b2.filters[1](conns[0]) {
-			t.Errorf("failed filter 1-0")
-		}
-		if !b2.filters[1](conns[1]) {
-			t.Errorf("failed filter 1-1")
-		}
+		require.Len(t, b2.filters, 2)
+		require.True(t, b2.filters[0](conns[0]))
+		require.False(t, b2.filters[0](conns[1]))
+		require.False(t, b2.filters[1](conns[0]))
+		require.True(t, b2.filters[1](conns[1]))
 	})
 }
 
@@ -138,9 +103,7 @@ func TestNeedRefresh(t *testing.T) {
 
 		ctxCancel()
 		res := <-callResult
-		if res {
-			t.Errorf("empty multi balancer must not need request")
-		}
+		require.False(t, res)
 	})
 
 	t.Run("Filled", func(t *testing.T) {
@@ -186,9 +149,7 @@ func TestNeedRefresh(t *testing.T) {
 
 			ctxCancel()
 			ans := <-callResult
-			if ans {
-				t.Errorf("timeout answer must be false")
-			}
+			require.False(t, ans)
 		})
 
 		t.Run("Answer-true", func(t *testing.T) {
@@ -212,9 +173,7 @@ func TestNeedRefresh(t *testing.T) {
 				m2ans <- true
 
 				ans := <-callResult
-				if !ans {
-					t.Errorf("Bad answer")
-				}
+				require.True(t, ans)
 			}
 
 			for _, needPause := range []bool{true, false} {
@@ -259,9 +218,7 @@ func TestNeedRefresh(t *testing.T) {
 				m2ans <- false
 
 				ans := <-callResult
-				if ans {
-					t.Errorf("Bad answer")
-				}
+				require.False(t, ans)
 			}
 
 			for _, needPause := range []bool{true, false} {
@@ -277,9 +234,7 @@ func TestNext(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		b := Balancer()
 		res := b.Next(nil, false)
-		if res != nil {
-			t.Errorf("must be nil")
-		}
+		require.Nil(t, res)
 	})
 
 	t.Run("SelectFirstNonNilAnswer", func(t *testing.T) {
@@ -295,25 +250,19 @@ func TestNext(t *testing.T) {
 		t.Run("First", func(t *testing.T) {
 			b := Balancer(WithBalancer(answer, nil), WithBalancer(noanswer, nil))
 			res := b.Next(context.Background(), false)
-			if res.Endpoint().Address() != "ok" {
-				t.Errorf("Bad answer")
-			}
+			require.Equal(t, "ok", res.Endpoint().Address())
 		})
 
 		t.Run("Second", func(t *testing.T) {
 			b := Balancer(WithBalancer(noanswer, nil), WithBalancer(answer, nil))
 			res := b.Next(context.Background(), false)
-			if res.Endpoint().Address() != "ok" {
-				t.Errorf("Bad answer")
-			}
+			require.Equal(t, "ok", res.Endpoint().Address())
 		})
 
 		t.Run("None", func(t *testing.T) {
 			b := Balancer(WithBalancer(noanswer, nil), WithBalancer(noanswer, nil))
 			res := b.Next(context.Background(), false)
-			if res != nil {
-				t.Errorf("Bad answer")
-			}
+			require.Nil(t, res)
 		})
 	})
 
@@ -321,12 +270,8 @@ func TestNext(t *testing.T) {
 		createCheckParams := func(t *testing.T, needContext context.Context, needAllowBanned bool) balancer.Balancer {
 			b := mock.Balancer()
 			b.OnNext = func(ctx context.Context, allowBanned bool) conn.Conn {
-				if ctx != needContext {
-					t.Errorf("bad context")
-				}
-				if allowBanned != needAllowBanned {
-					t.Errorf("bad allowBanned")
-				}
+				require.Equal(t, needContext, ctx)
+				require.Equal(t, needAllowBanned, allowBanned)
 				return nil
 			}
 			return b
