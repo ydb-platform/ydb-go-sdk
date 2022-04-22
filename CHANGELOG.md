@@ -1,3 +1,4 @@
+## v3.22.0
 * Supported `json.Unmarshaler` type for scanning row to values 
 * Reimplement `sugar.DSN` with `net/url`
 
