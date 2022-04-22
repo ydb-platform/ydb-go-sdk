@@ -2,6 +2,7 @@ package ydb
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -109,7 +110,7 @@ func WithDatabase(database string) Option {
 
 // WithSecure defines secure option
 //
-// Warning: use WithConnectionString or dsn package instead
+// Warning: if secure is false - TLS config options has no effect.
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(secure))
@@ -117,9 +118,9 @@ func WithSecure(secure bool) Option {
 	}
 }
 
-// WithInsecure defines secure option
+// WithInsecure defines secure option.
 //
-// Warning: use WithConnectionString or dsn package instead
+// Warning: WithInsecure lost current TLS config.
 func WithInsecure() Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(false))
@@ -135,6 +136,7 @@ func WithMinTLSVersion(minVersion uint16) Option {
 	}
 }
 
+// WithTLSSInsecureSkipVerify applies InsecureSkipVerify flag to TLS config
 func WithTLSSInsecureSkipVerify() Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithTLSSInsecureSkipVerify())
@@ -143,6 +145,7 @@ func WithTLSSInsecureSkipVerify() Option {
 }
 
 // WithLogger add enables logging for selected tracing events.
+//
 // See trace package documentation for details.
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 	loggerOpts := make([]logger.Option, 0, len(opts))
@@ -205,7 +208,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 }
 
 // With collects additional configuration options.
-// This option does not replace collected option, instead it will appen provided options.
+// This option does not replace collected option, instead it will append provided options.
 func With(options ...config.Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, options...)
@@ -241,7 +244,7 @@ func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Opti
 	}
 }
 
-// WithCertificate provides custom CA certificate.
+// WithCertificate appends certificate to TLS config root certificates
 func WithCertificate(cert *x509.Certificate) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithCertificate(cert))
@@ -249,7 +252,7 @@ func WithCertificate(cert *x509.Certificate) Option {
 	}
 }
 
-// WithCertificate provides filepath to load custom CA certificates.
+// WithCertificatesFromFile appends certificates by filepath to TLS config root certificates
 func WithCertificatesFromFile(caFile string) Option {
 	return func(ctx context.Context, c *connection) error {
 		if len(caFile) > 0 && caFile[0] == '~' {
@@ -270,7 +273,18 @@ func WithCertificatesFromFile(caFile string) Option {
 	}
 }
 
-// WithCertificate provides PEM encoded custom CA certificates.
+// WithTLSConfig replaces older TLS config
+//
+// Warning: all early TLS config changes (such as WithCertificate, WithCertificatesFromFile, WithCertificatesFromPem,
+// WithMinTLSVersion, WithTLSSInsecureSkipVerify) will be lost
+func WithTLSConfig(tlsConfig *tls.Config) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.options = append(c.options, config.WithTLSConfig(tlsConfig))
+		return nil
+	}
+}
+
+// WithCertificatesFromPem appends certificates by filepath to TLS config root certificates
 func WithCertificatesFromPem(bytes []byte) Option {
 	return func(ctx context.Context, c *connection) error {
 		if ok, err := func(bytes []byte) (ok bool, err error) {
