@@ -22,10 +22,9 @@ type Balancer interface {
 	// Create makes empty balancer with same implementation
 	Create(conns []conn.Conn) Balancer
 
-	// NeedRefresh sync call, which return in one of cases
-	// first - if balancer can known about need refresh or not (may be right after call, with pause or never)
-	// second - ctx cancelled, must be cancelled be caller for prevent goroutines leak
-	// return true if the balancer need refresh
+	// NeedRefresh ctx used to timeout
+	// is must cancel by caller for prevent goroutine leak
+	// without ctx NeedRefresh can return never.
 	NeedRefresh(ctx context.Context) bool
 }
 

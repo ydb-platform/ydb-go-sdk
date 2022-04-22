@@ -11,10 +11,9 @@ import (
 
 type ConnMock struct {
 	Address string
-}
-
-func NewConn(addr string) *ConnMock {
-	return &ConnMock{Address: addr}
+	NodeID  uint32
+	State   conn.State
+	PingErr error
 }
 
 func (c *ConnMock) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
@@ -26,7 +25,7 @@ func (c *ConnMock) NewStream(ctx context.Context, desc *grpc.StreamDesc, method 
 }
 
 func (c *ConnMock) Endpoint() endpoint.Endpoint {
-	return &EndpointMock{Addr: c.Address}
+	return &EndpointMock{AddrField: c.Address, NodeIdField: c.NodeID}
 }
 
 func (c *ConnMock) LastUsage() time.Time {
@@ -38,7 +37,7 @@ func (c *ConnMock) Park(ctx context.Context) (err error) {
 }
 
 func (c *ConnMock) Ping(ctx context.Context) error {
-	panic("not implemented in mock")
+	return c.PingErr
 }
 
 func (c *ConnMock) IsState(states ...conn.State) bool {
@@ -46,7 +45,7 @@ func (c *ConnMock) IsState(states ...conn.State) bool {
 }
 
 func (c *ConnMock) GetState() conn.State {
-	panic("not implemented in mock")
+	return c.State
 }
 
 func (c *ConnMock) SetState(state conn.State) conn.State {
@@ -58,15 +57,16 @@ func (c *ConnMock) Release(ctx context.Context) error {
 }
 
 type EndpointMock struct {
-	Addr string
+	AddrField   string
+	NodeIdField uint32
 }
 
 func (e *EndpointMock) NodeID() uint32 {
-	panic("not implemented in mock")
+	return e.NodeIdField
 }
 
 func (e *EndpointMock) Address() string {
-	return e.Addr
+	return e.AddrField
 }
 
 func (e *EndpointMock) LocalDC() bool {
