@@ -13,8 +13,8 @@ func TestCtxBalancer_Create(t *testing.T) {
 	b := Balancer([]conn.Conn{&mock.ConnMock{Address: "a1", NodeID: 1}, &mock.ConnMock{Address: "a2", NodeID: 2}}).(*ctxBalancer)
 	checkOriginalBalancer := func() {
 		require.Len(t, b.connMap, 2)
-		require.Equal(t, b.connMap[1].(*mock.ConnMock).Address, "a1")
-		require.Equal(t, b.connMap[2].(*mock.ConnMock).Address, "a2")
+		require.Equal(t, "a1", b.connMap[1].(*mock.ConnMock).Address)
+		require.Equal(t, "a2", b.connMap[2].(*mock.ConnMock).Address)
 	}
 	checkOriginalBalancer()
 
@@ -22,9 +22,9 @@ func TestCtxBalancer_Create(t *testing.T) {
 	checkOriginalBalancer()
 
 	require.Len(t, b1.connMap, 3)
-	require.Equal(t, b1.connMap[3].(*mock.ConnMock).Address, "a3")
-	require.Equal(t, b1.connMap[4].(*mock.ConnMock).Address, "a4")
-	require.Equal(t, b1.connMap[5].(*mock.ConnMock).Address, "a5")
+	require.Equal(t, "a3", b1.connMap[3].(*mock.ConnMock).Address)
+	require.Equal(t, "a4", b1.connMap[4].(*mock.ConnMock).Address)
+	require.Equal(t, "a5", b1.connMap[5].(*mock.ConnMock).Address)
 }
 
 func TestCtxBalancer_Next(t *testing.T) {
@@ -37,15 +37,15 @@ func TestCtxBalancer_Next(t *testing.T) {
 
 	t.Run("WithPreferOnline", func(t *testing.T) {
 		res := b.Next(WithEndpoint(context.Background(), &mock.EndpointMock{NodeIdField: 1}), true).(*mock.ConnMock)
-		require.Equal(t, res.NodeID, uint32(1))
+		require.Equal(t, uint32(1), res.NodeID)
 	})
 
 	t.Run("WithPreferBanned", func(t *testing.T) {
-		require.Equal(t, b.connMap[2].GetState(), conn.Banned)
+		require.Equal(t, conn.Banned, b.connMap[2].GetState())
 
 		for _, allowBanned := range []bool{true, false} {
 			res := b.Next(WithEndpoint(context.Background(), &mock.EndpointMock{NodeIdField: 2}), allowBanned).(*mock.ConnMock)
-			require.Equal(t, res.NodeID, uint32(2))
+			require.Equal(t, uint32(2), res.NodeID)
 		}
 	})
 }
