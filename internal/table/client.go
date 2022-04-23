@@ -52,8 +52,7 @@ type Client interface {
 	CloseSession(ctx context.Context, s Session) (err error)
 }
 
-func New(cc grpc.ClientConnInterface, opts []config.Option) Client {
-	config := config.New(opts...)
+func New(cc grpc.ClientConnInterface, config config.Config) Client {
 	return newClient(cc, nil, config)
 }
 

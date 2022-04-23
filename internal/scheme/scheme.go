@@ -24,9 +24,9 @@ func (c *client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, options []config.Option) scheme.Client {
+func New(cc grpc.ClientConnInterface, config config.Config) scheme.Client {
 	return &client{
-		config:  config.New(options...),
+		config:  config,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
 	}
 }

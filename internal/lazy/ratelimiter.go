@@ -8,22 +8,21 @@ import (
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 type lazyRatelimiter struct {
-	db      database.Connection
-	options []config.Option
-	c       ratelimiter.Client
-	m       sync.Mutex
+	db     database.Connection
+	config config.Config
+	c      ratelimiter.Client
+	m      sync.Mutex
 }
 
 func Ratelimiter(db database.Connection, options []config.Option) ratelimiter.Client {
 	return &lazyRatelimiter{
-		db:      db,
-		options: options,
+		db:     db,
+		config: config.New(options...),
 	}
 }
 
@@ -33,11 +32,7 @@ func (r *lazyRatelimiter) Close(ctx context.Context) (err error) {
 	if r.c == nil {
 		return nil
 	}
-	err = r.c.Close(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
+	return r.c.Close(ctx)
 }
 
 func (r *lazyRatelimiter) CreateResource(
@@ -45,6 +40,9 @@ func (r *lazyRatelimiter) CreateResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
+	if !r.config.AutoRetry() {
+		return r.client().CreateResource(ctx, coordinationNodePath, resource)
+	}
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return r.client().CreateResource(ctx, coordinationNodePath, resource)
 	})
@@ -55,6 +53,9 @@ func (r *lazyRatelimiter) AlterResource(
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
 ) (err error) {
+	if !r.config.AutoRetry() {
+		return r.client().AlterResource(ctx, coordinationNodePath, resource)
+	}
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return r.client().AlterResource(ctx, coordinationNodePath, resource)
 	})
@@ -65,6 +66,9 @@ func (r *lazyRatelimiter) DropResource(
 	coordinationNodePath string,
 	resourcePath string,
 ) (err error) {
+	if !r.config.AutoRetry() {
+		return r.client().DropResource(ctx, coordinationNodePath, resourcePath)
+	}
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return r.client().DropResource(ctx, coordinationNodePath, resourcePath)
 	})
@@ -76,11 +80,14 @@ func (r *lazyRatelimiter) ListResource(
 	resourcePath string,
 	recursive bool,
 ) (paths []string, err error) {
+	if !r.config.AutoRetry() {
+		return r.client().ListResource(ctx, coordinationNodePath, resourcePath, recursive)
+	}
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		paths, err = r.client().ListResource(ctx, coordinationNodePath, resourcePath, recursive)
-		return xerrors.WithStackTrace(err)
+		return err
 	})
-	return paths, xerrors.WithStackTrace(err)
+	return paths, err
 }
 
 func (r *lazyRatelimiter) DescribeResource(
@@ -88,11 +95,14 @@ func (r *lazyRatelimiter) DescribeResource(
 	coordinationNodePath string,
 	resourcePath string,
 ) (resource *ratelimiter.Resource, err error) {
+	if !r.config.AutoRetry() {
+		return r.client().DescribeResource(ctx, coordinationNodePath, resourcePath)
+	}
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		resource, err = r.client().DescribeResource(ctx, coordinationNodePath, resourcePath)
-		return xerrors.WithStackTrace(err)
+		return err
 	})
-	return resource, xerrors.WithStackTrace(err)
+	return resource, err
 }
 
 func (r *lazyRatelimiter) AcquireResource(
@@ -102,6 +112,9 @@ func (r *lazyRatelimiter) AcquireResource(
 	amount uint64,
 	opts ...options.AcquireOption,
 ) (err error) {
+	if !r.config.AutoRetry() {
+		return r.client().AcquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...)
+	}
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return r.client().AcquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...)
 	})
@@ -111,7 +124,7 @@ func (r *lazyRatelimiter) client() ratelimiter.Client {
 	r.m.Lock()
 	defer r.m.Unlock()
 	if r.c == nil {
-		r.c = builder.New(r.db, r.options)
+		r.c = builder.New(r.db, r.config)
 	}
 	return r.c
 }

@@ -21,9 +21,9 @@ type client struct {
 	service Ydb_Coordination_V1.CoordinationServiceClient
 }
 
-func New(cc grpc.ClientConnInterface, options []config.Option) coordination.Client {
+func New(cc grpc.ClientConnInterface, config config.Config) coordination.Client {
 	return &client{
-		config:  config.New(options...),
+		config:  config,
 		service: Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
 	}
 }

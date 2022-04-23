@@ -7,21 +7,20 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type lazyTable struct {
-	db      database.Connection
-	options []config.Option
-	c       table.Client
-	m       sync.Mutex
+	db     database.Connection
+	config config.Config
+	c      table.Client
+	m      sync.Mutex
 }
 
 func Table(db database.Connection, options []config.Option) table.Client {
 	return &lazyTable{
-		db:      db,
-		options: options,
+		db:     db,
+		config: config.New(options...),
 	}
 }
 
@@ -43,18 +42,14 @@ func (t *lazyTable) Close(ctx context.Context) (err error) {
 	if t.c == nil {
 		return nil
 	}
-	err = t.c.Close(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
+	return t.c.Close(ctx)
 }
 
 func (t *lazyTable) client() table.Client {
 	t.m.Lock()
 	defer t.m.Unlock()
 	if t.c == nil {
-		t.c = builder.New(t.db, t.options)
+		t.c = builder.New(t.db, t.config)
 	}
 	return t.c
 }
