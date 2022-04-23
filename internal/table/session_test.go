@@ -331,7 +331,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := newClient(
-							context.Background(),
 							testutil.NewDB(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{

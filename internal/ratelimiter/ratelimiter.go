@@ -34,9 +34,9 @@ func (c *client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, options []config.Option) *client {
+func New(cc grpc.ClientConnInterface, config config.Config) *client {
 	return &client{
-		config:  config.New(options...),
+		config:  config,
 		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
 	}
 }

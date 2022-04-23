@@ -7,8 +7,14 @@ import (
 type Common struct {
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
+	disableAutoRetry     bool
 
 	panicCallback func(e interface{})
+}
+
+// AutoRetry defines auto-retry flag
+func (c *Common) AutoRetry() bool {
+	return !c.disableAutoRetry
 }
 
 // PanicCallback returns user-defined panic callback
@@ -58,4 +64,9 @@ func SetOperationCancelAfter(c *Common, operationCancelAfter time.Duration) {
 // SetPanicCallback applies panic callback to config
 func SetPanicCallback(c *Common, panicCallback func(e interface{})) {
 	c.panicCallback = panicCallback
+}
+
+// SetAutoRetry affects on AutoRetry() flag
+func SetAutoRetry(c *Common, autoRetry bool) {
+	c.disableAutoRetry = !autoRetry
 }

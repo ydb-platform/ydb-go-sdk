@@ -1,3 +1,9 @@
+* Fixed re-opening case after close lazy-initialized clients
+* Removed dependency of call context for initializing lazy table client
+* Added `config.AutoRetry()` flag with `true` value by default. `config.AutoRetry()` affects how to errors handle in sub-clients calls.
+* Added `config.WithNoAutoRetry` for disabling auto-retry on errors in sub-clients calls 
+* Refactored `internal/lazy` package (supported check `config.AutoRetry()`, removed all error wrappings with stacktrace)
+
 ## v3.23.0
 * Added `WithTLSConfig` option for redefine TLS config
 * Added `sugar.LoadCertificatesFromFile` and `sugar.LoadCertificatesFromPem` helpers

@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -15,10 +14,10 @@ import (
 )
 
 type lazyScripting struct {
-	db      database.Connection
-	options []config.Option
-	c       scripting.Client
-	m       sync.Mutex
+	db     database.Connection
+	config config.Config
+	c      scripting.Client
+	m      sync.Mutex
 }
 
 func (s *lazyScripting) Execute(
@@ -28,9 +27,9 @@ func (s *lazyScripting) Execute(
 ) (res result.Result, err error) {
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err = s.client().Execute(ctx, query, params)
-		return xerrors.WithStackTrace(err)
+		return err
 	})
-	return res, xerrors.WithStackTrace(err)
+	return res, err
 }
 
 func (s *lazyScripting) Explain(
@@ -40,9 +39,9 @@ func (s *lazyScripting) Explain(
 ) (e table.ScriptingYQLExplanation, err error) {
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = s.client().Explain(ctx, query, mode)
-		return xerrors.WithStackTrace(err)
+		return err
 	})
-	return e, xerrors.WithStackTrace(err)
+	return e, err
 }
 
 func (s *lazyScripting) StreamExecute(
@@ -52,9 +51,9 @@ func (s *lazyScripting) StreamExecute(
 ) (res result.StreamResult, err error) {
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err = s.client().StreamExecute(ctx, query, params)
-		return xerrors.WithStackTrace(err)
+		return err
 	})
-	return res, xerrors.WithStackTrace(err)
+	return res, err
 }
 
 func (s *lazyScripting) Close(ctx context.Context) (err error) {
@@ -63,20 +62,13 @@ func (s *lazyScripting) Close(ctx context.Context) (err error) {
 	if s.c == nil {
 		return nil
 	}
-	defer func() {
-		s.c = nil
-	}()
-	err = s.c.Close(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
+	return s.c.Close(ctx)
 }
 
 func Scripting(db database.Connection, options []config.Option) scripting.Client {
 	return &lazyScripting{
-		db:      db,
-		options: options,
+		db:     db,
+		config: config.New(options...),
 	}
 }
 
@@ -84,7 +76,7 @@ func (s *lazyScripting) client() scripting.Client {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if s.c == nil {
-		s.c = builder.New(s.db, s.options)
+		s.c = builder.New(s.db, s.config)
 	}
 	return s.c
 }

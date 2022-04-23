@@ -188,9 +188,9 @@ func (c *client) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, options []config.Option) scripting.Client {
+func New(cc grpc.ClientConnInterface, config config.Config) scripting.Client {
 	return &client{
-		config:  config.New(options...),
+		config:  config,
 		service: Ydb_Scripting_V1.NewScriptingServiceClient(cc),
 	}
 }

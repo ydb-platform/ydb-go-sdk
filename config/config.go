@@ -208,6 +208,13 @@ func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 	}
 }
 
+// WithNoAutoRetry disable auto-retry calls from YDB sub-clients
+func WithNoAutoRetry() Option {
+	return func(c *Config) {
+		config.SetAutoRetry(&c.Common, false)
+	}
+}
+
 // WithPanicCallback applies panic callback to config
 func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(c *Config) {
