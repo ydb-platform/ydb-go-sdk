@@ -24,20 +24,21 @@ import (
 type Config struct {
 	config.Common
 
-	trace                            trace.Driver
-	dialTimeout                      time.Duration
-	connectionTTL                    time.Duration
-	balancer                         balancer.Balancer
-	secure                           bool
-	endpoint                         string
-	database                         string
-	requestsType                     string
-	userAgent                        string
+	trace         trace.Driver
+	dialTimeout   time.Duration
+	connectionTTL time.Duration
+	balancer      balancer.Balancer
+	secure        bool
+	endpoint      string
+	database      string
+	requestsType  string
+	userAgent     string
+	grpcOptions   []grpc.DialOption
+	credentials   credentials.Credentials
+	tlsConfig     *tls.Config
+	meta          meta.Meta
+
 	excludeGRPCCodesForPessimization []grpcCodes.Code
-	grpcOptions                      []grpc.DialOption
-	credentials                      credentials.Credentials
-	tlsConfig                        *tls.Config
-	meta                             meta.Meta
 }
 
 // ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
@@ -45,24 +46,24 @@ func (c Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
-// GrpcDialOptions is an custom client grpc dial options which will appends to
-// default grpc dial options
+// GrpcDialOptions reports about used grpc dialing options
 func (c Config) GrpcDialOptions() []grpc.DialOption {
 	return c.grpcOptions
 }
 
-// Meta is an internal option which contains meta information about database connection
+// Meta reports meta information about database connection
 func (c Config) Meta() meta.Meta {
 	return c.meta
 }
 
-// ConnectionTTL is a time to live of a connection
-// If ConnectionTTL is zero then TTL is not used.
+// ConnectionTTL defines interval for parking grpc connections.
+//
+// If ConnectionTTL is zero - connections are not park.
 func (c Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
 
-// Secure is an flag for secure connection
+// Secure is a flag for secure connection
 func (c Config) Secure() bool {
 	return c.secure
 }
@@ -72,6 +73,7 @@ func (c Config) Endpoint() string {
 	return c.endpoint
 }
 
+// TLSConfig reports about TLS configuration
 func (c Config) TLSConfig() *tls.Config {
 	return c.tlsConfig
 }
@@ -89,7 +91,7 @@ func (c Config) Database() string {
 	return c.database
 }
 
-// Credentials is an ydb client credentials.
+// Credentials is a ydb client credentials.
 // In most cases Credentials are required.
 func (c Config) Credentials() credentials.Credentials {
 	return c.credentials
@@ -116,7 +118,7 @@ type Option func(c *Config)
 
 // WithInternalDNSResolver
 //
-// Deprecated: already used internal dns-resolver
+// Deprecated: always used internal dns-resolver
 func WithInternalDNSResolver() Option {
 	return func(c *Config) {}
 }
@@ -127,6 +129,9 @@ func WithEndpoint(endpoint string) Option {
 	}
 }
 
+// WithSecure changes secure connection flag.
+//
+// Warning: if secure is false - TLS config options has no effect.
 func WithSecure(secure bool) Option {
 	return func(c *Config) {
 		c.secure = secure
@@ -139,9 +144,19 @@ func WithDatabase(database string) Option {
 	}
 }
 
+// WithCertificate appends certificate to TLS config root certificates
 func WithCertificate(certificate *x509.Certificate) Option {
 	return func(c *Config) {
 		c.tlsConfig.RootCAs.AddCert(certificate)
+	}
+}
+
+// WithTLSConfig replaces older TLS config
+//
+// Warning: all early changes of TLS config will be lost
+func WithTLSConfig(tlsConfig *tls.Config) Option {
+	return func(c *Config) {
+		c.tlsConfig = tlsConfig
 	}
 }
 
@@ -218,12 +233,14 @@ func WithRequestsType(requestsType string) Option {
 	}
 }
 
+// WithMinTLSVersion applies minimum TLS version that is acceptable.
 func WithMinTLSVersion(minVersion uint16) Option {
 	return func(c *Config) {
 		c.tlsConfig.MinVersion = minVersion
 	}
 }
 
+// WithTLSSInsecureSkipVerify applies InsecureSkipVerify flag to TLS config
 func WithTLSSInsecureSkipVerify() Option {
 	return func(c *Config) {
 		c.tlsConfig.InsecureSkipVerify = true
@@ -267,19 +284,19 @@ func New(opts ...Option) Config {
 	return c
 }
 
-func certPool() (certPool *x509.CertPool) {
-	defer func() {
-		// on darwin system panic raced on checking system security
-		if e := recover(); e != nil {
-			certPool = x509.NewCertPool()
-		}
-	}()
-	var err error
-	certPool, err = x509.SystemCertPool()
-	if err != nil {
-		certPool = x509.NewCertPool()
+func certPool() *x509.CertPool {
+	certPool, err := x509.SystemCertPool()
+	if err == nil {
+		return certPool
 	}
-	return
+	return x509.NewCertPool()
+}
+
+func defaultTLSConfig() *tls.Config {
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    certPool(),
+	}
 }
 
 func defaultConfig() (c Config) {
@@ -287,12 +304,8 @@ func defaultConfig() (c Config) {
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo("default"),
 		),
-		balancer: balancers.Default(),
-		secure:   true,
-		tlsConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			RootCAs:    certPool(),
-		},
+		balancer:  balancers.Default(),
+		tlsConfig: defaultTLSConfig(),
 		grpcOptions: []grpc.DialOption{
 			grpc.WithContextDialer(
 				func(ctx context.Context, address string) (net.Conn, error) {

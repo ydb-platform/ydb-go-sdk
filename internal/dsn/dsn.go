@@ -16,13 +16,8 @@ var (
 			}, nil
 		},
 	}
-	schemasSecure = map[string]bool{
-		"":      true,
-		"grpcs": true,
-		"grpc":  false,
-	}
-	errSchemeNotValid = xerrors.Wrap(fmt.Errorf("schema not valid"))
-	errParserExists   = xerrors.Wrap(fmt.Errorf("already exists parser. newest parser replaced old. param"))
+	insecureSchema  = "grpc"
+	errParserExists = xerrors.Wrap(fmt.Errorf("already exists parser. newest parser replaced old. param"))
 )
 
 type Parser func(value string) ([]config.Option, error)
@@ -41,15 +36,10 @@ func Parse(dsn string) (options []config.Option, err error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if _, has := schemasSecure[uri.Scheme]; !has {
-		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("%w: %v", errSchemeNotValid, uri.Scheme),
-		)
-	}
 	options = append(
 		options,
 		config.WithEndpoint(uri.Host),
-		config.WithSecure(schemasSecure[uri.Scheme]),
+		config.WithSecure(uri.Scheme != insecureSchema),
 	)
 	for param, values := range uri.Query() {
 		if p, has := parsers[param]; has {

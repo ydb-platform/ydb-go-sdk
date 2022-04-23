@@ -6,7 +6,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -27,7 +26,6 @@ func TestParseConnectionString(t *testing.T) {
 		endpoint         string
 		database         string
 		token            string
-		error            error
 	}{
 		{
 			"grpc://ydb-ru.yandex.net:2135/?" +
@@ -36,7 +34,6 @@ func TestParseConnectionString(t *testing.T) {
 			"ydb-ru.yandex.net:2135",
 			"/ru/home/gvit/mydb",
 			"123",
-			nil,
 		},
 		{
 			"grpcs://ydb.serverless.yandexcloud.net:2135/?" +
@@ -45,7 +42,6 @@ func TestParseConnectionString(t *testing.T) {
 			"ydb.serverless.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn02qso4v3isjb00te1",
 			"123",
-			nil,
 		},
 		{
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/?" +
@@ -54,20 +50,18 @@ func TestParseConnectionString(t *testing.T) {
 			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 			"123",
-			nil,
 		},
 		{
 			"abcd://ydb-ru.yandex.net:2135/?database=/ru/home/gvit/mydb",
 			true,
+			"ydb-ru.yandex.net:2135",
+			"/ru/home/gvit/mydb",
 			"",
-			"",
-			"",
-			errSchemeNotValid,
 		},
 	} {
 		t.Run(test.connectionString, func(t *testing.T) {
 			options, err := Parse(test.connectionString)
-			if !xerrors.Is(err, test.error) {
+			if err != nil {
 				t.Fatalf("Received unexpected error:\n%+v", err)
 			}
 			config := config.New(options...)
