@@ -1,3 +1,6 @@
+* Fixed re-opening case after close lazy-initialized clients
+* Removed dependency of call context for initializing lazy table client
+
 ## v3.23.0
 * Added `WithTLSConfig` option for redefine TLS config
 * Added `sugar.LoadCertificatesFromFile` and `sugar.LoadCertificatesFromPem` helpers

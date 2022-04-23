@@ -33,9 +33,6 @@ func (r *lazyRatelimiter) Close(ctx context.Context) (err error) {
 	if r.c == nil {
 		return nil
 	}
-	defer func() {
-		r.c = nil
-	}()
 	err = r.c.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)

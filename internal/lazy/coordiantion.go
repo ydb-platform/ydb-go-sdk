@@ -66,9 +66,6 @@ func (c *lazyCoordination) Close(ctx context.Context) (err error) {
 	if c.c == nil {
 		return nil
 	}
-	defer func() {
-		c.c = nil
-	}()
 	err = c.c.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)

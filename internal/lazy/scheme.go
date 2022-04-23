@@ -42,9 +42,6 @@ func (s *lazyScheme) Close(ctx context.Context) (err error) {
 	if s.c == nil {
 		return nil
 	}
-	defer func() {
-		s.c = nil
-	}()
 	err = s.c.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)

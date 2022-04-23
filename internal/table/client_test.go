@@ -230,10 +230,10 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			const timeout = time.Second
 			select {
 			case err := <-got:
-				if !xerrors.Is(err, errSessionPoolClosed) {
+				if !xerrors.Is(err, errAlreadyClosed) {
 					t.Fatalf(
 						"unexpected error: %v; want %v",
-						err, errSessionPoolClosed,
+						err, errAlreadyClosed,
 					)
 				}
 			case <-time.After(timeout):
@@ -310,10 +310,10 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatalf("unexpected session close")
 	}
 
-	if err := p.Put(context.Background(), s3); !xerrors.Is(err, errSessionPoolClosed) {
+	if err := p.Put(context.Background(), s3); !xerrors.Is(err, errAlreadyClosed) {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
-			err, errSessionPoolClosed,
+			err, errAlreadyClosed,
 		)
 	}
 	wg.Wait()
@@ -366,7 +366,7 @@ func TestRaceWgClosed(t *testing.T) {
 								return nil
 							},
 						)
-						if xerrors.Is(err, errSessionPoolClosed) {
+						if xerrors.Is(err, errAlreadyClosed) {
 							return
 						}
 					}
@@ -474,7 +474,6 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	}
 	create := make(chan createReq)
 	p := newClient(
-		context.Background(),
 		nil,
 		(&StubBuilder{
 			Limit: 1,
@@ -1357,7 +1356,6 @@ func newClientWithStubBuilder(
 	options ...config.Option,
 ) *client {
 	return newClient(
-		context.Background(),
 		cc,
 		(&StubBuilder{
 			T:     t,

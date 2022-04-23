@@ -26,15 +26,15 @@ func Table(db database.Connection, options []config.Option) table.Client {
 }
 
 func (t *lazyTable) CreateSession(ctx context.Context, opts ...table.Option) (s table.ClosableSession, err error) {
-	return t.client(ctx).CreateSession(ctx, opts...)
+	return t.client().CreateSession(ctx, opts...)
 }
 
 func (t *lazyTable) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
-	return t.client(ctx).Do(ctx, op, opts...)
+	return t.client().Do(ctx, op, opts...)
 }
 
 func (t *lazyTable) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
-	return t.client(ctx).DoTx(ctx, op, opts...)
+	return t.client().DoTx(ctx, op, opts...)
 }
 
 func (t *lazyTable) Close(ctx context.Context) (err error) {
@@ -43,9 +43,6 @@ func (t *lazyTable) Close(ctx context.Context) (err error) {
 	if t.c == nil {
 		return nil
 	}
-	defer func() {
-		t.c = nil
-	}()
 	err = t.c.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -53,11 +50,11 @@ func (t *lazyTable) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func (t *lazyTable) client(ctx context.Context) table.Client {
+func (t *lazyTable) client() table.Client {
 	t.m.Lock()
 	defer t.m.Unlock()
 	if t.c == nil {
-		t.c = builder.New(ctx, t.db, t.options...)
+		t.c = builder.New(t.db, t.options)
 	}
 	return t.c
 }
