@@ -1,4 +1,4 @@
-# `ydb-go-sdk` - native Go's driver for [YDB](https://github.com/ydb-platform/ydb).
+# `ydb-go-sdk` - native Go's driver for [YDB](https://github.com/ydb-platform/ydb)
 
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/ydb-platform/ydb-go-sdk/v3)](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3)
 ![tests](https://github.com/ydb-platform/ydb-go-sdk/workflows/tests/badge.svg?branch=master)
