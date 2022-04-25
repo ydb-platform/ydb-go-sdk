@@ -49,8 +49,8 @@ type (
 		OnClusterInit     func(DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo)
 		OnClusterClose    func(DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo)
 		OnClusterGet      func(DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo)
-		OnClusterInsert   func(DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo)
-		OnClusterRemove   func(DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo)
+		OnClusterInsert   func(DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo) // Deprecated
+		OnClusterRemove   func(DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo) // Deprecated
 		OnPessimizeNode   func(DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo)
 		OnUnpessimizeNode func(DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo)
 
