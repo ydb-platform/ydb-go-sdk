@@ -46,11 +46,16 @@ type (
 		OnConnRelease            func(DriverConnReleaseStartInfo) func(DriverConnReleaseDoneInfo)
 
 		// Cluster events
-		OnClusterInit     func(DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo)
-		OnClusterClose    func(DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo)
-		OnClusterGet      func(DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo)
-		OnClusterInsert   func(DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo) // Deprecated
-		OnClusterRemove   func(DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo) // Deprecated
+		OnClusterInit  func(DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo)
+		OnClusterClose func(DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo)
+		OnClusterGet   func(DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo)
+
+		// Deprecated: has no effect now
+		OnClusterInsert func(DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo)
+
+		// Deprecated: has no effect now
+		OnClusterRemove func(DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo)
+
 		OnPessimizeNode   func(DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo)
 		OnUnpessimizeNode func(DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo)
 
