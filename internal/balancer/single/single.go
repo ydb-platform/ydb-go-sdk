@@ -9,7 +9,10 @@ import (
 )
 
 func Balancer(c conn.Conn) balancer.Balancer {
-	return &single{conn: c}
+	return &single{
+		conn:        c,
+		needRefresh: make(chan struct{}),
+	}
 }
 
 type single struct {
@@ -23,9 +26,14 @@ func (b *single) Create(conns []conn.Conn) balancer.Balancer {
 	connCount := len(conns)
 	switch {
 	case connCount == 0:
-		return &single{}
+		return &single{
+			needRefresh: make(chan struct{}),
+		}
 	case connCount == 1:
-		return &single{conn: conns[0]}
+		return &single{
+			conn:        conns[0],
+			needRefresh: make(chan struct{}),
+		}
 	default:
 		panic("ydb: single Conn Balancer: must not conains more one value")
 	}

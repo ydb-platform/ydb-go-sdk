@@ -90,6 +90,9 @@ func New(
 		multi.WithBalancer(ctxbalancer.Balancer(conns), func(cc conn.Conn) bool {
 			return true
 		}),
+		multi.WithBalancer(config.Balancer().Create(conns), func(cc conn.Conn) bool {
+			return true
+		}),
 	)
 
 	res := &Cluster{
