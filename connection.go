@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -78,7 +79,8 @@ type connection struct {
 
 	discoveryOptions []discoveryConfig.Option
 
-	coordination        coordination.Client
+	coordinationOnce    sync.Once
+	coordination        *internalCoordination.Client
 	coordinationOptions []coordinationConfig.Option
 
 	ratelimiter        ratelimiter.Client
@@ -117,7 +119,13 @@ func (c *connection) Close(ctx context.Context) error {
 	closers = append(
 		closers,
 		c.ratelimiter.Close,
-		c.coordination.Close,
+		func(ctx context.Context) error {
+			c.coordinationOnce.Do(func() {})
+			if c.coordination == nil {
+				return nil
+			}
+			return c.coordination.Close(ctx)
+		},
 		c.scheme.Close,
 		c.table.Close,
 		c.scripting.Close,
@@ -190,6 +198,21 @@ func (c *connection) Scheme() scheme.Client {
 }
 
 func (c *connection) Coordination() coordination.Client {
+	c.coordinationOnce.Do(func() {
+		c.coordination = internalCoordination.New(
+			c,
+			coordinationConfig.New(
+				append(
+					// prepend common params from root config
+					[]coordinationConfig.Option{
+						coordinationConfig.With(c.config.Common),
+					},
+					c.coordinationOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.coordination
 }
 
@@ -331,17 +354,6 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 				scriptingConfig.With(c.config.Common),
 			},
 			c.scriptingOptions...,
-		),
-	)
-
-	c.coordination = lazy.Coordination(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]coordinationConfig.Option{
-				coordinationConfig.With(c.config.Common),
-			},
-			c.coordinationOptions...,
 		),
 	)
 
