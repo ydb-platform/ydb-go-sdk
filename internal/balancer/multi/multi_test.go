@@ -60,7 +60,7 @@ func TestCreate(t *testing.T) {
 		connCount := 6
 		var conns []conn.Conn
 		for i := 0; i < connCount; i++ {
-			conns = append(conns, &mock.ConnMock{Address: strconv.Itoa(i)})
+			conns = append(conns, &mock.ConnMock{AddrField: strconv.Itoa(i)})
 		}
 
 		b2 := b.Create(conns).(*multi)
@@ -240,7 +240,7 @@ func TestNext(t *testing.T) {
 	t.Run("SelectFirstNonNilAnswer", func(t *testing.T) {
 		answer := mock.Balancer()
 		answer.OnNext = func(ctx context.Context, allowBanned bool) conn.Conn {
-			return &mock.ConnMock{Address: "ok"}
+			return &mock.ConnMock{AddrField: "ok"}
 		}
 		noanswer := mock.Balancer()
 		noanswer.OnNext = func(ctx context.Context, allowBanned bool) conn.Conn {

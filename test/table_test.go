@@ -113,22 +113,6 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 	s.Unlock()
 }
 
-func TestDiscovery(t *testing.T) {
-	ctx := context.Background()
-	db, err := ydb.New(ctx, ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")))
-	if err != nil {
-		t.Fatal(err)
-	}
-	discovery := db.Discovery()
-	endpoints, err := discovery.Discover(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(endpoints) == 0 {
-		t.Fatal()
-	}
-}
-
 // nolint:gocyclo
 func TestTable(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)

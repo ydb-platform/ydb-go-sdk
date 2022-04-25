@@ -13,11 +13,11 @@ import (
 )
 
 func TestRandomChoice_Create(t *testing.T) {
-	conns := []conn.Conn{&mock.ConnMock{Address: "1"}, &mock.ConnMock{Address: "2"}}
+	conns := []conn.Conn{&mock.ConnMock{AddrField: "1"}, &mock.ConnMock{AddrField: "2"}}
 	b := RandomChoice(conns).(*randomChoice)
 	require.Equal(t, conns, b.conns)
 
-	conns2 := []conn.Conn{&mock.ConnMock{Address: "3"}, &mock.ConnMock{Address: "4"}}
+	conns2 := []conn.Conn{&mock.ConnMock{AddrField: "3"}, &mock.ConnMock{AddrField: "4"}}
 	b2 := b.Create(conns2).(*randomChoice)
 
 	require.Equal(t, conns, b.conns) // check about not modify original balancer
@@ -63,11 +63,11 @@ func TestRandomChoice_NeedRefresh(t *testing.T) {
 	})
 
 	t.Run("FewBanned", func(t *testing.T) {
-		var conns = []conn.Conn{&mock.ConnMock{Address: "ban", State: conn.Banned}}
+		var conns = []conn.Conn{&mock.ConnMock{AddrField: "ban", State: conn.Banned}}
 
 		// fill with many good connections
 		for i := 0; i < 10; i++ {
-			conns = append(conns, &mock.ConnMock{Address: strconv.Itoa(i), State: conn.Online})
+			conns = append(conns, &mock.ConnMock{AddrField: strconv.Itoa(i), State: conn.Online})
 		}
 
 		b := RandomChoice(conns)
@@ -83,7 +83,7 @@ func TestRandomChoice_NeedRefresh(t *testing.T) {
 
 	t.Run("ManyBanned", func(t *testing.T) {
 		createBalancer := func() balancer.Balancer {
-			conns := []conn.Conn{&mock.ConnMock{Address: "1", State: conn.Online}, &mock.ConnMock{Address: "2", State: conn.Banned}, &mock.ConnMock{Address: "3", State: conn.Banned}}
+			conns := []conn.Conn{&mock.ConnMock{AddrField: "1", State: conn.Online}, &mock.ConnMock{AddrField: "2", State: conn.Banned}, &mock.ConnMock{AddrField: "3", State: conn.Banned}}
 			return RandomChoice(conns)
 		}
 		t.Run("AllowBanned", func(t *testing.T) {
@@ -116,7 +116,7 @@ func TestRandomChoice_NeedRefresh(t *testing.T) {
 
 func TestRandomChoice_Next(t *testing.T) {
 	t.Run("Online", func(t *testing.T) {
-		b := RandomChoice([]conn.Conn{&mock.ConnMock{Address: "1", State: conn.Online}, &mock.ConnMock{Address: "2", State: conn.Online}})
+		b := RandomChoice([]conn.Conn{&mock.ConnMock{AddrField: "1", State: conn.Online}, &mock.ConnMock{AddrField: "2", State: conn.Online}})
 
 		res := make(map[string]int)
 		count := 100
@@ -132,7 +132,7 @@ func TestRandomChoice_Next(t *testing.T) {
 		require.InDelta(t, count/2, res["2"], delta)
 	})
 	t.Run("PartiallyBanned", func(t *testing.T) {
-		b := RandomChoice([]conn.Conn{&mock.ConnMock{Address: "1", State: conn.Online}, &mock.ConnMock{Address: "2", State: conn.Banned}, &mock.ConnMock{Address: "3", State: conn.Online}})
+		b := RandomChoice([]conn.Conn{&mock.ConnMock{AddrField: "1", State: conn.Online}, &mock.ConnMock{AddrField: "2", State: conn.Banned}, &mock.ConnMock{AddrField: "3", State: conn.Online}})
 
 		t.Run("AllowBanned", func(t *testing.T) {
 			res := make(map[string]int)
@@ -167,7 +167,7 @@ func TestRandomChoice_Next(t *testing.T) {
 
 	})
 	t.Run("FullBanned", func(t *testing.T) {
-		b := RandomChoice([]conn.Conn{&mock.ConnMock{Address: "1", State: conn.Banned}, &mock.ConnMock{Address: "2", State: conn.Banned}})
+		b := RandomChoice([]conn.Conn{&mock.ConnMock{AddrField: "1", State: conn.Banned}, &mock.ConnMock{AddrField: "2", State: conn.Banned}})
 
 		t.Run("AllowBanned", func(t *testing.T) {
 			res := make(map[string]int)
@@ -199,7 +199,7 @@ func tSleep() {
 }
 
 func TestRoundRobin(t *testing.T) {
-	conns := []conn.Conn{&mock.ConnMock{Address: "1"}}
+	conns := []conn.Conn{&mock.ConnMock{AddrField: "1"}}
 	hasNonZeroPosition := false
 	var b *roundRobin
 	for i := 0; i < 100; i++ {
@@ -214,7 +214,7 @@ func TestRoundRobin(t *testing.T) {
 }
 
 func TestRoundRobinWithStartPosition(t *testing.T) {
-	conns := []conn.Conn{&mock.ConnMock{Address: "1"}}
+	conns := []conn.Conn{&mock.ConnMock{AddrField: "1"}}
 	b := RoundRobinWithStartPosition(conns, 5).(*roundRobin)
 	require.Equal(t, int64(5), b.last)
 	require.Equal(t, conns, b.conns)
@@ -232,8 +232,8 @@ func TestRoundRobin_Create(t *testing.T) {
 		t.Errorf("Created balancer must start from random position")
 	})
 	t.Run("Conns", func(t *testing.T) {
-		conns := []conn.Conn{&mock.ConnMock{Address: "1"}}
-		conns2 := []conn.Conn{&mock.ConnMock{Address: "2"}}
+		conns := []conn.Conn{&mock.ConnMock{AddrField: "1"}}
+		conns2 := []conn.Conn{&mock.ConnMock{AddrField: "2"}}
 
 		b := RoundRobin(conns).(*roundRobin)
 		b2 := b.Create(conns2).(*roundRobin)
@@ -245,7 +245,7 @@ func TestRoundRobin_Create(t *testing.T) {
 
 func TestRoundRobin_Next(t *testing.T) {
 	t.Run("Online", func(t *testing.T) {
-		conns := []conn.Conn{&mock.ConnMock{Address: "1", State: conn.Online}, &mock.ConnMock{Address: "2", State: conn.Online}}
+		conns := []conn.Conn{&mock.ConnMock{AddrField: "1", State: conn.Online}, &mock.ConnMock{AddrField: "2", State: conn.Online}}
 		b := RoundRobin(conns).(*roundRobin)
 		b.last = -1
 		c := b.Next(nil, false)
@@ -257,21 +257,92 @@ func TestRoundRobin_Next(t *testing.T) {
 	})
 	t.Run("WithBanns", func(t *testing.T) {
 		t.Run("InMiddle", func(t *testing.T) {
-			conns := []conn.Conn{&mock.ConnMock{Address: "1", State: conn.Online}, &mock.ConnMock{Address: "2", State: conn.Banned}, &mock.ConnMock{Address: "3", State: conn.Online}}
+			conns := []conn.Conn{&mock.ConnMock{AddrField: "1", State: conn.Online}, &mock.ConnMock{AddrField: "2", State: conn.Banned}, &mock.ConnMock{AddrField: "3", State: conn.Online}}
 			b := RoundRobin(conns).(*roundRobin)
-			b.last = -1
-			c := b.Next(nil, false)
-			require.Equal(t, conns[0], c)
-			c = b.Next(nil, false)
-			require.Equal(t, conns[2], c)
+			t.Run("AllowBanned", func(t *testing.T) {
+				b.last = -1
+				c := b.Next(nil, true)
+				require.Equal(t, conns[0], c)
+				c = b.Next(nil, true)
+				require.Equal(t, conns[1], c)
+				c = b.Next(nil, true)
+				require.Equal(t, conns[2], c)
+				c = b.Next(nil, true)
+				require.Equal(t, conns[0], c)
+			})
+			t.Run("DenyBanned", func(t *testing.T) {
+				b.last = -1
+				c := b.Next(nil, false)
+				require.Equal(t, conns[0], c)
+				c = b.Next(nil, false)
+				require.Equal(t, conns[2], c)
 
-			// bad connection skipped, but counter has no additional moved on bad connection
-			// that mean next call return same result
-			c = b.Next(nil, false)
-			require.Equal(t, conns[2], c)
+				// bad connection skipped, but counter has no additional moved on bad connection
+				// that mean next call return same result
+				c = b.Next(nil, false)
+				require.Equal(t, conns[2], c)
 
-			c = b.Next(nil, false)
-			require.Equal(t, conns[0], c)
+				c = b.Next(nil, false)
+				require.Equal(t, conns[0], c)
+			})
 		})
+		t.Run("All", func(t *testing.T) {
+			conns := []conn.Conn{&mock.ConnMock{AddrField: "1", State: conn.Banned}, &mock.ConnMock{AddrField: "1", State: conn.Banned}}
+			b := RoundRobin(conns).(*roundRobin)
+
+			t.Run("AllowBanned", func(t *testing.T) {
+				b.last = -1
+				c := b.Next(nil, true)
+				require.Equal(t, conns[0], c)
+				c = b.Next(nil, true)
+				require.Equal(t, conns[1], c)
+				c = b.Next(nil, true)
+				require.Equal(t, conns[0], c)
+			})
+			t.Run("DenyBanned", func(t *testing.T) {
+				c := b.Next(nil, false)
+				require.Nil(t, c)
+				c = b.Next(nil, false)
+				require.Nil(t, c)
+			})
+		})
+	})
+}
+
+func TestRoundRobinNeedRefresh(t *testing.T) {
+	t.Run("Online", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+
+		b := RoundRobin([]conn.Conn{&mock.ConnMock{State: conn.Online}})
+
+		res := make(chan bool, 1)
+		go func() {
+			res <- b.NeedRefresh(ctx)
+		}()
+
+		tSleep()
+		require.Len(t, res, 0)
+
+		cancel()
+		require.False(t, <-res)
+	})
+
+	t.Run("WithBanned", func(t *testing.T) {
+		ctx := context.Background()
+		b := RoundRobin([]conn.Conn{&mock.ConnMock{State: conn.Online}, &mock.ConnMock{State: conn.Banned}, &mock.ConnMock{State: conn.Banned}}).(*roundRobin)
+
+		res := make(chan bool, 1)
+		go func() {
+			res <- b.NeedRefresh(ctx)
+		}()
+
+		b.last = 0
+		b.Next(ctx, true)
+		tSleep()
+		require.Empty(t, res, 0)
+
+		b.last = 0
+		b.Next(ctx, false)
+		require.True(t, <-res)
 	})
 }

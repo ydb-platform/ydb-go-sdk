@@ -16,8 +16,8 @@ var randomSources = xrand.New(xrand.WithLock())
 type baseBalancer struct {
 	conns []conn.Conn
 
-	m           sync.Mutex
-	needRefresh chan struct{}
+	needRefresh      chan struct{}
+	needRefreshClose sync.Once
 }
 
 func (r *baseBalancer) NeedRefresh(ctx context.Context) bool {
@@ -33,29 +33,15 @@ func (r *baseBalancer) NeedRefresh(ctx context.Context) bool {
 	}
 }
 
-func (r *baseBalancer) isNeedRefreshClosed() bool {
-	select {
-	case <-r.needRefresh:
-		return true
-	default:
-		return false
-	}
-}
-
 func (r *baseBalancer) checkNeedRefresh(failedConns *int) {
 	connsCount := len(r.conns)
 	if connsCount > 0 && *failedConns <= connsCount/2 {
 		return
 	}
 
-	r.m.Lock()
-	defer r.m.Unlock()
-
-	if r.isNeedRefreshClosed() {
-		return
-	}
-
-	close(r.needRefresh)
+	r.needRefreshClose.Do(func() {
+		close(r.needRefresh)
+	})
 }
 
 type roundRobin struct {
@@ -85,6 +71,9 @@ func RoundRobinWithStartPosition(conns []conn.Conn, index int) balancer.Balancer
 
 func (r *roundRobin) Next(_ context.Context, allowBanned bool) conn.Conn {
 	connCount := len(r.conns)
+	if connCount == 0 {
+		return nil
+	}
 
 	failedConns := 0
 	defer r.checkNeedRefresh(&failedConns)

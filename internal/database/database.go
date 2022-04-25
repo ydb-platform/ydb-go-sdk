@@ -54,6 +54,9 @@ func (db *database) clusterDiscovery(ctx context.Context) error {
 
 	newCluster := cluster.New(deadline.ContextWithoutDeadline(ctx), db.config, db.connectionPool, endpoints)
 	oldCluster := db.clusterSwap(newCluster)
+	if oldCluster == nil {
+		return nil
+	}
 	return oldCluster.Close(ctx)
 }
 

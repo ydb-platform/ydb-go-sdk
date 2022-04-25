@@ -15,8 +15,8 @@ func Balancer(c conn.Conn) balancer.Balancer {
 type single struct {
 	conn conn.Conn
 
-	m           sync.Mutex
-	needRefresh chan struct{}
+	needRefresh      chan struct{}
+	needRefreshClose sync.Once
 }
 
 func (b *single) Create(conns []conn.Conn) balancer.Balancer {
@@ -27,11 +27,13 @@ func (b *single) Create(conns []conn.Conn) balancer.Balancer {
 	case connCount == 1:
 		return &single{conn: conns[0]}
 	default:
-		panic("ydb: single Conn Balancer: must conains more then one value")
+		panic("ydb: single Conn Balancer: must not conains more one value")
 	}
 }
 
-func (b *single) Next(context.Context, bool) conn.Conn {
+func (b *single) Next(_ context.Context, allowBanned bool) conn.Conn {
+	b.checkIfNeedRefresh()
+
 	return b.conn
 }
 
@@ -56,23 +58,9 @@ func (b *single) checkIfNeedRefresh() {
 	if b.conn != nil && balancer.IsOkConnection(b.conn, false) {
 		return
 	}
-
-	b.m.Lock()
-	defer b.m.Unlock()
-
-	if b.isClosed() {
-		return
-	}
-	close(b.needRefresh)
-}
-
-func (b *single) isClosed() bool {
-	select {
-	case <-b.needRefresh:
-		return true
-	default:
-		return false
-	}
+	b.needRefreshClose.Do(func() {
+		close(b.needRefresh)
+	})
 }
 
 func IsSingle(i interface{}) bool {

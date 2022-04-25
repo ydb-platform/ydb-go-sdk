@@ -135,10 +135,10 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			cc = c.config.Balancer().Next(ctx, false)
+			cc = c.balancer.Next(ctx, false)
 
 			if cc == nil {
-				cc = c.config.Balancer().Next(ctx, true)
+				cc = c.balancer.Next(ctx, true)
 			}
 
 			if cc == nil {
