@@ -2,6 +2,7 @@ package ratelimiter
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"google.golang.org/grpc"
@@ -17,31 +18,49 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 // nolint:gofumpt
 // nolint:nolintlint
 var (
-	errUnknownAcquireType = xerrors.Wrap(fmt.Errorf("unknown acquire type"))
+	errUnknownAcquireType = xerrors.Wrap(errors.New("unknown acquire type"))
+	errNilClient          = xerrors.Wrap(errors.New("ratelimiter client is not initialized"))
 )
 
-type client struct {
+type Client struct {
 	config  config.Config
 	service Ydb_RateLimiter_V1.RateLimiterServiceClient
 }
 
-func (c *client) Close(ctx context.Context) error {
+func (c *Client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) *client {
-	return &client{
+func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+	return &Client{
 		config:  config,
 		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
 	}
 }
 
-func (c *client) CreateResource(
+func (c *Client) CreateResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resource ratelimiter.Resource,
+) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		return xerrors.WithStackTrace(c.createResource(ctx, coordinationNodePath, resource))
+	}
+	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return c.createResource(ctx, coordinationNodePath, resource)
+	}))
+}
+
+func (c *Client) createResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
@@ -67,7 +86,23 @@ func (c *client) CreateResource(
 	return
 }
 
-func (c *client) AlterResource(
+func (c *Client) AlterResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resource ratelimiter.Resource,
+) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		return xerrors.WithStackTrace(c.alterResource(ctx, coordinationNodePath, resource))
+	}
+	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return xerrors.WithStackTrace(c.alterResource(ctx, coordinationNodePath, resource))
+	}))
+}
+
+func (c *Client) alterResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resource ratelimiter.Resource,
@@ -93,7 +128,23 @@ func (c *client) AlterResource(
 	return
 }
 
-func (c *client) DropResource(
+func (c *Client) DropResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resourcePath string,
+) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		return xerrors.WithStackTrace(c.dropResource(ctx, coordinationNodePath, resourcePath))
+	}
+	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return xerrors.WithStackTrace(c.dropResource(ctx, coordinationNodePath, resourcePath))
+	}))
+}
+
+func (c *Client) dropResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
@@ -111,7 +162,27 @@ func (c *client) DropResource(
 	return
 }
 
-func (c *client) ListResource(
+func (c *Client) ListResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resourcePath string,
+	recursive bool,
+) (list []string, err error) {
+	if c == nil {
+		return list, xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		list, err = c.listResource(ctx, coordinationNodePath, resourcePath, recursive)
+		return list, xerrors.WithStackTrace(err)
+	}
+	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		list, err = c.listResource(ctx, coordinationNodePath, resourcePath, recursive)
+		return xerrors.WithStackTrace(err)
+	}))
+	return
+}
+
+func (c *Client) listResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
@@ -142,7 +213,26 @@ func (c *client) ListResource(
 	return result.GetResourcePaths(), nil
 }
 
-func (c *client) DescribeResource(
+func (c *Client) DescribeResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resourcePath string,
+) (resource *ratelimiter.Resource, err error) {
+	if c == nil {
+		return resource, xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		resource, err = c.describeResource(ctx, coordinationNodePath, resourcePath)
+		return resource, xerrors.WithStackTrace(err)
+	}
+	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		resource, err = c.describeResource(ctx, coordinationNodePath, resourcePath)
+		return xerrors.WithStackTrace(err)
+	}))
+	return
+}
+
+func (c *Client) describeResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
@@ -185,7 +275,25 @@ func (c *client) DescribeResource(
 	return resource, nil
 }
 
-func (c *client) AcquireResource(
+func (c *Client) AcquireResource(
+	ctx context.Context,
+	coordinationNodePath string,
+	resourcePath string,
+	amount uint64,
+	opts ...options.AcquireOption,
+) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		return xerrors.WithStackTrace(c.acquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...))
+	}
+	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return xerrors.WithStackTrace(c.acquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...))
+	}))
+}
+
+func (c *Client) acquireResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,

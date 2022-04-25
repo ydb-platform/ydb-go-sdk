@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
+	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
@@ -62,6 +63,7 @@ type Connection interface {
 	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
+// nolint: maligned
 type connection struct {
 	opts []Option
 
@@ -83,7 +85,8 @@ type connection struct {
 	coordination        *internalCoordination.Client
 	coordinationOptions []coordinationConfig.Option
 
-	ratelimiter        ratelimiter.Client
+	ratelimiterOnce    sync.Once
+	ratelimiter        *internalRatelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
 	pool conn.Pool
@@ -118,7 +121,13 @@ func (c *connection) Close(ctx context.Context) error {
 
 	closers = append(
 		closers,
-		c.ratelimiter.Close,
+		func(ctx context.Context) error {
+			c.ratelimiterOnce.Do(func() {})
+			if c.ratelimiter == nil {
+				return nil
+			}
+			return c.ratelimiter.Close(ctx)
+		},
 		func(ctx context.Context) error {
 			c.coordinationOnce.Do(func() {})
 			if c.coordination == nil {
@@ -217,6 +226,21 @@ func (c *connection) Coordination() coordination.Client {
 }
 
 func (c *connection) Ratelimiter() ratelimiter.Client {
+	c.ratelimiterOnce.Do(func() {
+		c.ratelimiter = internalRatelimiter.New(
+			c,
+			ratelimiterConfig.New(
+				append(
+					// prepend common params from root config
+					[]ratelimiterConfig.Option{
+						ratelimiterConfig.With(c.config.Common),
+					},
+					c.ratelimiterOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.ratelimiter
 }
 
@@ -354,17 +378,6 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 				scriptingConfig.With(c.config.Common),
 			},
 			c.scriptingOptions...,
-		),
-	)
-
-	c.ratelimiter = lazy.Ratelimiter(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]ratelimiterConfig.Option{
-				ratelimiterConfig.With(c.config.Common),
-			},
-			c.ratelimiterOptions...,
 		),
 	)
 

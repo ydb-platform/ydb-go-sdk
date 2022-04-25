@@ -21,7 +21,7 @@ import (
 // nolint: gofumpt
 // nolint: nolintlint
 var (
-	errCoordinationNil = errors.New("coordination client is not initialized")
+	errNilClient = xerrors.Wrap(errors.New("coordination client is not initialized"))
 )
 
 type Client struct {
@@ -38,14 +38,14 @@ func New(cc grpc.ClientConnInterface, config config.Config) *Client {
 
 func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	if c == nil {
-		return xerrors.WithStackTrace(errCoordinationNil)
+		return xerrors.WithStackTrace(errNilClient)
 	}
 	if !c.config.AutoRetry() {
-		return c.createNode(ctx, path, config)
+		return xerrors.WithStackTrace(c.createNode(ctx, path, config))
 	}
-	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return c.createNode(ctx, path, config)
-	})
+	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return xerrors.WithStackTrace(c.createNode(ctx, path, config))
+	}))
 }
 
 func (c *Client) createNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
@@ -69,19 +69,19 @@ func (c *Client) createNode(ctx context.Context, path string, config coordinatio
 			),
 		},
 	)
-	return
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *Client) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	if c == nil {
-		return xerrors.WithStackTrace(errCoordinationNil)
+		return xerrors.WithStackTrace(errNilClient)
 	}
 	if !c.config.AutoRetry() {
-		return c.alterNode(ctx, path, config)
+		return xerrors.WithStackTrace(c.alterNode(ctx, path, config))
 	}
-	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return c.alterNode(ctx, path, config)
-	})
+	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return xerrors.WithStackTrace(c.alterNode(ctx, path, config))
+	}))
 }
 
 func (c *Client) alterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
@@ -105,19 +105,19 @@ func (c *Client) alterNode(ctx context.Context, path string, config coordination
 			),
 		},
 	)
-	return
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *Client) DropNode(ctx context.Context, path string) (err error) {
 	if c == nil {
-		return xerrors.WithStackTrace(errCoordinationNil)
+		return xerrors.WithStackTrace(errNilClient)
 	}
 	if !c.config.AutoRetry() {
-		return c.dropNode(ctx, path)
+		return xerrors.WithStackTrace(c.dropNode(ctx, path))
 	}
-	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return c.dropNode(ctx, path)
-	})
+	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return xerrors.WithStackTrace(c.dropNode(ctx, path))
+	}))
 }
 
 func (c *Client) dropNode(ctx context.Context, path string) (err error) {
@@ -133,7 +133,7 @@ func (c *Client) dropNode(ctx context.Context, path string) (err error) {
 			),
 		},
 	)
-	return
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *Client) DescribeNode(
@@ -145,17 +145,18 @@ func (c *Client) DescribeNode(
 	err error,
 ) {
 	if c == nil {
-		err = xerrors.WithStackTrace(errCoordinationNil)
+		err = xerrors.WithStackTrace(errNilClient)
 		return
 	}
 	if !c.config.AutoRetry() {
-		return c.describeNode(ctx, path)
-	}
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		entry, config, err = c.describeNode(ctx, path)
-		return err
-	})
-	return entry, config, err
+		return entry, config, xerrors.WithStackTrace(err)
+	}
+	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		entry, config, err = c.describeNode(ctx, path)
+		return xerrors.WithStackTrace(err)
+	}))
+	return
 }
 
 // DescribeNode describes a coordination node
@@ -202,7 +203,7 @@ func (c *Client) describeNode(
 
 func (c *Client) Close(ctx context.Context) error {
 	if c == nil {
-		return xerrors.WithStackTrace(errCoordinationNil)
+		return xerrors.WithStackTrace(errNilClient)
 	}
 	return c.close(ctx)
 }
