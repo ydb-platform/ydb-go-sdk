@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -30,11 +31,12 @@ var (
 )
 
 type Cluster struct {
-	config   config.Config
-	pool     conn.Pool
-	balancer balancer.Balancer
+	config           config.Config
+	pool             conn.Pool
+	balancerGood     atomic.Value      // balancers with good connections only. Rebuild while pessimize/unpessimize
+	fallbackBalancer balancer.Balancer // contains known pessimized connections
+	conns            []conn.Conn
 
-	conns     []conn.Conn
 	index     map[string]entry.Entry
 	endpoints map[uint32]conn.Conn // only one endpoint by node ID
 
@@ -53,11 +55,15 @@ func (c *Cluster) isClosed() bool {
 
 // Pessimize connection in underling pool
 func (c *Cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
+	c.rebuildGoodBalancer()
+
 	c.pool.Pessimize(ctx, cc, cause)
 }
 
 // Unpessimize connection in underling pool
 func (c *Cluster) Unpessimize(ctx context.Context, cc conn.Conn) {
+	c.rebuildGoodBalancer()
+
 	c.pool.Unpessimize(ctx, cc)
 }
 
@@ -84,21 +90,20 @@ func New(
 		multi.WithBalancer(ctxbalancer.Balancer(conns), func(cc conn.Conn) bool {
 			return true
 		}),
-
-		// then use common balancers from config
-		multi.WithBalancer(config.Balancer().Create(conns), func(cc conn.Conn) bool {
-			return true
-		}),
 	)
 
-	return &Cluster{
-		done:      make(chan struct{}),
-		config:    config,
-		index:     make(map[string]entry.Entry),
-		endpoints: make(map[uint32]conn.Conn),
-		pool:      pool,
-		balancer:  clusterBalancer,
+	res := &Cluster{
+		done:             make(chan struct{}),
+		config:           config,
+		index:            make(map[string]entry.Entry),
+		endpoints:        make(map[uint32]conn.Conn),
+		pool:             pool,
+		fallbackBalancer: clusterBalancer,
+		conns:            conns,
 	}
+	res.balancerGood.Store(clusterBalancer)
+
+	return res
 }
 
 func (c *Cluster) Close(ctx context.Context) (err error) {
@@ -127,6 +132,10 @@ func (c *Cluster) Close(ctx context.Context) (err error) {
 	return nil
 }
 
+func (c *Cluster) balancer() balancer.Balancer {
+	return c.balancerGood.Load().(balancer.Balancer)
+}
+
 func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 	for {
 		select {
@@ -135,10 +144,10 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			cc = c.balancer.Next(ctx, false)
+			cc = c.balancer().Next(ctx, false)
 
 			if cc == nil {
-				cc = c.balancer.Next(ctx, true)
+				cc = c.fallbackBalancer.Next(ctx, true)
 			}
 
 			if cc == nil {
@@ -153,6 +162,18 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 			}
 		}
 	}
+}
+
+func (c *Cluster) rebuildGoodBalancer() {
+	goodConns := make([]conn.Conn, 0, len(c.conns))
+	for _, cc := range c.conns {
+		if balancer.IsOkConnection(cc, false) {
+			goodConns = append(goodConns, cc)
+		}
+	}
+
+	b := c.balancer().Create(goodConns)
+	c.balancerGood.Store(b)
 }
 
 // Get returns next available connection.
