@@ -111,8 +111,11 @@ func (p *pool) Unpessimize(ctx context.Context, cc Conn) {
 		return
 	}
 
-	// TODO: tracing
-	cc.SetState(Online)
+	trace.DriverOnUnpessimizeNode(p.config.Trace(),
+		&ctx,
+		e,
+		cc.GetState(),
+	)(cc.SetState(Online))
 }
 
 func (p *pool) Take(context.Context) error {
