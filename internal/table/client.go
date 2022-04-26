@@ -464,6 +464,10 @@ func (c *Client) Put(ctx context.Context, s Session) (err error) {
 // It returns first error occurred during stale sessions' deletion.
 // Note that even on error it calls Close() on each session.
 func (c *Client) Close(ctx context.Context) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+
 	onDone := trace.TableOnClose(c.config.Trace(), &ctx)
 	defer func() {
 		onDone(err)

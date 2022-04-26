@@ -32,6 +32,9 @@ type Client struct {
 }
 
 func (c *Client) Close(ctx context.Context) error {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
 	return nil
 }
 

@@ -29,6 +29,9 @@ type Client struct {
 }
 
 func (c *Client) Close(_ context.Context) error {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
 	return nil
 }
 

@@ -246,6 +246,9 @@ func (c *Client) streamExecute(
 }
 
 func (c *Client) Close(ctx context.Context) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
 	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx)
 	defer func() {
 		onDone(err)
