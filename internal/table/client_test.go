@@ -230,10 +230,10 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			const timeout = time.Second
 			select {
 			case err := <-got:
-				if !xerrors.Is(err, errAlreadyClosed) {
+				if !xerrors.Is(err, errClosedClient) {
 					t.Fatalf(
 						"unexpected error: %v; want %v",
-						err, errAlreadyClosed,
+						err, errClosedClient,
 					)
 				}
 			case <-time.After(timeout):
@@ -310,10 +310,10 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatalf("unexpected session close")
 	}
 
-	if err := p.Put(context.Background(), s3); !xerrors.Is(err, errAlreadyClosed) {
+	if err := p.Put(context.Background(), s3); !xerrors.Is(err, errClosedClient) {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
-			err, errAlreadyClosed,
+			err, errClosedClient,
 		)
 	}
 	wg.Wait()
@@ -366,7 +366,7 @@ func TestRaceWgClosed(t *testing.T) {
 								return nil
 							},
 						)
-						if xerrors.Is(err, errAlreadyClosed) {
+						if xerrors.Is(err, errClosedClient) {
 							return
 						}
 					}
@@ -527,17 +527,17 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	}
 
 	// Release the first create session request.
-	// Created session must be stored in the client.
+	// Created session must be stored in the Client.
 	expSession = r1.session
 	expSession.OnClose(func(context.Context) {
 		t.Fatalf("unexpected first session close")
 	})
 	close(r1.release)
 
-	// Wait for r1's session will be stored in the client.
+	// Wait for r1's session will be stored in the Client.
 	<-done
 
-	// Ensure that session is in the client.
+	// Ensure that session is in the Client.
 	s := mustGetSession(t, p)
 	mustPutSession(t, p, s)
 }
@@ -889,7 +889,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 
 	<-timer.Created
 
-	// Put s1 to a pull. Shift time that client need to keepalive s1.
+	// Put s1 to a pull. Shift time that Client need to keepalive s1.
 	mustPutSession(t, p, s1)
 	shiftTime(idleThreshold)
 	timer.C <- timeutil.Now()
@@ -906,7 +906,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 
 	// Now keeper routine must be sticked on awaiting result of keep alive request.
 	// That is perfect time to emulate race condition of pushing s2 back to the
-	// client with time, that is greater than `now` of s1 being touched.
+	// Client with time, that is greater than `now` of s1 being touched.
 	shiftTime(idleThreshold / 2)
 	mustPutSession(t, p, s2)
 
@@ -991,7 +991,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 		config.WithIdleThreshold(time.Second),
 	)
 
-	// First Get&Put to initialize client's timers.
+	// First Get&Put to initialize Client's timers.
 	mustPutSession(t, p, mustGetSession(t, p))
 	<-timer.Created
 
@@ -1073,7 +1073,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	defer func() {
 		_ = p.Close(context.Background())
 	}()
-	sessionBuilder := func(t *testing.T, pool *client) (Session, chan bool) {
+	sessionBuilder := func(t *testing.T, pool *Client) (Session, chan bool) {
 		s := mustCreateSession(t, pool)
 		closed := make(chan bool)
 		s.OnClose(func(context.Context) {
@@ -1231,7 +1231,7 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 	}
 }
 
-func mustCreateSession(t *testing.T, p *client) Session {
+func mustCreateSession(t *testing.T, p *Client) Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.createSession(context.Background())
@@ -1242,7 +1242,7 @@ func mustCreateSession(t *testing.T, p *client) Session {
 	return s
 }
 
-func mustGetSession(t *testing.T, p *client) Session {
+func mustGetSession(t *testing.T, p *Client) Session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.Get(context.Background())
@@ -1253,7 +1253,7 @@ func mustGetSession(t *testing.T, p *client) Session {
 	return s
 }
 
-func mustPutSession(t *testing.T, p *client, s Session) {
+func mustPutSession(t *testing.T, p *Client, s Session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Put(
@@ -1265,7 +1265,7 @@ func mustPutSession(t *testing.T, p *client, s Session) {
 	}
 }
 
-func mustClose(t *testing.T, p *client) {
+func mustClose(t *testing.T, p *Client) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Close(context.Background()); err != nil {
@@ -1354,7 +1354,7 @@ func newClientWithStubBuilder(
 	cc grpc.ClientConnInterface,
 	stubLimit int,
 	options ...config.Option,
-) *client {
+) *Client {
 	return newClient(
 		cc,
 		(&StubBuilder{
@@ -1388,7 +1388,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session Session, err e
 	return newSession(ctx, s.cc, config.New())
 }
 
-func (c *client) debug() {
+func (c *Client) debug() {
 	fmt.Print("head ")
 	for el := c.idle.Front(); el != nil; el = el.Next() {
 		s := el.Value.(Session)
@@ -1398,7 +1398,7 @@ func (c *client) debug() {
 	fmt.Print("<-> tail\n")
 }
 
-func whenWantWaitCh(p *client) <-chan struct{} {
+func whenWantWaitCh(p *Client) <-chan struct{} {
 	var (
 		prev = p.testHookGetWaitCh
 		ch   = make(chan struct{})

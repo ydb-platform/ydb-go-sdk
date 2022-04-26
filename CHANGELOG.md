@@ -1,3 +1,7 @@
+* Refactored initialization of coordination, ratelimiter, scheme, scripting and table clients from `internal/lazy` package to each client initialization with `sync.Once`
+* Removed `internal/lazy` package
+* Added retry option `retry.WithStackTrace` for wrapping errors with stacktrace
+
 ## v3.24.0
 * Fixed re-opening case after close lazy-initialized clients
 * Removed dependency of call context for initializing lazy table client

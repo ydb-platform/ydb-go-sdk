@@ -2,6 +2,7 @@ package scripting
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -16,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -23,12 +25,38 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type client struct {
+// nolint: gofumpt
+// nolint: nolintlint
+var (
+	errNilClient = xerrors.Wrap(errors.New("scripting client is not initialized"))
+)
+
+type Client struct {
 	config  config.Config
 	service Ydb_Scripting_V1.ScriptingServiceClient
 }
 
-func (c *client) Execute(
+func (c *Client) Execute(
+	ctx context.Context,
+	query string,
+	params *table.QueryParameters,
+) (r result.Result, err error) {
+	if c == nil {
+		return r, xerrors.WithStackTrace(errNilClient)
+	}
+	call := func(ctx context.Context) error {
+		r, err = c.execute(ctx, query, params)
+		return xerrors.WithStackTrace(err)
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithStackTrace())
+	return
+}
+
+func (c *Client) execute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
@@ -74,7 +102,27 @@ func mode2mode(mode scripting.ExplainMode) Ydb_Scripting.ExplainYqlRequest_Mode 
 	}
 }
 
-func (c *client) Explain(
+func (c *Client) Explain(
+	ctx context.Context,
+	query string,
+	mode scripting.ExplainMode,
+) (e table.ScriptingYQLExplanation, err error) {
+	if c == nil {
+		return e, xerrors.WithStackTrace(errNilClient)
+	}
+	call := func(ctx context.Context) error {
+		e, err = c.explain(ctx, query, mode)
+		return xerrors.WithStackTrace(err)
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithStackTrace())
+	return
+}
+
+func (c *Client) explain(
 	ctx context.Context,
 	query string,
 	mode scripting.ExplainMode,
@@ -118,7 +166,27 @@ func (c *client) Explain(
 	return e, nil
 }
 
-func (c *client) StreamExecute(
+func (c *Client) StreamExecute(
+	ctx context.Context,
+	query string,
+	params *table.QueryParameters,
+) (r result.StreamResult, err error) {
+	if c == nil {
+		return r, xerrors.WithStackTrace(errNilClient)
+	}
+	call := func(ctx context.Context) error {
+		r, err = c.streamExecute(ctx, query, params)
+		return xerrors.WithStackTrace(err)
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithStackTrace())
+	return
+}
+
+func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
@@ -180,7 +248,10 @@ func (c *client) StreamExecute(
 	), nil
 }
 
-func (c *client) Close(ctx context.Context) (err error) {
+func (c *Client) Close(ctx context.Context) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
 	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx)
 	defer func() {
 		onDone(err)
@@ -188,8 +259,8 @@ func (c *client) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) scripting.Client {
-	return &client{
+func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+	return &Client{
 		config:  config,
 		service: Ydb_Scripting_V1.NewScriptingServiceClient(cc),
 	}

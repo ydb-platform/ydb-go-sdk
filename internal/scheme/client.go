@@ -2,6 +2,7 @@ package scheme
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -12,26 +13,49 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
-type client struct {
+// nolint: gofumpt
+// nolint: nolintlint
+var (
+	errNilClient = xerrors.Wrap(errors.New("scheme client is not initialized"))
+)
+
+type Client struct {
 	config  config.Config
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
-func (c *client) Close(_ context.Context) error {
+func (c *Client) Close(_ context.Context) error {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) scheme.Client {
-	return &client{
+func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+	return &Client{
 		config:  config,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
 	}
 }
 
-func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
+func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+	call := func(ctx context.Context) error {
+		return xerrors.WithStackTrace(c.makeDirectory(ctx, path))
+	}
+	if !c.config.AutoRetry() {
+		return call(ctx)
+	}
+	return retry.Retry(ctx, call, retry.WithStackTrace())
+}
+
+func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
 	_, err = c.service.MakeDirectory(
 		ctx,
 		&Ydb_Scheme.MakeDirectoryRequest{
@@ -47,7 +71,20 @@ func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
+func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+	call := func(ctx context.Context) error {
+		return xerrors.WithStackTrace(c.removeDirectory(ctx, path))
+	}
+	if !c.config.AutoRetry() {
+		return call(ctx)
+	}
+	return retry.Retry(ctx, call, retry.WithStackTrace())
+}
+
+func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 	_, err = c.service.RemoveDirectory(
 		ctx,
 		&Ydb_Scheme.RemoveDirectoryRequest{
@@ -63,7 +100,23 @@ func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directory, error) {
+func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
+	if c == nil {
+		return d, xerrors.WithStackTrace(errNilClient)
+	}
+	call := func(ctx context.Context) error {
+		d, err = c.listDirectory(ctx, path)
+		return xerrors.WithStackTrace(err)
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithIdempotent(true), retry.WithStackTrace())
+	return
+}
+
+func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directory, error) {
 	var (
 		d        scheme.Directory
 		err      error
@@ -95,7 +148,23 @@ func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directo
 	return d, nil
 }
 
-func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
+func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
+	if c == nil {
+		return e, xerrors.WithStackTrace(errNilClient)
+	}
+	call := func(ctx context.Context) error {
+		e, err = c.describePath(ctx, path)
+		return xerrors.WithStackTrace(err)
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithIdempotent(true), retry.WithStackTrace())
+	return
+}
+
+func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry, err error) {
 	var (
 		response *Ydb_Scheme.DescribePathResponse
 		result   Ydb_Scheme.DescribePathResult
@@ -123,7 +192,20 @@ func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 	return e, nil
 }
 
-func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
+func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+	call := func(ctx context.Context) error {
+		return xerrors.WithStackTrace(c.modifyPermissions(ctx, path, opts...))
+	}
+	if !c.config.AutoRetry() {
+		return call(ctx)
+	}
+	return retry.Retry(ctx, call, retry.WithStackTrace())
+}
+
+func (c *Client) modifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
 	var desc permissionsDesc
 	for _, o := range opts {
 		o(&desc)
