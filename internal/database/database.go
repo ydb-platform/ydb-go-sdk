@@ -44,17 +44,13 @@ func (db *database) cluster() clusterConnector {
 }
 
 func (db *database) clusterCreate(ctx context.Context, endpoints []endpoint.Endpoint) clusterConnector {
-	once := sync.Once{}
-
 	return cluster.New(
 		deadline.ContextWithoutDeadline(ctx),
 		db.config,
 		db.connectionPool,
 		endpoints,
 		func(ctx context.Context) {
-			once.Do(func() {
-				db.discoveryRepeater.Force()
-			})
+			db.discoveryRepeater.Force()
 		})
 }
 
