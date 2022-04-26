@@ -29,7 +29,7 @@ func TestRatelimiter(t *testing.T) {
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAnonymousCredentials(),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
@@ -40,7 +40,7 @@ func TestRatelimiter(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stdout),
-			ydb.WithMinLevel(log.TRACE),
+			ydb.WithMinLevel(log.WARN),
 		),
 	)
 	if err != nil {
@@ -105,7 +105,7 @@ func TestRatelimiter(t *testing.T) {
 		described.ResourcePath != testResource ||
 		described.HierarchicalDrr.MaxUnitsPerSecond != 1.0 ||
 		described.HierarchicalDrr.MaxBurstSizeCoefficient != 2.0 {
-		t.Fatal("Resource invalid")
+		t.Fatalf("Resource invalid: %+v", described)
 	}
 	// alter resource
 	err = db.Ratelimiter().AlterResource(ctx, testCoordinationNodePath, ratelimiter.Resource{

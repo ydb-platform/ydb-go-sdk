@@ -17,11 +17,13 @@ import (
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
+	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
+	internalScripting "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -70,13 +72,16 @@ type connection struct {
 	config  config.Config
 	options []config.Option
 
-	table        table.Client
+	tableOnce    sync.Once
+	table        *internalTable.Client
 	tableOptions []tableConfig.Option
 
-	scripting        scripting.Client
+	scriptingOnce    sync.Once
+	scripting        *internalScripting.Client
 	scriptingOptions []scriptingConfig.Option
 
-	scheme        scheme.Client
+	schemeOnce    sync.Once
+	scheme        *internalScheme.Client
 	schemeOptions []schemeConfig.Option
 
 	discoveryOptions []discoveryConfig.Option
@@ -135,9 +140,27 @@ func (c *connection) Close(ctx context.Context) error {
 			}
 			return c.coordination.Close(ctx)
 		},
-		c.scheme.Close,
-		c.table.Close,
-		c.scripting.Close,
+		func(ctx context.Context) error {
+			c.schemeOnce.Do(func() {})
+			if c.scheme == nil {
+				return nil
+			}
+			return c.scheme.Close(ctx)
+		},
+		func(ctx context.Context) error {
+			c.scriptingOnce.Do(func() {})
+			if c.scripting == nil {
+				return nil
+			}
+			return c.scripting.Close(ctx)
+		},
+		func(ctx context.Context) error {
+			c.tableOnce.Do(func() {})
+			if c.table == nil {
+				return nil
+			}
+			return c.table.Close(ctx)
+		},
 		c.db.Close,
 		c.pool.Release,
 	)
@@ -199,10 +222,40 @@ func (c *connection) Secure() bool {
 }
 
 func (c *connection) Table() table.Client {
+	c.tableOnce.Do(func() {
+		c.table = internalTable.New(
+			c,
+			tableConfig.New(
+				append(
+					// prepend common params from root config
+					[]tableConfig.Option{
+						tableConfig.With(c.config.Common),
+					},
+					c.tableOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.table
 }
 
 func (c *connection) Scheme() scheme.Client {
+	c.schemeOnce.Do(func() {
+		c.scheme = internalScheme.New(
+			c,
+			schemeConfig.New(
+				append(
+					// prepend common params from root config
+					[]schemeConfig.Option{
+						schemeConfig.With(c.config.Common),
+					},
+					c.schemeOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.scheme
 }
 
@@ -249,6 +302,21 @@ func (c *connection) Discovery() discovery.Client {
 }
 
 func (c *connection) Scripting() scripting.Client {
+	c.scriptingOnce.Do(func() {
+		c.scripting = internalScripting.New(
+			c,
+			scriptingConfig.New(
+				append(
+					// prepend common params from root config
+					[]scriptingConfig.Option{
+						scriptingConfig.With(c.config.Common),
+					},
+					c.scriptingOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.scripting
 }
 
@@ -347,39 +415,6 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-
-	c.table = lazy.Table(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]tableConfig.Option{
-				tableConfig.With(c.config.Common),
-			},
-			c.tableOptions...,
-		),
-	)
-
-	c.scheme = lazy.Scheme(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]schemeConfig.Option{
-				schemeConfig.With(c.config.Common),
-			},
-			c.schemeOptions...,
-		),
-	)
-
-	c.scripting = lazy.Scripting(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]scriptingConfig.Option{
-				scriptingConfig.With(c.config.Common),
-			},
-			c.scriptingOptions...,
-		),
-	)
 
 	return c, nil
 }

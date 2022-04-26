@@ -307,7 +307,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNSUPPORTED)),
 		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY)),
 	}
-	client := &client{
+	client := &Client{
 		cc: testutil.NewDB(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	p := SessionProviderFunc{

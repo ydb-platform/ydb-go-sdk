@@ -15,23 +15,23 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
-type client struct {
+type Client struct {
 	config  config.Config
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
-func (c *client) Close(_ context.Context) error {
+func (c *Client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) scheme.Client {
-	return &client{
+func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+	return &Client{
 		config:  config,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
 	}
 }
 
-func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
+func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
 	_, err = c.service.MakeDirectory(
 		ctx,
 		&Ydb_Scheme.MakeDirectoryRequest{
@@ -47,7 +47,7 @@ func (c *client) MakeDirectory(ctx context.Context, path string) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
+func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	_, err = c.service.RemoveDirectory(
 		ctx,
 		&Ydb_Scheme.RemoveDirectoryRequest{
@@ -63,7 +63,7 @@ func (c *client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directory, error) {
+func (c *Client) ListDirectory(ctx context.Context, path string) (scheme.Directory, error) {
 	var (
 		d        scheme.Directory
 		err      error
@@ -95,7 +95,7 @@ func (c *client) ListDirectory(ctx context.Context, path string) (scheme.Directo
 	return d, nil
 }
 
-func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
+func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
 	var (
 		response *Ydb_Scheme.DescribePathResponse
 		result   Ydb_Scheme.DescribePathResult
@@ -123,7 +123,7 @@ func (c *client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 	return e, nil
 }
 
-func (c *client) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
+func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
 	var desc permissionsDesc
 	for _, o := range opts {
 		o(&desc)

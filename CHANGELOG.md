@@ -1,4 +1,5 @@
-* Refactored initialization of coordination and ratelimiter clients from `internal/lazy` package to `sync.Once` initialization
+* Refactored initialization of coordination, ratelimiter, scheme, scripting and table clients from `internal/lazy` package to each client initialization with `sync.Once`
+* Removed `internal/lazy` package
 
 ## v3.24.0
 * Fixed re-opening case after close lazy-initialized clients

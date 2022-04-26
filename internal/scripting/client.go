@@ -23,12 +23,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type client struct {
+type Client struct {
 	config  config.Config
 	service Ydb_Scripting_V1.ScriptingServiceClient
 }
 
-func (c *client) Execute(
+func (c *Client) Execute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
@@ -74,7 +74,7 @@ func mode2mode(mode scripting.ExplainMode) Ydb_Scripting.ExplainYqlRequest_Mode 
 	}
 }
 
-func (c *client) Explain(
+func (c *Client) Explain(
 	ctx context.Context,
 	query string,
 	mode scripting.ExplainMode,
@@ -118,7 +118,7 @@ func (c *client) Explain(
 	return e, nil
 }
 
-func (c *client) StreamExecute(
+func (c *Client) StreamExecute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
@@ -180,7 +180,7 @@ func (c *client) StreamExecute(
 	), nil
 }
 
-func (c *client) Close(ctx context.Context) (err error) {
+func (c *Client) Close(ctx context.Context) (err error) {
 	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx)
 	defer func() {
 		onDone(err)
@@ -188,8 +188,8 @@ func (c *client) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) scripting.Client {
-	return &client{
+func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+	return &Client{
 		config:  config,
 		service: Ydb_Scripting_V1.NewScriptingServiceClient(cc),
 	}
