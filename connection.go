@@ -224,7 +224,7 @@ func (c *connection) Secure() bool {
 func (c *connection) Table() table.Client {
 	c.tableOnce.Do(func() {
 		c.table = internalTable.New(
-			c,
+			c.db,
 			tableConfig.New(
 				append(
 					// prepend common params from root config
@@ -243,7 +243,7 @@ func (c *connection) Table() table.Client {
 func (c *connection) Scheme() scheme.Client {
 	c.schemeOnce.Do(func() {
 		c.scheme = internalScheme.New(
-			c,
+			c.db,
 			schemeConfig.New(
 				append(
 					// prepend common params from root config
@@ -262,7 +262,7 @@ func (c *connection) Scheme() scheme.Client {
 func (c *connection) Coordination() coordination.Client {
 	c.coordinationOnce.Do(func() {
 		c.coordination = internalCoordination.New(
-			c,
+			c.db,
 			coordinationConfig.New(
 				append(
 					// prepend common params from root config
@@ -281,7 +281,7 @@ func (c *connection) Coordination() coordination.Client {
 func (c *connection) Ratelimiter() ratelimiter.Client {
 	c.ratelimiterOnce.Do(func() {
 		c.ratelimiter = internalRatelimiter.New(
-			c,
+			c.db,
 			ratelimiterConfig.New(
 				append(
 					// prepend common params from root config

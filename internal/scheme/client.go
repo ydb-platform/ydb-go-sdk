@@ -95,23 +95,25 @@ func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *Client) ListDirectory(ctx context.Context, path string) (l scheme.Directory, err error) {
+func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
 	if c == nil {
-		return l, xerrors.WithStackTrace(errNilClient)
+		return d, xerrors.WithStackTrace(errNilClient)
 	}
 	if !c.config.AutoRetry() {
-		l, err = c.listDirectory(ctx, path)
-		return l, xerrors.WithStackTrace(err)
+		d, err = c.listDirectory(ctx, path)
+		return d, xerrors.WithStackTrace(err)
 	}
 	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
-		l, err = c.listDirectory(ctx, path)
+		d, err = c.listDirectory(ctx, path)
 		return xerrors.WithStackTrace(err)
 	}, retry.WithIdempotent(true)))
 	return
 }
 
-func (c *Client) listDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
+func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directory, error) {
 	var (
+		d        scheme.Directory
+		err      error
 		response *Ydb_Scheme.ListDirectoryResponse
 		result   Ydb_Scheme.ListDirectoryResult
 	)

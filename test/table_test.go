@@ -506,7 +506,7 @@ func TestTable(t *testing.T) {
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.ExecuteSchemeQuery(
 				ctx,
-				`DROP TABLE stream_query; CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
+				`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
 			)
 		},
 	); err != nil {
