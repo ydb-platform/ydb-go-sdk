@@ -86,7 +86,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
 		return res.Err()
-	}, retry.WithIdempotent(true), retry.WithStackTrace()); err != nil {
+	}, retry.WithIdempotent(true)); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 	// StreamExecute

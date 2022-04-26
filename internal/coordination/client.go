@@ -40,12 +40,13 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	if !c.config.AutoRetry() {
+	call := func(ctx context.Context) error {
 		return xerrors.WithStackTrace(c.createNode(ctx, path, config))
 	}
-	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return xerrors.WithStackTrace(c.createNode(ctx, path, config))
-	}, retry.WithStackTrace())
+	if !c.config.AutoRetry() {
+		return call(ctx)
+	}
+	return retry.Retry(ctx, call, retry.WithStackTrace())
 }
 
 func (c *Client) createNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
@@ -76,12 +77,13 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	if !c.config.AutoRetry() {
+	call := func(ctx context.Context) error {
 		return xerrors.WithStackTrace(c.alterNode(ctx, path, config))
 	}
-	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return xerrors.WithStackTrace(c.alterNode(ctx, path, config))
-	}, retry.WithStackTrace())
+	if !c.config.AutoRetry() {
+		return call(ctx)
+	}
+	return retry.Retry(ctx, call, retry.WithStackTrace())
 }
 
 func (c *Client) alterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
@@ -112,12 +114,13 @@ func (c *Client) DropNode(ctx context.Context, path string) (err error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	if !c.config.AutoRetry() {
+	call := func(ctx context.Context) error {
 		return xerrors.WithStackTrace(c.dropNode(ctx, path))
 	}
-	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return xerrors.WithStackTrace(c.dropNode(ctx, path))
-	}, retry.WithStackTrace())
+	if !c.config.AutoRetry() {
+		return call(ctx)
+	}
+	return retry.Retry(ctx, call, retry.WithStackTrace())
 }
 
 func (c *Client) dropNode(ctx context.Context, path string) (err error) {
@@ -148,14 +151,15 @@ func (c *Client) DescribeNode(
 		err = xerrors.WithStackTrace(errNilClient)
 		return
 	}
-	if !c.config.AutoRetry() {
-		entry, config, err = c.describeNode(ctx, path)
-		return entry, config, xerrors.WithStackTrace(err)
-	}
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	call := func(ctx context.Context) error {
 		entry, config, err = c.describeNode(ctx, path)
 		return xerrors.WithStackTrace(err)
-	}, retry.WithStackTrace())
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithStackTrace())
 	return
 }
 

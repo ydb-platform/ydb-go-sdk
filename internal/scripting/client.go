@@ -44,14 +44,15 @@ func (c *Client) Execute(
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
-	if !c.config.AutoRetry() {
-		r, err = c.execute(ctx, query, params)
-		return r, xerrors.WithStackTrace(err)
-	}
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	call := func(ctx context.Context) error {
 		r, err = c.execute(ctx, query, params)
 		return xerrors.WithStackTrace(err)
-	}, retry.WithStackTrace())
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithStackTrace())
 	return
 }
 
@@ -109,14 +110,15 @@ func (c *Client) Explain(
 	if c == nil {
 		return e, xerrors.WithStackTrace(errNilClient)
 	}
-	if !c.config.AutoRetry() {
-		e, err = c.explain(ctx, query, mode)
-		return e, xerrors.WithStackTrace(err)
-	}
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	call := func(ctx context.Context) error {
 		e, err = c.explain(ctx, query, mode)
 		return xerrors.WithStackTrace(err)
-	}, retry.WithStackTrace())
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithStackTrace())
 	return
 }
 
@@ -172,14 +174,15 @@ func (c *Client) StreamExecute(
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
-	if !c.config.AutoRetry() {
-		r, err = c.streamExecute(ctx, query, params)
-		return r, xerrors.WithStackTrace(err)
-	}
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	call := func(ctx context.Context) error {
 		r, err = c.streamExecute(ctx, query, params)
 		return xerrors.WithStackTrace(err)
-	}, retry.WithStackTrace())
+	}
+	if !c.config.AutoRetry() {
+		err = call(ctx)
+		return
+	}
+	err = retry.Retry(ctx, call, retry.WithStackTrace())
 	return
 }
 
