@@ -7,6 +7,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+const minimumForceInterval = time.Second
+
 type Repeater interface {
 	Stop()
 	Force()
@@ -60,23 +62,21 @@ const (
 // New creates and begins to execute task periodically.
 func New(
 	ctx context.Context,
+	interval time.Duration,
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) Repeater {
 	r := &repeater{
-		task:  task,
-		done:  make(chan struct{}),
-		force: make(chan struct{}),
+		interval: interval,
+		task:     task,
+		done:     make(chan struct{}),
+		force:    make(chan struct{}),
 	}
 
 	r.runCtx, r.stop = context.WithCancel(context.Background())
 
 	for _, o := range opts {
 		o(r)
-	}
-
-	if r.interval <= 0 {
-		return nil
 	}
 
 	go r.worker(ctx, r.interval)
@@ -123,6 +123,7 @@ func (r *repeater) wakeUp(ctx context.Context, e event) {
 func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 	defer close(r.done)
 
+	lastForce := time.Time{}
 	for {
 		select {
 		case <-ctx.Done():
@@ -132,6 +133,21 @@ func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 		case <-time.After(interval):
 			r.wakeUp(ctx, eventTick)
 		case <-r.force:
+
+			// prevent overload discovery endpoint
+			needSleep := minimumForceInterval - time.Since(lastForce)
+			if needSleep > 0 {
+				select {
+				case <-ctx.Done():
+					return
+				case <-r.runCtx.Done():
+					return
+				case <-time.After(needSleep):
+					// pass
+				}
+			}
+
+			lastForce = time.Now()
 			r.wakeUp(ctx, eventForce)
 		}
 	}
