@@ -117,7 +117,7 @@ func (c *connection) Close(ctx context.Context) error {
 	}()
 
 	c.childrenMtx.Lock()
-	closers := make([]func(context.Context) error, 0, len(c.children)+7)
+	closers := make([]func(context.Context) error, 0)
 	for _, child := range c.children {
 		closers = append(closers, child.Close)
 	}
