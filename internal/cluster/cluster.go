@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -33,15 +32,15 @@ var (
 type Cluster struct {
 	config           config.Config
 	pool             conn.Pool
-	balancerGood     atomic.Value      // balancers with good connections only. Rebuild while pessimize/unpessimize
 	fallbackBalancer balancer.Balancer // contains known pessimized connections
 	conns            []conn.Conn
 
 	index     map[string]entry.Entry
 	endpoints map[uint32]conn.Conn // only one endpoint by node ID
 
-	m    sync.Mutex
-	done chan struct{}
+	m            sync.RWMutex
+	balancerGood balancer.Balancer // balancers with good connections only. Rebuild while pessimize/unpessimize
+	done         chan struct{}
 }
 
 func (c *Cluster) isClosed() bool {
@@ -95,18 +94,16 @@ func New(
 		}),
 	)
 
-	res := &Cluster{
+	return &Cluster{
 		done:             make(chan struct{}),
 		config:           config,
 		index:            make(map[string]entry.Entry),
 		endpoints:        make(map[uint32]conn.Conn),
 		pool:             pool,
+		balancerGood:     clusterBalancer,
 		fallbackBalancer: clusterBalancer,
 		conns:            conns,
 	}
-	res.balancerGood.Store(clusterBalancer)
-
-	return res
 }
 
 func (c *Cluster) Close(ctx context.Context) (err error) {
@@ -136,10 +133,13 @@ func (c *Cluster) Close(ctx context.Context) (err error) {
 }
 
 func (c *Cluster) balancer() balancer.Balancer {
-	return c.balancerGood.Load().(balancer.Balancer)
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	return c.balancerGood
 }
 
-func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
+func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
 	for {
 		select {
 		case <-c.done:
@@ -160,7 +160,7 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, err error) {
 				}
 				return nil, xerrors.WithStackTrace(err)
 			}
-			if err = cc.Ping(ctx); err == nil {
+			if err := cc.Ping(ctx); err == nil {
 				return cc, nil
 			}
 		}
@@ -176,7 +176,10 @@ func (c *Cluster) rebuildGoodBalancer() {
 	}
 
 	b := c.balancer().Create(goodConns)
-	c.balancerGood.Store(b)
+
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.balancerGood = b
 }
 
 // Get returns next available connection.

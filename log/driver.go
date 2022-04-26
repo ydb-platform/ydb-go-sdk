@@ -463,6 +463,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
+		//nolint:staticcheck
 		t.OnClusterInsert = func(info trace.DriverClusterInsertStartInfo) func(trace.DriverClusterInsertDoneInfo) {
 			endpoint := info.Endpoint.String()
 			l.Debugf(`insert start {endpoint:%v}`,
@@ -477,6 +478,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
+		//nolint:staticcheck
 		t.OnClusterRemove = func(info trace.DriverClusterRemoveStartInfo) func(trace.DriverClusterRemoveDoneInfo) {
 			endpoint := info.Endpoint.String()
 			l.Debugf(`remove start {endpoint:%v}`,
@@ -501,6 +503,23 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.DriverPessimizeNodeDoneInfo) {
 				l.Warnf(`pessimize done {endpoint:%v,latency:"%v",state:"%s",version:"%s"}`,
+					endpoint,
+					time.Since(start),
+					info.State,
+					meta.Version,
+				)
+			}
+		}
+		t.OnUnpessimizeNode = func(info trace.DriverUnpessimizeNodeStartInfo) func(trace.DriverUnpessimizeNodeDoneInfo) {
+			endpoint := info.Endpoint.String()
+			l.Infof(`unpessimize start {endpoint:%v,version:"%s"}`,
+				endpoint,
+				meta.Version,
+			)
+
+			start := time.Now()
+			return func(info trace.DriverUnpessimizeNodeDoneInfo) {
+				l.Infof(`unpessimize done {endpoint:%v,latency:"%v",state:"%s",version:"%s"}`,
 					endpoint,
 					time.Since(start),
 					info.State,

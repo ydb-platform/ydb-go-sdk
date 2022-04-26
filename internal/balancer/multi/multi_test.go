@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -231,9 +232,11 @@ func TestNeedRefresh(t *testing.T) {
 }
 
 func TestNext(t *testing.T) {
+	ctx := context.Background()
+
 	t.Run("Empty", func(t *testing.T) {
 		b := Balancer()
-		res := b.Next(nil, false)
+		res := b.Next(ctx, false)
 		require.Nil(t, res)
 	})
 
@@ -277,7 +280,8 @@ func TestNext(t *testing.T) {
 			return b
 		}
 
-		ctx := context.WithValue(context.Background(), "test", "test")
+		type testKey struct{}
+		ctx := context.WithValue(context.Background(), testKey{}, "test")
 		for _, filter := range []bool{true, false} {
 			t.Run(fmt.Sprint(filter), func(t *testing.T) {
 				b := Balancer(

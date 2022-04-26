@@ -4,30 +4,45 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"google.golang.org/grpc"
 )
 
 type ConnMock struct {
-	AddrField     string
-	LocalDCField  bool
-	LocationField string
-	NodeIdField   uint32
-	State         conn.State
 	PingErr       error
+	AddrField     string
+	LocationField string
+	NodeIDField   uint32
+	State         conn.State
+	LocalDCField  bool
 }
 
-func (c *ConnMock) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+func (c *ConnMock) Invoke(
+	ctx context.Context,
+	method string,
+	args interface{},
+	reply interface{},
+	opts ...grpc.CallOption,
+) error {
 	panic("not implemented in mock")
 }
 
-func (c *ConnMock) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+func (c *ConnMock) NewStream(ctx context.Context,
+	desc *grpc.StreamDesc, method string,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
 	panic("not implemented in mock")
 }
 
 func (c *ConnMock) Endpoint() endpoint.Endpoint {
-	return &EndpointMock{AddrField: c.AddrField, LocalDCField: c.LocalDCField, LocationField: c.LocationField, NodeIdField: c.NodeIdField}
+	return &EndpointMock{
+		AddrField:     c.AddrField,
+		LocalDCField:  c.LocalDCField,
+		LocationField: c.LocationField,
+		NodeIDField:   c.NodeIDField,
+	}
 }
 
 func (c *ConnMock) LastUsage() time.Time {
@@ -61,13 +76,13 @@ func (c *ConnMock) Release(ctx context.Context) error {
 
 type EndpointMock struct {
 	AddrField     string
-	LocalDCField  bool
 	LocationField string
-	NodeIdField   uint32
+	NodeIDField   uint32
+	LocalDCField  bool
 }
 
 func (e *EndpointMock) NodeID() uint32 {
-	return e.NodeIdField
+	return e.NodeIDField
 }
 
 func (e *EndpointMock) Address() string {

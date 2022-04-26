@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ctxbalancer"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ctxbalancer"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 

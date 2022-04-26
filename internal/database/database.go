@@ -2,11 +2,12 @@ package database
 
 import (
 	"context"
-	"sync/atomic"
+	"sync"
+
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
-	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
@@ -31,19 +32,24 @@ type database struct {
 	discovery         discovery.Client
 	discoveryRepeater repeater.Repeater
 	connectionPool    conn.Pool
-	clusterPointer    atomic.Value
+
+	m              sync.RWMutex
+	clusterPointer clusterConnector
 }
 
 func (db *database) cluster() clusterConnector {
-	return db.clusterPointer.Load().(clusterConnector)
+	db.m.RLock()
+	defer db.m.RUnlock()
+	return db.clusterPointer
 }
 
 func (db *database) clusterSwap(cluster clusterConnector) clusterConnector {
-	oldCluster := db.clusterPointer.Swap(cluster)
-	if oldCluster == nil {
-		return nil
-	}
-	return oldCluster.(clusterConnector)
+	db.m.Lock()
+	defer db.m.Unlock()
+
+	oldCluster := db.clusterPointer
+	db.clusterPointer = cluster
+	return oldCluster
 }
 
 func (db *database) clusterDiscovery(ctx context.Context) error {
@@ -131,7 +137,11 @@ func New(
 			repeater.WithTrace(db.config.Trace()),
 		)
 	} else {
-		db.clusterSwap(cluster.New(deadline.ContextWithoutDeadline(ctx), db.config, pool, []endpoint.Endpoint{discoveryEndpoint}))
+		db.clusterSwap(
+			cluster.New(deadline.ContextWithoutDeadline(ctx),
+				db.config, pool,
+				[]endpoint.Endpoint{discoveryEndpoint}),
+		)
 	}
 
 	var cancel context.CancelFunc

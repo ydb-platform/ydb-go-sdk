@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
@@ -12,7 +13,11 @@ import (
 func TestPreferLocalDC(t *testing.T) {
 	ctx := context.Background()
 
-	conns := []conn.Conn{&mock.ConnMock{AddrField: "1", LocalDCField: false}, &mock.ConnMock{AddrField: "2", State: conn.Online, LocalDCField: true}, &mock.ConnMock{AddrField: "3", State: conn.Online, LocalDCField: true}}
+	conns := []conn.Conn{
+		&mock.ConnMock{AddrField: "1", LocalDCField: false},
+		&mock.ConnMock{AddrField: "2", State: conn.Online, LocalDCField: true},
+		&mock.ConnMock{AddrField: "3", State: conn.Online, LocalDCField: true},
+	}
 	rr := PreferLocalDC(RoundRobin()).Create(conns)
 	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
 	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
@@ -28,7 +33,11 @@ func TestPreferLocalDC(t *testing.T) {
 func TestPreferLocalDCWithFallBack(t *testing.T) {
 	ctx := context.Background()
 
-	conns := []conn.Conn{&mock.ConnMock{AddrField: "1", LocalDCField: false, State: conn.Online}, &mock.ConnMock{AddrField: "2", State: conn.Online, LocalDCField: true}, &mock.ConnMock{AddrField: "3", State: conn.Online, LocalDCField: true}}
+	conns := []conn.Conn{
+		&mock.ConnMock{AddrField: "1", LocalDCField: false, State: conn.Online},
+		&mock.ConnMock{AddrField: "2", State: conn.Online, LocalDCField: true},
+		&mock.ConnMock{AddrField: "3", State: conn.Online, LocalDCField: true},
+	}
 	rr := PreferLocalDCWithFallBack(RoundRobin()).Create(conns)
 	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
 	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))

@@ -14,8 +14,8 @@ type ctxBalancer struct {
 func Balancer(conns []conn.Conn) balancer.Balancer {
 	connMap := make(map[uint32]conn.Conn, len(conns))
 	for _, conn := range conns {
-		if nodeId := conn.Endpoint().NodeID(); nodeId > 0 {
-			connMap[nodeId] = conn
+		if nodeID := conn.Endpoint().NodeID(); nodeID > 0 {
+			connMap[nodeID] = conn
 		}
 	}
 	return &ctxBalancer{connMap: connMap}
