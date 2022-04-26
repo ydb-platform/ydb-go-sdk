@@ -50,7 +50,7 @@ func RoundRobinWithStartPosition(conns []conn.Conn, index int) balancer.Balancer
 }
 
 func (r *roundRobin) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
-	opt := balancer.NewNextOptions(opts...)
+	opt := balancer.MakeNextOptions(opts...)
 	connCount := len(r.conns)
 	if connCount == 0 {
 		return nil
@@ -63,7 +63,7 @@ func (r *roundRobin) Next(ctx context.Context, opts ...balancer.NextOption) conn
 	for i := 0; i < connCount; i++ {
 		connIndex := (startIndex + i) % connCount
 		c := r.conns[connIndex]
-		if balancer.IsOkConnection(c, opt.WantPessimized) {
+		if balancer.IsOkConnection(c, opt.AcceptBanned) {
 			return c
 		}
 		failedConns++
@@ -102,7 +102,7 @@ func (r *randomChoice) Create(conns []conn.Conn) balancer.Balancer {
 }
 
 func (r *randomChoice) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
-	opt := balancer.NewNextOptions(opts...)
+	opt := balancer.MakeNextOptions(opts...)
 	connCount := len(r.conns)
 
 	if connCount == 0 {
@@ -111,7 +111,7 @@ func (r *randomChoice) Next(ctx context.Context, opts ...balancer.NextOption) co
 	}
 
 	// fast path
-	if c := r.conns[r.rand.Int(connCount)]; balancer.IsOkConnection(c, opt.WantPessimized) {
+	if c := r.conns[r.rand.Int(connCount)]; balancer.IsOkConnection(c, opt.AcceptBanned) {
 		return c
 	}
 
@@ -129,7 +129,7 @@ func (r *randomChoice) Next(ctx context.Context, opts ...balancer.NextOption) co
 
 	for _, index := range indexes {
 		c := r.conns[index]
-		if balancer.IsOkConnection(c, opt.WantPessimized) {
+		if balancer.IsOkConnection(c, opt.AcceptBanned) {
 			return c
 		}
 		failedConns++

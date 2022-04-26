@@ -32,16 +32,16 @@ func IsOkConnection(c conn.Conn, bannedIsOk bool) bool {
 }
 
 type (
-	NextOption            func(o *NextOptions)
-	NeedDiscoveryCallback func(ctx context.Context)
+	NextOption         func(o *NextOptions)
+	OnBadStateCallback func(ctx context.Context)
 
 	NextOptions struct {
-		OnNeedRediscovery NeedDiscoveryCallback
-		WantPessimized    bool
+		OnBadState   OnBadStateCallback
+		AcceptBanned bool
 	}
 )
 
-func NewNextOptions(opts ...NextOption) NextOptions {
+func MakeNextOptions(opts ...NextOption) NextOptions {
 	var o NextOptions
 	for _, f := range opts {
 		f(&o)
@@ -50,23 +50,19 @@ func NewNextOptions(opts ...NextOption) NextOptions {
 }
 
 func (o *NextOptions) Discovery(ctx context.Context) {
-	if o.OnNeedRediscovery != nil {
-		o.OnNeedRediscovery(ctx)
+	if o.OnBadState != nil {
+		o.OnBadState(ctx)
 	}
 }
 
-func WithWantPessimized(val ...bool) NextOption {
+func WithAcceptBanned(val bool) NextOption {
 	return func(o *NextOptions) {
-		if len(val) == 0 {
-			o.WantPessimized = true
-		} else {
-			o.WantPessimized = val[0]
-		}
+		o.AcceptBanned = val
 	}
 }
 
-func WithOnNeedRediscovery(callback NeedDiscoveryCallback) NextOption {
+func WithOnBadState(callback OnBadStateCallback) NextOption {
 	return func(o *NextOptions) {
-		o.OnNeedRediscovery = callback
+		o.OnBadState = callback
 	}
 }

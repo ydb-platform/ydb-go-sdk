@@ -59,7 +59,7 @@ func TestRandomChoice_Next(t *testing.T) {
 				count := 100
 				delta := 10.0
 				for i := 0; i < count; i++ {
-					c := b.Next(ctx, balancer.WithWantPessimized())
+					c := b.Next(ctx, balancer.WithAcceptBanned(true))
 					res[c.Endpoint().Address()]++
 				}
 
@@ -96,7 +96,7 @@ func TestRandomChoice_Next(t *testing.T) {
 				count := 100
 				delta := 10.0
 				for i := 0; i < count; i++ {
-					c := b.Next(ctx, balancer.WithWantPessimized())
+					c := b.Next(ctx, balancer.WithAcceptBanned(true))
 					res[c.Endpoint().Address()]++
 				}
 
@@ -119,7 +119,7 @@ func TestRandomChoice_Next(t *testing.T) {
 	t.Run("CheckDiscovery", func(t *testing.T) {
 		t.Run("Empty", func(t *testing.T) {
 			b := RandomChoice(nil)
-			b.Next(ctx, balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+			b.Next(ctx, balancer.WithOnBadState(func(ctx context.Context) {
 				t.Error()
 			}))
 		})
@@ -135,7 +135,7 @@ func TestRandomChoice_Next(t *testing.T) {
 
 			// try next many times more then connections count - for `guarantee` about Next see a bad connection in internal loop
 			for i := 0; i < 1000; i++ {
-				c := b.Next(ctx, balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+				c := b.Next(ctx, balancer.WithOnBadState(func(ctx context.Context) {
 					t.Error(i)
 				}))
 				require.NotNil(t, c)
@@ -156,7 +156,7 @@ func TestRandomChoice_Next(t *testing.T) {
 				count := 100
 				for i := 0; i < count; i++ {
 					b := createBalancer()
-					b.Next(ctx, balancer.WithWantPessimized(), balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+					b.Next(ctx, balancer.WithAcceptBanned(true), balancer.WithOnBadState(func(ctx context.Context) {
 						t.Error(i)
 					}))
 				}
@@ -166,7 +166,7 @@ func TestRandomChoice_Next(t *testing.T) {
 				needRefresh := 0
 				for i := 0; i < count; i++ {
 					b := createBalancer()
-					b.Next(ctx, balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+					b.Next(ctx, balancer.WithOnBadState(func(ctx context.Context) {
 						needRefresh++
 					}))
 				}
@@ -249,13 +249,13 @@ func TestRoundRobin_Next(t *testing.T) {
 				b := RoundRobin(conns).(*roundRobin)
 				t.Run("AllowBanned", func(t *testing.T) {
 					b.last = -1
-					c := b.Next(ctx, balancer.WithWantPessimized())
+					c := b.Next(ctx, balancer.WithAcceptBanned(true))
 					require.Equal(t, conns[0], c)
-					c = b.Next(ctx, balancer.WithWantPessimized())
+					c = b.Next(ctx, balancer.WithAcceptBanned(true))
 					require.Equal(t, conns[1], c)
-					c = b.Next(ctx, balancer.WithWantPessimized())
+					c = b.Next(ctx, balancer.WithAcceptBanned(true))
 					require.Equal(t, conns[2], c)
-					c = b.Next(ctx, balancer.WithWantPessimized())
+					c = b.Next(ctx, balancer.WithAcceptBanned(true))
 					require.Equal(t, conns[0], c)
 				})
 				t.Run("DenyBanned", func(t *testing.T) {
@@ -283,11 +283,11 @@ func TestRoundRobin_Next(t *testing.T) {
 
 				t.Run("AllowBanned", func(t *testing.T) {
 					b.last = -1
-					c := b.Next(ctx, balancer.WithWantPessimized())
+					c := b.Next(ctx, balancer.WithAcceptBanned(true))
 					require.Equal(t, conns[0], c)
-					c = b.Next(ctx, balancer.WithWantPessimized())
+					c = b.Next(ctx, balancer.WithAcceptBanned(true))
 					require.Equal(t, conns[1], c)
-					c = b.Next(ctx, balancer.WithWantPessimized())
+					c = b.Next(ctx, balancer.WithAcceptBanned(true))
 					require.Equal(t, conns[0], c)
 				})
 				t.Run("DenyBanned", func(t *testing.T) {
@@ -303,7 +303,7 @@ func TestRoundRobin_Next(t *testing.T) {
 	t.Run("CheckNeedRefresh", func(t *testing.T) {
 		t.Run("Online", func(t *testing.T) {
 			b := RoundRobin([]conn.Conn{&mock.ConnMock{State: conn.Online}})
-			b.Next(ctx, balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+			b.Next(ctx, balancer.WithOnBadState(func(ctx context.Context) {
 				t.Error()
 			}))
 		})
@@ -316,13 +316,13 @@ func TestRoundRobin_Next(t *testing.T) {
 			}).(*roundRobin)
 
 			b.last = 0
-			b.Next(ctx, balancer.WithWantPessimized(), balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+			b.Next(ctx, balancer.WithAcceptBanned(true), balancer.WithOnBadState(func(ctx context.Context) {
 				t.Error()
 			}))
 
 			b.last = 0
 			discoveryCalled := false
-			b.Next(ctx, balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+			b.Next(ctx, balancer.WithOnBadState(func(ctx context.Context) {
 				discoveryCalled = true
 			}))
 			require.True(t, discoveryCalled)

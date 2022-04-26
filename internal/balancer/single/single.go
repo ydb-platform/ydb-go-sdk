@@ -42,8 +42,8 @@ func (b *single) Conn() conn.Conn {
 }
 
 func (b *single) checkIfNeedRefresh(ctx context.Context, opts ...balancer.NextOption) {
-	opt := balancer.NewNextOptions(opts...)
-	if b.conn != nil && !balancer.IsOkConnection(b.conn, opt.WantPessimized) {
+	opt := balancer.MakeNextOptions(opts...)
+	if b.conn != nil && !balancer.IsOkConnection(b.conn, opt.AcceptBanned) {
 		opt.Discovery(ctx)
 	}
 }

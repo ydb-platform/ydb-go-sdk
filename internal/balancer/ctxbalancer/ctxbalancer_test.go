@@ -46,19 +46,19 @@ func TestCtxBalancer_Next(t *testing.T) {
 
 	t.Run("EmptyContext", func(t *testing.T) {
 		res := b.Next(context.Background(),
-			balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+			balancer.WithOnBadState(func(ctx context.Context) {
 				t.Error()
 			}),
-			balancer.WithWantPessimized())
+			balancer.WithAcceptBanned(true))
 		require.Nil(t, res)
 	})
 
 	t.Run("WithPreferOnline", func(t *testing.T) {
 		res := b.Next(WithEndpoint(context.Background(), &mock.EndpointMock{NodeIDField: 1}),
-			balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+			balancer.WithOnBadState(func(ctx context.Context) {
 				t.Error()
 			}),
-			balancer.WithWantPessimized()).(*mock.ConnMock)
+			balancer.WithAcceptBanned(true)).(*mock.ConnMock)
 		require.Equal(t, uint32(1), res.NodeIDField)
 	})
 
@@ -68,10 +68,10 @@ func TestCtxBalancer_Next(t *testing.T) {
 		for _, allowBanned := range []bool{true, false} {
 			t.Run(fmt.Sprint(allowBanned), func(t *testing.T) {
 				res := b.Next(WithEndpoint(context.Background(), &mock.EndpointMock{NodeIDField: 2}),
-					balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+					balancer.WithOnBadState(func(ctx context.Context) {
 						t.Error()
 					}),
-					balancer.WithWantPessimized(allowBanned)).(*mock.ConnMock)
+					balancer.WithAcceptBanned(allowBanned)).(*mock.ConnMock)
 				require.Equal(t, uint32(2), res.NodeIDField)
 			})
 		}

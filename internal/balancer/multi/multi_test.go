@@ -128,9 +128,9 @@ func TestNext(t *testing.T) {
 	t.Run("ProxySameParams", func(t *testing.T) {
 		createCheckParams := func(t *testing.T, needContext context.Context, opts ...balancer.NextOption) balancer.Balancer {
 			b := mock.Balancer()
-			opt := balancer.NewNextOptions(opts...)
+			opt := balancer.MakeNextOptions(opts...)
 			b.OnNext = func(ctx context.Context, localOpts ...balancer.NextOption) conn.Conn {
-				localOpt := balancer.NewNextOptions(localOpts...)
+				localOpt := balancer.MakeNextOptions(localOpts...)
 				require.Equal(t, needContext, ctx)
 				require.Equal(t, opt, localOpt)
 				return nil
@@ -143,10 +143,10 @@ func TestNext(t *testing.T) {
 		for _, filter := range []bool{true, false} {
 			t.Run(fmt.Sprint(filter), func(t *testing.T) {
 				b := Balancer(
-					WithBalancer(createCheckParams(t, ctx, balancer.WithWantPessimized(filter)), nil),
-					WithBalancer(createCheckParams(t, ctx, balancer.WithWantPessimized(filter)), nil),
+					WithBalancer(createCheckParams(t, ctx, balancer.WithAcceptBanned(filter)), nil),
+					WithBalancer(createCheckParams(t, ctx, balancer.WithAcceptBanned(filter)), nil),
 				)
-				_ = b.Next(ctx, balancer.WithWantPessimized(filter))
+				_ = b.Next(ctx, balancer.WithAcceptBanned(filter))
 			})
 		}
 	})

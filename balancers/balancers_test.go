@@ -28,7 +28,7 @@ func TestPreferLocalDC(t *testing.T) {
 	// ban local connections
 	conns[1].SetState(conn.Banned)
 	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, balancer.WithWantPessimized()))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, balancer.WithAcceptBanned(true)))
 	require.Nil(t, rr.Next(ctx))
 }
 
@@ -48,7 +48,7 @@ func TestPreferLocalDCWithFallBack(t *testing.T) {
 	// ban connections
 	conns[1].SetState(conn.Banned)
 	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, balancer.WithWantPessimized()))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, balancer.WithAcceptBanned(true)))
 	require.Equal(t, conns[0], rr.Next(ctx))
 }
 
@@ -69,7 +69,7 @@ func TestPreferLocations(t *testing.T) {
 	// ban zero, two
 	conns[0].SetState(conn.Banned)
 	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, balancer.WithWantPessimized()))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, balancer.WithAcceptBanned(true)))
 	require.Nil(t, rr.Next(ctx))
 }
 
@@ -90,6 +90,6 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 	// ban zero, two
 	conns[0].SetState(conn.Banned)
 	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, balancer.WithWantPessimized()))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, balancer.WithAcceptBanned(true)))
 	require.Equal(t, conns[1], rr.Next(ctx))
 }

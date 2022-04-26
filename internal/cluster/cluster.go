@@ -33,7 +33,7 @@ type Cluster struct {
 	pool                  conn.Pool
 	conns                 []conn.Conn
 	balancerPointer       balancer.Balancer
-	needDiscoveryCallback balancer.NeedDiscoveryCallback
+	needDiscoveryCallback balancer.OnBadStateCallback
 
 	m    sync.RWMutex
 	done chan struct{}
@@ -63,7 +63,7 @@ func New(
 	config config.Config,
 	pool conn.Pool,
 	endpoints []endpoint.Endpoint,
-	needDiscoveryCallback balancer.NeedDiscoveryCallback,
+	needDiscoveryCallback balancer.OnBadStateCallback,
 ) *Cluster {
 	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)
 	defer func() {
@@ -71,8 +71,8 @@ func New(
 	}()
 
 	conns := make([]conn.Conn, 0, len(endpoints))
-	for _, endpoint := range endpoints {
-		conns = append(conns, pool.Get(endpoint))
+	for _, e := range endpoints {
+		conns = append(conns, pool.Get(e))
 	}
 
 	parkBanned(ctx, conns)
@@ -110,8 +110,8 @@ func (c *Cluster) Close(ctx context.Context) (err error) {
 
 	var issues []error
 
-	for _, conn := range c.conns {
-		if err := conn.Release(ctx); err != nil {
+	for _, cc := range c.conns {
+		if err := cc.Release(ctx); err != nil {
 			issues = append(issues, err)
 		}
 	}
@@ -138,10 +138,10 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			cc = c.balancer().Next(ctx, balancer.WithOnNeedRediscovery(c.needDiscoveryCallback))
+			cc = c.balancer().Next(ctx, balancer.WithOnBadState(c.needDiscoveryCallback))
 
 			if cc == nil {
-				cc = c.balancer().Next(ctx, balancer.WithWantPessimized())
+				cc = c.balancer().Next(ctx, balancer.WithAcceptBanned(true))
 			}
 
 			if cc == nil {
