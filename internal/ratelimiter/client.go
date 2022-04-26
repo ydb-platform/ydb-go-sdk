@@ -53,9 +53,9 @@ func (c *Client) CreateResource(
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(c.createResource(ctx, coordinationNodePath, resource))
 	}
-	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return c.createResource(ctx, coordinationNodePath, resource)
-	}))
+	}, retry.WithStackTrace())
 }
 
 func (c *Client) createResource(
@@ -95,9 +95,9 @@ func (c *Client) AlterResource(
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(c.alterResource(ctx, coordinationNodePath, resource))
 	}
-	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(c.alterResource(ctx, coordinationNodePath, resource))
-	}))
+	}, retry.WithStackTrace())
 }
 
 func (c *Client) alterResource(
@@ -137,9 +137,9 @@ func (c *Client) DropResource(
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(c.dropResource(ctx, coordinationNodePath, resourcePath))
 	}
-	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(c.dropResource(ctx, coordinationNodePath, resourcePath))
-	}))
+	}, retry.WithStackTrace())
 }
 
 func (c *Client) dropResource(
@@ -173,10 +173,10 @@ func (c *Client) ListResource(
 		list, err = c.listResource(ctx, coordinationNodePath, resourcePath, recursive)
 		return list, xerrors.WithStackTrace(err)
 	}
-	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		list, err = c.listResource(ctx, coordinationNodePath, resourcePath, recursive)
 		return xerrors.WithStackTrace(err)
-	}, retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true), retry.WithStackTrace())
 	return
 }
 
@@ -223,10 +223,10 @@ func (c *Client) DescribeResource(
 		resource, err = c.describeResource(ctx, coordinationNodePath, resourcePath)
 		return resource, xerrors.WithStackTrace(err)
 	}
-	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		resource, err = c.describeResource(ctx, coordinationNodePath, resourcePath)
 		return xerrors.WithStackTrace(err)
-	}, retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true), retry.WithStackTrace())
 	return
 }
 
@@ -286,9 +286,9 @@ func (c *Client) AcquireResource(
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(c.acquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...))
 	}
-	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(c.acquireResource(ctx, coordinationNodePath, resourcePath, amount, opts...))
-	}))
+	}, retry.WithStackTrace())
 }
 
 func (c *Client) acquireResource(

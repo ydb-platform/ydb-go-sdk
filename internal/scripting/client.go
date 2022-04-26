@@ -48,10 +48,10 @@ func (c *Client) Execute(
 		r, err = c.execute(ctx, query, params)
 		return r, xerrors.WithStackTrace(err)
 	}
-	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		r, err = c.execute(ctx, query, params)
 		return xerrors.WithStackTrace(err)
-	}))
+	}, retry.WithStackTrace())
 	return
 }
 
@@ -113,10 +113,10 @@ func (c *Client) Explain(
 		e, err = c.explain(ctx, query, mode)
 		return e, xerrors.WithStackTrace(err)
 	}
-	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = c.explain(ctx, query, mode)
 		return xerrors.WithStackTrace(err)
-	}))
+	}, retry.WithStackTrace())
 	return
 }
 
@@ -176,10 +176,10 @@ func (c *Client) StreamExecute(
 		r, err = c.streamExecute(ctx, query, params)
 		return r, xerrors.WithStackTrace(err)
 	}
-	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		r, err = c.streamExecute(ctx, query, params)
 		return xerrors.WithStackTrace(err)
-	}))
+	}, retry.WithStackTrace())
 	return
 }
 

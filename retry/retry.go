@@ -19,6 +19,7 @@ type retryOptions struct {
 	id          string
 	trace       trace.Retry
 	idempotent  bool
+	stackTrace  bool
 	fastBackoff backoff.Backoff
 	slowBackoff backoff.Backoff
 
@@ -31,6 +32,13 @@ type retryOption func(h *retryOptions)
 func WithID(id string) retryOption {
 	return func(h *retryOptions) {
 		h.id = id
+	}
+}
+
+// WithStackTrace wraps errors with stacktrace from Retry call
+func WithStackTrace() retryOption {
+	return func(h *retryOptions) {
+		h.stackTrace = true
 	}
 }
 
@@ -89,6 +97,14 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	for _, o := range opts {
 		o(options)
 	}
+	defer func() {
+		if err != nil && options.stackTrace {
+			err = xerrors.WithStackTrace(
+				err,
+				xerrors.WithSkipDepth(2), // 1 - exit from defer, 1 - exit from Retry call
+			)
+		}
+	}()
 	var (
 		i        int
 		attempts int

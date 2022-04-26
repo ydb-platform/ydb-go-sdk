@@ -27,7 +27,7 @@ func TestScripting(t *testing.T) {
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAnonymousCredentials(),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
@@ -86,7 +86,7 @@ func TestScripting(t *testing.T) {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
 		return res.Err()
-	}, retry.WithIdempotent(true)); err != nil {
+	}, retry.WithIdempotent(true), retry.WithStackTrace()); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 	// StreamExecute

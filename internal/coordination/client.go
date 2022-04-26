@@ -43,9 +43,9 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(c.createNode(ctx, path, config))
 	}
-	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(c.createNode(ctx, path, config))
-	}))
+	}, retry.WithStackTrace())
 }
 
 func (c *Client) createNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
@@ -79,9 +79,9 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(c.alterNode(ctx, path, config))
 	}
-	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(c.alterNode(ctx, path, config))
-	}))
+	}, retry.WithStackTrace())
 }
 
 func (c *Client) alterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
@@ -115,9 +115,9 @@ func (c *Client) DropNode(ctx context.Context, path string) (err error) {
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(c.dropNode(ctx, path))
 	}
-	return xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(c.dropNode(ctx, path))
-	}))
+	}, retry.WithStackTrace())
 }
 
 func (c *Client) dropNode(ctx context.Context, path string) (err error) {
@@ -152,10 +152,10 @@ func (c *Client) DescribeNode(
 		entry, config, err = c.describeNode(ctx, path)
 		return entry, config, xerrors.WithStackTrace(err)
 	}
-	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		entry, config, err = c.describeNode(ctx, path)
 		return xerrors.WithStackTrace(err)
-	}))
+	}, retry.WithStackTrace())
 	return
 }
 
