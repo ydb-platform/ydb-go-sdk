@@ -3,7 +3,6 @@ package rr
 import (
 	"context"
 	"math"
-	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
@@ -15,33 +14,15 @@ var randomSources = xrand.New(xrand.WithLock())
 
 type baseBalancer struct {
 	conns []conn.Conn
-
-	needRefresh      chan struct{}
-	needRefreshClose sync.Once
 }
 
-func (r *baseBalancer) NeedRefresh(ctx context.Context) bool {
-	if ctx.Err() != nil {
-		return false
-	}
-
-	select {
-	case <-ctx.Done():
-		return false
-	case <-r.needRefresh:
-		return true
-	}
-}
-
-func (r *baseBalancer) checkNeedRefresh(failedConns *int) {
+func (r *baseBalancer) checkNeedRefresh(ctx context.Context, failedConns *int, opt balancer.NextOptions) {
 	connsCount := len(r.conns)
 	if connsCount > 0 && *failedConns <= connsCount/2 {
 		return
 	}
 
-	r.needRefreshClose.Do(func() {
-		close(r.needRefresh)
-	})
+	opt.Discovery(ctx)
 }
 
 type roundRobin struct {
@@ -61,28 +42,28 @@ func RoundRobin(conns []conn.Conn) balancer.Balancer {
 func RoundRobinWithStartPosition(conns []conn.Conn, index int) balancer.Balancer {
 	return &roundRobin{
 		baseBalancer: baseBalancer{
-			conns:       conns,
-			needRefresh: make(chan struct{}),
+			conns: conns,
 		},
 		// random start need to prevent overload first nodes
 		last: int64(index),
 	}
 }
 
-func (r *roundRobin) Next(_ context.Context, allowBanned bool) conn.Conn {
+func (r *roundRobin) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
+	opt := balancer.NewNextOptions(opts...)
 	connCount := len(r.conns)
 	if connCount == 0 {
 		return nil
 	}
 
 	failedConns := 0
-	defer r.checkNeedRefresh(&failedConns)
+	defer r.checkNeedRefresh(ctx, &failedConns, opt)
 
 	startIndex := r.nextStartIndex()
 	for i := 0; i < connCount; i++ {
 		connIndex := (startIndex + i) % connCount
 		c := r.conns[connIndex]
-		if balancer.IsOkConnection(c, allowBanned) {
+		if balancer.IsOkConnection(c, opt.WantPessimized) {
 			return c
 		}
 		failedConns++
@@ -110,8 +91,7 @@ type randomChoice struct {
 func RandomChoice(conns []conn.Conn) balancer.Balancer {
 	return &randomChoice{
 		baseBalancer: baseBalancer{
-			conns:       conns,
-			needRefresh: make(chan struct{}),
+			conns: conns,
 		},
 		rand: xrand.New(xrand.WithLock(), xrand.WithSource(randomSources.Int64(math.MaxInt64))),
 	}
@@ -121,7 +101,8 @@ func (r *randomChoice) Create(conns []conn.Conn) balancer.Balancer {
 	return RandomChoice(conns)
 }
 
-func (r *randomChoice) Next(_ context.Context, allowBanned bool) conn.Conn {
+func (r *randomChoice) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
+	opt := balancer.NewNextOptions(opts...)
 	connCount := len(r.conns)
 
 	if connCount == 0 {
@@ -130,7 +111,7 @@ func (r *randomChoice) Next(_ context.Context, allowBanned bool) conn.Conn {
 	}
 
 	// fast path
-	if c := r.conns[r.rand.Int(connCount)]; balancer.IsOkConnection(c, allowBanned) {
+	if c := r.conns[r.rand.Int(connCount)]; balancer.IsOkConnection(c, opt.WantPessimized) {
 		return c
 	}
 
@@ -144,11 +125,11 @@ func (r *randomChoice) Next(_ context.Context, allowBanned bool) conn.Conn {
 	})
 
 	failedConns := 0
-	defer r.checkNeedRefresh(&failedConns)
+	defer r.checkNeedRefresh(ctx, &failedConns, opt)
 
 	for _, index := range indexes {
 		c := r.conns[index]
-		if balancer.IsOkConnection(c, allowBanned) {
+		if balancer.IsOkConnection(c, opt.WantPessimized) {
 			return c
 		}
 		failedConns++

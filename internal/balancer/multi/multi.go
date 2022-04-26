@@ -40,43 +40,9 @@ func (m *multi) Create(conns []conn.Conn) balancer.Balancer {
 	}
 }
 
-func (m *multi) NeedRefresh(ctx context.Context) bool {
-	if ctx.Err() != nil {
-		return false
-	}
-	ctx, ctxCancel := context.WithCancel(ctx)
-	defer ctxCancel()
-
-	// buffered channel need for prevent wait goroutines leak after function exit
-	needRefreshChannels := make(chan bool, len(m.balancers))
-
-	waitRefreshSignal := func(b balancer.Balancer) {
-		go func() {
-			needRefreshChannels <- b.NeedRefresh(ctx)
-		}()
-	}
-
+func (m *multi) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
 	for _, b := range m.balancers {
-		waitRefreshSignal(b)
-	}
-
-	for range m.balancers {
-		select {
-		case <-ctx.Done():
-			return false
-		case needRefresh := <-needRefreshChannels:
-			if needRefresh {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func (m *multi) Next(ctx context.Context, allowBanned bool) conn.Conn {
-	for _, b := range m.balancers {
-		if c := b.Next(ctx, allowBanned); c != nil {
+		if c := b.Next(ctx, opts...); c != nil {
 			return c
 		}
 	}

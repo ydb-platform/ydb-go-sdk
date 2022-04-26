@@ -2,7 +2,6 @@ package single
 
 import (
 	"context"
-	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -10,37 +9,30 @@ import (
 
 func Balancer(c conn.Conn) balancer.Balancer {
 	return &single{
-		conn:        c,
-		needRefresh: make(chan struct{}),
+		conn: c,
 	}
 }
 
 type single struct {
 	conn conn.Conn
-
-	needRefresh      chan struct{}
-	needRefreshClose sync.Once
 }
 
 func (b *single) Create(conns []conn.Conn) balancer.Balancer {
 	connCount := len(conns)
 	switch {
 	case connCount == 0:
-		return &single{
-			needRefresh: make(chan struct{}),
-		}
+		return &single{}
 	case connCount == 1:
 		return &single{
-			conn:        conns[0],
-			needRefresh: make(chan struct{}),
+			conn: conns[0],
 		}
 	default:
 		panic("ydb: single Conn Balancer: must not conains more one value")
 	}
 }
 
-func (b *single) Next(_ context.Context, allowBanned bool) conn.Conn {
-	b.checkIfNeedRefresh()
+func (b *single) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
+	b.checkIfNeedRefresh(ctx, opts...)
 
 	return b.conn
 }
@@ -49,29 +41,14 @@ func (b *single) Conn() conn.Conn {
 	return b.conn
 }
 
-func (b *single) NeedRefresh(ctx context.Context) bool {
-	if ctx.Err() != nil {
-		return false
-	}
-
-	select {
-	case <-ctx.Done():
-		return false
-	case <-b.needRefresh:
-		return true
+func (b *single) checkIfNeedRefresh(ctx context.Context, opts ...balancer.NextOption) {
+	opt := balancer.NewNextOptions(opts...)
+	if b.conn != nil && !balancer.IsOkConnection(b.conn, opt.WantPessimized) {
+		opt.Discovery(ctx)
 	}
 }
 
-func (b *single) checkIfNeedRefresh() {
-	if b.conn != nil && balancer.IsOkConnection(b.conn, false) {
-		return
-	}
-	b.needRefreshClose.Do(func() {
-		close(b.needRefresh)
-	})
-}
-
-func IsSingle(i interface{}) bool {
+func IsSingle(i balancer.Balancer) bool {
 	_, ok := i.(*single)
 	return ok
 }

@@ -10,11 +10,7 @@ import (
 
 type testBalancer struct{}
 
-func (t testBalancer) Next(ctx context.Context, allowBanned bool) conn.Conn {
-	panic("unexpected call")
-}
-
-func (t testBalancer) NeedRefresh(ctx context.Context) bool {
+func (t testBalancer) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
 	panic("unexpected call")
 }
 

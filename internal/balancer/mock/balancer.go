@@ -8,9 +8,8 @@ import (
 )
 
 type BalancerMock struct {
-	OnNext        func(ctx context.Context, allowBanned bool) conn.Conn
-	OnCreate      func(conns []conn.Conn) balancer.Balancer
-	OnNeedRefresh func(ctx context.Context) bool
+	OnNext   func(ctx context.Context, opts ...balancer.NextOption) conn.Conn
+	OnCreate func(conns []conn.Conn) balancer.Balancer
 }
 
 func Balancer() *BalancerMock {
@@ -21,10 +20,6 @@ func (s *BalancerMock) Create(conns []conn.Conn) balancer.Balancer {
 	return s.OnCreate(conns)
 }
 
-func (s *BalancerMock) Next(ctx context.Context, allowBanned bool) conn.Conn {
-	return s.OnNext(ctx, allowBanned)
-}
-
-func (s *BalancerMock) NeedRefresh(ctx context.Context) bool {
-	return s.OnNeedRefresh(ctx)
+func (s *BalancerMock) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
+	return s.OnNext(ctx, opts...)
 }

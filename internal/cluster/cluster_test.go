@@ -16,6 +16,6 @@ func TestNew(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := config.New(config.WithBalancer(balancers.RoundRobin()))
-	cluster := New(ctx, cfg, conn.NewPool(ctx, cfg), nil)
-	require.IsType(t, multi.Balancer(), cluster.balancer())
+	cluster := New(ctx, cfg, conn.NewPool(ctx, cfg), nil, nil)
+	require.IsType(t, multi.Balancer(), cluster.balancer()) // check about create own balancer
 }

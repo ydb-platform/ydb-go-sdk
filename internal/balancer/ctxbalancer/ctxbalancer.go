@@ -22,7 +22,7 @@ func Balancer(conns []conn.Conn) balancer.Balancer {
 }
 
 // Next of ctxBalancer return the connection
-func (c *ctxBalancer) Next(ctx context.Context, _allowBanned bool) conn.Conn {
+func (c *ctxBalancer) Next(ctx context.Context, _ ...balancer.NextOption) conn.Conn {
 	if e, ok := ContextEndpoint(ctx); ok {
 		if cc, ok := c.connMap[e.NodeID()]; ok && balancer.IsOkConnection(cc, true) {
 			if err := cc.Ping(ctx); err == nil {
@@ -35,8 +35,4 @@ func (c *ctxBalancer) Next(ctx context.Context, _allowBanned bool) conn.Conn {
 
 func (c *ctxBalancer) Create(conns []conn.Conn) balancer.Balancer {
 	return Balancer(conns)
-}
-
-func (c *ctxBalancer) NeedRefresh(ctx context.Context) bool {
-	return false
 }

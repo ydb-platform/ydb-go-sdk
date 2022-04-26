@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -13,10 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
-
-func tSleep() {
-	time.Sleep(time.Millisecond * 10)
-}
 
 func TestCreate(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
@@ -92,189 +87,52 @@ func TestCreate(t *testing.T) {
 	})
 }
 
-func TestNeedRefresh(t *testing.T) {
-	t.Run("Empty", func(t *testing.T) {
-		ctx, ctxCancel := context.WithCancel(context.Background())
-		b := Balancer()
-
-		callResult := make(chan bool)
-		go func() {
-			callResult <- b.NeedRefresh(ctx)
-		}()
-
-		ctxCancel()
-		res := <-callResult
-		require.False(t, res)
-	})
-
-	t.Run("Filled", func(t *testing.T) {
-		bTimeoutAnswer := mock.Balancer()
-		bTimeoutAnswer.OnNeedRefresh = func(ctx context.Context) bool {
-			<-ctx.Done()
-			return false
-		}
-
-		ansBalancerCreate := func() (*mock.BalancerMock, chan bool) {
-			ch := make(chan bool, 1)
-			b := mock.Balancer()
-			b.OnNeedRefresh = func(ctx context.Context) bool {
-				select {
-				case <-ctx.Done():
-					return false
-				case ans := <-ch:
-					return ans
-				}
-			}
-			return b, ch
-		}
-
-		t.Run("Timeout", func(t *testing.T) {
-			ctx, ctxCancel := context.WithCancel(context.Background())
-
-			m2, _ := ansBalancerCreate()
-
-			b := Balancer(WithBalancer(bTimeoutAnswer, nil), WithBalancer(m2, nil))
-			callResult := make(chan bool, 1)
-			go func() {
-				callResult <- b.NeedRefresh(ctx)
-			}()
-
-			tSleep()
-
-			select {
-			case ans := <-callResult:
-				t.Errorf("Unexpected answer: %v", ans)
-			default:
-				// pass
-			}
-
-			ctxCancel()
-			ans := <-callResult
-			require.False(t, ans)
-		})
-
-		t.Run("Answer-true", func(t *testing.T) {
-			checkAnswer := func(t *testing.T, needPause bool) {
-				ctx, ctxCancel := context.WithCancel(context.Background())
-				defer ctxCancel()
-
-				m2, m2ans := ansBalancerCreate()
-
-				b := Balancer(WithBalancer(bTimeoutAnswer, nil), WithBalancer(m2, nil))
-				callResult := make(chan bool, 1)
-
-				go func() {
-					callResult <- b.NeedRefresh(ctx)
-				}()
-
-				if needPause {
-					tSleep()
-				}
-
-				m2ans <- true
-
-				ans := <-callResult
-				require.True(t, ans)
-			}
-
-			for _, needPause := range []bool{true, false} {
-				t.Run(fmt.Sprintf("NeedPause_%v", needPause), func(t *testing.T) {
-					checkAnswer(t, needPause)
-				})
-			}
-		})
-
-		t.Run("Answer-false", func(t *testing.T) {
-			checkAnswer := func(t *testing.T, needPause bool) {
-				ctx, ctxCancel := context.WithCancel(context.Background())
-				defer ctxCancel()
-
-				m1, m1ans := ansBalancerCreate()
-				m2, m2ans := ansBalancerCreate()
-
-				b := Balancer(WithBalancer(m1, nil), WithBalancer(m2, nil))
-				callResult := make(chan bool, 1)
-
-				go func() {
-					callResult <- b.NeedRefresh(ctx)
-				}()
-
-				if needPause {
-					tSleep()
-				}
-
-				m1ans <- false
-
-				if needPause {
-					tSleep()
-				}
-
-				select {
-				case ans := <-callResult:
-					t.Errorf("unexpected result: %v", ans)
-				default:
-					// no block
-				}
-
-				m2ans <- false
-
-				ans := <-callResult
-				require.False(t, ans)
-			}
-
-			for _, needPause := range []bool{true, false} {
-				t.Run(fmt.Sprintf("NeedPause_%v", needPause), func(t *testing.T) {
-					checkAnswer(t, needPause)
-				})
-			}
-		})
-	})
-}
-
 func TestNext(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Empty", func(t *testing.T) {
 		b := Balancer()
-		res := b.Next(ctx, false)
+		res := b.Next(ctx)
 		require.Nil(t, res)
 	})
 
 	t.Run("SelectFirstNonNilAnswer", func(t *testing.T) {
 		answer := mock.Balancer()
-		answer.OnNext = func(ctx context.Context, allowBanned bool) conn.Conn {
+		answer.OnNext = func(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
 			return &mock.ConnMock{AddrField: "ok"}
 		}
 		noanswer := mock.Balancer()
-		noanswer.OnNext = func(ctx context.Context, allowBanned bool) conn.Conn {
+		noanswer.OnNext = func(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
 			return nil
 		}
 
 		t.Run("First", func(t *testing.T) {
 			b := Balancer(WithBalancer(answer, nil), WithBalancer(noanswer, nil))
-			res := b.Next(context.Background(), false)
+			res := b.Next(context.Background())
 			require.Equal(t, "ok", res.Endpoint().Address())
 		})
 
 		t.Run("Second", func(t *testing.T) {
 			b := Balancer(WithBalancer(noanswer, nil), WithBalancer(answer, nil))
-			res := b.Next(context.Background(), false)
+			res := b.Next(context.Background())
 			require.Equal(t, "ok", res.Endpoint().Address())
 		})
 
 		t.Run("None", func(t *testing.T) {
 			b := Balancer(WithBalancer(noanswer, nil), WithBalancer(noanswer, nil))
-			res := b.Next(context.Background(), false)
+			res := b.Next(context.Background())
 			require.Nil(t, res)
 		})
 	})
 
 	t.Run("ProxySameParams", func(t *testing.T) {
-		createCheckParams := func(t *testing.T, needContext context.Context, needAllowBanned bool) balancer.Balancer {
+		createCheckParams := func(t *testing.T, needContext context.Context, opts ...balancer.NextOption) balancer.Balancer {
 			b := mock.Balancer()
-			b.OnNext = func(ctx context.Context, allowBanned bool) conn.Conn {
+			opt := balancer.NewNextOptions(opts...)
+			b.OnNext = func(ctx context.Context, localOpts ...balancer.NextOption) conn.Conn {
+				localOpt := balancer.NewNextOptions(localOpts...)
 				require.Equal(t, needContext, ctx)
-				require.Equal(t, needAllowBanned, allowBanned)
+				require.Equal(t, opt, localOpt)
 				return nil
 			}
 			return b
@@ -285,10 +143,10 @@ func TestNext(t *testing.T) {
 		for _, filter := range []bool{true, false} {
 			t.Run(fmt.Sprint(filter), func(t *testing.T) {
 				b := Balancer(
-					WithBalancer(createCheckParams(t, ctx, filter), nil),
-					WithBalancer(createCheckParams(t, ctx, filter), nil),
+					WithBalancer(createCheckParams(t, ctx, balancer.WithWantPessimized(filter)), nil),
+					WithBalancer(createCheckParams(t, ctx, balancer.WithWantPessimized(filter)), nil),
 				)
-				_ = b.Next(ctx, filter)
+				_ = b.Next(ctx, balancer.WithWantPessimized(filter))
 			})
 		}
 	})

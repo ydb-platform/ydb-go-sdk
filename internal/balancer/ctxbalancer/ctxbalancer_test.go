@@ -2,9 +2,12 @@ package ctxbalancer
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -42,12 +45,20 @@ func TestCtxBalancer_Next(t *testing.T) {
 	}).(*ctxBalancer)
 
 	t.Run("EmptyContext", func(t *testing.T) {
-		res := b.Next(context.Background(), true)
+		res := b.Next(context.Background(),
+			balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+				t.Error()
+			}),
+			balancer.WithWantPessimized())
 		require.Nil(t, res)
 	})
 
 	t.Run("WithPreferOnline", func(t *testing.T) {
-		res := b.Next(WithEndpoint(context.Background(), &mock.EndpointMock{NodeIDField: 1}), true).(*mock.ConnMock)
+		res := b.Next(WithEndpoint(context.Background(), &mock.EndpointMock{NodeIDField: 1}),
+			balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+				t.Error()
+			}),
+			balancer.WithWantPessimized()).(*mock.ConnMock)
 		require.Equal(t, uint32(1), res.NodeIDField)
 	})
 
@@ -55,19 +66,14 @@ func TestCtxBalancer_Next(t *testing.T) {
 		require.Equal(t, conn.Banned, b.connMap[2].GetState())
 
 		for _, allowBanned := range []bool{true, false} {
-			res := b.Next(WithEndpoint(context.Background(), &mock.EndpointMock{NodeIDField: 2}), allowBanned).(*mock.ConnMock)
-			require.Equal(t, uint32(2), res.NodeIDField)
+			t.Run(fmt.Sprint(allowBanned), func(t *testing.T) {
+				res := b.Next(WithEndpoint(context.Background(), &mock.EndpointMock{NodeIDField: 2}),
+					balancer.WithOnNeedRediscovery(func(ctx context.Context) {
+						t.Error()
+					}),
+					balancer.WithWantPessimized(allowBanned)).(*mock.ConnMock)
+				require.Equal(t, uint32(2), res.NodeIDField)
+			})
 		}
-	})
-}
-
-func TestCtxBalancer_NeedRefresh(t *testing.T) {
-	t.Run("Empty", func(t *testing.T) {
-		require.False(t, Balancer(nil).NeedRefresh(context.Background()))
-	})
-
-	t.Run("Empty", func(t *testing.T) {
-		b := Balancer([]conn.Conn{&mock.ConnMock{NodeIDField: 1}})
-		require.False(t, b.NeedRefresh(context.Background()))
 	})
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/ctxbalancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/multi"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster/entry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -30,17 +29,14 @@ var (
 )
 
 type Cluster struct {
-	config           config.Config
-	pool             conn.Pool
-	fallbackBalancer balancer.Balancer // contains known pessimized connections
-	conns            []conn.Conn
+	config                config.Config
+	pool                  conn.Pool
+	conns                 []conn.Conn
+	balancerPointer       balancer.Balancer
+	needDiscoveryCallback balancer.NeedDiscoveryCallback
 
-	index     map[string]entry.Entry
-	endpoints map[uint32]conn.Conn // only one endpoint by node ID
-
-	m            sync.RWMutex
-	balancerGood balancer.Balancer // balancers with good connections only. Rebuild while pessimize/unpessimize
-	done         chan struct{}
+	m    sync.RWMutex
+	done chan struct{}
 }
 
 func (c *Cluster) isClosed() bool {
@@ -54,15 +50,11 @@ func (c *Cluster) isClosed() bool {
 
 // Pessimize connection in underling pool
 func (c *Cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
-	c.rebuildGoodBalancer()
-
 	c.pool.Pessimize(ctx, cc, cause)
 }
 
 // Unpessimize connection in underling pool
 func (c *Cluster) Unpessimize(ctx context.Context, cc conn.Conn) {
-	c.rebuildGoodBalancer()
-
 	c.pool.Unpessimize(ctx, cc)
 }
 
@@ -71,6 +63,7 @@ func New(
 	config config.Config,
 	pool conn.Pool,
 	endpoints []endpoint.Endpoint,
+	needDiscoveryCallback balancer.NeedDiscoveryCallback,
 ) *Cluster {
 	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)
 	defer func() {
@@ -95,14 +88,12 @@ func New(
 	)
 
 	return &Cluster{
-		done:             make(chan struct{}),
-		config:           config,
-		index:            make(map[string]entry.Entry),
-		endpoints:        make(map[uint32]conn.Conn),
-		pool:             pool,
-		balancerGood:     clusterBalancer,
-		fallbackBalancer: clusterBalancer,
-		conns:            conns,
+		done:                  make(chan struct{}),
+		config:                config,
+		pool:                  pool,
+		balancerPointer:       clusterBalancer,
+		conns:                 conns,
+		needDiscoveryCallback: needDiscoveryCallback,
 	}
 }
 
@@ -136,7 +127,7 @@ func (c *Cluster) balancer() balancer.Balancer {
 	c.m.RLock()
 	defer c.m.RUnlock()
 
-	return c.balancerGood
+	return c.balancerPointer
 }
 
 func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
@@ -147,10 +138,10 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			cc = c.balancer().Next(ctx, false)
+			cc = c.balancer().Next(ctx, balancer.WithOnNeedRediscovery(c.needDiscoveryCallback))
 
 			if cc == nil {
-				cc = c.fallbackBalancer.Next(ctx, true)
+				cc = c.balancer().Next(ctx, balancer.WithWantPessimized())
 			}
 
 			if cc == nil {
@@ -165,21 +156,6 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
 			}
 		}
 	}
-}
-
-func (c *Cluster) rebuildGoodBalancer() {
-	goodConns := make([]conn.Conn, 0, len(c.conns))
-	for _, cc := range c.conns {
-		if balancer.IsOkConnection(cc, false) {
-			goodConns = append(goodConns, cc)
-		}
-	}
-
-	b := c.balancer().Create(goodConns)
-
-	c.m.Lock()
-	defer c.m.Unlock()
-	c.balancerGood = b
 }
 
 // Get returns next available connection.

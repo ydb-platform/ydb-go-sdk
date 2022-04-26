@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
@@ -19,15 +21,15 @@ func TestPreferLocalDC(t *testing.T) {
 		&mock.ConnMock{AddrField: "3", State: conn.Online, LocalDCField: true},
 	}
 	rr := PreferLocalDC(RoundRobin()).Create(conns)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
 
 	// ban local connections
 	conns[1].SetState(conn.Banned)
 	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, true))
-	require.Nil(t, rr.Next(ctx, false))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, balancer.WithWantPessimized()))
+	require.Nil(t, rr.Next(ctx))
 }
 
 func TestPreferLocalDCWithFallBack(t *testing.T) {
@@ -39,15 +41,15 @@ func TestPreferLocalDCWithFallBack(t *testing.T) {
 		&mock.ConnMock{AddrField: "3", State: conn.Online, LocalDCField: true},
 	}
 	rr := PreferLocalDCWithFallBack(RoundRobin()).Create(conns)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, false))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
 
 	// ban connections
 	conns[1].SetState(conn.Banned)
 	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, true))
-	require.Equal(t, conns[0], rr.Next(ctx, false))
+	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, balancer.WithWantPessimized()))
+	require.Equal(t, conns[0], rr.Next(ctx))
 }
 
 func TestPreferLocations(t *testing.T) {
@@ -60,15 +62,15 @@ func TestPreferLocations(t *testing.T) {
 	}
 
 	rr := PreferLocations(RoundRobin(), "zero", "two").Create(conns)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, false))
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, false))
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, false))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
 
 	// ban zero, two
 	conns[0].SetState(conn.Banned)
 	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, true))
-	require.Nil(t, rr.Next(ctx, false))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, balancer.WithWantPessimized()))
+	require.Nil(t, rr.Next(ctx))
 }
 
 func TestPreferLocationsWithFallback(t *testing.T) {
@@ -81,13 +83,13 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 	}
 
 	rr := PreferLocationsWithFallback(RoundRobin(), "zero", "two").Create(conns)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, false))
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, false))
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, false))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
 
 	// ban zero, two
 	conns[0].SetState(conn.Banned)
 	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, true))
-	require.Equal(t, conns[1], rr.Next(ctx, false))
+	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, balancer.WithWantPessimized()))
+	require.Equal(t, conns[1], rr.Next(ctx))
 }

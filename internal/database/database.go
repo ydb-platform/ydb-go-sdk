@@ -43,6 +43,21 @@ func (db *database) cluster() clusterConnector {
 	return db.clusterPointer
 }
 
+func (db *database) clusterCreate(ctx context.Context, endpoints []endpoint.Endpoint) clusterConnector {
+	once := sync.Once{}
+
+	return cluster.New(
+		deadline.ContextWithoutDeadline(ctx),
+		db.config,
+		db.connectionPool,
+		endpoints,
+		func(ctx context.Context) {
+			once.Do(func() {
+				db.discoveryRepeater.Force()
+			})
+		})
+}
+
 func (db *database) clusterSwap(cluster clusterConnector) clusterConnector {
 	db.m.Lock()
 	defer db.m.Unlock()
@@ -58,7 +73,7 @@ func (db *database) clusterDiscovery(ctx context.Context) error {
 		return xerrors.WithStackTrace(err)
 	}
 
-	newCluster := cluster.New(deadline.ContextWithoutDeadline(ctx), db.config, db.connectionPool, endpoints)
+	newCluster := db.clusterCreate(ctx, endpoints)
 	oldCluster := db.clusterSwap(newCluster)
 	if oldCluster == nil {
 		return nil
@@ -137,11 +152,7 @@ func New(
 			repeater.WithTrace(db.config.Trace()),
 		)
 	} else {
-		db.clusterSwap(
-			cluster.New(deadline.ContextWithoutDeadline(ctx),
-				db.config, pool,
-				[]endpoint.Endpoint{discoveryEndpoint}),
-		)
+		db.clusterSwap(db.clusterCreate(ctx, []endpoint.Endpoint{discoveryEndpoint}))
 	}
 
 	var cancel context.CancelFunc
