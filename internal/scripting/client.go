@@ -2,6 +2,7 @@ package scripting
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -16,11 +17,18 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+)
+
+// nolint: gofumpt
+// nolint: nolintlint
+var (
+	errNilClient = xerrors.Wrap(errors.New("scripting client is not initialized"))
 )
 
 type Client struct {
@@ -29,6 +37,25 @@ type Client struct {
 }
 
 func (c *Client) Execute(
+	ctx context.Context,
+	query string,
+	params *table.QueryParameters,
+) (r result.Result, err error) {
+	if c == nil {
+		return r, xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		r, err = c.execute(ctx, query, params)
+		return r, xerrors.WithStackTrace(err)
+	}
+	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		r, err = c.execute(ctx, query, params)
+		return xerrors.WithStackTrace(err)
+	}))
+	return
+}
+
+func (c *Client) execute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,
@@ -79,6 +106,25 @@ func (c *Client) Explain(
 	query string,
 	mode scripting.ExplainMode,
 ) (e table.ScriptingYQLExplanation, err error) {
+	if c == nil {
+		return e, xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		e, err = c.explain(ctx, query, mode)
+		return e, xerrors.WithStackTrace(err)
+	}
+	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		e, err = c.explain(ctx, query, mode)
+		return xerrors.WithStackTrace(err)
+	}))
+	return
+}
+
+func (c *Client) explain(
+	ctx context.Context,
+	query string,
+	mode scripting.ExplainMode,
+) (e table.ScriptingYQLExplanation, err error) {
 	var (
 		onDone  = trace.ScriptingOnExplain(c.config.Trace(), &ctx, query)
 		request = &Ydb_Scripting.ExplainYqlRequest{
@@ -119,6 +165,25 @@ func (c *Client) Explain(
 }
 
 func (c *Client) StreamExecute(
+	ctx context.Context,
+	query string,
+	params *table.QueryParameters,
+) (r result.StreamResult, err error) {
+	if c == nil {
+		return r, xerrors.WithStackTrace(errNilClient)
+	}
+	if !c.config.AutoRetry() {
+		r, err = c.streamExecute(ctx, query, params)
+		return r, xerrors.WithStackTrace(err)
+	}
+	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
+		r, err = c.streamExecute(ctx, query, params)
+		return xerrors.WithStackTrace(err)
+	}))
+	return
+}
+
+func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
 	params *table.QueryParameters,

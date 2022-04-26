@@ -230,10 +230,10 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			const timeout = time.Second
 			select {
 			case err := <-got:
-				if !xerrors.Is(err, errAlreadyClosed) {
+				if !xerrors.Is(err, errClosedClient) {
 					t.Fatalf(
 						"unexpected error: %v; want %v",
-						err, errAlreadyClosed,
+						err, errClosedClient,
 					)
 				}
 			case <-time.After(timeout):
@@ -310,10 +310,10 @@ func TestSessionPoolClose(t *testing.T) {
 		t.Fatalf("unexpected session close")
 	}
 
-	if err := p.Put(context.Background(), s3); !xerrors.Is(err, errAlreadyClosed) {
+	if err := p.Put(context.Background(), s3); !xerrors.Is(err, errClosedClient) {
 		t.Errorf(
 			"unexpected Put() error: %v; want %v",
-			err, errAlreadyClosed,
+			err, errClosedClient,
 		)
 	}
 	wg.Wait()
@@ -366,7 +366,7 @@ func TestRaceWgClosed(t *testing.T) {
 								return nil
 							},
 						)
-						if xerrors.Is(err, errAlreadyClosed) {
+						if xerrors.Is(err, errClosedClient) {
 							return
 						}
 					}
@@ -521,7 +521,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	r1 := <-create
 	select {
 	case <-create:
-		t.Fatalf("session 2 on race created while Client size 1")
+		t.Fatalf("session 2 on race created while client size 1")
 	case <-time.After(time.Millisecond * 5):
 		// ok
 	}
@@ -559,11 +559,11 @@ func TestSessionPoolPutInFull(t *testing.T) {
 	)
 	s := mustGetSession(t, p)
 	if err := p.Put(context.Background(), s); err != nil {
-		t.Fatalf("unexpected error on put session into non-full Client: %v, wand: %v", err, nil)
+		t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
 	}
 
 	if err := p.Put(context.Background(), simpleSession(t)); !xerrors.Is(err, errSessionPoolOverflow) {
-		t.Fatalf("unexpected error on put session into full Client: %v, wand: %v", err, errSessionPoolOverflow)
+		t.Fatalf("unexpected error on put session into full client: %v, wand: %v", err, errSessionPoolOverflow)
 	}
 }
 
@@ -1101,7 +1101,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	<-c2
 
 	if s3.isClosed() {
-		t.Fatalf("lower bound for sessions in the Client is not equal KeepAliveMinSize")
+		t.Fatalf("lower bound for sessions in the client is not equal KeepAliveMinSize")
 	}
 
 	s := mustGetSession(t, p)

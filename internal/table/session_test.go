@@ -330,7 +330,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client := newClient(
+						client := New(
 							testutil.NewDB(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
@@ -377,7 +377,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 									},
 								),
 							),
-							nil,
 							config.New(),
 						)
 						ctx, cancel := context.WithTimeout(

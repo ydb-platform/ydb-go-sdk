@@ -3,6 +3,7 @@ package table
 import (
 	"container/list"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -24,28 +25,32 @@ import (
 )
 
 var (
-	// errAlreadyClosed returned by a Client instance to indicate
+	errNilClient = xerrors.Wrap(errors.New("table client is not initialized"))
+
+	// errClosedClient returned by a Client instance to indicate
 	// that Client is closed early and not able to complete requested operation.
-	errAlreadyClosed = xerrors.Wrap(fmt.Errorf("table Client closed early"))
+	errClosedClient = xerrors.Wrap(errors.New("table client closed early"))
 
 	// errSessionPoolOverflow returned by a Client instance to indicate
 	// that the Client is full and requested operation is not able to complete.
-	errSessionPoolOverflow = xerrors.Wrap(fmt.Errorf("session pool overflow"))
+	errSessionPoolOverflow = xerrors.Wrap(errors.New("session pool overflow"))
 
 	// errSessionShutdown returned by a Client instance to indicate that
 	// requested session is under shutdown.
-	errSessionShutdown = xerrors.Wrap(fmt.Errorf("session under shutdown"))
+	errSessionShutdown = xerrors.Wrap(errors.New("session under shutdown"))
 
 	// errNoProgress returned by a Client instance to indicate that
 	// operation could not be completed.
-	errNoProgress = xerrors.Wrap(fmt.Errorf("no progress"))
+	errNoProgress = xerrors.Wrap(errors.New("no progress"))
 )
 
 // SessionBuilder is the interface that holds logic of creating sessions.
 type SessionBuilder func(context.Context) (Session, error)
 
 func New(cc grpc.ClientConnInterface, config config.Config) *Client {
-	return newClient(cc, nil, config)
+	return newClient(cc, func(ctx context.Context) (s Session, err error) {
+		return newSession(ctx, cc, config)
+	}, config)
 }
 
 func newClient(
@@ -57,11 +62,6 @@ func newClient(
 		ctx    = context.Background()
 		onDone = trace.TableOnInit(config.Trace(), &ctx)
 	)
-	if builder == nil {
-		builder = func(ctx context.Context) (s Session, err error) {
-			return newSession(ctx, cc, config)
-		}
-	}
 	c := &Client{
 		config: config,
 		cc:     cc,
@@ -111,12 +111,16 @@ type Client struct {
 	closed            bool
 }
 
-func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (table.ClosableSession, error) {
-	var (
-		s       Session
-		err     error
-		options = retryOptions(c.config.Trace(), opts...)
-	)
+func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
+	if c == nil {
+		return nil, xerrors.WithStackTrace(errNilClient)
+	}
+	var s Session
+	if !c.config.AutoRetry() {
+		s, err = c.build(ctx)
+		return s, xerrors.WithStackTrace(err)
+	}
+	options := retryOptions(c.config.Trace(), opts...)
 	err = retry.Retry(
 		ctx,
 		func(ctx context.Context) (err error) {
@@ -241,7 +245,7 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 				c.notify(nil)
 
 				if info.idle != nil {
-					panic("session closed while still in idle Client")
+					panic("session closed while still in idle client")
 				}
 			})
 		}
@@ -265,7 +269,7 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 	select {
 	case r := <-resCh:
 		if r.s == nil && r.err == nil {
-			panic("ydb: abnormal result of Client.createSession()")
+			panic("ydb: abnormal result of createSession()")
 		}
 		return r.s, xerrors.WithStackTrace(r.err)
 	case <-ctx.Done():
@@ -308,7 +312,7 @@ func (c *Client) get(ctx context.Context, opts ...getOption) (s Session, err err
 	const maxAttempts = 100
 	for ; s == nil && err == nil && i < maxAttempts; i++ {
 		if c.isClosed() {
-			return nil, xerrors.WithStackTrace(errAlreadyClosed)
+			return nil, xerrors.WithStackTrace(errClosedClient)
 		}
 
 		// First, we try to get session from idle
@@ -408,7 +412,7 @@ func (c *Client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 
 // Put returns session to the Client for further reuse.
 // If Client is already closed Put() calls s.Close(ctx) and returns
-// errAlreadyClosed.
+// errClosedClient.
 // If Client is overflow calls s.Close(ctx) and returns
 // errSessionPoolOverflow.
 //
@@ -425,7 +429,7 @@ func (c *Client) Put(ctx context.Context, s Session) (err error) {
 
 	switch {
 	case c.closed:
-		err = xerrors.WithStackTrace(errAlreadyClosed)
+		err = xerrors.WithStackTrace(errClosedClient)
 
 	case c.idle.Len() >= c.limit:
 		err = xerrors.WithStackTrace(errSessionPoolOverflow)
@@ -466,7 +470,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	}()
 
 	if c.isClosed() {
-		return xerrors.WithStackTrace(errAlreadyClosed)
+		return xerrors.WithStackTrace(errClosedClient)
 	}
 
 	c.mu.Lock()
@@ -508,7 +512,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	c.wgClosed.Wait()
 
 	if len(issues) > 0 {
-		return xerrors.WithStackTrace(xerrors.NewWithIssues("table Client closed with issues", issues...))
+		return xerrors.WithStackTrace(xerrors.NewWithIssues("table client closed with issues", issues...))
 	}
 
 	return nil
@@ -532,8 +536,11 @@ func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
 	if c.isClosed() {
-		return xerrors.WithStackTrace(errAlreadyClosed)
+		return xerrors.WithStackTrace(errClosedClient)
 	}
 	opts = append(opts, table.WithTrace(c.config.Trace()))
 	return do(
@@ -546,8 +553,11 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 }
 
 func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
 	if c.isClosed() {
-		return xerrors.WithStackTrace(errAlreadyClosed)
+		return xerrors.WithStackTrace(errClosedClient)
 	}
 	return doTx(
 		ctx,
@@ -747,7 +757,7 @@ func (c *Client) peekFirstIdle() (s Session, touched time.Time) {
 	s = el.Value.(Session)
 	info, has := c.index[s]
 	if !has || el != info.idle {
-		panicLocked(&c.mu, "inconsistent session Client index")
+		panicLocked(&c.mu, "inconsistent session client index")
 	}
 	return s, info.touched
 }
@@ -913,7 +923,7 @@ func (c *Client) keepAliveSession(ctx context.Context, s Session) (err error) {
 func (c *Client) removeIdle(s Session) sessionInfo {
 	info, has := c.index[s]
 	if !has || info.idle == nil {
-		panicLocked(&c.mu, "inconsistent session Client index")
+		panicLocked(&c.mu, "inconsistent session client index")
 	}
 
 	c.idle.Remove(info.idle)
@@ -964,10 +974,10 @@ func (c *Client) pushIdleInOrderAfter(s Session, now time.Time, mark *list.Eleme
 func (c *Client) handlePushIdle(s Session, now time.Time, el *list.Element) {
 	info, has := c.index[s]
 	if !has {
-		panicLocked(&c.mu, "trying to store session created outside of the Client")
+		panicLocked(&c.mu, "trying to store session created outside of the client")
 	}
 	if info.idle != nil {
-		panicLocked(&c.mu, "inconsistent session Client index")
+		panicLocked(&c.mu, "inconsistent session client index")
 	}
 
 	info.touched = now

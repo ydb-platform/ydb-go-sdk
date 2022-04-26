@@ -506,7 +506,7 @@ func TestTable(t *testing.T) {
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.ExecuteSchemeQuery(
 				ctx,
-				`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
+				`DROP TABLE stream_query; CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
 			)
 		},
 	); err != nil {
@@ -543,18 +543,16 @@ func TestTable(t *testing.T) {
 						table.WithSerializableReadWrite(),
 					),
 					table.CommitTx(),
-				),
-				`
-						DECLARE $values AS List<Struct<
-							val: Int32,
-						> >;
-						UPSERT INTO stream_query
-						SELECT
-							val 
-						FROM
-							AS_TABLE($values);            
-						`,
-				table.NewQueryParameters(
+				), `
+					DECLARE $values AS List<Struct<
+						val: Int32,
+					> >;
+					UPSERT INTO stream_query
+					SELECT
+						val 
+					FROM
+						AS_TABLE($values);            
+				`, table.NewQueryParameters(
 					table.ValueParam(
 						"$values",
 						types.ListValue(values...),
@@ -574,11 +572,7 @@ func TestTable(t *testing.T) {
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			res, err := s.StreamExecuteScanQuery(
-				ctx,
-				`
-							SELECT val FROM stream_query;
-						`,
-				table.NewQueryParameters(),
+				ctx, `SELECT val FROM stream_query;`, table.NewQueryParameters(),
 			)
 			if err != nil {
 				return err
@@ -588,7 +582,7 @@ func TestTable(t *testing.T) {
 				rowsCount       = 0
 				checkSum        uint64
 			)
-			for res.NextResultSet(ctx, "val") {
+			for res.NextResultSet(ctx) {
 				resultSetsCount++
 				for res.NextRow() {
 					rowsCount++
@@ -601,7 +595,7 @@ func TestTable(t *testing.T) {
 				}
 			}
 			if rowsCount != upsertRowsCount {
-				return fmt.Errorf("wrong rows count: %v", rowsCount)
+				return fmt.Errorf("wrong rows count: %v, exp: %v", rowsCount, upsertRowsCount)
 			}
 
 			if sum != checkSum {

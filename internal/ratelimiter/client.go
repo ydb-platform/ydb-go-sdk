@@ -21,8 +21,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
-// nolint:gofumpt
-// nolint:nolintlint
 var (
 	errUnknownAcquireType = xerrors.Wrap(errors.New("unknown acquire type"))
 	errNilClient          = xerrors.Wrap(errors.New("ratelimiter client is not initialized"))
@@ -178,7 +176,7 @@ func (c *Client) ListResource(
 	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
 		list, err = c.listResource(ctx, coordinationNodePath, resourcePath, recursive)
 		return xerrors.WithStackTrace(err)
-	}))
+	}, retry.WithIdempotent(true)))
 	return
 }
 
@@ -228,7 +226,7 @@ func (c *Client) DescribeResource(
 	err = xerrors.WithStackTrace(retry.Retry(ctx, func(ctx context.Context) (err error) {
 		resource, err = c.describeResource(ctx, coordinationNodePath, resourcePath)
 		return xerrors.WithStackTrace(err)
-	}))
+	}, retry.WithIdempotent(true)))
 	return
 }
 
