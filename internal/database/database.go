@@ -13,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	int_discovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -128,22 +128,24 @@ func New(
 	discoveryEndpoint := endpoint.New(c.Endpoint())
 	discoveryConnection := pool.Get(discoveryEndpoint)
 
-	db.discovery = int_discovery.New(
+	discoveryConfig := discoveryConfig.New(opts...)
+
+	db.discovery = internalDiscovery.New(
 		discoveryConnection,
-		opts...,
+		discoveryConfig,
 	)
+
 	if err = db.clusterDiscovery(ctx); err != nil {
-		return nil, err
+		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if discoveryCfg := discoveryConfig.New(opts...); discoveryCfg.Interval() > 0 {
-		db.discoveryRepeater = repeater.New(deadline.ContextWithoutDeadline(ctx), discoveryCfg.Interval(),
-			func(ctx context.Context) (err error) {
-				ctx, cancel := context.WithTimeout(ctx, discoveryCfg.Interval())
-				defer cancel()
+	if d := discoveryConfig.Interval(); d > 0 {
+		db.discoveryRepeater = repeater.New(deadline.ContextWithoutDeadline(ctx), d, func(ctx context.Context) (err error) {
+			ctx, cancel := context.WithTimeout(ctx, d)
+			defer cancel()
 
-				return db.clusterDiscovery(ctx)
-			},
+			return db.clusterDiscovery(ctx)
+		},
 			repeater.WithName("discovery"),
 			repeater.WithTrace(db.config.Trace()),
 		)

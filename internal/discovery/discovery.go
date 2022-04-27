@@ -23,11 +23,11 @@ var DefaultDiscoveryInterval = time.Minute
 
 func New(
 	cc conn.Conn,
-	opts ...config.Option,
+	config config.Config,
 ) *Client {
 	c := &Client{
 		cc:      cc,
-		config:  config.New(opts...),
+		config:  config,
 		service: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
 	}
 
