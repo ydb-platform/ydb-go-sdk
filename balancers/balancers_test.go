@@ -15,9 +15,9 @@ func TestPreferLocalDC(t *testing.T) {
 	ctx := context.Background()
 
 	conns := []conn.Conn{
-		&mock.ConnMock{AddrField: "1", LocalDCField: false},
-		&mock.ConnMock{AddrField: "2", State: conn.Online, LocalDCField: true},
-		&mock.ConnMock{AddrField: "3", State: conn.Online, LocalDCField: true},
+		&mock.Conn{AddrField: "1", LocalDCField: false},
+		&mock.Conn{AddrField: "2", State: conn.Online, LocalDCField: true},
+		&mock.Conn{AddrField: "3", State: conn.Online, LocalDCField: true},
 	}
 	rr := PreferLocalDC(RoundRobin()).Create(conns)
 	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
@@ -35,9 +35,9 @@ func TestPreferLocalDCWithFallBack(t *testing.T) {
 	ctx := context.Background()
 
 	conns := []conn.Conn{
-		&mock.ConnMock{AddrField: "1", LocalDCField: false, State: conn.Online},
-		&mock.ConnMock{AddrField: "2", State: conn.Online, LocalDCField: true},
-		&mock.ConnMock{AddrField: "3", State: conn.Online, LocalDCField: true},
+		&mock.Conn{AddrField: "1", LocalDCField: false, State: conn.Online},
+		&mock.Conn{AddrField: "2", State: conn.Online, LocalDCField: true},
+		&mock.Conn{AddrField: "3", State: conn.Online, LocalDCField: true},
 	}
 	rr := PreferLocalDCWithFallBack(RoundRobin()).Create(conns)
 	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
@@ -55,9 +55,9 @@ func TestPreferLocations(t *testing.T) {
 	ctx := context.Background()
 
 	conns := []conn.Conn{
-		&mock.ConnMock{AddrField: "1", LocationField: "zero", State: conn.Online},
-		&mock.ConnMock{AddrField: "2", State: conn.Online, LocationField: "one"},
-		&mock.ConnMock{AddrField: "3", State: conn.Online, LocationField: "two"},
+		&mock.Conn{AddrField: "1", LocationField: "zero", State: conn.Online},
+		&mock.Conn{AddrField: "2", State: conn.Online, LocationField: "one"},
+		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "two"},
 	}
 
 	rr := PreferLocations(RoundRobin(), "zero", "two").Create(conns)
@@ -76,9 +76,9 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 	ctx := context.Background()
 
 	conns := []conn.Conn{
-		&mock.ConnMock{AddrField: "1", LocationField: "zero", State: conn.Online},
-		&mock.ConnMock{AddrField: "2", State: conn.Online, LocationField: "one"},
-		&mock.ConnMock{AddrField: "3", State: conn.Online, LocationField: "two"},
+		&mock.Conn{AddrField: "1", LocationField: "zero", State: conn.Online},
+		&mock.Conn{AddrField: "2", State: conn.Online, LocationField: "one"},
+		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "two"},
 	}
 
 	rr := PreferLocationsWithFallback(RoundRobin(), "zero", "two").Create(conns)

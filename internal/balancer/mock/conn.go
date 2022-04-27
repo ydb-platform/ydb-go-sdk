@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 )
 
-type ConnMock struct {
+type Conn struct {
 	PingErr       error
 	AddrField     string
 	LocationField string
@@ -19,7 +19,7 @@ type ConnMock struct {
 	LocalDCField  bool
 }
 
-func (c *ConnMock) Invoke(
+func (c *Conn) Invoke(
 	ctx context.Context,
 	method string,
 	args interface{},
@@ -29,15 +29,15 @@ func (c *ConnMock) Invoke(
 	panic("not implemented in mock")
 }
 
-func (c *ConnMock) NewStream(ctx context.Context,
+func (c *Conn) NewStream(ctx context.Context,
 	desc *grpc.StreamDesc, method string,
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
 	panic("not implemented in mock")
 }
 
-func (c *ConnMock) Endpoint() endpoint.Endpoint {
-	return &EndpointMock{
+func (c *Conn) Endpoint() endpoint.Endpoint {
+	return &Endpoint{
 		AddrField:     c.AddrField,
 		LocalDCField:  c.LocalDCField,
 		LocationField: c.LocationField,
@@ -45,75 +45,80 @@ func (c *ConnMock) Endpoint() endpoint.Endpoint {
 	}
 }
 
-func (c *ConnMock) LastUsage() time.Time {
+func (c *Conn) LastUsage() time.Time {
 	panic("not implemented in mock")
 }
 
-func (c *ConnMock) Park(ctx context.Context) (err error) {
+func (c *Conn) Park(ctx context.Context) (err error) {
 	panic("not implemented in mock")
 }
 
-func (c *ConnMock) Ping(ctx context.Context) error {
+func (c *Conn) Ping(ctx context.Context) error {
 	return c.PingErr
 }
 
-func (c *ConnMock) IsState(states ...conn.State) bool {
+func (c *Conn) IsState(states ...conn.State) bool {
 	panic("not implemented in mock")
 }
 
-func (c *ConnMock) GetState() conn.State {
+func (c *Conn) GetState() conn.State {
 	return c.State
 }
 
-func (c *ConnMock) SetState(state conn.State) conn.State {
+func (c *Conn) SetState(state conn.State) conn.State {
 	c.State = state
 	return c.State
 }
 
-func (c *ConnMock) Release(ctx context.Context) error {
+func (c *Conn) Unban() conn.State {
+	c.SetState(conn.Online)
+	return conn.Online
+}
+
+func (c *Conn) Release(ctx context.Context) error {
 	panic("not implemented in mock")
 }
 
-type EndpointMock struct {
+type Endpoint struct {
 	AddrField     string
 	LocationField string
 	NodeIDField   uint32
 	LocalDCField  bool
 }
 
-func (e *EndpointMock) NodeID() uint32 {
+func (e *Endpoint) NodeID() uint32 {
 	return e.NodeIDField
 }
 
-func (e *EndpointMock) Address() string {
+func (e *Endpoint) Address() string {
 	return e.AddrField
 }
 
-func (e *EndpointMock) LocalDC() bool {
+func (e *Endpoint) LocalDC() bool {
 	return e.LocalDCField
 }
 
-func (e *EndpointMock) Location() string {
+func (e *Endpoint) Location() string {
 	return e.LocationField
 }
 
-func (e *EndpointMock) LastUpdated() time.Time {
+func (e *Endpoint) LastUpdated() time.Time {
 	panic("not implemented in mock")
 }
 
-func (e *EndpointMock) LoadFactor() float32 {
+func (e *Endpoint) LoadFactor() float32 {
 	panic("not implemented in mock")
 }
 
-func (e *EndpointMock) String() string {
+func (e *Endpoint) String() string {
 	panic("not implemented in mock")
 }
 
-func (e *EndpointMock) Copy() endpoint.Endpoint {
+func (e *Endpoint) Copy() endpoint.Endpoint {
 	c := *e
 	return &c
 }
 
-func (e *EndpointMock) Touch(opts ...endpoint.Option) {
+func (e *Endpoint) Touch(opts ...endpoint.Option) {
 	panic("not implemented in mock")
 }
