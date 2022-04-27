@@ -36,11 +36,11 @@ type Conn interface {
 
 	LastUsage() time.Time
 
-	Park(ctx context.Context) (err error)
 	Ping(ctx context.Context) error
 	IsState(states ...State) bool
 	GetState() State
 	SetState(State) State
+	Unban() State
 
 	Release(ctx context.Context) error
 }
@@ -125,7 +125,7 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) Park(ctx context.Context) (err error) {
+func (c *conn) park(ctx context.Context) (err error) {
 	onDone := trace.DriverOnConnPark(
 		c.config.Trace(),
 		&ctx,
@@ -183,6 +183,21 @@ func (c *conn) setState(s State) State {
 	)(s)
 	c.state = s
 	return c.state
+}
+
+func (c *conn) Unban() State {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	var newState State
+	if isAvailable(c.cc) {
+		newState = Online
+	} else {
+		newState = Offline
+	}
+
+	c.setState(newState)
+	return newState
 }
 
 func (c *conn) GetState() (s State) {

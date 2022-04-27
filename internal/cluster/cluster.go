@@ -72,10 +72,10 @@ func New(
 
 	conns := make([]conn.Conn, 0, len(endpoints))
 	for _, e := range endpoints {
-		conns = append(conns, pool.Get(e))
+		c := pool.Get(e)
+		c.Unban()
+		conns = append(conns, c)
 	}
-
-	parkBanned(ctx, conns)
 
 	clusterBalancer := multi.Balancer(
 		// check conn from context at first place
@@ -181,12 +181,4 @@ func (c *Cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
 	}()
 
 	return c.get(ctx)
-}
-
-func parkBanned(ctx context.Context, conns []conn.Conn) {
-	for _, c := range conns {
-		if c.GetState() == conn.Banned {
-			_ = c.Park(ctx)
-		}
-	}
 }

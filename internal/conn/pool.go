@@ -161,7 +161,7 @@ func (p *pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 		case <-ticker.C:
 			for _, c := range p.collectConns() {
 				if time.Since(c.LastUsage()) > ttl {
-					_ = c.Park(ctx)
+					_ = c.park(ctx)
 				}
 			}
 		}
