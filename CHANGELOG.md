@@ -1,4 +1,5 @@
 * Reimplement internal balancers logic
+* Added `trace.Driver.OnUnpessimizeNode` trace event
 
 ## v3.24.1
 * Refactored initialization of coordination, ratelimiter, scheme, scripting and table clients from `internal/lazy` package to each client initialization with `sync.Once`
