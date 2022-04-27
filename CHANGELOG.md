@@ -1,4 +1,4 @@
-* Reimplement internal balancers logic
+* Refactored applying actual endpoints list after re-discovery (replaced diff-merge logic to swap cluster struct, cluster and balancers are immutable now)
 * Added `trace.Driver.OnUnpessimizeNode` trace event
 
 ## v3.24.1
