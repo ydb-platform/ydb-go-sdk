@@ -161,7 +161,12 @@ func (p *pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 		case <-ticker.C:
 			for _, c := range p.collectConns() {
 				if time.Since(c.LastUsage()) > ttl {
-					_ = c.park(ctx)
+					switch c.GetState() {
+					case Online, Banned:
+						_ = c.park(ctx)
+					default:
+						// nop
+					}
 				}
 			}
 		}
