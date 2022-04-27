@@ -13,13 +13,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/lazy"
+	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
+	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
+	internalScripting "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -61,27 +65,33 @@ type Connection interface {
 	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
+// nolint: maligned
 type connection struct {
 	opts []Option
 
 	config  config.Config
 	options []config.Option
 
-	table        table.Client
+	tableOnce    sync.Once
+	table        *internalTable.Client
 	tableOptions []tableConfig.Option
 
-	scripting        scripting.Client
+	scriptingOnce    sync.Once
+	scripting        *internalScripting.Client
 	scriptingOptions []scriptingConfig.Option
 
-	scheme        scheme.Client
+	schemeOnce    sync.Once
+	scheme        *internalScheme.Client
 	schemeOptions []schemeConfig.Option
 
 	discoveryOptions []discoveryConfig.Option
 
-	coordination        coordination.Client
+	coordinationOnce    sync.Once
+	coordination        *internalCoordination.Client
 	coordinationOptions []coordinationConfig.Option
 
-	ratelimiter        ratelimiter.Client
+	ratelimiterOnce    sync.Once
+	ratelimiter        *internalRatelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
 	pool conn.Pool
@@ -107,7 +117,7 @@ func (c *connection) Close(ctx context.Context) error {
 	}()
 
 	c.childrenMtx.Lock()
-	closers := make([]func(context.Context) error, 0, len(c.children)+7)
+	closers := make([]func(context.Context) error, 0)
 	for _, child := range c.children {
 		closers = append(closers, child.Close)
 	}
@@ -116,11 +126,41 @@ func (c *connection) Close(ctx context.Context) error {
 
 	closers = append(
 		closers,
-		c.ratelimiter.Close,
-		c.coordination.Close,
-		c.scheme.Close,
-		c.table.Close,
-		c.scripting.Close,
+		func(ctx context.Context) error {
+			c.ratelimiterOnce.Do(func() {})
+			if c.ratelimiter == nil {
+				return nil
+			}
+			return c.ratelimiter.Close(ctx)
+		},
+		func(ctx context.Context) error {
+			c.coordinationOnce.Do(func() {})
+			if c.coordination == nil {
+				return nil
+			}
+			return c.coordination.Close(ctx)
+		},
+		func(ctx context.Context) error {
+			c.schemeOnce.Do(func() {})
+			if c.scheme == nil {
+				return nil
+			}
+			return c.scheme.Close(ctx)
+		},
+		func(ctx context.Context) error {
+			c.scriptingOnce.Do(func() {})
+			if c.scripting == nil {
+				return nil
+			}
+			return c.scripting.Close(ctx)
+		},
+		func(ctx context.Context) error {
+			c.tableOnce.Do(func() {})
+			if c.table == nil {
+				return nil
+			}
+			return c.table.Close(ctx)
+		},
 		c.db.Close,
 		c.pool.Release,
 	)
@@ -182,18 +222,78 @@ func (c *connection) Secure() bool {
 }
 
 func (c *connection) Table() table.Client {
+	c.tableOnce.Do(func() {
+		c.table = internalTable.New(
+			c.db,
+			tableConfig.New(
+				append(
+					// prepend common params from root config
+					[]tableConfig.Option{
+						tableConfig.With(c.config.Common),
+					},
+					c.tableOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.table
 }
 
 func (c *connection) Scheme() scheme.Client {
+	c.schemeOnce.Do(func() {
+		c.scheme = internalScheme.New(
+			c.db,
+			schemeConfig.New(
+				append(
+					// prepend common params from root config
+					[]schemeConfig.Option{
+						schemeConfig.With(c.config.Common),
+					},
+					c.schemeOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.scheme
 }
 
 func (c *connection) Coordination() coordination.Client {
+	c.coordinationOnce.Do(func() {
+		c.coordination = internalCoordination.New(
+			c.db,
+			coordinationConfig.New(
+				append(
+					// prepend common params from root config
+					[]coordinationConfig.Option{
+						coordinationConfig.With(c.config.Common),
+					},
+					c.coordinationOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.coordination
 }
 
 func (c *connection) Ratelimiter() ratelimiter.Client {
+	c.ratelimiterOnce.Do(func() {
+		c.ratelimiter = internalRatelimiter.New(
+			c.db,
+			ratelimiterConfig.New(
+				append(
+					// prepend common params from root config
+					[]ratelimiterConfig.Option{
+						ratelimiterConfig.With(c.config.Common),
+					},
+					c.ratelimiterOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.ratelimiter
 }
 
@@ -202,6 +302,21 @@ func (c *connection) Discovery() discovery.Client {
 }
 
 func (c *connection) Scripting() scripting.Client {
+	c.scriptingOnce.Do(func() {
+		c.scripting = internalScripting.New(
+			c,
+			scriptingConfig.New(
+				append(
+					// prepend common params from root config
+					[]scriptingConfig.Option{
+						scriptingConfig.With(c.config.Common),
+					},
+					c.scriptingOptions...,
+				)...,
+			),
+		)
+	})
+	// may be nil if driver closed early
 	return c.scripting
 }
 
@@ -300,61 +415,6 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-
-	c.table = lazy.Table(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]tableConfig.Option{
-				tableConfig.With(c.config.Common),
-			},
-			c.tableOptions...,
-		),
-	)
-
-	c.scheme = lazy.Scheme(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]schemeConfig.Option{
-				schemeConfig.With(c.config.Common),
-			},
-			c.schemeOptions...,
-		),
-	)
-
-	c.scripting = lazy.Scripting(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]scriptingConfig.Option{
-				scriptingConfig.With(c.config.Common),
-			},
-			c.scriptingOptions...,
-		),
-	)
-
-	c.coordination = lazy.Coordination(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]coordinationConfig.Option{
-				coordinationConfig.With(c.config.Common),
-			},
-			c.coordinationOptions...,
-		),
-	)
-
-	c.ratelimiter = lazy.Ratelimiter(
-		c.db,
-		append(
-			// prepend common params from root config
-			[]ratelimiterConfig.Option{
-				ratelimiterConfig.With(c.config.Common),
-			},
-			c.ratelimiterOptions...,
-		),
-	)
 
 	return c, nil
 }

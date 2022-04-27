@@ -168,7 +168,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 	}()
 
 	// call all close listeners before doing request
-	// firstly this need to clear client from this session
+	// firstly this need to clear Client from this session
 	s.onCloseMtx.RLock()
 	for _, cb := range s.onClose {
 		cb(ctx)
