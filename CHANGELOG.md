@@ -1,3 +1,5 @@
+* Changed default balancer to `RandomChoice()` because `PreferLocalDC()` balancer works incorrectly with DNS-balanced call `Discovery/ListEndpoints`
+
 ## v3.24.1
 * Refactored initialization of coordination, ratelimiter, scheme, scripting and table clients from `internal/lazy` package to each client initialization with `sync.Once`
 * Removed `internal/lazy` package
