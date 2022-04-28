@@ -132,6 +132,7 @@ func PreferWithFallback(balancer balancer.Balancer, filter func(endpoint Endpoin
 	)
 }
 
+// Default balancer used by default
 func Default() balancer.Balancer {
-	return PreferLocalDCWithFallBack(RandomChoice())
+	return RandomChoice()
 }
