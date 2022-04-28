@@ -1,3 +1,4 @@
+## v3.24.2
 * Changed default balancer to `RandomChoice()` because `PreferLocalDC()` balancer works incorrectly with DNS-balanced call `Discovery/ListEndpoints`
 
 ## v3.24.1
