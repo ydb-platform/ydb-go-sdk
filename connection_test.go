@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package test
+package ydb_test
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -314,4 +314,29 @@ func TestConnection(t *testing.T) {
 			t.Fatalf("check export failed: %v", err)
 		}
 	})
+}
+
+func ExampleOpen() {
+	db, err := ydb.Open(context.TODO(), "grpc://localhost:2135?database=/local")
+	if err == nil {
+		fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
+	}
+}
+
+func ExampleOpen_advanced() {
+	db, err := ydb.Open(
+		context.TODO(),
+		"grpc://localhost:2135?database=/local",
+		ydb.WithAnonymousCredentials(),
+		ydb.WithBalancer(
+			balancers.PreferLocationsWithFallback(
+				balancers.RoundRobin(), "a", "b",
+			),
+		),
+		ydb.WithSessionPoolSizeLimit(100),
+	)
+	if err != nil {
+		fmt.Printf("connection failed: %v", err)
+	}
+	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }

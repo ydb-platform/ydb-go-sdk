@@ -326,7 +326,7 @@ func (c *connection) Scripting() scripting.Client {
 //
 //   "grpc[s]://{endpoint}/?database={database}"
 //
-// See `sugar.DSN` helper for make dsn from endpoint and database
+// See sugar.DSN helper for make dsn from endpoint and database
 func Open(ctx context.Context, dsn string, opts ...Option) (_ Connection, err error) {
 	return open(
 		ctx,
