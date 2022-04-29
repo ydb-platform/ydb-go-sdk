@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"io"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ func TestLongStream(t *testing.T) {
 		batchSize         = 1000
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*discoveryInterval)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	t.Run("make connection", func(t *testing.T) {
@@ -177,7 +178,7 @@ func TestLongStream(t *testing.T) {
 					start     = time.Now()
 					rowsCount = 0
 				)
-				res, err := s.StreamReadTable(ctx, "stream_query", options.ReadColumn("val"))
+				res, err := s.StreamReadTable(ctx, path.Join(db.Name(), "stream_query"), options.ReadColumn("val"))
 				if err != nil {
 					return err
 				}
