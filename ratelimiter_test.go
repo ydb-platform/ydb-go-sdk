@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package test
+package ydb_test
 
 import (
 	"context"
@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	cfg "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -62,13 +62,13 @@ func TestRatelimiter(t *testing.T) {
 		}
 	}
 	// create node
-	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, cfg.NodeConfig{
+	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, coordinationConfig.NodeConfig{
 		Path:                     "",
 		SelfCheckPeriodMillis:    1000,
 		SessionGracePeriodMillis: 1000,
-		ReadConsistencyMode:      cfg.ConsistencyModeRelaxed,
-		AttachConsistencyMode:    cfg.ConsistencyModeRelaxed,
-		RatelimiterCountersMode:  cfg.RatelimiterCountersModeDetailed,
+		ReadConsistencyMode:      coordinationConfig.ConsistencyModeRelaxed,
+		AttachConsistencyMode:    coordinationConfig.ConsistencyModeRelaxed,
+		RatelimiterCountersMode:  coordinationConfig.RatelimiterCountersModeDetailed,
 	})
 	if err != nil {
 		t.Fatal(err)

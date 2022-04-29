@@ -1,13 +1,12 @@
 //go:build !fast
 // +build !fast
 
-package test
+package ydb_test
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"io"
 	"os"
 	"path"
@@ -15,8 +14,9 @@ import (
 	"testing"
 	"time"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -72,7 +72,7 @@ func TestLongStream(t *testing.T) {
 	})
 
 	t.Run("upserting rows", func(t *testing.T) {
-		var upserted uint32 = 0
+		var upserted uint32
 		for i := 0; i < (upsertRowsCount / batchSize); i++ {
 			var (
 				from = int32(i * batchSize)
@@ -172,7 +172,11 @@ func TestLongStream(t *testing.T) {
 					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
 				}
 				if rowsCount != upsertRowsCount {
-					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)", rowsCount, upsertRowsCount, time.Since(start))
+					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
+						rowsCount,
+						upsertRowsCount,
+						time.Since(start),
+					)
 				}
 				return nil
 			},
@@ -213,7 +217,11 @@ func TestLongStream(t *testing.T) {
 					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
 				}
 				if rowsCount != upsertRowsCount {
-					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)", rowsCount, upsertRowsCount, time.Since(start))
+					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
+						rowsCount,
+						upsertRowsCount,
+						time.Since(start),
+					)
 				}
 				return nil
 			},
