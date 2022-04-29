@@ -13,10 +13,9 @@ import (
 // provide additional goroutine safety.
 type Balancer interface {
 	// Next returns next connection for request.
-	// return Err
 	Next(ctx context.Context, opts ...NextOption) conn.Conn
 
-	// Create makes empty balancer with same implementation
+	// Create same balancer instance with new connections
 	Create(conns []conn.Conn) Balancer
 }
 
