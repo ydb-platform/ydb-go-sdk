@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -71,6 +72,7 @@ func TestLongStream(t *testing.T) {
 	})
 
 	t.Run("upserting rows", func(t *testing.T) {
+		var upserted uint32 = 0
 		for i := 0; i < (upsertRowsCount / batchSize); i++ {
 			t.Run("", func(t *testing.T) {
 				values := make([]types.Value, 0, upsertRowsCount)
@@ -112,8 +114,13 @@ func TestLongStream(t *testing.T) {
 					},
 				); err != nil {
 					t.Fatalf("upsert failed: %v\n", err)
+				} else {
+					atomic.AddUint32(&upserted, uint32(batchSize))
 				}
 			})
+		}
+		if upserted != uint32(upsertRowsCount) {
+			t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
 		}
 	})
 
@@ -129,7 +136,7 @@ func TestLongStream(t *testing.T) {
 		_ = db.Close(ctx)
 	}(db)
 
-	t.Run("stream querying", func(t *testing.T) {
+	t.Run("execute stream query", func(t *testing.T) {
 		if err = db.Table().Do(
 			ctx,
 			func(ctx context.Context, s table.Session) (err error) {
