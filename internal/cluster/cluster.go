@@ -51,6 +51,17 @@ func (c *Cluster) isClosed() bool {
 // Pessimize connection in underling pool
 func (c *Cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 	c.pool.Pessimize(ctx, cc, cause)
+
+	online := 0
+	for _, cc := range c.conns {
+		if cc.GetState() == conn.Online {
+			online++
+		}
+	}
+
+	if online < len(c.conns)/2 {
+		c.needDiscoveryCallback(ctx)
+	}
 }
 
 // Unpessimize connection in underling pool
@@ -138,7 +149,7 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			cc = c.balancer().Next(ctx, balancer.WithOnBadState(c.needDiscoveryCallback))
+			cc = c.balancer().Next(ctx)
 
 			if cc == nil {
 				cc = c.balancer().Next(ctx, balancer.WithAcceptBanned(true))
