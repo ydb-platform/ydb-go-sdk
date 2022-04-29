@@ -57,7 +57,7 @@ func TestLongStream(t *testing.T) {
 			func(ctx context.Context, s table.Session) (err error) {
 				return s.ExecuteSchemeQuery(
 					ctx,
-					`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
+					`CREATE TABLE long_stream_query (val Int32, PRIMARY KEY (val))`,
 				)
 			},
 		); err != nil {
@@ -98,7 +98,7 @@ func TestLongStream(t *testing.T) {
 								DECLARE $values AS List<Struct<
 									val: Int32,
 								>>;
-								UPSERT INTO stream_query
+								UPSERT INTO long_stream_query
 								SELECT
 									val 
 								FROM
@@ -144,7 +144,7 @@ func TestLongStream(t *testing.T) {
 					start     = time.Now()
 					rowsCount = 0
 				)
-				res, err := s.StreamExecuteScanQuery(ctx, "SELECT val FROM stream_query", table.NewQueryParameters())
+				res, err := s.StreamExecuteScanQuery(ctx, "SELECT val FROM long_stream_query", table.NewQueryParameters())
 				if err != nil {
 					return err
 				}
@@ -185,7 +185,7 @@ func TestLongStream(t *testing.T) {
 					start     = time.Now()
 					rowsCount = 0
 				)
-				res, err := s.StreamReadTable(ctx, path.Join(db.Name(), "stream_query"), options.ReadColumn("val"))
+				res, err := s.StreamReadTable(ctx, path.Join(db.Name(), "long_stream_query"), options.ReadColumn("val"))
 				if err != nil {
 					return err
 				}
