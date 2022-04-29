@@ -59,7 +59,7 @@ func (c *Cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 		}
 	}
 
-	if online < len(c.conns)/2 {
+	if online*2 < len(c.conns) {
 		c.needDiscoveryCallback(ctx)
 	}
 }
