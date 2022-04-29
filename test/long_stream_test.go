@@ -74,13 +74,17 @@ func TestLongStream(t *testing.T) {
 	t.Run("upserting rows", func(t *testing.T) {
 		var upserted uint32 = 0
 		for i := 0; i < (upsertRowsCount / batchSize); i++ {
-			t.Run("", func(t *testing.T) {
-				values := make([]types.Value, 0, upsertRowsCount)
-				for j := 0; j < upsertRowsCount; j++ {
+			var (
+				from = int32(i * batchSize)
+				to   = int32((i + 1) * batchSize)
+			)
+			t.Run(fmt.Sprintf("upserting %d..%d", from, to-1), func(t *testing.T) {
+				values := make([]types.Value, 0, batchSize)
+				for j := from; j < to; j++ {
 					values = append(
 						values,
 						types.StructValue(
-							types.StructFieldValue("val", types.Int32Value(int32(i*batchSize+j))),
+							types.StructFieldValue("val", types.Int32Value(j)),
 						),
 					)
 				}
