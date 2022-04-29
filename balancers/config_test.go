@@ -1,6 +1,7 @@
 package balancers
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
@@ -9,27 +10,11 @@ import (
 
 type testBalancer struct{}
 
-func (t testBalancer) Create() balancer.Balancer {
+func (t testBalancer) Next(ctx context.Context, opts ...balancer.NextOption) conn.Conn {
 	panic("unexpected call")
 }
 
-func (t testBalancer) Next() conn.Conn {
-	panic("unexpected call")
-}
-
-func (t testBalancer) Insert(conn conn.Conn) balancer.Element {
-	panic("unexpected call")
-}
-
-func (t testBalancer) Update(element balancer.Element) {
-	panic("unexpected call")
-}
-
-func (t testBalancer) Remove(element balancer.Element) bool {
-	panic("unexpected call")
-}
-
-func (t testBalancer) Contains(element balancer.Element) bool {
+func (t testBalancer) Create([]conn.Conn) balancer.Balancer {
 	panic("unexpected call")
 }
 

@@ -40,6 +40,7 @@ type Conn interface {
 	IsState(states ...State) bool
 	GetState() State
 	SetState(State) State
+	Unban() State
 
 	Release(ctx context.Context) error
 }
@@ -182,6 +183,21 @@ func (c *conn) setState(s State) State {
 	)(s)
 	c.state = s
 	return c.state
+}
+
+func (c *conn) Unban() State {
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	var newState State
+	if isAvailable(c.cc) {
+		newState = Online
+	} else {
+		newState = Offline
+	}
+
+	c.setState(newState)
+	return newState
 }
 
 func (c *conn) GetState() (s State) {

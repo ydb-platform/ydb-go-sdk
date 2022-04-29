@@ -782,6 +782,41 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		}
 	}
 	{
+		h1 := t.OnUnpessimizeNode
+		h2 := x.OnUnpessimizeNode
+		ret.OnUnpessimizeNode = func(d DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverUnpessimizeNodeDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverUnpessimizeNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnRepeaterWakeUp
 		h2 := x.OnRepeaterWakeUp
 		ret.OnRepeaterWakeUp = func(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
@@ -1179,6 +1214,21 @@ func (t Driver) onPessimizeNode(d DriverPessimizeNodeStartInfo) func(DriverPessi
 	}
 	return res
 }
+func (t Driver) onUnpessimizeNode(d DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo) {
+	fn := t.OnUnpessimizeNode
+	if fn == nil {
+		return func(DriverUnpessimizeNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverUnpessimizeNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onRepeaterWakeUp(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
 	fn := t.OnRepeaterWakeUp
 	if fn == nil {
@@ -1452,6 +1502,18 @@ func DriverOnPessimizeNode(t Driver, c *context.Context, endpoint EndpointInfo, 
 	res := t.onPessimizeNode(p)
 	return func(state ConnState) {
 		var p DriverPessimizeNodeDoneInfo
+		p.State = state
+		res(p)
+	}
+}
+func DriverOnUnpessimizeNode(t Driver, c *context.Context, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+	var p DriverUnpessimizeNodeStartInfo
+	p.Context = c
+	p.Endpoint = endpoint
+	p.State = state
+	res := t.onUnpessimizeNode(p)
+	return func(state ConnState) {
+		var p DriverUnpessimizeNodeDoneInfo
 		p.State = state
 		res(p)
 	}

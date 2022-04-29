@@ -46,12 +46,18 @@ type (
 		OnConnRelease            func(DriverConnReleaseStartInfo) func(DriverConnReleaseDoneInfo)
 
 		// Cluster events
-		OnClusterInit   func(DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo)
-		OnClusterClose  func(DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo)
-		OnClusterGet    func(DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo)
+		OnClusterInit  func(DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo)
+		OnClusterClose func(DriverClusterCloseStartInfo) func(DriverClusterCloseDoneInfo)
+		OnClusterGet   func(DriverClusterGetStartInfo) func(DriverClusterGetDoneInfo)
+
+		// Deprecated: has no effect now
 		OnClusterInsert func(DriverClusterInsertStartInfo) func(DriverClusterInsertDoneInfo)
+
+		// Deprecated: has no effect now
 		OnClusterRemove func(DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo)
-		OnPessimizeNode func(DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo)
+
+		OnPessimizeNode   func(DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo)
+		OnUnpessimizeNode func(DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo)
 
 		// Repeater events
 		OnRepeaterWakeUp func(DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo)
@@ -309,6 +315,19 @@ type (
 	DriverPessimizeNodeDoneInfo struct {
 		State ConnState
 	}
+	DriverUnpessimizeNodeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Endpoint EndpointInfo
+		State    ConnState
+	}
+	DriverUnpessimizeNodeDoneInfo struct {
+		State ConnState
+	}
+
 	DriverRepeaterTickStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.

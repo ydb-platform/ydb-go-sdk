@@ -111,9 +111,12 @@ func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Opti
 // If Interval is negative, then no background discovery prepared.
 func WithInterval(interval time.Duration) Option {
 	return func(c *Config) {
-		if interval <= 0 {
+		switch {
+		case interval < 0:
 			c.interval = 0
-		} else {
+		case interval == 0:
+			c.interval = DefaultInterval
+		default:
 			c.interval = interval
 		}
 	}

@@ -1,11 +1,10 @@
 package balancer
 
 import (
+	"context"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
-
-// Element is an empty interface that holds some Balancer specific data.
-type Element interface{}
 
 // Balancer is an interface that implements particular load-balancing
 // algorithm.
@@ -14,18 +13,55 @@ type Element interface{}
 // provide additional goroutine safety.
 type Balancer interface {
 	// Next returns next connection for request.
-	// Next MUST not return nil if it has at least one connection.
-	Next() conn.Conn
+	Next(ctx context.Context, opts ...NextOption) conn.Conn
 
-	// Insert inserts new connection.
-	Insert(conn.Conn) Element
+	// Create same balancer instance with new connections
+	Create(conns []conn.Conn) Balancer
+}
 
-	// Remove removes previously inserted connection.
-	Remove(Element) bool
+func IsOkConnection(c conn.Conn, bannedIsOk bool) bool {
+	switch c.GetState() {
+	case conn.Online, conn.Created, conn.Offline:
+		return true
+	case conn.Banned:
+		return bannedIsOk
+	default:
+		return false
+	}
+}
 
-	// Contains returns true if Balancer contains requested element.
-	Contains(Element) bool
+type (
+	NextOption         func(o *NextOptions)
+	OnBadStateCallback func(ctx context.Context)
 
-	// Create makes empty balancer with same implementation
-	Create() Balancer
+	NextOptions struct {
+		OnBadState   OnBadStateCallback
+		AcceptBanned bool
+	}
+)
+
+func MakeNextOptions(opts ...NextOption) NextOptions {
+	var o NextOptions
+	for _, f := range opts {
+		f(&o)
+	}
+	return o
+}
+
+func (o *NextOptions) Discovery(ctx context.Context) {
+	if o.OnBadState != nil {
+		o.OnBadState(ctx)
+	}
+}
+
+func WithAcceptBanned(val bool) NextOption {
+	return func(o *NextOptions) {
+		o.AcceptBanned = val
+	}
+}
+
+func WithOnBadState(callback OnBadStateCallback) NextOption {
+	return func(o *NextOptions) {
+		o.OnBadState = callback
+	}
 }

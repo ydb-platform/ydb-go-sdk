@@ -11,15 +11,15 @@ import (
 )
 
 func RoundRobin() balancer.Balancer {
-	return rr.RoundRobin()
+	return rr.RoundRobin(nil)
 }
 
 func RandomChoice() balancer.Balancer {
-	return rr.RandomChoice()
+	return rr.RandomChoice(nil)
 }
 
 func SingleConn() balancer.Balancer {
-	return single.Balancer()
+	return single.Balancer(nil)
 }
 
 // PreferLocalDC creates balancer which use endpoints only in location such as initial endpoint location

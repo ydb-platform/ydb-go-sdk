@@ -1,3 +1,6 @@
+* Refactored applying actual endpoints list after re-discovery (replaced diff-merge logic to swap cluster struct, cluster and balancers are immutable now)
+* Added `trace.Driver.OnUnpessimizeNode` trace event
+
 ## v3.24.2
 * Changed default balancer to `RandomChoice()` because `PreferLocalDC()` balancer works incorrectly with DNS-balanced call `Discovery/ListEndpoints`
 

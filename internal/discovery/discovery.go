@@ -4,7 +4,6 @@ import (
 	"context"
 	"net"
 	"strconv"
-	"sync"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -13,124 +12,26 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var DefaultDiscoveryInterval = time.Minute
 
-type InserterRemoverExplorerLocker interface {
-	cluster.Inserter
-	cluster.Remover
-	cluster.Explorer
-	sync.Locker
-}
-
 func New(
-	ctx context.Context,
 	cc conn.Conn,
-	crudExplorer InserterRemoverExplorerLocker,
-	driverTrace trace.Driver,
-	opts ...config.Option,
-) (_ *Client, err error) {
-	defer func() {
-		if err != nil {
-			_ = cc.Release(ctx)
-		}
-	}()
-
+	config config.Config,
+) *Client {
 	c := &Client{
 		cc:      cc,
-		config:  config.New(opts...),
+		config:  config,
 		service: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
 	}
 
-	if c.config.Interval() <= 0 {
-		crudExplorer.Insert(ctx, cc.Endpoint())
-		return c, nil
-	}
-
-	var curr, next []endpoint.Endpoint
-
-	curr, err = c.Discover(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	crudExplorer.Lock()
-	defer crudExplorer.Unlock()
-
-	// Endpoints must be sorted to merge
-	cluster.SortEndpoints(curr)
-	for _, e := range curr {
-		crudExplorer.Insert(
-			ctx,
-			e,
-			cluster.WithoutLock(),
-		)
-	}
-
-	crudExplorer.SetExplorer(
-		repeater.New(
-			deadline.ContextWithoutDeadline(ctx),
-			func(ctx context.Context) (err error) {
-				next, err = c.Discover(ctx)
-				if err != nil {
-					return xerrors.WithStackTrace(err)
-				}
-
-				// NOTE: curr endpoints must be sorted here.
-				cluster.SortEndpoints(next)
-
-				crudExplorer.Lock()
-				defer crudExplorer.Unlock()
-
-				cluster.DiffEndpoints(curr, next,
-					func(i, j int) {
-						crudExplorer.Remove(
-							ctx,
-							curr[i],
-							cluster.WithoutLock(),
-						)
-						crudExplorer.Insert(
-							ctx,
-							next[j],
-							cluster.WithoutLock(),
-						)
-					},
-					func(i, j int) {
-						crudExplorer.Insert(
-							ctx,
-							next[j],
-							cluster.WithoutLock(),
-						)
-					},
-					func(i, j int) {
-						crudExplorer.Remove(
-							ctx,
-							curr[i],
-							cluster.WithoutLock(),
-						)
-					},
-				)
-
-				curr = next
-
-				return nil
-			},
-			repeater.WithInterval(c.config.Interval()),
-			repeater.WithName("discovery"),
-			repeater.WithTrace(driverTrace),
-		),
-	)
-
-	return c, nil
+	return c
 }
 
 var _ discovery.Client = &Client{}
