@@ -66,7 +66,9 @@ func TestConnection(t *testing.T) {
 		ctx,
 		"", // corner case for check replacement of endpoint+database+secure
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithAccessTokenCredentials(
+			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
+		),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
@@ -317,15 +319,19 @@ func TestConnection(t *testing.T) {
 }
 
 func ExampleOpen() {
-	db, err := ydb.Open(context.TODO(), "grpc://localhost:2135?database=/local")
-	if err == nil {
-		fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2135?database=/local")
+	if err != nil {
+		fmt.Printf("connection failed: %v", err)
 	}
+	defer db.Close(ctx) // cleanup resources
+	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }
 
 func ExampleOpen_advanced() {
+	ctx := context.TODO()
 	db, err := ydb.Open(
-		context.TODO(),
+		ctx,
 		"grpc://localhost:2135?database=/local",
 		ydb.WithAnonymousCredentials(),
 		ydb.WithBalancer(
@@ -338,5 +344,6 @@ func ExampleOpen_advanced() {
 	if err != nil {
 		fmt.Printf("connection failed: %v", err)
 	}
+	defer db.Close(ctx) // cleanup resources
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }

@@ -121,13 +121,16 @@ func (r *repeater) wakeUp(ctx context.Context, e event) {
 func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 	defer close(r.done)
 
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-r.runCtx.Done():
 			return
-		case <-time.After(interval):
+		case <-ticker.C:
 			r.wakeUp(ctx, eventTick)
 		case <-r.force:
 			r.wakeUp(ctx, eventForce)

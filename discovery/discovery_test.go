@@ -1,11 +1,12 @@
 //go:build !fast
 // +build !fast
 
-package test
+package discovery_test
 
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -52,7 +53,9 @@ func TestDiscovery(t *testing.T) {
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithAccessTokenCredentials(
+			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
+		),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
@@ -123,4 +126,39 @@ func TestDiscovery(t *testing.T) {
 			t.Fatalf("Execute failed: %v", err)
 		}
 	})
+}
+
+func Example_discoverCluster() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	if err != nil {
+		fmt.Printf("failed to connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	endpoints, err := db.Discovery().Discover(ctx)
+	if err != nil {
+		fmt.Printf("discover failed: %v", err)
+		return
+	}
+	fmt.Printf("%s endpoints:\n", db.Name())
+	for i, e := range endpoints {
+		fmt.Printf("%d) %s\n", i, e.String())
+	}
+}
+
+func Example_whoAmI() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	if err != nil {
+		fmt.Printf("failed to connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	whoAmI, err := db.Discovery().WhoAmI(ctx)
+	if err != nil {
+		fmt.Printf("discover failed: %v", err)
+		return
+	}
+	fmt.Printf("%s whoAmI: %s\n", db.Name(), whoAmI.String())
 }
