@@ -1,12 +1,14 @@
 //go:build !fast
 // +build !fast
 
-package ydb_test
+package table_test
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"os"
@@ -1253,4 +1255,337 @@ func render(t *template.Template, data interface{}) string {
 		panic(err)
 	}
 	return buf.String()
+}
+
+func TestLongStream(t *testing.T) {
+	var (
+		discoveryInterval = 10 * time.Second
+		db                ydb.Connection
+		err               error
+		upsertRowsCount   = 10000
+		batchSize         = 1000
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	t.Run("make connection", func(t *testing.T) {
+		db, err = ydb.Open(
+			ctx,
+			os.Getenv("YDB_CONNECTION_STRING"),
+			ydb.WithAccessTokenCredentials(
+				os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
+			),
+			ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	defer func(db ydb.Connection) {
+		// cleanup
+		_ = db.Close(ctx)
+	}(db)
+
+	t.Run("creating stream table", func(t *testing.T) {
+		if err = db.Table().Do(
+			ctx,
+			func(ctx context.Context, s table.Session) (err error) {
+				return s.ExecuteSchemeQuery(
+					ctx,
+					`CREATE TABLE long_stream_query (val Int32, PRIMARY KEY (val))`,
+				)
+			},
+		); err != nil {
+			t.Fatalf("create table failed: %v\n", err)
+		}
+	})
+
+	t.Run("check batch size", func(t *testing.T) {
+		if upsertRowsCount%batchSize != 0 {
+			t.Fatalf("wrong batch size: (%d mod %d = %d) != 0", upsertRowsCount, batchSize, upsertRowsCount%batchSize)
+		}
+	})
+
+	t.Run("upserting rows", func(t *testing.T) {
+		var upserted uint32
+		for i := 0; i < (upsertRowsCount / batchSize); i++ {
+			var (
+				from = int32(i * batchSize)
+				to   = int32((i + 1) * batchSize)
+			)
+			t.Run(fmt.Sprintf("upserting %d..%d", from, to-1), func(t *testing.T) {
+				values := make([]types.Value, 0, batchSize)
+				for j := from; j < to; j++ {
+					values = append(
+						values,
+						types.StructValue(
+							types.StructFieldValue("val", types.Int32Value(j)),
+						),
+					)
+				}
+				if err = db.Table().Do(
+					ctx,
+					func(ctx context.Context, s table.Session) (err error) {
+						_, _, err = s.Execute(
+							ctx,
+							table.TxControl(
+								table.BeginTx(
+									table.WithSerializableReadWrite(),
+								),
+								table.CommitTx(),
+							), `
+								DECLARE $values AS List<Struct<
+									val: Int32,
+								>>;
+								UPSERT INTO long_stream_query
+								SELECT
+									val 
+								FROM
+									AS_TABLE($values);            
+							`, table.NewQueryParameters(
+								table.ValueParam(
+									"$values",
+									types.ListValue(values...),
+								),
+							),
+						)
+						return err
+					},
+				); err != nil {
+					t.Fatalf("upsert failed: %v\n", err)
+				} else {
+					atomic.AddUint32(&upserted, uint32(batchSize))
+				}
+			})
+		}
+		if upserted != uint32(upsertRowsCount) {
+			t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
+		}
+	})
+
+	t.Run("make child discovered connection", func(t *testing.T) {
+		db, err = db.With(ctx, ydb.WithDiscoveryInterval(discoveryInterval))
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	defer func(db ydb.Connection) {
+		// cleanup
+		_ = db.Close(ctx)
+	}(db)
+
+	t.Run("execute stream query", func(t *testing.T) {
+		if err = db.Table().Do(
+			ctx,
+			func(ctx context.Context, s table.Session) (err error) {
+				var (
+					start     = time.Now()
+					rowsCount = 0
+				)
+				res, err := s.StreamExecuteScanQuery(ctx, "SELECT val FROM long_stream_query", table.NewQueryParameters())
+				if err != nil {
+					return err
+				}
+				t.Run("receiving result sets", func(t *testing.T) {
+					for err == nil {
+						t.Run("", func(t *testing.T) {
+							if err = res.NextResultSetErr(ctx); err != nil {
+								if errors.Is(err, io.EOF) {
+									return
+								}
+								t.Fatalf("unexpected error: %v (rowsCount: %d, duration: %v)", err, rowsCount, time.Since(start))
+							}
+							for res.NextRow() {
+								rowsCount++
+							}
+							time.Sleep(discoveryInterval)
+						})
+					}
+				})
+				if err = res.Err(); err != nil {
+					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
+				}
+				if rowsCount != upsertRowsCount {
+					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
+						rowsCount,
+						upsertRowsCount,
+						time.Since(start),
+					)
+				}
+				return nil
+			},
+		); err != nil {
+			t.Fatalf("stream query failed: %v\n", err)
+		}
+	})
+
+	t.Run("stream read table", func(t *testing.T) {
+		if err = db.Table().Do(
+			ctx,
+			func(ctx context.Context, s table.Session) (err error) {
+				var (
+					start     = time.Now()
+					rowsCount = 0
+				)
+				res, err := s.StreamReadTable(ctx, path.Join(db.Name(), "long_stream_query"), options.ReadColumn("val"))
+				if err != nil {
+					return err
+				}
+				t.Run("receiving result sets", func(t *testing.T) {
+					for err == nil {
+						t.Run("", func(t *testing.T) {
+							if err = res.NextResultSetErr(ctx); err != nil {
+								if errors.Is(err, io.EOF) {
+									return
+								}
+								t.Fatalf("unexpected error: %v (rowsCount: %d, duration: %v)", err, rowsCount, time.Since(start))
+							}
+							for res.NextRow() {
+								rowsCount++
+							}
+							time.Sleep(discoveryInterval)
+						})
+					}
+				})
+				if err = res.Err(); err != nil {
+					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
+				}
+				if rowsCount != upsertRowsCount {
+					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
+						rowsCount,
+						upsertRowsCount,
+						time.Since(start),
+					)
+				}
+				return nil
+			},
+		); err != nil {
+			t.Fatalf("stream query failed: %v\n", err)
+		}
+	})
+}
+
+func Example_select() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		query = `SELECT 42 as id, "my string" as myStr`
+		id    int32  // required value
+		myStr string // optional value
+	)
+	err = db.Table().Do( // Do retry operation on errors with best effort
+		ctx, // context manage exiting from Do
+		func(ctx context.Context, s table.Session) (err error) { // retry operation
+			_, res, err := s.Execute(ctx, table.DefaultTxControl(), query, nil)
+			if err != nil {
+				return err // for auto-retry with driver
+			}
+			defer res.Close()                                // cleanup resources
+			if err = res.NextResultSetErr(ctx); err != nil { // check single result set and switch to it
+				return err // for auto-retry with driver
+			}
+			for res.NextRow() { // iterate over rows
+				err = res.ScanNamed(
+					named.Required("id", &id),
+					named.OptionalWithDefault("myStr", &myStr),
+				)
+				if err != nil {
+					return err // generally scan error not retryable, return it for driver check error
+				}
+				fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+			}
+			return res.Err() // return finally result error for auto-retry with driver
+		},
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}
+
+func Example_createTable() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	err = db.Table().Do(
+		ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			return s.CreateTable(ctx, path.Join(db.Name(), "series"),
+				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
+				options.WithColumn("release_date", types.Optional(types.TypeDate)),
+				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
+				options.WithPrimaryKeyColumn("series_id"),
+			)
+		},
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}
+
+func Example_bulkUpsert() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	type logMessage struct {
+		App       string
+		Host      string
+		Timestamp time.Time
+		HTTPCode  uint32
+		Message   string
+	}
+	// prepare native go data
+	const batchSize = 10000
+	logs := make([]logMessage, 0, batchSize)
+	for i := 0; i < batchSize; i++ {
+		message := logMessage{
+			App:       fmt.Sprintf("App_%d", i/256),
+			Host:      fmt.Sprintf("192.168.0.%d", i%256),
+			Timestamp: time.Now().Add(time.Millisecond * time.Duration(i%1000)),
+			HTTPCode:  200,
+		}
+		if i%2 == 0 {
+			message.Message = "GET / HTTP/1.1"
+		} else {
+			message.Message = "GET /images/logo.png HTTP/1.1"
+		}
+		logs = append(logs, message)
+	}
+	// execute bulk upsert with native ydb data
+	err = db.Table().Do( // Do retry operation on errors with best effort
+		ctx, // context manage exiting from Do
+		func(ctx context.Context, s table.Session) (err error) { // retry operation
+			rows := make([]types.Value, 0, len(logs))
+			for _, msg := range logs {
+				rows = append(rows, types.StructValue(
+					types.StructFieldValue("App", types.UTF8Value(msg.App)),
+					types.StructFieldValue("Host", types.UTF8Value(msg.Host)),
+					types.StructFieldValue("Timestamp", types.TimestampValueFromTime(msg.Timestamp)),
+					types.StructFieldValue("HTTPCode", types.Uint32Value(msg.HTTPCode)),
+					types.StructFieldValue("Message", types.UTF8Value(msg.Message)),
+				))
+			}
+			return s.BulkUpsert(ctx, "/local/bulk_upsert_example", types.ListValue(rows...))
+		},
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
 }

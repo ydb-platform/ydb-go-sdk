@@ -1,10 +1,11 @@
 //go:build !fast
 // +build !fast
 
-package ydb_test
+package ratelimiter_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -62,13 +63,13 @@ func TestRatelimiter(t *testing.T) {
 		}
 	}
 	// create node
-	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, coordinationConfig.NodeConfig{
+	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, coordination.NodeConfig{
 		Path:                     "",
 		SelfCheckPeriodMillis:    1000,
 		SessionGracePeriodMillis: 1000,
-		ReadConsistencyMode:      coordinationConfig.ConsistencyModeRelaxed,
-		AttachConsistencyMode:    coordinationConfig.ConsistencyModeRelaxed,
-		RatelimiterCountersMode:  coordinationConfig.RatelimiterCountersModeDetailed,
+		ReadConsistencyMode:      coordination.ConsistencyModeRelaxed,
+		AttachConsistencyMode:    coordination.ConsistencyModeRelaxed,
+		RatelimiterCountersMode:  coordination.RatelimiterCountersModeDetailed,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -177,5 +178,75 @@ func TestRatelimiter(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("Resource must not be acquired")
+	}
+}
+
+func Example() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	if err != nil {
+		fmt.Printf("failed to connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	// create node
+	err = db.Coordination().CreateNode(ctx, testCoordinationNodePath, coordination.NodeConfig{
+		Path:                     "",
+		SelfCheckPeriodMillis:    1000,
+		SessionGracePeriodMillis: 1000,
+		ReadConsistencyMode:      coordination.ConsistencyModeRelaxed,
+		AttachConsistencyMode:    coordination.ConsistencyModeRelaxed,
+		RatelimiterCountersMode:  coordination.RatelimiterCountersModeDetailed,
+	})
+	if err != nil {
+		fmt.Printf("failed to create node: %v", err)
+		return
+	}
+	defer func() {
+		// cleanup node
+		err = db.Coordination().DropNode(ctx, testCoordinationNodePath)
+		if err != nil {
+			fmt.Printf("failed to drop node: %v", err)
+		}
+	}()
+	// create resource
+	err = db.Ratelimiter().CreateResource(ctx, testCoordinationNodePath, ratelimiter.Resource{
+		ResourcePath: testResource,
+		HierarchicalDrr: ratelimiter.HierarchicalDrrSettings{
+			MaxUnitsPerSecond:       1,
+			MaxBurstSizeCoefficient: 2,
+		},
+	})
+	if err != nil {
+		fmt.Printf("failed to create resource: %v", err)
+	}
+	defer func() {
+		// cleanup resource
+		err = db.Ratelimiter().DropResource(ctx, testCoordinationNodePath, testResource)
+		if err != nil {
+			fmt.Printf("failed to drop resource: %v", err)
+		}
+	}()
+	// alter resource
+	err = db.Ratelimiter().AlterResource(ctx, testCoordinationNodePath, ratelimiter.Resource{
+		ResourcePath: testResource,
+		HierarchicalDrr: ratelimiter.HierarchicalDrrSettings{
+			MaxUnitsPerSecond:       3,
+			MaxBurstSizeCoefficient: 4,
+		},
+	})
+	if err != nil {
+		fmt.Printf("failed to alter resource: %v", err)
+	}
+	// acquire resource amount 1
+	err = db.Ratelimiter().AcquireResource(
+		ctx,
+		testCoordinationNodePath,
+		testResource,
+		1,
+		ratelimiter.WithAcquire(),
+	)
+	if err != nil {
+		fmt.Printf("failed to acquire resource: %v", err)
 	}
 }

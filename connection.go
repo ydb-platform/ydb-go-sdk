@@ -40,6 +40,7 @@ import (
 // This interface is central part for access to various systems
 // embedded to ydb through one configured connection method.
 type Connection interface {
+	// ClientConnInterface provide execute unary and streaming RPC over internal balancer
 	grpc.ClientConnInterface
 
 	// Endpoint returns initial endpoint
@@ -51,17 +52,28 @@ type Connection interface {
 	// Secure returns true if database connection is secure
 	Secure() bool
 
+	// Close closes connection and clear resources
 	Close(ctx context.Context) error
 
-	// Method for accessing subsystems
+	// Table returns table client
 	Table() table.Client
+
+	// Scheme returns scheme client
 	Scheme() scheme.Client
+
+	// Coordination returns coordination client
 	Coordination() coordination.Client
+
+	// Ratelimiter returns ratelimiter client
 	Ratelimiter() ratelimiter.Client
+
+	// Discovery returns discovery client
 	Discovery() discovery.Client
+
+	// Scripting returns scripting client
 	Scripting() scripting.Client
 
-	// Make copy with additional options
+	// With makes child connection with the same options and another options
 	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
@@ -324,7 +336,7 @@ func (c *connection) Scripting() scripting.Client {
 //
 // DSN accept connection string like
 //
-//   "grpc[s]://{endpoint}/?database={database}"
+//   "grpc[s]://{endpoint}/?database={database}[&param=value]"
 //
 // See sugar.DSN helper for make dsn from endpoint and database
 func Open(ctx context.Context, dsn string, opts ...Option) (_ Connection, err error) {

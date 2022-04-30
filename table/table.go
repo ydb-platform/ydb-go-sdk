@@ -7,11 +7,55 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+// Operation is the interface that holds an operation for retry.
+// if Operation returns not nil - operation will retry
+// if Operation returns nil - retry loop will break
+type Operation func(ctx context.Context, s Session) error
+
+// TxOperation is the interface that holds an operation for retry.
+// if TxOperation returns not nil - operation will retry
+// if TxOperation returns nil - retry loop will break
+type TxOperation func(ctx context.Context, tx TransactionActor) error
+
+type ClosableSession interface {
+	closer.Closer
+	Session
+}
+
+type Client interface {
+	closer.Closer
+
+	// CreateSession returns session or error for manually control of session lifecycle
+	// CreateSession do not provide retry loop for failed create session requests.
+	// Best effort policy may be implements with outer retry loop includes CreateSession call
+	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
+
+	// Do provide the best effort for execute operation
+	// Do implements internal busy loop until one of the following conditions is met:
+	// - deadline was canceled or deadlined
+	// - retry operation returned nil as error
+	// Warning: if context without deadline or cancellation func than Do can run indefinitely
+	Do(ctx context.Context, op Operation, opts ...Option) error
+
+	// DoTx provide the best effort for execute transaction
+	// DoTx implements internal busy loop until one of the following conditions is met:
+	// - deadline was canceled or deadlined
+	// - retry operation returned nil as error
+	// DoTx makes auto begin, commit and rollback of transaction
+	// If op TxOperation returns nil - transaction will be committed
+	// If op TxOperation return non nil - transaction will be rollback
+	// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
+	DoTx(ctx context.Context, op TxOperation, opts ...Option) error
+}
 
 type SessionInfo interface {
 	ID() string
@@ -352,5 +396,40 @@ func (q *QueryParameters) Add(opts ...ParameterOption) {
 func ValueParam(name string, v types.Value) ParameterOption {
 	return func(q queryParams) {
 		q[name] = value.ToYDB(v)
+	}
+}
+
+type Options struct {
+	Idempotent      bool
+	TxSettings      *TransactionSettings
+	TxCommitOptions []options.CommitTransactionOption
+	FastBackoff     backoff.Backoff
+	SlowBackoff     backoff.Backoff
+	Trace           trace.Table
+}
+
+type Option func(o *Options)
+
+func WithIdempotent() Option {
+	return func(o *Options) {
+		o.Idempotent = true
+	}
+}
+
+func WithTxSettings(tx *TransactionSettings) Option {
+	return func(o *Options) {
+		o.TxSettings = tx
+	}
+}
+
+func WithTxCommitOptions(opts ...options.CommitTransactionOption) Option {
+	return func(o *Options) {
+		o.TxCommitOptions = append(o.TxCommitOptions, opts...)
+	}
+}
+
+func WithTrace(t trace.Table) Option {
+	return func(o *Options) {
+		o.Trace = o.Trace.Compose(t)
 	}
 }
