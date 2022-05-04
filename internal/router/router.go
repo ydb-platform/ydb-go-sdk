@@ -92,8 +92,11 @@ func (r *router) Close(ctx context.Context) (err error) {
 		issues = append(issues, err)
 	}
 
-	if err = r.cluster().Close(ctx); err != nil {
-		issues = append(issues, err)
+	c := r.clusterSwap(nil)
+	if c != nil {
+		if err = c.Close(ctx); err != nil {
+			issues = append(issues, err)
+		}
 	}
 
 	if len(issues) > 0 {

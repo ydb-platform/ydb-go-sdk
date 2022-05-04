@@ -1275,7 +1275,7 @@ func TestLongStream(t *testing.T) {
 			ydb.WithAccessTokenCredentials(
 				os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
 			),
-			ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
+			ydb.WithDiscoveryInterval(-1), // disable re-discovery on upsert time
 		)
 		if err != nil {
 			t.Fatal(err)
