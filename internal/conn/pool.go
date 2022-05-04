@@ -63,7 +63,6 @@ func (p *pool) Get(endpoint endpoint.Endpoint) Conn {
 	)
 
 	if cc, has = p.conns[address]; has {
-		cc.changeUsages(1)
 		return cc
 	}
 

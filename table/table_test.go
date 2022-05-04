@@ -6,9 +6,7 @@ package table_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"os"
@@ -1259,11 +1257,12 @@ func render(t *template.Template, data interface{}) string {
 
 func TestLongStream(t *testing.T) {
 	var (
+		tableName         = `long_stream_query`
 		discoveryInterval = 10 * time.Second
 		db                ydb.Connection
 		err               error
-		upsertRowsCount   = 10000
-		batchSize         = 1000
+		upsertRowsCount   = 100000
+		batchSize         = 10000
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -1292,9 +1291,18 @@ func TestLongStream(t *testing.T) {
 		if err = db.Table().Do(
 			ctx,
 			func(ctx context.Context, s table.Session) (err error) {
+				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
+				if !ydb.IsOperationErrorSchemeError(err) {
+					return err
+				}
+				if err == nil {
+					if err = s.DropTable(ctx, path.Join(db.Name(), tableName)); err != nil {
+						return err
+					}
+				}
 				return s.ExecuteSchemeQuery(
 					ctx,
-					`CREATE TABLE long_stream_query (val Int32, PRIMARY KEY (val))`,
+					`CREATE TABLE `+tableName+` (val Int64, PRIMARY KEY (val))`,
 				)
 			},
 		); err != nil {
@@ -1356,13 +1364,17 @@ func TestLongStream(t *testing.T) {
 				); err != nil {
 					t.Fatalf("upsert failed: %v\n", err)
 				} else {
-					atomic.AddUint32(&upserted, uint32(batchSize))
+					upserted += uint32(to - from)
+					t.Logf("upserted %d rows, total upserted rows: %d", uint32(to-from), upserted)
 				}
 			})
 		}
-		if upserted != uint32(upsertRowsCount) {
-			t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
-		}
+		t.Run("check upserted rows", func(t *testing.T) {
+			t.Logf("total upserted rows: %d, expected: %d", upserted, upsertRowsCount)
+			if upserted != uint32(upsertRowsCount) {
+				t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
+			}
+		})
 	})
 
 	t.Run("make child discovered connection", func(t *testing.T) {
@@ -1389,22 +1401,18 @@ func TestLongStream(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				t.Run("receiving result sets", func(t *testing.T) {
-					for err == nil {
-						t.Run("", func(t *testing.T) {
-							if err = res.NextResultSetErr(ctx); err != nil {
-								if errors.Is(err, io.EOF) {
-									return
-								}
-								t.Fatalf("unexpected error: %v (rowsCount: %d, duration: %v)", err, rowsCount, time.Since(start))
-							}
-							for res.NextRow() {
-								rowsCount++
-							}
-							time.Sleep(discoveryInterval)
-						})
+				defer func() {
+					_ = res.Close()
+				}()
+				for res.NextResultSet(ctx) {
+					count := 0
+					for res.NextRow() {
+						count++
 					}
-				})
+					rowsCount += count
+					t.Logf("received set with %d rows. total received: %d", count, rowsCount)
+					time.Sleep(discoveryInterval)
+				}
 				if err = res.Err(); err != nil {
 					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
 				}
@@ -1434,22 +1442,18 @@ func TestLongStream(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				t.Run("receiving result sets", func(t *testing.T) {
-					for err == nil {
-						t.Run("", func(t *testing.T) {
-							if err = res.NextResultSetErr(ctx); err != nil {
-								if errors.Is(err, io.EOF) {
-									return
-								}
-								t.Fatalf("unexpected error: %v (rowsCount: %d, duration: %v)", err, rowsCount, time.Since(start))
-							}
-							for res.NextRow() {
-								rowsCount++
-							}
-							time.Sleep(discoveryInterval)
-						})
+				defer func() {
+					_ = res.Close()
+				}()
+				for res.NextResultSet(ctx) {
+					count := 0
+					for res.NextRow() {
+						count++
 					}
-				})
+					rowsCount += count
+					t.Logf("received set with %d rows. total received: %d", count, rowsCount)
+					time.Sleep(discoveryInterval)
+				}
 				if err = res.Err(); err != nil {
 					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
 				}
