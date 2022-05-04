@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
@@ -38,8 +39,8 @@ func (s *grpcClientStream) CloseSend() (err error) {
 }
 
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
-	s.c.changeStreamUsages(1)
-	defer s.c.changeStreamUsages(-1)
+	cancel := createPinger(s.c)
+	defer cancel()
 
 	err = s.ClientStream.SendMsg(m)
 
@@ -59,8 +60,8 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
-	s.c.changeStreamUsages(1)
-	defer s.c.changeStreamUsages(-1)
+	cancel := createPinger(s.c)
+	defer cancel()
 
 	defer func() {
 		onDone := s.recv(xerrors.HideEOF(err))
@@ -99,4 +100,24 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	}
 
 	return nil
+}
+
+func createPinger(c *conn) context.CancelFunc {
+	c.touchLastUsage()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		ctxDone := ctx.Done()
+		for {
+			select {
+			case <-ctxDone:
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				c.touchLastUsage()
+			}
+		}
+	}()
+
+	return cancel
 }

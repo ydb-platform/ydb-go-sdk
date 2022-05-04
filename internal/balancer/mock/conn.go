@@ -75,10 +75,6 @@ func (c *Conn) Unban() conn.State {
 	return conn.Online
 }
 
-func (c *Conn) Release(ctx context.Context) error {
-	panic("not implemented in mock")
-}
-
 type Endpoint struct {
 	AddrField     string
 	LocationField string

@@ -119,18 +119,6 @@ func (c *Cluster) Close(ctx context.Context) (err error) {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	var issues []error
-
-	for _, cc := range c.conns {
-		if err := cc.Release(ctx); err != nil {
-			issues = append(issues, err)
-		}
-	}
-
-	if len(issues) > 0 {
-		return xerrors.WithStackTrace(xerrors.NewWithIssues("cluster closed with issues", issues...))
-	}
-
 	return nil
 }
 

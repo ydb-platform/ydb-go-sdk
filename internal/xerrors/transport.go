@@ -175,7 +175,6 @@ func FromGRPCError(err error, opts ...teOpt) error {
 	if errors.As(err, &t) {
 		return err
 	}
-
 	if s, ok := grpcStatus.FromError(err); ok {
 		te := &transportError{
 			code:    s.Code(),
