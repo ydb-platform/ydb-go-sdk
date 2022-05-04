@@ -1,4 +1,4 @@
-* Fixed Unexpected NullFlag while parse nil JSONDocument value
+* Fixed unexpected `NullFlag` while parse nil `JSONDocument` value
 * Removed `internal/conn/conn.streamUsages` and `internal/conn/conn.usages` (`internal/conn.conn` always touching last usage timestamp on API calls)
 * Removed auto-reconnecting for broken conns
 * Renamed `internal/database` package to `internal/router` for unambiguous understanding of package mission
