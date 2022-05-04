@@ -49,7 +49,7 @@ func (c *Cluster) isClosed() bool {
 }
 
 // Pessimize connection in underling pool
-func (c *Cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
+func (c *Cluster) Ban(ctx context.Context, cc conn.Conn, cause error) {
 	c.pool.Pessimize(ctx, cc, cause)
 
 	online := 0
@@ -65,7 +65,7 @@ func (c *Cluster) Pessimize(ctx context.Context, cc conn.Conn, cause error) {
 }
 
 // Unpessimize connection in underling pool
-func (c *Cluster) Unpessimize(ctx context.Context, cc conn.Conn) {
+func (c *Cluster) Unban(ctx context.Context, cc conn.Conn) {
 	c.pool.Unpessimize(ctx, cc)
 }
 

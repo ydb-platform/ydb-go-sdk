@@ -32,7 +32,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewDB(
+		cc: testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					// nolint:unparam
@@ -89,7 +89,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewDB(
+		cc: testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					// nolint:unparam
@@ -331,7 +331,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := New(
-							testutil.NewDB(
+							testutil.NewRouter(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
 										// nolint:unparam

@@ -32,7 +32,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := StubBuilder{
 				T: t,
-				cc: testutil.NewDB(
+				cc: testutil.NewRouter(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
 							// nolint:unparam

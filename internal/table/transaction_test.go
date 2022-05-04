@@ -23,7 +23,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewDB(
+		cc: testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableBeginTransaction: func(request interface{}) (proto.Message, error) {

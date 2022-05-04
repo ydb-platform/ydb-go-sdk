@@ -1,4 +1,4 @@
-package database
+package router
 
 import (
 	"context"
@@ -6,98 +6,98 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
+	clusterBuilder "github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
+	discoveryBuilder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type clusterConnector interface {
+type cluster interface {
 	Close(ctx context.Context) error
 	Get(ctx context.Context) (cc conn.Conn, err error)
-	Pessimize(ctx context.Context, cc conn.Conn, cause error)
-	Unpessimize(ctx context.Context, cc conn.Conn)
+	Ban(ctx context.Context, cc conn.Conn, cause error)
+	Unban(ctx context.Context, cc conn.Conn)
 }
 
-type database struct {
-	config            config.Config
+type router struct {
+	config config.Config
+	pool   conn.Pool
+
+	clusterMtx sync.RWMutex
+	clusterPtr cluster
+
 	discovery         discovery.Client
 	discoveryRepeater repeater.Repeater
-	connectionPool    conn.Pool
-
-	m              sync.RWMutex
-	clusterPointer clusterConnector
 }
 
-func (db *database) cluster() clusterConnector {
-	db.m.RLock()
-	defer db.m.RUnlock()
-	return db.clusterPointer
+func (r *router) cluster() cluster {
+	r.clusterMtx.RLock()
+	defer r.clusterMtx.RUnlock()
+	return r.clusterPtr
 }
 
-func (db *database) clusterCreate(ctx context.Context, endpoints []endpoint.Endpoint) clusterConnector {
-	return cluster.New(
+func (r *router) clusterCreate(ctx context.Context, endpoints []endpoint.Endpoint) cluster {
+	return clusterBuilder.New(
 		deadline.ContextWithoutDeadline(ctx),
-		db.config,
-		db.connectionPool,
+		r.config,
+		r.pool,
 		endpoints,
 		func(ctx context.Context) {
-			db.discoveryRepeater.Force()
+			r.discoveryRepeater.Force()
 		})
 }
 
-func (db *database) clusterSwap(cluster clusterConnector) clusterConnector {
-	db.m.Lock()
-	defer db.m.Unlock()
+func (r *router) clusterSwap(cluster cluster) cluster {
+	r.clusterMtx.Lock()
+	defer r.clusterMtx.Unlock()
 
-	oldCluster := db.clusterPointer
-	db.clusterPointer = cluster
+	oldCluster := r.clusterPtr
+	r.clusterPtr = cluster
 	return oldCluster
 }
 
-func (db *database) clusterDiscovery(ctx context.Context) error {
-	endpoints, err := db.discovery.Discover(ctx)
+func (r *router) clusterDiscovery(ctx context.Context) error {
+	endpoints, err := r.discovery.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	newCluster := db.clusterCreate(ctx, endpoints)
-	oldCluster := db.clusterSwap(newCluster)
+	newCluster := r.clusterCreate(ctx, endpoints)
+	oldCluster := r.clusterSwap(newCluster)
 	if oldCluster == nil {
 		return nil
 	}
 	return oldCluster.Close(ctx)
 }
 
-func (db *database) Discovery() discovery.Client {
-	return db.discovery
+func (r *router) Discovery() discovery.Client {
+	return r.discovery
 }
 
-func (db *database) Close(ctx context.Context) (err error) {
+func (r *router) Close(ctx context.Context) (err error) {
 	issues := make([]error, 0, 2)
 
-	if db.discoveryRepeater != nil {
-		db.discoveryRepeater.Stop()
+	if r.discoveryRepeater != nil {
+		r.discoveryRepeater.Stop()
 	}
 
-	if err = db.discovery.Close(ctx); err != nil {
+	if err = r.discovery.Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 
-	if err = db.cluster().Close(ctx); err != nil {
+	if err = r.cluster().Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 
 	if len(issues) > 0 {
-		return xerrors.WithStackTrace(xerrors.NewWithIssues("database close failed", issues...))
+		return xerrors.WithStackTrace(xerrors.NewWithIssues("router close failed", issues...))
 	}
 
 	return nil
@@ -120,9 +120,9 @@ func New(
 		onDone(err)
 	}()
 
-	db := &database{
-		config:         c,
-		connectionPool: pool,
+	db := &router{
+		config: c,
+		pool:   pool,
 	}
 
 	discoveryEndpoint := endpoint.New(c.Endpoint())
@@ -130,7 +130,7 @@ func New(
 
 	discoveryConfig := discoveryConfig.New(opts...)
 
-	db.discovery = internalDiscovery.New(
+	db.discovery = discoveryBuilder.New(
 		discoveryConnection,
 		discoveryConfig,
 	)
@@ -164,33 +164,33 @@ func New(
 	return db, nil
 }
 
-func (db *database) Endpoint() string {
-	return db.config.Endpoint()
+func (r *router) Endpoint() string {
+	return r.config.Endpoint()
 }
 
-func (db *database) Name() string {
-	return db.config.Database()
+func (r *router) Name() string {
+	return r.config.Database()
 }
 
-func (db *database) Secure() bool {
-	return db.config.Secure()
+func (r *router) Secure() bool {
+	return r.config.Secure()
 }
 
-func (db *database) Invoke(
+func (r *router) Invoke(
 	ctx context.Context,
 	method string,
 	args interface{},
 	reply interface{},
 	opts ...grpc.CallOption,
 ) error {
-	cc, err := db.cluster().Get(ctx)
+	cc, err := r.cluster().Get(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	defer db.handleConnRequestError(ctx, &err, cc)
+	defer r.handleConnRequestError(ctx, &err, cc)
 
-	ctx, err = db.config.Meta().Meta(ctx)
+	ctx, err = r.config.Meta().Meta(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -203,20 +203,20 @@ func (db *database) Invoke(
 	return nil
 }
 
-func (db *database) NewStream(
+func (r *router) NewStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	cc, err := db.cluster().Get(ctx)
+	cc, err := r.cluster().Get(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	defer db.handleConnRequestError(ctx, &err, cc)
+	defer r.handleConnRequestError(ctx, &err, cc)
 
-	ctx, err = db.config.Meta().Meta(ctx)
+	ctx, err = r.config.Meta().Meta(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -230,12 +230,12 @@ func (db *database) NewStream(
 	return client, nil
 }
 
-func (db *database) handleConnRequestError(ctx context.Context, perr *error, cc conn.Conn) {
+func (r *router) handleConnRequestError(ctx context.Context, perr *error, cc conn.Conn) {
 	err := *perr
 	if err == nil && cc.GetState() == conn.Banned {
-		db.cluster().Unpessimize(ctx, cc)
+		r.cluster().Unban(ctx, cc)
 	}
-	if err != nil && xerrors.MustPessimizeEndpoint(err, db.config.ExcludeGRPCCodesForPessimization()...) {
-		db.cluster().Pessimize(ctx, cc, err)
+	if err != nil && xerrors.MustPessimizeEndpoint(err, r.config.ExcludeGRPCCodesForPessimization()...) {
+		r.cluster().Ban(ctx, cc, err)
 	}
 }

@@ -66,7 +66,7 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile table.txt -covermode atomic ./table/table_test.go
+        run: go test -race -coverpkg=./... -coverprofile table.txt -covermode atomic ./table/table_e2e_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -107,7 +107,7 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile ratelimiter.txt -covermode atomic ./ratelimiter/ratelimiter_test.go
+        run: go test -race -coverpkg=./... -coverprofile ratelimiter.txt -covermode atomic ./ratelimiter/ratelimiter_e2e_test.go
         shell: bash
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
@@ -149,7 +149,7 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile scripting.txt -covermode atomic ./scripting/scripting_test.go
+        run: go test -race -coverpkg=./... -coverprofile scripting.txt -covermode atomic ./scripting/scripting_e2e_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -190,7 +190,7 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile discovery.txt -covermode atomic ./discovery/discovery_test.go
+        run: go test -race -coverpkg=./... -coverprofile discovery.txt -covermode atomic ./discovery/discovery_e2e_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -231,7 +231,7 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile connection.txt -covermode atomic ./connection_test.go
+        run: go test -race -coverpkg=./... -coverprofile connection.txt -covermode atomic ./connection_e2e_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
