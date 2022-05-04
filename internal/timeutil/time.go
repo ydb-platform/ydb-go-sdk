@@ -19,11 +19,11 @@ var unix = time.Unix(0, 0)
 
 // UnmarshalInterval up to ±292 years.
 func UnmarshalInterval(n int64) time.Duration {
-	return time.Duration(n)
+	return time.Millisecond * time.Duration(n)
 }
 
 func MarshalInterval(d time.Duration) int64 {
-	return int64(d)
+	return d.Microseconds()
 }
 
 // Up to 11761191-01-20 00:00:00 +0000 UTC.

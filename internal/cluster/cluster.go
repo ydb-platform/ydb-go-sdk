@@ -3,7 +3,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -29,14 +28,15 @@ var (
 )
 
 type Cluster struct {
-	config                config.Config
-	pool                  conn.Pool
-	conns                 []conn.Conn
-	balancerPointer       balancer.Balancer
-	needDiscoveryCallback balancer.OnBadStateCallback
+	config config.Config
+	pool   conn.Pool
+	conns  []conn.Conn
 
-	m    sync.RWMutex
+	balancer balancer.Balancer
+
 	done chan struct{}
+
+	onBadStateCallback balancer.OnBadStateCallback
 }
 
 func (c *Cluster) isClosed() bool {
@@ -48,7 +48,7 @@ func (c *Cluster) isClosed() bool {
 	}
 }
 
-// Pessimize connection in underling pool
+// Ban connection in underling pool
 func (c *Cluster) Ban(ctx context.Context, cc conn.Conn, cause error) {
 	c.pool.Pessimize(ctx, cc, cause)
 
@@ -60,11 +60,11 @@ func (c *Cluster) Ban(ctx context.Context, cc conn.Conn, cause error) {
 	}
 
 	if online*2 < len(c.conns) {
-		c.needDiscoveryCallback(ctx)
+		c.onBadStateCallback(ctx)
 	}
 }
 
-// Unpessimize connection in underling pool
+// Unban connection in underling pool
 func (c *Cluster) Unban(ctx context.Context, cc conn.Conn) {
 	c.pool.Unpessimize(ctx, cc)
 }
@@ -74,7 +74,7 @@ func New(
 	config config.Config,
 	pool conn.Pool,
 	endpoints []endpoint.Endpoint,
-	needDiscoveryCallback balancer.OnBadStateCallback,
+	onBadStateCallback balancer.OnBadStateCallback,
 ) *Cluster {
 	onDone := trace.DriverOnClusterInit(config.Trace(), &ctx)
 	defer func() {
@@ -88,7 +88,7 @@ func New(
 		conns = append(conns, c)
 	}
 
-	clusterBalancer := multi.Balancer(
+	balancer := multi.Balancer(
 		// check conn from context at first place
 		multi.WithBalancer(ctxbalancer.Balancer(conns), func(cc conn.Conn) bool {
 			return true
@@ -99,34 +99,28 @@ func New(
 	)
 
 	return &Cluster{
-		done:                  make(chan struct{}),
-		config:                config,
-		pool:                  pool,
-		balancerPointer:       clusterBalancer,
-		conns:                 conns,
-		needDiscoveryCallback: needDiscoveryCallback,
+		done:               make(chan struct{}),
+		config:             config,
+		pool:               pool,
+		conns:              conns,
+		balancer:           balancer,
+		onBadStateCallback: onBadStateCallback,
 	}
 }
 
 func (c *Cluster) Close(ctx context.Context) (err error) {
-	close(c.done)
+	if c == nil {
+		return nil
+	}
 
 	onDone := trace.DriverOnClusterClose(c.config.Trace(), &ctx)
 	defer func() {
 		onDone(err)
 	}()
 
-	c.m.Lock()
-	defer c.m.Unlock()
+	close(c.done)
 
 	return nil
-}
-
-func (c *Cluster) balancer() balancer.Balancer {
-	c.m.RLock()
-	defer c.m.RUnlock()
-
-	return c.balancerPointer
 }
 
 func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
@@ -134,13 +128,15 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
 		select {
 		case <-c.done:
 			return nil, xerrors.WithStackTrace(ErrClusterClosed)
+
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
+
 		default:
-			cc = c.balancer().Next(ctx)
+			cc = c.balancer.Next(ctx)
 
 			if cc == nil {
-				cc = c.balancer().Next(ctx, balancer.WithAcceptBanned(true))
+				cc = c.balancer.Next(ctx, balancer.WithAcceptBanned(true))
 			}
 
 			if cc == nil {

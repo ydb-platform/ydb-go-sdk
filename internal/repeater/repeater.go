@@ -2,6 +2,7 @@ package repeater
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,10 +25,10 @@ type repeater struct {
 	// Task is a function that must be executed periodically.
 	task func(context.Context) error
 
-	runCtx context.Context
-	stop   context.CancelFunc
-	done   chan struct{}
-	force  chan struct{}
+	stop    context.CancelFunc
+	stopped chan struct{}
+
+	force int32
 }
 
 type option func(r *repeater)
@@ -59,19 +60,18 @@ const (
 
 // New creates and begins to execute task periodically.
 func New(
-	ctx context.Context,
 	interval time.Duration,
 	task func(ctx context.Context) (err error),
 	opts ...option,
-) Repeater {
+) *repeater {
+	ctx, stop := context.WithCancel(context.Background())
+
 	r := &repeater{
 		interval: interval,
 		task:     task,
-		done:     make(chan struct{}),
-		force:    make(chan struct{}),
+		stop:     stop,
+		stopped:  make(chan struct{}),
 	}
-
-	r.runCtx, r.stop = context.WithCancel(context.Background())
 
 	for _, o := range opts {
 		o(r)
@@ -85,55 +85,59 @@ func New(
 // Stop stops to execute its task.
 func (r *repeater) Stop() {
 	r.stop()
+	<-r.stopped
 }
 
 func (r *repeater) Force() {
-	select {
-	case r.force <- struct{}{}:
-	default:
-	}
+	atomic.AddInt32(&r.force, 1)
 }
 
-func (r *repeater) wakeUp(ctx context.Context, e event) {
-	var (
-		onDone = trace.DriverOnRepeaterWakeUp(
-			r.trace,
-			&ctx,
-			r.name,
-			string(e),
-		)
-		cancel context.CancelFunc
-		err    error
+func (r *repeater) wakeUp(ctx context.Context, e event) (err error) {
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+
+	onDone := trace.DriverOnRepeaterWakeUp(
+		r.trace,
+		&ctx,
+		r.name,
+		string(e),
 	)
 
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
+	defer func() {
+		onDone(err)
 
-	err = r.task(ctx)
+		if err != nil {
+			atomic.StoreInt32(&r.force, 1)
+		} else {
+			atomic.StoreInt32(&r.force, 0)
+		}
+	}()
 
-	onDone(err)
-
-	if err != nil {
-		r.Force()
-	}
+	return r.task(ctx)
 }
 
 func (r *repeater) worker(ctx context.Context, interval time.Duration) {
-	defer close(r.done)
+	defer close(r.stopped)
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	tick := time.NewTicker(interval)
+	defer tick.Stop()
+
+	force := time.NewTicker(time.Second) // minimal interval between force wakeup's (maybe configured?)
+	defer force.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-r.runCtx.Done():
-			return
-		case <-ticker.C:
-			r.wakeUp(ctx, eventTick)
-		case <-r.force:
-			r.wakeUp(ctx, eventForce)
+
+		case <-tick.C:
+			_ = r.wakeUp(ctx, eventTick)
+
+		case <-force.C:
+			if atomic.LoadInt32(&r.force) != 0 {
+				_ = r.wakeUp(ctx, eventForce)
+			}
 		}
 	}
 }

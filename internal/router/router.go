@@ -8,7 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	clusterBuilder "github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	discoveryBuilder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
@@ -19,42 +19,36 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type cluster interface {
-	Close(ctx context.Context) error
-	Get(ctx context.Context) (cc conn.Conn, err error)
-	Ban(ctx context.Context, cc conn.Conn, cause error)
-	Unban(ctx context.Context, cc conn.Conn)
-}
-
 type router struct {
 	config config.Config
 	pool   conn.Pool
 
 	clusterMtx sync.RWMutex
-	clusterPtr cluster
+	clusterPtr *cluster.Cluster
 
 	discovery         discovery.Client
 	discoveryRepeater repeater.Repeater
 }
 
-func (r *router) cluster() cluster {
+func (r *router) cluster() *cluster.Cluster {
 	r.clusterMtx.RLock()
 	defer r.clusterMtx.RUnlock()
 	return r.clusterPtr
 }
 
-func (r *router) clusterCreate(ctx context.Context, endpoints []endpoint.Endpoint) cluster {
-	return clusterBuilder.New(
+func (r *router) clusterCreate(ctx context.Context, endpoints []endpoint.Endpoint) *cluster.Cluster {
+	return cluster.New(
 		deadline.ContextWithoutDeadline(ctx),
 		r.config,
 		r.pool,
 		endpoints,
 		func(ctx context.Context) {
 			r.discoveryRepeater.Force()
-		})
+		},
+	)
 }
 
-func (r *router) clusterSwap(cluster cluster) cluster {
+func (r *router) clusterSwap(cluster *cluster.Cluster) *cluster.Cluster {
 	r.clusterMtx.Lock()
 	defer r.clusterMtx.Unlock()
 
@@ -71,9 +65,7 @@ func (r *router) clusterDiscovery(ctx context.Context) error {
 
 	newCluster := r.clusterCreate(ctx, endpoints)
 	oldCluster := r.clusterSwap(newCluster)
-	if oldCluster == nil {
-		return nil
-	}
+
 	return oldCluster.Close(ctx)
 }
 
@@ -120,7 +112,7 @@ func New(
 		onDone(err)
 	}()
 
-	db := &router{
+	r := &router{
 		config: c,
 		pool:   pool,
 	}
@@ -130,27 +122,27 @@ func New(
 
 	discoveryConfig := discoveryConfig.New(opts...)
 
-	db.discovery = discoveryBuilder.New(
+	r.discovery = discoveryBuilder.New(
 		discoveryConnection,
 		discoveryConfig,
 	)
 
-	if err = db.clusterDiscovery(ctx); err != nil {
+	if err = r.clusterDiscovery(ctx); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	if d := discoveryConfig.Interval(); d > 0 {
-		db.discoveryRepeater = repeater.New(deadline.ContextWithoutDeadline(ctx), d, func(ctx context.Context) (err error) {
+		r.discoveryRepeater = repeater.New(d, func(ctx context.Context) (err error) {
 			ctx, cancel := context.WithTimeout(ctx, d)
 			defer cancel()
 
-			return db.clusterDiscovery(ctx)
+			return r.clusterDiscovery(ctx)
 		},
 			repeater.WithName("discovery"),
-			repeater.WithTrace(db.config.Trace()),
+			repeater.WithTrace(r.config.Trace()),
 		)
 	} else {
-		db.clusterSwap(db.clusterCreate(ctx, []endpoint.Endpoint{discoveryEndpoint}))
+		r.clusterSwap(r.clusterCreate(ctx, []endpoint.Endpoint{discoveryEndpoint}))
 	}
 
 	var cancel context.CancelFunc
@@ -161,7 +153,7 @@ func New(
 	}
 	defer cancel()
 
-	return db, nil
+	return r, nil
 }
 
 func (r *router) Endpoint() string {

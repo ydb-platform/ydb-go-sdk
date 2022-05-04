@@ -1,3 +1,6 @@
+* Fixed stopping of repeater
+* Added hard minimal interval (1 second) between force wake up's 
+* Renamed `trace.DriverRepeaterTick{Start,Done}Info` to `trace.DriverRepeaterWakeUp{Start,Done}Info`
 * Fixed unexpected `NullFlag` while parse nil `JSONDocument` value
 * Removed `internal/conn/conn.streamUsages` and `internal/conn/conn.usages` (`internal/conn.conn` always touching last usage timestamp on API calls)
 * Removed auto-reconnecting for broken conns
@@ -26,7 +29,7 @@
 
 ## v3.22.0
 * Supported `json.Unmarshaler` type for scanning row to values 
-* Reimplement `sugar.DSN` with `net/url`
+* Reimplemented `sugar.DSN` with `net/url`
 
 ## v3.21.0
 * Fixed gtrace tool generation code style bug with leading spaces
