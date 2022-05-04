@@ -1,15 +1,13 @@
-//go:build !fast
-// +build !fast
-
-package regress
+package table
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 type issue229Struct struct{}
@@ -25,7 +23,7 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 	defer cancel()
 
 	db := connect(t)
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	err := db.Table().DoTx(ctx, func(ctx context.Context, tx TransactionActor) error {
 		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
 		require.NoError(t, err)
 		require.NoError(t, res.NextResultSetErr(ctx))
@@ -34,6 +32,12 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 		var val issue229Struct
 		require.NoError(t, res.Scan(&val))
 		return nil
-	}, table.WithTxSettings(table.TxSettings(table.WithSerializableReadWrite())))
+	}, WithTxSettings(TxSettings(WithSerializableReadWrite())))
 	require.NoError(t, err)
+}
+
+func connect(t *testing.T) ydb.Connection {
+	db, err := ydb.Open(context.Background(), os.Getenv("YDB_CONNECTION_STRING"), ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")))
+	require.NoError(t, err)
+	return db
 }
