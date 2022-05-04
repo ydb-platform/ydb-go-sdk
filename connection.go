@@ -15,10 +15,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/database"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/router"
 	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	internalScripting "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
@@ -108,8 +108,8 @@ type connection struct {
 
 	pool conn.Pool
 
-	mtx sync.Mutex
-	db  database.Connection
+	mtx    sync.Mutex
+	router router.Connection
 
 	children    map[uint64]Connection
 	childrenMtx sync.Mutex
@@ -173,7 +173,7 @@ func (c *connection) Close(ctx context.Context) error {
 			}
 			return c.table.Close(ctx)
 		},
-		c.db.Close,
+		c.router.Close,
 		c.pool.Release,
 	)
 
@@ -198,7 +198,7 @@ func (c *connection) Invoke(
 	reply interface{},
 	opts ...grpc.CallOption,
 ) (err error) {
-	return c.db.Invoke(
+	return c.router.Invoke(
 		conn.WithoutWrapping(ctx),
 		method,
 		args,
@@ -213,7 +213,7 @@ func (c *connection) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	return c.db.NewStream(
+	return c.router.NewStream(
 		conn.WithoutWrapping(ctx),
 		desc,
 		method,
@@ -236,7 +236,7 @@ func (c *connection) Secure() bool {
 func (c *connection) Table() table.Client {
 	c.tableOnce.Do(func() {
 		c.table = internalTable.New(
-			c.db,
+			c.router,
 			tableConfig.New(
 				append(
 					// prepend common params from root config
@@ -255,7 +255,7 @@ func (c *connection) Table() table.Client {
 func (c *connection) Scheme() scheme.Client {
 	c.schemeOnce.Do(func() {
 		c.scheme = internalScheme.New(
-			c.db,
+			c.router,
 			schemeConfig.New(
 				append(
 					// prepend common params from root config
@@ -274,7 +274,7 @@ func (c *connection) Scheme() scheme.Client {
 func (c *connection) Coordination() coordination.Client {
 	c.coordinationOnce.Do(func() {
 		c.coordination = internalCoordination.New(
-			c.db,
+			c.router,
 			coordinationConfig.New(
 				append(
 					// prepend common params from root config
@@ -293,7 +293,7 @@ func (c *connection) Coordination() coordination.Client {
 func (c *connection) Ratelimiter() ratelimiter.Client {
 	c.ratelimiterOnce.Do(func() {
 		c.ratelimiter = internalRatelimiter.New(
-			c.db,
+			c.router,
 			ratelimiterConfig.New(
 				append(
 					// prepend common params from root config
@@ -310,7 +310,7 @@ func (c *connection) Ratelimiter() ratelimiter.Client {
 }
 
 func (c *connection) Discovery() discovery.Client {
-	return c.db.Discovery()
+	return c.router.Discovery()
 }
 
 func (c *connection) Scripting() scripting.Client {
@@ -408,7 +408,7 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)
 	}
 
-	c.db, err = database.New(
+	c.router, err = router.New(
 		ctx,
 		c.config,
 		c.pool,

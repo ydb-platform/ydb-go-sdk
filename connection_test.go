@@ -118,7 +118,7 @@ func TestConnection(t *testing.T) {
 	defer func() {
 		// cleanup connection
 		if e := db.Close(ctx); e != nil {
-			t.Fatalf("db close failed: %+v", e)
+			t.Fatalf("router close failed: %+v", e)
 		}
 	}()
 	t.Run("discovery.WhoAmI", func(t *testing.T) {

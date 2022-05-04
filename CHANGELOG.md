@@ -1,6 +1,7 @@
 * Fixed Unexpected NullFlag while parse nil JSONDocument value
 * Removed `internal/conn/conn.streamUsages` and `internal/conn/conn.usages` (`internal/conn.conn` always touching last usage timestamp on API calls)
 * Removed auto-reconnecting for broken conns
+* Renamed `internal/database` package to `internal/router` for unambiguous understanding of package mission
 * Refactored applying actual endpoints list after re-discovery (replaced diff-merge logic to swap cluster struct, cluster and balancers are immutable now)
 * Added `trace.Driver.OnUnpessimizeNode` trace event
 
