@@ -969,9 +969,17 @@ func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) 
 		var err error
 		switch s.getType() {
 		case types.TypeJSON:
-			err = v.UnmarshalJSON(s.converter.JSON())
+			if s.isNull() {
+				err = v.UnmarshalJSON(nil)
+			} else {
+				err = v.UnmarshalJSON(s.converter.JSON())
+			}
 		case types.TypeJSONDocument:
-			err = v.UnmarshalJSON(s.converter.JSONDocument())
+			if s.isNull() {
+				err = v.UnmarshalJSON(nil)
+			} else {
+				err = v.UnmarshalJSON(s.converter.JSONDocument())
+			}
 		default:
 			_ = s.errorf(0, "ydb optional type %T not unsupported for applying to json.Unmarshaler", s.getType())
 		}
