@@ -685,6 +685,9 @@ func (s *session) executeDataQuery(
 		TxControl:  tx.Desc(),
 		Parameters: params.Params(),
 		Query:      &query.query,
+		QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
+			KeepInCache: true,
+		},
 		OperationParams: operation.Params(
 			ctx,
 			s.config.OperationTimeout(),

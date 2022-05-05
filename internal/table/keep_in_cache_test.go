@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -15,18 +16,28 @@ import (
 
 func TestQueryCachePolicyKeepInCache(t *testing.T) {
 	for _, test := range [...]struct {
-		name                   string
-		queryCachePolicyOption []options.QueryCachePolicyOption
+		name                    string
+		executeDataQueryOptions []options.ExecuteDataQueryOption
+		keepInCache             bool
 	}{
 		{
-			name: "with server cache",
-			queryCachePolicyOption: []options.QueryCachePolicyOption{
-				options.WithQueryCachePolicyKeepInCache(),
-			},
+			name:                    "no options",
+			executeDataQueryOptions: nil,
+			keepInCache:             true,
 		},
 		{
-			name:                   "no server cache",
-			queryCachePolicyOption: []options.QueryCachePolicyOption{},
+			name: "with server cache",
+			executeDataQueryOptions: []options.ExecuteDataQueryOption{
+				options.WithKeepInCache(true),
+			},
+			keepInCache: true,
+		},
+		{
+			name: "no server cache",
+			executeDataQueryOptions: []options.ExecuteDataQueryOption{
+				options.WithKeepInCache(false),
+			},
+			keepInCache: false,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -41,15 +52,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 								if !ok {
 									t.Fatalf("cannot cast request '%T' to *Ydb_Table.ExecuteDataQueryRequest", request)
 								}
-								if len(test.queryCachePolicyOption) > 0 {
-									if !r.QueryCachePolicy.GetKeepInCache() {
-										t.Fatalf("keep-in-cache policy must be true, got: %v", r.QueryCachePolicy.GetKeepInCache())
-									}
-								} else {
-									if r.QueryCachePolicy.GetKeepInCache() {
-										t.Fatalf("keep-in-cache policy must be false, got: %v", r.QueryCachePolicy.GetKeepInCache())
-									}
-								}
+								require.Equal(t, test.keepInCache, r.QueryCachePolicy.GetKeepInCache())
 								return &Ydb_Table.ExecuteQueryResult{
 									TxMeta: &Ydb_Table.TransactionMeta{
 										Id: "",
@@ -79,7 +82,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 				),
 				"SELECT 1",
 				table.NewQueryParameters(),
-				options.WithQueryCachePolicy(test.queryCachePolicyOption...),
+				test.executeDataQueryOptions...,
 			)
 			if err != nil {
 				t.Fatal(err)

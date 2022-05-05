@@ -1,3 +1,7 @@
+* Marked as deprecated `session.Prepare` callback
+* Marked as deprecated `options.WithQueryCachePolicyKeepInCache` and `options.WithQueryCachePolicy` options
+* Added `options.WithKeepInCache` option
+* Enabled by default keep-in-cache policy for data queries
 * Fixed bug with convertation `time.Duration` from/to YDB value
 * Removed from `ydb.Connection` embedding of `grpc.ClientConnInterface`
 * Fixed stopping of repeater

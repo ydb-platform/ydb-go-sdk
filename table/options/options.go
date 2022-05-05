@@ -511,16 +511,42 @@ type (
 	QueryCachePolicyOption func(*queryCachePolicy)
 )
 
+// WithKeepInCache manages keep-in-cache flag in query cache policy
+//
+// By default all data queries executes with keep-in-cache policy
+func WithKeepInCache(keepInCache bool) ExecuteDataQueryOption {
+	return withQueryCachePolicy(
+		withQueryCachePolicyKeepInCache(keepInCache),
+	)
+}
+
+// WithQueryCachePolicyKeepInCache manages keep-in-cache policy
+//
+// Deprecated: data queries always executes with enabled keep-in-cache policy.
+// Use WithKeepInCache for disabling keep-in-cache policy
 func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
+	return withQueryCachePolicyKeepInCache(true)
+}
+
+func withQueryCachePolicyKeepInCache(keepInCache bool) QueryCachePolicyOption {
 	return func(p *queryCachePolicy) {
-		p.KeepInCache = true
+		p.KeepInCache = keepInCache
 	}
 }
 
+// WithQueryCachePolicy manages query cache policy
+//
+// Deprecated: use WithKeepInCache for disabling keep-in-cache policy
 func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
+	return withQueryCachePolicy(opts...)
+}
+
+func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
 	return func(d *ExecuteDataQueryDesc) {
 		if d.QueryCachePolicy == nil {
-			d.QueryCachePolicy = new(Ydb_Table.QueryCachePolicy)
+			d.QueryCachePolicy = &Ydb_Table.QueryCachePolicy{
+				KeepInCache: true,
+			}
 		}
 		for _, opt := range opts {
 			opt((*queryCachePolicy)(d.QueryCachePolicy))
