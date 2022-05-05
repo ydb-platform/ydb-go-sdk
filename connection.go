@@ -115,8 +115,6 @@ type connection struct {
 	panicCallback func(e interface{})
 }
 
-var _ grpc.ClientConnInterface = (*connection)(nil)
-
 func (c *connection) Close(ctx context.Context) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
@@ -428,4 +426,15 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}
 
 	return c, nil
+}
+
+// GRPCConn casts ydb.Connection to grpc.ClientConnInterface for executing
+// unary and streaming RPC over internal driver balancer.
+//
+// Warning: for connect to driver-unsupported YDB services
+func GRPCConn(conn Connection) grpc.ClientConnInterface {
+	if cc, ok := conn.(*connection); ok {
+		return cc
+	}
+	return nil
 }

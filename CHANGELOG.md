@@ -1,3 +1,4 @@
+* Added `ydb.GRPCConn(ydb.Connection)` helper for connect to driver-unsupported YDB services
 * Marked as deprecated `session.Prepare` callback
 * Marked as deprecated `options.WithQueryCachePolicyKeepInCache` and `options.WithQueryCachePolicy` options
 * Added `options.WithKeepInCache` option
