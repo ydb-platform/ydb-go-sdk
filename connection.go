@@ -40,9 +40,6 @@ import (
 // This interface is central part for access to various systems
 // embedded to ydb through one configured connection method.
 type Connection interface {
-	// ClientConnInterface provide execute unary and streaming RPC over internal balancer
-	grpc.ClientConnInterface
-
 	// Endpoint returns initial endpoint
 	Endpoint() string
 
@@ -117,6 +114,8 @@ type connection struct {
 
 	panicCallback func(e interface{})
 }
+
+var _ grpc.ClientConnInterface = (*connection)(nil)
 
 func (c *connection) Close(ctx context.Context) error {
 	c.mtx.Lock()

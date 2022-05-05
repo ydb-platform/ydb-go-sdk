@@ -1,4 +1,5 @@
 * Fixed bug with convertation `time.Duration` from/to YDB value
+* Removed from `ydb.Connection` embedding of `grpc.ClientConnInterface`
 * Fixed stopping of repeater
 * Added hard minimal interval (1 second) between force wake up's 
 * Renamed `trace.DriverRepeaterTick{Start,Done}Info` to `trace.DriverRepeaterWakeUp{Start,Done}Info`
