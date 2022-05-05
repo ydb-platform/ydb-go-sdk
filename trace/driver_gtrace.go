@@ -819,7 +819,7 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 	{
 		h1 := t.OnRepeaterWakeUp
 		h2 := x.OnRepeaterWakeUp
-		ret.OnRepeaterWakeUp = func(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
+		ret.OnRepeaterWakeUp = func(d DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -827,14 +827,14 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 					}
 				}()
 			}
-			var r, r1 func(DriverRepeaterTickDoneInfo)
+			var r, r1 func(DriverRepeaterWakeUpDoneInfo)
 			if h1 != nil {
 				r = h1(d)
 			}
 			if h2 != nil {
 				r1 = h2(d)
 			}
-			return func(d DriverRepeaterTickDoneInfo) {
+			return func(d DriverRepeaterWakeUpDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -1229,16 +1229,16 @@ func (t Driver) onUnpessimizeNode(d DriverUnpessimizeNodeStartInfo) func(DriverU
 	}
 	return res
 }
-func (t Driver) onRepeaterWakeUp(d DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo) {
+func (t Driver) onRepeaterWakeUp(d DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo) {
 	fn := t.OnRepeaterWakeUp
 	if fn == nil {
-		return func(DriverRepeaterTickDoneInfo) {
+		return func(DriverRepeaterWakeUpDoneInfo) {
 			return
 		}
 	}
 	res := fn(d)
 	if res == nil {
-		return func(DriverRepeaterTickDoneInfo) {
+		return func(DriverRepeaterWakeUpDoneInfo) {
 			return
 		}
 	}
@@ -1519,13 +1519,13 @@ func DriverOnUnpessimizeNode(t Driver, c *context.Context, endpoint EndpointInfo
 	}
 }
 func DriverOnRepeaterWakeUp(t Driver, c *context.Context, name string, event string) func(error) {
-	var p DriverRepeaterTickStartInfo
+	var p DriverRepeaterWakeUpStartInfo
 	p.Context = c
 	p.Name = name
 	p.Event = event
 	res := t.onRepeaterWakeUp(p)
 	return func(e error) {
-		var p DriverRepeaterTickDoneInfo
+		var p DriverRepeaterWakeUpDoneInfo
 		p.Error = e
 		res(p)
 	}

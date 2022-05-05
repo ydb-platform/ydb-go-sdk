@@ -389,7 +389,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverRepeaterEvents != 0 {
 		// nolint:govet
 		l := l.WithName(`repeater`)
-		t.OnRepeaterWakeUp = func(info trace.DriverRepeaterTickStartInfo) func(trace.DriverRepeaterTickDoneInfo) {
+		t.OnRepeaterWakeUp = func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
 			name := info.Name
 			event := info.Event
 			l.Tracef(`repeater wake up {name:"%s",event:"%s"}`,
@@ -397,7 +397,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				event,
 			)
 			start := time.Now()
-			return func(info trace.DriverRepeaterTickDoneInfo) {
+			return func(info trace.DriverRepeaterWakeUpDoneInfo) {
 				if info.Error == nil {
 					l.Tracef(`repeater wake up done {name:"%s",event:"%s",latency:"%v"}`,
 						name,

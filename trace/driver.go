@@ -60,7 +60,7 @@ type (
 		OnUnpessimizeNode func(DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo)
 
 		// Repeater events
-		OnRepeaterWakeUp func(DriverRepeaterTickStartInfo) func(DriverRepeaterTickDoneInfo)
+		OnRepeaterWakeUp func(DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo)
 
 		// Credentials events
 		OnGetCredentials func(DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo)
@@ -327,8 +327,7 @@ type (
 	DriverUnpessimizeNodeDoneInfo struct {
 		State ConnState
 	}
-
-	DriverRepeaterTickStartInfo struct {
+	DriverRepeaterWakeUpStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -337,7 +336,7 @@ type (
 		Name    string
 		Event   string
 	}
-	DriverRepeaterTickDoneInfo struct {
+	DriverRepeaterWakeUpDoneInfo struct {
 		Error error
 	}
 	DriverGetCredentialsStartInfo struct {
