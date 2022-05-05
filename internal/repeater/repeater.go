@@ -2,9 +2,9 @@ package repeater
 
 import (
 	"context"
-	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -25,10 +25,10 @@ type repeater struct {
 	// Task is a function that must be executed periodically.
 	task func(context.Context) error
 
-	stop    context.CancelFunc
+	cancel  context.CancelFunc
 	stopped chan struct{}
 
-	force int32
+	force chan struct{}
 }
 
 type option func(r *repeater)
@@ -54,8 +54,9 @@ func WithInterval(interval time.Duration) option {
 type event string
 
 const (
-	eventTick  = event("tick")
-	eventForce = event("force")
+	eventTick   = event("tick")
+	eventForce  = event("force")
+	eventCancel = event("cancel")
 )
 
 // New creates and begins to execute task periodically.
@@ -64,13 +65,14 @@ func New(
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) *repeater {
-	ctx, stop := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	r := &repeater{
 		interval: interval,
 		task:     task,
-		stop:     stop,
+		cancel:   cancel,
 		stopped:  make(chan struct{}),
+		force:    make(chan struct{}, 1),
 	}
 
 	for _, o := range opts {
@@ -82,14 +84,24 @@ func New(
 	return r
 }
 
-// Stop stops to execute its task.
-func (r *repeater) Stop() {
-	r.stop()
+func (r *repeater) stop(onCancel func()) {
+	r.cancel()
+	if onCancel != nil {
+		onCancel()
+	}
 	<-r.stopped
 }
 
+// Stop stops to execute its task.
+func (r *repeater) Stop() {
+	r.stop(nil)
+}
+
 func (r *repeater) Force() {
-	atomic.AddInt32(&r.force, 1)
+	select {
+	case r.force <- struct{}{}:
+	default:
+	}
 }
 
 func (r *repeater) wakeUp(ctx context.Context, e event) (err error) {
@@ -108,9 +120,12 @@ func (r *repeater) wakeUp(ctx context.Context, e event) (err error) {
 		onDone(err)
 
 		if err != nil {
-			atomic.StoreInt32(&r.force, 1)
+			r.Force()
 		} else {
-			atomic.StoreInt32(&r.force, 0)
+			select {
+			case <-r.force:
+			default:
+			}
 		}
 	}()
 
@@ -123,8 +138,41 @@ func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 
-	force := time.NewTicker(time.Second) // minimal interval between force wakeup's (maybe configured?)
-	defer force.Stop()
+	// force returns backoff with delays [500ms...32s]
+	force := backoff.New(
+		backoff.WithSlotDuration(500*time.Second),
+		backoff.WithCeiling(6),
+		backoff.WithJitterLimit(1),
+	)
+
+	// forceIndex defines delay index for force backoff
+	forceIndex := 0
+
+	waitForceEvent := func() event {
+		if forceIndex == 0 {
+			return eventForce
+		}
+		select {
+		case <-ctx.Done():
+			return eventCancel
+		case <-tick.C:
+			return eventTick
+		case <-force.Wait(forceIndex):
+			return eventForce
+		}
+	}
+
+	// processEvent func checks wakeup error and returns new force index
+	processEvent := func(event event) {
+		if event == eventCancel {
+			return
+		}
+		if err := r.wakeUp(ctx, event); err != nil {
+			forceIndex++
+		} else {
+			forceIndex = 0
+		}
+	}
 
 	for {
 		select {
@@ -132,12 +180,10 @@ func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 			return
 
 		case <-tick.C:
-			_ = r.wakeUp(ctx, eventTick)
+			processEvent(eventTick)
 
-		case <-force.C:
-			if atomic.LoadInt32(&r.force) != 0 {
-				_ = r.wakeUp(ctx, eventForce)
-			}
+		case <-r.force:
+			processEvent(waitForceEvent())
 		}
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
@@ -389,13 +388,6 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}
 	if c.config.Database() == "" {
 		return nil, xerrors.WithStackTrace(errors.New("configuration: empty database"))
-	}
-
-	if single.IsSingle(c.config.Balancer()) {
-		c.discoveryOptions = append(
-			c.discoveryOptions,
-			discoveryConfig.WithInterval(0),
-		)
 	}
 
 	if c.pool == nil {
