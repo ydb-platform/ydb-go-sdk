@@ -123,7 +123,7 @@ func TestConnection(t *testing.T) {
 	}()
 	t.Run("discovery.WhoAmI", func(t *testing.T) {
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			discoveryClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(db)
+			discoveryClient := Ydb_Discovery_V1.NewDiscoveryServiceClient(db.(grpc.ClientConnInterface))
 			response, err := discoveryClient.WhoAmI(
 				ctx,
 				&Ydb_Discovery.WhoAmIRequest{IncludeGroups: true},
@@ -143,7 +143,7 @@ func TestConnection(t *testing.T) {
 	})
 	t.Run("scripting.ExecuteYql", func(t *testing.T) {
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(db)
+			scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(db.(grpc.ClientConnInterface))
 			response, err := scriptingClient.ExecuteYql(
 				ctx,
 				&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
@@ -194,7 +194,7 @@ func TestConnection(t *testing.T) {
 	})
 	t.Run("scripting.StreamExecuteYql", func(t *testing.T) {
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(db)
+			scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(db.(grpc.ClientConnInterface))
 			client, err := scriptingClient.StreamExecuteYql(
 				ctx,
 				&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
@@ -248,7 +248,7 @@ func TestConnection(t *testing.T) {
 			_ = childDB.Close(ctx)
 		}()
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(childDB)
+			scriptingClient := Ydb_Scripting_V1.NewScriptingServiceClient(childDB.(grpc.ClientConnInterface))
 			client, err := scriptingClient.StreamExecuteYql(
 				ctx,
 				&Ydb_Scripting.ExecuteYqlRequest{Script: "SELECT 1+100 AS sum"},
@@ -291,7 +291,7 @@ func TestConnection(t *testing.T) {
 	})
 	t.Run("export.ExportToS3", func(t *testing.T) {
 		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			exportClient := Ydb_Export_V1.NewExportServiceClient(db)
+			exportClient := Ydb_Export_V1.NewExportServiceClient(db.(grpc.ClientConnInterface))
 			response, err := exportClient.ExportToS3(
 				ctx,
 				&Ydb_Export.ExportToS3Request{
