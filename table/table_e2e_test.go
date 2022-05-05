@@ -380,9 +380,6 @@ func TestTable(t *testing.T) {
 					table.ValueParam("$seasonID", types.Uint64Value(1)),
 					table.ValueParam("$episodeID", types.Uint64Value(1)),
 				),
-				options.WithQueryCachePolicy(
-					options.WithQueryCachePolicyKeepInCache(),
-				),
 			)
 			if err != nil {
 				return err
@@ -418,9 +415,6 @@ func TestTable(t *testing.T) {
 					table.ValueParam("$seasonID", types.Uint64Value(1)),
 					table.ValueParam("$episodeID", types.Uint64Value(1)),
 					table.ValueParam("$views", types.Uint64Value(views+1)), // increment views
-				),
-				options.WithQueryCachePolicy(
-					options.WithQueryCachePolicyKeepInCache(),
 				),
 			)
 			if err != nil {
@@ -466,9 +460,6 @@ func TestTable(t *testing.T) {
 					table.ValueParam("$seriesID", types.Uint64Value(1)),
 					table.ValueParam("$seasonID", types.Uint64Value(1)),
 					table.ValueParam("$episodeID", types.Uint64Value(1)),
-				),
-				options.WithQueryCachePolicy(
-					options.WithQueryCachePolicyKeepInCache(),
 				),
 			)
 			if err != nil {
@@ -776,9 +767,6 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$seriesID", types.Uint64Value(1)),
-				),
-				options.WithQueryCachePolicy(
-					options.WithQueryCachePolicyKeepInCache(),
 				),
 				options.WithCollectStatsModeBasic(),
 			)

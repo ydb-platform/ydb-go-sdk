@@ -69,34 +69,44 @@ type Session interface {
 		path string,
 		opts ...options.CreateTableOption,
 	) (err error)
+
 	DescribeTable(
 		ctx context.Context,
 		path string,
 		opts ...options.DescribeTableOption,
 	) (desc options.Description, err error)
+
 	DropTable(
 		ctx context.Context,
 		path string,
 		opts ...options.DropTableOption,
 	) (err error)
+
 	AlterTable(
 		ctx context.Context,
 		path string,
 		opts ...options.AlterTableOption,
 	) (err error)
+
 	CopyTable(
 		ctx context.Context,
 		dst, src string,
 		opts ...options.CopyTableOption,
 	) (err error)
+
 	Explain(
 		ctx context.Context,
 		query string,
 	) (exp DataQueryExplanation, err error)
+
+	// Prepare prepares query for executing in the future
+	//
+	// Deprecated: use Execute with KeepInCache policy option
 	Prepare(
 		ctx context.Context,
 		query string,
 	) (stmt Statement, err error)
+
 	Execute(
 		ctx context.Context,
 		tx *TransactionControl,
@@ -104,34 +114,41 @@ type Session interface {
 		params *QueryParameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
+
 	ExecuteSchemeQuery(
 		ctx context.Context,
 		query string,
 		opts ...options.ExecuteSchemeQueryOption,
 	) (err error)
+
 	DescribeTableOptions(
 		ctx context.Context,
 	) (desc options.TableOptionsDescription, err error)
+
 	StreamReadTable(
 		ctx context.Context,
 		path string,
 		opts ...options.ReadTableOption,
 	) (r result.StreamResult, err error)
+
 	StreamExecuteScanQuery(
 		ctx context.Context,
 		query string,
 		params *QueryParameters,
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)
+
 	BulkUpsert(
 		ctx context.Context,
 		table string,
 		rows types.Value,
 	) (err error)
+
 	BeginTransaction(
 		ctx context.Context,
 		tx *TransactionSettings,
 	) (x Transaction, err error)
+
 	KeepAlive(
 		ctx context.Context,
 	) error
