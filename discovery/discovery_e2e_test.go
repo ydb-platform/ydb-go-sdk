@@ -63,7 +63,7 @@ func TestDiscovery(t *testing.T) {
 		ydb.WithConnectionTTL(time.Second*1),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
-			trace.MatchDetails(`ydb\.(driver|discovery).*`),
+			trace.MatchDetails(`ydb\.(driver|discovery|repeater).*`),
 			ydb.WithNamespace("ydb"),
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stdout),

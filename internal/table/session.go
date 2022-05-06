@@ -926,8 +926,13 @@ func (s *session) StreamReadTable(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if checkHintSessionClose(stream.Trailer()) {
-		s.SetStatus(options.SessionClosing)
+	select {
+	case <-stream.Context().Done():
+		// nop
+	default:
+		if checkHintSessionClose(stream.Trailer()) {
+			s.SetStatus(options.SessionClosing)
+		}
 	}
 
 	return scanner.NewStream(
@@ -1010,8 +1015,13 @@ func (s *session) StreamExecuteScanQuery(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if checkHintSessionClose(stream.Trailer()) {
-		s.SetStatus(options.SessionClosing)
+	select {
+	case <-stream.Context().Done():
+		// nop
+	default:
+		if checkHintSessionClose(stream.Trailer()) {
+			s.SetStatus(options.SessionClosing)
+		}
 	}
 
 	return scanner.NewStream(

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
@@ -127,22 +128,23 @@ func New(
 		discoveryConfig,
 	)
 
-	if err = r.clusterDiscovery(ctx); err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	if d := discoveryConfig.Interval(); d > 0 {
-		r.discoveryRepeater = repeater.New(d, func(ctx context.Context) (err error) {
-			ctx, cancel := context.WithTimeout(ctx, d)
-			defer cancel()
-
-			return r.clusterDiscovery(ctx)
-		},
-			repeater.WithName("discovery"),
-			repeater.WithTrace(r.config.Trace()),
-		)
-	} else {
+	if single.IsSingle(r.config.Balancer()) {
 		r.clusterSwap(r.clusterCreate(ctx, []endpoint.Endpoint{discoveryEndpoint}))
+	} else {
+		if err = r.clusterDiscovery(ctx); err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		if d := discoveryConfig.Interval(); d > 0 {
+			r.discoveryRepeater = repeater.New(d, func(ctx context.Context) (err error) {
+				ctx, cancel := context.WithTimeout(ctx, d)
+				defer cancel()
+
+				return r.clusterDiscovery(ctx)
+			},
+				repeater.WithName("discovery"),
+				repeater.WithTrace(r.config.Trace()),
+			)
+		}
 	}
 
 	var cancel context.CancelFunc

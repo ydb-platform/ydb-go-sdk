@@ -6,7 +6,7 @@
 * Fixed bug with convertation `time.Duration` from/to YDB value
 * Removed from `ydb.Connection` embedding of `grpc.ClientConnInterface`
 * Fixed stopping of repeater
-* Added hard minimal interval (1 second) between force wake up's 
+* Added log backoff between force repeater wake up's (from 500ms to 32s) 
 * Renamed `trace.DriverRepeaterTick{Start,Done}Info` to `trace.DriverRepeaterWakeUp{Start,Done}Info`
 * Fixed unexpected `NullFlag` while parse nil `JSONDocument` value
 * Removed `internal/conn/conn.streamUsages` and `internal/conn/conn.usages` (`internal/conn.conn` always touching last usage timestamp on API calls)
