@@ -250,7 +250,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Int64Value: v,
 			},
 		}
-		src := timeutil.UnmarshalInterval(v)
+		src := timeutil.MicrosecondsToDuration(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp

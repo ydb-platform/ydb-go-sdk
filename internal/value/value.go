@@ -339,6 +339,7 @@ func TimestampValue(v uint64) Value {
 	}
 }
 
+// IntervalValue makes Value from given microseconds value
 func IntervalValue(v int64) Value {
 	return Value{
 		t: TypeInterval,

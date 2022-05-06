@@ -42,56 +42,104 @@ func DatetimeValue(v uint32) Value { return value.DatetimeValue(v) }
 
 func TimestampValue(v uint64) Value { return value.TimestampValue(v) }
 
+// IntervalValue makes Value from given microseconds value
 func IntervalValue(v int64) Value { return value.IntervalValue(v) }
 
+// TzDateValue makes TzDate value from string
 func TzDateValue(v string) Value { return value.TzDateValue(v) }
 
+// TzDatetimeValue makes TzDatetime value from string
 func TzDatetimeValue(v string) Value { return value.TzDatetimeValue(v) }
 
+// TzTimestampValue makes TzTimestamp value from string
 func TzTimestampValue(v string) Value { return value.TzTimestampValue(v) }
 
+// DateValueFromTime makes Date value from time.Time
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func DateValueFromTime(v time.Time) Value { return value.DateValue(timeutil.MarshalDate(v)) }
 
+// DatetimeValueFromTime makes Datetime value from time.Time
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func DatetimeValueFromTime(v time.Time) Value {
 	return value.DatetimeValue(timeutil.MarshalDatetime(v))
 }
 
+// TimestampValueFromTime makes Timestamp value from time.Time
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func TimestampValueFromTime(v time.Time) Value {
 	return value.TimestampValue(timeutil.MarshalTimestamp(v))
 }
 
+// IntervalValueFromDuration makes Interval value from time.Duration
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func IntervalValueFromDuration(v time.Duration) Value {
-	return value.IntervalValue(timeutil.MarshalInterval(v))
+	return value.IntervalValue(timeutil.DurationToMicroseconds(v))
 }
 
+// TzDateValueFromTime makes TzDate value from time.Time
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func TzDateValueFromTime(v time.Time) Value { return value.TzDateValue(timeutil.MarshalTzDate(v)) }
 
+// TzDatetimeValueFromTime makes TzDatetime value from time.Time
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func TzDatetimeValueFromTime(v time.Time) Value {
 	return value.TzDatetimeValue(timeutil.MarshalTzDatetime(v))
 }
 
+// TzTimestampValueFromTime makes TzTimestamp value from time.Time
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func TzTimestampValueFromTime(v time.Time) Value {
 	return value.TzTimestampValue(timeutil.MarshalTzTimestamp(v))
 }
 
 func StringValue(v []byte) Value { return value.StringValue(v) }
 
+// StringValueFromString makes String value from string
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func StringValueFromString(v string) Value { return value.StringValue([]byte(v)) }
 
 func UTF8Value(v string) Value { return value.UTF8Value(v) }
 
 func YSONValue(v string) Value { return value.YSONValue(v) }
 
+// YSONValueFromBytes makes YSON value from bytes
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func YSONValueFromBytes(v []byte) Value { return value.YSONValue(string(v)) }
 
 func JSONValue(v string) Value { return value.JSONValue(v) }
 
+// JSONValueFromBytes makes JSON value from bytes
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func JSONValueFromBytes(v []byte) Value { return value.JSONValue(string(v)) }
 
 func UUIDValue(v [16]byte) Value { return value.UUIDValue(v) }
 
 func JSONDocumentValue(v string) Value { return value.JSONDocumentValue(v) }
 
+// JSONDocumentValueFromBytes makes JSONDocument value from bytes
+//
+// Warning: all *From* helpers will be removed at next major release
+// (functional will be implements with go1.18 type lists)
 func JSONDocumentValueFromBytes(v []byte) Value { return value.JSONDocumentValue(string(v)) }
 
 func DyNumberValue(v string) Value { return value.DyNumberValue(v) }

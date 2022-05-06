@@ -378,7 +378,7 @@ func (s *scanner) any() interface{} {
 	case value.TypeInt64:
 		return s.int64()
 	case value.TypeInterval:
-		return timeutil.UnmarshalInterval(s.int64())
+		return timeutil.MicrosecondsToDuration(s.int64())
 	case value.TypeTzDate:
 		src, err := timeutil.UnmarshalTzDate(s.text())
 		if err != nil {
@@ -750,7 +750,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	case *time.Time:
 		s.setTime(v)
 	case *time.Duration:
-		*v = timeutil.UnmarshalInterval(s.int64())
+		*v = timeutil.MicrosecondsToDuration(s.int64())
 	case *string:
 		s.setString(v)
 	case *[]byte:
@@ -910,7 +910,7 @@ func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) 
 		if s.isNull() {
 			*v = nil
 		} else {
-			src := timeutil.UnmarshalInterval(s.int64())
+			src := timeutil.MicrosecondsToDuration(s.int64())
 			*v = &src
 		}
 	case **string:
