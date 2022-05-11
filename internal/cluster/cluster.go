@@ -19,38 +19,26 @@ const (
 	MaxGetConnTimeout = 10 * time.Second
 )
 
+// nolint: gofumpt
+// nolint: nolintlint
 var (
-	// ErrClusterClosed returned when requested on a closed cluster.
-	ErrClusterClosed = xerrors.Wrap(fmt.Errorf("cluster closed"))
-
 	// ErrClusterEmpty returned when no connections left in cluster.
 	ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
 )
 
 type Cluster struct {
 	config config.Config
-	pool   conn.Pool
+	pool   *conn.Pool
 	conns  []conn.Conn
 
 	balancer balancer.Balancer
 
-	done chan struct{}
-
 	onBadStateCallback balancer.OnBadStateCallback
-}
-
-func (c *Cluster) isClosed() bool {
-	select {
-	case <-c.done:
-		return true
-	default:
-		return false
-	}
 }
 
 // Ban connection in underling pool
 func (c *Cluster) Ban(ctx context.Context, cc conn.Conn, cause error) {
-	c.pool.Pessimize(ctx, cc, cause)
+	c.pool.Ban(ctx, cc, cause)
 
 	online := 0
 	for _, cc := range c.conns {
@@ -64,15 +52,15 @@ func (c *Cluster) Ban(ctx context.Context, cc conn.Conn, cause error) {
 	}
 }
 
-// Unban connection in underling pool
-func (c *Cluster) Unban(ctx context.Context, cc conn.Conn) {
-	c.pool.Unpessimize(ctx, cc)
+// Allow connection in underling pool
+func (c *Cluster) Allow(ctx context.Context, cc conn.Conn) {
+	c.pool.Allow(ctx, cc)
 }
 
 func New(
 	ctx context.Context,
 	config config.Config,
-	pool conn.Pool,
+	pool *conn.Pool,
 	endpoints []endpoint.Endpoint,
 	onBadStateCallback balancer.OnBadStateCallback,
 ) *Cluster {
@@ -99,7 +87,6 @@ func New(
 	)
 
 	return &Cluster{
-		done:               make(chan struct{}),
 		config:             config,
 		pool:               pool,
 		conns:              conns,
@@ -118,17 +105,12 @@ func (c *Cluster) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	close(c.done)
-
-	return nil
+	return c.pool.Release(ctx)
 }
 
 func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
 	for {
 		select {
-		case <-c.done:
-			return nil, xerrors.WithStackTrace(ErrClusterClosed)
-
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 
@@ -156,10 +138,6 @@ func (c *Cluster) get(ctx context.Context) (cc conn.Conn, _ error) {
 // Get returns next available connection.
 // It returns error on given deadline cancellation or when cluster become closed.
 func (c *Cluster) Get(ctx context.Context) (cc conn.Conn, err error) {
-	if c.isClosed() {
-		return nil, xerrors.WithStackTrace(ErrClusterClosed)
-	}
-
 	var cancel context.CancelFunc
 	// without client context deadline lock limited on MaxGetConnTimeout
 	// cluster endpoints cannot be updated at this time

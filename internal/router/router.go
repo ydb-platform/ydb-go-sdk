@@ -22,7 +22,7 @@ import (
 
 type router struct {
 	config config.Config
-	pool   conn.Pool
+	pool   *conn.Pool
 
 	clusterMtx sync.RWMutex
 	clusterPtr *cluster.Cluster
@@ -99,7 +99,7 @@ func (r *router) Close(ctx context.Context) (err error) {
 func New(
 	ctx context.Context,
 	c config.Config,
-	pool conn.Pool,
+	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {
 	onDone := trace.DriverOnInit(
@@ -182,7 +182,17 @@ func (r *router) Invoke(
 		return xerrors.WithStackTrace(err)
 	}
 
-	defer r.handleConnRequestError(ctx, &err, cc)
+	defer func() {
+		if err == nil {
+			if cc.GetState() == conn.Banned {
+				r.cluster().Allow(ctx, cc)
+			}
+		} else {
+			if xerrors.MustPessimizeEndpoint(err, r.config.ExcludeGRPCCodesForPessimization()...) {
+				r.cluster().Ban(ctx, cc, err)
+			}
+		}
+	}()
 
 	ctx, err = r.config.Meta().Meta(ctx)
 	if err != nil {
@@ -202,13 +212,24 @@ func (r *router) NewStream(
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	cc, err := r.cluster().Get(ctx)
+) (_ grpc.ClientStream, err error) {
+	var cc conn.Conn
+	cc, err = r.cluster().Get(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	defer r.handleConnRequestError(ctx, &err, cc)
+	defer func() {
+		if err == nil {
+			if cc.GetState() == conn.Banned {
+				r.cluster().Allow(ctx, cc)
+			}
+		} else {
+			if xerrors.MustPessimizeEndpoint(err, r.config.ExcludeGRPCCodesForPessimization()...) {
+				r.cluster().Ban(ctx, cc, err)
+			}
+		}
+	}()
 
 	ctx, err = r.config.Meta().Meta(ctx)
 	if err != nil {
@@ -222,14 +243,4 @@ func (r *router) NewStream(
 	}
 
 	return client, nil
-}
-
-func (r *router) handleConnRequestError(ctx context.Context, perr *error, cc conn.Conn) {
-	err := *perr
-	if err == nil && cc.GetState() == conn.Banned {
-		r.cluster().Unban(ctx, cc)
-	}
-	if err != nil && xerrors.MustPessimizeEndpoint(err, r.config.ExcludeGRPCCodesForPessimization()...) {
-		r.cluster().Ban(ctx, cc, err)
-	}
 }

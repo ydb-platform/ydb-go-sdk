@@ -645,7 +645,6 @@ func (c *Client) keeper(ctx context.Context) {
 					case
 						xerrors.Is(
 							err,
-							cluster.ErrClusterClosed,
 							cluster.ErrClusterEmpty,
 						),
 						xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION),
