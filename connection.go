@@ -102,7 +102,7 @@ type connection struct {
 	ratelimiter        *internalRatelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
-	pool conn.Pool
+	pool *conn.Pool
 
 	mtx    sync.Mutex
 	router router.Connection

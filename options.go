@@ -515,7 +515,7 @@ func withOnClose(onClose func(c *connection)) Option {
 	}
 }
 
-func withConnPool(pool conn.Pool) Option {
+func withConnPool(pool *conn.Pool) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.pool = pool
 		return pool.Take(ctx)

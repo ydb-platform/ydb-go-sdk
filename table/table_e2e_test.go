@@ -725,7 +725,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 		},
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
-		t.Errorf("read table error: %+v", err)
+		t.Fatalf("read table error: %+v", err)
 	}
 }
 
@@ -797,7 +797,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 		},
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
-		t.Errorf("select simple error: %+v", err)
+		t.Fatalf("select simple error: %+v", err)
 	}
 }
 
@@ -856,7 +856,7 @@ func executeScanQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 		},
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
-		t.Errorf("scan query error: %+v", err)
+		t.Fatalf("scan query error: %+v", err)
 	}
 }
 

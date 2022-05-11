@@ -1,3 +1,7 @@
+* Fixed bug with unexpected failing of call `Invoke` and `NewStream` on closed cluster
+* Fixed bug with releasing `internal/conn/conn.Pool` in cluster
+* Replaced interface `internal/conn/conn.Pool` to struct `internal/conn/conn.Pool`
+
 ## v3.25.0
 * Added `ydb.GRPCConn(ydb.Connection)` helper for connect to driver-unsupported YDB services
 * Marked as deprecated `session.Prepare` callback

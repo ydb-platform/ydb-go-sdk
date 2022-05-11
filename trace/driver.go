@@ -38,12 +38,20 @@ type (
 		) func(
 			DriverConnNewStreamDoneInfo,
 		)
-		OnConnTake               func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
-		OnConnUsagesChange       func(DriverConnUsagesChangeInfo)
+		OnConnTake  func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
+		OnConnPark  func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
+		OnConnBan   func(DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
+		OnConnAllow func(DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo)
+		OnConnClose func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
+
+		// Deprecated: has no effect now
+		OnConnUsagesChange func(DriverConnUsagesChangeInfo)
+
+		// Deprecated: has no effect now
 		OnConnStreamUsagesChange func(DriverConnStreamUsagesChangeInfo)
-		OnConnPark               func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
-		OnConnClose              func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
-		OnConnRelease            func(DriverConnReleaseStartInfo) func(DriverConnReleaseDoneInfo)
+
+		// Deprecated: has no effect now
+		OnConnRelease func(DriverConnReleaseStartInfo) func(DriverConnReleaseDoneInfo)
 
 		// Cluster events
 		OnClusterInit  func(DriverClusterInitStartInfo) func(DriverClusterInitDoneInfo)
@@ -56,7 +64,10 @@ type (
 		// Deprecated: has no effect now
 		OnClusterRemove func(DriverClusterRemoveStartInfo) func(DriverClusterRemoveDoneInfo)
 
-		OnPessimizeNode   func(DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo)
+		// Deprecated: has no effect now
+		OnPessimizeNode func(DriverPessimizeNodeStartInfo) func(DriverPessimizeNodeDoneInfo)
+
+		// Deprecated: has no effect now
 		OnUnpessimizeNode func(DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo)
 
 		// Repeater events
@@ -117,6 +128,7 @@ type EndpointInfo interface {
 }
 
 type (
+	// Deprecated: has no effect now
 	DriverClusterInsertStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -125,10 +137,12 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
+	// Deprecated: has no effect now
 	DriverClusterInsertDoneInfo struct {
 		Inserted bool
 		State    ConnState
 	}
+	// Deprecated: has no effect now
 	DriverClusterRemoveStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -137,6 +151,7 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
+	// Deprecated: has no effect now
 	DriverClusterRemoveDoneInfo struct {
 		Removed bool
 		State   ConnState
@@ -221,6 +236,32 @@ type (
 	DriverConnCloseDoneInfo struct {
 		Error error
 	}
+	DriverConnBanStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Endpoint EndpointInfo
+		State    ConnState
+		Cause    error
+	}
+	DriverConnBanDoneInfo struct {
+		State ConnState
+	}
+	DriverConnAllowStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Endpoint EndpointInfo
+		State    ConnState
+	}
+	DriverConnAllowDoneInfo struct {
+		State ConnState
+	}
+	// Deprecated: has no effect now
 	DriverConnReleaseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -229,13 +270,16 @@ type (
 		Context  *context.Context
 		Endpoint EndpointInfo
 	}
+	// Deprecated: has no effect now
 	DriverConnReleaseDoneInfo struct {
 		Error error
 	}
+	// Deprecated: has no effect now
 	DriverConnUsagesChangeInfo struct {
 		Endpoint EndpointInfo
 		Usages   int
 	}
+	// Deprecated: has no effect now
 	DriverConnStreamUsagesChangeInfo struct {
 		Endpoint EndpointInfo
 		Usages   int
@@ -302,6 +346,7 @@ type (
 		Endpoint EndpointInfo
 		Error    error
 	}
+	// Deprecated: has no effect now
 	DriverPessimizeNodeStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -312,9 +357,11 @@ type (
 		State    ConnState
 		Cause    error
 	}
+	// Deprecated: has no effect now
 	DriverPessimizeNodeDoneInfo struct {
 		State ConnState
 	}
+	// Deprecated: has no effect now
 	DriverUnpessimizeNodeStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -324,6 +371,7 @@ type (
 		Endpoint EndpointInfo
 		State    ConnState
 	}
+	// Deprecated: has no effect now
 	DriverUnpessimizeNodeDoneInfo struct {
 		State ConnState
 	}
