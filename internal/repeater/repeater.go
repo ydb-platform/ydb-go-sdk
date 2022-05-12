@@ -89,7 +89,7 @@ func New(
 		o(r)
 	}
 
-	go r.worker(ctx, r.interval, r.clock.NewTicker(interval))
+	go r.worker(ctx, r.clock.NewTicker(interval))
 
 	return r
 }
@@ -142,7 +142,7 @@ func (r *repeater) wakeUp(ctx context.Context, e event) (err error) {
 	return r.task(ctx)
 }
 
-func (r *repeater) worker(ctx context.Context, interval time.Duration, tick clockwork.Ticker) {
+func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 	defer close(r.stopped)
 	defer tick.Stop()
 

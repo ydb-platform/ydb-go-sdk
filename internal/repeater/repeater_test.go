@@ -11,56 +11,45 @@ import (
 )
 
 func TestRepeaterNoWakeUpsAfterStop(t *testing.T) {
-	testFunc := func(i int) {
-		if i%100 == 0 {
-			t.Logf("check %d ...", i)
-			defer t.Logf("check %d done", i)
-		}
-		var (
-			interval    = time.Millisecond
-			wakeUpStart = make(chan struct{})
-			wakeUpDone  = make(chan struct{})
-		)
-		fakeClock := clockwork.NewFakeClock()
-		r := New(interval, func(ctx context.Context) (err error) {
-			wakeUpStart <- struct{}{}
-			<-wakeUpDone
-			return nil
-		}, WithClock(fakeClock))
+	var (
+		interval    = time.Millisecond
+		wakeUpStart = make(chan struct{})
+		wakeUpDone  = make(chan struct{})
+	)
+	fakeClock := clockwork.NewFakeClock()
+	r := New(interval, func(ctx context.Context) (err error) {
+		wakeUpStart <- struct{}{}
+		<-wakeUpDone
+		return nil
+	}, WithClock(fakeClock))
 
+	fakeClock.Advance(interval)
+	<-wakeUpStart            // wait first wake up
+	wakeUpDone <- struct{}{} // unlock exit from first wake up
+
+	fakeClock.Advance(interval)
+	<-wakeUpStart   // wait second wake up
+	r.stop(func() { // call stop
+		wakeUpDone <- struct{}{} // unlock exit from second wake up
+	})
+
+	noWakeup := make(chan struct{})
+	go func() {
+		<-fakeClock.After(interval * 2)
+		noWakeup <- struct{}{}
+	}()
+
+waitNoWakeup:
+	for {
 		fakeClock.Advance(interval)
-		<-wakeUpStart            // wait first wake up
-		wakeUpDone <- struct{}{} // unlock exit from first wake up
-
-		fakeClock.Advance(interval)
-		<-wakeUpStart   // wait second wake up
-		r.stop(func() { // call stop
-			wakeUpDone <- struct{}{} // unlock exit from second wake up
-		})
-
-		noWakeup := make(chan struct{})
-		go func() {
-			select {
-			case <-wakeUpStart:
-				t.Fatalf("unexpected wake up after stop")
-			case <-fakeClock.After(interval * 2):
-				noWakeup <- struct{}{}
-			}
-		}()
-
-	waitNoWakeup:
-		for {
-			fakeClock.Advance(interval)
-			select {
-			case <-noWakeup:
-				break waitNoWakeup
-			default:
-				runtime.Gosched()
-			}
+		select {
+		case <-wakeUpStart:
+			t.Fatalf("unexpected wake up after stop")
+		case <-noWakeup:
+			break waitNoWakeup
+		default:
+			runtime.Gosched()
 		}
-	}
-	for i := 0; i < 10000; i++ {
-		testFunc(i)
 	}
 }
 
