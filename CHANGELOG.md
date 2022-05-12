@@ -1,3 +1,4 @@
+## v3.25.2
 * Fixed repeater initial force timeout from 500 to 0.5 second
 
 ## v3.25.1
