@@ -1,3 +1,5 @@
+* Fixed repeater initial force timeout from 500 to 0.5 second
+
 ## v3.25.1
 * Fixed bug with unexpected failing of call `Invoke` and `NewStream` on closed cluster
 * Fixed bug with releasing `internal/conn/conn.Pool` in cluster
