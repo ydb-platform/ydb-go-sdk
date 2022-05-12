@@ -140,7 +140,7 @@ func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 
 	// force returns backoff with delays [500ms...32s]
 	force := backoff.New(
-		backoff.WithSlotDuration(500*time.Second),
+		backoff.WithSlotDuration(500*time.Millisecond),
 		backoff.WithCeiling(6),
 		backoff.WithJitterLimit(1),
 	)
