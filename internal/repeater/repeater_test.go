@@ -102,10 +102,14 @@ func TestRepeaterForceLogBackoff(t *testing.T) {
 	<-repeaterDone
 
 	for _, delay := range delays[1:] {
-		fakeClock.Advance(delay - 2) // release trash timer listeners
-		fakeClock.BlockUntil(2)      // ensure right listeners attached
-		fakeClock.Advance(1)         // check about new listeners not fire before estimated
-		fakeClock.Advance(1)         // fire estimated time
+		// ensure right listeners attached
+		fakeClock.BlockUntil(2)
+
+		// release trash timer listeners
+		fakeClock.Advance(delay - 1)
+
+		// fire estimated time
+		fakeClock.Advance(1)
 		<-repeaterDone
 	}
 }
