@@ -72,8 +72,7 @@ func TestRepeaterForceLogBackoff(t *testing.T) {
 		4 * time.Second,  // 7 sec
 		8 * time.Second,  // 15 sec
 		16 * time.Second, // 31 sec
-		29 * time.Second, // 60 sec - normal ticker
-		32 * time.Second, // 92 sec - force
+		32 * time.Second, // 63 sec
 	}
 
 	fakeClock := clockwork.NewFakeClock()
@@ -83,7 +82,7 @@ func TestRepeaterForceLogBackoff(t *testing.T) {
 	)
 
 	repeaterDone := make(chan struct{})
-	r := New(time.Minute, func(ctx context.Context) (err error) {
+	r := New(10*time.Minute, func(ctx context.Context) (err error) {
 		defer func() {
 			repeaterDone <- struct{}{}
 		}()
