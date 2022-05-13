@@ -1,4 +1,5 @@
-* Refactor Struct value creation
+* Changed primary license to `Apache2.0` for auto-detect license 
+* Refactored `types.Struct` value creation
 
 ## v3.25.2
 * Fixed repeater initial force timeout from 500 to 0.5 second
