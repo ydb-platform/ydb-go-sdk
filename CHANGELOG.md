@@ -1,3 +1,5 @@
+* Refactor Struct value creation
+
 ## v3.25.2
 * Fixed repeater initial force timeout from 500 to 0.5 second
 
@@ -14,7 +16,7 @@
 * Enabled by default keep-in-cache policy for data queries
 * Removed from `ydb.Connection` embedding of `grpc.ClientConnInterface`
 * Fixed stopping of repeater
-* Added log backoff between force repeater wake up's (from 500ms to 32s) 
+* Added log backoff between force repeater wake up's (from 500ms to 32s)
 * Renamed `trace.DriverRepeaterTick{Start,Done}Info` to `trace.DriverRepeaterWakeUp{Start,Done}Info`
 * Fixed unexpected `NullFlag` while parse nil `JSONDocument` value
 * Removed `internal/conn/conn.streamUsages` and `internal/conn/conn.usages` (`internal/conn.conn` always touching last usage timestamp on API calls)
@@ -35,7 +37,7 @@
 * Fixed re-opening case after close lazy-initialized clients
 * Removed dependency of call context for initializing lazy table client
 * Added `config.AutoRetry()` flag with `true` value by default. `config.AutoRetry()` affects how to errors handle in sub-clients calls.
-* Added `config.WithNoAutoRetry` for disabling auto-retry on errors in sub-clients calls 
+* Added `config.WithNoAutoRetry` for disabling auto-retry on errors in sub-clients calls
 * Refactored `internal/lazy` package (supported check `config.AutoRetry()`, removed all error wrappings with stacktrace)
 
 ## v3.23.0
@@ -43,7 +45,7 @@
 * Added `sugar.LoadCertificatesFromFile` and `sugar.LoadCertificatesFromPem` helpers
 
 ## v3.22.0
-* Supported `json.Unmarshaler` type for scanning row to values 
+* Supported `json.Unmarshaler` type for scanning row to values
 * Reimplemented `sugar.DSN` with `net/url`
 
 ## v3.21.0
