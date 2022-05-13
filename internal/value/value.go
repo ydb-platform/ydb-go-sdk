@@ -502,6 +502,19 @@ type StructValueProto struct {
 	Values []*Ydb.Value
 }
 
+func (s *StructValueProto) Grow(size int) {
+	if cap(s.Fields) < size {
+		newFields := make([]StructField, 0, size)
+		newFields = append(newFields, s.Fields...)
+		s.Fields = newFields
+	}
+	if cap(s.Values) < size {
+		newValues := make([]*Ydb.Value, 0, size)
+		newValues = append(newValues, s.Values...)
+		s.Values = newValues
+	}
+}
+
 func (s *StructValueProto) Add(name string, value V) {
 	s.Fields = append(s.Fields, StructField{
 		Name: name,
