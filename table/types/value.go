@@ -147,18 +147,28 @@ func ListValue(vs ...Value) Value {
 
 type tStructValueProto value.StructValueProto
 
-type StructValueOption func(*tStructValueProto)
+type StructValueOption interface {
+	apply(*tStructValueProto)
+}
+
+type structField struct {
+	name  string
+	value Value
+}
+
+func (f structField) apply(p *tStructValueProto) {
+	(*value.StructValueProto)(p).Add(f.name, f.value)
+}
 
 func StructFieldValue(name string, v Value) StructValueOption {
-	return func(p *tStructValueProto) {
-		(*value.StructValueProto)(p).Add(name, v)
-	}
+	return structField{name: name, value: v}
 }
 
 func StructValue(opts ...StructValueOption) Value {
 	var p tStructValueProto
+	(*value.StructValueProto)(&p).Grow(len(opts))
 	for _, opt := range opts {
-		opt(&p)
+		opt.apply(&p)
 	}
 	return value.StructValue((*value.StructValueProto)(&p))
 }
