@@ -1,94 +1,71 @@
 package balancers
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
 func TestPreferLocalDC(t *testing.T) {
-	ctx := context.Background()
-
 	conns := []conn.Conn{
 		&mock.Conn{AddrField: "1", LocalDCField: false},
 		&mock.Conn{AddrField: "2", State: conn.Online, LocalDCField: true},
 		&mock.Conn{AddrField: "3", State: conn.Online, LocalDCField: true},
 	}
-	rr := PreferLocalDC(RoundRobin()).Create(conns)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
-
-	// ban local connections
-	conns[1].SetState(conn.Banned)
-	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, balancer.WithAcceptBanned(true)))
-	require.Nil(t, rr.Next(ctx))
+	rr := PreferLocalDC(RoundRobin())
+	require.False(t, rr.AllowFalback)
+	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(rr, conns))
 }
 
 func TestPreferLocalDCWithFallBack(t *testing.T) {
-	ctx := context.Background()
-
 	conns := []conn.Conn{
-		&mock.Conn{AddrField: "1", LocalDCField: false, State: conn.Online},
+		&mock.Conn{AddrField: "1", LocalDCField: false},
 		&mock.Conn{AddrField: "2", State: conn.Online, LocalDCField: true},
 		&mock.Conn{AddrField: "3", State: conn.Online, LocalDCField: true},
 	}
-	rr := PreferLocalDCWithFallBack(RoundRobin()).Create(conns)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx))
-
-	// ban connections
-	conns[1].SetState(conn.Banned)
-	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[1], conns[2]}, rr.Next(ctx, balancer.WithAcceptBanned(true)))
-	require.Equal(t, conns[0], rr.Next(ctx))
+	rr := PreferLocalDCWithFallBack(RoundRobin())
+	require.True(t, rr.AllowFalback)
+	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(rr, conns))
 }
 
 func TestPreferLocations(t *testing.T) {
-	ctx := context.Background()
-
 	conns := []conn.Conn{
 		&mock.Conn{AddrField: "1", LocationField: "zero", State: conn.Online},
 		&mock.Conn{AddrField: "2", State: conn.Online, LocationField: "one"},
 		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "two"},
 	}
 
-	rr := PreferLocations(RoundRobin(), "zero", "two").Create(conns)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
-
-	// ban zero, two
-	conns[0].SetState(conn.Banned)
-	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, balancer.WithAcceptBanned(true)))
-	require.Nil(t, rr.Next(ctx))
+	rr := PreferLocations(RoundRobin(), "zero", "two")
+	require.False(t, rr.AllowFalback)
+	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(rr, conns))
 }
 
 func TestPreferLocationsWithFallback(t *testing.T) {
-	ctx := context.Background()
-
 	conns := []conn.Conn{
 		&mock.Conn{AddrField: "1", LocationField: "zero", State: conn.Online},
 		&mock.Conn{AddrField: "2", State: conn.Online, LocationField: "one"},
 		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "two"},
 	}
 
-	rr := PreferLocationsWithFallback(RoundRobin(), "zero", "two").Create(conns)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx))
+	rr := PreferLocationsWithFallback(RoundRobin(), "zero", "two")
+	require.True(t, rr.AllowFalback)
+	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(rr, conns))
+}
 
-	// ban zero, two
-	conns[0].SetState(conn.Banned)
-	conns[2].SetState(conn.Banned)
-	require.Contains(t, []conn.Conn{conns[0], conns[2]}, rr.Next(ctx, balancer.WithAcceptBanned(true)))
-	require.Equal(t, conns[1], rr.Next(ctx))
+func applyPreferFilter(b balancer.Balancer, conns []conn.Conn) []conn.Conn {
+	if b.IsPreferConn == nil {
+		b.IsPreferConn = func(c conn.Conn) bool { return true }
+	}
+	res := make([]conn.Conn, 0, len(conns))
+	for _, c := range conns {
+		if b.IsPreferConn(c) {
+			res = append(res, c)
+		}
+	}
+	return res
 }

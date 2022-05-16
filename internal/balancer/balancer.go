@@ -6,18 +6,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
-// Balancer is an interface that implements particular load-balancing
-// algorithm.
-//
-// Balancer methods called synchronized. That is, implementations must not
-// provide additional goroutine safety.
-type Balancer interface {
-	// Next returns next connection for request.
-	Next(ctx context.Context, opts ...NextOption) conn.Conn
+type (
+	Balancer = *Config
 
-	// Create same balancer instance with new connections
-	Create(conns []conn.Conn) Balancer
-}
+	Config struct {
+		IsPreferConn PreferConnFunc
+		AllowFalback bool
+		SingleConn   bool
+	}
+)
+
+type PreferConnFunc func(c conn.Conn) bool
 
 func IsOkConnection(c conn.Conn, bannedIsOk bool) bool {
 	switch c.GetState() {

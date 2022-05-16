@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
@@ -22,11 +24,13 @@ func TestFromConfig(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		config string
+		res    balancer.Config
 		fail   bool
 	}{
 		{
 			name:   "empty",
 			config: ``,
+			res:    balancer.Config{},
 			fail:   true,
 		},
 		{
@@ -34,18 +38,21 @@ func TestFromConfig(t *testing.T) {
 			config: `{
 				"type": "single"
 			}`,
+			res: balancer.Config{SingleConn: true},
 		},
 		{
 			name: "round_robin",
 			config: `{
 				"type": "round_robin"
 			}`,
+			res: balancer.Config{},
 		},
 		{
 			name: "random_choice",
 			config: `{
 				"type": "random_choice"
 			}`,
+			res: balancer.Config{},
 		},
 		{
 			name: "prefer_local_dc",
@@ -53,6 +60,10 @@ func TestFromConfig(t *testing.T) {
 				"type": "random_choice",
 				"prefer": "local_dc"
 			}`,
+			res: balancer.Config{IsPreferConn: func(c conn.Conn) bool {
+				// some non nil func
+				return false
+			}},
 		},
 		{
 			name: "prefer_unknown_type",
@@ -69,6 +80,13 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "local_dc",
 				"fallback": true
 			}`,
+			res: balancer.Config{
+				AllowFalback: true,
+				IsPreferConn: func(c conn.Conn) bool {
+					// some non nil func
+					return false
+				},
+			},
 		},
 		{
 			name: "prefer_locations",
@@ -77,6 +95,12 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "locations",
 				"locations": ["AAA", "BBB", "CCC"]
 			}`,
+			res: balancer.Config{
+				IsPreferConn: func(c conn.Conn) bool {
+					// some non nil func
+					return false
+				},
+			},
 		},
 		{
 			name: "prefer_locations_with_fallback",
@@ -86,12 +110,19 @@ func TestFromConfig(t *testing.T) {
 				"locations": ["AAA", "BBB", "CCC"],
 				"fallback": true
 			}`,
+			res: balancer.Config{
+				AllowFalback: true,
+				IsPreferConn: func(c conn.Conn) bool {
+					// some non nil func
+					return false
+				},
+			},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				actErr   error
-				fallback testBalancer
+				fallback = &balancer.Config{}
 			)
 			b := FromConfig(
 				test.config,
@@ -109,6 +140,15 @@ func TestFromConfig(t *testing.T) {
 			if test.fail && b != fallback {
 				t.Fatalf("unexpected balancer: %v", b)
 			}
+
+			// function pointers can check equal to nil only
+			if test.res.IsPreferConn != nil {
+				require.NotNil(t, b.IsPreferConn)
+				b.IsPreferConn = nil
+				test.res.IsPreferConn = nil
+			}
+
+			require.Equal(t, &test.res, b)
 		})
 	}
 }

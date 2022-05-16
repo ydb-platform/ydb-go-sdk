@@ -134,6 +134,7 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 func (c *conn) SetState(s State) State {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
+
 	return c.setState(s)
 }
 
