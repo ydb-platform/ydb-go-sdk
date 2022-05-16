@@ -23,14 +23,6 @@ import (
 
 var ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
 
-type BalancerConfig struct {
-	IsPreferConn PreferConnFunc
-	AllowFalback bool
-	SingleConn   bool
-}
-
-type PreferConnFunc func(c conn.Conn) bool
-
 type router struct {
 	config            config.Config
 	balancerConfig    balancer.Config
@@ -239,7 +231,7 @@ func (r *router) connections() *connectionsState {
 func (r *router) getConn(ctx context.Context) (conn.Conn, error) {
 	state := r.connections()
 	c, failedCount := state.Connection(ctx)
-	if failedCount > state.PreferCount {
+	if failedCount*2 > state.PreferCount {
 		r.discoveryRepeater.Force()
 	}
 
@@ -247,13 +239,6 @@ func (r *router) getConn(ctx context.Context) (conn.Conn, error) {
 		return nil, xerrors.WithStackTrace(ErrClusterEmpty)
 	}
 	return c, nil
-}
-
-func (r *router) getConnsWithLock(p *[]conn.Conn) []conn.Conn {
-	r.m.RLock()
-	defer r.m.RUnlock()
-
-	return *p
 }
 
 func endpointsToConnections(p *conn.Pool, endpoints []endpoint.Endpoint) []conn.Conn {
