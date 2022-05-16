@@ -25,6 +25,7 @@ func newConnectionsState(conns []conn.Conn, preferFunc balancer.PreferConnFunc, 
 		connByNodeID: connsToNodeIDMap(conns),
 		rand: xrand.New(
 			xrand.WithLock(),
+			//nolint:gosec
 			xrand.WithSource(rand.Int63()),
 		),
 	}
@@ -42,7 +43,7 @@ func newConnectionsState(conns []conn.Conn, preferFunc balancer.PreferConnFunc, 
 func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
 	if e, hasPreferEndpoint := ContextEndpoint(ctx); hasPreferEndpoint {
 		c := s.connByNodeID[e.NodeID()]
-		if isOkConnection(c, true) {
+		if c != nil && isOkConnection(c, true) {
 			return c
 		}
 	}
@@ -120,7 +121,11 @@ func connsToNodeIDMap(conns []conn.Conn) (res map[uint32]conn.Conn) {
 	return res
 }
 
-func sortPreferConnections(conns []conn.Conn, preferFunc balancer.PreferConnFunc, allowFallback bool) (prefer []conn.Conn, fallback []conn.Conn) {
+func sortPreferConnections(
+	conns []conn.Conn,
+	preferFunc balancer.PreferConnFunc,
+	allowFallback bool,
+) (prefer []conn.Conn, fallback []conn.Conn) {
 	if preferFunc == nil {
 		return conns, nil
 	}
@@ -133,10 +138,8 @@ func sortPreferConnections(conns []conn.Conn, preferFunc balancer.PreferConnFunc
 	for _, c := range conns {
 		if preferFunc(c) {
 			prefer = append(prefer, c)
-		} else {
-			if allowFallback {
-				fallback = append(fallback, c)
-			}
+		} else if allowFallback {
+			fallback = append(fallback, c)
 		}
 	}
 	return prefer, fallback

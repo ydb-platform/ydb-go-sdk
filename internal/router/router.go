@@ -72,10 +72,6 @@ func (r *router) Close(ctx context.Context) (err error) {
 		issues = append(issues, err)
 	}
 
-	if err = r.pool.Release(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
 	if len(issues) > 0 {
 		return xerrors.WithStackTrace(xerrors.NewWithIssues("router close failed", issues...))
 	}
@@ -122,7 +118,9 @@ func New(
 	)
 
 	if r.balancerConfig.SingleConn {
-		r.connectionsState = newConnectionsState(endpointsToConnections(pool, []endpoint.Endpoint{discoveryEndpoint}), nil, false)
+		r.connectionsState = newConnectionsState(
+			endpointsToConnections(pool, []endpoint.Endpoint{discoveryEndpoint}),
+			nil, false)
 	} else {
 		if err = r.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
