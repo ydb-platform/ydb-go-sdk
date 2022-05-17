@@ -219,7 +219,7 @@ func TestTable(t *testing.T) {
 		),
 		ydb.WithBalancer(balancers.PreferLocalDCWithFallBack( // for max tests coverage
 			balancers.PreferLocationsWithFallback( // for max tests coverage
-				balancers.RoundRobin(),
+				balancers.RandomChoice(),
 				"ABC",
 			),
 		)),

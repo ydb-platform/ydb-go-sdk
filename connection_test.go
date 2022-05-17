@@ -29,7 +29,7 @@ func ExampleOpen_advanced() {
 		ydb.WithAnonymousCredentials(),
 		ydb.WithBalancer(
 			balancers.PreferLocationsWithFallback(
-				balancers.RoundRobin(), "a", "b",
+				balancers.RandomChoice(), "a", "b",
 			),
 		),
 		ydb.WithSessionPoolSizeLimit(100),

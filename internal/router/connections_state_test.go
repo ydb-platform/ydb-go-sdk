@@ -240,11 +240,10 @@ func TestNewState(t *testing.T) {
 			name:  "Empty",
 			state: newConnectionsState(nil, nil, false),
 			res: &connectionsState{
-				PreferCount:  0,
 				connByNodeID: nil,
 				prefer:       nil,
 				fallback:     nil,
-				lastAttempt:  nil,
+				all:          nil,
 			},
 		},
 		{
@@ -254,14 +253,13 @@ func TestNewState(t *testing.T) {
 				&mock.Conn{AddrField: "2"},
 			}, nil, false),
 			res: &connectionsState{
-				PreferCount:  2,
 				connByNodeID: nil,
 				prefer: []conn.Conn{
 					&mock.Conn{AddrField: "1"},
 					&mock.Conn{AddrField: "2"},
 				},
 				fallback: nil,
-				lastAttempt: []conn.Conn{
+				all: []conn.Conn{
 					&mock.Conn{AddrField: "1"},
 					&mock.Conn{AddrField: "2"},
 				},
@@ -278,14 +276,13 @@ func TestNewState(t *testing.T) {
 				return c.Endpoint().Address()[0] == 't'
 			}, false),
 			res: &connectionsState{
-				PreferCount:  2,
 				connByNodeID: nil,
 				prefer: []conn.Conn{
 					&mock.Conn{AddrField: "t1"},
 					&mock.Conn{AddrField: "t2"},
 				},
 				fallback: nil,
-				lastAttempt: []conn.Conn{
+				all: []conn.Conn{
 					&mock.Conn{AddrField: "t1"},
 					&mock.Conn{AddrField: "t2"},
 				},
@@ -302,7 +299,6 @@ func TestNewState(t *testing.T) {
 				return c.Endpoint().Address()[0] == 't'
 			}, true),
 			res: &connectionsState{
-				PreferCount:  2,
 				connByNodeID: nil,
 				prefer: []conn.Conn{
 					&mock.Conn{AddrField: "t1"},
@@ -312,7 +308,7 @@ func TestNewState(t *testing.T) {
 					&mock.Conn{AddrField: "f1"},
 					&mock.Conn{AddrField: "f2"},
 				},
-				lastAttempt: []conn.Conn{
+				all: []conn.Conn{
 					&mock.Conn{AddrField: "t1"},
 					&mock.Conn{AddrField: "f1"},
 					&mock.Conn{AddrField: "t2"},
@@ -331,7 +327,6 @@ func TestNewState(t *testing.T) {
 				return c.Endpoint().Address()[0] == 't'
 			}, true),
 			res: &connectionsState{
-				PreferCount: 2,
 				connByNodeID: map[uint32]conn.Conn{
 					1: &mock.Conn{AddrField: "t1", NodeIDField: 1},
 					2: &mock.Conn{AddrField: "f1", NodeIDField: 2},
@@ -346,7 +341,7 @@ func TestNewState(t *testing.T) {
 					&mock.Conn{AddrField: "f1", NodeIDField: 2},
 					&mock.Conn{AddrField: "f2", NodeIDField: 4},
 				},
-				lastAttempt: []conn.Conn{
+				all: []conn.Conn{
 					&mock.Conn{AddrField: "t1", NodeIDField: 1},
 					&mock.Conn{AddrField: "f1", NodeIDField: 2},
 					&mock.Conn{AddrField: "t2", NodeIDField: 3},

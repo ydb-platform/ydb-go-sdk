@@ -11,9 +11,10 @@ import (
 
 type connectionsState struct {
 	connByNodeID map[uint32]conn.Conn
-	prefer       []conn.Conn
-	fallback     []conn.Conn
-	lastAttempt  []conn.Conn
+
+	prefer   []conn.Conn
+	fallback []conn.Conn
+	all      []conn.Conn
 
 	rand xrand.Rand
 }
@@ -30,9 +31,9 @@ func newConnectionsState(conns []conn.Conn, preferFunc balancer.PreferConnFunc, 
 
 	res.prefer, res.fallback = sortPreferConnections(conns, preferFunc, allowFallback)
 	if allowFallback {
-		res.lastAttempt = conns
+		res.all = conns
 	} else {
-		res.lastAttempt = res.prefer
+		res.all = res.prefer
 	}
 	return res
 }
@@ -60,7 +61,7 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 		return c, failedCount
 	}
 
-	c, _ := s.selectRandomConnection(s.lastAttempt, true)
+	c, _ := s.selectRandomConnection(s.all, true)
 	return c, failedCount
 }
 
