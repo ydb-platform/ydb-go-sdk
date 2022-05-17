@@ -85,7 +85,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 		&ctx,
 		e,
 		cc.GetState(),
-	)(cc.SetState(Online))
+	)(cc.Unban())
 }
 
 func (p *Pool) Take(context.Context) error {

@@ -1,3 +1,5 @@
+* Simplified the balancing logic
+
 ## v3.25.3
 * Changed primary license to `Apache2.0` for auto-detect license 
 * Refactored `types.Struct` value creation

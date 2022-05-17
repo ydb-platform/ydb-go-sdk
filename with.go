@@ -18,7 +18,7 @@ func (c *connection) With(ctx context.Context, opts ...Option) (Connection, erro
 			append(
 				c.opts,
 				WithBalancer(
-					c.config.Balancer().Create(nil),
+					c.config.Balancer(),
 				),
 				withOnClose(func(child *connection) {
 					c.childrenMtx.Lock()

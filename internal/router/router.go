@@ -2,16 +2,17 @@ package router
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/single"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cluster"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	discoveryBuilder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -20,42 +21,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
+
 type router struct {
-	config config.Config
-	pool   *conn.Pool
-
-	clusterMtx sync.RWMutex
-	clusterPtr *cluster.Cluster
-
+	config            config.Config
+	balancerConfig    balancer.Config
+	pool              *conn.Pool
 	discovery         discovery.Client
 	discoveryRepeater repeater.Repeater
-}
 
-func (r *router) cluster() *cluster.Cluster {
-	r.clusterMtx.RLock()
-	defer r.clusterMtx.RUnlock()
-	return r.clusterPtr
-}
-
-func (r *router) clusterCreate(ctx context.Context, endpoints []endpoint.Endpoint) *cluster.Cluster {
-	return cluster.New(
-		deadline.ContextWithoutDeadline(ctx),
-		r.config,
-		r.pool,
-		endpoints,
-		func(ctx context.Context) {
-			r.discoveryRepeater.Force()
-		},
-	)
-}
-
-func (r *router) clusterSwap(cluster *cluster.Cluster) *cluster.Cluster {
-	r.clusterMtx.Lock()
-	defer r.clusterMtx.Unlock()
-
-	oldCluster := r.clusterPtr
-	r.clusterPtr = cluster
-	return oldCluster
+	m                sync.RWMutex
+	connectionsState *connectionsState
 }
 
 func (r *router) clusterDiscovery(ctx context.Context) error {
@@ -64,10 +40,21 @@ func (r *router) clusterDiscovery(ctx context.Context) error {
 		return xerrors.WithStackTrace(err)
 	}
 
-	newCluster := r.clusterCreate(ctx, endpoints)
-	oldCluster := r.clusterSwap(newCluster)
+	r.applyDiscoveredEndpoints(ctx, endpoints)
+	return nil
+}
 
-	return oldCluster.Close(ctx)
+func (r *router) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint) {
+	connections := endpointsToConnections(r.pool, endpoints)
+	for _, c := range connections {
+		r.pool.Allow(ctx, c)
+	}
+
+	state := newConnectionsState(connections, r.balancerConfig.IsPreferConn, r.balancerConfig.AllowFalback)
+
+	r.m.Lock()
+	defer r.m.Unlock()
+	r.connectionsState = state
 }
 
 func (r *router) Discovery() discovery.Client {
@@ -82,10 +69,6 @@ func (r *router) Close(ctx context.Context) (err error) {
 	}
 
 	if err = r.discovery.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if err = r.cluster().Close(ctx); err != nil {
 		issues = append(issues, err)
 	}
 
@@ -118,6 +101,12 @@ func New(
 		pool:   pool,
 	}
 
+	if balancerConfig := c.Balancer(); balancerConfig == nil {
+		r.balancerConfig = balancer.Config{}
+	} else {
+		r.balancerConfig = *balancerConfig
+	}
+
 	discoveryEndpoint := endpoint.New(c.Endpoint())
 	discoveryConnection := pool.Get(discoveryEndpoint)
 
@@ -128,8 +117,10 @@ func New(
 		discoveryConfig,
 	)
 
-	if single.IsSingle(r.config.Balancer()) {
-		r.clusterSwap(r.clusterCreate(ctx, []endpoint.Endpoint{discoveryEndpoint}))
+	if r.balancerConfig.SingleConn {
+		r.connectionsState = newConnectionsState(
+			endpointsToConnections(pool, []endpoint.Endpoint{discoveryEndpoint}),
+			nil, false)
 	} else {
 		if err = r.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -177,34 +168,9 @@ func (r *router) Invoke(
 	reply interface{},
 	opts ...grpc.CallOption,
 ) error {
-	cc, err := r.cluster().Get(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	defer func() {
-		if err == nil {
-			if cc.GetState() == conn.Banned {
-				r.cluster().Allow(ctx, cc)
-			}
-		} else {
-			if xerrors.MustPessimizeEndpoint(err, r.config.ExcludeGRPCCodesForPessimization()...) {
-				r.cluster().Ban(ctx, cc, err)
-			}
-		}
-	}()
-
-	ctx, err = r.config.Meta().Meta(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	err = cc.Invoke(ctx, method, args, reply, opts...)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	return nil
+	return r.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
+		return cc.Invoke(ctx, method, args, reply, opts...)
+	})
 }
 
 func (r *router) NewStream(
@@ -213,34 +179,70 @@ func (r *router) NewStream(
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
-	var cc conn.Conn
-	cc, err = r.cluster().Get(ctx)
+	var client grpc.ClientStream
+	err = r.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
+		client, err = cc.NewStream(ctx, desc, method, opts...)
+		return err
+	})
+	if err == nil {
+		return client, nil
+	}
+	return nil, err
+}
+
+func (r *router) wrapCall(ctx context.Context, f func(ctx context.Context, cc conn.Conn) error) (err error) {
+	cc, err := r.getConn(ctx)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	defer func() {
 		if err == nil {
 			if cc.GetState() == conn.Banned {
-				r.cluster().Allow(ctx, cc)
+				r.pool.Allow(ctx, cc)
 			}
 		} else {
 			if xerrors.MustPessimizeEndpoint(err, r.config.ExcludeGRPCCodesForPessimization()...) {
-				r.cluster().Ban(ctx, cc, err)
+				r.pool.Ban(ctx, cc, err)
 			}
 		}
 	}()
 
-	ctx, err = r.config.Meta().Meta(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+	if ctx, err = r.config.Meta().Meta(ctx); err != nil {
+		return xerrors.WithStackTrace(err)
 	}
 
-	var client grpc.ClientStream
-	client, err = cc.NewStream(ctx, desc, method, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+	if err = f(ctx, cc); err != nil {
+		return xerrors.WithStackTrace(err)
 	}
 
-	return client, nil
+	return nil
+}
+
+func (r *router) connections() *connectionsState {
+	r.m.RLock()
+	defer r.m.RUnlock()
+
+	return r.connectionsState
+}
+
+func (r *router) getConn(ctx context.Context) (conn.Conn, error) {
+	state := r.connections()
+	c, failedCount := state.GetConnection(ctx)
+	if failedCount*2 > state.PreferredCount() {
+		r.discoveryRepeater.Force()
+	}
+
+	if c == nil {
+		return nil, xerrors.WithStackTrace(ErrClusterEmpty)
+	}
+	return c, nil
+}
+
+func endpointsToConnections(p *conn.Pool, endpoints []endpoint.Endpoint) []conn.Conn {
+	conns := make([]conn.Conn, 0, len(endpoints))
+	for _, e := range endpoints {
+		conns = append(conns, p.Get(e))
+	}
+	return conns
 }
