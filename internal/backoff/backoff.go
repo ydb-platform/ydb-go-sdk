@@ -4,6 +4,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/jonboulle/clockwork"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
@@ -57,6 +59,8 @@ type logBackoff struct {
 	// duration D; and R is a random sized part from [0,(D - F)].
 	jitterLimit float64
 
+	clock clockwork.Clock
+
 	// generator of jitter
 	r xrand.Rand
 }
@@ -81,9 +85,16 @@ func WithJitterLimit(jitterLimit float64) option {
 	}
 }
 
+func WithClock(clock clockwork.Clock) option {
+	return func(b *logBackoff) {
+		b.clock = clock
+	}
+}
+
 func New(opts ...option) logBackoff {
 	b := logBackoff{
-		r: xrand.New(xrand.WithLock()),
+		r:     xrand.New(xrand.WithLock()),
+		clock: clockwork.NewRealClock(),
 	}
 	for _, o := range opts {
 		o(&b)
@@ -93,7 +104,7 @@ func New(opts ...option) logBackoff {
 
 // Wait implements Backoff interface.
 func (b logBackoff) Wait(n int) <-chan time.Time {
-	return time.After(b.Delay(n))
+	return b.clock.After(b.Delay(n))
 }
 
 // Delay returns mapping of i to Delay.

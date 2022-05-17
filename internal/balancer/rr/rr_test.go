@@ -56,8 +56,8 @@ func TestRandomChoice_Next(t *testing.T) {
 
 			t.Run("AllowBanned", func(t *testing.T) {
 				res := make(map[string]int)
-				count := 100
-				delta := 10.0
+				count := 1000
+				delta := 100.0
 				for i := 0; i < count; i++ {
 					c := b.Next(ctx, balancer.WithAcceptBanned(true))
 					res[c.Endpoint().Address()]++
@@ -93,8 +93,8 @@ func TestRandomChoice_Next(t *testing.T) {
 
 			t.Run("AllowBanned", func(t *testing.T) {
 				res := make(map[string]int)
-				count := 100
-				delta := 10.0
+				count := 1000
+				delta := 100.0
 				for i := 0; i < count; i++ {
 					c := b.Next(ctx, balancer.WithAcceptBanned(true))
 					res[c.Endpoint().Address()]++

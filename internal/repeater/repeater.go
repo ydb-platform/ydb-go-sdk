@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/jonboulle/clockwork"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -29,6 +31,7 @@ type repeater struct {
 	stopped chan struct{}
 
 	force chan struct{}
+	clock clockwork.Clock
 }
 
 type option func(r *repeater)
@@ -48,6 +51,12 @@ func WithTrace(trace trace.Driver) option {
 func WithInterval(interval time.Duration) option {
 	return func(r *repeater) {
 		r.interval = interval
+	}
+}
+
+func WithClock(clock clockwork.Clock) option {
+	return func(r *repeater) {
+		r.clock = clock
 	}
 }
 
@@ -73,13 +82,14 @@ func New(
 		cancel:   cancel,
 		stopped:  make(chan struct{}),
 		force:    make(chan struct{}, 1),
+		clock:    clockwork.NewRealClock(),
 	}
 
 	for _, o := range opts {
 		o(r)
 	}
 
-	go r.worker(ctx, r.interval)
+	go r.worker(ctx, r.clock.NewTicker(interval))
 
 	return r
 }
@@ -132,10 +142,8 @@ func (r *repeater) wakeUp(ctx context.Context, e event) (err error) {
 	return r.task(ctx)
 }
 
-func (r *repeater) worker(ctx context.Context, interval time.Duration) {
+func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 	defer close(r.stopped)
-
-	tick := time.NewTicker(interval)
 	defer tick.Stop()
 
 	// force returns backoff with delays [500ms...32s]
@@ -143,6 +151,7 @@ func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 		backoff.WithSlotDuration(500*time.Millisecond),
 		backoff.WithCeiling(6),
 		backoff.WithJitterLimit(1),
+		backoff.WithClock(r.clock),
 	)
 
 	// forceIndex defines delay index for force backoff
@@ -155,7 +164,7 @@ func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 		select {
 		case <-ctx.Done():
 			return eventCancel
-		case <-tick.C:
+		case <-tick.Chan():
 			return eventTick
 		case <-force.Wait(forceIndex):
 			return eventForce
@@ -179,7 +188,7 @@ func (r *repeater) worker(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 
-		case <-tick.C:
+		case <-tick.Chan():
 			processEvent(eventTick)
 
 		case <-r.force:
