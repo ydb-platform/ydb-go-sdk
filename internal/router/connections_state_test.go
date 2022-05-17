@@ -368,7 +368,7 @@ func TestNewState(t *testing.T) {
 func TestConnection(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		s := newConnectionsState(nil, nil, false)
-		c, failed := s.Connection(context.Background())
+		c, failed := s.GetConnection(context.Background())
 		require.Nil(t, c)
 		require.Equal(t, 0, failed)
 	})
@@ -377,7 +377,7 @@ func TestConnection(t *testing.T) {
 			&mock.Conn{AddrField: "1", State: conn.Online},
 			&mock.Conn{AddrField: "2", State: conn.Online},
 		}, nil, false)
-		c, failed := s.Connection(context.Background())
+		c, failed := s.GetConnection(context.Background())
 		require.NotNil(t, c)
 		require.Equal(t, 0, failed)
 	})
@@ -386,7 +386,7 @@ func TestConnection(t *testing.T) {
 			&mock.Conn{AddrField: "1", State: conn.Online},
 			&mock.Conn{AddrField: "2", State: conn.Banned},
 		}, nil, false)
-		c, _ := s.Connection(context.Background())
+		c, _ := s.GetConnection(context.Background())
 		require.Equal(t, &mock.Conn{AddrField: "1", State: conn.Online}, c)
 	})
 	t.Run("AllBanned", func(t *testing.T) {
@@ -399,7 +399,7 @@ func TestConnection(t *testing.T) {
 		preferred := 0
 		fallback := 0
 		for i := 0; i < 100; i++ {
-			c, failed := s.Connection(context.Background())
+			c, failed := s.GetConnection(context.Background())
 			require.NotNil(t, c)
 			require.Equal(t, 2, failed)
 			if c.Endpoint().Address() == "t1" {
@@ -419,7 +419,7 @@ func TestConnection(t *testing.T) {
 		}, func(c conn.Conn) bool {
 			return c.Endpoint().Address()[0] == 't'
 		}, true)
-		c, failed := s.Connection(context.Background())
+		c, failed := s.GetConnection(context.Background())
 		require.Equal(t, &mock.Conn{AddrField: "f2", State: conn.Online}, c)
 		require.Equal(t, 1, failed)
 	})
@@ -428,7 +428,7 @@ func TestConnection(t *testing.T) {
 			&mock.Conn{AddrField: "1", State: conn.Online, NodeIDField: 1},
 			&mock.Conn{AddrField: "2", State: conn.Online, NodeIDField: 2},
 		}, nil, false)
-		c, failed := s.Connection(WithEndpoint(context.Background(), &mock.Endpoint{AddrField: "2", NodeIDField: 2}))
+		c, failed := s.GetConnection(WithEndpoint(context.Background(), &mock.Endpoint{AddrField: "2", NodeIDField: 2}))
 		require.Equal(t, &mock.Conn{AddrField: "2", State: conn.Online, NodeIDField: 2}, c)
 		require.Equal(t, 0, failed)
 	})
@@ -437,7 +437,7 @@ func TestConnection(t *testing.T) {
 			&mock.Conn{AddrField: "1", State: conn.Online, NodeIDField: 1},
 			&mock.Conn{AddrField: "2", State: conn.Unknown, NodeIDField: 2},
 		}, nil, false)
-		c, failed := s.Connection(WithEndpoint(context.Background(), &mock.Endpoint{AddrField: "2", NodeIDField: 2}))
+		c, failed := s.GetConnection(WithEndpoint(context.Background(), &mock.Endpoint{AddrField: "2", NodeIDField: 2}))
 		require.Equal(t, &mock.Conn{AddrField: "1", State: conn.Online, NodeIDField: 1}, c)
 		require.Equal(t, 0, failed)
 	})

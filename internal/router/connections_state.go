@@ -10,8 +10,6 @@ import (
 )
 
 type connectionsState struct {
-	PreferCount int
-
 	connByNodeID map[uint32]conn.Conn
 	prefer       []conn.Conn
 	fallback     []conn.Conn
@@ -36,22 +34,14 @@ func newConnectionsState(conns []conn.Conn, preferFunc balancer.PreferConnFunc, 
 	} else {
 		res.lastAttempt = res.prefer
 	}
-	res.PreferCount = len(res.prefer)
 	return res
 }
 
-func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
-	if e, hasPreferEndpoint := ContextEndpoint(ctx); hasPreferEndpoint {
-		c := s.connByNodeID[e.NodeID()]
-		if c != nil && isOkConnection(c, true) {
-			return c
-		}
-	}
-
-	return nil
+func (s *connectionsState) PreferredCount() int {
+	return len(s.prefer)
 }
 
-func (s *connectionsState) Connection(ctx context.Context) (_ conn.Conn, failedCount int) {
+func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
 	if c := s.preferConnection(ctx); c != nil {
 		return c, 0
 	}
@@ -72,6 +62,17 @@ func (s *connectionsState) Connection(ctx context.Context) (_ conn.Conn, failedC
 
 	c, _ := s.selectRandomConnection(s.lastAttempt, true)
 	return c, failedCount
+}
+
+func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
+	if e, hasPreferEndpoint := ContextEndpoint(ctx); hasPreferEndpoint {
+		c := s.connByNodeID[e.NodeID()]
+		if c != nil && isOkConnection(c, true) {
+			return c
+		}
+	}
+
+	return nil
 }
 
 func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned bool) (c conn.Conn, failedConns int) {

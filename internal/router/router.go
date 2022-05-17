@@ -228,8 +228,8 @@ func (r *router) connections() *connectionsState {
 
 func (r *router) getConn(ctx context.Context) (conn.Conn, error) {
 	state := r.connections()
-	c, failedCount := state.Connection(ctx)
-	if failedCount*2 > state.PreferCount {
+	c, failedCount := state.GetConnection(ctx)
+	if failedCount*2 > state.PreferredCount() {
 		r.discoveryRepeater.Force()
 	}
 
