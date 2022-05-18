@@ -4,8 +4,8 @@ import (
 	"context"
 	"math/rand"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
@@ -19,7 +19,11 @@ type connectionsState struct {
 	rand xrand.Rand
 }
 
-func newConnectionsState(conns []conn.Conn, preferFunc balancer.PreferConnFunc, allowFallback bool) *connectionsState {
+func newConnectionsState(
+	conns []conn.Conn,
+	preferFunc routerconfig.PreferConnFunc,
+	allowFallback bool,
+) *connectionsState {
 	res := &connectionsState{
 		connByNodeID: connsToNodeIDMap(conns),
 		rand: xrand.New(
@@ -125,7 +129,7 @@ func connsToNodeIDMap(conns []conn.Conn) (res map[uint32]conn.Conn) {
 
 func sortPreferConnections(
 	conns []conn.Conn,
-	preferFunc balancer.PreferConnFunc,
+	preferFunc routerconfig.PreferConnFunc,
 	allowFallback bool,
 ) (prefer []conn.Conn, fallback []conn.Conn) {
 	if preferFunc == nil {

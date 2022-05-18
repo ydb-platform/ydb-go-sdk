@@ -5,10 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 )
 
 func TestPreferLocalDC(t *testing.T) {
@@ -57,7 +56,7 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(rr, conns))
 }
 
-func applyPreferFilter(b balancer.Balancer, conns []conn.Conn) []conn.Conn {
+func applyPreferFilter(b *routerconfig.Config, conns []conn.Conn) []conn.Conn {
 	if b.IsPreferConn == nil {
 		b.IsPreferConn = func(c conn.Conn) bool { return true }
 	}

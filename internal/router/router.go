@@ -7,12 +7,11 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	discoveryBuilder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -25,7 +24,7 @@ var ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
 
 type router struct {
 	config            config.Config
-	balancerConfig    balancer.Config
+	balancerConfig    routerconfig.Config
 	pool              *conn.Pool
 	discovery         discovery.Client
 	discoveryRepeater repeater.Repeater
@@ -102,7 +101,7 @@ func New(
 	}
 
 	if balancerConfig := c.Balancer(); balancerConfig == nil {
-		r.balancerConfig = balancer.Config{}
+		r.balancerConfig = routerconfig.Config{}
 	} else {
 		r.balancerConfig = *balancerConfig
 	}

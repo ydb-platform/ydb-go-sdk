@@ -7,11 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
 func TestConnsToNodeIDMap(t *testing.T) {
@@ -69,7 +68,7 @@ func TestSortPreferConnections(t *testing.T) {
 		name          string
 		source        []conn.Conn
 		allowFallback bool
-		filter        balancer.PreferConnFunc
+		filter        routerconfig.PreferConnFunc
 		prefer        []conn.Conn
 		fallback      []conn.Conn
 	}{

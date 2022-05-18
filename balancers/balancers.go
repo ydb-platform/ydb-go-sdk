@@ -3,28 +3,28 @@ package balancers
 import (
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 )
 
 // Deprecated: RoundRobin is RandomChoice now
-func RoundRobin() balancer.Balancer {
-	return &balancer.Config{}
+func RoundRobin() *routerconfig.Config {
+	return &routerconfig.Config{}
 }
 
-func RandomChoice() balancer.Balancer {
-	return &balancer.Config{}
+func RandomChoice() *routerconfig.Config {
+	return &routerconfig.Config{}
 }
 
-func SingleConn() balancer.Balancer {
-	return &balancer.Config{
+func SingleConn() *routerconfig.Config {
+	return &routerconfig.Config{
 		SingleConn: true,
 	}
 }
 
 // PreferLocalDC creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-func PreferLocalDC(balancer balancer.Balancer) balancer.Balancer {
+func PreferLocalDC(balancer *routerconfig.Config) *routerconfig.Config {
 	balancer.IsPreferConn = func(c conn.Conn) bool {
 		return c.Endpoint().LocalDC()
 	}
@@ -34,7 +34,7 @@ func PreferLocalDC(balancer balancer.Balancer) balancer.Balancer {
 // PreferLocalDCWithFallBack creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocalDCWithFallBack(balancer balancer.Balancer) balancer.Balancer {
+func PreferLocalDCWithFallBack(balancer *routerconfig.Config) *routerconfig.Config {
 	balancer = PreferLocalDC(balancer)
 	balancer.AllowFalback = true
 	return balancer
@@ -42,7 +42,7 @@ func PreferLocalDCWithFallBack(balancer balancer.Balancer) balancer.Balancer {
 
 // PreferLocations creates balancer which use endpoints only in selected locations (such as "ABC", "DEF", etc.)
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
-func PreferLocations(balancer balancer.Balancer, locations ...string) balancer.Balancer {
+func PreferLocations(balancer *routerconfig.Config, locations ...string) *routerconfig.Config {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
@@ -64,7 +64,7 @@ func PreferLocations(balancer balancer.Balancer, locations ...string) balancer.B
 // PreferLocationsWithFallback creates balancer which use endpoints only in selected locations
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferLocationsWithFallback(balancer balancer.Balancer, locations ...string) balancer.Balancer {
+func PreferLocationsWithFallback(balancer *routerconfig.Config, locations ...string) *routerconfig.Config {
 	balancer = PreferLocations(balancer, locations...)
 	balancer.AllowFalback = true
 	return balancer
@@ -79,7 +79,7 @@ type Endpoint interface {
 
 // Prefer creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
-func Prefer(balancer balancer.Balancer, filter func(endpoint Endpoint) bool) balancer.Balancer {
+func Prefer(balancer *routerconfig.Config, filter func(endpoint Endpoint) bool) *routerconfig.Config {
 	balancer.IsPreferConn = func(c conn.Conn) bool {
 		return filter(c.Endpoint())
 	}
@@ -89,13 +89,13 @@ func Prefer(balancer balancer.Balancer, filter func(endpoint Endpoint) bool) bal
 // PreferWithFallback creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferWithFallback(balancer balancer.Balancer, filter func(endpoint Endpoint) bool) balancer.Balancer {
+func PreferWithFallback(balancer *routerconfig.Config, filter func(endpoint Endpoint) bool) *routerconfig.Config {
 	balancer = Prefer(balancer, filter)
 	balancer.AllowFalback = true
 	return balancer
 }
 
 // Default balancer used by default
-func Default() balancer.Balancer {
+func Default() *routerconfig.Config {
 	return RandomChoice()
 }

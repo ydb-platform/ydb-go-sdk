@@ -10,9 +10,10 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/xnet"
@@ -27,7 +28,7 @@ type Config struct {
 	trace         trace.Driver
 	dialTimeout   time.Duration
 	connectionTTL time.Duration
-	balancer      balancer.Balancer
+	balancer      *routerconfig.Config
 	secure        bool
 	endpoint      string
 	database      string
@@ -104,7 +105,7 @@ func (c Config) Trace() trace.Driver {
 
 // Balancer is an optional configuration related to selected balancer.
 // That is, some balancing methods allow to be configured.
-func (c Config) Balancer() balancer.Balancer {
+func (c Config) Balancer() *routerconfig.Config {
 	return c.balancer
 }
 
@@ -228,7 +229,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
-func WithBalancer(balancer balancer.Balancer) Option {
+func WithBalancer(balancer *routerconfig.Config) Option {
 	return func(c *Config) {
 		c.balancer = balancer
 	}
