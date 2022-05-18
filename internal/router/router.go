@@ -23,11 +23,12 @@ import (
 var ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
 
 type router struct {
-	config            config.Config
-	balancerConfig    routerconfig.Config
+	driverConfig      config.Config
+	routerConfig      routerconfig.Config
 	pool              *conn.Pool
 	discovery         discovery.Client
 	discoveryRepeater repeater.Repeater
+	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	m                sync.RWMutex
 	connectionsState *connectionsState
@@ -39,20 +40,30 @@ func (r *router) clusterDiscovery(ctx context.Context) error {
 		return xerrors.WithStackTrace(err)
 	}
 
-	r.applyDiscoveredEndpoints(ctx, endpoints)
+	var localDC string
+	if r.routerConfig.DetectlocalDC {
+		localDC, err = r.localDCDetector(ctx, endpoints)
+		if err != nil {
+			return err
+		}
+	}
+
+	r.applyDiscoveredEndpoints(ctx, endpoints, localDC)
 	return nil
 }
 
-func (r *router) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint) {
+func (r *router) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
 	connections := endpointsToConnections(r.pool, endpoints)
 	for _, c := range connections {
 		r.pool.Allow(ctx, c)
 	}
 
-	state := newConnectionsState(connections, r.balancerConfig.IsPreferConn, r.balancerConfig.AllowFalback)
+	routerInfo := routerconfig.Info{SelfLocation: localDC}
+	state := newConnectionsState(connections, r.routerConfig.IsPreferConn, routerInfo, r.routerConfig.AllowFalback)
 
 	r.m.Lock()
 	defer r.m.Unlock()
+
 	r.connectionsState = state
 }
 
@@ -96,14 +107,15 @@ func New(
 	}()
 
 	r := &router{
-		config: c,
-		pool:   pool,
+		driverConfig:    c,
+		pool:            pool,
+		localDCDetector: detectLocalDC,
 	}
 
 	if balancerConfig := c.Balancer(); balancerConfig == nil {
-		r.balancerConfig = routerconfig.Config{}
+		r.routerConfig = routerconfig.Config{}
 	} else {
-		r.balancerConfig = *balancerConfig
+		r.routerConfig = *balancerConfig
 	}
 
 	discoveryEndpoint := endpoint.New(c.Endpoint())
@@ -116,10 +128,10 @@ func New(
 		discoveryConfig,
 	)
 
-	if r.balancerConfig.SingleConn {
+	if r.routerConfig.SingleConn {
 		r.connectionsState = newConnectionsState(
 			endpointsToConnections(pool, []endpoint.Endpoint{discoveryEndpoint}),
-			nil, false)
+			nil, routerconfig.Info{}, false)
 	} else {
 		if err = r.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -132,7 +144,7 @@ func New(
 				return r.clusterDiscovery(ctx)
 			},
 				repeater.WithName("discovery"),
-				repeater.WithTrace(r.config.Trace()),
+				repeater.WithTrace(r.driverConfig.Trace()),
 			)
 		}
 	}
@@ -149,15 +161,15 @@ func New(
 }
 
 func (r *router) Endpoint() string {
-	return r.config.Endpoint()
+	return r.driverConfig.Endpoint()
 }
 
 func (r *router) Name() string {
-	return r.config.Database()
+	return r.driverConfig.Database()
 }
 
 func (r *router) Secure() bool {
-	return r.config.Secure()
+	return r.driverConfig.Secure()
 }
 
 func (r *router) Invoke(
@@ -201,13 +213,13 @@ func (r *router) wrapCall(ctx context.Context, f func(ctx context.Context, cc co
 				r.pool.Allow(ctx, cc)
 			}
 		} else {
-			if xerrors.MustPessimizeEndpoint(err, r.config.ExcludeGRPCCodesForPessimization()...) {
+			if xerrors.MustPessimizeEndpoint(err, r.driverConfig.ExcludeGRPCCodesForPessimization()...) {
 				r.pool.Ban(ctx, cc, err)
 			}
 		}
 	}()
 
-	if ctx, err = r.config.Meta().Meta(ctx); err != nil {
+	if ctx, err = r.driverConfig.Meta().Meta(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 

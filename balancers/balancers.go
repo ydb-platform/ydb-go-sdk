@@ -24,10 +24,12 @@ func SingleConn() *routerconfig.Config {
 
 // PreferLocalDC creates balancer which use endpoints only in location such as initial endpoint location
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter by location
+// PreferLocalDC balancer try to autodetect local DC from client side.
 func PreferLocalDC(balancer *routerconfig.Config) *routerconfig.Config {
-	balancer.IsPreferConn = func(c conn.Conn) bool {
-		return c.Endpoint().LocalDC()
+	balancer.IsPreferConn = func(routerInfo routerconfig.Info, c conn.Conn) bool {
+		return c.Endpoint().Location() == routerInfo.SelfLocation
 	}
+	balancer.DetectlocalDC = true
 	return balancer
 }
 
@@ -49,7 +51,7 @@ func PreferLocations(balancer *routerconfig.Config, locations ...string) *router
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
-	balancer.IsPreferConn = func(c conn.Conn) bool {
+	balancer.IsPreferConn = func(_ routerconfig.Info, c conn.Conn) bool {
 		location := strings.ToUpper(c.Endpoint().Location())
 		for _, l := range locations {
 			if location == l {
@@ -74,13 +76,16 @@ type Endpoint interface {
 	NodeID() uint32
 	Address() string
 	Location() string
+
+	// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+	// It work good only if connection url always point to local dc.
 	LocalDC() bool
 }
 
 // Prefer creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
 func Prefer(balancer *routerconfig.Config, filter func(endpoint Endpoint) bool) *routerconfig.Config {
-	balancer.IsPreferConn = func(c conn.Conn) bool {
+	balancer.IsPreferConn = func(_ routerconfig.Info, c conn.Conn) bool {
 		return filter(c.Endpoint())
 	}
 	return balancer

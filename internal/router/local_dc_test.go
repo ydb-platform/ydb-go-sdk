@@ -11,12 +11,10 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/mock"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/multi"
 )
 
 var localIP = net.IPv4(127, 0, 0, 1)
@@ -103,17 +101,6 @@ func TestCheckFastestAddress(t *testing.T) {
 	})
 }
 
-func TestCheckNeedLocalDC(t *testing.T) {
-	t.Run("Multi", func(t *testing.T) {
-		require.False(t, checkNeedLocalDC(multi.Balancer()))
-		require.False(t, checkNeedLocalDC(multi.Balancer(multi.WithNeedLocalDC(false))))
-		require.True(t, checkNeedLocalDC(multi.Balancer(multi.WithNeedLocalDC(true))))
-	})
-	t.Run("Other", func(t *testing.T) {
-		require.False(t, checkNeedLocalDC(balancers.RoundRobin()))
-	})
-}
-
 func TestDetectLocalDC(t *testing.T) {
 	ctx := context.Background()
 	t.Run("Ok", func(t *testing.T) {
@@ -137,16 +124,30 @@ func TestDetectLocalDC(t *testing.T) {
 			})
 		}
 	})
+	t.Run("Empty", func(t *testing.T) {
+		res, err := detectLocalDC(ctx, nil)
+		require.Equal(t, "", res)
+		require.Error(t, err)
+	})
+	t.Run("OneDC", func(t *testing.T) {
+		res, err := detectLocalDC(ctx, []endpoint.Endpoint{
+			&mock.Endpoint{LocationField: "a"},
+			&mock.Endpoint{LocationField: "a"},
+		})
+		require.NoError(t, err)
+		require.Equal(t, "a", res)
+	})
 }
 
 func TestLocalDCDiscovery(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.New(
-		config.WithBalancer(balancers.PreferLocalDC(balancers.RoundRobin())),
+		config.WithBalancer(balancers.PreferLocalDC(balancers.Default())),
 	)
 	r := &router{
-		config: cfg,
-		pool:   conn.NewPool(ctx, cfg),
+		driverConfig: cfg,
+		routerConfig: *cfg.Balancer(),
+		pool:         conn.NewPool(ctx, cfg),
 		discovery: discoveryMock{endpoints: []endpoint.Endpoint{
 			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
 			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
@@ -155,15 +156,13 @@ func TestLocalDCDiscovery(t *testing.T) {
 		localDCDetector: func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
 			return "b", nil
 		},
-		pingConnections: false,
 	}
 
 	err := r.clusterDiscovery(ctx)
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
-		conn, err := r.cluster().Get(ctx)
-		require.NoError(t, err)
+		conn, _ := r.connections().GetConnection(ctx)
 		require.Equal(t, "b:234", conn.Endpoint().Address())
 		require.Equal(t, "b", conn.Endpoint().Location())
 	}

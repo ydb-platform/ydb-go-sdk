@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/gogroup"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -53,13 +52,6 @@ func checkFastestAddress(ctx context.Context, addresses []string) (string, error
 		return "", err
 	}
 	return res, nil
-}
-
-func checkNeedLocalDC(b balancer.Balancer) bool {
-	if candidate, ok := b.(needLocalDC); ok {
-		return candidate.NeedLocalDC()
-	}
-	return false
 }
 
 func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (endpoint.Endpoint, error) {
@@ -109,7 +101,14 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 }
 
 func detectLocalDC(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
+	if len(endpoints) == 0 {
+		return "", xerrors.WithStackTrace(ErrClusterEmpty)
+	}
 	endpointsByDc := splitEndpointsByLocation(endpoints)
+
+	if len(endpointsByDc) == 1 {
+		return endpoints[0].Location(), nil
+	}
 
 	endpointsToTest := make([]endpoint.Endpoint, 0, maxEndpointsCheckPerLocation*len(endpointsByDc))
 	for _, dcEndpoints := range endpointsByDc {

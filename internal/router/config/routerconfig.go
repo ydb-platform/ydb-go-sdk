@@ -1,15 +1,18 @@
 package routerconfig
 
+import "github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+
 // Dedicated package need for prevent cyclo dependencies config -> router -> config
 
-import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-)
-
 type Config struct {
-	IsPreferConn PreferConnFunc
-	AllowFalback bool
-	SingleConn   bool
+	IsPreferConn  PreferConnFunc
+	AllowFalback  bool
+	SingleConn    bool
+	DetectlocalDC bool
 }
 
-type PreferConnFunc func(c conn.Conn) bool
+type Info struct {
+	SelfLocation string
+}
+
+type PreferConnFunc func(routerInfo Info, c conn.Conn) bool

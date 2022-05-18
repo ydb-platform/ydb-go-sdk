@@ -50,10 +50,13 @@ func TestFromConfig(t *testing.T) {
 				"type": "random_choice",
 				"prefer": "local_dc"
 			}`,
-			res: routerconfig.Config{IsPreferConn: func(c conn.Conn) bool {
-				// some non nil func
-				return false
-			}},
+			res: routerconfig.Config{
+				DetectlocalDC: true,
+				IsPreferConn: func(routerInfo routerconfig.Info, c conn.Conn) bool {
+					// some non nil func
+					return false
+				},
+			},
 		},
 		{
 			name: "prefer_unknown_type",
@@ -71,8 +74,9 @@ func TestFromConfig(t *testing.T) {
 				"fallback": true
 			}`,
 			res: routerconfig.Config{
-				AllowFalback: true,
-				IsPreferConn: func(c conn.Conn) bool {
+				AllowFalback:  true,
+				DetectlocalDC: true,
+				IsPreferConn: func(routerInfo routerconfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
 				},
@@ -86,7 +90,7 @@ func TestFromConfig(t *testing.T) {
 				"locations": ["AAA", "BBB", "CCC"]
 			}`,
 			res: routerconfig.Config{
-				IsPreferConn: func(c conn.Conn) bool {
+				IsPreferConn: func(routerInfo routerconfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
 				},
@@ -102,7 +106,7 @@ func TestFromConfig(t *testing.T) {
 			}`,
 			res: routerconfig.Config{
 				AllowFalback: true,
-				IsPreferConn: func(c conn.Conn) bool {
+				IsPreferConn: func(routerInfo routerconfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
 				},
