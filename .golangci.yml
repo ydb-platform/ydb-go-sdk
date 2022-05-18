@@ -159,7 +159,6 @@ linters:
 #    - ireturn
     - lll
     - makezero
-    - maligned
     - misspell
     - ineffassign
     - misspell
