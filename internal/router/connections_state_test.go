@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/routerconfig"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
 func TestConnsToNodeIDMap(t *testing.T) {

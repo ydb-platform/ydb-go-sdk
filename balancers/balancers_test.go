@@ -5,10 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/routerconfig"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 )
 
 func TestPreferLocalDC(t *testing.T) {

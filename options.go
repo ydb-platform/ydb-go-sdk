@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/routerconfig"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"

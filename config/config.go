@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/routerconfig"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"

@@ -5,8 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/routerconfig"
 )
 
 func TestFromConfig(t *testing.T) {
