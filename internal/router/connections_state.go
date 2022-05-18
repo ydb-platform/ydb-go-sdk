@@ -19,7 +19,11 @@ type connectionsState struct {
 	rand xrand.Rand
 }
 
-func newConnectionsState(conns []conn.Conn, preferFunc routerconfig.PreferConnFunc, allowFallback bool) *connectionsState {
+func newConnectionsState(
+	conns []conn.Conn,
+	preferFunc routerconfig.PreferConnFunc,
+	allowFallback bool,
+) *connectionsState {
 	res := &connectionsState{
 		connByNodeID: connsToNodeIDMap(conns),
 		rand: xrand.New(
