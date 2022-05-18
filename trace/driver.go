@@ -71,7 +71,8 @@ type (
 		OnUnpessimizeNode func(DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo)
 
 		// Repeater events
-		OnRepeaterWakeUp func(DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo)
+		OnRepeaterWakeUp  func(DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo)
+		OnRouterDiscovery func(DriverRouterDiscoveryInfo)
 
 		// Credentials events
 		OnGetCredentials func(DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo)
@@ -169,6 +170,13 @@ type (
 	}
 	DriverResolveDoneInfo struct {
 		Error error
+	}
+	DriverRouterDiscoveryInfo struct {
+		Latency     time.Duration
+		Endpoints   []EndpointInfo
+		NeedLocalDC bool
+		LocalDC     string
+		Error       error
 	}
 	DriverNetReadStartInfo struct {
 		Address string

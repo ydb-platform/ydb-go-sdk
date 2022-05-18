@@ -1,3 +1,4 @@
+* Detect LocalDC by tcp ping
 * Simplified the balancing logic
 
 ## v3.25.3

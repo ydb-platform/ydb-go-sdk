@@ -418,6 +418,27 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
+
+		t.OnRouterDiscovery = func(info trace.DriverRouterDiscoveryInfo) {
+			if info.Error == nil {
+				l.Tracef(
+					`discovery new endpoints done {latency:"%v", endpoints: "%v", needLocalDC: "%v", detectedLocalDC: "%v"}`,
+					info.Latency,
+					info.Endpoints,
+					info.NeedLocalDC,
+					info.LocalDC,
+				)
+			} else {
+				l.Errorf(
+					`discovery new endpoints fail {latency:"%v", endpoints: "%v", needLocalDC: "%v", localDC: "%v", error: "%v"}`,
+					info.Latency,
+					info.Endpoints,
+					info.NeedLocalDC,
+					info.LocalDC,
+					info.Error,
+				)
+			}
+		}
 	}
 	if details&trace.DriverClusterEvents != 0 {
 		// nolint:govet

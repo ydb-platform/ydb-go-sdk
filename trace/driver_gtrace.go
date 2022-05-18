@@ -4,6 +4,7 @@ package trace
 
 import (
 	"context"
+	"time"
 )
 
 // driverComposeOptions is a holder of options
@@ -922,6 +923,25 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		}
 	}
 	{
+		h1 := t.OnRouterDiscovery
+		h2 := x.OnRouterDiscovery
+		ret.OnRouterDiscovery = func(d DriverRouterDiscoveryInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(d)
+			}
+			if h2 != nil {
+				h2(d)
+			}
+		}
+	}
+	{
 		h1 := t.OnGetCredentials
 		h2 := x.OnGetCredentials
 		ret.OnGetCredentials = func(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
@@ -1344,6 +1364,13 @@ func (t Driver) onRepeaterWakeUp(d DriverRepeaterWakeUpStartInfo) func(DriverRep
 	}
 	return res
 }
+func (t Driver) onRouterDiscovery(d DriverRouterDiscoveryInfo) {
+	fn := t.OnRouterDiscovery
+	if fn == nil {
+		return
+	}
+	fn(d)
+}
 func (t Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
 	if fn == nil {
@@ -1654,6 +1681,15 @@ func DriverOnRepeaterWakeUp(t Driver, c *context.Context, name string, event str
 		p.Error = e
 		res(p)
 	}
+}
+func DriverOnRouterDiscovery(t Driver, latency time.Duration, endpoints []EndpointInfo, needLocalDC bool, localDC string, e error) {
+	var p DriverRouterDiscoveryInfo
+	p.Latency = latency
+	p.Endpoints = endpoints
+	p.NeedLocalDC = needLocalDC
+	p.LocalDC = localDC
+	p.Error = e
+	t.onRouterDiscovery(p)
 }
 func DriverOnGetCredentials(t Driver, c *context.Context) func(token string, _ error) {
 	var p DriverGetCredentialsStartInfo
