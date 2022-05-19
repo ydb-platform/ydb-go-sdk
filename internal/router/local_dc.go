@@ -18,45 +18,47 @@ const (
 	maxEndpointsCheckPerLocation = 5
 )
 
-func checkFastestAddress(ctx context.Context, addresses []string) (string, error) {
+func checkFastestAddress(ctx context.Context, addresses []string) string {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	results := make(chan string, len(addresses))
-	errs := make(chan error, len(addresses))
+	type result struct {
+		address string
+		err     error
+	}
+	results := make(chan result, len(addresses))
+	defer close(results)
 
 	startDial := make(chan struct{})
-	dialer := net.Dialer{}
+	var dialer net.Dialer
+
 	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	for _, addr := range addresses {
 		wg.Add(1)
 		go func(address string) {
 			defer wg.Done()
-
 			<-startDial
 			conn, err := dialer.DialContext(ctx, "tcp", address)
 			if err == nil {
-				results <- address
 				cancel()
-			} else {
-				errs <- err
-			}
-			if conn != nil {
 				_ = conn.Close()
 			}
+			results <- result{address: address, err: err}
 		}(addr)
 	}
 
 	close(startDial)
 
-	wg.Wait()
-	close(results)
-	close(errs)
-
-	if res, ok := <-results; ok {
-		return res, nil
+	for range addresses {
+		res := <-results
+		if res.err == nil {
+			return res.address
+		}
 	}
-	return "", xerrors.WithStackTrace(<-errs)
+
+	return ""
 }
 
 func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (endpoint.Endpoint, error) {
@@ -98,9 +100,9 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 		addressesToPing = append(addressesToPing, ip)
 	}
 
-	fastestAddress, err := checkFastestAddress(ctx, addressesToPing)
-	if err != nil {
-		return nil, err
+	fastestAddress := checkFastestAddress(ctx, addressesToPing)
+	if fastestAddress == "" {
+		return nil, xerrors.WithStackTrace(errors.New("failed to check fastest address"))
 	}
 	return addressToEndpoint[fastestAddress], nil
 }

@@ -51,8 +51,8 @@ func TestCheckFastestAddress(t *testing.T) {
 			addr1 := listen1.Addr().String()
 			addr2 := listen2.Addr().String()
 
-			fastest, err := checkFastestAddress(ctx, []string{addr1, addr2})
-			require.NoError(t, err)
+			fastest := checkFastestAddress(ctx, []string{addr1, addr2})
+			require.NotEmpty(t, fastest)
 
 			switch fastest {
 			case addr1:
@@ -79,8 +79,7 @@ func TestCheckFastestAddress(t *testing.T) {
 
 		_ = listen2.Close() // for can't accept connections
 
-		fastest, err := checkFastestAddress(ctx, []string{addr1, addr2})
-		require.NoError(t, err)
+		fastest := checkFastestAddress(ctx, []string{addr1, addr2})
 		require.Equal(t, addr1, fastest)
 
 		_ = listen1.Close()
@@ -96,8 +95,8 @@ func TestCheckFastestAddress(t *testing.T) {
 		_ = listen1.Close() // for can't accept connections
 		_ = listen2.Close() // for can't accept connections
 
-		_, err = checkFastestAddress(ctx, []string{addr1, addr2})
-		require.Error(t, err)
+		res := checkFastestAddress(ctx, []string{addr1, addr2})
+		require.Empty(t, res)
 	})
 }
 
