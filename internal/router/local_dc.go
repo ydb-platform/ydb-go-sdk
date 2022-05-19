@@ -19,6 +19,9 @@ const (
 )
 
 func checkFastestAddress(ctx context.Context, addresses []string) (string, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	results := make(chan string, len(addresses))
 	errs := make(chan error, len(addresses))
 
