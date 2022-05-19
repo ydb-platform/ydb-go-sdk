@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"math/rand"
 	"net"
 	"testing"
 
@@ -51,7 +52,14 @@ func TestCheckFastestAddress(t *testing.T) {
 			addr1 := listen1.Addr().String()
 			addr2 := listen2.Addr().String()
 
-			fastest, err := checkFastestAddress(ctx, []string{addr1, addr2})
+			var checkAddresses []string
+			if rand.Intn(2) == 0 {
+				checkAddresses = []string{addr1, addr2}
+			} else {
+				checkAddresses = []string{addr2, addr1}
+			}
+
+			fastest, err := checkFastestAddress(ctx, checkAddresses)
 			require.NoError(t, err)
 
 			switch fastest {

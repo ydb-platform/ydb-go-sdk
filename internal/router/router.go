@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -30,14 +31,36 @@ type router struct {
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
+	lastLocalDC string
+
 	m                sync.RWMutex
 	connectionsState *connectionsState
 }
 
-func (r *router) clusterDiscovery(ctx context.Context) error {
+func (r *router) clusterDiscovery(ctx context.Context) (err error) {
+	var discoveryTrace trace.DriverRouterDiscoveryInfo
+	start := time.Now()
+	defer func() {
+		discoveryTrace.Error = err
+		discoveryTrace.Latency = time.Since(start)
+
+		trace.DriverOnRouterDiscovery(
+			r.driverConfig.Trace(),
+			discoveryTrace.Latency,
+			discoveryTrace.Endpoints,
+			r.routerConfig.DetectlocalDC,
+			discoveryTrace.LocalDC,
+			err,
+		)
+	}()
+
 	endpoints, err := r.discovery.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
+	}
+	discoveryTrace.Endpoints = make([]trace.EndpointInfo, 0, len(endpoints))
+	for _, e := range endpoints {
+		discoveryTrace.Endpoints = append(discoveryTrace.Endpoints, e)
 	}
 
 	var localDC string
@@ -46,6 +69,7 @@ func (r *router) clusterDiscovery(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		discoveryTrace.LocalDC = localDC
 	}
 
 	r.applyDiscoveredEndpoints(ctx, endpoints, localDC)

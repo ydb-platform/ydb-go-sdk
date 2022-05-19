@@ -8,9 +8,9 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/gogroup"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -20,36 +20,40 @@ const (
 
 func checkFastestAddress(ctx context.Context, addresses []string) (string, error) {
 	results := make(chan string, len(addresses))
+	errs := make(chan error, len(addresses))
 
-	grp := gogroup.WithContext(ctx, len(addresses))
-
-	workCtx, workCancel := context.WithCancel(ctx)
-	defer workCancel()
-
+	startDial := make(chan struct{})
 	dialer := net.Dialer{}
-	createPingFunction := func(address string) func() error {
-		return func() error {
-			conn, err := dialer.DialContext(workCtx, "tcp", address)
+	var wg sync.WaitGroup
+	for _, addr := range addresses {
+
+		wg.Add(1)
+		go func(address string) {
+			defer wg.Done()
+
+			<-startDial
+			conn, err := dialer.DialContext(ctx, "tcp", address)
 			if err == nil {
 				results <- address
-				workCancel()
+			} else {
+				errs <- err
 			}
 			if conn != nil {
 				_ = conn.Close()
 			}
-			return err
-		}
-	}
-	for _, addr := range addresses {
-		grp.Go(createPingFunction(addr))
+		}(addr)
 	}
 
-	err := grp.Wait()
-	close(results)
+	go func() {
+		wg.Wait()
+		close(results)
+		close(errs)
+	}()
 
+	close(startDial)
 	res := <-results
 	if res == "" {
-		return "", err
+		return "", xerrors.WithStackTrace(<-errs)
 	}
 	return res, nil
 }
@@ -70,7 +74,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 			continue
 		}
 
-		addresses, err := net.LookupHost(host)
+		addresses, err := net.DefaultResolver.LookupHost(ctx, host)
 		if err != nil {
 			lastErr = err
 			continue

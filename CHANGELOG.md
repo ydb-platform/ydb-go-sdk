@@ -1,4 +1,4 @@
-* Detect LocalDC by tcp ping
+* Implemented detection of local data-center with measuring tcp dial RTT
 * Simplified the balancing logic
 
 ## v3.25.3
