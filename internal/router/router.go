@@ -35,7 +35,7 @@ type router struct {
 
 func (r *router) clusterDiscovery(ctx context.Context) (err error) {
 	var (
-		onDone = trace.DriverOnRouterDiscovery(
+		onDone = trace.DriverOnBalancerUpdate(
 			r.driverConfig.Trace(),
 			&ctx,
 			r.routerConfig.DetectlocalDC,
@@ -93,6 +93,14 @@ func (r *router) Discovery() discovery.Client {
 }
 
 func (r *router) Close(ctx context.Context) (err error) {
+	onDone := trace.DriverOnBalancerClose(
+		r.driverConfig.Trace(),
+		&ctx,
+	)
+	defer func() {
+		onDone(err)
+	}()
+
 	issues := make([]error, 0, 2)
 
 	if r.discoveryRepeater != nil {
@@ -116,12 +124,9 @@ func New(
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {
-	onDone := trace.DriverOnInit(
+	onDone := trace.DriverOnBalancerInit(
 		c.Trace(),
 		&ctx,
-		c.Endpoint(),
-		c.Database(),
-		c.Secure(),
 	)
 	defer func() {
 		onDone(err)
@@ -258,13 +263,31 @@ func (r *router) connections() *connectionsState {
 	return r.connectionsState
 }
 
-func (r *router) getConn(ctx context.Context) (conn.Conn, error) {
-	state := r.connections()
-	c, failedCount := state.GetConnection(ctx)
-	if failedCount*2 > state.PreferredCount() {
-		r.discoveryRepeater.Force()
-	}
+func (r *router) getConn(ctx context.Context) (c conn.Conn, err error) {
+	onDone := trace.DriverOnBalancerChooseEndpoint(
+		r.driverConfig.Trace(),
+		&ctx,
+	)
+	defer func() {
+		if err == nil {
+			onDone(c.Endpoint(), nil)
+		} else {
+			onDone(nil, err)
+		}
+	}()
 
+	var (
+		state       = r.connections()
+		failedCount int
+	)
+
+	defer func() {
+		if failedCount*2 > state.PreferredCount() {
+			r.discoveryRepeater.Force()
+		}
+	}()
+
+	c, failedCount = state.GetConnection(ctx)
 	if c == nil {
 		return nil, xerrors.WithStackTrace(ErrClusterEmpty)
 	}

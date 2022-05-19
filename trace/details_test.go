@@ -18,15 +18,15 @@ func TestDetailsMatch(t *testing.T) {
 			details: DriverEvents,
 		},
 		{
-			pattern: `^ydb\.driver\.xresolver$`,
+			pattern: `^ydb\.driver\.resolver$`,
 			details: DriverResolverEvents,
 		},
 		{
-			pattern: `^ydb\.driver\.(xresolver|xnet)$`,
+			pattern: `^ydb\.driver\.(resolver|net)$`,
 			details: DriverResolverEvents | DriverNetEvents,
 		},
 		{
-			pattern: `^ydb\.driver\.(conn|credentials|xresolver|xnet)$`,
+			pattern: `^ydb\.driver\.(conn|credentials|resolver|net)$`,
 			details: DriverConnEvents | DriverCredentialsEvents | DriverResolverEvents | DriverNetEvents,
 		},
 		{

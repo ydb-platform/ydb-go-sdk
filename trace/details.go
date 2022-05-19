@@ -9,7 +9,7 @@ type Details uint64
 const (
 	DriverNetEvents         Details = 1 << iota // 1
 	DriverConnEvents                            // 2
-	DriverClusterEvents                         // 4
+	DriverBalancerEvents                        // 4
 	DriverResolverEvents                        // 8
 	DriverRepeaterEvents                        // 16
 	DriverCredentialsEvents                     // 32
@@ -34,9 +34,12 @@ const (
 
 	CoordinationEvents // 262144
 
+	// Deprecated: has no effect now
+	DriverClusterEvents
+
 	DriverEvents = DriverNetEvents |
 		DriverConnEvents |
-		DriverClusterEvents |
+		DriverBalancerEvents |
 		DriverResolverEvents |
 		DriverRepeaterEvents |
 		DriverCredentialsEvents // 63
@@ -65,9 +68,9 @@ const (
 var (
 	details = map[Details]string{
 		DriverEvents:            "ydb.driver",
-		DriverClusterEvents:     "ydb.driver.cluster",
-		DriverNetEvents:         "ydb.driver.xnet",
-		DriverResolverEvents:    "ydb.driver.xresolver",
+		DriverBalancerEvents:    "ydb.driver.balancer",
+		DriverNetEvents:         "ydb.driver.net",
+		DriverResolverEvents:    "ydb.driver.resolver",
 		DriverRepeaterEvents:    "ydb.driver.repeater",
 		DriverConnEvents:        "ydb.driver.conn",
 		DriverCredentialsEvents: "ydb.driver.credentials",
