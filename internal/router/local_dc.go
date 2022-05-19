@@ -26,7 +26,6 @@ func checkFastestAddress(ctx context.Context, addresses []string) (string, error
 	dialer := net.Dialer{}
 	var wg sync.WaitGroup
 	for _, addr := range addresses {
-
 		wg.Add(1)
 		go func(address string) {
 			defer wg.Done()

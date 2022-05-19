@@ -31,8 +31,6 @@ type router struct {
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
-	lastLocalDC string
-
 	m                sync.RWMutex
 	connectionsState *connectionsState
 }
