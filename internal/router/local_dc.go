@@ -50,11 +50,11 @@ func checkFastestAddress(ctx context.Context, addresses []string) (string, error
 	}()
 
 	close(startDial)
-	res := <-results
-	if res == "" {
-		return "", xerrors.WithStackTrace(<-errs)
+
+	if res, ok := <-results; ok {
+		return res, nil
 	}
-	return res, nil
+	return "", xerrors.WithStackTrace(<-errs)
 }
 
 func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (endpoint.Endpoint, error) {
