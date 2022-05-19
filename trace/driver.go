@@ -71,8 +71,10 @@ type (
 		OnUnpessimizeNode func(DriverUnpessimizeNodeStartInfo) func(DriverUnpessimizeNodeDoneInfo)
 
 		// Repeater events
-		OnRepeaterWakeUp  func(DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo)
-		OnRouterDiscovery func(DriverRouterDiscoveryInfo)
+		OnRepeaterWakeUp func(DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo)
+
+		// Router events
+		OnRouterDiscovery func(DriverRouterDiscoveryStartInfo) func(DriverRouterDiscoveryDoneInfo)
 
 		// Credentials events
 		OnGetCredentials func(DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo)
@@ -171,12 +173,18 @@ type (
 	DriverResolveDoneInfo struct {
 		Error error
 	}
-	DriverRouterDiscoveryInfo struct {
-		Latency     time.Duration
-		Endpoints   []EndpointInfo
+	DriverRouterDiscoveryStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context     *context.Context
 		NeedLocalDC bool
-		LocalDC     string
-		Error       error
+	}
+	DriverRouterDiscoveryDoneInfo struct {
+		Endpoints []EndpointInfo
+		LocalDC   string
+		Error     error
 	}
 	DriverNetReadStartInfo struct {
 		Address string

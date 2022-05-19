@@ -419,24 +419,27 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 
-		t.OnRouterDiscovery = func(info trace.DriverRouterDiscoveryInfo) {
-			if info.Error == nil {
-				l.Tracef(
-					`discovery new endpoints done {latency:"%v", endpoints: "%v", needLocalDC: "%v", detectedLocalDC: "%v"}`,
-					info.Latency,
-					info.Endpoints,
-					info.NeedLocalDC,
-					info.LocalDC,
-				)
-			} else {
-				l.Errorf(
-					`discovery new endpoints fail {latency:"%v", endpoints: "%v", needLocalDC: "%v", localDC: "%v", error: "%v"}`,
-					info.Latency,
-					info.Endpoints,
-					info.NeedLocalDC,
-					info.LocalDC,
-					info.Error,
-				)
+		t.OnRouterDiscovery = func(info trace.DriverRouterDiscoveryStartInfo) func(trace.DriverRouterDiscoveryDoneInfo) {
+			l.Tracef(
+				`router discovery start {needLocalDC: "%v"}`,
+				info.NeedLocalDC,
+			)
+			start := time.Now()
+			return func(info trace.DriverRouterDiscoveryDoneInfo) {
+				if info.Error == nil {
+					l.Infof(
+						`router discovery done {latency:"%v", endpoints: "%v", detectedLocalDC: "%v"}`,
+						time.Since(start),
+						info.Endpoints,
+						info.LocalDC,
+					)
+				} else {
+					l.Errorf(
+						`router discovery failed {latency:"%v", error: "%v"}`,
+						time.Since(start),
+						info.Error,
+					)
+				}
 			}
 		}
 	}

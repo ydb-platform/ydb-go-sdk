@@ -4,11 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"google.golang.org/grpc"
-
-	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
@@ -17,6 +14,7 @@ import (
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -36,41 +34,42 @@ type router struct {
 }
 
 func (r *router) clusterDiscovery(ctx context.Context) (err error) {
-	var discoveryTrace trace.DriverRouterDiscoveryInfo
-	start := time.Now()
-	defer func() {
-		discoveryTrace.Error = err
-		discoveryTrace.Latency = time.Since(start)
-
-		trace.DriverOnRouterDiscovery(
+	var (
+		onDone = trace.DriverOnRouterDiscovery(
 			r.driverConfig.Trace(),
-			discoveryTrace.Latency,
-			discoveryTrace.Endpoints,
+			&ctx,
 			r.routerConfig.DetectlocalDC,
-			discoveryTrace.LocalDC,
+		)
+		endpoints []endpoint.Endpoint
+		localDC   string
+	)
+
+	defer func() {
+		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
+		for _, e := range endpoints {
+			nodes = append(nodes, e.Copy())
+		}
+		onDone(
+			nodes,
+			localDC,
 			err,
 		)
 	}()
 
-	endpoints, err := r.discovery.Discover(ctx)
+	endpoints, err = r.discovery.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
-	discoveryTrace.Endpoints = make([]trace.EndpointInfo, 0, len(endpoints))
-	for _, e := range endpoints {
-		discoveryTrace.Endpoints = append(discoveryTrace.Endpoints, e)
-	}
 
-	var localDC string
 	if r.routerConfig.DetectlocalDC {
 		localDC, err = r.localDCDetector(ctx, endpoints)
 		if err != nil {
-			return err
+			return xerrors.WithStackTrace(err)
 		}
-		discoveryTrace.LocalDC = localDC
 	}
 
 	r.applyDiscoveredEndpoints(ctx, endpoints, localDC)
+
 	return nil
 }
 

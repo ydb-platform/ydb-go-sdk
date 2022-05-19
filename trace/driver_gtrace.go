@@ -4,7 +4,6 @@ package trace
 
 import (
 	"context"
-	"time"
 )
 
 // driverComposeOptions is a holder of options
@@ -925,7 +924,7 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 	{
 		h1 := t.OnRouterDiscovery
 		h2 := x.OnRouterDiscovery
-		ret.OnRouterDiscovery = func(d DriverRouterDiscoveryInfo) {
+		ret.OnRouterDiscovery = func(d DriverRouterDiscoveryStartInfo) func(DriverRouterDiscoveryDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -933,11 +932,27 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 					}
 				}()
 			}
+			var r, r1 func(DriverRouterDiscoveryDoneInfo)
 			if h1 != nil {
-				h1(d)
+				r = h1(d)
 			}
 			if h2 != nil {
-				h2(d)
+				r1 = h2(d)
+			}
+			return func(d DriverRouterDiscoveryDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
 			}
 		}
 	}
@@ -1364,12 +1379,20 @@ func (t Driver) onRepeaterWakeUp(d DriverRepeaterWakeUpStartInfo) func(DriverRep
 	}
 	return res
 }
-func (t Driver) onRouterDiscovery(d DriverRouterDiscoveryInfo) {
+func (t Driver) onRouterDiscovery(d DriverRouterDiscoveryStartInfo) func(DriverRouterDiscoveryDoneInfo) {
 	fn := t.OnRouterDiscovery
 	if fn == nil {
-		return
+		return func(DriverRouterDiscoveryDoneInfo) {
+			return
+		}
 	}
-	fn(d)
+	res := fn(d)
+	if res == nil {
+		return func(DriverRouterDiscoveryDoneInfo) {
+			return
+		}
+	}
+	return res
 }
 func (t Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
@@ -1682,14 +1705,18 @@ func DriverOnRepeaterWakeUp(t Driver, c *context.Context, name string, event str
 		res(p)
 	}
 }
-func DriverOnRouterDiscovery(t Driver, latency time.Duration, endpoints []EndpointInfo, needLocalDC bool, localDC string, e error) {
-	var p DriverRouterDiscoveryInfo
-	p.Latency = latency
-	p.Endpoints = endpoints
+func DriverOnRouterDiscovery(t Driver, c *context.Context, needLocalDC bool) func(endpoints []EndpointInfo, localDC string, _ error) {
+	var p DriverRouterDiscoveryStartInfo
+	p.Context = c
 	p.NeedLocalDC = needLocalDC
-	p.LocalDC = localDC
-	p.Error = e
-	t.onRouterDiscovery(p)
+	res := t.onRouterDiscovery(p)
+	return func(endpoints []EndpointInfo, localDC string, e error) {
+		var p DriverRouterDiscoveryDoneInfo
+		p.Endpoints = endpoints
+		p.LocalDC = localDC
+		p.Error = e
+		res(p)
+	}
 }
 func DriverOnGetCredentials(t Driver, c *context.Context) func(token string, _ error) {
 	var p DriverGetCredentialsStartInfo

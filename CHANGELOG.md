@@ -1,4 +1,5 @@
 * Implemented detection of local data-center with measuring tcp dial RTT
+* Added `trace.Driver.OnRouterDiscovery` event
 * Simplified the balancing logic
 
 ## v3.25.3
