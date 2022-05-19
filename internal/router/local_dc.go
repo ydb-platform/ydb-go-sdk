@@ -37,6 +37,7 @@ func checkFastestAddress(ctx context.Context, addresses []string) (string, error
 			conn, err := dialer.DialContext(ctx, "tcp", address)
 			if err == nil {
 				results <- address
+				cancel()
 			} else {
 				errs <- err
 			}
@@ -46,13 +47,11 @@ func checkFastestAddress(ctx context.Context, addresses []string) (string, error
 		}(addr)
 	}
 
-	go func() {
-		wg.Wait()
-		close(results)
-		close(errs)
-	}()
-
 	close(startDial)
+
+	wg.Wait()
+	close(results)
+	close(errs)
 
 	if res, ok := <-results; ok {
 		return res, nil
