@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/router"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -646,7 +646,7 @@ func (c *Client) keeper(ctx context.Context) {
 					case
 						xerrors.Is(
 							err,
-							router.ErrClusterEmpty,
+							balancer.ErrClusterEmpty,
 						),
 						xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION),
 						xerrors.IsTransportError(

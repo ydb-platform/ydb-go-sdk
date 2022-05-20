@@ -6,7 +6,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/router"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
@@ -107,7 +107,7 @@ func (tx *transaction) CommitTx(
 	defer t.processHints()
 
 	response, err = tx.s.tableService.CommitTransaction(
-		router.WithEndpoint(ctx, tx.s),
+		balancer.WithEndpoint(ctx, tx.s),
 		request,
 		t.Trailer(),
 	)
@@ -146,7 +146,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	defer t.processHints()
 
 	_, err = tx.s.tableService.RollbackTransaction(
-		router.WithEndpoint(ctx, tx.s),
+		balancer.WithEndpoint(ctx, tx.s),
 		&Ydb_Table.RollbackTransactionRequest{
 			SessionId: tx.s.id,
 			TxId:      tx.id,

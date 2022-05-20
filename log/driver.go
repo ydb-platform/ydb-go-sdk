@@ -477,21 +477,21 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			trace.DriverBalancerUpdateDoneInfo,
 		) {
 			l.Tracef(
-				`router discovery start {needLocalDC: "%v"}`,
+				`balancer discovery start {needLocalDC: "%v"}`,
 				info.NeedLocalDC,
 			)
 			start := time.Now()
 			return func(info trace.DriverBalancerUpdateDoneInfo) {
 				if info.Error == nil {
 					l.Infof(
-						`router discovery done {latency:"%v", endpoints: "%v", detectedLocalDC: "%v"}`,
+						`balancer discovery done {latency:"%v", endpoints: "%v", detectedLocalDC: "%v"}`,
 						time.Since(start),
 						info.Endpoints,
 						info.LocalDC,
 					)
 				} else {
 					l.Errorf(
-						`router discovery failed {latency:"%v", error: "%v"}`,
+						`balancer discovery failed {latency:"%v", error: "%v"}`,
 						time.Since(start),
 						info.Error,
 					)

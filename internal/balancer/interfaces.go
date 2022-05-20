@@ -1,4 +1,4 @@
-package router
+package balancer
 
 import (
 	"google.golang.org/grpc"
@@ -24,10 +24,10 @@ type Info interface {
 	// Endpoint returns initial endpoint
 	Endpoint() string
 
-	// Name returns router name
+	// Name returns balancer name
 	Name() string
 
-	// Secure returns true if router connection is secure
+	// Secure returns true if balancer connection is secure
 	Secure() bool
 }
 

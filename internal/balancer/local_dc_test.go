@@ -1,4 +1,4 @@
-package router
+package balancer
 
 import (
 	"context"
@@ -143,10 +143,10 @@ func TestLocalDCDiscovery(t *testing.T) {
 	cfg := config.New(
 		config.WithBalancer(balancers.PreferLocalDC(balancers.Default())),
 	)
-	r := &router{
-		driverConfig: cfg,
-		routerConfig: *cfg.Balancer(),
-		pool:         conn.NewPool(ctx, cfg),
+	r := &balancer{
+		driverConfig:   cfg,
+		balancerConfig: *cfg.Balancer(),
+		pool:           conn.NewPool(ctx, cfg),
 		discovery: discoveryMock{endpoints: []endpoint.Endpoint{
 			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
 			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
@@ -14,13 +14,13 @@ func TestFromConfig(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		config string
-		res    routerconfig.Config
+		res    balancerConfig.Config
 		fail   bool
 	}{
 		{
 			name:   "empty",
 			config: ``,
-			res:    routerconfig.Config{},
+			res:    balancerConfig.Config{},
 			fail:   true,
 		},
 		{
@@ -28,21 +28,21 @@ func TestFromConfig(t *testing.T) {
 			config: `{
 				"type": "single"
 			}`,
-			res: routerconfig.Config{SingleConn: true},
+			res: balancerConfig.Config{SingleConn: true},
 		},
 		{
 			name: "round_robin",
 			config: `{
 				"type": "round_robin"
 			}`,
-			res: routerconfig.Config{},
+			res: balancerConfig.Config{},
 		},
 		{
 			name: "random_choice",
 			config: `{
 				"type": "random_choice"
 			}`,
-			res: routerconfig.Config{},
+			res: balancerConfig.Config{},
 		},
 		{
 			name: "prefer_local_dc",
@@ -50,9 +50,9 @@ func TestFromConfig(t *testing.T) {
 				"type": "random_choice",
 				"prefer": "local_dc"
 			}`,
-			res: routerconfig.Config{
+			res: balancerConfig.Config{
 				DetectlocalDC: true,
-				IsPreferConn: func(routerInfo routerconfig.Info, c conn.Conn) bool {
+				IsPreferConn: func(info balancerConfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
 				},
@@ -73,10 +73,10 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "local_dc",
 				"fallback": true
 			}`,
-			res: routerconfig.Config{
+			res: balancerConfig.Config{
 				AllowFalback:  true,
 				DetectlocalDC: true,
-				IsPreferConn: func(routerInfo routerconfig.Info, c conn.Conn) bool {
+				IsPreferConn: func(info balancerConfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
 				},
@@ -89,8 +89,8 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "locations",
 				"locations": ["AAA", "BBB", "CCC"]
 			}`,
-			res: routerconfig.Config{
-				IsPreferConn: func(routerInfo routerconfig.Info, c conn.Conn) bool {
+			res: balancerConfig.Config{
+				IsPreferConn: func(info balancerConfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
 				},
@@ -104,9 +104,9 @@ func TestFromConfig(t *testing.T) {
 				"locations": ["AAA", "BBB", "CCC"],
 				"fallback": true
 			}`,
-			res: routerconfig.Config{
+			res: balancerConfig.Config{
 				AllowFalback: true,
-				IsPreferConn: func(routerInfo routerconfig.Info, c conn.Conn) bool {
+				IsPreferConn: func(info balancerConfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
 				},
@@ -116,7 +116,7 @@ func TestFromConfig(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				actErr   error
-				fallback = &routerconfig.Config{}
+				fallback = &balancerConfig.Config{}
 			)
 			b := FromConfig(
 				test.config,
