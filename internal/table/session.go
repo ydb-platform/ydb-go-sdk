@@ -917,23 +917,18 @@ func (s *session) StreamReadTable(
 
 	ctx, cancel := context.WithCancel(ctx)
 
+	t := s.trailer()
+	defer t.processHints()
+
 	stream, err = s.tableService.StreamReadTable(
 		balancer.WithEndpoint(ctx, s),
 		&request,
+		t.Trailer(),
 	)
 
 	if err != nil {
 		cancel()
 		return nil, xerrors.WithStackTrace(err)
-	}
-
-	select {
-	case <-stream.Context().Done():
-		// nop
-	default:
-		if checkHintSessionClose(stream.Trailer()) {
-			s.SetStatus(options.SessionClosing)
-		}
 	}
 
 	return scanner.NewStream(
@@ -1006,23 +1001,18 @@ func (s *session) StreamExecuteScanQuery(
 
 	ctx, cancel := context.WithCancel(ctx)
 
+	t := s.trailer()
+	defer t.processHints()
+
 	stream, err = s.tableService.StreamExecuteScanQuery(
 		balancer.WithEndpoint(ctx, s),
 		&request,
+		t.Trailer(),
 	)
 
 	if err != nil {
 		cancel()
 		return nil, xerrors.WithStackTrace(err)
-	}
-
-	select {
-	case <-stream.Context().Done():
-		// nop
-	default:
-		if checkHintSessionClose(stream.Trailer()) {
-			s.SetStatus(options.SessionClosing)
-		}
 	}
 
 	return scanner.NewStream(
