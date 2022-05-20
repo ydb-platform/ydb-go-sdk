@@ -1,3 +1,4 @@
+## v3.26.0
 * Fixed data race on session stream queries
 * Renamed `internal/router` package to `internal/balancer` for unambiguous understanding of package mission
 * Implemented detection of local data-center with measuring tcp dial RTT
