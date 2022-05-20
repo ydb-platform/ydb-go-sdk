@@ -42,7 +42,12 @@ func DatetimeValue(v uint32) Value { return value.DatetimeValue(v) }
 
 func TimestampValue(v uint64) Value { return value.TimestampValue(v) }
 
+// IntervalValueFromMicroseconds makes Value from given microseconds value
+func IntervalValueFromMicroseconds(v int64) Value { return value.IntervalValue(v) }
+
 // IntervalValue makes Value from given microseconds value
+//
+// Deprecated: use IntervalValueFromMicroseconds instead
 func IntervalValue(v int64) Value { return value.IntervalValue(v) }
 
 // TzDateValue makes TzDate value from string
@@ -392,11 +397,21 @@ func NullableTzTimestampValueFromTime(v *time.Time) Value {
 	return OptionalValue(TzTimestampValueFromTime(*v))
 }
 
+// NullableIntervalValue makes Value which maybe nil or valued
+//
+// Deprecated: use NullableIntervalValueFromMicroseconds instead
 func NullableIntervalValue(v *int64) Value {
 	if v == nil {
 		return NullValue(TypeInterval)
 	}
 	return OptionalValue(IntervalValue(*v))
+}
+
+func NullableIntervalValueFromMicroseconds(v *int64) Value {
+	if v == nil {
+		return NullValue(TypeInterval)
+	}
+	return OptionalValue(IntervalValueFromMicroseconds(*v))
 }
 
 func NullableIntervalValueFromDuration(v *time.Duration) Value {
@@ -540,7 +555,7 @@ func Nullable(t Type, v interface{}) Value {
 	case TypeInterval:
 		switch tt := v.(type) {
 		case *int64:
-			return NullableIntervalValue(tt)
+			return NullableIntervalValueFromMicroseconds(tt)
 		case *time.Duration:
 			return NullableIntervalValueFromDuration(tt)
 		default:

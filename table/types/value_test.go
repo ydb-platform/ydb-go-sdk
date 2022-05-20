@@ -217,10 +217,10 @@ func TestNullable(t *testing.T) {
 			exp:  NullValue(TypeTzDate),
 		},
 		{
-			name: "interval from int32",
+			name: "interval from int64",
 			t:    TypeInterval,
 			v:    func(v int64) *int64 { return &v }(123),
-			exp:  OptionalValue(IntervalValue(123)),
+			exp:  OptionalValue(IntervalValueFromMicroseconds(123)),
 		},
 		{
 			name: "interval from time.Time",
