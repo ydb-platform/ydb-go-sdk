@@ -28,7 +28,7 @@ type Config struct {
 	trace         trace.Driver
 	dialTimeout   time.Duration
 	connectionTTL time.Duration
-	balancer      *routerconfig.Config
+	routerConfig  *routerconfig.Config
 	secure        bool
 	endpoint      string
 	database      string
@@ -106,7 +106,7 @@ func (c Config) Trace() trace.Driver {
 // Balancer is an optional configuration related to selected balancer.
 // That is, some balancing methods allow to be configured.
 func (c Config) Balancer() *routerconfig.Config {
-	return c.balancer
+	return c.routerConfig
 }
 
 // RequestsType set an additional type hint to all requests.
@@ -231,7 +231,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 
 func WithBalancer(balancer *routerconfig.Config) Option {
 	return func(c *Config) {
-		c.balancer = balancer
+		c.routerConfig = balancer
 	}
 }
 
@@ -312,8 +312,8 @@ func defaultConfig() (c Config) {
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo("default"),
 		),
-		balancer:  balancers.Default(),
-		tlsConfig: defaultTLSConfig(),
+		routerConfig: balancers.Default(),
+		tlsConfig:    defaultTLSConfig(),
 		grpcOptions: []grpc.DialOption{
 			grpc.WithContextDialer(
 				func(ctx context.Context, address string) (net.Conn, error) {

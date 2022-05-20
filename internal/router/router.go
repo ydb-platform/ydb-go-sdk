@@ -7,8 +7,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -16,6 +14,7 @@ import (
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
+	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -23,36 +22,69 @@ import (
 var ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
 
 type router struct {
-	config            config.Config
-	balancerConfig    routerconfig.Config
+	driverConfig      config.Config
+	routerConfig      routerconfig.Config
 	pool              *conn.Pool
 	discovery         discovery.Client
 	discoveryRepeater repeater.Repeater
+	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	m                sync.RWMutex
 	connectionsState *connectionsState
 }
 
-func (r *router) clusterDiscovery(ctx context.Context) error {
-	endpoints, err := r.discovery.Discover(ctx)
+func (r *router) clusterDiscovery(ctx context.Context) (err error) {
+	var (
+		onDone = trace.DriverOnBalancerUpdate(
+			r.driverConfig.Trace(),
+			&ctx,
+			r.routerConfig.DetectlocalDC,
+		)
+		endpoints []endpoint.Endpoint
+		localDC   string
+	)
+
+	defer func() {
+		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
+		for _, e := range endpoints {
+			nodes = append(nodes, e.Copy())
+		}
+		onDone(
+			nodes,
+			localDC,
+			err,
+		)
+	}()
+
+	endpoints, err = r.discovery.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	r.applyDiscoveredEndpoints(ctx, endpoints)
+	if r.routerConfig.DetectlocalDC {
+		localDC, err = r.localDCDetector(ctx, endpoints)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+	}
+
+	r.applyDiscoveredEndpoints(ctx, endpoints, localDC)
+
 	return nil
 }
 
-func (r *router) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint) {
+func (r *router) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
 	connections := endpointsToConnections(r.pool, endpoints)
 	for _, c := range connections {
 		r.pool.Allow(ctx, c)
 	}
 
-	state := newConnectionsState(connections, r.balancerConfig.IsPreferConn, r.balancerConfig.AllowFalback)
+	routerInfo := routerconfig.Info{SelfLocation: localDC}
+	state := newConnectionsState(connections, r.routerConfig.IsPreferConn, routerInfo, r.routerConfig.AllowFalback)
 
 	r.m.Lock()
 	defer r.m.Unlock()
+
 	r.connectionsState = state
 }
 
@@ -61,6 +93,14 @@ func (r *router) Discovery() discovery.Client {
 }
 
 func (r *router) Close(ctx context.Context) (err error) {
+	onDone := trace.DriverOnBalancerClose(
+		r.driverConfig.Trace(),
+		&ctx,
+	)
+	defer func() {
+		onDone(err)
+	}()
+
 	issues := make([]error, 0, 2)
 
 	if r.discoveryRepeater != nil {
@@ -84,26 +124,24 @@ func New(
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (_ Connection, err error) {
-	onDone := trace.DriverOnInit(
+	onDone := trace.DriverOnBalancerInit(
 		c.Trace(),
 		&ctx,
-		c.Endpoint(),
-		c.Database(),
-		c.Secure(),
 	)
 	defer func() {
 		onDone(err)
 	}()
 
 	r := &router{
-		config: c,
-		pool:   pool,
+		driverConfig:    c,
+		pool:            pool,
+		localDCDetector: detectLocalDC,
 	}
 
 	if balancerConfig := c.Balancer(); balancerConfig == nil {
-		r.balancerConfig = routerconfig.Config{}
+		r.routerConfig = routerconfig.Config{}
 	} else {
-		r.balancerConfig = *balancerConfig
+		r.routerConfig = *balancerConfig
 	}
 
 	discoveryEndpoint := endpoint.New(c.Endpoint())
@@ -116,10 +154,10 @@ func New(
 		discoveryConfig,
 	)
 
-	if r.balancerConfig.SingleConn {
+	if r.routerConfig.SingleConn {
 		r.connectionsState = newConnectionsState(
 			endpointsToConnections(pool, []endpoint.Endpoint{discoveryEndpoint}),
-			nil, false)
+			nil, routerconfig.Info{}, false)
 	} else {
 		if err = r.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
@@ -132,7 +170,7 @@ func New(
 				return r.clusterDiscovery(ctx)
 			},
 				repeater.WithName("discovery"),
-				repeater.WithTrace(r.config.Trace()),
+				repeater.WithTrace(r.driverConfig.Trace()),
 			)
 		}
 	}
@@ -149,15 +187,15 @@ func New(
 }
 
 func (r *router) Endpoint() string {
-	return r.config.Endpoint()
+	return r.driverConfig.Endpoint()
 }
 
 func (r *router) Name() string {
-	return r.config.Database()
+	return r.driverConfig.Database()
 }
 
 func (r *router) Secure() bool {
-	return r.config.Secure()
+	return r.driverConfig.Secure()
 }
 
 func (r *router) Invoke(
@@ -201,13 +239,13 @@ func (r *router) wrapCall(ctx context.Context, f func(ctx context.Context, cc co
 				r.pool.Allow(ctx, cc)
 			}
 		} else {
-			if xerrors.MustPessimizeEndpoint(err, r.config.ExcludeGRPCCodesForPessimization()...) {
+			if xerrors.MustPessimizeEndpoint(err, r.driverConfig.ExcludeGRPCCodesForPessimization()...) {
 				r.pool.Ban(ctx, cc, err)
 			}
 		}
 	}()
 
-	if ctx, err = r.config.Meta().Meta(ctx); err != nil {
+	if ctx, err = r.driverConfig.Meta().Meta(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -225,13 +263,31 @@ func (r *router) connections() *connectionsState {
 	return r.connectionsState
 }
 
-func (r *router) getConn(ctx context.Context) (conn.Conn, error) {
-	state := r.connections()
-	c, failedCount := state.GetConnection(ctx)
-	if failedCount*2 > state.PreferredCount() {
-		r.discoveryRepeater.Force()
-	}
+func (r *router) getConn(ctx context.Context) (c conn.Conn, err error) {
+	onDone := trace.DriverOnBalancerChooseEndpoint(
+		r.driverConfig.Trace(),
+		&ctx,
+	)
+	defer func() {
+		if err == nil {
+			onDone(c.Endpoint(), nil)
+		} else {
+			onDone(nil, err)
+		}
+	}()
 
+	var (
+		state       = r.connections()
+		failedCount int
+	)
+
+	defer func() {
+		if failedCount*2 > state.PreferredCount() {
+			r.discoveryRepeater.Force()
+		}
+	}()
+
+	c, failedCount = state.GetConnection(ctx)
 	if c == nil {
 		return nil, xerrors.WithStackTrace(ErrClusterEmpty)
 	}

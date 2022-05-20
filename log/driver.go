@@ -419,22 +419,23 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	if details&trace.DriverClusterEvents != 0 {
+	// nolint:nestif
+	if details&trace.DriverBalancerEvents != 0 {
 		// nolint:govet
 		l := l.WithName(`cluster`)
-		t.OnClusterInit = func(info trace.DriverClusterInitStartInfo) func(trace.DriverClusterInitDoneInfo) {
+		t.OnBalancerInit = func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
 			l.Tracef(`init start`)
 			start := time.Now()
-			return func(info trace.DriverClusterInitDoneInfo) {
+			return func(info trace.DriverBalancerInitDoneInfo) {
 				l.Debugf(`init done {latency:"%v"}`,
 					time.Since(start),
 				)
 			}
 		}
-		t.OnClusterClose = func(info trace.DriverClusterCloseStartInfo) func(trace.DriverClusterCloseDoneInfo) {
+		t.OnBalancerClose = func(info trace.DriverBalancerCloseStartInfo) func(trace.DriverBalancerCloseDoneInfo) {
 			l.Tracef(`close start`)
 			start := time.Now()
-			return func(info trace.DriverClusterCloseDoneInfo) {
+			return func(info trace.DriverBalancerCloseDoneInfo) {
 				if info.Error == nil {
 					l.Tracef(`close done {latency:"%v"}`,
 						time.Since(start),
@@ -448,20 +449,51 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
-		t.OnClusterGet = func(info trace.DriverClusterGetStartInfo) func(trace.DriverClusterGetDoneInfo) {
-			l.Tracef(`get start`)
+		t.OnBalancerChooseEndpoint = func(
+			info trace.DriverBalancerChooseEndpointStartInfo,
+		) func(
+			trace.DriverBalancerChooseEndpointDoneInfo,
+		) {
+			l.Tracef(`select endpoint start`)
 			start := time.Now()
-			return func(info trace.DriverClusterGetDoneInfo) {
+			return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`get done {latency:"%v",endpoint:%v}`,
+					l.Tracef(`select endpoint done {latency:"%v",endpoint:%v}`,
 						time.Since(start),
 						info.Endpoint.String(),
 					)
 				} else {
-					l.Warnf(`get failed {latency:"%v",error:"%s",version:"%s"}`,
+					l.Warnf(`select endpoint failed {latency:"%v",error:"%s",version:"%s"}`,
 						time.Since(start),
 						info.Error,
 						meta.Version,
+					)
+				}
+			}
+		}
+		t.OnBalancerUpdate = func(
+			info trace.DriverBalancerUpdateStartInfo,
+		) func(
+			trace.DriverBalancerUpdateDoneInfo,
+		) {
+			l.Tracef(
+				`router discovery start {needLocalDC: "%v"}`,
+				info.NeedLocalDC,
+			)
+			start := time.Now()
+			return func(info trace.DriverBalancerUpdateDoneInfo) {
+				if info.Error == nil {
+					l.Infof(
+						`router discovery done {latency:"%v", endpoints: "%v", detectedLocalDC: "%v"}`,
+						time.Since(start),
+						info.Endpoints,
+						info.LocalDC,
+					)
+				} else {
+					l.Errorf(
+						`router discovery failed {latency:"%v", error: "%v"}`,
+						time.Since(start),
+						info.Error,
 					)
 				}
 			}

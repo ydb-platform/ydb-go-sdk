@@ -1,3 +1,6 @@
+* Implemented detection of local data-center with measuring tcp dial RTT
+* Added `trace.Driver.OnBalancer{Init,Close,ChooseEndpoint,Update}` events
+* Marked the driver cluster events as deprecated  
 * Simplified the balancing logic
 
 ## v3.25.3

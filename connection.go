@@ -390,6 +390,17 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		return nil, xerrors.WithStackTrace(errors.New("configuration: empty database"))
 	}
 
+	onDone := trace.DriverOnInit(
+		c.config.Trace(),
+		&ctx,
+		c.config.Endpoint(),
+		c.config.Database(),
+		c.config.Secure(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
 	if c.pool == nil {
 		c.pool = conn.NewPool(
 			ctx,
