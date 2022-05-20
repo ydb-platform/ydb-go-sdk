@@ -5,9 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
-	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
 )
 
 func TestPreferLocalDC(t *testing.T) {
@@ -18,7 +18,7 @@ func TestPreferLocalDC(t *testing.T) {
 	}
 	rr := PreferLocalDC(Default())
 	require.False(t, rr.AllowFalback)
-	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(routerconfig.Info{SelfLocation: "2"}, rr, conns))
+	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(balancerConfig.Info{SelfLocation: "2"}, rr, conns))
 }
 
 func TestPreferLocalDCWithFallBack(t *testing.T) {
@@ -29,7 +29,7 @@ func TestPreferLocalDCWithFallBack(t *testing.T) {
 	}
 	rr := PreferLocalDCWithFallBack(Default())
 	require.True(t, rr.AllowFalback)
-	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(routerconfig.Info{SelfLocation: "2"}, rr, conns))
+	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(balancerConfig.Info{SelfLocation: "2"}, rr, conns))
 }
 
 func TestPreferLocations(t *testing.T) {
@@ -41,7 +41,7 @@ func TestPreferLocations(t *testing.T) {
 
 	rr := PreferLocations(Default(), "zero", "two")
 	require.False(t, rr.AllowFalback)
-	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(routerconfig.Info{}, rr, conns))
+	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(balancerConfig.Info{}, rr, conns))
 }
 
 func TestPreferLocationsWithFallback(t *testing.T) {
@@ -53,12 +53,12 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 
 	rr := PreferLocationsWithFallback(Default(), "zero", "two")
 	require.True(t, rr.AllowFalback)
-	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(routerconfig.Info{}, rr, conns))
+	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(balancerConfig.Info{}, rr, conns))
 }
 
-func applyPreferFilter(info routerconfig.Info, b *routerconfig.Config, conns []conn.Conn) []conn.Conn {
+func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns []conn.Conn) []conn.Conn {
 	if b.IsPreferConn == nil {
-		b.IsPreferConn = func(routerInfo routerconfig.Info, c conn.Conn) bool { return true }
+		b.IsPreferConn = func(info balancerConfig.Info, c conn.Conn) bool { return true }
 	}
 	res := make([]conn.Conn, 0, len(conns))
 	for _, c := range conns {

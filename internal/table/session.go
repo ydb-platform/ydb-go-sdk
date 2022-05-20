@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/router"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -177,7 +177,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 	s.onCloseMtx.RUnlock()
 
 	_, err = s.tableService.DeleteSession(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&Ydb_Table.DeleteSessionRequest{
 			SessionId: s.id,
 			OperationParams: operation.Params(
@@ -208,7 +208,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	t := s.trailer()
 	defer t.processHints()
 	resp, err := s.tableService.KeepAlive(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&Ydb_Table.KeepAliveRequest{
 			SessionId: s.id,
 			OperationParams: operation.Params(
@@ -261,7 +261,7 @@ func (s *session) CreateTable(
 	t := s.trailer()
 	defer t.processHints()
 	_, err = s.tableService.CreateTable(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 		t.Trailer(),
 	)
@@ -292,7 +292,7 @@ func (s *session) DescribeTable(
 		opt((*options.DescribeTableDesc)(&request))
 	}
 	response, err = s.tableService.DescribeTable(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 	)
 	if err != nil {
@@ -431,7 +431,7 @@ func (s *session) DropTable(
 	t := s.trailer()
 	defer t.processHints()
 	_, err = s.tableService.DropTable(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 		t.Trailer(),
 	)
@@ -460,7 +460,7 @@ func (s *session) AlterTable(
 	t := s.trailer()
 	defer t.processHints()
 	_, err = s.tableService.AlterTable(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 		t.Trailer(),
 	)
@@ -490,7 +490,7 @@ func (s *session) CopyTable(
 	t := s.trailer()
 	defer t.processHints()
 	_, err = s.tableService.CopyTable(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 		t.Trailer(),
 	)
@@ -527,7 +527,7 @@ func (s *session) Explain(
 	t := s.trailer()
 	defer t.processHints()
 	response, err = s.tableService.ExplainDataQuery(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&Ydb_Table.ExplainDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
@@ -578,7 +578,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	t := s.trailer()
 	defer t.processHints()
 	response, err = s.tableService.PrepareDataQuery(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&Ydb_Table.PrepareDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
@@ -705,7 +705,7 @@ func (s *session) executeDataQuery(
 
 	var response *Ydb_Table.ExecuteDataQueryResponse
 	response, err = s.tableService.ExecuteDataQuery(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		request,
 		t.Trailer(),
 	)
@@ -741,7 +741,7 @@ func (s *session) ExecuteSchemeQuery(
 	t := s.trailer()
 	defer t.processHints()
 	_, err = s.tableService.ExecuteSchemeQuery(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 		t.Trailer(),
 	)
@@ -768,7 +768,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 	t := s.trailer()
 	defer t.processHints()
 	response, err = s.tableService.DescribeTableOptions(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 		t.Trailer(),
 	)
@@ -918,7 +918,7 @@ func (s *session) StreamReadTable(
 	ctx, cancel := context.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamReadTable(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 	)
 
@@ -1007,7 +1007,7 @@ func (s *session) StreamExecuteScanQuery(
 	ctx, cancel := context.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamExecuteScanQuery(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&request,
 	)
 
@@ -1060,7 +1060,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 	t := s.trailer()
 	defer t.processHints()
 	_, err = s.tableService.BulkUpsert(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
 			Rows:  value.ToYDB(rows),
@@ -1098,7 +1098,7 @@ func (s *session) BeginTransaction(
 	t := s.trailer()
 	defer t.processHints()
 	response, err = s.tableService.BeginTransaction(
-		router.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(ctx, s),
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
 			TxSettings: tx.Settings(),

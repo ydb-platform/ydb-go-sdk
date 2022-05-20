@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -31,13 +31,13 @@ type balancersConfig struct {
 }
 
 type fromConfigOptionsHolder struct {
-	fallbackBalancer *routerconfig.Config
+	fallbackBalancer *balancerConfig.Config
 	errorHandler     func(error)
 }
 
 type fromConfigOption func(h *fromConfigOptionsHolder)
 
-func WithParseErrorFallbackBalancer(b *routerconfig.Config) fromConfigOption {
+func WithParseErrorFallbackBalancer(b *balancerConfig.Config) fromConfigOption {
 	return func(h *fromConfigOptionsHolder) {
 		h.fallbackBalancer = b
 	}
@@ -49,9 +49,9 @@ func WithParseErrorHandler(errorHandler func(error)) fromConfigOption {
 	}
 }
 
-func CreateFromConfig(config string) (*routerconfig.Config, error) {
+func CreateFromConfig(config string) (*balancerConfig.Config, error) {
 	var (
-		b   *routerconfig.Config
+		b   *balancerConfig.Config
 		err error
 		c   balancersConfig
 	)
@@ -90,12 +90,12 @@ func CreateFromConfig(config string) (*routerconfig.Config, error) {
 	}
 }
 
-func FromConfig(config string, opts ...fromConfigOption) *routerconfig.Config {
+func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config {
 	var (
 		h = fromConfigOptionsHolder{
 			fallbackBalancer: Default(),
 		}
-		b   *routerconfig.Config
+		b   *balancerConfig.Config
 		err error
 	)
 	for _, o := range opts {

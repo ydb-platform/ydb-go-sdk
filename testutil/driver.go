@@ -13,7 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/router"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -158,7 +158,7 @@ func getField(name string, src, dst interface{}) bool {
 	return fn(reflect.ValueOf(src).Elem(), strings.Split(name, ".")...)
 }
 
-type routerStub struct {
+type balancerStub struct {
 	onInvoke func(
 		ctx context.Context,
 		method string,
@@ -177,48 +177,48 @@ type routerStub struct {
 	) error
 }
 
-func (r *routerStub) Invoke(
+func (b *balancerStub) Invoke(
 	ctx context.Context,
 	method string,
 	args interface{},
 	reply interface{},
 	opts ...grpc.CallOption,
 ) (err error) {
-	if r.onInvoke == nil {
+	if b.onInvoke == nil {
 		return fmt.Errorf("database.onInvoke() not implemented")
 	}
-	return r.onInvoke(ctx, method, args, reply, opts...)
+	return b.onInvoke(ctx, method, args, reply, opts...)
 }
 
-func (r *routerStub) NewStream(
+func (b *balancerStub) NewStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
-	if r.onNewStream == nil {
+	if b.onNewStream == nil {
 		return nil, fmt.Errorf("database.onNewStream() not implemented")
 	}
-	return r.onNewStream(ctx, desc, method, opts...)
+	return b.onNewStream(ctx, desc, method, opts...)
 }
 
-func (r *routerStub) Get(context.Context) (conn grpc.ClientConnInterface, err error) {
+func (b *balancerStub) Get(context.Context) (conn grpc.ClientConnInterface, err error) {
 	cc := &clientConn{
-		onInvoke:    r.onInvoke,
-		onNewStream: r.onNewStream,
+		onInvoke:    b.onInvoke,
+		onNewStream: b.onNewStream,
 	}
 	return cc, nil
 }
 
-func (r *routerStub) Name() string {
+func (b *balancerStub) Name() string {
 	return "testutil.database"
 }
 
-func (r *routerStub) Close(ctx context.Context) error {
-	if r.onClose == nil {
+func (b *balancerStub) Close(ctx context.Context) error {
+	if b.onClose == nil {
 		return fmt.Errorf("database.Close() not implemented")
 	}
-	return r.onClose(ctx)
+	return b.onClose(ctx)
 }
 
 type (
@@ -226,10 +226,10 @@ type (
 	NewStreamHandlers map[MethodCode]func(desc *grpc.StreamDesc) (grpc.ClientStream, error)
 )
 
-type routerOption func(c *routerStub)
+type balancerOption func(c *balancerStub)
 
-func WithInvokeHandlers(invokeHandlers InvokeHandlers) routerOption {
-	return func(r *routerStub) {
+func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
+	return func(r *balancerStub) {
 		r.onInvoke = func(
 			ctx context.Context,
 			method string,
@@ -260,8 +260,8 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) routerOption {
 	}
 }
 
-func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) routerOption {
-	return func(r *routerStub) {
+func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) balancerOption {
+	return func(r *balancerStub) {
 		r.onNewStream = func(
 			ctx context.Context,
 			desc *grpc.StreamDesc,
@@ -276,14 +276,14 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) routerOption {
 	}
 }
 
-func WithClose(onClose func(ctx context.Context) error) routerOption {
-	return func(c *routerStub) {
+func WithClose(onClose func(ctx context.Context) error) balancerOption {
+	return func(c *balancerStub) {
 		c.onClose = onClose
 	}
 }
 
-func NewRouter(opts ...routerOption) router.Router {
-	c := &routerStub{}
+func NewRouter(opts ...balancerOption) balancer.Router {
+	c := &balancerStub{}
 	for _, opt := range opts {
 		opt(c)
 	}

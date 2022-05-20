@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	routerconfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/router/config"
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
@@ -25,19 +25,19 @@ import (
 type Config struct {
 	config.Common
 
-	trace         trace.Driver
-	dialTimeout   time.Duration
-	connectionTTL time.Duration
-	routerConfig  *routerconfig.Config
-	secure        bool
-	endpoint      string
-	database      string
-	requestsType  string
-	userAgent     string
-	grpcOptions   []grpc.DialOption
-	credentials   credentials.Credentials
-	tlsConfig     *tls.Config
-	meta          meta.Meta
+	trace          trace.Driver
+	dialTimeout    time.Duration
+	connectionTTL  time.Duration
+	balancerConfig *balancerConfig.Config
+	secure         bool
+	endpoint       string
+	database       string
+	requestsType   string
+	userAgent      string
+	grpcOptions    []grpc.DialOption
+	credentials    credentials.Credentials
+	tlsConfig      *tls.Config
+	meta           meta.Meta
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
 }
@@ -105,8 +105,8 @@ func (c Config) Trace() trace.Driver {
 
 // Balancer is an optional configuration related to selected balancer.
 // That is, some balancing methods allow to be configured.
-func (c Config) Balancer() *routerconfig.Config {
-	return c.routerConfig
+func (c Config) Balancer() *balancerConfig.Config {
+	return c.balancerConfig
 }
 
 // RequestsType set an additional type hint to all requests.
@@ -229,9 +229,9 @@ func WithDialTimeout(timeout time.Duration) Option {
 	}
 }
 
-func WithBalancer(balancer *routerconfig.Config) Option {
+func WithBalancer(balancer *balancerConfig.Config) Option {
 	return func(c *Config) {
-		c.routerConfig = balancer
+		c.balancerConfig = balancer
 	}
 }
 
@@ -312,8 +312,8 @@ func defaultConfig() (c Config) {
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo("default"),
 		),
-		routerConfig: balancers.Default(),
-		tlsConfig:    defaultTLSConfig(),
+		balancerConfig: balancers.Default(),
+		tlsConfig:      defaultTLSConfig(),
 		grpcOptions: []grpc.DialOption{
 			grpc.WithContextDialer(
 				func(ctx context.Context, address string) (net.Conn, error) {

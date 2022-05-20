@@ -1,3 +1,4 @@
+* Renamed `internal/router` package to `internal/balancer` for unambiguous understanding of package mission
 * Implemented detection of local data-center with measuring tcp dial RTT
 * Added `trace.Driver.OnBalancer{Init,Close,ChooseEndpoint,Update}` events
 * Marked the driver cluster events as deprecated  
