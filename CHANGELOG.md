@@ -1,3 +1,5 @@
+* Removed deprecated traces
+
 ## v3.26.0
 * Fixed data race on session stream queries
 * Renamed `internal/router` package to `internal/balancer` for unambiguous understanding of package mission
