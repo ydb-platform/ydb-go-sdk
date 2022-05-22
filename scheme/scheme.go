@@ -94,19 +94,12 @@ func (e *Entry) IsCoordinationNode() bool {
 }
 
 func (e *Entry) From(y *Ydb_Scheme.Entry) {
-	var (
-		n = len(y.Permissions)
-		m = len(y.EffectivePermissions)
-		p = make([]Permissions, n+m)
-	)
-	putPermissions(p[:n], y.Permissions)
-	putPermissions(p[n:], y.EffectivePermissions)
 	*e = Entry{
 		Name:                 y.Name,
 		Owner:                y.Owner,
 		Type:                 entryType(y.Type),
-		Permissions:          p[0:n],
-		EffectivePermissions: p[n:m],
+		Permissions:          makePermissions(y.Permissions),
+		EffectivePermissions: makePermissions(y.EffectivePermissions),
 	}
 }
 
@@ -131,9 +124,17 @@ func entryType(t Ydb_Scheme.Entry_Type) EntryType {
 	}
 }
 
-func putPermissions(dst []Permissions, src []*Ydb_Scheme.Permissions) {
-	for i, p := range src {
-		(dst[i]).from(p)
+func makePermissions(src []*Ydb_Scheme.Permissions) (dst []Permissions) {
+	for _, p := range src {
+		dst = append(dst, from(p))
+	}
+	return dst
+}
+
+func from(y *Ydb_Scheme.Permissions) (p Permissions) {
+	return Permissions{
+		Subject:         y.Subject,
+		PermissionNames: y.PermissionNames,
 	}
 }
 
@@ -145,13 +146,6 @@ type Permissions struct {
 func (p Permissions) To(y *Ydb_Scheme.Permissions) {
 	y.Subject = p.Subject
 	y.PermissionNames = p.PermissionNames
-}
-
-func (p *Permissions) from(y *Ydb_Scheme.Permissions) {
-	*p = Permissions{
-		Subject:         y.Subject,
-		PermissionNames: y.PermissionNames,
-	}
 }
 
 func InnerConvertEntry(y *Ydb_Scheme.Entry) *Entry {

@@ -1,3 +1,5 @@
+* Refactored of making permissions from scheme entry
+
 ## v3.26.1
 * Removed deprecated traces
 
