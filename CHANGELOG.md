@@ -1,3 +1,4 @@
+## v3.26.1
 * Removed deprecated traces
 
 ## v3.26.0
