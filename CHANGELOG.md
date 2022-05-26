@@ -1,3 +1,6 @@
+* Removed `Deprecated` mark from `table/session.Prepare` method
+* Added comments for `table/session.Execute` method
+
 ## v3.26.2
 * Refactored of making permissions from scheme entry
 

@@ -100,13 +100,15 @@ type Session interface {
 	) (exp DataQueryExplanation, err error)
 
 	// Prepare prepares query for executing in the future
-	//
-	// Deprecated: use Execute with KeepInCache policy option
 	Prepare(
 		ctx context.Context,
 		query string,
 	) (stmt Statement, err error)
 
+	// Execute executes query.
+	//
+	// By default, Execute have a flag options.WithKeepInCache(true). For redefine behavior -
+	// append option options.WithKeepInCache(false)
 	Execute(
 		ctx context.Context,
 		tx *TransactionControl,
