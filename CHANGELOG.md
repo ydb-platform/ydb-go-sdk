@@ -1,3 +1,4 @@
+## v3.26.3
 * Removed `Deprecated` mark from `table/session.Prepare` method
 * Added comments for `table/session.Execute` method
 
