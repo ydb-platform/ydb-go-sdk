@@ -1,3 +1,4 @@
+## v3.26.4
 * Update indirect dependency to `gopkg.in/yaml.v3`
 
 ## v3.26.3
