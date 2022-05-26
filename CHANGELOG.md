@@ -1,3 +1,5 @@
+* Update indirect dependency to `gopkg.in/yaml.v3`
+
 ## v3.26.3
 * Removed `Deprecated` mark from `table/session.Prepare` method
 * Added comments for `table/session.Execute` method
