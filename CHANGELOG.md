@@ -1,3 +1,5 @@
+* Disabled the `KeepInCache` policy for queries without params
+
 ## v3.26.4
 * Update indirect dependency to `gopkg.in/yaml.v3`
 

@@ -687,7 +687,7 @@ func (s *session) executeDataQuery(
 		Parameters: params.Params(),
 		Query:      &query.query,
 		QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
-			KeepInCache: true,
+			KeepInCache: len(params.Params()) > 0,
 		},
 		OperationParams: operation.Params(
 			ctx,
