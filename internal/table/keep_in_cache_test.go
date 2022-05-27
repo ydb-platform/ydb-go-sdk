@@ -11,29 +11,56 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestQueryCachePolicyKeepInCache(t *testing.T) {
 	for _, test := range [...]struct {
 		name                    string
+		params                  *table.QueryParameters
 		executeDataQueryOptions []options.ExecuteDataQueryOption
 		keepInCache             bool
 	}{
 		{
-			name:                    "no options",
+			name:                    "no params, no options",
+			params:                  table.NewQueryParameters(),
+			executeDataQueryOptions: nil,
+			keepInCache:             false,
+		},
+		{
+			name:                    "not empty params, no options",
+			params:                  table.NewQueryParameters(table.ValueParam("a", types.UTF8Value("b"))),
 			executeDataQueryOptions: nil,
 			keepInCache:             true,
 		},
 		{
-			name: "with server cache",
+			name:   "no params, with server cache",
+			params: table.NewQueryParameters(),
 			executeDataQueryOptions: []options.ExecuteDataQueryOption{
 				options.WithKeepInCache(true),
 			},
 			keepInCache: true,
 		},
 		{
-			name: "no server cache",
+			name:   "not empty params, with server cache",
+			params: table.NewQueryParameters(table.ValueParam("a", types.UTF8Value("b"))),
+			executeDataQueryOptions: []options.ExecuteDataQueryOption{
+				options.WithKeepInCache(true),
+			},
+			keepInCache: true,
+		},
+		{
+			name:   "no params, no server cache",
+			params: table.NewQueryParameters(),
+			executeDataQueryOptions: []options.ExecuteDataQueryOption{
+				options.WithKeepInCache(false),
+			},
+			keepInCache: false,
+		},
+		{
+			name:   "not empty params, no server cache",
+			params: table.NewQueryParameters(table.ValueParam("a", types.UTF8Value("b"))),
 			executeDataQueryOptions: []options.ExecuteDataQueryOption{
 				options.WithKeepInCache(false),
 			},
@@ -81,7 +108,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 					table.CommitTx(),
 				),
 				"SELECT 1",
-				table.NewQueryParameters(),
+				test.params,
 				test.executeDataQueryOptions...,
 			)
 			if err != nil {

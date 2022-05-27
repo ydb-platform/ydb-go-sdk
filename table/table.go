@@ -107,7 +107,7 @@ type Session interface {
 
 	// Execute executes query.
 	//
-	// By default, Execute have a flag options.WithKeepInCache(true). For redefine behavior -
+	// By default, Execute have a flag options.WithKeepInCache(true) if params is not empty. For redefine behavior -
 	// append option options.WithKeepInCache(false)
 	Execute(
 		ctx context.Context,
