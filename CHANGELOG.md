@@ -1,3 +1,4 @@
+## v3.26.5
 * Disabled the `KeepInCache` policy for queries without params
 
 ## v3.26.4
