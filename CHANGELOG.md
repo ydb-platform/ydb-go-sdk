@@ -1,3 +1,4 @@
+## v3.26.7
 * Updated the `ydb-go-genproto` dependency
 
 ## v3.26.6
