@@ -39,18 +39,24 @@ type Client interface {
 	// Best effort policy may be implements with outer retry loop includes CreateSession call
 	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
 
-	// Do provide the best effort for execute operation
+	// Do provide the best effort for execute operation.
+	//
 	// Do implements internal busy loop until one of the following conditions is met:
 	// - deadline was canceled or deadlined
 	// - retry operation returned nil as error
-	// Warning: if context without deadline or cancellation func than Do can run indefinitely
+	//
+	// Warning: if context without deadline or cancellation func than Do can run indefinitely.
 	Do(ctx context.Context, op Operation, opts ...Option) error
 
-	// DoTx provide the best effort for execute transaction
+	// DoTx provide the best effort for execute transaction.
+	//
 	// DoTx implements internal busy loop until one of the following conditions is met:
 	// - deadline was canceled or deadlined
 	// - retry operation returned nil as error
-	// DoTx makes auto begin, commit and rollback of transaction
+	//
+	// DoTx makes auto begin (with TxSettings, by default - SerializableReadWrite), commit and
+	// rollback (on error) of transaction.
+	//
 	// If op TxOperation returns nil - transaction will be committed
 	// If op TxOperation return non nil - transaction will be rollback
 	// Warning: if context without deadline or cancellation func than DoTx can run indefinitely

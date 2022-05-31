@@ -528,6 +528,9 @@ func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
 		Trace:       trace,
 		FastBackoff: backoff.Fast,
 		SlowBackoff: backoff.Slow,
+		TxSettings: table.TxSettings(
+			table.WithSerializableReadWrite(),
+		),
 	}
 	for _, o := range opts {
 		o(&options)
