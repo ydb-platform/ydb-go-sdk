@@ -1,4 +1,5 @@
-* Updated the genproto dependency
+* Defined the `SerializableReadWrite` isolation level by default in `db.Table.DoTx(ctx, func(ctx, tx))` 
+* Updated the `ydb-go-genproto` dependency
 
 ## v3.26.5
 * Disabled the `KeepInCache` policy for queries without params
