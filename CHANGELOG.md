@@ -1,8 +1,10 @@
+* Updated the genproto dependency
+
 ## v3.26.5
 * Disabled the `KeepInCache` policy for queries without params
 
 ## v3.26.4
-* Update indirect dependency to `gopkg.in/yaml.v3`
+* Updated the indirect dependency to `gopkg.in/yaml.v3`
 
 ## v3.26.3
 * Removed `Deprecated` mark from `table/session.Prepare` method
