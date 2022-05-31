@@ -917,13 +917,9 @@ func (s *session) StreamReadTable(
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	t := s.trailer()
-	defer t.processHints()
-
 	stream, err = s.tableService.StreamReadTable(
 		balancer.WithEndpoint(ctx, s),
 		&request,
-		t.Trailer(),
 	)
 
 	if err != nil {
@@ -1001,13 +997,9 @@ func (s *session) StreamExecuteScanQuery(
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	t := s.trailer()
-	defer t.processHints()
-
 	stream, err = s.tableService.StreamExecuteScanQuery(
 		balancer.WithEndpoint(ctx, s),
 		&request,
-		t.Trailer(),
 	)
 
 	if err != nil {
