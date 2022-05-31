@@ -1,3 +1,4 @@
+## v3.26.8
 * Removed the processing of trailer metadata on stream calls 
 
 ## v3.26.7
