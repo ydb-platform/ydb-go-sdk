@@ -37,7 +37,7 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 		var val issue229Struct
 		require.NoError(t, res.Scan(&val))
 		return nil
-	}, table.WithTxSettings(table.TxSettings(table.WithSerializableReadWrite())))
+	})
 	require.NoError(t, err)
 }
 

@@ -425,11 +425,6 @@ func TestTable(t *testing.T) {
 			}
 			return res.Close()
 		},
-		table.WithTxSettings(
-			table.TxSettings(
-				table.WithSerializableReadWrite(),
-			),
-		),
 	); err != nil {
 		t.Fatalf("tx failed: %v\n", err)
 	}
