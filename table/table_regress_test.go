@@ -58,6 +58,7 @@ func TestIssue259IntervalFromDuration(t *testing.T) {
 
 	db := connect(t)
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+		// Check about interval work with microseconds
 		res, err := tx.Execute(ctx, `DECLARE $ts as Interval;
 			$ten_micro = CAST(10 as Interval);
 			SELECT $ts == $ten_micro, $ten_micro;`, table.NewQueryParameters(
@@ -68,13 +69,47 @@ func TestIssue259IntervalFromDuration(t *testing.T) {
 		require.True(t, res.NextRow())
 
 		var (
-			val      bool
-			tenMicro time.Duration
+			valuesEqual bool
+			tenMicro    time.Duration
 		)
-		require.NoError(t, res.Scan(&val, &tenMicro))
-		require.True(t, val)
+		require.NoError(t, res.Scan(&valuesEqual, &tenMicro))
+		require.True(t, valuesEqual)
 		require.Equal(t, 10*time.Microsecond, tenMicro)
+
+		// Check about parse interval represent date interval
+		query := `
+		SELECT 
+			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T02:31:30+0000")) - 
+			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T01:31:30+0000")) 
+		`
+		res, err = tx.Execute(ctx, query, nil)
+		require.NoError(t, err)
+		require.NoError(t, res.NextResultSetErr(ctx))
+		require.True(t, res.NextRow())
+
+		var delta time.Duration
+		require.NoError(t, res.ScanWithDefaults(&delta))
+		require.Equal(t, time.Hour, delta)
+
+		// check about send interval work find with dates
+		query = `
+		DECLARE $delta AS Interval;
+	
+		SELECT 
+			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T01:31:30+0000")) + $delta ==
+			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T02:31:30+0000"))
+		`
+		res, err = tx.Execute(ctx, query, table.NewQueryParameters(
+			table.ValueParam("$delta", types.IntervalValueFromDuration(time.Hour))),
+		)
+		require.NoError(t, err)
+		require.NoError(t, res.NextResultSetErr(ctx))
+		require.True(t, res.NextRow())
+
+		require.NoError(t, res.ScanWithDefaults(&valuesEqual))
+		require.True(t, valuesEqual)
+
 		return nil
-	}, table.WithTxSettings(table.TxSettings(table.WithSerializableReadWrite())))
+	})
 	require.NoError(t, err)
 }
