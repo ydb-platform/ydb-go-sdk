@@ -1,3 +1,7 @@
+* Fixed bug with convert ydb value to `time.Duration` in `result.Scan[WithDefaults,Named]()`
+* Fixed bug with make ydb value from `time.Duration` in `types.IntervalValueFromDuration(d)`
+* Marked `table/types.{IntervalValue,NullableIntervalValue}` as deprecated 
+
 ## v3.26.8
 * Removed the processing of trailer metadata on stream calls 
 
