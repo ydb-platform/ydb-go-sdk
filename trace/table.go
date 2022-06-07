@@ -60,7 +60,7 @@ type (
 			TableSessionTransactionRollbackDoneInfo,
 		)
 		// Pool state event
-		OnPoolStateChange func(TablePooStateChangeInfo)
+		OnPoolStateChange func(TablePoolStateChangeInfo)
 		// Pool session lifecycle events
 		OnPoolSessionNew   func(TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo)
 		OnPoolSessionClose func(TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo)
@@ -247,7 +247,7 @@ type (
 		Limit            int
 		KeepAliveMinSize int
 	}
-	TablePooStateChangeInfo struct {
+	TablePoolStateChangeInfo struct {
 		Size  int
 		Event string
 	}

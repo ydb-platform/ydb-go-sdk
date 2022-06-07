@@ -582,7 +582,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					}
 				}
 			}
-			t.OnPoolStateChange = func(info trace.TablePooStateChangeInfo) {
+			t.OnPoolStateChange = func(info trace.TablePoolStateChangeInfo) {
 				l.Infof(`state changed {size:%d,event:"%s"}`,
 					info.Size,
 					info.Event,
