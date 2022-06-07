@@ -1,3 +1,4 @@
+## v3.26.10
 * Fixed syntax mistake in `trace.TablePooStateChangeInfo` to `trace.TablePoolStateChangeInfo` 
 
 ## v3.26.9
