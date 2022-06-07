@@ -670,7 +670,7 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 	{
 		h1 := t.OnPoolStateChange
 		h2 := x.OnPoolStateChange
-		ret.OnPoolStateChange = func(t TablePooStateChangeInfo) {
+		ret.OnPoolStateChange = func(t TablePoolStateChangeInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -1163,7 +1163,7 @@ func (t Table) onSessionTransactionRollback(t1 TableSessionTransactionRollbackSt
 	}
 	return res
 }
-func (t Table) onPoolStateChange(t1 TablePooStateChangeInfo) {
+func (t Table) onPoolStateChange(t1 TablePoolStateChangeInfo) {
 	fn := t.OnPoolStateChange
 	if fn == nil {
 		return
@@ -1464,7 +1464,7 @@ func TableOnSessionTransactionRollback(t Table, c *context.Context, session tabl
 	}
 }
 func TableOnPoolStateChange(t Table, size int, event string) {
-	var p TablePooStateChangeInfo
+	var p TablePoolStateChangeInfo
 	p.Size = size
 	p.Event = event
 	t.onPoolStateChange(p)
