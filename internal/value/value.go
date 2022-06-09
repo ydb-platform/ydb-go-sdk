@@ -10,6 +10,7 @@ import (
 )
 
 type V interface {
+	Type() T
 	ToYDB() *Ydb.TypedValue
 	String() string
 	toString(*bytes.Buffer)
