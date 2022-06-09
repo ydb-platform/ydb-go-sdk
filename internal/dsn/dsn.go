@@ -10,6 +10,7 @@ import (
 
 var (
 	parsers = map[string]Parser{
+		// for compatibility with old connection string format
 		"database": func(database string) ([]config.Option, error) {
 			return []config.Option{
 				config.WithDatabase(database),
@@ -40,6 +41,7 @@ func Parse(dsn string) (options []config.Option, err error) {
 		options,
 		config.WithEndpoint(uri.Host),
 		config.WithSecure(uri.Scheme != insecureSchema),
+		config.WithDatabase(uri.Path),
 	)
 	for param, values := range uri.Query() {
 		if p, has := parsers[param]; has {

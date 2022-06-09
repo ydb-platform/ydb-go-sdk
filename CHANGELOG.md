@@ -1,3 +1,4 @@
+* Supported parsing of database name from connection string URI path
 * Added `options.WithExecuteScanQueryStats` option
 * Added to query stats plan and AST
 * Changed behaviour of `result.Stats()` (if query result have no stats - returns `nil`) 
