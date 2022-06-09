@@ -93,6 +93,10 @@ type Value struct {
 	v *Ydb.Value
 }
 
+func (v Value) Type() T {
+	return v.t
+}
+
 func (v Value) String() string {
 	var buf bytes.Buffer
 	v.toString(&buf)
