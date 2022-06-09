@@ -649,3 +649,7 @@ func Nullable(t Type, v interface{}) Value {
 		panic(fmt.Sprintf("unsupported type: %s", t.String()))
 	}
 }
+
+func ValueToType(v Value) Type {
+	return v.Type()
+}
