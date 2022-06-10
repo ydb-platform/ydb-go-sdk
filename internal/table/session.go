@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 	"sync"
@@ -10,6 +11,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 
@@ -915,7 +918,7 @@ func (s *session) StreamReadTable(
 		opt((*options.ReadTableDesc)(&request))
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := xcontext.WithErrCancel(ctx)
 
 	stream, err = s.tableService.StreamReadTable(
 		balancer.WithEndpoint(ctx, s),
@@ -923,7 +926,7 @@ func (s *session) StreamReadTable(
 	)
 
 	if err != nil {
-		cancel()
+		cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: stream read error: %w", err)))
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -950,7 +953,11 @@ func (s *session) StreamReadTable(
 			}
 		},
 		func(err error) error {
-			cancel()
+			if err == nil {
+				cancel(nil)
+			} else {
+				cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: stream closed with: %w", err)))
+			}
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},

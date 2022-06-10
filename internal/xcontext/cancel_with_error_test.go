@@ -13,7 +13,7 @@ func TestCancelWithError(t *testing.T) {
 	t.Run("SimpleCancel", func(t *testing.T) {
 		ctx, cancel := WithErrCancel(context.Background())
 		cancel(testError)
-		require.Equal(t, testError, ctx.Err())
+		require.ErrorIs(t, ctx.Err(), testError)
 	})
 
 	t.Run("CancelBeforeParent", func(t *testing.T) {
@@ -23,7 +23,8 @@ func TestCancelWithError(t *testing.T) {
 		cancel(testError)
 		parentCancel()
 
-		require.Equal(t, testError, ctx.Err())
+		require.ErrorIs(t, ctx.Err(), testError)
+		require.ErrorIs(t, ctx.Err(), context.Canceled)
 	})
 
 	t.Run("CancelAfterParent", func(t *testing.T) {
@@ -36,4 +37,10 @@ func TestCancelWithError(t *testing.T) {
 		require.Equal(t, context.Canceled, ctx.Err())
 	})
 
+	t.Run("CancelWithNil", func(t *testing.T) {
+		ctx, cancel := WithErrCancel(context.Background())
+		cancel(nil)
+		require.ErrorIs(t, ctx.Err(), errCancelWithNilError)
+		require.ErrorIs(t, ctx.Err(), context.Canceled)
+	})
 }

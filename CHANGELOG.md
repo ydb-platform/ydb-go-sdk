@@ -1,3 +1,5 @@
+* Added context cancel with specific error
+
 ## v3.26.10
 * Fixed syntax mistake in `trace.TablePooStateChangeInfo` to `trace.TablePoolStateChangeInfo` 
 

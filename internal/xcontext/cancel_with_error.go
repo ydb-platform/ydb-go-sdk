@@ -2,6 +2,7 @@ package xcontext
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -51,7 +52,6 @@ func (c *ctxError) errUnderLock() error {
 	}
 
 	return c.err
-
 }
 
 func (c *ctxError) Value(key interface{}) interface{} {
@@ -67,8 +67,29 @@ func (c *ctxError) cancel(err error) {
 	}
 
 	if c.errUnderLock() == nil {
+		err = cancelError{err: err}
 		c.err = err
 	}
 
 	c.ctxCancel()
+}
+
+type cancelError struct {
+	err error
+}
+
+func (e cancelError) Error() string {
+	return e.err.Error()
+}
+
+func (e cancelError) Is(target error) bool {
+	return errors.Is(e.err, target) || errors.Is(context.Canceled, target)
+}
+
+func (e cancelError) As(target interface{}) bool {
+	return errors.As(e.err, target) || errors.As(context.Canceled, target)
+}
+
+func (e cancelError) Unwrap() error {
+	return e.err
 }

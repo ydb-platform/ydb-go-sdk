@@ -2,9 +2,14 @@ package repeater
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jonboulle/clockwork"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -27,7 +32,7 @@ type repeater struct {
 	// Task is a function that must be executed periodically.
 	task func(context.Context) error
 
-	cancel  context.CancelFunc
+	cancel  xcontext.CancelErrFunc
 	stopped chan struct{}
 
 	force chan struct{}
@@ -74,7 +79,7 @@ func New(
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) *repeater {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithErrCancel(context.Background())
 
 	r := &repeater{
 		interval: interval,
@@ -95,7 +100,7 @@ func New(
 }
 
 func (r *repeater) stop(onCancel func()) {
-	r.cancel()
+	r.cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: repeater stopped")))
 	if onCancel != nil {
 		onCancel()
 	}
