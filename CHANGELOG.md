@@ -1,3 +1,4 @@
+* Added `sugar.ToDeclare()` helper for make declare section in `YQL`
 * Refactor connection closing
 
 ## v3.27.0
