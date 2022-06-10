@@ -1,4 +1,5 @@
 * Added `sugar.ToDeclare()` helper for make declare section in `YQL`
+* Added check when parameter name not started from "$" and automatically prepends it to name 
 * Refactor connection closing
 
 ## v3.27.0

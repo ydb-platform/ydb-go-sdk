@@ -3,6 +3,7 @@ package sugar
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"

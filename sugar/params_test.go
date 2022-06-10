@@ -78,6 +78,27 @@ func TestToDeclare(t *testing.T) {
 				DECLARE $c AS Optional<Utf8>;
 			`,
 		},
+		{
+			params: table.NewQueryParameters(
+				table.ValueParam(
+					"a",
+					types.BoolValue(true),
+				),
+				table.ValueParam(
+					"b",
+					types.Int64Value(123),
+				),
+				table.ValueParam(
+					"c",
+					types.OptionalValue(types.UTF8Value("test")),
+				),
+			),
+			declare: `
+				DECLARE $a AS Bool; 
+				DECLARE $b AS Int64; 
+				DECLARE $c AS Optional<Utf8>;
+			`,
+		},
 	} {
 		t.Run("", func(t *testing.T) {
 			got := removeEmpty(strings.Split(ToDeclare(tt.params), "\n"))
