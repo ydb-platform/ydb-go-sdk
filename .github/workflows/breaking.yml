@@ -4,12 +4,15 @@ on:
   pull_request:
 env:
   GO111MODULE: "on"
+
 jobs:
   gorelease:
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Gorelease cache
