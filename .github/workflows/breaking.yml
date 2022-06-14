@@ -4,6 +4,7 @@ on:
   pull_request:
 env:
   GO111MODULE: "on"
+
 jobs:
   gorelease:
     runs-on: ubuntu-latest
