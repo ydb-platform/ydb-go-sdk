@@ -3,14 +3,13 @@ package xcontext
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errCancelWithNilError = fmt.Errorf("nil error: %w", context.Canceled)
+var errCancelWithNilError = cancelError{err: errors.New("cancel context with nil error")}
 
 // CancelErrFunc use for cancel with wrap with specific error
 // if err == nil CancelErrFunc will panic for prevent
