@@ -8,9 +8,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
