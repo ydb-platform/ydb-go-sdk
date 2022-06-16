@@ -16,31 +16,32 @@ type queryStats struct {
 }
 
 func (s *queryStats) ProcessCPUTime() time.Duration {
-	if s == nil {
-		return 0
-	}
 	return s.processCPUTime
 }
 
 func (s *queryStats) Compilation() (c *stats.CompilationStats) {
-	if s == nil || s.stats == nil || s.stats.Compilation == nil {
+	if s.stats == nil || s.stats.Compilation == nil {
 		return nil
 	}
-	x := s.stats.Compilation
-	if x == nil {
-		return
-	}
 	return &stats.CompilationStats{
-		FromCache: x.FromCache,
-		Duration:  time.Microsecond * time.Duration(x.DurationUs),
-		CPUTime:   time.Microsecond * time.Duration(x.CpuTimeUs),
+		FromCache: s.stats.Compilation.FromCache,
+		Duration:  time.Microsecond * time.Duration(s.stats.Compilation.DurationUs),
+		CPUTime:   time.Microsecond * time.Duration(s.stats.Compilation.CpuTimeUs),
 	}
+}
+
+func (s *queryStats) QueryPlan() string {
+	return s.stats.GetQueryPlan()
+}
+
+func (s *queryStats) QueryAST() string {
+	return s.stats.GetQueryAst()
 }
 
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
 func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {
-	if s.stats == nil || s.pos >= len(s.stats.QueryPhases) {
+	if s.pos >= len(s.stats.QueryPhases) {
 		return
 	}
 	x := s.stats.QueryPhases[s.pos]
@@ -54,6 +55,7 @@ func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {
 		duration:       time.Microsecond * time.Duration(x.DurationUs),
 		cpuTime:        time.Microsecond * time.Duration(x.CpuTimeUs),
 		affectedShards: x.AffectedShards,
+		literalPhase:   x.LiteralPhase,
 	}, true
 }
 
@@ -64,6 +66,7 @@ type queryPhase struct {
 	affectedShards uint64
 	tables         []*Ydb_TableStats.TableAccessStats
 	pos            int
+	literalPhase   bool
 }
 
 // NextTableAccess returns next accessed table within query execution phase.
@@ -94,6 +97,10 @@ func (q *queryPhase) CPUTime() time.Duration {
 
 func (q *queryPhase) AffectedShards() uint64 {
 	return q.affectedShards
+}
+
+func (q *queryPhase) IsLiteralPhase() bool {
+	return q.literalPhase
 }
 
 func initOperationStats(x *Ydb_TableStats.OperationStats) stats.OperationStats {

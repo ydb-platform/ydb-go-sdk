@@ -583,9 +583,39 @@ type (
 	ExecuteScanQueryOption func(*ExecuteScanQueryDesc)
 )
 
+// WithExecuteScanQueryMode defines scan query mode: execute or explain
 func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {
 	return func(desc *ExecuteScanQueryDesc) {
 		desc.Mode = m.toYDB()
+	}
+}
+
+// ExecuteScanQueryStatsType specified scan query mode
+type ExecuteScanQueryStatsType uint32
+
+const (
+	ExecuteScanQueryStatsTypeNone = iota
+	ExecuteScanQueryStatsTypeBasic
+	ExecuteScanQueryStatsTypeFull
+)
+
+func (stats ExecuteScanQueryStatsType) toYDB() Ydb_Table.QueryStatsCollection_Mode {
+	switch stats {
+	case ExecuteScanQueryStatsTypeNone:
+		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+	case ExecuteScanQueryStatsTypeBasic:
+		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
+	case ExecuteScanQueryStatsTypeFull:
+		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_FULL
+	default:
+		return Ydb_Table.QueryStatsCollection_STATS_COLLECTION_UNSPECIFIED
+	}
+}
+
+// WithExecuteScanQueryStats defines query statistics mode
+func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQueryOption {
+	return func(desc *ExecuteScanQueryDesc) {
+		desc.CollectStats = stats.toYDB()
 	}
 }
 

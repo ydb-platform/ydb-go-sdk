@@ -106,6 +106,8 @@ type result interface {
 	ScanNamed(namedValues ...named.Value) error
 
 	// Stats returns query execution QueryStats.
+	//
+	// If query result have no stats - returns nil
 	Stats() (s stats.QueryStats)
 
 	// Err return scanner error

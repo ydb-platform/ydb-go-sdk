@@ -149,13 +149,18 @@ func (r *baseResult) CurrentResultSet() result.Set {
 
 // Stats returns query execution queryStats.
 func (r *baseResult) Stats() stats.QueryStats {
-	var s queryStats
 	r.statsMtx.RLock()
-	s.stats = r.stats
+	stats := r.stats
 	r.statsMtx.RUnlock()
-	s.processCPUTime = time.Microsecond * time.Duration(s.stats.GetProcessCpuTimeUs())
-	s.pos = 0
-	return &s
+
+	if stats == nil {
+		return nil
+	}
+
+	return &queryStats{
+		stats:          stats,
+		processCPUTime: time.Microsecond * time.Duration(stats.GetProcessCpuTimeUs()),
+	}
 }
 
 // Close closes the result, preventing further iteration.
