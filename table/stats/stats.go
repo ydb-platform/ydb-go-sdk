@@ -10,12 +10,15 @@ type QueryPhase interface {
 	Duration() time.Duration
 	CPUTime() time.Duration
 	AffectedShards() uint64
+	IsLiteralPhase() bool
 }
 
 // QueryStats holds query execution statistics.
 type QueryStats interface {
 	ProcessCPUTime() time.Duration
 	Compilation() (c *CompilationStats)
+	QueryPlan() string
+	QueryAST() string
 	// NextPhase returns next execution phase within query.
 	// If ok flag is false, then there are no more phases and p is invalid.
 	NextPhase() (p QueryPhase, ok bool)

@@ -559,6 +559,7 @@ func TestTable(t *testing.T) {
 		func(ctx context.Context, s table.Session) (err error) {
 			res, err := s.StreamExecuteScanQuery(
 				ctx, `SELECT val FROM stream_query;`, table.NewQueryParameters(),
+				options.WithExecuteScanQueryStats(options.ExecuteScanQueryStatsTypeFull),
 			)
 			if err != nil {
 				return err
@@ -578,6 +579,21 @@ func TestTable(t *testing.T) {
 						return err
 					}
 					checkSum += uint64(*val)
+				}
+				if stats := res.Stats(); stats != nil {
+					t.Logf(" --- query stats: compilation: %v, process CPU time: %v, affected shards: %v\n",
+						stats.Compilation(),
+						stats.ProcessCPUTime(),
+						func() (count uint64) {
+							for {
+								phase, ok := stats.NextPhase()
+								if !ok {
+									return
+								}
+								count += phase.AffectedShards()
+							}
+						}(),
+					)
 				}
 			}
 			if rowsCount != upsertRowsCount {
@@ -695,27 +711,30 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 			if err = res.Err(); err != nil {
 				return err
 			}
-			stats := res.Stats()
-			for i := 0; ; i++ {
-				phase, ok := stats.NextPhase()
-				if !ok {
-					break
-				}
-				t.Logf(
-					"# phase #%d: took %s\n",
-					i, phase.Duration(),
-				)
-				for {
-					tbl, ok := phase.NextTableAccess()
+
+			if stats := res.Stats(); stats != nil {
+				for i := 0; ; i++ {
+					phase, ok := stats.NextPhase()
 					if !ok {
 						break
 					}
 					t.Logf(
-						"#  accessed %s: read=(%drows, %dbytes)\n",
-						tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
+						"# phase #%d: took %s\n",
+						i, phase.Duration(),
 					)
+					for {
+						tbl, ok := phase.NextTableAccess()
+						if !ok {
+							break
+						}
+						t.Logf(
+							"#  accessed %s: read=(%drows, %dbytes)\n",
+							tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
+						)
+					}
 				}
 			}
+
 			return nil
 		},
 	)
