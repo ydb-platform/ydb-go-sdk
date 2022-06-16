@@ -8,10 +8,11 @@ import (
 	"io"
 	"math"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -32,7 +33,7 @@ type scanner struct {
 
 	columnIndexes []int
 
-	errMtx sync.RWMutex
+	errMtx xsync.RWMutex
 	err    error
 }
 
@@ -1064,9 +1065,9 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 }
 
 func (r *baseResult) SetErr(err error) {
-	r.errMtx.Lock()
-	r.err = err
-	r.errMtx.Unlock()
+	r.errMtx.WithLock(func() {
+		r.err = err
+	})
 }
 
 func (s *scanner) errorf(depth int, f string, args ...interface{}) error {

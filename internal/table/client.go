@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -104,7 +106,7 @@ type Client struct {
 	keeperStop        chan struct{}
 	keeperDone        chan struct{}
 	touchingDone      chan struct{}
-	mu                sync.Mutex
+	mu                xsync.Mutex
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
 	wgClosed          sync.WaitGroup
@@ -188,12 +190,13 @@ type createSessionResult struct {
 // p.mu must NOT be held.
 func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 	// pre-check the Client size
-	c.mu.Lock()
-	enoughSpace := c.createInProgress+len(c.index) < c.limit
-	if enoughSpace {
-		c.createInProgress++
-	}
-	c.mu.Unlock()
+	var enoughSpace bool
+	c.mu.WithLock(func() {
+		enoughSpace = c.createInProgress+len(c.index) < c.limit
+		if enoughSpace {
+			c.createInProgress++
+		}
+	})
 
 	if !enoughSpace {
 		return nil, xerrors.WithStackTrace(errSessionPoolOverflow)
@@ -251,15 +254,13 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 			})
 		}
 
-		c.mu.Lock()
-		{
+		c.mu.WithLock(func() {
 			c.createInProgress--
 			if s != nil {
 				c.index[s] = sessionInfo{}
 				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
 			}
-		}
-		c.mu.Unlock()
+		})
 
 		resCh <- createSessionResult{
 			s:   s,
@@ -317,9 +318,9 @@ func (c *Client) get(ctx context.Context, opts ...getOption) (s Session, err err
 		}
 
 		// First, we try to get session from idle
-		c.mu.Lock()
-		s = c.removeFirstIdle()
-		c.mu.Unlock()
+		c.mu.WithLock(func() {
+			s = c.removeFirstIdle()
+		})
 
 		if s != nil {
 			return s, nil
@@ -370,10 +371,10 @@ func (c *Client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 		ok bool
 	)
 
-	c.mu.Lock()
-	ch = c.getWaitCh()
-	el = c.waitq.PushBack(ch)
-	c.mu.Unlock()
+	c.mu.WithLock(func() {
+		ch = c.getWaitCh()
+		el = c.waitq.PushBack(ch)
+	})
 
 	waitDone := trace.TableOnPoolWait(t, &ctx)
 
@@ -398,15 +399,15 @@ func (c *Client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 		return s, nil
 
 	case <-time.After(c.config.CreateSessionTimeout()):
-		c.mu.Lock()
-		c.waitq.Remove(el)
-		c.mu.Unlock()
+		c.mu.WithLock(func() {
+			c.waitq.Remove(el)
+		})
 		return s, nil
 
 	case <-ctx.Done():
-		c.mu.Lock()
-		c.waitq.Remove(el)
-		c.mu.Unlock()
+		c.mu.WithLock(func() {
+			c.waitq.Remove(el)
+		})
 		return nil, ctx.Err()
 	}
 }
@@ -426,25 +427,23 @@ func (c *Client) Put(ctx context.Context, s Session) (err error) {
 		onDone(err)
 	}()
 
-	c.mu.Lock()
+	c.mu.WithLock(func() {
+		switch {
+		case c.closed:
+			err = xerrors.WithStackTrace(errClosedClient)
 
-	switch {
-	case c.closed:
-		err = xerrors.WithStackTrace(errClosedClient)
+		case c.idle.Len() >= c.limit:
+			err = xerrors.WithStackTrace(errSessionPoolOverflow)
 
-	case c.idle.Len() >= c.limit:
-		err = xerrors.WithStackTrace(errSessionPoolOverflow)
+		case s.isClosing():
+			err = xerrors.WithStackTrace(errSessionShutdown)
 
-	case s.isClosing():
-		err = xerrors.WithStackTrace(errSessionShutdown)
-
-	default:
-		if !c.notify(s) {
-			c.pushIdle(s, timeutil.Now())
+		default:
+			if !c.notify(s) {
+				c.pushIdle(s, timeutil.Now())
+			}
 		}
-	}
-
-	c.mu.Unlock()
+	})
 
 	if err != nil {
 		var cancel context.CancelFunc
@@ -478,41 +477,40 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
 
-	c.mu.Lock()
-
-	keeperDone := c.keeperDone
-	if ch := c.keeperStop; ch != nil {
-		close(ch)
-	}
-
-	if keeperDone != nil {
-		<-keeperDone
-	}
-
-	for el := c.waitq.Front(); el != nil; el = el.Next() {
-		ch := el.Value.(*chan Session)
-		close(*ch)
-	}
-
-	issues := make([]error, 0, len(c.index))
-
-	for e := c.idle.Front(); e != nil; e = e.Next() {
-		if err = c.closeSession(
-			ctx,
-			e.Value.(Session),
-			withCloseSessionAsync(),
-		); err != nil {
-			issues = append(issues, err)
+	var issues []error
+	c.mu.WithLock(func() {
+		keeperDone := c.keeperDone
+		if ch := c.keeperStop; ch != nil {
+			close(ch)
 		}
-	}
 
-	c.limit = 0
-	c.idle = list.New()
-	c.waitq = list.New()
-	c.index = make(map[Session]sessionInfo)
-	c.closed = true
+		if keeperDone != nil {
+			<-keeperDone
+		}
 
-	c.mu.Unlock()
+		for el := c.waitq.Front(); el != nil; el = el.Next() {
+			ch := el.Value.(*chan Session)
+			close(*ch)
+		}
+
+		issues = make([]error, 0, len(c.index))
+
+		for e := c.idle.Front(); e != nil; e = e.Next() {
+			if err = c.closeSession(
+				ctx,
+				e.Value.(Session),
+				withCloseSessionAsync(),
+			); err != nil {
+				issues = append(issues, err)
+			}
+		}
+
+		c.limit = 0
+		c.idle = list.New()
+		c.waitq = list.New()
+		c.index = make(map[Session]sessionInfo)
+		c.closed = true
+	})
 
 	c.wgClosed.Wait()
 
@@ -609,8 +607,7 @@ func (c *Client) keeper(ctx context.Context) {
 			toTryAgain = toTryAgain[:0]
 			toDelete = toDelete[:0]
 
-			c.mu.Lock()
-			{
+			c.mu.WithLock(func() {
 				c.touching = true
 				for c.idle.Len() > 0 {
 					s, touched := c.peekFirstIdle()
@@ -620,17 +617,18 @@ func (c *Client) keeper(ctx context.Context) {
 					_ = c.removeIdle(s)
 					toTouch = append(toTouch, s)
 				}
-			}
-			c.mu.Unlock()
+			})
 
 			var mark *list.Element // Element in the list to insert touched sessions after.
 			for i, s := range toTouch {
 				toTouch[i] = nil
 
-				c.mu.Lock()
-				keepAliveCount := c.incrementKeepAlive(s)
-				lenIndex := len(c.index)
-				c.mu.Unlock()
+				var keepAliveCount, lenIndex int
+				c.mu.WithLock(func() {
+					keepAliveCount = c.incrementKeepAlive(s)
+					lenIndex = len(c.index)
+				})
+
 				// if keepAlive was called more than the corresponding limit for the
 				// session to be alive and more sessions are open than the lower limit
 				// of continuously kept sessions
@@ -664,54 +662,54 @@ func (c *Client) keeper(ctx context.Context) {
 					continue
 				}
 
-				c.mu.Lock()
-				if !c.notify(s) {
-					// Need to push back session into list in order, to prevent
-					// shuffling of sessions order.
-					//
-					// That is, there may be a race condition, when some session S1
-					// pushed back in the list before we took the mutex. Suppose S1
-					// touched time is greater than ours `now` for S0. If so, it
-					// then may interrupt next keep alive iteration earlier and
-					// prevent our session S0 being touched:
-					// time.Since(S1) < threshold but time.Since(S0) > threshold.
-					mark = c.pushIdleInOrderAfter(s, now, mark)
-				}
-				c.mu.Unlock()
+				c.mu.WithLock(func() {
+					if !c.notify(s) {
+						// Need to push back session into list in order, to prevent
+						// shuffling of sessions order.
+						//
+						// That is, there may be a race condition, when some session S1
+						// pushed back in the list before we took the mutex. Suppose S1
+						// touched time is greater than ours `now` for S0. If so, it
+						// then may interrupt next keep alive iteration earlier and
+						// prevent our session S0 being touched:
+						// time.Since(S1) < threshold but time.Since(S0) > threshold.
+						mark = c.pushIdleInOrderAfter(s, now, mark)
+					}
+				})
 			}
 
 			{ // push all the soft failed sessions to retry on the next tick
 				pushBackTime := now.Add(-c.config.IdleThreshold())
 
-				c.mu.Lock()
-				for _, el := range toTryAgain {
-					_ = c.pushIdleInOrder(el, pushBackTime)
-				}
-				c.mu.Unlock()
+				c.mu.WithLock(func() {
+					for _, el := range toTryAgain {
+						_ = c.pushIdleInOrder(el, pushBackTime)
+					}
+				})
 			}
 
 			var (
 				sleep bool
 				delay time.Duration
 			)
-			c.mu.Lock()
 
-			if s, touched := c.peekFirstIdle(); s == nil {
-				// No sessions to check. Let the Put() caller to wake up
-				// keeper when session arrive.
-				sleep = true
-				c.keeperWake = wake
-			} else {
-				// NOTE: negative delay is also fine.
-				delay = c.config.IdleThreshold() - now.Sub(touched)
-			}
+			var touchingDone chan struct{}
+			c.mu.WithLock(func() {
+				if s, touched := c.peekFirstIdle(); s == nil {
+					// No sessions to check. Let the Put() caller to wake up
+					// keeper when session arrive.
+					sleep = true
+					c.keeperWake = wake
+				} else {
+					// NOTE: negative delay is also fine.
+					delay = c.config.IdleThreshold() - now.Sub(touched)
+				}
 
-			// Takers notification broadcast channel.
-			touchingDone := c.touchingDone
-			c.touchingDone = nil
-			c.touching = false
-
-			c.mu.Unlock()
+				// Takers notification broadcast channel.
+				touchingDone = c.touchingDone
+				c.touchingDone = nil
+				c.touching = false
+			})
 
 			if !sleep {
 				timer.Reset(delay)
@@ -764,7 +762,7 @@ func (c *Client) peekFirstIdle() (s Session, touched time.Time) {
 	s = el.Value.(Session)
 	info, has := c.index[s]
 	if !has || el != info.idle {
-		panicLocked(&c.mu, "inconsistent session client index")
+		panic("inconsistent session client index")
 	}
 	return s, info.touched
 }
@@ -888,9 +886,9 @@ func (c *Client) closeSession(ctx context.Context, s Session, opts ...closeSessi
 	}
 
 	if h.withLock {
-		c.mu.Lock()
-		c.wgClosed.Add(1)
-		c.mu.Unlock()
+		c.mu.WithLock(func() {
+			c.wgClosed.Add(1)
+		})
 	} else {
 		c.wgClosed.Add(1)
 	}
@@ -930,7 +928,7 @@ func (c *Client) keepAliveSession(ctx context.Context, s Session) (err error) {
 func (c *Client) removeIdle(s Session) sessionInfo {
 	info, has := c.index[s]
 	if !has || info.idle == nil {
-		panicLocked(&c.mu, "inconsistent session client index")
+		panic("inconsistent session client index")
 	}
 
 	c.idle.Remove(info.idle)
@@ -981,10 +979,10 @@ func (c *Client) pushIdleInOrderAfter(s Session, now time.Time, mark *list.Eleme
 func (c *Client) handlePushIdle(s Session, now time.Time, el *list.Element) {
 	info, has := c.index[s]
 	if !has {
-		panicLocked(&c.mu, "trying to store session created outside of the client")
+		panic("trying to store session created outside of the client")
 	}
 	if info.idle != nil {
-		panicLocked(&c.mu, "inconsistent session client index")
+		panic("inconsistent session client index")
 	}
 
 	info.touched = now
@@ -1006,9 +1004,4 @@ type sessionInfo struct {
 	idle           *list.Element
 	touched        time.Time
 	keepAliveCount int
-}
-
-func panicLocked(mu sync.Locker, message string) {
-	mu.Unlock()
-	panic(message)
 }

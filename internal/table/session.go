@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -24,6 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -43,13 +43,13 @@ type session struct {
 	tableService Ydb_Table_V1.TableServiceClient
 	config       config.Config
 
-	closedMtx sync.RWMutex
+	closedMtx xsync.RWMutex
 	closed    bool
 
-	statusMtx sync.RWMutex
+	statusMtx xsync.RWMutex
 	status    options.SessionStatus
 
-	onCloseMtx sync.RWMutex
+	onCloseMtx xsync.RWMutex
 	onClose    []func(ctx context.Context)
 }
 
@@ -72,9 +72,9 @@ func (s *session) Status() string {
 }
 
 func (s *session) SetStatus(status options.SessionStatus) {
-	s.statusMtx.Lock()
-	s.status = status
-	s.statusMtx.Unlock()
+	s.statusMtx.WithLock(func() {
+		s.status = status
+	})
 }
 
 func (s *session) isClosed() bool {
@@ -145,19 +145,25 @@ func (s *session) OnClose(cb func(ctx context.Context)) {
 	if s.isClosed() {
 		return
 	}
+
 	s.onCloseMtx.Lock()
+	defer s.onCloseMtx.Unlock()
+
 	s.onClose = append(s.onClose, cb)
-	s.onCloseMtx.Unlock()
 }
 
 func (s *session) Close(ctx context.Context) (err error) {
-	s.closedMtx.Lock()
-	if s.closed {
-		s.closedMtx.Unlock()
+	var fastReturn bool
+	s.closedMtx.WithLock(func() {
+		if s.closed {
+			fastReturn = true
+		} else {
+			s.closed = true
+		}
+	})
+	if fastReturn {
 		return nil
 	}
-	s.closed = true
-	s.closedMtx.Unlock()
 
 	onDone := trace.TableOnSessionDelete(
 		s.config.Trace(),
@@ -170,11 +176,11 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 	// call all close listeners before doing request
 	// firstly this need to clear Client from this session
-	s.onCloseMtx.RLock()
-	for _, cb := range s.onClose {
-		cb(ctx)
-	}
-	s.onCloseMtx.RUnlock()
+	s.onCloseMtx.WithRLock(func() {
+		for _, cb := range s.onClose {
+			cb(ctx)
+		}
+	})
 
 	_, err = s.tableService.DeleteSession(
 		balancer.WithEndpoint(ctx, s),

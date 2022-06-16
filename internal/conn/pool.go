@@ -2,11 +2,12 @@ package conn
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -17,7 +18,7 @@ import (
 type Pool struct {
 	usages int64
 	config Config
-	mtx    sync.RWMutex
+	mtx    xsync.RWMutex
 	opts   []grpc.DialOption
 	conns  map[string]*conn
 	done   chan struct{}
@@ -100,12 +101,13 @@ func (p *Pool) Release(ctx context.Context) error {
 
 	close(p.done)
 
-	p.mtx.RLock()
-	conns := make([]closer.Closer, 0, len(p.conns))
-	for _, c := range p.conns {
-		conns = append(conns, c)
-	}
-	p.mtx.RUnlock()
+	var conns []closer.Closer
+	p.mtx.WithRLock(func() {
+		conns = make([]closer.Closer, 0, len(p.conns))
+		for _, c := range p.conns {
+			conns = append(conns, c)
+		}
+	})
 
 	var issues []error
 	for _, c := range conns {
