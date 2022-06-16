@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
@@ -1345,7 +1347,7 @@ type StubBuilder struct {
 	Limit int
 	T     *testing.T
 
-	mu     sync.Mutex
+	mu     xsync.Mutex
 	actual int
 }
 
@@ -1367,19 +1369,20 @@ func newClientWithStubBuilder(
 }
 
 func (s *StubBuilder) createSession(ctx context.Context) (session Session, err error) {
-	defer func() {
-		s.mu.Lock()
+	defer s.mu.WithLock(func() {
 		if session != nil {
 			s.actual++
 		}
-		s.mu.Unlock()
-	}()
-	s.mu.Lock()
-	if s.Limit > 0 && s.actual == s.Limit {
-		s.mu.Unlock()
-		return nil, fmt.Errorf("stub session: limit overflow")
+	})
+
+	s.mu.WithLock(func() {
+		if s.Limit > 0 && s.actual == s.Limit {
+			err = fmt.Errorf("stub session: limit overflow")
+		}
+	})
+	if err != nil {
+		return nil, err
 	}
-	s.mu.Unlock()
 
 	if f := s.OnCreateSession; f != nil {
 		return f(ctx)

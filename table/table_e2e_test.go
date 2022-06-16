@@ -22,6 +22,8 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -40,7 +42,7 @@ const (
 )
 
 type stats struct {
-	sync.Mutex
+	xsync.Mutex
 
 	keepAliveMinSize int
 	inFlight         int
@@ -101,16 +103,20 @@ func (s *stats) max() int {
 
 func (s *stats) addBalance(t *testing.T, delta int) {
 	defer s.check(t)
+
 	s.Lock()
+	defer s.Unlock()
+
 	s.balance += delta
-	s.Unlock()
 }
 
 func (s *stats) addInFlight(t *testing.T, delta int) {
 	defer s.check(t)
+
 	s.Lock()
+	defer s.Unlock()
+
 	s.inFlight += delta
-	s.Unlock()
 }
 
 // nolint:gocyclo
@@ -268,10 +274,10 @@ func TestTable(t *testing.T) {
 						trace.TableInitDoneInfo,
 					) {
 						return func(info trace.TableInitDoneInfo) {
-							s.Lock()
-							s.keepAliveMinSize = info.KeepAliveMinSize
-							s.limit = info.Limit
-							s.Unlock()
+							s.WithLock(func() {
+								s.keepAliveMinSize = info.KeepAliveMinSize
+								s.limit = info.Limit
+							})
 						}
 					},
 					OnPoolGet: func(

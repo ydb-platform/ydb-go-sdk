@@ -8,6 +8,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
@@ -108,7 +110,7 @@ type connection struct {
 	balancer balancer.Connection
 
 	children    map[uint64]Connection
-	childrenMtx sync.Mutex
+	childrenMtx xsync.Mutex
 	onClose     []func(c *connection)
 
 	panicCallback func(e interface{})
@@ -124,13 +126,13 @@ func (c *connection) Close(ctx context.Context) error {
 		}
 	}()
 
-	c.childrenMtx.Lock()
 	closers := make([]func(context.Context) error, 0)
-	for _, child := range c.children {
-		closers = append(closers, child.Close)
-	}
-	c.children = nil
-	c.childrenMtx.Unlock()
+	c.childrenMtx.WithLock(func() {
+		for _, child := range c.children {
+			closers = append(closers, child.Close)
+		}
+		c.children = nil
+	})
 
 	closers = append(
 		closers,

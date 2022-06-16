@@ -2,6 +2,7 @@
 * Added to query stats plan and AST
 * Changed behaviour of `result.Stats()` (if query result have no stats - returns `nil`) 
 * Added context cancel with specific error
+* Added mutex wrapper for mutex, rwmutex for guarantee unlock and better show critical section
 
 ## v3.26.10
 * Fixed syntax mistake in `trace.TablePooStateChangeInfo` to `trace.TablePoolStateChangeInfo` 
