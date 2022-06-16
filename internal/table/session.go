@@ -8,24 +8,21 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/protobuf/proto"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
