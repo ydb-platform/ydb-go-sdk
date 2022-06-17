@@ -8,7 +8,13 @@ import (
 )
 
 type (
-	free      func()
+	putter interface {
+		Put()
+	}
+	free struct {
+		v any
+		p *sync.Pool
+	}
 	Allocator struct {
 		allocations []free
 	}
@@ -72,7 +78,7 @@ func (a *Allocator) Close() {
 		if l == 0 {
 			break
 		}
-		a.allocations[l-1]()
+		a.allocations[l-1].p.Put(a.allocations[l-1].v)
 		a.allocations = a.allocations[:l-1]
 	}
 	allocatorsPool.Put(a)
@@ -80,201 +86,157 @@ func (a *Allocator) Close() {
 
 func (a *Allocator) Value() (v *Ydb.Value) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			v.Reset()
-			valuePool.Put(v)
-		})
+		v.Reset()
+		a.allocations = append(a.allocations, free{v, &valuePool.Pool})
 	}()
 	return valuePool.Get()
 }
 
 func (a *Allocator) TypedValue() (v *Ydb.TypedValue) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			v.Reset()
-			typedValuePool.Put(v)
-		})
+		v.Reset()
+		a.allocations = append(a.allocations, free{v, &typedValuePool.Pool})
 	}()
 	return typedValuePool.Get()
 }
 
 func (a *Allocator) Type() (v *Ydb.Type) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			v.Reset()
-			typePool.Put(v)
-		})
+		v.Reset()
+		a.allocations = append(a.allocations, free{v, &typePool.Pool})
 	}()
 	return typePool.Get()
 }
 
 func (a *Allocator) TypePrimitive() (v *Ydb.Type_TypeId) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			typePrimitivePool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &typePrimitivePool.Pool})
 	}()
 	return typePrimitivePool.Get()
 }
 
 func (a *Allocator) Decimal() (v *Ydb.DecimalType) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			decimalPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &decimalPool.Pool})
 	}()
 	return decimalPool.Get()
 }
 
 func (a *Allocator) List() (v *Ydb.ListType) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			listPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &listPool.Pool})
 	}()
 	return listPool.Get()
 }
 
 func (a *Allocator) Tuple() (v *Ydb.TupleType) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			tuplePool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &tuplePool.Pool})
 	}()
 	return tuplePool.Get()
 }
 
 func (a *Allocator) TypeDecimal() (v *Ydb.Type_DecimalType) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			typeDecimalPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &typeDecimalPool.Pool})
 	}()
 	return typeDecimalPool.Get()
 }
 
 func (a *Allocator) TypeList() (v *Ydb.Type_ListType) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			typeListPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &typeListPool.Pool})
 	}()
 	return typeListPool.Get()
 }
 
 func (a *Allocator) TypeTuple() (v *Ydb.Type_TupleType) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			typeTuplePool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &typeTuplePool.Pool})
 	}()
 	return typeTuplePool.Get()
 }
 
 func (a *Allocator) EmptyTypeList() (v *Ydb.Type_EmptyListType) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			typeEmptyListPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &typeEmptyListPool.Pool})
 	}()
 	return typeEmptyListPool.Get()
 }
 
 func (a *Allocator) TypeOptional() (v *Ydb.Type_OptionalType) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			typeOptionalPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &typeOptionalPool.Pool})
 	}()
 	return typeOptionalPool.Get()
 }
 
 func (a *Allocator) BoolValue() (v *Ydb.Value_BoolValue) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			boolPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &boolPool.Pool})
 	}()
 	return boolPool.Get()
 }
 
 func (a *Allocator) BytesValue() (v *Ydb.Value_BytesValue) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			bytesPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &bytesPool.Pool})
 	}()
 	return bytesPool.Get()
 }
 
 func (a *Allocator) Int32Value() (v *Ydb.Value_Int32Value) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			int32Pool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &int32Pool.Pool})
 	}()
 	return int32Pool.Get()
 }
 
 func (a *Allocator) Int64Value() (v *Ydb.Value_Int64Value) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			int64Pool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &int64Pool.Pool})
 	}()
 	return int64Pool.Get()
 }
 
 func (a *Allocator) Uint32Value() (v *Ydb.Value_Uint32Value) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			uint32Pool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &uint32Pool.Pool})
 	}()
 	return uint32Pool.Get()
 }
 
 func (a *Allocator) FloatValue() (v *Ydb.Value_FloatValue) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			floatPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &floatPool.Pool})
 	}()
 	return floatPool.Get()
 }
 
 func (a *Allocator) DoubleValue() (v *Ydb.Value_DoubleValue) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			doublePool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &doublePool.Pool})
 	}()
 	return doublePool.Get()
 }
 
 func (a *Allocator) Uint64Value() (v *Ydb.Value_Uint64Value) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			uint64Pool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &uint64Pool.Pool})
 	}()
 	return uint64Pool.Get()
 }
 
 func (a *Allocator) TextValue() (v *Ydb.Value_TextValue) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			textPool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &textPool.Pool})
 	}()
 	return textPool.Get()
 }
 
 func (a *Allocator) Low128Value() (v *Ydb.Value_Low_128) {
 	defer func() {
-		a.allocations = append(a.allocations, func() {
-			low128Pool.Put(v)
-		})
+		a.allocations = append(a.allocations, free{v, &low128Pool.Pool})
 	}()
 	return low128Pool.Get()
 }
