@@ -40,7 +40,6 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -98,13 +97,11 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					// nolint:unparam
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						keepalive <- struct{}{}
 						return nil, nil
@@ -172,7 +169,6 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			p := newClientWithStubBuilder(
 				t,
 				testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -250,7 +246,6 @@ func TestSessionPoolClose(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			// nolint:unparam
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
@@ -347,7 +342,6 @@ func TestRaceWgClosed(t *testing.T) {
 			p := newClientWithStubBuilder(
 				t,
 				testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -404,7 +398,6 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 			p := newClientWithStubBuilder(
 				t,
 				testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -548,7 +541,6 @@ func TestSessionPoolPutInFull(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			// nolint:unparam
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
@@ -596,7 +588,6 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			p := newClientWithStubBuilder(
 				t,
 				testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -699,14 +690,12 @@ func TestSessionPoolGetPut(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						created++
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					// nolint:unparam
 					testutil.TableDeleteSession: func(interface{}) (proto.Message, error) {
 						deleted++
 						return nil, nil
@@ -744,7 +733,6 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			// nolint:unparam
 			testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
@@ -784,13 +772,11 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						atomic.AddUint32(&keepAliveCount, 1)
 						return &Ydb_Table.KeepAliveResult{}, nil
 					},
 					testutil.TableDeleteSession: okHandler,
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -861,13 +847,11 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					// nolint:unparam
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						done := make(chan struct{})
 						keepalive <- done
@@ -928,7 +912,6 @@ func TestSessionPoolDoublePut(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
 		testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			// nolint:unparam
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
@@ -969,18 +952,15 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					// nolint:unparam
 					testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
 						keepalive <- request
 						return nil, <-keepaliveResult
 					},
-					// nolint:unparam
 					testutil.TableDeleteSession: func(request interface{}) (proto.Message, error) {
 						deleteSession <- request
 						return nil, <-deleteSessionResult
@@ -1053,7 +1033,6 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -1120,14 +1099,12 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					// nolint:nolintlint
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					// nolint:unparam
 					// nolint:nolintlint
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						return nil, xerrors.Operation(
@@ -1166,13 +1143,11 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					// nolint:unparam
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						if retry {
 							retry = false
@@ -1288,7 +1263,6 @@ var okHandler = func(interface{}) (proto.Message, error) {
 var simpleCluster = testutil.NewRouter(
 	testutil.WithInvokeHandlers(
 		testutil.InvokeHandlers{
-			// nolint:unparam
 			testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.ExecuteQueryResult{
 					TxMeta: &Ydb_Table.TransactionMeta{
@@ -1296,7 +1270,6 @@ var simpleCluster = testutil.NewRouter(
 					},
 				}, nil
 			},
-			// nolint:unparam
 			testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.BeginTransactionResult{
 					TxMeta: &Ydb_Table.TransactionMeta{
@@ -1310,7 +1283,6 @@ var simpleCluster = testutil.NewRouter(
 			testutil.TablePrepareDataQuery: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.PrepareQueryResult{}, nil
 			},
-			// nolint:unparam
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),

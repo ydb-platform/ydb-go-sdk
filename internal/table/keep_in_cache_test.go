@@ -73,7 +73,6 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 				cc: testutil.NewRouter(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
-							// nolint:unparam
 							testutil.TableExecuteDataQuery: func(request interface{}) (proto.Message, error) {
 								r, ok := request.(*Ydb_Table.ExecuteDataQueryRequest)
 								if !ok {
@@ -86,7 +85,6 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 									},
 								}, nil
 							},
-							// nolint:unparam
 							testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 								return &Ydb_Table.CreateSessionResult{
 									SessionId: testutil.SessionID(),

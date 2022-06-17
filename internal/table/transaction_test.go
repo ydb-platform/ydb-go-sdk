@@ -70,7 +70,6 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							},
 						}, nil
 					},
-					// nolint:unparam
 					testutil.TableRollbackTransaction: func(request interface{}) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.RollbackTransactionRequest)
 						if !ok {
@@ -84,7 +83,6 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							},
 						}, nil
 					},
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
