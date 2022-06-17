@@ -2,7 +2,9 @@ package value
 
 import (
 	"encoding/binary"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
@@ -18,11 +20,11 @@ func (v decimalValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	decimal.Scale = v.scale
 	decimal.Precision = v.precision
 
-	typeId := a.TypeDecimal()
-	typeId.DecimalType = decimal
+	typeDecimal := a.TypeDecimal()
+	typeDecimal.DecimalType = decimal
 
 	t := a.Type()
-	t.Type = typeId
+	t.Type = typeDecimal
 
 	return t
 }

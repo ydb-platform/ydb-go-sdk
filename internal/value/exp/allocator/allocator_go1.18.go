@@ -4,8 +4,9 @@
 package allocator
 
 import (
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"sync"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
 type (

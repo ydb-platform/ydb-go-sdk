@@ -2,17 +2,18 @@ package value
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
 type int64Value int64
 
 func (v int64Value) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	typeId := a.TypePrimitive()
-	typeId.TypeId = Ydb.Type_INT64
+	typePrimitive := a.TypePrimitive()
+	typePrimitive.TypeId = Ydb.Type_INT64
 
 	t := a.Type()
-	t.Type = typeId
+	t.Type = typePrimitive
 
 	return t
 }
