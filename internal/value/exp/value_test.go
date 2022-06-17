@@ -11,7 +11,7 @@ func BenchmarkMemory(b *testing.B) {
 		func() {
 			a := allocator.New()
 			defer a.Free()
-			params := []V{
+			_ = typedValue(TupleValue(
 				BoolValue(true),
 				Int8Value(1),
 				Int16Value(1),
@@ -45,11 +45,7 @@ func BenchmarkMemory(b *testing.B) {
 					Int64Value(2),
 					Int64Value(3),
 				),
-			}
-			for _, p := range params {
-				_ = typedValue(p, a)
-			}
-			//_ = typedValue(TupleValue(params...), a)
+			), a)
 		}()
 	}
 }
