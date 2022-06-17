@@ -85,90 +85,113 @@ func New() (v *Allocator) {
 
 func (a *Allocator) Free() {
 	for _, v := range a.valueAllocations {
+		v.Reset()
 		valuePool.Put(v)
 	}
 	a.valueAllocations = a.valueAllocations[:0]
 	for _, v := range a.typeAllocations {
+		v.Reset()
 		typePool.Put(v)
 	}
 	a.typeAllocations = a.typeAllocations[:0]
 	for _, v := range a.typePrimitiveAllocations {
+		*v = Ydb.Type_TypeId{}
 		typePrimitivePool.Put(v)
 	}
 	a.typePrimitiveAllocations = a.typePrimitiveAllocations[:0]
 	for _, v := range a.typeDecimalAllocations {
+		*v = Ydb.Type_DecimalType{}
 		typeDecimalPool.Put(v)
 	}
 	a.typeDecimalAllocations = a.typeDecimalAllocations[:0]
 	for _, v := range a.typeListAllocations {
+		*v = Ydb.Type_ListType{}
 		typeListPool.Put(v)
 	}
 	a.typeListAllocations = a.typeListAllocations[:0]
 	for _, v := range a.typeEmptyListAllocations {
+		*v = Ydb.Type_EmptyListType{}
 		typeEmptyListPool.Put(v)
 	}
 	a.typeEmptyListAllocations = a.typeEmptyListAllocations[:0]
 	for _, v := range a.typeTupleAllocations {
+		*v = Ydb.Type_TupleType{}
 		typeTuplePool.Put(v)
 	}
 	a.typeTupleAllocations = a.typeTupleAllocations[:0]
 	for _, v := range a.decimalAllocations {
+		*v = Ydb.DecimalType{}
+		v.Reset()
 		decimalPool.Put(v)
 	}
 	a.decimalAllocations = a.decimalAllocations[:0]
 	for _, v := range a.listAllocations {
+		v.Reset()
 		listPool.Put(v)
 	}
 	a.listAllocations = a.listAllocations[:0]
 	for _, v := range a.tupleAllocations {
+		v.Reset()
 		tuplePool.Put(v)
 	}
 	a.tupleAllocations = a.tupleAllocations[:0]
 	for _, v := range a.typeOptionalAllocations {
+		*v = Ydb.Type_OptionalType{}
 		typeOptionalPool.Put(v)
 	}
 	a.typeOptionalAllocations = a.typeOptionalAllocations[:0]
 	for _, v := range a.typedValueAllocations {
+		v.Reset()
 		typedValuePool.Put(v)
 	}
 	a.typedValueAllocations = a.typedValueAllocations[:0]
 	for _, v := range a.boolAllocations {
+		*v = Ydb.Value_BoolValue{}
 		boolPool.Put(v)
 	}
 	a.boolAllocations = a.boolAllocations[:0]
 	for _, v := range a.bytesAllocations {
+		*v = Ydb.Value_BytesValue{}
 		bytesPool.Put(v)
 	}
 	a.bytesAllocations = a.bytesAllocations[:0]
 	for _, v := range a.textAllocations {
+		*v = Ydb.Value_TextValue{}
 		textPool.Put(v)
 	}
 	a.textAllocations = a.textAllocations[:0]
 	for _, v := range a.int32Allocations {
+		*v = Ydb.Value_Int32Value{}
 		int32Pool.Put(v)
 	}
 	a.int32Allocations = a.int32Allocations[:0]
 	for _, v := range a.uint32Allocations {
+		*v = Ydb.Value_Uint32Value{}
 		uint32Pool.Put(v)
 	}
 	a.uint32Allocations = a.uint32Allocations[:0]
 	for _, v := range a.low128Allocations {
+		*v = Ydb.Value_Low_128{}
 		low128Pool.Put(v)
 	}
 	a.low128Allocations = a.low128Allocations[:0]
 	for _, v := range a.int64Allocations {
+		*v = Ydb.Value_Int64Value{}
 		int64Pool.Put(v)
 	}
 	a.int64Allocations = a.int64Allocations[:0]
 	for _, v := range a.uint64Allocations {
+		*v = Ydb.Value_Uint64Value{}
 		uint64Pool.Put(v)
 	}
 	a.uint64Allocations = a.uint64Allocations[:0]
 	for _, v := range a.floatAllocations {
+		*v = Ydb.Value_FloatValue{}
 		floatPool.Put(v)
 	}
 	a.floatAllocations = a.floatAllocations[:0]
 	for _, v := range a.doubleAllocations {
+		*v = Ydb.Value_DoubleValue{}
 		doublePool.Put(v)
 	}
 	a.doubleAllocations = a.doubleAllocations[:0]
