@@ -23,7 +23,14 @@ type (
 	}
 )
 
-func (p *pool[T]) Get() *T {
+func (p *pool[T]) Get() (v *T) {
+	defer func() {
+		if vv, ok := (any)(v).(interface {
+			Reset()
+		}); ok {
+			vv.Reset()
+		}
+	}()
 	return p.Pool.Get().(*T)
 }
 
@@ -86,7 +93,6 @@ func (a *Allocator) Close() {
 
 func (a *Allocator) Value() (v *Ydb.Value) {
 	defer func() {
-		v.Reset()
 		a.allocations = append(a.allocations, free{v, &valuePool.Pool})
 	}()
 	return valuePool.Get()
@@ -94,7 +100,6 @@ func (a *Allocator) Value() (v *Ydb.Value) {
 
 func (a *Allocator) TypedValue() (v *Ydb.TypedValue) {
 	defer func() {
-		v.Reset()
 		a.allocations = append(a.allocations, free{v, &typedValuePool.Pool})
 	}()
 	return typedValuePool.Get()
@@ -102,7 +107,6 @@ func (a *Allocator) TypedValue() (v *Ydb.TypedValue) {
 
 func (a *Allocator) Type() (v *Ydb.Type) {
 	defer func() {
-		v.Reset()
 		a.allocations = append(a.allocations, free{v, &typePool.Pool})
 	}()
 	return typePool.Get()
