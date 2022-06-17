@@ -18,10 +18,14 @@ type (
 		typeListAllocations      []*Ydb.Type_ListType
 		typeEmptyListAllocations []*Ydb.Type_EmptyListType
 		typeTupleAllocations     []*Ydb.Type_TupleType
+		typeStructAllocations    []*Ydb.Type_StructType
 		decimalAllocations       []*Ydb.DecimalType
 		listAllocations          []*Ydb.ListType
 		tupleAllocations         []*Ydb.TupleType
+		structAllocations        []*Ydb.StructType
+		structMemberAllocations  []*Ydb.StructMember
 		typeOptionalAllocations  []*Ydb.Type_OptionalType
+		optionalAllocations      []*Ydb.OptionalType
 		typedValueAllocations    []*Ydb.TypedValue
 		boolAllocations          []*Ydb.Value_BoolValue
 		bytesAllocations         []*Ydb.Value_BytesValue
@@ -33,6 +37,7 @@ type (
 		uint64Allocations        []*Ydb.Value_Uint64Value
 		floatAllocations         []*Ydb.Value_FloatValue
 		doubleAllocations        []*Ydb.Value_DoubleValue
+		nestedAllocations        []*Ydb.Value_NestedValue
 	}
 	pool[T any] sync.Pool
 )
@@ -64,10 +69,14 @@ var (
 	typeListPool      pool[Ydb.Type_ListType]
 	typeEmptyListPool pool[Ydb.Type_EmptyListType]
 	typeTuplePool     pool[Ydb.Type_TupleType]
+	typeStructPool    pool[Ydb.Type_StructType]
 	decimalPool       pool[Ydb.DecimalType]
 	listPool          pool[Ydb.ListType]
 	tuplePool         pool[Ydb.TupleType]
+	structPool        pool[Ydb.StructType]
+	structMemberPool  pool[Ydb.StructMember]
 	typeOptionalPool  pool[Ydb.Type_OptionalType]
+	optionalPool      pool[Ydb.OptionalType]
 	typedValuePool    pool[Ydb.TypedValue]
 	boolPool          pool[Ydb.Value_BoolValue]
 	bytesPool         pool[Ydb.Value_BytesValue]
@@ -79,6 +88,7 @@ var (
 	uint64Pool        pool[Ydb.Value_Uint64Value]
 	floatPool         pool[Ydb.Value_FloatValue]
 	doublePool        pool[Ydb.Value_DoubleValue]
+	nestedPool        pool[Ydb.Value_NestedValue]
 )
 
 func New() (v *Allocator) {
@@ -121,6 +131,11 @@ func (a *Allocator) Free() {
 		typeTuplePool.Put(v)
 	}
 	a.typeTupleAllocations = a.typeTupleAllocations[:0]
+	for _, v := range a.typeStructAllocations {
+		*v = Ydb.Type_StructType{}
+		typeStructPool.Put(v)
+	}
+	a.typeStructAllocations = a.typeStructAllocations[:0]
 	for _, v := range a.decimalAllocations {
 		*v = Ydb.DecimalType{}
 		v.Reset()
@@ -137,6 +152,21 @@ func (a *Allocator) Free() {
 		tuplePool.Put(v)
 	}
 	a.tupleAllocations = a.tupleAllocations[:0]
+	for _, v := range a.structAllocations {
+		v.Reset()
+		structPool.Put(v)
+	}
+	a.structAllocations = a.structAllocations[:0]
+	for _, v := range a.structMemberAllocations {
+		v.Reset()
+		structMemberPool.Put(v)
+	}
+	a.structMemberAllocations = a.structMemberAllocations[:0]
+	for _, v := range a.optionalAllocations {
+		v.Reset()
+		optionalPool.Put(v)
+	}
+	a.optionalAllocations = a.optionalAllocations[:0]
 	for _, v := range a.typeOptionalAllocations {
 		*v = Ydb.Type_OptionalType{}
 		typeOptionalPool.Put(v)
@@ -242,6 +272,24 @@ func (a *Allocator) Tuple() (v *Ydb.TupleType) {
 	return v
 }
 
+func (a *Allocator) Struct() (v *Ydb.StructType) {
+	v = structPool.Get()
+	a.structAllocations = append(a.structAllocations, v)
+	return v
+}
+
+func (a *Allocator) StructMember() (v *Ydb.StructMember) {
+	v = structMemberPool.Get()
+	a.structMemberAllocations = append(a.structMemberAllocations, v)
+	return v
+}
+
+func (a *Allocator) Optional() (v *Ydb.OptionalType) {
+	v = optionalPool.Get()
+	a.optionalAllocations = append(a.optionalAllocations, v)
+	return v
+}
+
 func (a *Allocator) TypeDecimal() (v *Ydb.Type_DecimalType) {
 	v = typeDecimalPool.Get()
 	a.typeDecimalAllocations = append(a.typeDecimalAllocations, v)
@@ -257,6 +305,12 @@ func (a *Allocator) TypeList() (v *Ydb.Type_ListType) {
 func (a *Allocator) TypeTuple() (v *Ydb.Type_TupleType) {
 	v = typeTuplePool.Get()
 	a.typeTupleAllocations = append(a.typeTupleAllocations, v)
+	return v
+}
+
+func (a *Allocator) TypeStruct() (v *Ydb.Type_StructType) {
+	v = typeStructPool.Get()
+	a.typeStructAllocations = append(a.typeStructAllocations, v)
 	return v
 }
 
@@ -311,6 +365,12 @@ func (a *Allocator) FloatValue() (v *Ydb.Value_FloatValue) {
 func (a *Allocator) DoubleValue() (v *Ydb.Value_DoubleValue) {
 	v = doublePool.Get()
 	a.doubleAllocations = append(a.doubleAllocations, v)
+	return v
+}
+
+func (a *Allocator) NestedValue() (v *Ydb.Value_NestedValue) {
+	v = nestedPool.Get()
+	a.nestedAllocations = append(a.nestedAllocations, v)
 	return v
 }
 

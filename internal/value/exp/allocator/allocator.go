@@ -104,3 +104,23 @@ func (a *Allocator) TextValue() (v *Ydb.Value_TextValue) {
 func (a *Allocator) Low128Value() (v *Ydb.Value_Low_128) {
 	return new(Ydb.Value_Low_128)
 }
+
+func (a *Allocator) Struct() (v *Ydb.StructType) {
+	return new(Ydb.StructType)
+}
+
+func (a *Allocator) StructMember() (v *Ydb.StructMember) {
+	return new(Ydb.StructMember)
+}
+
+func (a *Allocator) Optional() (v *Ydb.OptionalType) {
+	return new(Ydb.OptionalType)
+}
+
+func (a *Allocator) TypeStruct() (v *Ydb.Type_StructType) {
+	return new(Ydb.Type_StructType)
+}
+
+func (a *Allocator) NestedValue() (v *Ydb.Value_NestedValue) {
+	return new(Ydb.Value_NestedValue)
+}

@@ -2,6 +2,8 @@ package value
 
 import (
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
 func TestValueToString(t *testing.T) {
@@ -216,6 +218,38 @@ func BenchmarkMemory(b *testing.B) {
 					3,
 					func(i int) V {
 						return Int64Value(int64(i + 1))
+					},
+				),
+				OptionalValue(IntervalValue(1)),
+				OptionalValue(OptionalValue(IntervalValue(1))),
+				StructValue(
+					&StructValueProto{
+						Fields: []StructField{
+							{
+								"series_id",
+								TypeFromYDB(Uint64Value(1).ToYDB().Type),
+							},
+							{
+								"title",
+								TypeFromYDB(UTF8Value("test").ToYDB().Type),
+							},
+							{
+								"air_date",
+								TypeFromYDB(DateValue(1).ToYDB().Type),
+							},
+							{
+								"remove_date",
+								TypeFromYDB(
+									OptionalValue(TzDatetimeValue("1234")).ToYDB().Type,
+								),
+							},
+						},
+						Values: []*Ydb.Value{
+							Uint64Value(1).ToYDB().Value,
+							UTF8Value("test").ToYDB().Value,
+							DateValue(1).ToYDB().Value,
+							OptionalValue(TzDatetimeValue("1234")).ToYDB().Value,
+						},
 					},
 				),
 			}
