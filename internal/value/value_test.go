@@ -176,3 +176,52 @@ func TestValueToString(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkMemory(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		func() {
+			values := [...]V{
+				StringValue([]byte("test")),
+				BoolValue(true),
+				DateValue(1),
+				DatetimeValue(1),
+				DecimalValue(
+					DecimalType{Precision: 22, Scale: 9},
+					[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6},
+				),
+				DoubleValue(1),
+				DyNumberValue("123"),
+				FloatValue(1),
+				Int8Value(1),
+				Int16Value(1),
+				Int32Value(1),
+				Int64Value(1),
+				IntervalValue(1),
+				JSONValue("{}"),
+				JSONDocumentValue("{}"),
+				TimestampValue(1),
+				TzDateValue("1"),
+				TzDatetimeValue("1"),
+				TzTimestampValue("1"),
+				Uint8Value(1),
+				Uint16Value(1),
+				Uint32Value(1),
+				Uint64Value(1),
+				UTF8Value("1"),
+				UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
+				VoidValue,
+				YSONValue("{}"),
+				ListValue(
+					3,
+					func(i int) V {
+						return Int64Value(int64(i + 1))
+					},
+				),
+			}
+			_ = TupleValue(len(values), func(i int) V {
+				return values[i]
+			}).ToYDB()
+		}()
+	}
+}

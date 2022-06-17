@@ -1,6 +1,6 @@
 module github.com/ydb-platform/ydb-go-sdk/v3
 
-go 1.13
+go 1.18
 
 require (
 	github.com/jonboulle/clockwork v0.2.2
