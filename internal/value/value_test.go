@@ -252,6 +252,31 @@ func BenchmarkMemory(b *testing.B) {
 						},
 					},
 				),
+				DictValue(8, func(i int) V {
+					switch i {
+					// Key items.
+					case 0:
+						return UTF8Value("series_id")
+					case 2:
+						return UTF8Value("title")
+					case 4:
+						return UTF8Value("air_date")
+					case 6:
+						return UTF8Value("remove_date")
+					}
+					// Value items.
+					switch i {
+					case 1:
+						return Uint64Value(1)
+					case 3:
+						return Uint64Value(2)
+					case 5:
+						return Uint64Value(3)
+					case 7:
+						return Uint64Value(4)
+					}
+					panic("whoa")
+				}),
 			}
 			_ = TupleValue(len(values), func(i int) V {
 				return values[i]

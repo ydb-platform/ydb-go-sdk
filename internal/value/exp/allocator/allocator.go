@@ -124,3 +124,15 @@ func (a *Allocator) TypeStruct() (v *Ydb.Type_StructType) {
 func (a *Allocator) NestedValue() (v *Ydb.Value_NestedValue) {
 	return new(Ydb.Value_NestedValue)
 }
+
+func (a *Allocator) TypeDict() (v *Ydb.Type_DictType) {
+	return new(Ydb.Type_DictType)
+}
+
+func (a *Allocator) Dict() (v *Ydb.DictType) {
+	return new(Ydb.DictType)
+}
+
+func (a *Allocator) Pair() (v *Ydb.ValuePair) {
+	return new(Ydb.ValuePair)
+}

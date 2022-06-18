@@ -19,10 +19,12 @@ type (
 		typeEmptyListAllocations []*Ydb.Type_EmptyListType
 		typeTupleAllocations     []*Ydb.Type_TupleType
 		typeStructAllocations    []*Ydb.Type_StructType
+		typeDictAllocations      []*Ydb.Type_DictType
 		decimalAllocations       []*Ydb.DecimalType
 		listAllocations          []*Ydb.ListType
 		tupleAllocations         []*Ydb.TupleType
 		structAllocations        []*Ydb.StructType
+		dictAllocations          []*Ydb.DictType
 		structMemberAllocations  []*Ydb.StructMember
 		typeOptionalAllocations  []*Ydb.Type_OptionalType
 		optionalAllocations      []*Ydb.OptionalType
@@ -38,6 +40,7 @@ type (
 		floatAllocations         []*Ydb.Value_FloatValue
 		doubleAllocations        []*Ydb.Value_DoubleValue
 		nestedAllocations        []*Ydb.Value_NestedValue
+		pairAllocations          []*Ydb.ValuePair
 	}
 	pool[T any] sync.Pool
 )
@@ -70,10 +73,12 @@ var (
 	typeEmptyListPool pool[Ydb.Type_EmptyListType]
 	typeTuplePool     pool[Ydb.Type_TupleType]
 	typeStructPool    pool[Ydb.Type_StructType]
+	typeDictPool      pool[Ydb.Type_DictType]
 	decimalPool       pool[Ydb.DecimalType]
 	listPool          pool[Ydb.ListType]
 	tuplePool         pool[Ydb.TupleType]
 	structPool        pool[Ydb.StructType]
+	dictPool          pool[Ydb.DictType]
 	structMemberPool  pool[Ydb.StructMember]
 	typeOptionalPool  pool[Ydb.Type_OptionalType]
 	optionalPool      pool[Ydb.OptionalType]
@@ -89,6 +94,7 @@ var (
 	floatPool         pool[Ydb.Value_FloatValue]
 	doublePool        pool[Ydb.Value_DoubleValue]
 	nestedPool        pool[Ydb.Value_NestedValue]
+	pairPool          pool[Ydb.ValuePair]
 )
 
 func New() (v *Allocator) {
@@ -136,6 +142,11 @@ func (a *Allocator) Free() {
 		typeStructPool.Put(v)
 	}
 	a.typeStructAllocations = a.typeStructAllocations[:0]
+	for _, v := range a.typeDictAllocations {
+		*v = Ydb.Type_DictType{}
+		typeDictPool.Put(v)
+	}
+	a.typeDictAllocations = a.typeDictAllocations[:0]
 	for _, v := range a.decimalAllocations {
 		*v = Ydb.DecimalType{}
 		v.Reset()
@@ -157,6 +168,11 @@ func (a *Allocator) Free() {
 		structPool.Put(v)
 	}
 	a.structAllocations = a.structAllocations[:0]
+	for _, v := range a.dictAllocations {
+		v.Reset()
+		dictPool.Put(v)
+	}
+	a.dictAllocations = a.dictAllocations[:0]
 	for _, v := range a.structMemberAllocations {
 		v.Reset()
 		structMemberPool.Put(v)
@@ -227,6 +243,16 @@ func (a *Allocator) Free() {
 		doublePool.Put(v)
 	}
 	a.doubleAllocations = a.doubleAllocations[:0]
+	for _, v := range a.nestedAllocations {
+		*v = Ydb.Value_NestedValue{}
+		nestedPool.Put(v)
+	}
+	a.nestedAllocations = a.nestedAllocations[:0]
+	for _, v := range a.pairAllocations {
+		*v = Ydb.ValuePair{}
+		pairPool.Put(v)
+	}
+	a.pairAllocations = a.pairAllocations[:0]
 	allocatorsPool.Put(a)
 }
 
@@ -278,6 +304,18 @@ func (a *Allocator) Struct() (v *Ydb.StructType) {
 	return v
 }
 
+func (a *Allocator) Dict() (v *Ydb.DictType) {
+	v = dictPool.Get()
+	a.dictAllocations = append(a.dictAllocations, v)
+	return v
+}
+
+func (a *Allocator) Pair() (v *Ydb.ValuePair) {
+	v = pairPool.Get()
+	a.pairAllocations = append(a.pairAllocations, v)
+	return v
+}
+
 func (a *Allocator) StructMember() (v *Ydb.StructMember) {
 	v = structMemberPool.Get()
 	a.structMemberAllocations = append(a.structMemberAllocations, v)
@@ -311,6 +349,12 @@ func (a *Allocator) TypeTuple() (v *Ydb.Type_TupleType) {
 func (a *Allocator) TypeStruct() (v *Ydb.Type_StructType) {
 	v = typeStructPool.Get()
 	a.typeStructAllocations = append(a.typeStructAllocations, v)
+	return v
+}
+
+func (a *Allocator) TypeDict() (v *Ydb.Type_DictType) {
+	v = typeDictPool.Get()
+	a.typeDictAllocations = append(a.typeDictAllocations, v)
 	return v
 }
 

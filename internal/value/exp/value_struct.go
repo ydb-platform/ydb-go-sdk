@@ -46,8 +46,8 @@ func (v structValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func StructField(name string, v V) structField {
-	return structField{name, v}
+func StructField(name string, value V) structField {
+	return structField{name, value}
 }
 
 func StructValue(v ...structField) structValue {

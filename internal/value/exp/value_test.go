@@ -59,6 +59,12 @@ func BenchmarkMemory(b *testing.B) {
 					StructField("air_date", DateValue(1)),
 					StructField("remove_date", OptionalValue(TzDatetimeValue("1234"))),
 				),
+				DictValue(
+					DictField(UTF8Value("series_id"), Uint64Value(1)),
+					DictField(UTF8Value("title"), Uint64Value(2)),
+					DictField(UTF8Value("air_date"), Uint64Value(3)),
+					DictField(UTF8Value("remove_date"), Uint64Value(4)),
+				),
 			), a)
 		}()
 	}
@@ -260,6 +266,39 @@ func TestCompareProtos(t *testing.T) {
 				StructField("title", UTF8Value("test")),
 				StructField("air_date", DateValue(1)),
 				StructField("remove_date", OptionalValue(TzDatetimeValue("1234"))),
+			), a),
+		},
+		{
+			value.ToYDB(value.DictValue(8, func(i int) value.V {
+				switch i {
+				// Key items.
+				case 0:
+					return value.UTF8Value("series_id")
+				case 2:
+					return value.UTF8Value("title")
+				case 4:
+					return value.UTF8Value("air_date")
+				case 6:
+					return value.UTF8Value("remove_date")
+				}
+				// Value items.
+				switch i {
+				case 1:
+					return value.Uint64Value(1)
+				case 3:
+					return value.Uint64Value(2)
+				case 5:
+					return value.Uint64Value(3)
+				case 7:
+					return value.Uint64Value(4)
+				}
+				panic("whoa")
+			})),
+			typedValue(DictValue(
+				DictField(UTF8Value("series_id"), Uint64Value(1)),
+				DictField(UTF8Value("title"), Uint64Value(2)),
+				DictField(UTF8Value("air_date"), Uint64Value(3)),
+				DictField(UTF8Value("remove_date"), Uint64Value(4)),
 			), a),
 		},
 	} {
