@@ -229,20 +229,20 @@ func TestCompareProtos(t *testing.T) {
 				&value.StructValueProto{
 					Fields: []value.StructField{
 						{
-							"series_id",
-							value.TypeFromYDB(value.Uint64Value(1).ToYDB().Type),
+							Name: "series_id",
+							Type: value.TypeFromYDB(value.Uint64Value(1).ToYDB().Type),
 						},
 						{
-							"title",
-							value.TypeFromYDB(value.UTF8Value("test").ToYDB().Type),
+							Name: "title",
+							Type: value.TypeFromYDB(value.UTF8Value("test").ToYDB().Type),
 						},
 						{
-							"air_date",
-							value.TypeFromYDB(value.DateValue(1).ToYDB().Type),
+							Name: "air_date",
+							Type: value.TypeFromYDB(value.DateValue(1).ToYDB().Type),
 						},
 						{
-							"remove_date",
-							value.TypeFromYDB(
+							Name: "remove_date",
+							Type: value.TypeFromYDB(
 								value.OptionalValue(value.TzDatetimeValue("1234")).ToYDB().Type,
 							),
 						},
