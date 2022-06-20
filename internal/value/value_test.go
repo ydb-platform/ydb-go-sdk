@@ -2,6 +2,8 @@ package value
 
 import (
 	"testing"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
 func TestValueToString(t *testing.T) {
@@ -174,5 +176,111 @@ func TestValueToString(t *testing.T) {
 				t.Errorf("got: %s, want: %s", got, tt.exp)
 			}
 		})
+	}
+}
+
+func BenchmarkMemory(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		func() {
+			values := [...]V{
+				StringValue([]byte("test")),
+				BoolValue(true),
+				DateValue(1),
+				DatetimeValue(1),
+				DecimalValue(
+					DecimalType{Precision: 22, Scale: 9},
+					[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6},
+				),
+				DoubleValue(1),
+				DyNumberValue("123"),
+				FloatValue(1),
+				Int8Value(1),
+				Int16Value(1),
+				Int32Value(1),
+				Int64Value(1),
+				IntervalValue(1),
+				JSONValue("{}"),
+				JSONDocumentValue("{}"),
+				TimestampValue(1),
+				TzDateValue("1"),
+				TzDatetimeValue("1"),
+				TzTimestampValue("1"),
+				Uint8Value(1),
+				Uint16Value(1),
+				Uint32Value(1),
+				Uint64Value(1),
+				UTF8Value("1"),
+				UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
+				VoidValue,
+				YSONValue("{}"),
+				ListValue(
+					3,
+					func(i int) V {
+						return Int64Value(int64(i + 1))
+					},
+				),
+				OptionalValue(IntervalValue(1)),
+				OptionalValue(OptionalValue(IntervalValue(1))),
+				StructValue(
+					&StructValueProto{
+						Fields: []StructField{
+							{
+								"series_id",
+								TypeFromYDB(Uint64Value(1).ToYDB().Type),
+							},
+							{
+								"title",
+								TypeFromYDB(UTF8Value("test").ToYDB().Type),
+							},
+							{
+								"air_date",
+								TypeFromYDB(DateValue(1).ToYDB().Type),
+							},
+							{
+								"remove_date",
+								TypeFromYDB(
+									OptionalValue(TzDatetimeValue("1234")).ToYDB().Type,
+								),
+							},
+						},
+						Values: []*Ydb.Value{
+							Uint64Value(1).ToYDB().Value,
+							UTF8Value("test").ToYDB().Value,
+							DateValue(1).ToYDB().Value,
+							OptionalValue(TzDatetimeValue("1234")).ToYDB().Value,
+						},
+					},
+				),
+				DictValue(8, func(i int) V {
+					switch i {
+					// Key items.
+					case 0:
+						return UTF8Value("series_id")
+					case 2:
+						return UTF8Value("title")
+					case 4:
+						return UTF8Value("air_date")
+					case 6:
+						return UTF8Value("remove_date")
+					}
+					// Value items.
+					switch i {
+					case 1:
+						return Uint64Value(1)
+					case 3:
+						return Uint64Value(2)
+					case 5:
+						return Uint64Value(3)
+					case 7:
+						return Uint64Value(4)
+					}
+					panic("whoa")
+				}),
+			}
+			_ = TupleValue(len(values), func(i int) V {
+				return values[i]
+			}).ToYDB()
+		}()
 	}
 }

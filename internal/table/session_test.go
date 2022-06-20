@@ -35,12 +35,9 @@ func TestSessionKeepAlive(t *testing.T) {
 		cc: testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
-					// nolint:nolintlint
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.KeepAliveResult{SessionStatus: status}, e
 					},
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -92,7 +89,6 @@ func TestSessionDescribeTable(t *testing.T) {
 		cc: testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:unparam
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -334,7 +330,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 							testutil.NewRouter(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
-										// nolint:unparam
 										testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.ExecuteQueryResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
@@ -342,7 +337,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 												},
 											}, nil
 										},
-										// nolint:unparam
 										testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.BeginTransactionResult{
 												TxMeta: &Ydb_Table.TransactionMeta{
@@ -356,7 +350,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 										testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.PrepareQueryResult{}, nil
 										},
-										// nolint:unparam
 										testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 											return &Ydb_Table.CreateSessionResult{
 												SessionId: testutil.SessionID(),

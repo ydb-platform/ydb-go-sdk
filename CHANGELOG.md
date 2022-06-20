@@ -1,3 +1,4 @@
+* Added internal experimental packages `internal/value/exp` and `internal/value/exp/allocator` with alternative value implementations with zero-allocation model
 * Supported parsing of database name from connection string URI path
 * Added `options.WithExecuteScanQueryStats` option
 * Added to query stats plan and AST
