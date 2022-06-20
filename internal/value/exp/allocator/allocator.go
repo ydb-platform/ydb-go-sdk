@@ -21,7 +21,7 @@ func (a *Allocator) Value() (v *Ydb.Value) {
 	return new(Ydb.Value)
 }
 
-func (a *Allocator) Typed() (v *Ydb.TypedValue) {
+func (a *Allocator) TypedValue() (v *Ydb.TypedValue) {
 	return new(Ydb.TypedValue)
 }
 
