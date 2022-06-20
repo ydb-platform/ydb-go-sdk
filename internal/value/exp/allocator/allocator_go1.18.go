@@ -4,15 +4,15 @@
 package allocator
 
 import (
-	"sync"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
 type (
 	Allocator struct {
-		valueAllocations         []*Ydb.Value
-		typeAllocations          []*Ydb.Type
+		valueAlocator
+		typeAllocator
+		typedValueAllocator
+
 		typePrimitiveAllocations []*Ydb.Type_TypeId
 		typeDecimalAllocations   []*Ydb.Type_DecimalType
 		typeListAllocations      []*Ydb.Type_ListType
@@ -28,7 +28,6 @@ type (
 		structMemberAllocations  []*Ydb.StructMember
 		typeOptionalAllocations  []*Ydb.Type_OptionalType
 		optionalAllocations      []*Ydb.OptionalType
-		typedValueAllocations    []*Ydb.TypedValue
 		boolAllocations          []*Ydb.Value_BoolValue
 		bytesAllocations         []*Ydb.Value_BytesValue
 		textAllocations          []*Ydb.Value_TextValue
@@ -42,54 +41,6 @@ type (
 		nestedAllocations        []*Ydb.Value_NestedValue
 		pairAllocations          []*Ydb.ValuePair
 	}
-	pool[T any] sync.Pool
-)
-
-func (p *pool[T]) Get() *T {
-	v := (*sync.Pool)(p).Get()
-	if v == nil {
-		var zero T
-		v = &zero
-	}
-	return v.(*T)
-}
-
-func (p *pool[T]) Put(t *T) {
-	(*sync.Pool)(p).Put(t)
-}
-
-var (
-	allocatorsPool    pool[Allocator]
-	valuePool         pool[Ydb.Value]
-	typePool          pool[Ydb.Type]
-	typePrimitivePool pool[Ydb.Type_TypeId]
-	typeDecimalPool   pool[Ydb.Type_DecimalType]
-	typeListPool      pool[Ydb.Type_ListType]
-	typeEmptyListPool pool[Ydb.Type_EmptyListType]
-	typeTuplePool     pool[Ydb.Type_TupleType]
-	typeStructPool    pool[Ydb.Type_StructType]
-	typeDictPool      pool[Ydb.Type_DictType]
-	decimalPool       pool[Ydb.DecimalType]
-	listPool          pool[Ydb.ListType]
-	tuplePool         pool[Ydb.TupleType]
-	structPool        pool[Ydb.StructType]
-	dictPool          pool[Ydb.DictType]
-	structMemberPool  pool[Ydb.StructMember]
-	typeOptionalPool  pool[Ydb.Type_OptionalType]
-	optionalPool      pool[Ydb.OptionalType]
-	typedValuePool    pool[Ydb.TypedValue]
-	boolPool          pool[Ydb.Value_BoolValue]
-	bytesPool         pool[Ydb.Value_BytesValue]
-	textPool          pool[Ydb.Value_TextValue]
-	int32Pool         pool[Ydb.Value_Int32Value]
-	uint32Pool        pool[Ydb.Value_Uint32Value]
-	low128Pool        pool[Ydb.Value_Low_128]
-	int64Pool         pool[Ydb.Value_Int64Value]
-	uint64Pool        pool[Ydb.Value_Uint64Value]
-	floatPool         pool[Ydb.Value_FloatValue]
-	doublePool        pool[Ydb.Value_DoubleValue]
-	nestedPool        pool[Ydb.Value_NestedValue]
-	pairPool          pool[Ydb.ValuePair]
 )
 
 func New() (v *Allocator) {
@@ -97,26 +48,10 @@ func New() (v *Allocator) {
 }
 
 func (a *Allocator) Free() {
-	for _, v := range a.valueAllocations {
-		items := v.Items
-		pairs := v.Pairs
-		for i := range items {
-			items[i] = nil
-		}
-		for i := range pairs {
-			pairs[i] = nil
-		}
-		v.Reset()
-		v.Items = items[:0]
-		v.Pairs = pairs[:0]
-		valuePool.Put(v)
-	}
-	a.valueAllocations = a.valueAllocations[:0]
-	for _, v := range a.typeAllocations {
-		v.Reset()
-		typePool.Put(v)
-	}
-	a.typeAllocations = a.typeAllocations[:0]
+	a.valueAlocator.free()
+	a.typeAllocator.free()
+	a.typedValueAllocator.free()
+
 	for _, v := range a.typePrimitiveAllocations {
 		*v = Ydb.Type_TypeId{}
 		typePrimitivePool.Put(v)
@@ -203,11 +138,7 @@ func (a *Allocator) Free() {
 		typeOptionalPool.Put(v)
 	}
 	a.typeOptionalAllocations = a.typeOptionalAllocations[:0]
-	for _, v := range a.typedValueAllocations {
-		v.Reset()
-		typedValuePool.Put(v)
-	}
-	a.typedValueAllocations = a.typedValueAllocations[:0]
+
 	for _, v := range a.boolAllocations {
 		*v = Ydb.Value_BoolValue{}
 		boolPool.Put(v)
@@ -271,22 +202,68 @@ func (a *Allocator) Free() {
 	allocatorsPool.Put(a)
 }
 
-func (a *Allocator) Value() (v *Ydb.Value) {
+type valueAlocator struct {
+	valueAllocations []*Ydb.Value
+}
+
+func (a *valueAlocator) Value() (v *Ydb.Value) {
 	v = valuePool.Get()
 	a.valueAllocations = append(a.valueAllocations, v)
 	return v
 }
 
-func (a *Allocator) TypedValue() (v *Ydb.TypedValue) {
+func (a *valueAlocator) free() {
+	for _, v := range a.valueAllocations {
+		items := v.Items
+		pairs := v.Pairs
+		for i := range items {
+			items[i] = nil
+		}
+		for i := range pairs {
+			pairs[i] = nil
+		}
+		v.Reset()
+		v.Items = items[:0]
+		v.Pairs = pairs[:0]
+		valuePool.Put(v)
+	}
+	a.valueAllocations = a.valueAllocations[:0]
+}
+
+type typeAllocator struct {
+	typeAllocations []*Ydb.Type
+}
+
+func (a *typeAllocator) Type() (v *Ydb.Type) {
+	v = typePool.Get()
+	a.typeAllocations = append(a.typeAllocations, v)
+	return v
+}
+
+func (a *typeAllocator) free() {
+	for _, v := range a.typeAllocations {
+		v.Reset()
+		typePool.Put(v)
+	}
+	a.typeAllocations = a.typeAllocations[:0]
+}
+
+type typedValueAllocator struct {
+	typedValueAllocations []*Ydb.TypedValue
+}
+
+func (a *typedValueAllocator) TypedValue() (v *Ydb.TypedValue) {
 	v = typedValuePool.Get()
 	a.typedValueAllocations = append(a.typedValueAllocations, v)
 	return v
 }
 
-func (a *Allocator) Type() (v *Ydb.Type) {
-	v = typePool.Get()
-	a.typeAllocations = append(a.typeAllocations, v)
-	return v
+func (a *typedValueAllocator) free() {
+	for _, v := range a.typedValueAllocations {
+		v.Reset()
+		typedValuePool.Put(v)
+	}
+	a.typedValueAllocations = a.typedValueAllocations[:0]
 }
 
 func (a *Allocator) TypePrimitive() (v *Ydb.Type_TypeId) {
