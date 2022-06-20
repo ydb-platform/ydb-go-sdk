@@ -3,10 +3,12 @@ package value
 import (
 	"testing"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
-	"google.golang.org/protobuf/proto"
 )
 
 func BenchmarkMemory(b *testing.B) {
