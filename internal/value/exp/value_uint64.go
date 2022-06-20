@@ -19,7 +19,7 @@ func (v uint64Value) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v uint64Value) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.Uint64Value()
+	vv := a.Uint64()
 	vv.Uint64Value = uint64(v)
 
 	vvv := a.Value()

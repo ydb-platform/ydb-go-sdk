@@ -21,7 +21,7 @@ func (*jsondocumentValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v *jsondocumentValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.TextValue()
+	vv := a.Text()
 	if v != nil {
 		vv.TextValue = v.v
 	}

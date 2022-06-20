@@ -21,7 +21,7 @@ func (*floatValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v *floatValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.FloatValue()
+	vv := a.Float()
 	if v != nil {
 		vv.FloatValue = v.v
 	}

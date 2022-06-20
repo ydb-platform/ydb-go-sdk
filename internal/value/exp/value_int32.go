@@ -19,7 +19,7 @@ func (v int32Value) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v int32Value) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.Int32Value()
+	vv := a.Int32()
 	vv.Int32Value = int32(v)
 
 	vvv := a.Value()

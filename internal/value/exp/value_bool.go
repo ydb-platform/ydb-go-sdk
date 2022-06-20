@@ -20,7 +20,7 @@ func (v boolValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v boolValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.BoolValue()
+	vv := a.Bool()
 
 	vv.BoolValue = bool(v)
 

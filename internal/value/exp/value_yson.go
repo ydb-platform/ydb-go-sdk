@@ -21,7 +21,7 @@ func (*ysonValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v *ysonValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.TextValue()
+	vv := a.Text()
 	if v != nil {
 		vv.TextValue = v.v
 	}

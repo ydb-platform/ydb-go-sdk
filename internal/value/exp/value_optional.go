@@ -28,7 +28,7 @@ func (v optionalValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	if _, opt := v.v.(optionalValue); opt {
-		vv := a.NestedValue()
+		vv := a.Nested()
 		vv.NestedValue = v.v.toYDBValue(a)
 		vvv.Value = vv
 	} else {

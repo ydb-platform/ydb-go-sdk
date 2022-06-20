@@ -21,7 +21,7 @@ func (a *Allocator) Value() (v *Ydb.Value) {
 	return new(Ydb.Value)
 }
 
-func (a *Allocator) TypedValue() (v *Ydb.TypedValue) {
+func (a *Allocator) Typed() (v *Ydb.TypedValue) {
 	return new(Ydb.TypedValue)
 }
 
@@ -57,7 +57,7 @@ func (a *Allocator) TypeTuple() (v *Ydb.Type_TupleType) {
 	return new(Ydb.Type_TupleType)
 }
 
-func (a *Allocator) EmptyTypeList() (v *Ydb.Type_EmptyListType) {
+func (a *Allocator) TypeEmptyList() (v *Ydb.Type_EmptyListType) {
 	return new(Ydb.Type_EmptyListType)
 }
 
@@ -65,43 +65,43 @@ func (a *Allocator) TypeOptional() (v *Ydb.Type_OptionalType) {
 	return new(Ydb.Type_OptionalType)
 }
 
-func (a *Allocator) BoolValue() (v *Ydb.Value_BoolValue) {
+func (a *Allocator) Bool() (v *Ydb.Value_BoolValue) {
 	return new(Ydb.Value_BoolValue)
 }
 
-func (a *Allocator) BytesValue() (v *Ydb.Value_BytesValue) {
+func (a *Allocator) Bytes() (v *Ydb.Value_BytesValue) {
 	return new(Ydb.Value_BytesValue)
 }
 
-func (a *Allocator) Int32Value() (v *Ydb.Value_Int32Value) {
+func (a *Allocator) Int32() (v *Ydb.Value_Int32Value) {
 	return new(Ydb.Value_Int32Value)
 }
 
-func (a *Allocator) Int64Value() (v *Ydb.Value_Int64Value) {
+func (a *Allocator) Int64() (v *Ydb.Value_Int64Value) {
 	return new(Ydb.Value_Int64Value)
 }
 
-func (a *Allocator) Uint32Value() (v *Ydb.Value_Uint32Value) {
+func (a *Allocator) Uint32() (v *Ydb.Value_Uint32Value) {
 	return new(Ydb.Value_Uint32Value)
 }
 
-func (a *Allocator) FloatValue() (v *Ydb.Value_FloatValue) {
+func (a *Allocator) Float() (v *Ydb.Value_FloatValue) {
 	return new(Ydb.Value_FloatValue)
 }
 
-func (a *Allocator) DoubleValue() (v *Ydb.Value_DoubleValue) {
+func (a *Allocator) Double() (v *Ydb.Value_DoubleValue) {
 	return new(Ydb.Value_DoubleValue)
 }
 
-func (a *Allocator) Uint64Value() (v *Ydb.Value_Uint64Value) {
+func (a *Allocator) Uint64() (v *Ydb.Value_Uint64Value) {
 	return new(Ydb.Value_Uint64Value)
 }
 
-func (a *Allocator) TextValue() (v *Ydb.Value_TextValue) {
+func (a *Allocator) Text() (v *Ydb.Value_TextValue) {
 	return new(Ydb.Value_TextValue)
 }
 
-func (a *Allocator) Low128Value() (v *Ydb.Value_Low_128) {
+func (a *Allocator) Low128() (v *Ydb.Value_Low_128) {
 	return new(Ydb.Value_Low_128)
 }
 
@@ -121,7 +121,7 @@ func (a *Allocator) TypeStruct() (v *Ydb.Type_StructType) {
 	return new(Ydb.Type_StructType)
 }
 
-func (a *Allocator) NestedValue() (v *Ydb.Value_NestedValue) {
+func (a *Allocator) Nested() (v *Ydb.Value_NestedValue) {
 	return new(Ydb.Value_NestedValue)
 }
 

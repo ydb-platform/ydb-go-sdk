@@ -21,7 +21,7 @@ func (*doubleValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v *doubleValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.DoubleValue()
+	vv := a.Double()
 	if v != nil {
 		vv.DoubleValue = v.v
 	}

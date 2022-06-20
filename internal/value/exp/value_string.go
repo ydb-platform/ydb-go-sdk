@@ -20,7 +20,7 @@ func (v stringValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v stringValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.BytesValue()
+	vv := a.Bytes()
 
 	vv.BytesValue = v
 

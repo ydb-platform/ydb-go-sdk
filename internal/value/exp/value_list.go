@@ -28,7 +28,7 @@ func (v *listValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 
 		t.Type = typeList
 	default:
-		typeList := a.EmptyTypeList()
+		typeList := a.TypeEmptyList()
 
 		t.Type = typeList
 	}

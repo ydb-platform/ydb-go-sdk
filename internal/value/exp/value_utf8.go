@@ -21,7 +21,7 @@ func (*utf8Value) toYDBType(a *allocator.Allocator) *Ydb.Type {
 }
 
 func (v *utf8Value) toYDBValue(a *allocator.Allocator) *Ydb.Value {
-	vv := a.TextValue()
+	vv := a.Text()
 	if v != nil {
 		vv.TextValue = v.v
 	}

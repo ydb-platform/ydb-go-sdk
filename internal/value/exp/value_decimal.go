@@ -39,7 +39,7 @@ func (v *decimalValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	if v != nil {
 		bytes = v.v
 	}
-	vv := a.Low128Value()
+	vv := a.Low128()
 	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
 
 	vvv := a.Value()
