@@ -6,9 +6,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
-type tzDateValue string
+type tzDateValue struct {
+	v string
+}
 
-func (v tzDateValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+func (*tzDateValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	typePrimitive := a.TypePrimitive()
 	typePrimitive.TypeId = Ydb.Type_TZ_DATE
 
@@ -18,9 +20,11 @@ func (v tzDateValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func (v tzDateValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *tzDateValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	vv := a.TextValue()
-	vv.TextValue = string(v)
+	if v != nil {
+		vv.TextValue = v.v
+	}
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -28,6 +32,6 @@ func (v tzDateValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func TzDateValue(v string) tzDateValue {
-	return tzDateValue(v)
+func TzDateValue(v string) *tzDateValue {
+	return &tzDateValue{v: v}
 }

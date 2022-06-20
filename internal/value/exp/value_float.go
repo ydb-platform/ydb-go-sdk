@@ -6,9 +6,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
-type floatValue float32
+type floatValue struct {
+	v float32
+}
 
-func (v floatValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+func (*floatValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	typePrimitive := a.TypePrimitive()
 	typePrimitive.TypeId = Ydb.Type_FLOAT
 
@@ -18,9 +20,11 @@ func (v floatValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func (v floatValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *floatValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	vv := a.FloatValue()
-	vv.FloatValue = float32(v)
+	if v != nil {
+		vv.FloatValue = v.v
+	}
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -28,6 +32,6 @@ func (v floatValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func FloatValue(v float32) floatValue {
-	return floatValue(v)
+func FloatValue(v float32) *floatValue {
+	return &floatValue{v: v}
 }

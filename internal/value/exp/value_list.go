@@ -6,16 +6,22 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
-type listValue []V
+type listValue struct {
+	items []V
+}
 
-func (v listValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+func (v *listValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+	var items []V
+	if v != nil {
+		items = v.items
+	}
 	t := a.Type()
 
 	switch {
-	case len(v) > 0:
+	case len(items) > 0:
 		list := a.List()
 
-		list.Item = v[0].toYDBType(a)
+		list.Item = items[0].toYDBType(a)
 
 		typeList := a.TypeList()
 		typeList.ListType = list
@@ -30,16 +36,20 @@ func (v listValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func (v listValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *listValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+	var items []V
+	if v != nil {
+		items = v.items
+	}
 	vvv := a.Value()
 
-	for _, vv := range v {
+	for _, vv := range items {
 		vvv.Items = append(vvv.Items, vv.toYDBValue(a))
 	}
 
 	return vvv
 }
 
-func ListValue(v ...V) listValue {
-	return listValue(v)
+func ListValue(v ...V) *listValue {
+	return &listValue{items: v}
 }

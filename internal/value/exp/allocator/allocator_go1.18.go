@@ -51,11 +51,6 @@ func (p *pool[T]) Get() *T {
 		var zero T
 		v = &zero
 	}
-	if vv, ok := (v).(interface {
-		Reset()
-	}); ok {
-		vv.Reset()
-	}
 	return v.(*T)
 }
 
@@ -103,7 +98,17 @@ func New() (v *Allocator) {
 
 func (a *Allocator) Free() {
 	for _, v := range a.valueAllocations {
+		items := v.Items
+		pairs := v.Pairs
+		for i := range items {
+			items[i] = nil
+		}
+		for i := range pairs {
+			pairs[i] = nil
+		}
 		v.Reset()
+		v.Items = items[:0]
+		v.Pairs = pairs[:0]
 		valuePool.Put(v)
 	}
 	a.valueAllocations = a.valueAllocations[:0]
@@ -159,12 +164,22 @@ func (a *Allocator) Free() {
 	}
 	a.listAllocations = a.listAllocations[:0]
 	for _, v := range a.tupleAllocations {
+		elements := v.Elements
+		for i := range elements {
+			elements[i] = nil
+		}
 		v.Reset()
+		v.Elements = elements[:0]
 		tuplePool.Put(v)
 	}
 	a.tupleAllocations = a.tupleAllocations[:0]
 	for _, v := range a.structAllocations {
+		members := v.Members
+		for i := range members {
+			members[i] = nil
+		}
 		v.Reset()
+		v.Members = members[:0]
 		structPool.Put(v)
 	}
 	a.structAllocations = a.structAllocations[:0]
@@ -300,6 +315,9 @@ func (a *Allocator) Tuple() (v *Ydb.TupleType) {
 
 func (a *Allocator) Struct() (v *Ydb.StructType) {
 	v = structPool.Get()
+	if cap(v.Members) <= 0 {
+		v.Members = make([]*Ydb.StructMember, 0, 10)
+	}
 	a.structAllocations = append(a.structAllocations, v)
 	return v
 }

@@ -11,28 +11,39 @@ type (
 		k V
 		v V
 	}
-	dictValue []dictField
+	dictValue struct {
+		fields []dictField
+	}
 )
 
-func (v dictValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+func (v *dictValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+	var fields []dictField
+	if v != nil {
+		fields = v.fields
+	}
+
 	t := a.Type()
 
 	typeDict := a.TypeDict()
 
 	typeDict.DictType = a.Dict()
 
-	typeDict.DictType.Key = v[0].k.toYDBType(a)
-	typeDict.DictType.Payload = v[0].v.toYDBType(a)
+	typeDict.DictType.Key = fields[0].k.toYDBType(a)
+	typeDict.DictType.Payload = fields[0].v.toYDBType(a)
 
 	t.Type = typeDict
 
 	return t
 }
 
-func (v dictValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *dictValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+	var fields []dictField
+	if v != nil {
+		fields = v.fields
+	}
 	vvv := a.Value()
 
-	for _, vv := range v {
+	for _, vv := range fields {
 		pair := a.Pair()
 
 		pair.Key = vv.k.toYDBValue(a)
@@ -51,6 +62,6 @@ func DictField(k, v V) dictField {
 	}
 }
 
-func DictValue(v ...dictField) dictValue {
-	return v
+func DictValue(v ...dictField) *dictValue {
+	return &dictValue{fields: v}
 }

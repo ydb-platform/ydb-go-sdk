@@ -6,9 +6,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
-type jsondocumentValue string
+type jsondocumentValue struct {
+	v string
+}
 
-func (v jsondocumentValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+func (*jsondocumentValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	typePrimitive := a.TypePrimitive()
 	typePrimitive.TypeId = Ydb.Type_JSON_DOCUMENT
 
@@ -18,9 +20,11 @@ func (v jsondocumentValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func (v jsondocumentValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *jsondocumentValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	vv := a.TextValue()
-	vv.TextValue = string(v)
+	if v != nil {
+		vv.TextValue = v.v
+	}
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -28,6 +32,6 @@ func (v jsondocumentValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func JSONDocumentValue(v string) jsondocumentValue {
-	return jsondocumentValue(v)
+func JSONDocumentValue(v string) *jsondocumentValue {
+	return &jsondocumentValue{v: v}
 }

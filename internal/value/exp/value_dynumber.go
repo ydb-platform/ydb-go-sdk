@@ -6,9 +6,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
-type dyNumberValue string
+type dyNumberValue struct {
+	v string
+}
 
-func (v dyNumberValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+func (dyNumberValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	typePrimitive := a.TypePrimitive()
 	typePrimitive.TypeId = Ydb.Type_DYNUMBER
 
@@ -18,9 +20,11 @@ func (v dyNumberValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func (v dyNumberValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *dyNumberValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	vv := a.TextValue()
-	vv.TextValue = string(v)
+	if v != nil {
+		vv.TextValue = v.v
+	}
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -28,6 +32,6 @@ func (v dyNumberValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func DyNumberValue(v string) dyNumberValue {
-	return dyNumberValue(v)
+func DyNumberValue(v string) *dyNumberValue {
+	return &dyNumberValue{v: v}
 }

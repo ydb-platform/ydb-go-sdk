@@ -6,9 +6,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
-type utf8Value string
+type utf8Value struct {
+	v string
+}
 
-func (v utf8Value) toYDBType(a *allocator.Allocator) *Ydb.Type {
+func (*utf8Value) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	typePrimitive := a.TypePrimitive()
 	typePrimitive.TypeId = Ydb.Type_UTF8
 
@@ -18,9 +20,11 @@ func (v utf8Value) toYDBType(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func (v utf8Value) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *utf8Value) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	vv := a.TextValue()
-	vv.TextValue = string(v)
+	if v != nil {
+		vv.TextValue = v.v
+	}
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -28,6 +32,6 @@ func (v utf8Value) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func UTF8Value(v string) utf8Value {
-	return utf8Value(v)
+func UTF8Value(v string) *utf8Value {
+	return &utf8Value{v: v}
 }
