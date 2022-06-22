@@ -1,6 +1,7 @@
 package value
 
 import (
+	"bytes"
 	"encoding/binary"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -9,29 +10,29 @@ import (
 )
 
 type decimalValue struct {
-	v         [16]byte
-	precision uint32
-	scale     uint32
+	v [16]byte
+	t *DecimalType
+}
+
+func (v decimalValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.getType().toString(buffer)
+	valueToString(buffer, v.getType(), v.toYDBValue(a))
+}
+
+func (v decimalValue) String() string {
+	var buf bytes.Buffer
+	v.toString(&buf)
+	return buf.String()
+}
+
+func (v decimalValue) getType() T {
+	return v.t
 }
 
 func (v *decimalValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	var precision, scale uint32
-	if v != nil {
-		precision = v.precision
-		scale = v.scale
-	}
-	decimal := a.Decimal()
-
-	decimal.Scale = scale
-	decimal.Precision = precision
-
-	typeDecimal := a.TypeDecimal()
-	typeDecimal.DecimalType = decimal
-
-	t := a.Type()
-	t.Type = typeDecimal
-
-	return t
+	return v.t.toYDB(a)
 }
 
 func (v *decimalValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
@@ -51,8 +52,10 @@ func (v *decimalValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 
 func DecimalValue(v [16]byte, precision uint32, scale uint32) *decimalValue {
 	return &decimalValue{
-		v:         v,
-		precision: precision,
-		scale:     scale,
+		v: v,
+		t: &DecimalType{
+			Precision: precision,
+			Scale:     scale,
+		},
 	}
 }

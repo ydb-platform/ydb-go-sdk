@@ -9,7 +9,6 @@ type (
 		typeAllocator
 		typedValueAllocator
 		boolAllocator
-		typePrimitiveAllocator
 		typeDecimalAllocator
 		typeListAllocator
 		typeEmptyListAllocator
@@ -35,6 +34,11 @@ type (
 		doubleAllocator
 		nestedAllocator
 		pairAllocator
+		nullFlagAllocator
+		variantAllocator
+		typeVariantAllocator
+		variantStructItemsAllocator
+		variantTupleItemsAllocator
 	}
 )
 
@@ -47,7 +51,6 @@ func (a *Allocator) Free() {
 	a.typeAllocator.free()
 	a.typedValueAllocator.free()
 	a.boolAllocator.free()
-	a.typePrimitiveAllocator.free()
 	a.typeDecimalAllocator.free()
 	a.typeListAllocator.free()
 	a.typeEmptyListAllocator.free()
@@ -73,6 +76,11 @@ func (a *Allocator) Free() {
 	a.doubleAllocator.free()
 	a.nestedAllocator.free()
 	a.pairAllocator.free()
+	a.nullFlagAllocator.free()
+	a.variantAllocator.free()
+	a.typeVariantAllocator.free()
+	a.variantStructItemsAllocator.free()
+	a.variantTupleItemsAllocator.free()
 
 	allocatorsPool.Put(a)
 }

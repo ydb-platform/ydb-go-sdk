@@ -1,6 +1,8 @@
 package value
 
 import (
+	"bytes"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
@@ -8,15 +10,25 @@ import (
 
 type stringValue []byte
 
-func (v stringValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	typePrimitive := a.TypePrimitive()
+func (v stringValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.getType().toString(buffer)
+	valueToString(buffer, v.getType(), v.toYDBValue(a))
+}
 
-	typePrimitive.TypeId = Ydb.Type_STRING
+func (v stringValue) String() string {
+	var buf bytes.Buffer
+	v.toString(&buf)
+	return buf.String()
+}
 
-	t := a.Type()
-	t.Type = typePrimitive
+func (stringValue) getType() T {
+	return TypeString
+}
 
-	return t
+func (stringValue) toYDBType(*allocator.Allocator) *Ydb.Type {
+	return primitive[TypeString]
 }
 
 func (v stringValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {

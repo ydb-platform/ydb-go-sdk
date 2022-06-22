@@ -136,3 +136,7 @@ func (a *Allocator) Dict() (v *Ydb.DictType) {
 func (a *Allocator) Pair() (v *Ydb.ValuePair) {
 	return new(Ydb.ValuePair)
 }
+
+func (a *Allocator) NullFlag() (v *Ydb.Value_NullFlagValue) {
+	return new(Ydb.Value_NullFlagValue)
+}

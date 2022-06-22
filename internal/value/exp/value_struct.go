@@ -1,55 +1,66 @@
 package value
 
 import (
+	"bytes"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 )
 
 type (
-	structField struct {
-		name string
-		v    V
+	StructValueField struct {
+		Name string
+		V    V
 	}
-	structValue []structField
+	structValue struct {
+		t      T
+		values []V
+	}
 )
 
-func (v structValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
+func (v *structValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.getType().toString(buffer)
+	valueToString(buffer, v.getType(), v.toYDBValue(a))
+}
 
-	typeStruct := a.TypeStruct()
+func (v *structValue) String() string {
+	var buf bytes.Buffer
+	v.toString(&buf)
+	return buf.String()
+}
 
-	typeStruct.StructType = a.Struct()
+func (v *structValue) getType() T {
+	return v.t
+}
 
-	for _, vv := range v {
-		structMember := a.StructMember()
-		structMember.Name = vv.name
-		structMember.Type = vv.v.toYDBType(a)
-		typeStruct.StructType.Members = append(
-			typeStruct.StructType.Members,
-			structMember,
-		)
-	}
-
-	t.Type = typeStruct
-
-	return t
+func (v *structValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
+	return v.t.toYDB(a)
 }
 
 func (v structValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
-	for _, vv := range v {
-		vvv.Items = append(vvv.Items, vv.v.toYDBValue(a))
+	for _, vv := range v.values {
+		vvv.Items = append(vvv.Items, vv.toYDBValue(a))
 	}
 
 	return vvv
 }
 
-func StructField(name string, value V) structField {
-	return structField{name, value}
-}
-
-func StructValue(v ...structField) structValue {
-	return v
+func StructValue(fields ...StructValueField) *structValue {
+	var (
+		structFields []StructField
+		values       []V
+	)
+	for _, field := range fields {
+		structFields = append(structFields, StructField{field.Name, field.V.getType()})
+		values = append(values, field.V)
+	}
+	return &structValue{
+		t:      Struct(structFields...),
+		values: values,
+	}
 }

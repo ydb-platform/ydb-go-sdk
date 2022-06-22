@@ -1,6 +1,7 @@
 package value
 
 import (
+	"fmt"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -28,7 +29,6 @@ func BenchmarkMemory(b *testing.B) {
 		TimestampValue(1),
 		IntervalValue(1),
 		VoidValue(),
-		// types with non-zero allocations
 		FloatValue(1),
 		DoubleValue(1),
 		StringValue([]byte("test")),
@@ -50,42 +50,60 @@ func BenchmarkMemory(b *testing.B) {
 		OptionalValue(IntervalValue(1)),
 		OptionalValue(OptionalValue(IntervalValue(1))),
 		StructValue(
-			StructField("series_id", Uint64Value(1)),
-			StructField("title", UTF8Value("test")),
-			StructField("air_date", DateValue(1)),
-			StructField("remove_date", OptionalValue(TzDatetimeValue("1234"))),
+			StructValueField{"series_id", Uint64Value(1)},
+			StructValueField{"title", UTF8Value("test")},
+			StructValueField{"air_date", DateValue(1)},
+			StructValueField{"remove_date", OptionalValue(TzDatetimeValue("1234"))},
 		),
 		DictValue(
-			DictField(UTF8Value("series_id"), Uint64Value(1)),
-			DictField(UTF8Value("title"), Uint64Value(2)),
-			DictField(UTF8Value("air_date"), Uint64Value(3)),
-			DictField(UTF8Value("remove_date"), Uint64Value(4)),
+			DictValueField{UTF8Value("series_id"), Uint64Value(1)},
+			DictValueField{UTF8Value("title"), Uint64Value(2)},
+			DictValueField{UTF8Value("air_date"), Uint64Value(3)},
+			DictValueField{UTF8Value("remove_date"), Uint64Value(4)},
 		),
+		NullValue(Optional(Optional(Optional(Primitive(TypeBool))))),
+		VariantValue(Int32Value(42), 1, Tuple(
+			TypeString,
+			TypeInt32,
+		)),
+		VariantValue(Int32Value(42), 1, Struct(
+			StructField{
+				Name: "foo",
+				T:    TypeString,
+			},
+			StructField{
+				Name: "bar",
+				T:    TypeInt32,
+			},
+		)),
+		ZeroValue(TypeUTF8),
+		ZeroValue(Struct()),
+		ZeroValue(Tuple()),
 	)
 	for i := 0; i < b.N; i++ {
 		a := allocator.New()
-		_ = typedValue(v, a)
+		_ = ToYDB(v, a)
 		a.Free()
 	}
 }
 
 func TestCompareProtos(t *testing.T) {
 	a := allocator.New()
-	for _, tt := range []struct {
+	for i, tt := range []struct {
 		old *Ydb.TypedValue
 		new *Ydb.TypedValue
 	}{
 		{
 			value.ToYDB(value.BoolValue(true)),
-			typedValue(BoolValue(true), a),
+			ToYDB(BoolValue(true), a),
 		},
 		{
 			value.ToYDB(value.DateValue(1)),
-			typedValue(DateValue(1), a),
+			ToYDB(DateValue(1), a),
 		},
 		{
 			value.ToYDB(value.DatetimeValue(1)),
-			typedValue(DatetimeValue(1), a),
+			ToYDB(DatetimeValue(1), a),
 		},
 		{
 			value.ToYDB(
@@ -96,7 +114,7 @@ func TestCompareProtos(t *testing.T) {
 					[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6},
 				),
 			),
-			typedValue(
+			ToYDB(
 				DecimalValue(
 					[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6},
 					22,
@@ -107,59 +125,59 @@ func TestCompareProtos(t *testing.T) {
 		},
 		{
 			value.ToYDB(value.DoubleValue(1)),
-			typedValue(DoubleValue(1), a),
+			ToYDB(DoubleValue(1), a),
 		},
 		{
 			value.ToYDB(value.DyNumberValue("1")),
-			typedValue(DyNumberValue("1"), a),
+			ToYDB(DyNumberValue("1"), a),
 		},
 		{
 			value.ToYDB(value.FloatValue(1)),
-			typedValue(FloatValue(1), a),
+			ToYDB(FloatValue(1), a),
 		},
 		{
 			value.ToYDB(value.Int8Value(1)),
-			typedValue(Int8Value(1), a),
+			ToYDB(Int8Value(1), a),
 		},
 		{
 			value.ToYDB(value.Int16Value(1)),
-			typedValue(Int16Value(1), a),
+			ToYDB(Int16Value(1), a),
 		},
 		{
 			value.ToYDB(value.Int32Value(1)),
-			typedValue(Int32Value(1), a),
+			ToYDB(Int32Value(1), a),
 		},
 		{
 			value.ToYDB(value.Int64Value(1)),
-			typedValue(Int64Value(1), a),
+			ToYDB(Int64Value(1), a),
 		},
 		{
 			value.ToYDB(value.IntervalValue(1)),
-			typedValue(IntervalValue(1), a),
+			ToYDB(IntervalValue(1), a),
 		},
 		{
 			value.ToYDB(value.JSONValue("1")),
-			typedValue(JSONValue("1"), a),
+			ToYDB(JSONValue("1"), a),
 		},
 		{
 			value.ToYDB(value.JSONDocumentValue("1")),
-			typedValue(JSONDocumentValue("1"), a),
+			ToYDB(JSONDocumentValue("1"), a),
 		},
 		{
 			value.ToYDB(value.ListValue(1, func(i int) value.V {
 				return value.Int8Value(1)
 			})),
-			typedValue(ListValue(
+			ToYDB(ListValue(
 				Int8Value(1),
 			), a),
 		},
 		{
 			value.ToYDB(value.StringValue([]byte("test"))),
-			typedValue(StringValue([]byte("test")), a),
+			ToYDB(StringValue([]byte("test")), a),
 		},
 		{
 			value.ToYDB(value.TimestampValue(1)),
-			typedValue(TimestampValue(1), a),
+			ToYDB(TimestampValue(1), a),
 		},
 		{
 			value.ToYDB(value.TupleValue(2, func(i int) value.V {
@@ -172,62 +190,62 @@ func TestCompareProtos(t *testing.T) {
 					return nil
 				}
 			})),
-			typedValue(TupleValue(
+			ToYDB(TupleValue(
 				Int8Value(1),
 				FloatValue(1),
 			), a),
 		},
 		{
 			value.ToYDB(value.TzDateValue("1")),
-			typedValue(TzDateValue("1"), a),
+			ToYDB(TzDateValue("1"), a),
 		},
 		{
 			value.ToYDB(value.TzDatetimeValue("1")),
-			typedValue(TzDatetimeValue("1"), a),
+			ToYDB(TzDatetimeValue("1"), a),
 		},
 		{
 			value.ToYDB(value.TzTimestampValue("1")),
-			typedValue(TzTimestampValue("1"), a),
+			ToYDB(TzTimestampValue("1"), a),
 		},
 		{
 			value.ToYDB(value.Uint8Value(1)),
-			typedValue(Uint8Value(1), a),
+			ToYDB(Uint8Value(1), a),
 		},
 		{
 			value.ToYDB(value.Uint16Value(1)),
-			typedValue(Uint16Value(1), a),
+			ToYDB(Uint16Value(1), a),
 		},
 		{
 			value.ToYDB(value.Uint32Value(1)),
-			typedValue(Uint32Value(1), a),
+			ToYDB(Uint32Value(1), a),
 		},
 		{
 			value.ToYDB(value.Uint64Value(1)),
-			typedValue(Uint64Value(1), a),
+			ToYDB(Uint64Value(1), a),
 		},
 		{
 			value.ToYDB(value.UTF8Value("test")),
-			typedValue(UTF8Value("test"), a),
+			ToYDB(UTF8Value("test"), a),
 		},
 		{
 			value.ToYDB(value.UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6})),
-			typedValue(UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}), a),
+			ToYDB(UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}), a),
 		},
 		{
 			value.ToYDB(value.VoidValue),
-			typedValue(VoidValue(), a),
+			ToYDB(VoidValue(), a),
 		},
 		{
 			value.ToYDB(value.YSONValue("1")),
-			typedValue(YSONValue("1"), a),
+			ToYDB(YSONValue("1"), a),
 		},
 		{
 			value.ToYDB(value.OptionalValue(value.IntervalValue(1))),
-			typedValue(OptionalValue(IntervalValue(1)), a),
+			ToYDB(OptionalValue(IntervalValue(1)), a),
 		},
 		{
 			value.ToYDB(value.OptionalValue(value.OptionalValue(value.IntervalValue(1)))),
-			typedValue(OptionalValue(OptionalValue(IntervalValue(1))), a),
+			ToYDB(OptionalValue(OptionalValue(IntervalValue(1))), a),
 		},
 		{
 			value.ToYDB(value.StructValue(
@@ -260,11 +278,11 @@ func TestCompareProtos(t *testing.T) {
 					},
 				},
 			)),
-			typedValue(StructValue(
-				StructField("series_id", Uint64Value(1)),
-				StructField("title", UTF8Value("test")),
-				StructField("air_date", DateValue(1)),
-				StructField("remove_date", OptionalValue(TzDatetimeValue("1234"))),
+			ToYDB(StructValue(
+				StructValueField{"series_id", Uint64Value(1)},
+				StructValueField{"title", UTF8Value("test")},
+				StructValueField{"air_date", DateValue(1)},
+				StructValueField{"remove_date", OptionalValue(TzDatetimeValue("1234"))},
 			), a),
 		},
 		{
@@ -293,17 +311,221 @@ func TestCompareProtos(t *testing.T) {
 				}
 				panic("whoa")
 			})),
-			typedValue(DictValue(
-				DictField(UTF8Value("series_id"), Uint64Value(1)),
-				DictField(UTF8Value("title"), Uint64Value(2)),
-				DictField(UTF8Value("air_date"), Uint64Value(3)),
-				DictField(UTF8Value("remove_date"), Uint64Value(4)),
+			ToYDB(DictValue(
+				DictValueField{UTF8Value("series_id"), Uint64Value(1)},
+				DictValueField{UTF8Value("title"), Uint64Value(2)},
+				DictValueField{UTF8Value("air_date"), Uint64Value(3)},
+				DictValueField{UTF8Value("remove_date"), Uint64Value(4)},
 			), a),
 		},
+		{
+			value.ToYDB(value.NullValue(value.OptionalType{T: value.TypeBool})),
+			ToYDB(NullValue(Optional(TypeBool)), a),
+		},
+		{
+			value.ToYDB(value.VariantValue(value.Int32Value(42), 1, value.VariantType{T: value.TupleType{
+				Elems: []value.T{
+					value.TypeString,
+					value.TypeInt32,
+				},
+			}})),
+			ToYDB(VariantValue(Int32Value(42), 1, Tuple(
+				TypeString,
+				TypeInt32,
+			)), a),
+		},
+		{
+			value.ToYDB(value.VariantValue(value.Int32Value(42), 1, value.VariantType{S: value.StructType{
+				Fields: []value.StructField{
+					{"foo", value.TypeString},
+					{"bar", value.TypeInt32},
+				},
+			}})),
+			ToYDB(VariantValue(Int32Value(42), 1, Struct(
+				StructField{
+					Name: "foo",
+					T:    TypeString,
+				},
+				StructField{
+					Name: "bar",
+					T:    TypeInt32,
+				},
+			)), a),
+		},
+		{
+			value.ToYDB(value.ZeroValue(value.TypeUTF8)),
+			ToYDB(ZeroValue(TypeUTF8), a),
+		},
+		{
+			value.ToYDB(value.ZeroValue(value.StructType{})),
+			ToYDB(ZeroValue(Struct()), a),
+		},
+		{
+			value.ToYDB(value.ZeroValue(value.TupleType{})),
+			ToYDB(ZeroValue(Tuple()), a),
+		},
 	} {
-		t.Run(tt.old.String(), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d:%v", i, tt.old.String()), func(t *testing.T) {
 			if !proto.Equal(tt.old, tt.new) {
-				t.Errorf("not equal: %v != %v", tt.old, tt.new)
+				t.Errorf("not equal:\n - old: %v\n - new: %v", tt.old, tt.new)
+			}
+		})
+	}
+}
+
+func TestValueToString(t *testing.T) {
+	for _, tt := range []struct {
+		value V
+		exp   string
+	}{
+		{
+			value: VoidValue(),
+			exp:   "Void(NULL)",
+		},
+		{
+			value: UTF8Value("foo"),
+			exp:   "Utf8(foo)",
+		},
+		{
+			value: StringValue([]byte("foo")),
+			exp:   "String([102 111 111])",
+		},
+		{
+			value: BoolValue(true),
+			exp:   "Bool(true)",
+		},
+		{
+			value: Int8Value(42),
+			exp:   "Int8(42)",
+		},
+		{
+			value: Uint8Value(42),
+			exp:   "Uint8(42)",
+		},
+		{
+			value: Int16Value(42),
+			exp:   "Int16(42)",
+		},
+		{
+			value: Uint16Value(42),
+			exp:   "Uint16(42)",
+		},
+		{
+			value: Int32Value(42),
+			exp:   "Int32(42)",
+		},
+		{
+			value: Uint32Value(42),
+			exp:   "Uint32(42)",
+		},
+		{
+			value: Int64Value(42),
+			exp:   "Int64(42)",
+		},
+		{
+			value: Uint64Value(42),
+			exp:   "Uint64(42)",
+		},
+		{
+			value: FloatValue(42),
+			exp:   "Float(42)",
+		},
+		{
+			value: DoubleValue(42),
+			exp:   "Double(42)",
+		},
+		{
+			value: IntervalValue(42),
+			exp:   "Interval(42)",
+		},
+		{
+			value: TimestampValue(42),
+			exp:   "Timestamp(42)",
+		},
+		{
+			value: NullValue(TypeInt32),
+			exp:   "Optional<Int32>(NULL)",
+		},
+		{
+			value: NullValue(Optional(TypeBool)),
+			exp:   "Optional<Optional<Bool>>((NULL))",
+		},
+		{
+			value: OptionalValue(OptionalValue(Int32Value(42))),
+			exp:   "Optional<Optional<Int32>>((42))",
+		},
+		{
+			value: OptionalValue(OptionalValue(OptionalValue(Int32Value(42)))),
+			exp:   "Optional<Optional<Optional<Int32>>>(((42)))",
+		},
+		{
+			value: ListValue(
+				Int32Value(0),
+				Int32Value(1),
+				Int32Value(2),
+				Int32Value(3),
+			),
+			exp: "List<Int32>((0)(1)(2)(3))",
+		},
+		{
+			value: TupleValue(
+				Int32Value(0),
+				Int32Value(1),
+				Int32Value(2),
+				Int32Value(3),
+			),
+			exp: "Tuple<Int32,Int32,Int32,Int32>((0)(1)(2)(3))",
+		},
+		{
+			value: VariantValue(Int32Value(42), 1, Variant(Tuple(
+				TypeString,
+				TypeInt32,
+			))),
+			exp: "Variant<Tuple<String,Int32>>(1=(42))",
+		},
+		{
+			value: VariantValue(Int32Value(42), 1, Variant(Struct(
+				StructField{
+					Name: "foo",
+					T:    TypeString,
+				},
+				StructField{
+					Name: "bar",
+					T:    TypeInt32,
+				},
+			))),
+			exp: "Variant<Struct<foo:String,bar:Int32>>(bar=(42))",
+		},
+		{
+			value: DictValue(
+				DictValueField{UTF8Value("foo"), Int32Value(42)},
+				DictValueField{UTF8Value("bar"), Int32Value(43)},
+			),
+			exp: "Dict<Utf8,Int32>(((foo)(42))((bar)(43)))",
+		},
+		{
+			value: DictValue(
+				DictValueField{UTF8Value("foo"), VoidValue()},
+				DictValueField{UTF8Value("bar"), VoidValue()},
+			),
+			exp: "Dict<Utf8,Void>(((foo)(NULL))((bar)(NULL)))",
+		},
+		{
+			value: ZeroValue(Optional(TypeBool)),
+			exp:   "Optional<Bool>(NULL)",
+		},
+		{
+			value: ZeroValue(List(TypeBool)),
+			exp:   "List<Bool>()",
+		},
+		{
+			value: ZeroValue(TypeUUID),
+			exp:   "Uuid([0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0])",
+		},
+	} {
+		t.Run(tt.exp, func(t *testing.T) {
+			if got := tt.value.String(); got != tt.exp {
+				t.Errorf("got: %s, want: %s", got, tt.exp)
 			}
 		})
 	}
