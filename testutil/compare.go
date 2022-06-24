@@ -3,12 +3,13 @@ package testutil
 import (
 	"bytes"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 	"math/big"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -26,7 +27,9 @@ var ErrNotComparable = xerrors.Wrap(fmt.Errorf("not comparable"))
 // shorter tuple (list) are all equal to corresponding elements of the other tuple (list), than the shorter tuple (list)
 // is considered less than the longer one.
 func Compare(l, r value.V) (int, error) {
-	return compare(unwrapTypedValue(l.ToYDB()), unwrapTypedValue(r.ToYDB()))
+	a := allocator.New()
+	defer a.Free()
+	return compare(value.ToYDB(l, a), value.ToYDB(r, a))
 }
 
 func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {

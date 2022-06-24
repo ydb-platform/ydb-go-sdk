@@ -11,7 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -544,7 +544,7 @@ func (s *rawConverter) IsDecimal() bool {
 }
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
-	w := t.(value.DecimalType)
+	w := t.(*value.DecimalType)
 	return d.Precision == w.Precision && d.Scale == w.Scale
 }
 

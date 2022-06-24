@@ -3,13 +3,14 @@ package table
 import (
 	"bytes"
 	"context"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	value "github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -363,12 +364,21 @@ func DefaultTxControl() *TransactionControl {
 // QueryParameters
 
 type (
-	queryParams     map[string]*Ydb.TypedValue
+	queryParams     map[string]types.Value
 	ParameterOption func(queryParams)
 	QueryParameters struct {
+		a *allocator.Allocator
 		m queryParams
 	}
 )
+
+func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	params := make(map[string]*Ydb.TypedValue, len(qp))
+	for k, v := range qp {
+		params[k] = value.ToYDB(v, a)
+	}
+	return params
+}
 
 func (q *QueryParameters) Params() queryParams {
 	if q == nil {
@@ -382,10 +392,7 @@ func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 		return
 	}
 	for key, v := range q.m {
-		it(key, value.FromYDB(
-			v.Type,
-			v.Value,
-		))
+		it(key, v)
 	}
 }
 
@@ -397,7 +404,7 @@ func (q *QueryParameters) String() string {
 		buf.WriteString(name)
 		buf.WriteByte(')')
 		buf.WriteByte('(')
-		value.WriteValueStringTo(&buf, v)
+		buf.WriteString(v.String())
 		buf.WriteString("))")
 	})
 	buf.WriteByte(')')
@@ -428,7 +435,7 @@ func ValueParam(name string, v types.Value) ParameterOption {
 		}
 	}
 	return func(q queryParams) {
-		q[name] = value.ToYDB(v)
+		q[name] = v
 	}
 }
 

@@ -2,11 +2,10 @@ package types
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
 )
 
 // Type describes YDB data types.
@@ -15,7 +14,7 @@ type Type interface {
 }
 
 func List(t Type) Type {
-	return value.ListType{T: t}
+	return value.List(t)
 }
 
 func Tuple(elems ...Type) Type {
@@ -23,20 +22,20 @@ func Tuple(elems ...Type) Type {
 	for i, el := range elems {
 		es[i] = el
 	}
-	return value.TupleType{
-		Elems: es,
-	}
+	return value.Tuple(es...)
 }
 
-type tStructType value.StructType
+type tStructType struct {
+	fields []value.StructField
+}
 
 type StructOption func(*tStructType)
 
-func StructField(name string, typ Type) StructOption {
+func StructField(name string, t Type) StructOption {
 	return func(s *tStructType) {
-		s.Fields = append(s.Fields, value.StructField{
+		s.fields = append(s.fields, value.StructField{
 			Name: name,
-			Type: typ,
+			T:    t,
 		})
 	}
 }
@@ -46,46 +45,29 @@ func Struct(opts ...StructOption) Type {
 	for _, opt := range opts {
 		opt(&s)
 	}
-	return value.StructType(s)
+	return value.Struct(s.fields...)
 }
 
 func Variant(x Type) Type {
-	switch v := x.(type) {
-	case value.TupleType:
-		return value.VariantType{
-			T: v,
-		}
-	case value.StructType:
-		return value.VariantType{
-			S: v,
-		}
-	default:
-		panic(fmt.Sprintf("unsupported types for variant: %s", v))
-	}
+	return value.Variant(x)
 }
 
 func Void() Type {
-	return value.VoidType{}
+	return value.Void()
 }
 
 func Optional(t Type) Type {
-	return value.OptionalType{T: t}
+	return value.Optional(t)
 }
 
 var DefaultDecimal = DecimalType(22, 9)
 
 func DecimalType(precision, scale uint32) Type {
-	return value.DecimalType{
-		Precision: precision,
-		Scale:     scale,
-	}
+	return value.Decimal(precision, scale)
 }
 
 func DecimalTypeFromDecimal(d *Decimal) Type {
-	return value.DecimalType{
-		Precision: d.Precision,
-		Scale:     d.Scale,
-	}
+	return value.Decimal(d.Precision, d.Scale)
 }
 
 // Primitive types known by YDB.
