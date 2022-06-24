@@ -4,4 +4,5 @@ while ! docker run --network host cr.yandex/yc/yandex-docker-local-ydb:latest /y
   echo wait db...
   sleep 3
 done
+
 echo DB available
