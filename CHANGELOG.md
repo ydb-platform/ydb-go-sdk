@@ -1,28 +1,30 @@
+* Refactor connection closing
+
 ## v3.27.0
 * Added internal experimental packages `internal/value/exp` and `internal/value/exp/allocator` with alternative value implementations with zero-allocation model
 * Supported parsing of database name from connection string URI path
 * Added `options.WithExecuteScanQueryStats` option
 * Added to query stats plan and AST
-* Changed behaviour of `result.Stats()` (if query result have no stats - returns `nil`) 
+* Changed behaviour of `result.Stats()` (if query result have no stats - returns `nil`)
 * Added context cancel with specific error
 * Added mutex wrapper for mutex, rwmutex for guarantee unlock and better show critical section
 
 ## v3.26.10
-* Fixed syntax mistake in `trace.TablePooStateChangeInfo` to `trace.TablePoolStateChangeInfo` 
+* Fixed syntax mistake in `trace.TablePooStateChangeInfo` to `trace.TablePoolStateChangeInfo`
 
 ## v3.26.9
 * Fixed bug with convert ydb value to `time.Duration` in `result.Scan[WithDefaults,Named]()`
 * Fixed bug with make ydb value from `time.Duration` in `types.IntervalValueFromDuration(d)`
-* Marked `table/types.{IntervalValue,NullableIntervalValue}` as deprecated 
+* Marked `table/types.{IntervalValue,NullableIntervalValue}` as deprecated
 
 ## v3.26.8
-* Removed the processing of trailer metadata on stream calls 
+* Removed the processing of trailer metadata on stream calls
 
 ## v3.26.7
 * Updated the `ydb-go-genproto` dependency
 
 ## v3.26.6
-* Defined the `SerializableReadWrite` isolation level by default in `db.Table.DoTx(ctx, func(ctx, tx))` 
+* Defined the `SerializableReadWrite` isolation level by default in `db.Table.DoTx(ctx, func(ctx, tx))`
 * Updated the `ydb-go-genproto` dependency
 
 ## v3.26.5
@@ -46,11 +48,11 @@
 * Renamed `internal/router` package to `internal/balancer` for unambiguous understanding of package mission
 * Implemented detection of local data-center with measuring tcp dial RTT
 * Added `trace.Driver.OnBalancer{Init,Close,ChooseEndpoint,Update}` events
-* Marked the driver cluster events as deprecated  
+* Marked the driver cluster events as deprecated
 * Simplified the balancing logic
 
 ## v3.25.3
-* Changed primary license to `Apache2.0` for auto-detect license 
+* Changed primary license to `Apache2.0` for auto-detect license
 * Refactored `types.Struct` value creation
 
 ## v3.25.2

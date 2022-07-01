@@ -82,25 +82,25 @@ type connection struct {
 	config  config.Config
 	options []config.Option
 
-	tableOnce    sync.Once
+	tableOnce    initOnce
 	table        *internalTable.Client
 	tableOptions []tableConfig.Option
 
-	scriptingOnce    sync.Once
+	scriptingOnce    initOnce
 	scripting        *internalScripting.Client
 	scriptingOptions []scriptingConfig.Option
 
-	schemeOnce    sync.Once
+	schemeOnce    initOnce
 	scheme        *internalScheme.Client
 	schemeOptions []schemeConfig.Option
 
 	discoveryOptions []discoveryConfig.Option
 
-	coordinationOnce    sync.Once
+	coordinationOnce    initOnce
 	coordination        *internalCoordination.Client
 	coordinationOptions []coordinationConfig.Option
 
-	ratelimiterOnce    sync.Once
+	ratelimiterOnce    initOnce
 	ratelimiter        *internalRatelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
@@ -136,41 +136,11 @@ func (c *connection) Close(ctx context.Context) error {
 
 	closers = append(
 		closers,
-		func(ctx context.Context) error {
-			c.ratelimiterOnce.Do(func() {})
-			if c.ratelimiter == nil {
-				return nil
-			}
-			return c.ratelimiter.Close(ctx)
-		},
-		func(ctx context.Context) error {
-			c.coordinationOnce.Do(func() {})
-			if c.coordination == nil {
-				return nil
-			}
-			return c.coordination.Close(ctx)
-		},
-		func(ctx context.Context) error {
-			c.schemeOnce.Do(func() {})
-			if c.scheme == nil {
-				return nil
-			}
-			return c.scheme.Close(ctx)
-		},
-		func(ctx context.Context) error {
-			c.scriptingOnce.Do(func() {})
-			if c.scripting == nil {
-				return nil
-			}
-			return c.scripting.Close(ctx)
-		},
-		func(ctx context.Context) error {
-			c.tableOnce.Do(func() {})
-			if c.table == nil {
-				return nil
-			}
-			return c.table.Close(ctx)
-		},
+		c.ratelimiterOnce.Close,
+		c.coordinationOnce.Close,
+		c.schemeOnce.Close,
+		c.scriptingOnce.Close,
+		c.tableOnce.Close,
 		c.balancer.Close,
 		c.pool.Release,
 	)
@@ -232,7 +202,7 @@ func (c *connection) Secure() bool {
 }
 
 func (c *connection) Table() table.Client {
-	c.tableOnce.Do(func() {
+	c.tableOnce.Init(func() closeFunc {
 		c.table = internalTable.New(
 			c.balancer,
 			tableConfig.New(
@@ -245,13 +215,14 @@ func (c *connection) Table() table.Client {
 				)...,
 			),
 		)
+		return c.table.Close
 	})
 	// may be nil if driver closed early
 	return c.table
 }
 
 func (c *connection) Scheme() scheme.Client {
-	c.schemeOnce.Do(func() {
+	c.schemeOnce.Init(func() closeFunc {
 		c.scheme = internalScheme.New(
 			c.balancer,
 			schemeConfig.New(
@@ -264,13 +235,14 @@ func (c *connection) Scheme() scheme.Client {
 				)...,
 			),
 		)
+		return c.scheme.Close
 	})
 	// may be nil if driver closed early
 	return c.scheme
 }
 
 func (c *connection) Coordination() coordination.Client {
-	c.coordinationOnce.Do(func() {
+	c.coordinationOnce.Init(func() closeFunc {
 		c.coordination = internalCoordination.New(
 			c.balancer,
 			coordinationConfig.New(
@@ -283,13 +255,14 @@ func (c *connection) Coordination() coordination.Client {
 				)...,
 			),
 		)
+		return c.coordination.Close
 	})
 	// may be nil if driver closed early
 	return c.coordination
 }
 
 func (c *connection) Ratelimiter() ratelimiter.Client {
-	c.ratelimiterOnce.Do(func() {
+	c.ratelimiterOnce.Init(func() closeFunc {
 		c.ratelimiter = internalRatelimiter.New(
 			c.balancer,
 			ratelimiterConfig.New(
@@ -302,6 +275,7 @@ func (c *connection) Ratelimiter() ratelimiter.Client {
 				)...,
 			),
 		)
+		return c.ratelimiter.Close
 	})
 	// may be nil if driver closed early
 	return c.ratelimiter
@@ -312,7 +286,7 @@ func (c *connection) Discovery() discovery.Client {
 }
 
 func (c *connection) Scripting() scripting.Client {
-	c.scriptingOnce.Do(func() {
+	c.scriptingOnce.Init(func() closeFunc {
 		c.scripting = internalScripting.New(
 			c,
 			scriptingConfig.New(
@@ -325,6 +299,7 @@ func (c *connection) Scripting() scripting.Client {
 				)...,
 			),
 		)
+		return c.scripting.Close
 	})
 	// may be nil if driver closed early
 	return c.scripting
@@ -442,4 +417,26 @@ func GRPCConn(conn Connection) grpc.ClientConnInterface {
 		return cc
 	}
 	return nil
+}
+
+// Helper types for closing lazy clients
+type closeFunc func(ctx context.Context) error
+
+type initOnce struct {
+	once  sync.Once
+	close closeFunc
+}
+
+func (lo *initOnce) Init(f func() closeFunc) {
+	lo.once.Do(func() {
+		lo.close = f()
+	})
+}
+
+func (lo *initOnce) Close(ctx context.Context) error {
+	lo.once.Do(func() {})
+	if lo.close == nil {
+		return nil
+	}
+	return lo.close(ctx)
 }
