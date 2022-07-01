@@ -82,25 +82,25 @@ type connection struct {
 	config  config.Config
 	options []config.Option
 
-	tableOnce    lazyOnce
+	tableOnce    initOnce
 	table        *internalTable.Client
 	tableOptions []tableConfig.Option
 
-	scriptingOnce    lazyOnce
+	scriptingOnce    initOnce
 	scripting        *internalScripting.Client
 	scriptingOptions []scriptingConfig.Option
 
-	schemeOnce    lazyOnce
+	schemeOnce    initOnce
 	scheme        *internalScheme.Client
 	schemeOptions []schemeConfig.Option
 
 	discoveryOptions []discoveryConfig.Option
 
-	coordinationOnce    lazyOnce
+	coordinationOnce    initOnce
 	coordination        *internalCoordination.Client
 	coordinationOptions []coordinationConfig.Option
 
-	ratelimiterOnce    lazyOnce
+	ratelimiterOnce    initOnce
 	ratelimiter        *internalRatelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
@@ -202,7 +202,7 @@ func (c *connection) Secure() bool {
 }
 
 func (c *connection) Table() table.Client {
-	c.tableOnce.Do(func() closeFunc {
+	c.tableOnce.Init(func() closeFunc {
 		c.table = internalTable.New(
 			c.balancer,
 			tableConfig.New(
@@ -222,7 +222,7 @@ func (c *connection) Table() table.Client {
 }
 
 func (c *connection) Scheme() scheme.Client {
-	c.schemeOnce.Do(func() closeFunc {
+	c.schemeOnce.Init(func() closeFunc {
 		c.scheme = internalScheme.New(
 			c.balancer,
 			schemeConfig.New(
@@ -242,7 +242,7 @@ func (c *connection) Scheme() scheme.Client {
 }
 
 func (c *connection) Coordination() coordination.Client {
-	c.coordinationOnce.Do(func() closeFunc {
+	c.coordinationOnce.Init(func() closeFunc {
 		c.coordination = internalCoordination.New(
 			c.balancer,
 			coordinationConfig.New(
@@ -262,7 +262,7 @@ func (c *connection) Coordination() coordination.Client {
 }
 
 func (c *connection) Ratelimiter() ratelimiter.Client {
-	c.ratelimiterOnce.Do(func() closeFunc {
+	c.ratelimiterOnce.Init(func() closeFunc {
 		c.ratelimiter = internalRatelimiter.New(
 			c.balancer,
 			ratelimiterConfig.New(
@@ -286,7 +286,7 @@ func (c *connection) Discovery() discovery.Client {
 }
 
 func (c *connection) Scripting() scripting.Client {
-	c.scriptingOnce.Do(func() closeFunc {
+	c.scriptingOnce.Init(func() closeFunc {
 		c.scripting = internalScripting.New(
 			c,
 			scriptingConfig.New(
@@ -422,19 +422,19 @@ func GRPCConn(conn Connection) grpc.ClientConnInterface {
 // Helper types for closing lazy clients
 type closeFunc func(ctx context.Context) error
 
-type lazyOnce struct {
-	sync.Once
+type initOnce struct {
+	once  sync.Once
 	close closeFunc
 }
 
-func (lo *lazyOnce) Do(f func() closeFunc) {
-	lo.Once.Do(func() {
+func (lo *initOnce) Init(f func() closeFunc) {
+	lo.once.Do(func() {
 		lo.close = f()
 	})
 }
 
-func (lo *lazyOnce) Close(ctx context.Context) error {
-	lo.Once.Do(func() {})
+func (lo *initOnce) Close(ctx context.Context) error {
+	lo.once.Do(func() {})
 	if lo.close == nil {
 		return nil
 	}
