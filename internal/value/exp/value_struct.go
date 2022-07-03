@@ -22,29 +22,26 @@ type (
 func (v *structValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v *structValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (v *structValue) getType() T {
+func (v *structValue) Type() T {
 	return v.t
 }
 
-func (v *structValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	return v.t.toYDB(a)
-}
-
-func (v structValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	for _, vv := range v.values {
-		vvv.Items = append(vvv.Items, vv.toYDBValue(a))
+		vvv.Items = append(vvv.Items, vv.toYDB(a))
 	}
 
 	return vvv
@@ -56,7 +53,7 @@ func StructValue(fields ...StructValueField) *structValue {
 		values       []V
 	)
 	for _, field := range fields {
-		structFields = append(structFields, StructField{field.Name, field.V.getType()})
+		structFields = append(structFields, StructField{field.Name, field.V.Type()})
 		values = append(values, field.V)
 	}
 	return &structValue{

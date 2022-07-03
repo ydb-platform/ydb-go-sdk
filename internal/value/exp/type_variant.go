@@ -29,8 +29,9 @@ func (v *variantType) toString(buffer *bytes.Buffer) {
 }
 
 func (v *variantType) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 

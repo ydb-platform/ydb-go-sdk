@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -24,7 +23,7 @@ func GenerateDeclareSection(params *table.QueryParameters) string {
 		declares[name] = fmt.Sprintf(
 			"DECLARE %s AS %s;\n",
 			name,
-			value.TypeFromYDB(v.ToYDB().GetType()).String(),
+			v.Type().String(),
 		)
 	})
 	sort.Strings(names)

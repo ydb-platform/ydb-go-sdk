@@ -15,25 +15,22 @@ type doubleValue struct {
 func (v *doubleValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v *doubleValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (*doubleValue) getType() T {
+func (*doubleValue) Type() T {
 	return TypeDouble
 }
 
-func (*doubleValue) toYDBType(*allocator.Allocator) *Ydb.Type {
-	return primitive[TypeDouble]
-}
-
-func (v *doubleValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *doubleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Double()
 	if v != nil {
 		vv.DoubleValue = v.v

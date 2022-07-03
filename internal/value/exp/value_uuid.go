@@ -16,25 +16,22 @@ type uuidValue struct {
 func (v *uuidValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v *uuidValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (*uuidValue) getType() T {
+func (*uuidValue) Type() T {
 	return TypeUUID
 }
 
-func (*uuidValue) toYDBType(*allocator.Allocator) *Ydb.Type {
-	return primitive[TypeUUID]
-}
-
-func (v *uuidValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	var bytes [16]byte
 	if v != nil {
 		bytes = v.v

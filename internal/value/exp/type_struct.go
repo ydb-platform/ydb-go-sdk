@@ -32,8 +32,9 @@ func (v *StructType) toString(buffer *bytes.Buffer) {
 }
 
 func (v *StructType) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 

@@ -13,25 +13,22 @@ type int64Value int64
 func (v int64Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v int64Value) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (int64Value) getType() T {
+func (int64Value) Type() T {
 	return TypeInt64
 }
 
-func (int64Value) toYDBType(*allocator.Allocator) *Ydb.Type {
-	return primitive[TypeInt64]
-}
-
-func (v int64Value) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v int64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Int64()
 	vv.Int64Value = int64(v)
 

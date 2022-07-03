@@ -15,25 +15,22 @@ type tzTimestampValue struct {
 func (v *tzTimestampValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v *tzTimestampValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (*tzTimestampValue) getType() T {
+func (*tzTimestampValue) Type() T {
 	return TypeTzTimestamp
 }
 
-func (*tzTimestampValue) toYDBType(*allocator.Allocator) *Ydb.Type {
-	return primitive[TypeTzTimestamp]
-}
-
-func (v *tzTimestampValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
 		vv.TextValue = v.v

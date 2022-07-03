@@ -17,29 +17,26 @@ type variantValue struct {
 func (v *variantValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v *variantValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (v *variantValue) getType() T {
+func (v *variantValue) Type() T {
 	return v.t
 }
 
-func (v *variantValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	return v.t.toYDB(a)
-}
-
-func (v *variantValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *variantValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	nested := a.Nested()
-	nested.NestedValue = v.v.toYDBValue(a)
+	nested.NestedValue = v.v.toYDB(a)
 
 	vvv.Value = nested
 	vvv.VariantIndex = v.idx
@@ -61,7 +58,7 @@ func VariantValueStruct(v V, idx uint32) *variantValue {
 	}
 	return &variantValue{
 		t: &variantType{
-			t:  v.getType(),
+			t:  v.Type(),
 			tt: variantTypeStruct,
 		},
 		v:   v,
@@ -75,7 +72,7 @@ func VariantValueTuple(v V, idx uint32) *variantValue {
 	}
 	return &variantValue{
 		t: &variantType{
-			t:  v.getType(),
+			t:  v.Type(),
 			tt: variantTypeTuple,
 		},
 		v:   v,

@@ -13,25 +13,22 @@ type timestampValue uint64
 func (v timestampValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v timestampValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (timestampValue) getType() T {
+func (timestampValue) Type() T {
 	return TypeTimestamp
 }
 
-func (timestampValue) toYDBType(*allocator.Allocator) *Ydb.Type {
-	return primitive[TypeTimestamp]
-}
-
-func (v timestampValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v timestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Uint64()
 	vv.Uint64Value = uint64(v)
 

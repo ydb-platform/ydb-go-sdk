@@ -15,8 +15,9 @@ func (v emptyListType) toString(buffer *bytes.Buffer) {
 }
 
 func (v emptyListType) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 

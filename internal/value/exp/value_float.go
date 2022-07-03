@@ -15,25 +15,22 @@ type floatValue struct {
 func (v *floatValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v *floatValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (*floatValue) getType() T {
+func (*floatValue) Type() T {
 	return TypeFloat
 }
 
-func (*floatValue) toYDBType(*allocator.Allocator) *Ydb.Type {
-	return primitive[TypeFloat]
-}
-
-func (v *floatValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *floatValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Float()
 	if v != nil {
 		vv.FloatValue = v.v

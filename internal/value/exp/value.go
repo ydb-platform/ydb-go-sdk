@@ -13,19 +13,18 @@ import (
 )
 
 type V interface {
-	getType() T
-	toYDBType(a *allocator.Allocator) *Ydb.Type
-	toYDBValue(a *allocator.Allocator) *Ydb.Value
-	toString(*bytes.Buffer)
-
+	Type() T
 	String() string
+
+	toYDB(a *allocator.Allocator) *Ydb.Value
+	toString(*bytes.Buffer)
 }
 
 func ToYDB(v V, a *allocator.Allocator) *Ydb.TypedValue {
 	tv := a.TypedValue()
 
-	tv.Type = v.toYDBType(a)
-	tv.Value = v.toYDBValue(a)
+	tv.Type = v.Type().toYDB(a)
+	tv.Value = v.toYDB(a)
 
 	return tv
 }
@@ -123,6 +122,8 @@ func primitiveFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
 		return v.TextValue, true
 	case *Ydb.Value_Low_128:
 		return BigEndianUint128(x.High_128, v.Low_128), true
+	case *Ydb.Value_NestedValue:
+		return primitiveFromYDB(v.NestedValue)
 	case *Ydb.Value_NullFlagValue:
 		return nil, true
 	default:
@@ -145,13 +146,20 @@ func FromYDB(t *Ydb.Type, v *Ydb.Value) V {
 	}
 }
 
-func nullValueFromYDB(x *Ydb.Value, t T) (_ *nullValue, ok bool) {
+func nullValueFromYDB(x *Ydb.Value, t T) (_ V, ok bool) {
 	for {
 		switch xx := x.Value.(type) {
 		case *Ydb.Value_NestedValue:
 			x = xx.NestedValue
 		case *Ydb.Value_NullFlagValue:
-			return NullValue(t.(*optionalType).t), true
+			switch tt := t.(type) {
+			case *optionalType:
+				return NullValue(tt.t), true
+			case voidType:
+				return VoidValue(), true
+			default:
+				return nil, false
+			}
 		default:
 			return nil, false
 		}

@@ -17,25 +17,22 @@ type decimalValue struct {
 func (v decimalValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v decimalValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (v decimalValue) getType() T {
+func (v decimalValue) Type() T {
 	return v.t
 }
 
-func (v *decimalValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	return v.t.toYDB(a)
-}
-
-func (v *decimalValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *decimalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	var bytes [16]byte
 	if v != nil {
 		bytes = v.v

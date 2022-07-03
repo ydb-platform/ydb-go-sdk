@@ -22,25 +22,22 @@ type (
 func (v *dictValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v *dictValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+	buf := bytesPool.Get()
+	defer bytesPool.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (v *dictValue) getType() T {
+func (v *dictValue) Type() T {
 	return v.t
 }
 
-func (v *dictValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	return v.t.toYDB(a)
-}
-
-func (v *dictValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	var values []DictValueField
 	if v != nil {
 		values = v.values
@@ -50,8 +47,8 @@ func (v *dictValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 	for _, vv := range values {
 		pair := a.Pair()
 
-		pair.Key = vv.K.toYDBValue(a)
-		pair.Payload = vv.V.toYDBValue(a)
+		pair.Key = vv.K.toYDB(a)
+		pair.Payload = vv.V.toYDB(a)
 
 		vvv.Pairs = append(vvv.Pairs, pair)
 	}
@@ -61,7 +58,7 @@ func (v *dictValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 
 func DictValue(values ...DictValueField) *dictValue {
 	return &dictValue{
-		t:      Dict(values[0].K.getType(), values[0].V.getType()),
+		t:      Dict(values[0].K.Type(), values[0].V.Type()),
 		values: values,
 	}
 }

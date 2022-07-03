@@ -12,8 +12,8 @@ type boolValue bool
 func (v boolValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
-	v.getType().toString(buffer)
-	valueToString(buffer, v.getType(), v.toYDBValue(a))
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v boolValue) String() string {
@@ -23,15 +23,11 @@ func (v boolValue) String() string {
 	return "Bool(false)"
 }
 
-func (boolValue) getType() T {
+func (boolValue) Type() T {
 	return TypeBool
 }
 
-func (boolValue) toYDBType(*allocator.Allocator) *Ydb.Type {
-	return primitive[TypeBool]
-}
-
-func (v boolValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
+func (v boolValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Bool()
 
 	vv.BoolValue = bool(v)
