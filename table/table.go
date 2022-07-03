@@ -419,6 +419,14 @@ func (q *QueryParameters) Add(opts ...ParameterOption) {
 }
 
 func ValueParam(name string, v types.Value) ParameterOption {
+	switch len(name) {
+	case 0:
+		panic("empty name")
+	default:
+		if name[0] != '$' {
+			name = "$" + name
+		}
+	}
 	return func(q queryParams) {
 		q[name] = value.ToYDB(v)
 	}
