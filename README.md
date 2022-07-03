@@ -56,7 +56,7 @@ More examples of usage placed in [examples](https://github.com/ydb-platform/ydb-
 ## Credentials <a name="credentials"></a>
 
 Driver contains two options for making simple `credentials.Credentials`:
-- `ydb.WithAnonymousCredentials()`
+- `ydb.WithAnonymousCredentials()` (enabled by default unless otherwise specified)
 - `ydb.WithAccessTokenCredentials("token")`
 
 Another variants of `credentials.Credentials` object provides with external packages:
