@@ -3,21 +3,33 @@ package sugar
 import (
 	"bytes"
 	"fmt"
+	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-// ToDeclare makes DECLARE section text in YQL query by params
-func ToDeclare(params *table.QueryParameters) string {
-	var buf bytes.Buffer
+// GenerateDeclareSection generates DECLARE section text in YQL query by params
+//
+// Warning: This is an experimental feature and could change at any time
+func GenerateDeclareSection(params *table.QueryParameters) string {
+	var (
+		buf      bytes.Buffer
+		names    []string
+		declares = make(map[string]string, len(params.Params()))
+	)
 	params.Each(func(name string, v types.Value) {
-		buf.WriteString(fmt.Sprintf(
+		names = append(names, name)
+		declares[name] = fmt.Sprintf(
 			"DECLARE %s AS %s;\n",
 			name,
 			value.TypeFromYDB(v.ToYDB().GetType()).String(),
-		))
+		)
 	})
+	sort.Strings(names)
+	for _, name := range names {
+		buf.WriteString(declares[name])
+	}
 	return buf.String()
 }

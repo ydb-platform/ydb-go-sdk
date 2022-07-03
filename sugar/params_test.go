@@ -10,15 +10,16 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func TestToDeclare(t *testing.T) {
-	removeEmpty := func(in []string) (out []string) {
-		for _, s := range in {
+func TestGenerateDeclareSection(t *testing.T) {
+	splitDeclares := func(declaresSection string) (declares []string) {
+		for _, s := range strings.Split(declaresSection, ";") {
 			s = strings.TrimSpace(s)
 			if s != "" {
-				out = append(out, s)
+				declares = append(declares, s)
 			}
 		}
-		return out
+		sort.Strings(declares)
+		return declares
 	}
 	for _, tt := range []struct {
 		params  *table.QueryParameters
@@ -37,7 +38,9 @@ func TestToDeclare(t *testing.T) {
 					),
 				),
 			),
-			declare: `DECLARE $values AS List<Uint64>;`,
+			declare: `
+				DECLARE $values AS List<Uint64>;
+			`,
 		},
 		{
 			params: table.NewQueryParameters(
@@ -46,7 +49,9 @@ func TestToDeclare(t *testing.T) {
 					types.IntervalValueFromDuration(time.Hour),
 				),
 			),
-			declare: `DECLARE $delta AS Interval;`,
+			declare: `
+				DECLARE $delta AS Interval;
+			`,
 		},
 		{
 			params: table.NewQueryParameters(
@@ -55,7 +60,9 @@ func TestToDeclare(t *testing.T) {
 					types.TimestampValueFromTime(time.Now()),
 				),
 			),
-			declare: `DECLARE $ts AS Timestamp;`,
+			declare: `
+				DECLARE $ts AS Timestamp;
+			`,
 		},
 		{
 			params: table.NewQueryParameters(
@@ -73,7 +80,7 @@ func TestToDeclare(t *testing.T) {
 				),
 			),
 			declare: `
-				DECLARE $a AS Bool; 
+				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
 				DECLARE $c AS Optional<Utf8>;
 			`,
@@ -81,7 +88,7 @@ func TestToDeclare(t *testing.T) {
 		{
 			params: table.NewQueryParameters(
 				table.ValueParam(
-					"a",
+					"$a",
 					types.BoolValue(true),
 				),
 				table.ValueParam(
@@ -94,23 +101,25 @@ func TestToDeclare(t *testing.T) {
 				),
 			),
 			declare: `
-				DECLARE $a AS Bool; 
+				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
 				DECLARE $c AS Optional<Utf8>;
 			`,
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			got := removeEmpty(strings.Split(ToDeclare(tt.params), "\n"))
-			want := removeEmpty(strings.Split(tt.declare, "\n"))
-			sort.Strings(got)
-			sort.Strings(want)
+			got := splitDeclares(GenerateDeclareSection(tt.params))
+			want := splitDeclares(tt.declare)
 			if len(got) != len(want) {
 				t.Errorf("len(got) = %v, len(want) = %v", len(got), len(want))
 			} else {
 				for i := range got {
 					if strings.TrimSpace(got[i]) != strings.TrimSpace(want[i]) {
-						t.Errorf("ToDeclare() = %v, want %v", got, want)
+						t.Errorf(
+							"unexpected generation of declare section:\n%v\n\nwant:\n%v",
+							strings.Join(got, ";\n"),
+							strings.Join(want, ";\n"),
+						)
 					}
 				}
 			}
