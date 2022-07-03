@@ -54,3 +54,31 @@ func VariantValue(v V, idx uint32, t T) *variantValue {
 		idx: idx,
 	}
 }
+
+func VariantValueStruct(v V, idx uint32) *variantValue {
+	if _, ok := v.(*structValue); !ok {
+		panic("value must be a struct type")
+	}
+	return &variantValue{
+		t: &variantType{
+			t:  v.getType(),
+			tt: variantTypeStruct,
+		},
+		v:   v,
+		idx: idx,
+	}
+}
+
+func VariantValueTuple(v V, idx uint32) *variantValue {
+	if _, ok := v.(*tupleValue); !ok {
+		panic("value must be a tuple type")
+	}
+	return &variantValue{
+		t: &variantType{
+			t:  v.getType(),
+			tt: variantTypeTuple,
+		},
+		v:   v,
+		idx: idx,
+	}
+}

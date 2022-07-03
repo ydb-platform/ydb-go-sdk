@@ -26,11 +26,11 @@ func (v *nullValue) String() string {
 }
 
 func (v *nullValue) getType() T {
-	return Optional(v.t)
+	return v.t
 }
 
 func (v *nullValue) toYDBType(a *allocator.Allocator) *Ydb.Type {
-	return Optional(v.t).toYDB(a)
+	return v.t.toYDB(a)
 }
 
 func (v *nullValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
@@ -55,6 +55,6 @@ func (v *nullValue) toYDBValue(a *allocator.Allocator) *Ydb.Value {
 
 func NullValue(t T) *nullValue {
 	return &nullValue{
-		t: t,
+		t: Optional(t),
 	}
 }

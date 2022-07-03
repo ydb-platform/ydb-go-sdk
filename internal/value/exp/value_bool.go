@@ -2,7 +2,6 @@ package value
 
 import (
 	"bytes"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
@@ -18,9 +17,10 @@ func (v boolValue) toString(buffer *bytes.Buffer) {
 }
 
 func (v boolValue) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
-	return buf.String()
+	if v {
+		return "Bool(true)"
+	}
+	return "Bool(false)"
 }
 
 func (boolValue) getType() T {

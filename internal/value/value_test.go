@@ -1,6 +1,7 @@
 package value
 
 import (
+	"google.golang.org/protobuf/proto"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -283,4 +284,124 @@ func BenchmarkMemory(b *testing.B) {
 			}).ToYDB()
 		}()
 	}
+}
+
+func TestToYDBFromYDB(t *testing.T) {
+	vv := []V{
+		BoolValue(true),
+		Int8Value(1),
+		Int16Value(1),
+		Int32Value(1),
+		Int64Value(1),
+		Uint8Value(1),
+		Uint16Value(1),
+		Uint32Value(1),
+		Uint64Value(1),
+		DateValue(1),
+		DatetimeValue(1),
+		TimestampValue(1),
+		IntervalValue(1),
+		VoidValue,
+		FloatValue(1),
+		DoubleValue(1),
+		StringValue([]byte("test")),
+		DecimalValue(DecimalType{Precision: 22, Scale: 9}, [...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
+		DyNumberValue("123"),
+		JSONValue("{}"),
+		JSONDocumentValue("{}"),
+		TzDateValue("1"),
+		TzDatetimeValue("1"),
+		TzTimestampValue("1"),
+		UTF8Value("1"),
+		UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
+		YSONValue("{}"),
+		TupleValue(4, func(i int) V {
+			return Int32Value(int32(i))
+		}),
+		ListValue(4, func(i int) V {
+			return Int32Value(int32(i))
+		}),
+		OptionalValue(IntervalValue(1)),
+		OptionalValue(OptionalValue(IntervalValue(1))),
+		StructValue(
+			&StructValueProto{
+				Fields: []StructField{
+					{
+						"series_id",
+						TypeFromYDB(Uint64Value(1).ToYDB().Type),
+					},
+					{
+						"title",
+						TypeFromYDB(UTF8Value("test").ToYDB().Type),
+					},
+					{
+						"air_date",
+						TypeFromYDB(DateValue(1).ToYDB().Type),
+					},
+					{
+						"remove_date",
+						TypeFromYDB(
+							OptionalValue(TzDatetimeValue("1234")).ToYDB().Type,
+						),
+					},
+				},
+				Values: []*Ydb.Value{
+					Uint64Value(1).ToYDB().Value,
+					UTF8Value("test").ToYDB().Value,
+					DateValue(1).ToYDB().Value,
+					OptionalValue(TzDatetimeValue("1234")).ToYDB().Value,
+				},
+			},
+		),
+		DictValue(8, func(i int) V {
+			switch i {
+			// Key items.
+			case 0:
+				return UTF8Value("series_id")
+			case 2:
+				return UTF8Value("title")
+			case 4:
+				return UTF8Value("air_date")
+			case 6:
+				return UTF8Value("remove_date")
+			}
+			// Value items.
+			switch i {
+			case 1:
+				return Uint64Value(1)
+			case 3:
+				return Uint64Value(2)
+			case 5:
+				return Uint64Value(3)
+			case 7:
+				return Uint64Value(4)
+			}
+			panic("whoa")
+		}),
+		NullValue(OptionalType{T: TypeBool}),
+		VariantValue(Int32Value(42), 1, VariantType{T: TupleType{
+			Elems: []T{
+				TypeString,
+				TypeInt32,
+			},
+		}}),
+		VariantValue(Int32Value(42), 1, VariantType{S: StructType{
+			Fields: []StructField{
+				{"foo", TypeString},
+				{"bar", TypeInt32},
+			},
+		}}),
+		ZeroValue(OptionalType{T: TypeBool}),
+		ZeroValue(ListType{T: TypeBool}),
+		ZeroValue(TypeUUID),
+	}
+	for _, v := range vv {
+		t.Run(v.String(), func(t *testing.T) {
+			value := ToYDB(v)
+			if !proto.Equal(value, FromYDB(value.Type, value.Value).ToYDB()) {
+				t.Errorf("dual conversion failed. got: %v, want: %v", FromYDB(value.Type, value.Value).ToYDB(), value)
+			}
+		})
+	}
+
 }

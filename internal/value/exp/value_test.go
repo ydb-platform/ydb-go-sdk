@@ -319,10 +319,6 @@ func TestCompareProtos(t *testing.T) {
 			), a),
 		},
 		{
-			value.ToYDB(value.NullValue(value.OptionalType{T: value.TypeBool})),
-			ToYDB(NullValue(Optional(TypeBool)), a),
-		},
-		{
 			value.ToYDB(value.VariantValue(value.Int32Value(42), 1, value.VariantType{T: value.TupleType{
 				Elems: []value.T{
 					value.TypeString,
@@ -364,10 +360,14 @@ func TestCompareProtos(t *testing.T) {
 			value.ToYDB(value.ZeroValue(value.TupleType{})),
 			ToYDB(ZeroValue(Tuple()), a),
 		},
+		{
+			value.ToYDB(value.NullValue(value.OptionalType{T: value.TypeBool})),
+			ToYDB(NullValue(Optional(TypeBool)), a),
+		},
 	} {
 		t.Run(fmt.Sprintf("%d:%v", i, tt.old.String()), func(t *testing.T) {
 			if !proto.Equal(tt.old, tt.new) {
-				t.Errorf("not equal:\n - old: %v\n - new: %v", tt.old, tt.new)
+				t.Errorf("not equal:\n\n - old: %v\n\n - new: %v", tt.old, tt.new)
 			}
 		})
 	}
@@ -525,8 +525,98 @@ func TestValueToString(t *testing.T) {
 	} {
 		t.Run(tt.exp, func(t *testing.T) {
 			if got := tt.value.String(); got != tt.exp {
-				t.Errorf("got: %s, want: %s", got, tt.exp)
+				t.Errorf("string representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.exp)
 			}
 		})
 	}
+}
+
+func TestToYDBFromYDB(t *testing.T) {
+	vv := []V{
+		BoolValue(true),
+		Int8Value(1),
+		Int16Value(1),
+		Int32Value(1),
+		Int64Value(1),
+		Uint8Value(1),
+		Uint16Value(1),
+		Uint32Value(1),
+		Uint64Value(1),
+		DateValue(1),
+		DatetimeValue(1),
+		TimestampValue(1),
+		IntervalValue(1),
+		VoidValue(),
+		FloatValue(1),
+		DoubleValue(1),
+		StringValue([]byte("test")),
+		DecimalValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9),
+		DyNumberValue("123"),
+		JSONValue("{}"),
+		JSONDocumentValue("{}"),
+		TzDateValue("1"),
+		TzDatetimeValue("1"),
+		TzTimestampValue("1"),
+		UTF8Value("1"),
+		UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
+		YSONValue("{}"),
+		TupleValue(
+			Int64Value(1),
+			Int32Value(2),
+			Int16Value(3),
+			Int8Value(4),
+		),
+		ListValue(
+			Int64Value(1),
+			Int64Value(2),
+			Int64Value(3),
+		),
+		OptionalValue(IntervalValue(1)),
+		OptionalValue(OptionalValue(IntervalValue(1))),
+		StructValue(
+			StructValueField{"series_id", Uint64Value(1)},
+			StructValueField{"title", UTF8Value("test")},
+			StructValueField{"air_date", DateValue(1)},
+			StructValueField{"remove_date", OptionalValue(TzDatetimeValue("1234"))},
+		),
+		DictValue(
+			DictValueField{UTF8Value("series_id"), Uint64Value(1)},
+			DictValueField{UTF8Value("title"), Uint64Value(2)},
+			DictValueField{UTF8Value("air_date"), Uint64Value(3)},
+			DictValueField{UTF8Value("remove_date"), Uint64Value(4)},
+		),
+		NullValue(Primitive(TypeBool)),
+		NullValue(Optional(Primitive(TypeBool))),
+		VariantValue(Int32Value(42), 1, Tuple(
+			TypeString,
+			TypeInt32,
+		)),
+		VariantValue(Int32Value(42), 1, Struct(
+			StructField{
+				Name: "foo",
+				T:    TypeString,
+			},
+			StructField{
+				Name: "bar",
+				T:    TypeInt32,
+			},
+		)),
+		ZeroValue(TypeUTF8),
+		ZeroValue(Struct()),
+		ZeroValue(Tuple()),
+	}
+	for _, v := range vv {
+		t.Run(v.String(), func(t *testing.T) {
+			a := allocator.New()
+			defer a.Free()
+			value := ToYDB(v, a)
+			dualConversedValue, err := fromYDB(value.Type, value.Value)
+			if err != nil {
+				t.Errorf("dual conversion error: %v", err)
+			} else if !proto.Equal(value, ToYDB(dualConversedValue, a)) {
+				t.Errorf("dual conversion failed:\n\n - got:  %v\n\n - want: %v", ToYDB(dualConversedValue, a), value)
+			}
+		})
+	}
+
 }
