@@ -74,7 +74,7 @@ func (e *transportError) Error() string {
 		if len(e.details) > 0 {
 			b.WriteString(", details:")
 			for _, detail := range e.details {
-				b.WriteString(fmt.Sprintf("\r- %v", detail))
+				b.WriteString(fmt.Sprintf("\n- %v", detail))
 			}
 		}
 	}

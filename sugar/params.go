@@ -22,7 +22,7 @@ func GenerateDeclareSection(params *table.QueryParameters) string {
 	params.Each(func(name string, v types.Value) {
 		names = append(names, name)
 		declares[name] = fmt.Sprintf(
-			"DECLARE %s AS %s;\r",
+			"DECLARE %s AS %s;\n",
 			name,
 			value.TypeFromYDB(v.ToYDB().GetType()).String(),
 		)
