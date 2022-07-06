@@ -1,3 +1,4 @@
+## v3.28.0
 * Added `sugar.GenerateDeclareSection()` helper for make declare section in `YQL`
 * Added check when parameter name not started from `$` and automatically prepends it to name 
 * Refactor connection closing
