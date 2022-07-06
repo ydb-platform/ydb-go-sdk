@@ -10,6 +10,7 @@
 ![Code lines](https://sloc.xyz/github/ydb-platform/ydb-go-sdk/?category=code)
 ![Comments](https://sloc.xyz/github/ydb-platform/ydb-go-sdk/?category=comments)
 [![View examples](https://img.shields.io/badge/learn-examples-brightgreen.svg)](https://github.com/ydb-platform/ydb-go-examples)
+[![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/YDBPlatform)
 
 Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme` and `scripting` clients for `YDB`. 
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and ACID transactions.
