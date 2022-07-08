@@ -229,7 +229,7 @@ func TestRetryModes(t *testing.T) {
 			deleteSession: true,
 			canRetry: CanRetry{
 				idempotentOperation:    true,
-				nonIdempotentOperation: false,
+				nonIdempotentOperation: true,
 			},
 		},
 		{

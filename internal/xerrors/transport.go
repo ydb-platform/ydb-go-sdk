@@ -109,12 +109,12 @@ func (e *transportError) OperationStatus() operation.Status {
 	switch e.code {
 	case
 		grpcCodes.Aborted,
-		grpcCodes.ResourceExhausted:
+		grpcCodes.ResourceExhausted,
+		grpcCodes.Unavailable:
 		return operation.NotFinished
 	case
 		grpcCodes.Internal,
-		grpcCodes.Canceled,
-		grpcCodes.Unavailable:
+		grpcCodes.Canceled:
 		return operation.Undefined
 	default:
 		return operation.Finished

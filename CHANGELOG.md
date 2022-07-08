@@ -1,9 +1,9 @@
-* Add transport errors checks in retry
+* Changed retry behaviour to retryable on transport error `Unavailable` in non-idempotent mode
 
 ## v3.28.0
 * Added `sugar.GenerateDeclareSection()` helper for make declare section in `YQL`
-* Added check when parameter name not started from `$` and automatically prepends it to name
-* Refactor connection closing
+* Added check when parameter name not started from `$` and automatically prepends it to name 
+* Refactored connection closing
 
 ## v3.27.0
 * Added internal experimental packages `internal/value/exp` and `internal/value/exp/allocator` with alternative value implementations with zero-allocation model

@@ -23,10 +23,6 @@ func NewMode(statusCode int64, operationStatus operation.Status, backoff backoff
 }
 
 func (m Mode) MustRetry(isOperationIdempotent bool) bool {
-	if m.statusCode == 14 { // Unavailable Code = 14
-		return true
-	}
-
 	switch m.operationStatus {
 	case operation.Finished:
 		return false
