@@ -1,4 +1,4 @@
-* Changed retry behaviour to retryable on transport error `Unavailable` in non-idempotent mode
+* Marked dial errors as retryable
 
 ## v3.28.0
 * Added `sugar.GenerateDeclareSection()` helper for make declare section in `YQL`

@@ -109,12 +109,12 @@ func (e *transportError) OperationStatus() operation.Status {
 	switch e.code {
 	case
 		grpcCodes.Aborted,
-		grpcCodes.ResourceExhausted,
-		grpcCodes.Unavailable:
+		grpcCodes.ResourceExhausted:
 		return operation.NotFinished
 	case
 		grpcCodes.Internal,
-		grpcCodes.Canceled:
+		grpcCodes.Canceled,
+		grpcCodes.Unavailable:
 		return operation.Undefined
 	default:
 		return operation.Finished
@@ -153,18 +153,30 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 		return false
 	}
 	var t *transportError
-	if !errors.As(err, &t) {
-		return false
-	}
-	if len(codes) == 0 {
-		return true
-	}
-	for _, code := range codes {
-		if t.code == code {
+	switch {
+	case errors.As(err, &t):
+		if len(codes) == 0 {
 			return true
 		}
+		for _, code := range codes {
+			if t.code == code {
+				return true
+			}
+		}
+		return false
+	default:
+		if s, ok := grpcStatus.FromError(err); ok {
+			if len(codes) == 0 {
+				return true
+			}
+			for _, code := range codes {
+				if s.Code() == code {
+					return true
+				}
+			}
+		}
+		return false
 	}
-	return false
 }
 
 func FromGRPCError(err error, opts ...teOpt) error {

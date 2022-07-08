@@ -6,10 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -203,7 +205,14 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("dial %s failed: %w", address, err))
+		return nil, xerrors.WithStackTrace(
+			xerrors.Retryable(
+				fmt.Errorf("dial to `%s` failed: %w", address, err),
+				xerrors.WithName("DIAL"),
+				xerrors.WithBackoff(backoff.TypeSlow),
+				xerrors.WithDeleteSession(),
+			),
+		)
 	}
 
 	c.cc = cc

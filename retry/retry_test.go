@@ -3,10 +3,12 @@ package retry
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -224,6 +226,34 @@ func TestRetryModes(t *testing.T) {
 		{
 			err: xerrors.Transport(
 				xerrors.WithCode(grpcCodes.Unavailable),
+			),
+			backoff:       backoff.TypeFast,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: false,
+			},
+		},
+		{
+			err: xerrors.Retryable(
+				xerrors.Transport(
+					xerrors.WithCode(grpcCodes.Unavailable),
+				),
+				xerrors.WithBackoff(backoff.TypeFast),
+				xerrors.WithDeleteSession(),
+			),
+			backoff:       backoff.TypeFast,
+			deleteSession: true,
+			canRetry: CanRetry{
+				idempotentOperation:    true,
+				nonIdempotentOperation: true,
+			},
+		},
+		{
+			err: xerrors.Retryable(
+				status.Error(grpcCodes.Unavailable, ""),
+				xerrors.WithBackoff(backoff.TypeFast),
+				xerrors.WithDeleteSession(),
 			),
 			backoff:       backoff.TypeFast,
 			deleteSession: true,
@@ -464,8 +494,8 @@ func TestRetryModes(t *testing.T) {
 			},
 		},
 	}
-	for _, test := range errs {
-		t.Run(test.err.Error(), func(t *testing.T) {
+	for i, test := range errs {
+		t.Run(strconv.Itoa(i)+": "+test.err.Error(), func(t *testing.T) {
 			m := Check(test.err)
 			if m.MustRetry(true) != test.canRetry.idempotentOperation {
 				t.Errorf(
