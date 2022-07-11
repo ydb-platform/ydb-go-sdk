@@ -48,15 +48,16 @@ func (c *conn) Address() string {
 }
 
 type conn struct {
-	mtx       sync.RWMutex
-	config    Config // ro access
-	cc        *grpc.ClientConn
-	done      chan struct{}
-	endpoint  endpoint.Endpoint // ro access
-	closed    bool
-	state     State
-	lastUsage time.Time
-	onClose   []func(*conn)
+	mtx         sync.RWMutex
+	config      Config // ro access
+	cc          *grpc.ClientConn
+	done        chan struct{}
+	endpoint    endpoint.Endpoint // ro access
+	closed      bool
+	state       State
+	lastUsage   time.Time
+	onClose     []func(*conn)
+	onPessimize []func(ctx context.Context, cc Conn, cause error)
 }
 
 func (c *conn) Ping(ctx context.Context) error {
@@ -199,13 +200,13 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		defer cancel()
 	}
 
-	// prepend "ydb" scheme for grpc dns-xresolver to find the proper scheme
-	// "ydb:///", three slashes is ok. It needs for good parse scheme in grpc resolver.
+	// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
+	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
 	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(
+		err = xerrors.WithStackTrace(
 			xerrors.Retryable(
 				fmt.Errorf("dial to `%s` failed: %w", address, err),
 				xerrors.WithName("DIAL"),
@@ -213,6 +214,12 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 				xerrors.WithDeleteSession(),
 			),
 		)
+
+		for _, onPessimize := range c.onPessimize {
+			onPessimize(ctx, c, err)
+		}
+
+		return nil, err
 	}
 
 	c.cc = cc
@@ -271,8 +278,8 @@ func (c *conn) Close(ctx context.Context) (err error) {
 
 	c.setState(Destroyed)
 
-	for _, f := range c.onClose {
-		f(c)
+	for _, onClose := range c.onClose {
+		onClose(c)
 	}
 
 	return xerrors.WithStackTrace(err)
@@ -425,13 +432,20 @@ func withOnClose(onClose func(*conn)) option {
 	}
 }
 
+func withOnPessimize(onPessimize func(ctx context.Context, cc Conn, cause error)) option {
+	return func(c *conn) {
+		if onPessimize != nil {
+			c.onPessimize = append(c.onPessimize, onPessimize)
+		}
+	}
+}
+
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
 		state:    Created,
 		endpoint: e,
 		config:   config,
 		done:     make(chan struct{}),
-		onClose:  make([]func(*conn), 0),
 	}
 	for _, o := range opts {
 		o(c)

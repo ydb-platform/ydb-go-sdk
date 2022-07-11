@@ -1,4 +1,5 @@
 * Marked dial errors as retryable
+* Supported node pessimization on dialing errors  
 
 ## v3.28.0
 * Added `sugar.GenerateDeclareSection()` helper for make declare section in `YQL`
