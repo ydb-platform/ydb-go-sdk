@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/stats"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -47,6 +48,10 @@ func (c *conn) Address() string {
 	return c.endpoint.Address()
 }
 
+var _ stats.Handler = &conn{}
+
+type ctxHandleRPCKey struct{}
+
 type conn struct {
 	mtx         sync.RWMutex
 	config      Config // ro access
@@ -58,6 +63,25 @@ type conn struct {
 	lastUsage   time.Time
 	onClose     []func(*conn)
 	onPessimize []func(ctx context.Context, cc Conn, cause error)
+}
+
+func (c *conn) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Context {
+	return ctx
+}
+
+func (c *conn) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
+	if _, ok := rpcStats.(*stats.OutPayload); ok {
+		if b, ok := ctx.Value(ctxHandleRPCKey{}).(*bool); ok {
+			*b = true
+		}
+	}
+}
+
+func (c *conn) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.Context {
+	return ctx
+}
+
+func (c *conn) HandleConn(ctx context.Context, connStats stats.ConnStats) {
 }
 
 func (c *conn) Ping(ctx context.Context) error {
@@ -204,12 +228,21 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
-	cc, err = grpc.DialContext(ctx, address, c.config.GrpcDialOptions()...)
+	cc, err = grpc.DialContext(
+		ctx,
+		address,
+		append(
+			[]grpc.DialOption{
+				grpc.WithStatsHandler(c),
+			},
+			c.config.GrpcDialOptions()...,
+		)...,
+	)
 	if err != nil {
 		err = xerrors.WithStackTrace(
 			xerrors.Retryable(
 				fmt.Errorf("dial to `%s` failed: %w", address, err),
-				xerrors.WithName("DIAL"),
+				xerrors.WithName("DialContext"),
 				xerrors.WithBackoff(backoff.TypeSlow),
 				xerrors.WithDeleteSession(),
 			),
@@ -317,17 +350,39 @@ func (c *conn) Invoke(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	err = cc.Invoke(ctx, method, req, res, opts...)
+	var sended bool
+
+	err = cc.Invoke(
+		context.WithValue(
+			ctx,
+			ctxHandleRPCKey{},
+			&sended,
+		),
+		method,
+		req,
+		res,
+		opts...,
+	)
 
 	if err != nil {
 		if wrapping {
-			return xerrors.WithStackTrace(
-				xerrors.FromGRPCError(
-					err,
-					xerrors.WithAddress(c.Address()),
-				),
+			err = xerrors.FromGRPCError(
+				err,
+				xerrors.WithAddress(c.Address()),
 			)
+			if !sended {
+				err = xerrors.Retryable(
+					err,
+					xerrors.WithName("Invoke"),
+					xerrors.WithDeleteSession(),
+				)
+			}
 		}
+
+		for _, onPessimize := range c.onPessimize {
+			onPessimize(ctx, c, err)
+		}
+
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -397,17 +452,38 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	s, err = cc.NewStream(ctx, desc, method, opts...)
+	var sended bool
+
+	s, err = cc.NewStream(
+		context.WithValue(
+			ctx,
+			ctxHandleRPCKey{},
+			&sended,
+		),
+		desc,
+		method,
+		opts...,
+	)
 
 	if err != nil {
 		if wrapping {
-			return s, xerrors.WithStackTrace(
-				xerrors.FromGRPCError(
-					err,
-					xerrors.WithAddress(c.Address()),
-				),
+			err = xerrors.FromGRPCError(
+				err,
+				xerrors.WithAddress(c.Address()),
 			)
+			if !sended {
+				err = xerrors.Retryable(
+					err,
+					xerrors.WithName("NewStream"),
+					xerrors.WithDeleteSession(),
+				)
+			}
 		}
+
+		for _, onPessimize := range c.onPessimize {
+			onPessimize(ctx, c, err)
+		}
+
 		return s, xerrors.WithStackTrace(err)
 	}
 

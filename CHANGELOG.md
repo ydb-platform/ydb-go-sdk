@@ -1,5 +1,6 @@
 * Marked dial errors as retryable
 * Supported node pessimization on dialing errors  
+* Marked error from `Invoke` and `NewStream` as retryable if request not sended to server
 
 ## v3.28.0
 * Added `sugar.GenerateDeclareSection()` helper for make declare section in `YQL`
