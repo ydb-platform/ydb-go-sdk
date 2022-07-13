@@ -169,8 +169,9 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 			if len(codes) == 0 {
 				return true
 			}
-			for _, code := range codes {
-				if s.Code() == code {
+			code := s.Code()
+			for _, c := range codes {
+				if code == c {
 					return true
 				}
 			}
