@@ -50,17 +50,17 @@ func (c *conn) Address() string {
 }
 
 type conn struct {
-	mtx             sync.RWMutex
-	config          Config // ro access
-	grpcDialOptions []grpc.DialOption
-	cc              *grpc.ClientConn
-	done            chan struct{}
-	endpoint        endpoint.Endpoint // ro access
-	closed          bool
-	state           State
-	lastUsage       time.Time
-	onClose         []func(*conn)
-	onPessimize     []func(ctx context.Context, cc Conn, cause error)
+	mtx               sync.RWMutex
+	config            Config // ro access
+	grpcDialOptions   []grpc.DialOption
+	cc                *grpc.ClientConn
+	done              chan struct{}
+	endpoint          endpoint.Endpoint // ro access
+	closed            bool
+	state             State
+	lastUsage         time.Time
+	onClose           []func(*conn)
+	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
 }
 
 func (c *conn) Ping(ctx context.Context) error {
@@ -222,9 +222,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 			),
 		)
 
-		for _, onPessimize := range c.onPessimize {
-			onPessimize(ctx, c, err)
-		}
+		c.onTransportError(ctx, err)
 
 		return nil, err
 	}
@@ -233,6 +231,12 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	c.setState(Online)
 
 	return c.cc, nil
+}
+
+func (c *conn) onTransportError(ctx context.Context, cause error) {
+	for _, onPessimize := range c.onTransportErrors {
+		onPessimize(ctx, c, cause)
+	}
 }
 
 func (c *conn) touchLastUsage() {
@@ -341,9 +345,7 @@ func (c *conn) Invoke(
 			err = xerrors.WithStackTrace(err)
 		}
 
-		for _, onPessimize := range c.onPessimize {
-			onPessimize(ctx, c, err)
-		}
+		c.onTransportError(ctx, err)
 
 		return err
 	}
@@ -428,9 +430,7 @@ func (c *conn) NewStream(
 			)
 		}
 
-		for _, onPessimize := range c.onPessimize {
-			onPessimize(ctx, c, err)
-		}
+		c.onTransportError(ctx, err)
 
 		return s, err
 	}
@@ -457,10 +457,10 @@ func withOnClose(onClose func(*conn)) option {
 	}
 }
 
-func withOnPessimize(onPessimize func(ctx context.Context, cc Conn, cause error)) option {
+func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, cause error)) option {
 	return func(c *conn) {
-		if onPessimize != nil {
-			c.onPessimize = append(c.onPessimize, onPessimize)
+		if onTransportError != nil {
+			c.onTransportErrors = append(c.onTransportErrors, onTransportError)
 		}
 	}
 }

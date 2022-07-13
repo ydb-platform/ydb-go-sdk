@@ -42,7 +42,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 		endpoint,
 		p.config,
 		withOnClose(p.remove),
-		withOnPessimize(p.Ban),
+		withOnTransportError(p.Ban),
 	)
 
 	p.conns[address] = cc

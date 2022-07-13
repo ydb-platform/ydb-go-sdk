@@ -62,9 +62,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 			err = xerrors.WithStackTrace(err)
 		}
 
-		for _, onPessimize := range s.c.onPessimize {
-			onPessimize(s.Context(), s.c, err)
-		}
+		s.c.onTransportError(s.Context(), err)
 
 		return err
 	}
@@ -100,9 +98,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 			err = xerrors.WithStackTrace(err)
 		}
 
-		for _, onPessimize := range s.c.onPessimize {
-			onPessimize(s.Context(), s.c, err)
-		}
+		s.c.onTransportError(s.Context(), err)
 
 		return err
 	}
