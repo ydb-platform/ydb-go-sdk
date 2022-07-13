@@ -50,16 +50,17 @@ func (c *conn) Address() string {
 }
 
 type conn struct {
-	mtx         sync.RWMutex
-	config      Config // ro access
-	cc          *grpc.ClientConn
-	done        chan struct{}
-	endpoint    endpoint.Endpoint // ro access
-	closed      bool
-	state       State
-	lastUsage   time.Time
-	onClose     []func(*conn)
-	onPessimize []func(ctx context.Context, cc Conn, cause error)
+	mtx             sync.RWMutex
+	config          Config // ro access
+	grpcDialOptions []grpc.DialOption
+	cc              *grpc.ClientConn
+	done            chan struct{}
+	endpoint        endpoint.Endpoint // ro access
+	closed          bool
+	state           State
+	lastUsage       time.Time
+	onClose         []func(*conn)
+	onPessimize     []func(ctx context.Context, cc Conn, cause error)
 }
 
 func (c *conn) Ping(ctx context.Context) error {
@@ -206,14 +207,10 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
-	cOpts := c.config.GrpcDialOptions()
-	opts := make([]grpc.DialOption, 0, len(cOpts)+1)
-	opts = append(opts, cOpts...)
-	opts = append(opts, statsHandlerOption)
 	cc, err = grpc.DialContext(
 		ctx,
 		address,
-		opts...,
+		c.grpcDialOptions...,
 	)
 	if err != nil {
 		err = xerrors.WithStackTrace(
@@ -470,14 +467,16 @@ func withOnPessimize(onPessimize func(ctx context.Context, cc Conn, cause error)
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
-		state:    Created,
-		endpoint: e,
-		config:   config,
-		done:     make(chan struct{}),
+		grpcDialOptions: append(config.GrpcDialOptions(), statsHandlerOption),
+		state:           Created,
+		endpoint:        e,
+		config:          config,
+		done:            make(chan struct{}),
 	}
 	for _, o := range opts {
 		o(c)
 	}
+
 	return c
 }
 
