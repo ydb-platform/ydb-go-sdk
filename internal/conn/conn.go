@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -496,9 +497,10 @@ func (statsHandler) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Con
 
 func (statsHandler) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
 	switch rpcStats.(type) {
-	case *stats.OutPayload, *stats.OutHeader, *stats.OutTrailer,
-		*stats.InPayload, *stats.InHeader, *stats.InTrailer:
+	case *stats.OutPayload:
 		getContextMark(ctx).payloadSent()
+	case *stats.InHeader:
+		getContextMark(ctx).headerReceived()
 	}
 }
 
@@ -526,18 +528,17 @@ func getContextMark(ctx context.Context) *modificationMark {
 }
 
 type modificationMark struct {
-	dirty bool
-	mtx   sync.RWMutex
+	dirty uint32
 }
 
 func (m *modificationMark) payloadSent() {
-	m.mtx.Lock()
-	defer m.mtx.Unlock()
-	m.dirty = true
+	atomic.StoreUint32(&m.dirty, 1)
+}
+
+func (m *modificationMark) headerReceived() {
+	atomic.StoreUint32(&m.dirty, 1)
 }
 
 func (m *modificationMark) safeToRetry() bool {
-	m.mtx.RLock()
-	defer m.mtx.RUnlock()
-	return !m.dirty
+	return atomic.LoadUint32(&m.dirty) == 0
 }
