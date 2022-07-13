@@ -48,10 +48,6 @@ func (c *conn) Address() string {
 	return c.endpoint.Address()
 }
 
-var _ stats.Handler = &conn{}
-
-type ctxHandleRPCKey struct{}
-
 type conn struct {
 	mtx         sync.RWMutex
 	config      Config // ro access
@@ -63,25 +59,6 @@ type conn struct {
 	lastUsage   time.Time
 	onClose     []func(*conn)
 	onPessimize []func(ctx context.Context, cc Conn, cause error)
-}
-
-func (c *conn) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Context {
-	return ctx
-}
-
-func (c *conn) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
-	if _, ok := rpcStats.(*stats.OutPayload); ok {
-		if b, ok := ctx.Value(ctxHandleRPCKey{}).(*bool); ok {
-			*b = true
-		}
-	}
-}
-
-func (c *conn) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.Context {
-	return ctx
-}
-
-func (c *conn) HandleConn(ctx context.Context, connStats stats.ConnStats) {
 }
 
 func (c *conn) Ping(ctx context.Context) error {
@@ -228,15 +205,14 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
+	cOpts := c.config.GrpcDialOptions()
+	opts := make([]grpc.DialOption, 0, len(cOpts)+1)
+	opts = append(opts, cOpts...)
+	opts = append(opts, statsHandlerOption)
 	cc, err = grpc.DialContext(
 		ctx,
 		address,
-		append(
-			[]grpc.DialOption{
-				grpc.WithStatsHandler(c),
-			},
-			c.config.GrpcDialOptions()...,
-		)...,
+		opts...,
 	)
 	if err != nil {
 		err = xerrors.WithStackTrace(
@@ -350,19 +326,8 @@ func (c *conn) Invoke(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	var sended bool
-
-	err = cc.Invoke(
-		context.WithValue(
-			ctx,
-			ctxHandleRPCKey{},
-			&sended,
-		),
-		method,
-		req,
-		res,
-		opts...,
-	)
+	ctx, sentMark := markContext(ctx)
+	err = cc.Invoke(ctx, method, req, res, opts...)
 
 	if err != nil {
 		if wrapping {
@@ -370,7 +335,7 @@ func (c *conn) Invoke(
 				err,
 				xerrors.WithAddress(c.Address()),
 			)
-			if !sended {
+			if sentMark.safeToRetry() {
 				err = xerrors.Retryable(
 					err,
 					xerrors.WithName("Invoke"),
@@ -452,18 +417,8 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	var sended bool
-
-	s, err = cc.NewStream(
-		context.WithValue(
-			ctx,
-			ctxHandleRPCKey{},
-			&sended,
-		),
-		desc,
-		method,
-		opts...,
-	)
+	ctx, sentMark := markContext(ctx)
+	s, err = cc.NewStream(ctx, desc, method, opts...)
 
 	if err != nil {
 		if wrapping {
@@ -471,7 +426,7 @@ func (c *conn) NewStream(
 				err,
 				xerrors.WithAddress(c.Address()),
 			)
-			if !sended {
+			if sentMark.safeToRetry() {
 				err = xerrors.Retryable(
 					err,
 					xerrors.WithName("NewStream"),
@@ -531,4 +486,56 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 
 func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
 	return newConn(e, config, opts...)
+}
+
+var _ stats.Handler = statsHandler{}
+
+type statsHandler struct{}
+
+var statsHandlerOption = grpc.WithStatsHandler(statsHandler{})
+
+func (statsHandler) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Context {
+	return ctx
+}
+
+func (statsHandler) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
+	if _, ok := rpcStats.(*stats.OutPayload); ok {
+		mark := getContextMark(ctx)
+		mark.payloadSent()
+	}
+}
+
+func (statsHandler) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.Context {
+	return ctx
+}
+
+func (statsHandler) HandleConn(ctx context.Context, connStats stats.ConnStats) {}
+
+type ctxHandleRPCKey struct{}
+
+var rpcKey = ctxHandleRPCKey{}
+
+func markContext(ctx context.Context) (context.Context, *modificationMark) {
+	mark := &modificationMark{}
+	return context.WithValue(ctx, rpcKey, mark), mark
+}
+
+func getContextMark(ctx context.Context) *modificationMark {
+	v := ctx.Value(rpcKey)
+	if v == nil {
+		return &modificationMark{}
+	}
+	return v.(*modificationMark)
+}
+
+type modificationMark struct {
+	durty bool
+}
+
+func (m *modificationMark) payloadSent() {
+	m.durty = true
+}
+
+func (m *modificationMark) safeToRetry() bool {
+	return !m.durty
 }
