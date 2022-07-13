@@ -331,24 +331,23 @@ func (c *conn) Invoke(
 	err = cc.Invoke(ctx, method, req, res, opts...)
 	if err != nil {
 		if wrapping {
-			err = xerrors.FromGRPCError(
-				err,
+			err = xerrors.FromGRPCError(err,
 				xerrors.WithAddress(c.Address()),
 			)
 			if sentMark.safeToRetry() {
-				err = xerrors.Retryable(
-					err,
+				err = xerrors.Retryable(err,
 					xerrors.WithName("Invoke"),
 					xerrors.WithDeleteSession(),
 				)
 			}
+			err = xerrors.WithStackTrace(err)
 		}
 
 		for _, onPessimize := range c.onPessimize {
 			onPessimize(ctx, c, err)
 		}
 
-		return xerrors.WithStackTrace(err)
+		return err
 	}
 
 	if o, ok := res.(response.Response); ok {
@@ -417,6 +416,8 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
+	ctx, sentMark := markContext(ctx)
+
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
 		if wrapping {
@@ -433,13 +434,14 @@ func (c *conn) NewStream(
 			onPessimize(ctx, c, err)
 		}
 
-		return s, xerrors.WithStackTrace(err)
+		return s, err
 	}
 
 	return &grpcClientStream{
 		ClientStream: s,
 		c:            c,
 		wrapping:     wrapping,
+		sentMark:     sentMark,
 		onDone: func(ctx context.Context) {
 			cancel()
 		},
@@ -493,9 +495,10 @@ func (statsHandler) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Con
 }
 
 func (statsHandler) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
-	if _, ok := rpcStats.(*stats.OutPayload); ok {
-		mark := getContextMark(ctx)
-		mark.payloadSent()
+	switch rpcStats.(type) {
+	case *stats.OutPayload, *stats.OutHeader, *stats.OutTrailer,
+		*stats.InPayload, *stats.InHeader, *stats.InTrailer:
+		getContextMark(ctx).payloadSent()
 	}
 }
 
@@ -503,7 +506,7 @@ func (statsHandler) TagConn(ctx context.Context, _ *stats.ConnTagInfo) context.C
 	return ctx
 }
 
-func (statsHandler) HandleConn(ctx context.Context, connStats stats.ConnStats) {}
+func (statsHandler) HandleConn(context.Context, stats.ConnStats) {}
 
 type ctxHandleRPCKey struct{}
 
@@ -523,13 +526,18 @@ func getContextMark(ctx context.Context) *modificationMark {
 }
 
 type modificationMark struct {
-	durty bool
+	dirty bool
+	mtx   sync.RWMutex
 }
 
 func (m *modificationMark) payloadSent() {
-	m.durty = true
+	m.mtx.Lock()
+	defer m.mtx.Unlock()
+	m.dirty = true
 }
 
 func (m *modificationMark) safeToRetry() bool {
-	return !m.durty
+	m.mtx.RLock()
+	defer m.mtx.RUnlock()
+	return !m.dirty
 }
