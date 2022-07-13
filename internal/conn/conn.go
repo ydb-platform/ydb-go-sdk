@@ -327,8 +327,8 @@ func (c *conn) Invoke(
 	defer c.touchLastUsage()
 
 	ctx, sentMark := markContext(ctx)
-	err = cc.Invoke(ctx, method, req, res, opts...)
 
+	err = cc.Invoke(ctx, method, req, res, opts...)
 	if err != nil {
 		if wrapping {
 			err = xerrors.FromGRPCError(
@@ -417,22 +417,16 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	ctx, sentMark := markContext(ctx)
 	s, err = cc.NewStream(ctx, desc, method, opts...)
-
 	if err != nil {
 		if wrapping {
-			err = xerrors.FromGRPCError(
-				err,
-				xerrors.WithAddress(c.Address()),
+			err = xerrors.Retryable(
+				xerrors.FromGRPCError(err,
+					xerrors.WithAddress(c.Address()),
+				),
+				xerrors.WithName("NewStream"),
+				xerrors.WithDeleteSession(),
 			)
-			if sentMark.safeToRetry() {
-				err = xerrors.Retryable(
-					err,
-					xerrors.WithName("NewStream"),
-					xerrors.WithDeleteSession(),
-				)
-			}
 		}
 
 		for _, onPessimize := range c.onPessimize {
