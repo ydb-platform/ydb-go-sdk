@@ -234,8 +234,8 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 }
 
 func (c *conn) onTransportError(ctx context.Context, cause error) {
-	for _, onPessimize := range c.onTransportErrors {
-		onPessimize(ctx, c, cause)
+	for _, onTransportError := range c.onTransportErrors {
+		onTransportError(ctx, c, cause)
 	}
 }
 
@@ -466,8 +466,18 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 }
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
+	grpcDialOptions := config.GrpcDialOptions()
+	// If user defined a grpc.WithStatsHandler option - applied user option.
+	// Otherwise - used statsHandlerOption
+	grpcDialOptions = append(
+		append(
+			make([]grpc.DialOption, 0, len(grpcDialOptions)+1),
+			statsHandlerOption,
+		),
+		grpcDialOptions...,
+	)
 	c := &conn{
-		grpcDialOptions: append(config.GrpcDialOptions(), statsHandlerOption),
+		grpcDialOptions: grpcDialOptions,
 		state:           Created,
 		endpoint:        e,
 		config:          config,
