@@ -153,18 +153,31 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 		return false
 	}
 	var t *transportError
-	if !errors.As(err, &t) {
-		return false
-	}
-	if len(codes) == 0 {
-		return true
-	}
-	for _, code := range codes {
-		if t.code == code {
+	switch {
+	case errors.As(err, &t):
+		if len(codes) == 0 {
 			return true
 		}
+		for _, code := range codes {
+			if t.code == code {
+				return true
+			}
+		}
+		return false
+	default:
+		if s, ok := grpcStatus.FromError(err); ok {
+			if len(codes) == 0 {
+				return true
+			}
+			code := s.Code()
+			for _, c := range codes {
+				if code == c {
+					return true
+				}
+			}
+		}
+		return false
 	}
-	return false
 }
 
 func FromGRPCError(err error, opts ...teOpt) error {

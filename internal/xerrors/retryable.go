@@ -41,6 +41,10 @@ func (e *retryableError) Error() string {
 	return e.err.Error()
 }
 
+func (e *retryableError) Unwrap() error {
+	return e.err
+}
+
 type RetryableErrorOption func(e *retryableError)
 
 func WithBackoff(t backoff.Type) RetryableErrorOption {

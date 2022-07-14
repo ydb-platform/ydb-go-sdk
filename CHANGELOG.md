@@ -1,7 +1,11 @@
+* Marked dial errors as retryable
+* Supported node pessimization on dialing errors  
+* Marked error from `Invoke` and `NewStream` as retryable if request not sended to server
+
 ## v3.28.0
 * Added `sugar.GenerateDeclareSection()` helper for make declare section in `YQL`
 * Added check when parameter name not started from `$` and automatically prepends it to name 
-* Refactor connection closing
+* Refactored connection closing
 
 ## v3.27.0
 * Added internal experimental packages `internal/value/exp` and `internal/value/exp/allocator` with alternative value implementations with zero-allocation model

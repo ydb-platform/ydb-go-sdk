@@ -38,7 +38,12 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 		return cc
 	}
 
-	cc = newConn(endpoint, p.config, withOnClose(p.remove))
+	cc = newConn(
+		endpoint,
+		p.config,
+		withOnClose(p.remove),
+		withOnTransportError(p.Ban),
+	)
 
 	p.conns[address] = cc
 

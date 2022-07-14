@@ -5,8 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -18,6 +19,7 @@ type grpcClientStream struct {
 	grpc.ClientStream
 	c        *conn
 	wrapping bool
+	sentMark *modificationMark
 	onDone   func(ctx context.Context)
 	recv     func(error) func(trace.ConnState, error)
 }
@@ -48,14 +50,21 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return xerrors.WithStackTrace(
-				xerrors.FromGRPCError(
-					err,
-					xerrors.WithAddress(s.c.Address()),
-				),
+			err = xerrors.FromGRPCError(err,
+				xerrors.WithAddress(s.c.Address()),
 			)
+			if s.sentMark.canRetry() {
+				err = xerrors.Retryable(err,
+					xerrors.WithName("SendMsg"),
+					xerrors.WithDeleteSession(),
+				)
+			}
+			err = xerrors.WithStackTrace(err)
 		}
-		return xerrors.WithStackTrace(err)
+
+		s.c.onTransportError(s.Context(), err)
+
+		return err
 	}
 
 	return nil
@@ -77,14 +86,21 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return xerrors.WithStackTrace(
-				xerrors.FromGRPCError(
-					err,
-					xerrors.WithAddress(s.c.Address()),
-				),
+			err = xerrors.FromGRPCError(err,
+				xerrors.WithAddress(s.c.Address()),
 			)
+			if s.sentMark.canRetry() {
+				err = xerrors.Retryable(err,
+					xerrors.WithName("RecvMsg"),
+					xerrors.WithDeleteSession(),
+				)
+			}
+			err = xerrors.WithStackTrace(err)
 		}
-		return xerrors.WithStackTrace(err)
+
+		s.c.onTransportError(s.Context(), err)
+
+		return err
 	}
 
 	if s.wrapping {
