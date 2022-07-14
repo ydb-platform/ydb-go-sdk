@@ -53,7 +53,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 			err = xerrors.FromGRPCError(err,
 				xerrors.WithAddress(s.c.Address()),
 			)
-			if s.sentMark.safeToRetry() {
+			if s.sentMark.canRetry() {
 				err = xerrors.Retryable(err,
 					xerrors.WithName("SendMsg"),
 					xerrors.WithDeleteSession(),
@@ -89,7 +89,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 			err = xerrors.FromGRPCError(err,
 				xerrors.WithAddress(s.c.Address()),
 			)
-			if s.sentMark.safeToRetry() {
+			if s.sentMark.canRetry() {
 				err = xerrors.Retryable(err,
 					xerrors.WithName("RecvMsg"),
 					xerrors.WithDeleteSession(),

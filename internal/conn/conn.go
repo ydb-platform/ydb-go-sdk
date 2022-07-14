@@ -336,7 +336,7 @@ func (c *conn) Invoke(
 			err = xerrors.FromGRPCError(err,
 				xerrors.WithAddress(c.Address()),
 			)
-			if sentMark.safeToRetry() {
+			if sentMark.canRetry() {
 				err = xerrors.Retryable(err,
 					xerrors.WithName("Invoke"),
 					xerrors.WithDeleteSession(),
@@ -467,13 +467,12 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	grpcDialOptions := config.GrpcDialOptions()
-	// statsHandlerOption always replacing an user defined grpc.WithStatsHandler
 	grpcDialOptions = append(
 		append(
 			make([]grpc.DialOption, 0, len(grpcDialOptions)+1),
-			grpcDialOptions...,
+			statsHandlerOption,
 		),
-		statsHandlerOption,
+		grpcDialOptions...,
 	)
 	c := &conn{
 		grpcDialOptions: grpcDialOptions,
@@ -505,14 +504,10 @@ func (statsHandler) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Con
 
 func (statsHandler) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
 	switch rpcStats.(type) {
-	case *stats.OutHeader:
-		getContextMark(ctx).headerSent()
-	case *stats.OutPayload:
-		getContextMark(ctx).payloadSent()
-	case *stats.InHeader:
-		getContextMark(ctx).headerReceived()
-	case *stats.InPayload:
-		getContextMark(ctx).payloadReceived()
+	case *stats.Begin:
+		getContextMark(ctx).markSafeToRetry()
+	default:
+		getContextMark(ctx).markDirty()
 	}
 }
 
@@ -540,29 +535,17 @@ func getContextMark(ctx context.Context) *modificationMark {
 }
 
 type modificationMark struct {
-	dirty uint32
+	safeToRetry uint32
+}
+
+func (m *modificationMark) canRetry() bool {
+	return atomic.LoadUint32(&m.safeToRetry) != 0
+}
+
+func (m *modificationMark) markSafeToRetry() {
+	atomic.StoreUint32(&m.safeToRetry, 1)
 }
 
 func (m *modificationMark) markDirty() {
-	atomic.StoreUint32(&m.dirty, 1)
-}
-
-func (m *modificationMark) payloadSent() {
-	m.markDirty()
-}
-
-func (m *modificationMark) headerSent() {
-	m.markDirty()
-}
-
-func (m *modificationMark) headerReceived() {
-	m.markDirty()
-}
-
-func (m *modificationMark) payloadReceived() {
-	m.markDirty()
-}
-
-func (m *modificationMark) safeToRetry() bool {
-	return atomic.LoadUint32(&m.dirty) == 0
+	atomic.StoreUint32(&m.safeToRetry, 0)
 }
