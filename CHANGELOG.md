@@ -1,3 +1,5 @@
+* Upgraded dependencies (grpc, protobuf, testify)
+
 ## v3.28.1
 * Marked dial errors as retryable
 * Supported node pessimization on dialing errors  
