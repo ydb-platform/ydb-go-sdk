@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 	"errors"
+	"io"
 	"time"
 
 	"google.golang.org/grpc"
@@ -98,7 +99,9 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 			err = xerrors.WithStackTrace(err)
 		}
 
-		s.c.onTransportError(s.Context(), err)
+		if !xerrors.Is(err, io.EOF) {
+			s.c.onTransportError(s.Context(), err)
+		}
 
 		return err
 	}
