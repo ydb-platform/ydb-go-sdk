@@ -255,6 +255,9 @@ func WithTLSSInsecureSkipVerify() Option {
 	}
 }
 
+// WithGrpcOptions appends custom grpc dial options to ydb-go-sdk defaults
+//
+// Warning: grpc.WithStatsHandler not supported
 func WithGrpcOptions(option ...grpc.DialOption) Option {
 	return func(c *Config) {
 		c.grpcOptions = append(c.grpcOptions, option...)
