@@ -1,3 +1,4 @@
+## v3.28.2
 * Upgraded dependencies (grpc, protobuf, testify)
 
 ## v3.28.1
