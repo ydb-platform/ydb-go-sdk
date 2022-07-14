@@ -1,3 +1,4 @@
+## v3.28.3
 * Fixed false-positive node pessimization on receiving from stream io.EOF
 
 ## v3.28.2
