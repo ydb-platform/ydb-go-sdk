@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
 // Type describes YDB data types.

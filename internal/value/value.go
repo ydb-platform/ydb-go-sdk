@@ -7,59 +7,100 @@ import (
 	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 type V interface {
-	ToYDB() *Ydb.TypedValue
+	Type() T
 	String() string
+
+	toYDB(a *allocator.Allocator) *Ydb.Value
 	toString(*bytes.Buffer)
 }
 
-func ToYDB(v V) *Ydb.TypedValue {
-	return v.ToYDB()
+func ToYDB(v V, a *allocator.Allocator) *Ydb.TypedValue {
+	tv := a.TypedValue()
+
+	tv.Type = v.Type().toYDB(a)
+	tv.Value = v.toYDB(a)
+
+	return tv
 }
 
-func FromYDB(t *Ydb.Type, v *Ydb.Value) V {
-	return Value{
-		t: TypeFromYDB(t),
-		v: v,
+func valueToString(buf *bytes.Buffer, t T, v *Ydb.Value) {
+	buf.WriteByte('(')
+	defer buf.WriteByte(')')
+	if x, ok := v.Value.(*Ydb.Value_NestedValue); ok {
+		switch x := t.(type) {
+		case *variantType:
+			var (
+				i = int(v.VariantIndex)
+				s string
+			)
+			switch x.tt {
+			case variantTypeTuple:
+				t = x.t.(*TupleType).items[i]
+				s = strconv.Itoa(i)
+			case variantTypeStruct:
+				f := x.t.(*StructType).fields[i]
+				t = f.T
+				s = f.Name
+			}
+			buf.WriteString(s)
+			buf.WriteByte('=')
+
+		case *optionalType:
+			t = x.t
+
+		default:
+			panic("ydb: unknown nested types")
+		}
+		valueToString(buf, t, x.NestedValue)
+		return
+	}
+	if x, ok := primitiveGoTypeFromYDB(v); ok {
+		if x != nil {
+			fmt.Fprintf(buf, "%v", x)
+		} else {
+			buf.WriteString("NULL")
+		}
+		return
+	}
+	if n := len(v.Items); n > 0 {
+		types := make([]T, n)
+		switch x := t.(type) {
+		case *StructType:
+			for i, f := range x.fields {
+				types[i] = f.T
+			}
+		case *listType:
+			for i := range types {
+				types[i] = x.t
+			}
+		case *TupleType:
+			copy(types, x.items)
+		default:
+			panic(fmt.Sprintf("ydb: unknown iterable types: %v", x))
+		}
+		for i, item := range v.Items {
+			valueToString(buf, types[i], item)
+		}
+		return
+	}
+	if len(v.Pairs) > 0 {
+		dict := t.(*dictType)
+		for _, pair := range v.Pairs {
+			buf.WriteByte('(')
+			valueToString(buf, dict.k, pair.Key)
+			valueToString(buf, dict.v, pair.Payload)
+			buf.WriteByte(')')
+		}
 	}
 }
 
-func WriteValueStringTo(buf *bytes.Buffer, v V) {
-	v.toString(buf)
-}
-
-// BigEndianUint128 builds a big-endian uint128 value.
-func BigEndianUint128(hi, lo uint64) (v [16]byte) {
-	binary.BigEndian.PutUint64(v[0:8], hi)
-	binary.BigEndian.PutUint64(v[8:16], lo)
-	return v
-}
-
-// PrimitiveFromYDB returns a primitive value stored in x.
-// Currently it may return one of this types:
-//
-//   bool
-//   int32
-//   uint32
-//   int64
-//   uint64
-//   float32
-//   float64
-//   []byte
-//   string
-//   [16]byte
-//
-// Or nil.
-func PrimitiveFromYDB(x *Ydb.Value) (v interface{}) {
-	if x != nil {
-		v, _ = primitiveFromYDB(x)
-	}
-	return v
-}
-
-func primitiveFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
+func primitiveGoTypeFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
 	switch v := x.Value.(type) {
 	case *Ydb.Value_BoolValue:
 		return v.BoolValue, true
@@ -81,6 +122,8 @@ func primitiveFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
 		return v.TextValue, true
 	case *Ydb.Value_Low_128:
 		return BigEndianUint128(x.High_128, v.Low_128), true
+	case *Ydb.Value_NestedValue:
+		return primitiveGoTypeFromYDB(v.NestedValue)
 	case *Ydb.Value_NullFlagValue:
 		return nil, true
 	default:
@@ -88,654 +131,214 @@ func primitiveFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
 	}
 }
 
-type Value struct {
-	t T
-	v *Ydb.Value
+// BigEndianUint128 builds a big-endian uint128 value.
+func BigEndianUint128(hi, lo uint64) (v [16]byte) {
+	binary.BigEndian.PutUint64(v[0:8], hi)
+	binary.BigEndian.PutUint64(v[8:16], lo)
+	return v
 }
 
-func (v Value) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
-	return buf.String()
-}
-
-func valueToString(buf *bytes.Buffer, t T, v *Ydb.Value) {
-	buf.WriteByte('(')
-	defer buf.WriteByte(')')
-	if x, ok := primitiveFromYDB(v); ok {
-		if x != nil {
-			fmt.Fprintf(buf, "%v", x)
-		} else {
-			buf.WriteString("NULL")
-		}
-		return
+func FromYDB(t *Ydb.Type, v *Ydb.Value) V {
+	if vv, err := fromYDB(t, v); err != nil {
+		panic(err)
+	} else {
+		return vv
 	}
-	if x, ok := v.Value.(*Ydb.Value_NestedValue); ok {
-		switch x := t.(type) {
-		case VariantType:
-			var (
-				i = int(v.VariantIndex)
-				s string
-			)
-			if !x.S.Empty() {
-				f := x.S.Fields[i]
-				t = f.Type
-				s = f.Name
-			} else {
-				t = x.T.Elems[i]
-				s = strconv.Itoa(i)
+}
+
+func nullValueFromYDB(x *Ydb.Value, t T) (_ V, ok bool) {
+	for {
+		switch xx := x.Value.(type) {
+		case *Ydb.Value_NestedValue:
+			x = xx.NestedValue
+		case *Ydb.Value_NullFlagValue:
+			switch tt := t.(type) {
+			case *optionalType:
+				return NullValue(tt.t), true
+			case voidType:
+				return VoidValue(), true
+			default:
+				return nil, false
 			}
-			buf.WriteString(s)
-			buf.WriteByte('=')
-
-		case OptionalType:
-			t = x.T
-
 		default:
-			panic("ydb: unknown nested types")
-		}
-		valueToString(buf, t, x.NestedValue)
-		return
-	}
-	if n := len(v.Items); n > 0 {
-		types := make([]T, n)
-		switch x := t.(type) {
-		case StructType:
-			for i, f := range x.Fields {
-				types[i] = f.Type
-			}
-		case ListType:
-			for i := range types {
-				types[i] = x.T
-			}
-		case TupleType:
-			copy(types, x.Elems)
-		default:
-			panic("ydb: unknown iterable types")
-		}
-		for i, item := range v.Items {
-			valueToString(buf, types[i], item)
-		}
-		return
-	}
-	if len(v.Pairs) > 0 {
-		dict := t.(DictType)
-		for _, pair := range v.Pairs {
-			buf.WriteByte('(')
-			valueToString(buf, dict.Key, pair.Key)
-			valueToString(buf, dict.Payload, pair.Payload)
-			buf.WriteByte(')')
+			return nil, false
 		}
 	}
 }
 
-func (v Value) toString(buf *bytes.Buffer) {
-	v.t.toString(buf)
-	valueToString(buf, v.t, v.v)
-}
+func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (V, error) {
+	switch t {
+	case TypeBool:
+		return BoolValue(v.GetBoolValue()), nil
 
-func (v Value) ToYDB() *Ydb.TypedValue {
-	// TODO: may be optimized -1 allocation: make all *Value() methods return
-	// *Value, put TypedValue, Value and Type on Value and then use pointer to
-	// already heap-allocated bytes.
-	// nolint:godox
-	return &Ydb.TypedValue{
-		Type:  v.t.toYDB(),
-		Value: v.v,
-	}
-}
+	case TypeInt8:
+		return Int8Value(int8(v.GetInt32Value())), nil
 
-func BoolValue(v bool) Value {
-	return Value{
-		t: TypeBool,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_BoolValue{
-				BoolValue: v,
-			},
-		},
-	}
-}
+	case TypeInt16:
+		return Int16Value(int16(v.GetInt32Value())), nil
 
-func Int8Value(v int8) Value {
-	return Value{
-		t: TypeInt8,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: int32(v),
-			},
-		},
-	}
-}
+	case TypeInt32:
+		return Int32Value(v.GetInt32Value()), nil
 
-func Uint8Value(v uint8) Value {
-	return Value{
-		t: TypeUint8,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: uint32(v),
-			},
-		},
-	}
-}
+	case TypeInt64:
+		return Int64Value(v.GetInt64Value()), nil
 
-func Int16Value(v int16) Value {
-	return Value{
-		t: TypeInt16,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: int32(v),
-			},
-		},
-	}
-}
+	case TypeUint8:
+		return Uint8Value(uint8(v.GetUint32Value())), nil
 
-func Uint16Value(v uint16) Value {
-	return Value{
-		t: TypeUint16,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: uint32(v),
-			},
-		},
-	}
-}
+	case TypeUint16:
+		return Uint16Value(uint16(v.GetUint32Value())), nil
 
-func Int32Value(v int32) Value {
-	return Value{
-		t: TypeInt32,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: v,
-			},
-		},
-	}
-}
+	case TypeUint32:
+		return Uint32Value(v.GetUint32Value()), nil
 
-func Uint32Value(v uint32) Value {
-	return Value{
-		t: TypeUint32,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		},
-	}
-}
+	case TypeUint64:
+		return Uint64Value(v.GetUint64Value()), nil
 
-func Int64Value(v int64) Value {
-	return Value{
-		t: TypeInt64,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int64Value{
-				Int64Value: v,
-			},
-		},
-	}
-}
+	case TypeDate:
+		return DateValue(v.GetUint32Value()), nil
 
-func Uint64Value(v uint64) Value {
-	return Value{
-		t: TypeUint64,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: v,
-			},
-		},
-	}
-}
+	case TypeDatetime:
+		return DatetimeValue(v.GetUint32Value()), nil
 
-func FloatValue(v float32) Value {
-	return Value{
-		t: TypeFloat,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_FloatValue{
-				FloatValue: v,
-			},
-		},
-	}
-}
+	case TypeInterval:
+		return IntervalValue(v.GetInt64Value()), nil
 
-func DoubleValue(v float64) Value {
-	return Value{
-		t: TypeDouble,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_DoubleValue{
-				DoubleValue: v,
-			},
-		},
-	}
-}
+	case TypeTimestamp:
+		return TimestampValue(v.GetUint64Value()), nil
 
-func DateValue(v uint32) Value {
-	return Value{
-		t: TypeDate,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		},
-	}
-}
+	case TypeFloat:
+		return FloatValue(v.GetFloatValue()), nil
 
-func DatetimeValue(v uint32) Value {
-	return Value{
-		t: TypeDatetime,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		},
-	}
-}
+	case TypeDouble:
+		return DoubleValue(v.GetDoubleValue()), nil
 
-func TimestampValue(v uint64) Value {
-	return Value{
-		t: TypeTimestamp,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: v,
-			},
-		},
-	}
-}
+	case TypeUTF8:
+		return UTF8Value(v.GetTextValue()), nil
 
-// IntervalValue makes Value from given microseconds value
-func IntervalValue(v int64) Value {
-	return Value{
-		t: TypeInterval,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int64Value{
-				Int64Value: v,
-			},
-		},
-	}
-}
+	case TypeYSON:
+		return YSONValue(v.GetTextValue()), nil
 
-func TzDateValue(v string) Value {
-	return Value{
-		t: TypeTzDate,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
+	case TypeJSON:
+		return JSONValue(v.GetTextValue()), nil
 
-func TzDatetimeValue(v string) Value {
-	return Value{
-		t: TypeTzDatetime,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
+	case TypeJSONDocument:
+		return JSONDocumentValue(v.GetTextValue()), nil
 
-func TzTimestampValue(v string) Value {
-	return Value{
-		t: TypeTzTimestamp,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
+	case TypeDyNumber:
+		return DyNumberValue(v.GetTextValue()), nil
 
-func StringValue(v []byte) Value {
-	return Value{
-		t: TypeString,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_BytesValue{
-				BytesValue: v,
-			},
-		},
-	}
-}
+	case TypeTzDate:
+		return TzDateValue(v.GetTextValue()), nil
 
-func UTF8Value(v string) Value {
-	return Value{
-		t: TypeUTF8,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
+	case TypeTzDatetime:
+		return TzDatetimeValue(v.GetTextValue()), nil
 
-func YSONValue(v string) Value {
-	return Value{
-		t: TypeYSON,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
+	case TypeTzTimestamp:
+		return TzTimestampValue(v.GetTextValue()), nil
 
-func JSONValue(v string) Value {
-	return Value{
-		t: TypeJSON,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
+	case TypeString:
+		return StringValue(v.GetBytesValue()), nil
 
-func UUIDValue(v [16]byte) Value {
-	return Value{
-		t: TypeUUID,
-		v: &Ydb.Value{
-			High_128: binary.BigEndian.Uint64(v[0:8]),
-			Value: &Ydb.Value_Low_128{
-				Low_128: binary.BigEndian.Uint64(v[8:16]),
-			},
-		},
-	}
-}
-
-func JSONDocumentValue(v string) Value {
-	return Value{
-		t: TypeJSONDocument,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
-
-func DyNumberValue(v string) Value {
-	return Value{
-		t: TypeDyNumber,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
-
-func DecimalValue(t T, v [16]byte) Value {
-	return Value{
-		t: t,
-		v: &Ydb.Value{
-			High_128: binary.BigEndian.Uint64(v[0:8]),
-			Value: &Ydb.Value_Low_128{
-				Low_128: binary.BigEndian.Uint64(v[8:16]),
-			},
-		},
-	}
-}
-
-var VoidValue = Value{
-	t: VoidType{},
-	v: &Ydb.Value{
-		Value: new(Ydb.Value_NullFlagValue),
-	},
-}
-
-func TupleValue(n int, it func(int) V) Value {
-	var (
-		types = make([]T, n)
-		items = make([]*Ydb.Value, n)
-	)
-	for i := 0; i < n; i++ {
-		types[i] = it(i).(Value).t
-		items[i] = it(i).(Value).v
-	}
-	return Value{
-		t: TupleType{types},
-		v: &Ydb.Value{
-			Items: items,
-		},
-	}
-}
-
-type StructValueProto struct {
-	Fields []StructField
-	Values []*Ydb.Value
-}
-
-func (s *StructValueProto) Grow(size int) {
-	if cap(s.Fields) < size {
-		newFields := make([]StructField, 0, size)
-		newFields = append(newFields, s.Fields...)
-		s.Fields = newFields
-	}
-	if cap(s.Values) < size {
-		newValues := make([]*Ydb.Value, 0, size)
-		newValues = append(newValues, s.Values...)
-		s.Values = newValues
-	}
-}
-
-func (s *StructValueProto) Add(name string, value V) {
-	s.Fields = append(s.Fields, StructField{
-		Name: name,
-		Type: value.(Value).t,
-	})
-	s.Values = append(s.Values, value.(Value).v)
-}
-
-func StructValue(p *StructValueProto) Value {
-	return Value{
-		t: StructType{p.Fields},
-		v: &Ydb.Value{
-			Items: p.Values,
-		},
-	}
-}
-
-func DictValue(n int, it func(int) V) Value {
-	if n == 0 || n%2 == 1 {
-		panic("malformed number of pairs")
-	}
-	var (
-		keyT     = it(0).(Value).t
-		payloadT = it(1).(Value).t
-	)
-	ps := make([]*Ydb.ValuePair, n/2)
-	for i := 0; i < n; i += 2 {
-		k := it(i).(Value)
-		p := it(i + 1).(Value)
-		if !TypesEqual(k.t, keyT) {
-			panic(fmt.Sprintf(
-				"unexpected key types: %s; want %s",
-				k.t, keyT,
-			))
-		}
-		if !TypesEqual(p.t, payloadT) {
-			panic(fmt.Sprintf(
-				"unexpected payload types: %s; want %s",
-				p.t, payloadT,
-			))
-		}
-		ps[i/2] = &Ydb.ValuePair{
-			Key:     k.v,
-			Payload: p.v,
-		}
-	}
-	return Value{
-		t: Dict(keyT, payloadT),
-		v: &Ydb.Value{
-			Pairs: ps,
-		},
-	}
-}
-
-// It panics if vs is empty or contains not equal types.
-func ListValue(n int, it func(int) V) Value {
-	t := it(0).(Value).t
-	items := make([]*Ydb.Value, n)
-	for i := 0; i < n; i++ {
-		v := it(i).(Value)
-		if !TypesEqual(v.t, t) {
-			panic(fmt.Sprintf(
-				"unexpected item types: %s; want %s",
-				v.t, t,
-			))
-		}
-		items[i] = v.v
-	}
-	return Value{
-		t: ListType{t},
-		v: &Ydb.Value{
-			Items: items,
-		},
-	}
-}
-
-func VariantValue(x V, i uint32, t T) Value {
-	v, ok := t.(VariantType)
-	if !ok {
-		panic(fmt.Sprintf("not a variant types: %s", t))
-	}
-	exp, ok := v.at(int(i))
-	if !ok {
-		panic(fmt.Sprintf("no %d-th variant for %s", i, t))
-	}
-	val := x.(Value)
-	if !TypesEqual(exp, val.t) {
-		panic(fmt.Sprintf(
-			"unexpected types for %d-th variant: %s; want %s",
-			i, val.t, exp,
-		))
-	}
-	return Value{
-		t: t,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: val.v,
-			},
-			VariantIndex: i,
-		},
-	}
-}
-
-func ZeroValue(t T) Value {
-	v := new(Ydb.Value)
-	switch t := t.(type) {
-	case PrimitiveType:
-		switch t {
-		case TypeBool:
-			v.Value = new(Ydb.Value_BoolValue)
-
-		case TypeInt8, TypeInt16, TypeInt32:
-			v.Value = new(Ydb.Value_Int32Value)
-
-		case
-			TypeUint8, TypeUint16, TypeUint32,
-			TypeDate, TypeDatetime:
-
-			v.Value = new(Ydb.Value_Uint32Value)
-
-		case
-			TypeInt64,
-			TypeInterval:
-
-			v.Value = new(Ydb.Value_Int64Value)
-
-		case
-			TypeUint64,
-			TypeTimestamp:
-
-			v.Value = new(Ydb.Value_Uint64Value)
-
-		case TypeFloat:
-			v.Value = new(Ydb.Value_FloatValue)
-
-		case TypeDouble:
-			v.Value = new(Ydb.Value_DoubleValue)
-
-		case
-			TypeUTF8, TypeYSON, TypeJSON, TypeJSONDocument, TypeDyNumber,
-			TypeTzDate, TypeTzDatetime, TypeTzTimestamp:
-
-			v.Value = new(Ydb.Value_TextValue)
-
-		case TypeString:
-			v.Value = new(Ydb.Value_BytesValue)
-
-		case TypeUUID:
-			v.Value = new(Ydb.Value_Low_128)
-
-		default:
-			panic("uncovered primitive types")
-		}
-
-	case OptionalType, VoidType:
-		v.Value = new(Ydb.Value_NullFlagValue)
-
-	case ListType, TupleType, StructType, DictType:
-		// Nothing to do.
-
-	case DecimalType:
-		v.Value = new(Ydb.Value_Low_128)
-
-	case VariantType:
-		panic("do not know what to do with variant types for zero value")
+	case TypeUUID:
+		return UUIDValue(BigEndianUint128(v.High_128, v.GetLow_128())), nil
 
 	default:
-		panic("uncovered types")
-	}
-	return Value{
-		t: t,
-		v: v,
+		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered primitive type: %T", t))
 	}
 }
 
-// NullValue returns NULL value of given types T.
-//
-// For example, if T is Int32Type, then NullValue(Int32Type) will return value
-// of types Optional<Int32Type> with NULL value.
-//
-// Nested optional types are handled also.
-func NullValue(t T) Value {
-	v := &Ydb.Value{
-		Value: new(Ydb.Value_NullFlagValue),
-	}
-	x := t
-	for {
-		opt, ok := x.(OptionalType)
-		if !ok {
-			break
-		}
-		x = opt.T
-		v = &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: v,
-			},
-		}
-	}
-	return Value{
-		t: OptionalType{T: t},
-		v: v,
-	}
-}
+func fromYDB(t *Ydb.Type, v *Ydb.Value) (V, error) {
+	tt := TypeFromYDB(t)
 
-func OptionalValue(v V) Value {
-	var (
-		x   = v.(Value)
-		typ = x.t
-		val = x.v
-	)
-	_, opt := typ.(OptionalType)
-	if opt {
-		val = &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: val,
-			},
-		}
+	if vv, ok := nullValueFromYDB(v, tt); ok {
+		return vv, nil
 	}
-	return Value{
-		t: OptionalType{T: x.t},
-		v: val,
+
+	switch ttt := tt.(type) {
+	case PrimitiveType:
+		return primitiveValueFromYDB(ttt, v)
+
+	case voidType:
+		return VoidValue(), nil
+
+	case *DecimalType:
+		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
+
+	case *optionalType:
+		t = t.Type.(*Ydb.Type_OptionalType).OptionalType.Item
+		if nestedValue, ok := v.Value.(*Ydb.Value_NestedValue); ok {
+			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
+		}
+		return OptionalValue(FromYDB(t, v)), nil
+
+	case *listType:
+		return ListValue(func() (vv []V) {
+			a := allocator.New()
+			defer a.Free()
+			for _, vvv := range v.Items {
+				vv = append(vv, FromYDB(ttt.t.toYDB(a), vvv))
+			}
+			return vv
+		}()...), nil
+
+	case *TupleType:
+		return TupleValue(func() (vv []V) {
+			a := allocator.New()
+			defer a.Free()
+			for i, vvv := range v.Items {
+				vv = append(vv, FromYDB(ttt.items[i].toYDB(a), vvv))
+			}
+			return vv
+		}()...), nil
+
+	case *StructType:
+		return StructValue(func() (vv []StructValueField) {
+			a := allocator.New()
+			defer a.Free()
+			for i, vvv := range v.Items {
+				vv = append(vv, StructValueField{
+					Name: ttt.fields[i].Name,
+					V:    FromYDB(ttt.fields[i].T.toYDB(a), vvv),
+				})
+			}
+			return vv
+		}()...), nil
+
+	case *dictType:
+		return DictValue(func() (vv []DictValueField) {
+			a := allocator.New()
+			defer a.Free()
+			for _, vvv := range v.Pairs {
+				vv = append(vv, DictValueField{
+					K: FromYDB(ttt.k.toYDB(a), vvv.Key),
+					V: FromYDB(ttt.v.toYDB(a), vvv.Payload),
+				})
+			}
+			return vv
+		}()...), nil
+
+	case *variantType:
+		a := allocator.New()
+		defer a.Free()
+		switch ttt.tt {
+		case variantTypeTuple:
+			return VariantValue(
+				FromYDB(ttt.t.(*TupleType).items[v.VariantIndex].toYDB(a), v.Value.(*Ydb.Value_NestedValue).NestedValue),
+				v.VariantIndex,
+				ttt.t,
+			), nil
+		case variantTypeStruct:
+			return VariantValue(
+				FromYDB(ttt.t.(*StructType).fields[v.VariantIndex].T.toYDB(a), v.Value.(*Ydb.Value_NestedValue).NestedValue),
+				v.VariantIndex,
+				ttt.t,
+			), nil
+		default:
+			return nil, fmt.Errorf("unknown variant type: %v", ttt.tt)
+		}
+
+	default:
+		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered type: %T", ttt))
 	}
 }

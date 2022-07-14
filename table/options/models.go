@@ -2,13 +2,13 @@ package options
 
 import (
 	"bytes"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -45,7 +45,7 @@ type Column struct {
 func (c Column) toYDB(a *allocator.Allocator) *Ydb_Table.ColumnMeta {
 	return &Ydb_Table.ColumnMeta{
 		Name:   c.Name,
-		Type:   value.YDBType(c.Type, a),
+		Type:   value.TypeToYDB(c.Type, a),
 		Family: c.Family,
 	}
 }

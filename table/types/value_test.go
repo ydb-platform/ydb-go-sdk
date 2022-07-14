@@ -1,11 +1,13 @@
 package types
 
 import (
-	value "github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
-	"google.golang.org/protobuf/proto"
 	"testing"
 	"time"
+
+	"google.golang.org/protobuf/proto"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 )
 
 func TestNullable(t *testing.T) {

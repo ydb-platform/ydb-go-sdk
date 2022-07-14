@@ -7,15 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -158,6 +160,8 @@ func TestSessionDescribeTable(t *testing.T) {
 			},
 			Indexes: []options.IndexDescription{},
 		}
+		a := allocator.New()
+		defer a.Free()
 		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{
 				Name:                 expect.Name,
@@ -169,13 +173,13 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []*Ydb_Table.ColumnMeta{
 				{
 					Name:   expect.Columns[0].Name,
-					Type:   value.TypeToYDB(expect.Columns[0].Type),
+					Type:   value.TypeToYDB(expect.Columns[0].Type, a),
 					Family: "testFamily",
 				},
 			},
 			PrimaryKey: expect.PrimaryKey,
 			ShardKeyBounds: []*Ydb.TypedValue{
-				value.ToYDB(expect.KeyRanges[0].To),
+				value.ToYDB(expect.KeyRanges[0].To, a),
 			},
 			Indexes:    nil,
 			TableStats: nil,

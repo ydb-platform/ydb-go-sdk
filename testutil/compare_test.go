@@ -3,15 +3,19 @@ package testutil
 import (
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 )
 
 func TestUnwrapOptionalValue(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
 	v := value.OptionalValue(value.OptionalValue(value.UTF8Value("a")))
-	val := unwrapTypedValue(v.ToYDB())
+	val := unwrapTypedValue(value.ToYDB(v, a))
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
@@ -24,8 +28,10 @@ func TestUnwrapOptionalValue(t *testing.T) {
 }
 
 func TestUnwrapPrimitiveValue(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
 	v := value.UTF8Value("a")
-	val := unwrapTypedValue(v.ToYDB())
+	val := unwrapTypedValue(value.ToYDB(v, a))
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
@@ -38,8 +44,10 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 }
 
 func TestUnwrapNullValue(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
 	v := value.NullValue(value.TypeUTF8)
-	val := unwrapTypedValue(v.ToYDB())
+	val := unwrapTypedValue(value.ToYDB(v, a))
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)

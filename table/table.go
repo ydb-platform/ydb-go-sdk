@@ -3,14 +3,14 @@ package table
 import (
 	"bytes"
 	"context"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	value "github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -367,7 +367,6 @@ type (
 	queryParams     map[string]types.Value
 	ParameterOption func(queryParams)
 	QueryParameters struct {
-		a *allocator.Allocator
 		m queryParams
 	}
 )

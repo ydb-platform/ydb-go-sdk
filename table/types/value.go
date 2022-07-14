@@ -7,7 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
 type Value interface {

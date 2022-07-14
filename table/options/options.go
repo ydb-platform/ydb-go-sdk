@@ -4,8 +4,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/exp/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -50,7 +50,7 @@ func WithColumn(name string, typ types.Type) CreateTableOption {
 	return func(d *CreateTableDesc, a *allocator.Allocator) {
 		d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
 			Name: name,
-			Type: value.YDBType(typ, a),
+			Type: value.TypeToYDB(typ, a),
 		})
 	}
 }
@@ -405,7 +405,7 @@ func WithAddColumn(name string, typ types.Type) AlterTableOption {
 	return func(d *AlterTableDesc, a *allocator.Allocator) {
 		d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
 			Name: name,
-			Type: value.YDBType(typ, a),
+			Type: value.TypeToYDB(typ, a),
 		})
 	}
 }
