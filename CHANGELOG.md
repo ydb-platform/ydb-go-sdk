@@ -1,4 +1,4 @@
-* Fixed false-positive banning of conn on receiving from stream io.EOF
+* Fixed false-positive node pessimization on receiving from stream io.EOF
 
 ## v3.28.2
 * Upgraded dependencies (grpc, protobuf, testify)
