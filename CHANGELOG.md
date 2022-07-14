@@ -1,3 +1,4 @@
+## v3.28.1
 * Marked dial errors as retryable
 * Supported node pessimization on dialing errors  
 * Marked error from `Invoke` and `NewStream` as retryable if request not sended to server
