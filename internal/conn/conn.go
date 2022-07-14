@@ -467,14 +467,13 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	grpcDialOptions := config.GrpcDialOptions()
-	// If user defined a grpc.WithStatsHandler option - applied user option.
-	// Otherwise - used statsHandlerOption
+	// statsHandlerOption always replacing an user defined grpc.WithStatsHandler
 	grpcDialOptions = append(
 		append(
 			make([]grpc.DialOption, 0, len(grpcDialOptions)+1),
-			statsHandlerOption,
+			grpcDialOptions...,
 		),
-		grpcDialOptions...,
+		statsHandlerOption,
 	)
 	c := &conn{
 		grpcDialOptions: grpcDialOptions,
@@ -506,10 +505,14 @@ func (statsHandler) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Con
 
 func (statsHandler) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
 	switch rpcStats.(type) {
+	case *stats.OutHeader:
+		getContextMark(ctx).headerSent()
 	case *stats.OutPayload:
 		getContextMark(ctx).payloadSent()
 	case *stats.InHeader:
 		getContextMark(ctx).headerReceived()
+	case *stats.InPayload:
+		getContextMark(ctx).payloadReceived()
 	}
 }
 
@@ -540,12 +543,24 @@ type modificationMark struct {
 	dirty uint32
 }
 
-func (m *modificationMark) payloadSent() {
+func (m *modificationMark) markDirty() {
 	atomic.StoreUint32(&m.dirty, 1)
 }
 
+func (m *modificationMark) payloadSent() {
+	m.markDirty()
+}
+
+func (m *modificationMark) headerSent() {
+	m.markDirty()
+}
+
 func (m *modificationMark) headerReceived() {
-	atomic.StoreUint32(&m.dirty, 1)
+	m.markDirty()
+}
+
+func (m *modificationMark) payloadReceived() {
+	m.markDirty()
 }
 
 func (m *modificationMark) safeToRetry() bool {
