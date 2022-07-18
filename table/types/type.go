@@ -10,7 +10,7 @@ import (
 
 // Type describes YDB data types.
 type Type interface {
-	value.T
+	value.Type
 }
 
 func List(t Type) Type {
@@ -18,7 +18,7 @@ func List(t Type) Type {
 }
 
 func Tuple(elems ...Type) Type {
-	es := make([]value.T, len(elems))
+	es := make([]value.Type, len(elems))
 	for i, el := range elems {
 		es[i] = el
 	}
@@ -156,7 +156,7 @@ type RawValue interface {
 	//
 	Any() interface{}
 
-	// Unwrap unwraps current item under scan interpreting it as Optional<T> types.
+	// Unwrap unwraps current item under scan interpreting it as Optional<Type> types.
 	Unwrap()
 	AssertType(t Type) bool
 	IsNull() bool
@@ -217,10 +217,10 @@ type RawValue interface {
 	// DictOut leaves dict entered before by DictIn() call.
 	DictOut()
 
-	// Variant unwraps current item under scan interpreting it as Variant<T> types.
+	// Variant unwraps current item under scan interpreting it as Variant<Type> types.
 	// It returns non-empty name of a field that is filled for struct-based
 	// variant.
-	// It always returns an index of filled field of a T.
+	// It always returns an index of filled field of a Type.
 	Variant() (name string, index uint32)
 
 	// Decimal returns decimal value represented by big-endian 128 bit signed integer.

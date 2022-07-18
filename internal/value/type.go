@@ -9,23 +9,23 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 )
 
-type T interface {
+type Type interface {
 	toYDB(a *allocator.Allocator) *Ydb.Type
-	equalsTo(rhs T) bool
+	equalsTo(rhs Type) bool
 	toString(*bytes.Buffer)
 
 	String() string
 }
 
-func WriteTypeStringTo(buf *bytes.Buffer, t T) {
+func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
 	buf.WriteString(fmt.Sprintf("%T", t))
 }
 
-func TypeToYDB(t T, a *allocator.Allocator) *Ydb.Type {
+func TypeToYDB(t Type, a *allocator.Allocator) *Ydb.Type {
 	return t.toYDB(a)
 }
 
-func TypeFromYDB(x *Ydb.Type) T {
+func TypeFromYDB(x *Ydb.Type) Type {
 	switch v := x.Type.(type) {
 	case *Ydb.Type_TypeId:
 		return primitiveTypeFromYDB(v.TypeId)
@@ -78,7 +78,7 @@ func TypeFromYDB(x *Ydb.Type) T {
 	}
 }
 
-func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) T {
+func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 	switch t {
 	case Ydb.Type_BOOL:
 		return TypeBool
@@ -135,15 +135,15 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) T {
 	}
 }
 
-func TypesFromYDB(es []*Ydb.Type) []T {
-	ts := make([]T, len(es))
+func TypesFromYDB(es []*Ydb.Type) []Type {
+	ts := make([]Type, len(es))
 	for i, el := range es {
 		ts[i] = TypeFromYDB(el)
 	}
 	return ts
 }
 
-func TypesEqual(a, b T) bool {
+func TypesEqual(a, b Type) bool {
 	return a.equalsTo(b)
 }
 
@@ -163,7 +163,7 @@ func (v *DecimalType) String() string {
 	return buf.String()
 }
 
-func (v *DecimalType) equalsTo(rhs T) bool {
+func (v *DecimalType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*DecimalType)
 	return ok && *v == *vv
 }
@@ -191,8 +191,8 @@ func Decimal(precision, scale uint32) *DecimalType {
 }
 
 type dictType struct {
-	k T
-	v T
+	k Type
+	v Type
 }
 
 func (v *dictType) toString(buffer *bytes.Buffer) {
@@ -210,7 +210,7 @@ func (v *dictType) String() string {
 	return buf.String()
 }
 
-func (v *dictType) equalsTo(rhs T) bool {
+func (v *dictType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*dictType)
 	if !ok {
 		return false
@@ -239,7 +239,7 @@ func (v *dictType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func Dict(key, value T) (v *dictType) {
+func Dict(key, value Type) (v *dictType) {
 	return &dictType{
 		k: key,
 		v: value,
@@ -259,7 +259,7 @@ func (v emptyListType) String() string {
 	return buf.String()
 }
 
-func (emptyListType) equalsTo(rhs T) bool {
+func (emptyListType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(emptyListType)
 	return ok
 }
@@ -277,7 +277,7 @@ func EmptyList() emptyListType {
 }
 
 type listType struct {
-	t T
+	t Type
 }
 
 func (v *listType) toString(buffer *bytes.Buffer) {
@@ -293,7 +293,7 @@ func (v *listType) String() string {
 	return buf.String()
 }
 
-func (v *listType) equalsTo(rhs T) bool {
+func (v *listType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*listType)
 	if !ok {
 		return false
@@ -316,14 +316,14 @@ func (v *listType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func List(t T) *listType {
+func List(t Type) *listType {
 	return &listType{
 		t: t,
 	}
 }
 
 type optionalType struct {
-	t T
+	t Type
 }
 
 func (v *optionalType) toString(buffer *bytes.Buffer) {
@@ -339,7 +339,7 @@ func (v *optionalType) String() string {
 	return buf.String()
 }
 
-func (v *optionalType) equalsTo(rhs T) bool {
+func (v *optionalType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*optionalType)
 	if !ok {
 		return false
@@ -361,7 +361,7 @@ func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func Optional(t T) *optionalType {
+func Optional(t Type) *optionalType {
 	return &optionalType{
 		t: t,
 	}
@@ -466,7 +466,7 @@ var primitiveString = [...]string{
 	TypeDyNumber:     "DyNumber",
 }
 
-func (v PrimitiveType) equalsTo(rhs T) bool {
+func (v PrimitiveType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(PrimitiveType)
 	if !ok {
 		return false
@@ -485,7 +485,7 @@ func Primitive(t PrimitiveType) PrimitiveType {
 type (
 	StructField struct {
 		Name string
-		T    T
+		T    Type
 	}
 	StructType struct {
 		fields []StructField
@@ -512,7 +512,7 @@ func (v *StructType) String() string {
 	return buf.String()
 }
 
-func (v *StructType) equalsTo(rhs T) bool {
+func (v *StructType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*StructType)
 	if !ok {
 		return false
@@ -571,7 +571,7 @@ func StructFields(ms []*Ydb.StructMember) []StructField {
 }
 
 type TupleType struct {
-	items []T
+	items []Type
 }
 
 func (v *TupleType) toString(buffer *bytes.Buffer) {
@@ -592,7 +592,7 @@ func (v *TupleType) String() string {
 	return buf.String()
 }
 
-func (v *TupleType) equalsTo(rhs T) bool {
+func (v *TupleType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*TupleType)
 	if !ok {
 		return false
@@ -609,7 +609,7 @@ func (v *TupleType) equalsTo(rhs T) bool {
 }
 
 func (v *TupleType) toYDB(a *allocator.Allocator) *Ydb.Type {
-	var items []T
+	var items []Type
 	if v != nil {
 		items = v.items
 	}
@@ -628,7 +628,7 @@ func (v *TupleType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func Tuple(items ...T) (v *TupleType) {
+func Tuple(items ...Type) (v *TupleType) {
 	return &TupleType{
 		items: items,
 	}
@@ -642,7 +642,7 @@ const (
 )
 
 type variantType struct {
-	t  T
+	t  Type
 	tt internalVariantType
 }
 
@@ -659,7 +659,7 @@ func (v *variantType) String() string {
 	return buf.String()
 }
 
-func (v *variantType) equalsTo(rhs T) bool {
+func (v *variantType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*variantType)
 	if !ok {
 		return false
@@ -706,7 +706,7 @@ func (v *variantType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func Variant(t T) *variantType {
+func Variant(t Type) *variantType {
 	if tt, ok := t.(*variantType); ok {
 		t = tt.t
 	}
@@ -739,7 +739,7 @@ var _voidType = &Ydb.Type{
 	Type: &Ydb.Type_VoidType{},
 }
 
-func (v voidType) equalsTo(rhs T) bool {
+func (v voidType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(voidType)
 	return ok
 }

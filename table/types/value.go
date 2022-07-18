@@ -11,7 +11,7 @@ import (
 )
 
 type Value interface {
-	value.V
+	value.Value
 }
 
 func BoolValue(v bool) Value { return value.BoolValue(v) }
@@ -185,7 +185,7 @@ func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
 }
 
 func TupleValue(vs ...Value) Value {
-	return value.TupleValue(func() (vv []value.V) {
+	return value.TupleValue(func() (vv []value.Value) {
 		for _, v := range vs {
 			vv = append(vv, v)
 		}
@@ -194,7 +194,7 @@ func TupleValue(vs ...Value) Value {
 }
 
 func ListValue(vs ...Value) Value {
-	return value.ListValue(func() (vv []value.V) {
+	return value.ListValue(func() (vv []value.Value) {
 		for _, v := range vs {
 			vv = append(vv, v)
 		}

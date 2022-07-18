@@ -375,7 +375,7 @@ func TestCompareProtos(t *testing.T) {
 
 func TestValueToString(t *testing.T) {
 	for _, tt := range []struct {
-		value V
+		value Value
 		exp   string
 	}{
 		{
@@ -532,7 +532,7 @@ func TestValueToString(t *testing.T) {
 }
 
 func TestToYDBFromYDB(t *testing.T) {
-	vv := []V{
+	vv := []Value{
 		BoolValue(true),
 		Int8Value(1),
 		Int16Value(1),

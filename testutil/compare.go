@@ -26,7 +26,7 @@ var ErrNotComparable = xerrors.Wrap(fmt.Errorf("not comparable"))
 // Tuples and Lists are compared lexicographically. If tuples (lists) have different length and elements of the
 // shorter tuple (list) are all equal to corresponding elements of the other tuple (list), than the shorter tuple (list)
 // is considered less than the longer one.
-func Compare(l, r value.V) (int, error) {
+func Compare(l, r value.Value) (int, error) {
 	a := allocator.New()
 	defer a.Free()
 	return compare(unwrapTypedValue(value.ToYDB(l, a)), unwrapTypedValue(value.ToYDB(r, a)))

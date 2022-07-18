@@ -427,7 +427,7 @@ func (s *scanner) isNull() bool {
 	return yes
 }
 
-// unwrap current item under scan interpreting it as Optional<T> types.
+// unwrap current item under scan interpreting it as Optional<Type> types.
 // ignores if type is not optional
 func (s *scanner) unwrap() {
 	if s.Err() != nil {

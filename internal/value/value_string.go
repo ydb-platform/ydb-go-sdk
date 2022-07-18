@@ -24,7 +24,7 @@ func (v stringValue) String() string {
 	return buf.String()
 }
 
-func (stringValue) Type() T {
+func (stringValue) Type() Type {
 	return TypeString
 }
 
