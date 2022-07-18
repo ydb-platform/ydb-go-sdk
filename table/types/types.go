@@ -13,6 +13,7 @@ type Type interface {
 	value.Type
 }
 
+// Equal checks for type equivalence
 func Equal(lhs, rhs Type) bool {
 	return value.TypesEqual(lhs, rhs)
 }

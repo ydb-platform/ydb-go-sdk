@@ -1,4 +1,5 @@
-* Refactored `internal/value` package for decrease CPU and memory workload with GC 
+* Refactored `internal/value` package for decrease CPU and memory workload with GC
+* Added `table/types.Equal(lhs, rhs)` helper for check equal for two types
 
 ## v3.28.3
 * Fixed false-positive node pessimization on receiving from stream io.EOF
