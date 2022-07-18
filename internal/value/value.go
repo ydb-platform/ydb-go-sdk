@@ -1017,8 +1017,8 @@ func NullValue(t Type) *nullValue {
 }
 
 type optionalValue struct {
-	t Type
-	v Value
+	innerType Type
+	v         Value
 }
 
 func (v *optionalValue) toString(buffer *bytes.Buffer) {
@@ -1036,7 +1036,7 @@ func (v *optionalValue) String() string {
 }
 
 func (v *optionalValue) Type() Type {
-	return v.t
+	return v.innerType
 }
 
 func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1055,8 +1055,8 @@ func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func OptionalValue(v Value) *optionalValue {
 	return &optionalValue{
-		t: Optional(v.Type()),
-		v: v,
+		innerType: Optional(v.Type()),
+		v:         v,
 	}
 }
 
