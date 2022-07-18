@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"time"
 
@@ -11,32 +10,37 @@ import (
 
 // Type describes YDB data types.
 type Type interface {
-	value.T
+	value.Type
+}
+
+// Equal checks for type equivalence
+func Equal(lhs, rhs Type) bool {
+	return value.TypesEqual(lhs, rhs)
 }
 
 func List(t Type) Type {
-	return value.ListType{T: t}
+	return value.List(t)
 }
 
 func Tuple(elems ...Type) Type {
-	es := make([]value.T, len(elems))
+	es := make([]value.Type, len(elems))
 	for i, el := range elems {
 		es[i] = el
 	}
-	return value.TupleType{
-		Elems: es,
-	}
+	return value.Tuple(es...)
 }
 
-type tStructType value.StructType
+type tStructType struct {
+	fields []value.StructField
+}
 
 type StructOption func(*tStructType)
 
-func StructField(name string, typ Type) StructOption {
+func StructField(name string, t Type) StructOption {
 	return func(s *tStructType) {
-		s.Fields = append(s.Fields, value.StructField{
+		s.fields = append(s.fields, value.StructField{
 			Name: name,
-			Type: typ,
+			T:    t,
 		})
 	}
 }
@@ -46,46 +50,29 @@ func Struct(opts ...StructOption) Type {
 	for _, opt := range opts {
 		opt(&s)
 	}
-	return value.StructType(s)
+	return value.Struct(s.fields...)
 }
 
 func Variant(x Type) Type {
-	switch v := x.(type) {
-	case value.TupleType:
-		return value.VariantType{
-			T: v,
-		}
-	case value.StructType:
-		return value.VariantType{
-			S: v,
-		}
-	default:
-		panic(fmt.Sprintf("unsupported types for variant: %s", v))
-	}
+	return value.Variant(x)
 }
 
 func Void() Type {
-	return value.VoidType{}
+	return value.Void()
 }
 
 func Optional(t Type) Type {
-	return value.OptionalType{T: t}
+	return value.Optional(t)
 }
 
 var DefaultDecimal = DecimalType(22, 9)
 
 func DecimalType(precision, scale uint32) Type {
-	return value.DecimalType{
-		Precision: precision,
-		Scale:     scale,
-	}
+	return value.Decimal(precision, scale)
 }
 
 func DecimalTypeFromDecimal(d *Decimal) Type {
-	return value.DecimalType{
-		Precision: d.Precision,
-		Scale:     d.Scale,
-	}
+	return value.Decimal(d.Precision, d.Scale)
 }
 
 // Primitive types known by YDB.
@@ -174,7 +161,7 @@ type RawValue interface {
 	//
 	Any() interface{}
 
-	// Unwrap unwraps current item under scan interpreting it as Optional<T> types.
+	// Unwrap unwraps current item under scan interpreting it as Optional<Type> types.
 	Unwrap()
 	AssertType(t Type) bool
 	IsNull() bool
@@ -235,10 +222,10 @@ type RawValue interface {
 	// DictOut leaves dict entered before by DictIn() call.
 	DictOut()
 
-	// Variant unwraps current item under scan interpreting it as Variant<T> types.
+	// Variant unwraps current item under scan interpreting it as Variant<Type> types.
 	// It returns non-empty name of a field that is filled for struct-based
 	// variant.
-	// It always returns an index of filled field of a T.
+	// It always returns an index of filled field of a Type.
 	Variant() (name string, index uint32)
 
 	// Decimal returns decimal value represented by big-endian 128 bit signed integer.

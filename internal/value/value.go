@@ -7,59 +7,100 @@ import (
 	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-type V interface {
-	ToYDB() *Ydb.TypedValue
+type Value interface {
+	Type() Type
 	String() string
+
+	toYDB(a *allocator.Allocator) *Ydb.Value
 	toString(*bytes.Buffer)
 }
 
-func ToYDB(v V) *Ydb.TypedValue {
-	return v.ToYDB()
+func ToYDB(v Value, a *allocator.Allocator) *Ydb.TypedValue {
+	tv := a.TypedValue()
+
+	tv.Type = v.Type().toYDB(a)
+	tv.Value = v.toYDB(a)
+
+	return tv
 }
 
-func FromYDB(t *Ydb.Type, v *Ydb.Value) V {
-	return Value{
-		t: TypeFromYDB(t),
-		v: v,
+func valueToString(buf *bytes.Buffer, t Type, v *Ydb.Value) {
+	buf.WriteByte('(')
+	defer buf.WriteByte(')')
+	if x, ok := v.Value.(*Ydb.Value_NestedValue); ok {
+		switch x := t.(type) {
+		case *variantType:
+			var (
+				i = int(v.VariantIndex)
+				s string
+			)
+			switch x.variantType {
+			case variantTypeTuple:
+				t = x.innerType.(*TupleType).items[i]
+				s = strconv.Itoa(i)
+			case variantTypeStruct:
+				f := x.innerType.(*StructType).fields[i]
+				t = f.T
+				s = f.Name
+			}
+			buf.WriteString(s)
+			buf.WriteByte('=')
+
+		case *optionalType:
+			t = x.innerType
+
+		default:
+			panic("ydb: unknown nested types")
+		}
+		valueToString(buf, t, x.NestedValue)
+		return
+	}
+	if x, ok := primitiveGoTypeFromYDB(v); ok {
+		if x != nil {
+			fmt.Fprintf(buf, "%v", x)
+		} else {
+			buf.WriteString("NULL")
+		}
+		return
+	}
+	if n := len(v.Items); n > 0 {
+		types := make([]Type, n)
+		switch x := t.(type) {
+		case *StructType:
+			for i, f := range x.fields {
+				types[i] = f.T
+			}
+		case *listType:
+			for i := range types {
+				types[i] = x.itemType
+			}
+		case *TupleType:
+			copy(types, x.items)
+		default:
+			panic(fmt.Sprintf("ydb: unknown iterable types: %v", x))
+		}
+		for i, item := range v.Items {
+			valueToString(buf, types[i], item)
+		}
+		return
+	}
+	if len(v.Pairs) > 0 {
+		dict := t.(*dictType)
+		for _, pair := range v.Pairs {
+			buf.WriteByte('(')
+			valueToString(buf, dict.keyType, pair.Key)
+			valueToString(buf, dict.valueType, pair.Payload)
+			buf.WriteByte(')')
+		}
 	}
 }
 
-func WriteValueStringTo(buf *bytes.Buffer, v V) {
-	v.toString(buf)
-}
-
-// BigEndianUint128 builds a big-endian uint128 value.
-func BigEndianUint128(hi, lo uint64) (v [16]byte) {
-	binary.BigEndian.PutUint64(v[0:8], hi)
-	binary.BigEndian.PutUint64(v[8:16], lo)
-	return v
-}
-
-// PrimitiveFromYDB returns a primitive value stored in x.
-// Currently it may return one of this types:
-//
-//   bool
-//   int32
-//   uint32
-//   int64
-//   uint64
-//   float32
-//   float64
-//   []byte
-//   string
-//   [16]byte
-//
-// Or nil.
-func PrimitiveFromYDB(x *Ydb.Value) (v interface{}) {
-	if x != nil {
-		v, _ = primitiveFromYDB(x)
-	}
-	return v
-}
-
-func primitiveFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
+func primitiveGoTypeFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
 	switch v := x.Value.(type) {
 	case *Ydb.Value_BoolValue:
 		return v.BoolValue, true
@@ -81,6 +122,8 @@ func primitiveFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
 		return v.TextValue, true
 	case *Ydb.Value_Low_128:
 		return BigEndianUint128(x.High_128, v.Low_128), true
+	case *Ydb.Value_NestedValue:
+		return primitiveGoTypeFromYDB(v.NestedValue)
 	case *Ydb.Value_NullFlagValue:
 		return nil, true
 	default:
@@ -88,654 +131,1680 @@ func primitiveFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
 	}
 }
 
-type Value struct {
-	t T
-	v *Ydb.Value
+// BigEndianUint128 builds a big-endian uint128 value.
+func BigEndianUint128(hi, lo uint64) (v [16]byte) {
+	binary.BigEndian.PutUint64(v[0:8], hi)
+	binary.BigEndian.PutUint64(v[8:16], lo)
+	return v
 }
 
-func (v Value) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
+func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
+	if vv, err := fromYDB(t, v); err != nil {
+		panic(err)
+	} else {
+		return vv
+	}
+}
+
+func nullValueFromYDB(x *Ydb.Value, t Type) (_ Value, ok bool) {
+	for {
+		switch xx := x.Value.(type) {
+		case *Ydb.Value_NestedValue:
+			x = xx.NestedValue
+		case *Ydb.Value_NullFlagValue:
+			switch tt := t.(type) {
+			case *optionalType:
+				return NullValue(tt.innerType), true
+			case voidType:
+				return VoidValue(), true
+			default:
+				return nil, false
+			}
+		default:
+			return nil, false
+		}
+	}
+}
+
+func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (Value, error) {
+	switch t {
+	case TypeBool:
+		return BoolValue(v.GetBoolValue()), nil
+
+	case TypeInt8:
+		return Int8Value(int8(v.GetInt32Value())), nil
+
+	case TypeInt16:
+		return Int16Value(int16(v.GetInt32Value())), nil
+
+	case TypeInt32:
+		return Int32Value(v.GetInt32Value()), nil
+
+	case TypeInt64:
+		return Int64Value(v.GetInt64Value()), nil
+
+	case TypeUint8:
+		return Uint8Value(uint8(v.GetUint32Value())), nil
+
+	case TypeUint16:
+		return Uint16Value(uint16(v.GetUint32Value())), nil
+
+	case TypeUint32:
+		return Uint32Value(v.GetUint32Value()), nil
+
+	case TypeUint64:
+		return Uint64Value(v.GetUint64Value()), nil
+
+	case TypeDate:
+		return DateValue(v.GetUint32Value()), nil
+
+	case TypeDatetime:
+		return DatetimeValue(v.GetUint32Value()), nil
+
+	case TypeInterval:
+		return IntervalValue(v.GetInt64Value()), nil
+
+	case TypeTimestamp:
+		return TimestampValue(v.GetUint64Value()), nil
+
+	case TypeFloat:
+		return FloatValue(v.GetFloatValue()), nil
+
+	case TypeDouble:
+		return DoubleValue(v.GetDoubleValue()), nil
+
+	case TypeUTF8:
+		return UTF8Value(v.GetTextValue()), nil
+
+	case TypeYSON:
+		return YSONValue(v.GetTextValue()), nil
+
+	case TypeJSON:
+		return JSONValue(v.GetTextValue()), nil
+
+	case TypeJSONDocument:
+		return JSONDocumentValue(v.GetTextValue()), nil
+
+	case TypeDyNumber:
+		return DyNumberValue(v.GetTextValue()), nil
+
+	case TypeTzDate:
+		return TzDateValue(v.GetTextValue()), nil
+
+	case TypeTzDatetime:
+		return TzDatetimeValue(v.GetTextValue()), nil
+
+	case TypeTzTimestamp:
+		return TzTimestampValue(v.GetTextValue()), nil
+
+	case TypeString:
+		return StringValue(v.GetBytesValue()), nil
+
+	case TypeUUID:
+		return UUIDValue(BigEndianUint128(v.High_128, v.GetLow_128())), nil
+
+	default:
+		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered primitive type: %T", t))
+	}
+}
+
+func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
+	tt := TypeFromYDB(t)
+
+	if vv, ok := nullValueFromYDB(v, tt); ok {
+		return vv, nil
+	}
+
+	switch ttt := tt.(type) {
+	case PrimitiveType:
+		return primitiveValueFromYDB(ttt, v)
+
+	case voidType:
+		return VoidValue(), nil
+
+	case *DecimalType:
+		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
+
+	case *optionalType:
+		t = t.Type.(*Ydb.Type_OptionalType).OptionalType.Item
+		if nestedValue, ok := v.Value.(*Ydb.Value_NestedValue); ok {
+			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
+		}
+		return OptionalValue(FromYDB(t, v)), nil
+
+	case *listType:
+		return ListValue(func() (vv []Value) {
+			a := allocator.New()
+			defer a.Free()
+			for _, vvv := range v.Items {
+				vv = append(vv, FromYDB(ttt.itemType.toYDB(a), vvv))
+			}
+			return vv
+		}()...), nil
+
+	case *TupleType:
+		return TupleValue(func() (vv []Value) {
+			a := allocator.New()
+			defer a.Free()
+			for i, vvv := range v.Items {
+				vv = append(vv, FromYDB(ttt.items[i].toYDB(a), vvv))
+			}
+			return vv
+		}()...), nil
+
+	case *StructType:
+		return StructValue(func() (vv []StructValueField) {
+			a := allocator.New()
+			defer a.Free()
+			for i, vvv := range v.Items {
+				vv = append(vv, StructValueField{
+					Name: ttt.fields[i].Name,
+					V:    FromYDB(ttt.fields[i].T.toYDB(a), vvv),
+				})
+			}
+			return vv
+		}()...), nil
+
+	case *dictType:
+		return DictValue(func() (vv []DictValueField) {
+			a := allocator.New()
+			defer a.Free()
+			for _, vvv := range v.Pairs {
+				vv = append(vv, DictValueField{
+					K: FromYDB(ttt.keyType.toYDB(a), vvv.Key),
+					V: FromYDB(ttt.valueType.toYDB(a), vvv.Payload),
+				})
+			}
+			return vv
+		}()...), nil
+
+	case *variantType:
+		a := allocator.New()
+		defer a.Free()
+		switch ttt.variantType {
+		case variantTypeTuple:
+			return VariantValue(
+				FromYDB(
+					ttt.innerType.(*TupleType).items[v.VariantIndex].toYDB(a),
+					v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				),
+				v.VariantIndex,
+				ttt.innerType,
+			), nil
+		case variantTypeStruct:
+			return VariantValue(
+				FromYDB(
+					ttt.innerType.(*StructType).fields[v.VariantIndex].T.toYDB(a),
+					v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				),
+				v.VariantIndex,
+				ttt.innerType,
+			), nil
+		default:
+			return nil, fmt.Errorf("unknown variant type: %v", ttt.variantType)
+		}
+
+	default:
+		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered type: %T", ttt))
+	}
+}
+
+type boolValue bool
+
+func (v boolValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v boolValue) String() string {
+	if v {
+		return "Bool(true)"
+	}
+	return "Bool(false)"
+}
+
+func (boolValue) Type() Type {
+	return TypeBool
+}
+
+func (v boolValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Bool()
+
+	vv.BoolValue = bool(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func BoolValue(v bool) boolValue {
+	return boolValue(v)
+}
+
+type dateValue uint32
+
+func (v dateValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v dateValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func valueToString(buf *bytes.Buffer, t T, v *Ydb.Value) {
-	buf.WriteByte('(')
-	defer buf.WriteByte(')')
-	if x, ok := primitiveFromYDB(v); ok {
-		if x != nil {
-			fmt.Fprintf(buf, "%v", x)
-		} else {
-			buf.WriteString("NULL")
-		}
-		return
-	}
-	if x, ok := v.Value.(*Ydb.Value_NestedValue); ok {
-		switch x := t.(type) {
-		case VariantType:
-			var (
-				i = int(v.VariantIndex)
-				s string
-			)
-			if !x.S.Empty() {
-				f := x.S.Fields[i]
-				t = f.Type
-				s = f.Name
-			} else {
-				t = x.T.Elems[i]
-				s = strconv.Itoa(i)
-			}
-			buf.WriteString(s)
-			buf.WriteByte('=')
-
-		case OptionalType:
-			t = x.T
-
-		default:
-			panic("ydb: unknown nested types")
-		}
-		valueToString(buf, t, x.NestedValue)
-		return
-	}
-	if n := len(v.Items); n > 0 {
-		types := make([]T, n)
-		switch x := t.(type) {
-		case StructType:
-			for i, f := range x.Fields {
-				types[i] = f.Type
-			}
-		case ListType:
-			for i := range types {
-				types[i] = x.T
-			}
-		case TupleType:
-			copy(types, x.Elems)
-		default:
-			panic("ydb: unknown iterable types")
-		}
-		for i, item := range v.Items {
-			valueToString(buf, types[i], item)
-		}
-		return
-	}
-	if len(v.Pairs) > 0 {
-		dict := t.(DictType)
-		for _, pair := range v.Pairs {
-			buf.WriteByte('(')
-			valueToString(buf, dict.Key, pair.Key)
-			valueToString(buf, dict.Payload, pair.Payload)
-			buf.WriteByte(')')
-		}
-	}
+func (dateValue) Type() Type {
+	return TypeDate
 }
 
-func (v Value) toString(buf *bytes.Buffer) {
-	v.t.toString(buf)
-	valueToString(buf, v.t, v.v)
+func (v dateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Uint32()
+
+	vv.Uint32Value = uint32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
 }
 
-func (v Value) ToYDB() *Ydb.TypedValue {
-	// TODO: may be optimized -1 allocation: make all *Value() methods return
-	// *Value, put TypedValue, Value and Type on Value and then use pointer to
-	// already heap-allocated bytes.
-	// nolint:godox
-	return &Ydb.TypedValue{
-		Type:  v.t.toYDB(),
-		Value: v.v,
+func DateValue(v uint32) dateValue {
+	return dateValue(v)
+}
+
+type datetimeValue uint32
+
+func (v datetimeValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v datetimeValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (datetimeValue) Type() Type {
+	return TypeDatetime
+}
+
+func (v datetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Uint32()
+	vv.Uint32Value = uint32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func DatetimeValue(v uint32) datetimeValue {
+	return datetimeValue(v)
+}
+
+type decimalValue struct {
+	value     [16]byte
+	innerType *DecimalType
+}
+
+func (v decimalValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v decimalValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v decimalValue) Type() Type {
+	return v.innerType
+}
+
+func (v *decimalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	var bytes [16]byte
+	if v != nil {
+		bytes = v.value
 	}
+	vv := a.Low128()
+	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
+
+	vvv := a.Value()
+	vvv.High_128 = binary.BigEndian.Uint64(bytes[0:8])
+	vvv.Value = vv
+
+	return vvv
 }
 
-func BoolValue(v bool) Value {
-	return Value{
-		t: TypeBool,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_BoolValue{
-				BoolValue: v,
-			},
+func DecimalValue(v [16]byte, precision uint32, scale uint32) *decimalValue {
+	return &decimalValue{
+		value: v,
+		innerType: &DecimalType{
+			Precision: precision,
+			Scale:     scale,
 		},
 	}
 }
 
-func Int8Value(v int8) Value {
-	return Value{
-		t: TypeInt8,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: int32(v),
-			},
-		},
+type (
+	DictValueField struct {
+		K Value
+		V Value
+	}
+	dictValue struct {
+		t      Type
+		values []DictValueField
+	}
+)
+
+func (v *dictValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *dictValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *dictValue) Type() Type {
+	return v.t
+}
+
+func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	var values []DictValueField
+	if v != nil {
+		values = v.values
+	}
+	vvv := a.Value()
+
+	for _, vv := range values {
+		pair := a.Pair()
+
+		pair.Key = vv.K.toYDB(a)
+		pair.Payload = vv.V.toYDB(a)
+
+		vvv.Pairs = append(vvv.Pairs, pair)
+	}
+
+	return vvv
+}
+
+func DictValue(values ...DictValueField) *dictValue {
+	return &dictValue{
+		t:      Dict(values[0].K.Type(), values[0].V.Type()),
+		values: values,
 	}
 }
 
-func Uint8Value(v uint8) Value {
-	return Value{
-		t: TypeUint8,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: uint32(v),
-			},
-		},
-	}
+type doubleValue struct {
+	value float64
 }
 
-func Int16Value(v int16) Value {
-	return Value{
-		t: TypeInt16,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: int32(v),
-			},
-		},
-	}
+func (v *doubleValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
-func Uint16Value(v uint16) Value {
-	return Value{
-		t: TypeUint16,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: uint32(v),
-			},
-		},
-	}
+func (v *doubleValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
 }
 
-func Int32Value(v int32) Value {
-	return Value{
-		t: TypeInt32,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int32Value{
-				Int32Value: v,
-			},
-		},
-	}
+func (*doubleValue) Type() Type {
+	return TypeDouble
 }
 
-func Uint32Value(v uint32) Value {
-	return Value{
-		t: TypeUint32,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		},
+func (v *doubleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Double()
+	if v != nil {
+		vv.DoubleValue = v.value
 	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
 }
 
-func Int64Value(v int64) Value {
-	return Value{
-		t: TypeInt64,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int64Value{
-				Int64Value: v,
-			},
-		},
-	}
+func DoubleValue(v float64) *doubleValue {
+	return &doubleValue{value: v}
 }
 
-func Uint64Value(v uint64) Value {
-	return Value{
-		t: TypeUint64,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: v,
-			},
-		},
-	}
+type dyNumberValue struct {
+	value string
 }
 
-func FloatValue(v float32) Value {
-	return Value{
-		t: TypeFloat,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_FloatValue{
-				FloatValue: v,
-			},
-		},
-	}
+func (v dyNumberValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
-func DoubleValue(v float64) Value {
-	return Value{
-		t: TypeDouble,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_DoubleValue{
-				DoubleValue: v,
-			},
-		},
-	}
+func (v dyNumberValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
 }
 
-func DateValue(v uint32) Value {
-	return Value{
-		t: TypeDate,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		},
-	}
+func (dyNumberValue) Type() Type {
+	return TypeDyNumber
 }
 
-func DatetimeValue(v uint32) Value {
-	return Value{
-		t: TypeDatetime,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint32Value{
-				Uint32Value: v,
-			},
-		},
+func (v *dyNumberValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Text()
+	if v != nil {
+		vv.TextValue = v.value
 	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
 }
 
-func TimestampValue(v uint64) Value {
-	return Value{
-		t: TypeTimestamp,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Uint64Value{
-				Uint64Value: v,
-			},
-		},
+func DyNumberValue(v string) *dyNumberValue {
+	return &dyNumberValue{value: v}
+}
+
+type floatValue struct {
+	value float32
+}
+
+func (v *floatValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *floatValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (*floatValue) Type() Type {
+	return TypeFloat
+}
+
+func (v *floatValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Float()
+	if v != nil {
+		vv.FloatValue = v.value
 	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func FloatValue(v float32) *floatValue {
+	return &floatValue{value: v}
+}
+
+type int8Value int8
+
+func (v int8Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v int8Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (int8Value) Type() Type {
+	return TypeInt8
+}
+
+func (v int8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int32()
+	vv.Int32Value = int32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func Int8Value(v int8) int8Value {
+	return int8Value(v)
+}
+
+type int16Value int16
+
+func (v int16Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v int16Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (int16Value) Type() Type {
+	return TypeInt16
+}
+
+func (v int16Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int32()
+	vv.Int32Value = int32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func Int16Value(v int16) int16Value {
+	return int16Value(v)
+}
+
+type int32Value int32
+
+func (v int32Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v int32Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (int32Value) Type() Type {
+	return TypeInt32
+}
+
+func (v int32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int32()
+	vv.Int32Value = int32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func Int32Value(v int32) int32Value {
+	return int32Value(v)
+}
+
+type int64Value int64
+
+func (v int64Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v int64Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (int64Value) Type() Type {
+	return TypeInt64
+}
+
+func (v int64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int64()
+	vv.Int64Value = int64(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func Int64Value(v int64) int64Value {
+	return int64Value(v)
+}
+
+type intervalValue int64
+
+func (v intervalValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v intervalValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (intervalValue) Type() Type {
+	return TypeInterval
+}
+
+func (v intervalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Int64()
+	vv.Int64Value = int64(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
 }
 
 // IntervalValue makes Value from given microseconds value
-func IntervalValue(v int64) Value {
-	return Value{
-		t: TypeInterval,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_Int64Value{
-				Int64Value: v,
-			},
-		},
+func IntervalValue(v int64) intervalValue {
+	return intervalValue(v)
+}
+
+type jsonValue struct {
+	value string
+}
+
+func (v *jsonValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *jsonValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (*jsonValue) Type() Type {
+	return TypeJSON
+}
+
+func (v *jsonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Text()
+	if v != nil {
+		vv.TextValue = v.value
+	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func JSONValue(v string) *jsonValue {
+	return &jsonValue{value: v}
+}
+
+type jsonDocumentValue struct {
+	value string
+}
+
+func (v *jsonDocumentValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *jsonDocumentValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (*jsonDocumentValue) Type() Type {
+	return TypeJSONDocument
+}
+
+func (v *jsonDocumentValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Text()
+	if v != nil {
+		vv.TextValue = v.value
+	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func JSONDocumentValue(v string) *jsonDocumentValue {
+	return &jsonDocumentValue{value: v}
+}
+
+type listValue struct {
+	t     Type
+	items []Value
+}
+
+func (v *listValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *listValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *listValue) Type() Type {
+	return v.t
+}
+
+func (v *listValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	var items []Value
+	if v != nil {
+		items = v.items
+	}
+	vvv := a.Value()
+
+	for _, vv := range items {
+		vvv.Items = append(vvv.Items, vv.toYDB(a))
+	}
+
+	return vvv
+}
+
+func ListValue(items ...Value) *listValue {
+	var t Type
+	switch {
+	case len(items) > 0:
+		t = List(items[0].Type())
+	default:
+		t = EmptyList()
+	}
+
+	for _, v := range items {
+		if !v.Type().equalsTo(v.Type()) {
+			panic(fmt.Sprintf("different types of items: %v", items))
+		}
+	}
+	return &listValue{
+		t:     t,
+		items: items,
 	}
 }
 
-func TzDateValue(v string) Value {
-	return Value{
-		t: TypeTzDate,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
+type nullValue struct {
+	t *optionalType
+}
+
+func (v *nullValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *nullValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *nullValue) Type() Type {
+	return v.t
+}
+
+func (v *nullValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Value()
+	vv.Value = a.NullFlag()
+
+	x := v.t.innerType
+	for {
+		opt, ok := x.(*optionalType)
+		if !ok {
+			break
+		}
+		x = opt.innerType
+		nestedValue := a.Nested()
+		nestedValue.NestedValue = vv
+		vv = a.Value()
+		vv.Value = nestedValue
+	}
+
+	return vv
+}
+
+func NullValue(t Type) *nullValue {
+	return &nullValue{
+		t: Optional(t),
 	}
 }
 
-func TzDatetimeValue(v string) Value {
-	return Value{
-		t: TypeTzDatetime,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
+type optionalValue struct {
+	innerType Type
+	value     Value
+}
+
+func (v *optionalValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *optionalValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *optionalValue) Type() Type {
+	return v.innerType
+}
+
+func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vvv := a.Value()
+
+	if _, opt := v.value.(*optionalValue); opt {
+		vv := a.Nested()
+		vv.NestedValue = v.value.toYDB(a)
+		vvv.Value = vv
+	} else {
+		vvv.Value = v.value.toYDB(a).Value
+	}
+
+	return vvv
+}
+
+func OptionalValue(v Value) *optionalValue {
+	return &optionalValue{
+		innerType: Optional(v.Type()),
+		value:     v,
 	}
 }
 
-func TzTimestampValue(v string) Value {
-	return Value{
-		t: TypeTzTimestamp,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
+type (
+	StructValueField struct {
+		Name string
+		V    Value
+	}
+	structValue struct {
+		t      Type
+		values []Value
+	}
+)
+
+func (v *structValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *structValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *structValue) Type() Type {
+	return v.t
+}
+
+func (v structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vvv := a.Value()
+
+	for _, vv := range v.values {
+		vvv.Items = append(vvv.Items, vv.toYDB(a))
+	}
+
+	return vvv
+}
+
+func StructValue(fields ...StructValueField) *structValue {
+	var (
+		structFields = make([]StructField, 0, len(fields))
+		values       = make([]Value, 0, len(fields))
+	)
+	for _, field := range fields {
+		structFields = append(structFields, StructField{field.Name, field.V.Type()})
+		values = append(values, field.V)
+	}
+	return &structValue{
+		t:      Struct(structFields...),
+		values: values,
 	}
 }
 
-func StringValue(v []byte) Value {
-	return Value{
-		t: TypeString,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_BytesValue{
-				BytesValue: v,
-			},
-		},
+type timestampValue uint64
+
+func (v timestampValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v timestampValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (timestampValue) Type() Type {
+	return TypeTimestamp
+}
+
+func (v timestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Uint64()
+	vv.Uint64Value = uint64(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func TimestampValue(v uint64) timestampValue {
+	return timestampValue(v)
+}
+
+type tupleValue struct {
+	t     Type
+	items []Value
+}
+
+func (v *tupleValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *tupleValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *tupleValue) Type() Type {
+	return v.t
+}
+
+func (v *tupleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	var items []Value
+	if v != nil {
+		items = v.items
+	}
+	vvv := a.Value()
+
+	for _, vv := range items {
+		vvv.Items = append(vvv.Items, vv.toYDB(a))
+	}
+
+	return vvv
+}
+
+func TupleValue(values ...Value) *tupleValue {
+	tupleItems := make([]Type, 0, len(values))
+	for _, v := range values {
+		tupleItems = append(tupleItems, v.Type())
+	}
+	return &tupleValue{
+		t:     Tuple(tupleItems...),
+		items: values,
 	}
 }
 
-func UTF8Value(v string) Value {
-	return Value{
-		t: TypeUTF8,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
+type tzDateValue struct {
+	value string
+}
+
+func (v *tzDateValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *tzDateValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (*tzDateValue) Type() Type {
+	return TypeTzDate
+}
+
+func (v *tzDateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Text()
+	if v != nil {
+		vv.TextValue = v.value
+	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func TzDateValue(v string) *tzDateValue {
+	return &tzDateValue{value: v}
+}
+
+type tzDatetimeValue struct {
+	value string
+}
+
+func (v *tzDatetimeValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *tzDatetimeValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (*tzDatetimeValue) Type() Type {
+	return TypeTzDatetime
+}
+
+func (v *tzDatetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Text()
+	if v != nil {
+		vv.TextValue = v.value
+	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func TzDatetimeValue(v string) *tzDatetimeValue {
+	return &tzDatetimeValue{value: v}
+}
+
+type tzTimestampValue struct {
+	value string
+}
+
+func (v *tzTimestampValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *tzTimestampValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (*tzTimestampValue) Type() Type {
+	return TypeTzTimestamp
+}
+
+func (v *tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Text()
+	if v != nil {
+		vv.TextValue = v.value
+	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func TzTimestampValue(v string) *tzTimestampValue {
+	return &tzTimestampValue{value: v}
+}
+
+type uint8Value uint8
+
+func (v uint8Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v uint8Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (uint8Value) Type() Type {
+	return TypeUint8
+}
+
+func (v uint8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Uint32()
+	vv.Uint32Value = uint32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func Uint8Value(v uint8) uint8Value {
+	return uint8Value(v)
+}
+
+type uint16Value uint16
+
+func (v uint16Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v uint16Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (uint16Value) Type() Type {
+	return TypeUint16
+}
+
+func (v uint16Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Uint32()
+	vv.Uint32Value = uint32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func Uint16Value(v uint16) uint16Value {
+	return uint16Value(v)
+}
+
+type uint32Value uint32
+
+func (v uint32Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v uint32Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (uint32Value) Type() Type {
+	return TypeUint32
+}
+
+func (v uint32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Uint32()
+	vv.Uint32Value = uint32(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func Uint32Value(v uint32) uint32Value {
+	return uint32Value(v)
+}
+
+type uint64Value uint64
+
+func (v uint64Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v uint64Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (uint64Value) Type() Type {
+	return TypeUint64
+}
+
+func (v uint64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Uint64()
+	vv.Uint64Value = uint64(v)
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func Uint64Value(v uint64) uint64Value {
+	return uint64Value(v)
+}
+
+type utf8Value struct {
+	value string
+}
+
+func (v *utf8Value) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *utf8Value) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (*utf8Value) Type() Type {
+	return TypeUTF8
+}
+
+func (v *utf8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Text()
+	if v != nil {
+		vv.TextValue = v.value
+	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func UTF8Value(v string) *utf8Value {
+	return &utf8Value{value: v}
+}
+
+type uuidValue struct {
+	value [16]byte
+}
+
+func (v *uuidValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *uuidValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (*uuidValue) Type() Type {
+	return TypeUUID
+}
+
+func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	var bytes [16]byte
+	if v != nil {
+		bytes = v.value
+	}
+	vv := a.Low128()
+	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
+
+	vvv := a.Value()
+	vvv.High_128 = binary.BigEndian.Uint64(bytes[0:8])
+	vvv.Value = vv
+
+	return vvv
+}
+
+func UUIDValue(v [16]byte) *uuidValue {
+	return &uuidValue{value: v}
+}
+
+type variantValue struct {
+	innerType Type
+	value     Value
+	idx       uint32
+}
+
+func (v *variantValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *variantValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *variantValue) Type() Type {
+	return v.innerType
+}
+
+func (v *variantValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vvv := a.Value()
+
+	nested := a.Nested()
+	nested.NestedValue = v.value.toYDB(a)
+
+	vvv.Value = nested
+	vvv.VariantIndex = v.idx
+
+	return vvv
+}
+
+func VariantValue(v Value, idx uint32, t Type) *variantValue {
+	return &variantValue{
+		innerType: Variant(t),
+		value:     v,
+		idx:       idx,
 	}
 }
 
-func YSONValue(v string) Value {
-	return Value{
-		t: TypeYSON,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
+func VariantValueStruct(v Value, idx uint32) *variantValue {
+	if _, ok := v.(*structValue); !ok {
+		panic("value must be a struct type")
+	}
+	return &variantValue{
+		innerType: &variantType{
+			innerType:   v.Type(),
+			variantType: variantTypeStruct,
 		},
+		value: v,
+		idx:   idx,
 	}
 }
 
-func JSONValue(v string) Value {
-	return Value{
-		t: TypeJSON,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
+func VariantValueTuple(v Value, idx uint32) *variantValue {
+	if _, ok := v.(*tupleValue); !ok {
+		panic("value must be a tuple type")
+	}
+	return &variantValue{
+		innerType: &variantType{
+			innerType:   v.Type(),
+			variantType: variantTypeTuple,
 		},
+		value: v,
+		idx:   idx,
 	}
 }
 
-func UUIDValue(v [16]byte) Value {
-	return Value{
-		t: TypeUUID,
-		v: &Ydb.Value{
-			High_128: binary.BigEndian.Uint64(v[0:8]),
-			Value: &Ydb.Value_Low_128{
-				Low_128: binary.BigEndian.Uint64(v[8:16]),
-			},
-		},
-	}
+type voidValue struct{}
+
+func (v voidValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
-func JSONDocumentValue(v string) Value {
-	return Value{
-		t: TypeJSONDocument,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
+func (v voidValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
 }
 
-func DyNumberValue(v string) Value {
-	return Value{
-		t: TypeDyNumber,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_TextValue{
-				TextValue: v,
-			},
-		},
-	}
-}
-
-func DecimalValue(t T, v [16]byte) Value {
-	return Value{
-		t: t,
-		v: &Ydb.Value{
-			High_128: binary.BigEndian.Uint64(v[0:8]),
-			Value: &Ydb.Value_Low_128{
-				Low_128: binary.BigEndian.Uint64(v[8:16]),
-			},
-		},
-	}
-}
-
-var VoidValue = Value{
-	t: VoidType{},
-	v: &Ydb.Value{
+var (
+	_voidValueType = voidType{}
+	_voidValue     = &Ydb.Value{
 		Value: new(Ydb.Value_NullFlagValue),
-	},
+	}
+)
+
+func (voidValue) Type() Type {
+	return _voidValueType
 }
 
-func TupleValue(n int, it func(int) V) Value {
-	var (
-		types = make([]T, n)
-		items = make([]*Ydb.Value, n)
-	)
-	for i := 0; i < n; i++ {
-		types[i] = it(i).(Value).t
-		items[i] = it(i).(Value).v
-	}
-	return Value{
-		t: TupleType{types},
-		v: &Ydb.Value{
-			Items: items,
-		},
-	}
+func (voidValue) toYDB(*allocator.Allocator) *Ydb.Value {
+	return _voidValue
 }
 
-type StructValueProto struct {
-	Fields []StructField
-	Values []*Ydb.Value
+func VoidValue() voidValue {
+	return voidValue{}
 }
 
-func (s *StructValueProto) Grow(size int) {
-	if cap(s.Fields) < size {
-		newFields := make([]StructField, 0, size)
-		newFields = append(newFields, s.Fields...)
-		s.Fields = newFields
-	}
-	if cap(s.Values) < size {
-		newValues := make([]*Ydb.Value, 0, size)
-		newValues = append(newValues, s.Values...)
-		s.Values = newValues
-	}
+type ysonValue struct {
+	value string
 }
 
-func (s *StructValueProto) Add(name string, value V) {
-	s.Fields = append(s.Fields, StructField{
-		Name: name,
-		Type: value.(Value).t,
-	})
-	s.Values = append(s.Values, value.(Value).v)
+func (v *ysonValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
-func StructValue(p *StructValueProto) Value {
-	return Value{
-		t: StructType{p.Fields},
-		v: &Ydb.Value{
-			Items: p.Values,
-		},
-	}
+func (v *ysonValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
 }
 
-func DictValue(n int, it func(int) V) Value {
-	if n == 0 || n%2 == 1 {
-		panic("malformed number of pairs")
-	}
-	var (
-		keyT     = it(0).(Value).t
-		payloadT = it(1).(Value).t
-	)
-	ps := make([]*Ydb.ValuePair, n/2)
-	for i := 0; i < n; i += 2 {
-		k := it(i).(Value)
-		p := it(i + 1).(Value)
-		if !TypesEqual(k.t, keyT) {
-			panic(fmt.Sprintf(
-				"unexpected key types: %s; want %s",
-				k.t, keyT,
-			))
-		}
-		if !TypesEqual(p.t, payloadT) {
-			panic(fmt.Sprintf(
-				"unexpected payload types: %s; want %s",
-				p.t, payloadT,
-			))
-		}
-		ps[i/2] = &Ydb.ValuePair{
-			Key:     k.v,
-			Payload: p.v,
-		}
-	}
-	return Value{
-		t: Dict(keyT, payloadT),
-		v: &Ydb.Value{
-			Pairs: ps,
-		},
-	}
+func (*ysonValue) Type() Type {
+	return TypeYSON
 }
 
-// It panics if vs is empty or contains not equal types.
-func ListValue(n int, it func(int) V) Value {
-	t := it(0).(Value).t
-	items := make([]*Ydb.Value, n)
-	for i := 0; i < n; i++ {
-		v := it(i).(Value)
-		if !TypesEqual(v.t, t) {
-			panic(fmt.Sprintf(
-				"unexpected item types: %s; want %s",
-				v.t, t,
-			))
-		}
-		items[i] = v.v
+func (v *ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Text()
+	if v != nil {
+		vv.TextValue = v.value
 	}
-	return Value{
-		t: ListType{t},
-		v: &Ydb.Value{
-			Items: items,
-		},
-	}
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
 }
 
-func VariantValue(x V, i uint32, t T) Value {
-	v, ok := t.(VariantType)
-	if !ok {
-		panic(fmt.Sprintf("not a variant types: %s", t))
-	}
-	exp, ok := v.at(int(i))
-	if !ok {
-		panic(fmt.Sprintf("no %d-th variant for %s", i, t))
-	}
-	val := x.(Value)
-	if !TypesEqual(exp, val.t) {
-		panic(fmt.Sprintf(
-			"unexpected types for %d-th variant: %s; want %s",
-			i, val.t, exp,
-		))
-	}
-	return Value{
-		t: t,
-		v: &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: val.v,
-			},
-			VariantIndex: i,
-		},
-	}
+func YSONValue(v string) *ysonValue {
+	return &ysonValue{value: v}
 }
 
-func ZeroValue(t T) Value {
-	v := new(Ydb.Value)
-	switch t := t.(type) {
+type zeroValue struct {
+	t Type
+}
+
+func (v *zeroValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
+}
+
+func (v *zeroValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *zeroValue) Type() Type {
+	return v.t
+}
+
+func (v *zeroValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Value()
+	switch t := v.t.(type) {
 	case PrimitiveType:
 		switch t {
 		case TypeBool:
-			v.Value = new(Ydb.Value_BoolValue)
+			vv.Value = a.Bool()
 
 		case TypeInt8, TypeInt16, TypeInt32:
-			v.Value = new(Ydb.Value_Int32Value)
+			vv.Value = a.Int32()
 
 		case
 			TypeUint8, TypeUint16, TypeUint32,
 			TypeDate, TypeDatetime:
 
-			v.Value = new(Ydb.Value_Uint32Value)
+			vv.Value = a.Uint32()
 
 		case
 			TypeInt64,
 			TypeInterval:
 
-			v.Value = new(Ydb.Value_Int64Value)
+			vv.Value = a.Int64()
 
 		case
 			TypeUint64,
 			TypeTimestamp:
 
-			v.Value = new(Ydb.Value_Uint64Value)
+			vv.Value = a.Uint64()
 
 		case TypeFloat:
-			v.Value = new(Ydb.Value_FloatValue)
+			vv.Value = a.Float()
 
 		case TypeDouble:
-			v.Value = new(Ydb.Value_DoubleValue)
+			vv.Value = a.Double()
 
 		case
 			TypeUTF8, TypeYSON, TypeJSON, TypeJSONDocument, TypeDyNumber,
 			TypeTzDate, TypeTzDatetime, TypeTzTimestamp:
 
-			v.Value = new(Ydb.Value_TextValue)
+			vv.Value = a.Text()
 
 		case TypeString:
-			v.Value = new(Ydb.Value_BytesValue)
+			vv.Value = a.Bytes()
 
 		case TypeUUID:
-			v.Value = new(Ydb.Value_Low_128)
+			vv.Value = a.Low128()
 
 		default:
 			panic("uncovered primitive types")
 		}
 
-	case OptionalType, VoidType:
-		v.Value = new(Ydb.Value_NullFlagValue)
+	case *optionalType, *voidType:
+		vv.Value = a.NullFlag()
 
-	case ListType, TupleType, StructType, DictType:
+	case *listType, *TupleType, *StructType, *dictType:
 		// Nothing to do.
 
-	case DecimalType:
-		v.Value = new(Ydb.Value_Low_128)
+	case *DecimalType:
+		vv.Value = a.Low128()
 
-	case VariantType:
+	case *variantType:
 		panic("do not know what to do with variant types for zero value")
 
 	default:
 		panic("uncovered types")
 	}
-	return Value{
+
+	return vv
+}
+
+func ZeroValue(t Type) *zeroValue {
+	return &zeroValue{
 		t: t,
-		v: v,
 	}
 }
 
-// NullValue returns NULL value of given types T.
-//
-// For example, if T is Int32Type, then NullValue(Int32Type) will return value
-// of types Optional<Int32Type> with NULL value.
-//
-// Nested optional types are handled also.
-func NullValue(t T) Value {
-	v := &Ydb.Value{
-		Value: new(Ydb.Value_NullFlagValue),
-	}
-	x := t
-	for {
-		opt, ok := x.(OptionalType)
-		if !ok {
-			break
-		}
-		x = opt.T
-		v = &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: v,
-			},
-		}
-	}
-	return Value{
-		t: OptionalType{T: t},
-		v: v,
-	}
+type stringValue []byte
+
+func (v stringValue) toString(buffer *bytes.Buffer) {
+	a := allocator.New()
+	defer a.Free()
+	v.Type().toString(buffer)
+	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
-func OptionalValue(v V) Value {
-	var (
-		x   = v.(Value)
-		typ = x.t
-		val = x.v
-	)
-	_, opt := typ.(OptionalType)
-	if opt {
-		val = &Ydb.Value{
-			Value: &Ydb.Value_NestedValue{
-				NestedValue: val,
-			},
-		}
-	}
-	return Value{
-		t: OptionalType{T: x.t},
-		v: val,
-	}
+func (v stringValue) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (stringValue) Type() Type {
+	return TypeString
+}
+
+func (v stringValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Bytes()
+
+	vv.BytesValue = v
+
+	vvv := a.Value()
+	vvv.Value = vv
+
+	return vvv
+}
+
+func StringValue(v []byte) stringValue {
+	return stringValue(v)
 }

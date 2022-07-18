@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -251,18 +252,22 @@ func (s *session) CreateTable(
 	path string,
 	opts ...options.CreateTableOption,
 ) (err error) {
-	request := Ydb_Table.CreateTableRequest{
-		SessionId: s.id,
-		Path:      path,
-		OperationParams: operation.Params(
-			ctx,
-			s.config.OperationTimeout(),
-			s.config.OperationCancelAfter(),
-			operation.ModeSync,
-		),
-	}
+	var (
+		request = Ydb_Table.CreateTableRequest{
+			SessionId: s.id,
+			Path:      path,
+			OperationParams: operation.Params(
+				ctx,
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		}
+		a = allocator.New()
+	)
+	defer a.Free()
 	for _, opt := range opts {
-		opt((*options.CreateTableDesc)(&request))
+		opt((*options.CreateTableDesc)(&request), a)
 	}
 	t := s.trailer()
 	defer t.processHints()
@@ -450,18 +455,22 @@ func (s *session) AlterTable(
 	path string,
 	opts ...options.AlterTableOption,
 ) (err error) {
-	request := Ydb_Table.AlterTableRequest{
-		SessionId: s.id,
-		Path:      path,
-		OperationParams: operation.Params(
-			ctx,
-			s.config.OperationTimeout(),
-			s.config.OperationCancelAfter(),
-			operation.ModeSync,
-		),
-	}
+	var (
+		request = Ydb_Table.AlterTableRequest{
+			SessionId: s.id,
+			Path:      path,
+			OperationParams: operation.Params(
+				ctx,
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		}
+		a = allocator.New()
+	)
+	defer a.Free()
 	for _, opt := range opts {
-		opt((*options.AlterTableDesc)(&request))
+		opt((*options.AlterTableDesc)(&request), a)
 	}
 	t := s.trailer()
 	defer t.processHints()
@@ -682,26 +691,31 @@ func (s *session) executeDataQuery(
 	query *dataQuery, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	request *Ydb_Table.ExecuteDataQueryRequest,
-	result *Ydb_Table.ExecuteQueryResult,
+	_ *Ydb_Table.ExecuteDataQueryRequest,
+	_ *Ydb_Table.ExecuteQueryResult,
 	err error,
 ) {
-	result = &Ydb_Table.ExecuteQueryResult{}
-	request = &Ydb_Table.ExecuteDataQueryRequest{
-		SessionId:  s.id,
-		TxControl:  tx.Desc(),
-		Parameters: params.Params(),
-		Query:      &query.query,
-		QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
-			KeepInCache: len(params.Params()) > 0,
-		},
-		OperationParams: operation.Params(
-			ctx,
-			s.config.OperationTimeout(),
-			s.config.OperationCancelAfter(),
-			operation.ModeSync,
-		),
-	}
+	var (
+		a       = allocator.New()
+		result  = &Ydb_Table.ExecuteQueryResult{}
+		request = &Ydb_Table.ExecuteDataQueryRequest{
+			SessionId:  s.id,
+			TxControl:  tx.Desc(),
+			Parameters: params.Params().ToYDB(a),
+			Query:      &query.query,
+			QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
+				KeepInCache: len(params.Params()) > 0,
+			},
+			OperationParams: operation.Params(
+				ctx,
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		}
+	)
+	defer a.Free()
+
 	for _, opt := range opts {
 		opt((*options.ExecuteDataQueryDesc)(request))
 	}
@@ -910,15 +924,17 @@ func (s *session) StreamReadTable(
 			Path:      path,
 		}
 		stream Ydb_Table_V1.TableService_StreamReadTableClient
+		a      = allocator.New()
 	)
 	defer func() {
+		a.Free()
 		if err != nil {
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 		}
 	}()
 
 	for _, opt := range opts {
-		opt((*options.ReadTableDesc)(&request))
+		opt((*options.ReadTableDesc)(&request), a)
 	}
 
 	ctx, cancel := xcontext.WithErrCancel(ctx)
@@ -988,14 +1004,16 @@ func (s *session) StreamExecuteScanQuery(
 			q,
 			params,
 		)
+		a       = allocator.New()
 		request = Ydb_Table.ExecuteScanQueryRequest{
 			Query:      &q.query,
-			Parameters: params.Params(),
+			Parameters: params.Params().ToYDB(a),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		stream Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 	)
 	defer func() {
+		a.Free()
 		if err != nil {
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 		}
@@ -1049,13 +1067,19 @@ func (s *session) StreamExecuteScanQuery(
 
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
-	t := s.trailer()
-	defer t.processHints()
+	var (
+		t = s.trailer()
+		a = allocator.New()
+	)
+	defer func() {
+		a.Free()
+		t.processHints()
+	}()
 	_, err = s.tableService.BulkUpsert(
 		balancer.WithEndpoint(ctx, s),
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
-			Rows:  value.ToYDB(rows),
+			Rows:  value.ToYDB(rows, a),
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),

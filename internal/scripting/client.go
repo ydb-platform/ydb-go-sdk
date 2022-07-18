@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -63,9 +64,10 @@ func (c *Client) execute(
 ) (r result.Result, err error) {
 	var (
 		onDone  = trace.ScriptingOnExecute(c.config.Trace(), &ctx, query, params)
+		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
-			Parameters: params.Params(),
+			Parameters: params.Params().ToYDB(a),
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),
@@ -77,6 +79,7 @@ func (c *Client) execute(
 		response *Ydb_Scripting.ExecuteYqlResponse
 	)
 	defer func() {
+		a.Free()
 		onDone(r, err)
 	}()
 	response, err = c.service.ExecuteYql(ctx, request)
@@ -193,9 +196,10 @@ func (c *Client) streamExecute(
 ) (r result.StreamResult, err error) {
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx, query, params)
+		a              = allocator.New()
 		request        = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
-			Parameters: params.Params(),
+			Parameters: params.Params().ToYDB(a),
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),
@@ -205,6 +209,7 @@ func (c *Client) streamExecute(
 		}
 	)
 	defer func() {
+		a.Free()
 		if err != nil {
 			onIntermediate(err)(err)
 		}

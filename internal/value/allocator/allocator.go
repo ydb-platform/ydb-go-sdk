@@ -4,6 +4,9 @@
 package allocator
 
 import (
+	"bytes"
+	"sync"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 )
 
@@ -135,4 +138,43 @@ func (a *Allocator) Dict() (v *Ydb.DictType) {
 
 func (a *Allocator) Pair() (v *Ydb.ValuePair) {
 	return new(Ydb.ValuePair)
+}
+
+func (a *Allocator) NullFlag() (v *Ydb.Value_NullFlagValue) {
+	return new(Ydb.Value_NullFlagValue)
+}
+
+func (a *Allocator) VariantStructItems() (v *Ydb.VariantType_StructItems) {
+	return new(Ydb.VariantType_StructItems)
+}
+
+func (a *Allocator) TypeVariant() (v *Ydb.Type_VariantType) {
+	return new(Ydb.Type_VariantType)
+}
+
+func (a *Allocator) Variant() (v *Ydb.VariantType) {
+	return new(Ydb.VariantType)
+}
+
+func (a *Allocator) VariantTupleItems() (v *Ydb.VariantType_TupleItems) {
+	return new(Ydb.VariantType_TupleItems)
+}
+
+var Buffers = &buffersPoolType{}
+
+type buffersPoolType struct {
+	sync.Pool
+}
+
+func (p *buffersPoolType) Get() *bytes.Buffer {
+	v := p.Pool.Get()
+	if v == nil {
+		v = new(bytes.Buffer)
+	}
+	return v.(*bytes.Buffer)
+}
+
+func (p *buffersPoolType) Put(b *bytes.Buffer) {
+	b.Reset()
+	p.Pool.Put(b)
 }

@@ -544,7 +544,7 @@ func (s *rawConverter) IsDecimal() bool {
 }
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
-	w := t.(value.DecimalType)
+	w := t.(*value.DecimalType)
 	return d.Precision == w.Precision && d.Scale == w.Scale
 }
 

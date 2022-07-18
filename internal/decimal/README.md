@@ -1,4 +1,5 @@
-/*
+# Decimal package
+
 Package decimal provides tools for working with YDB's decimal types.
 
 Decimal types are stored as int128 values inside YDB and represented as 16-byte
@@ -24,5 +25,3 @@ prepared keeping in mind scaling factor:
 		x := big.NewInt(n)
 		return x.Mul(x, scaleFactor)
 	}
-*/
-package decimal
