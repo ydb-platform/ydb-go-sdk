@@ -2,8 +2,7 @@ package value
 
 import (
 	"bytes"
-	"strconv"
-
+	"fmt"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
@@ -15,11 +14,7 @@ type DecimalType struct {
 }
 
 func (v *DecimalType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString("Decimal(")
-	buffer.WriteString(strconv.FormatUint(uint64(v.Precision), 10))
-	buffer.WriteByte(',')
-	buffer.WriteString(strconv.FormatUint(uint64(v.Scale), 10))
-	buffer.WriteString(")")
+	buffer.WriteString(fmt.Sprintf("Decimal(%d,%d)", v.Precision, v.Scale))
 }
 
 func (v *DecimalType) String() string {
@@ -31,16 +26,7 @@ func (v *DecimalType) String() string {
 
 func (v *DecimalType) equalsTo(rhs T) bool {
 	vv, ok := rhs.(*DecimalType)
-	if !ok {
-		return false
-	}
-	if v.Precision != vv.Precision {
-		return false
-	}
-	if v.Scale != vv.Scale {
-		return false
-	}
-	return true
+	return ok && *v == *vv
 }
 
 func (v *DecimalType) toYDB(a *allocator.Allocator) *Ydb.Type {
