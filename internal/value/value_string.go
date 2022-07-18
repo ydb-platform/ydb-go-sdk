@@ -18,8 +18,8 @@ func (v stringValue) toString(buffer *bytes.Buffer) {
 }
 
 func (v stringValue) String() string {
-	buf := bytesPool.Get()
-	defer bytesPool.Put(buf)
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
 	v.toString(buf)
 	return buf.String()
 }
