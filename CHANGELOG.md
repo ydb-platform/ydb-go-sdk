@@ -1,3 +1,5 @@
+* Refactored `internal/value` package for decrease CPU and memory workload with GC 
+
 ## v3.28.3
 * Fixed false-positive node pessimization on receiving from stream io.EOF
 
