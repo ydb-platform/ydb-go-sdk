@@ -13,6 +13,10 @@ type Type interface {
 	value.Type
 }
 
+func Equal(lhs, rhs Type) bool {
+	return value.TypesEqual(lhs, rhs)
+}
+
 func List(t Type) Type {
 	return value.List(t)
 }
