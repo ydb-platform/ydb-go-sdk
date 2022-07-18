@@ -39,12 +39,12 @@ func valueToString(buf *bytes.Buffer, t Type, v *Ydb.Value) {
 				i = int(v.VariantIndex)
 				s string
 			)
-			switch x.tt {
+			switch x.variantType {
 			case variantTypeTuple:
-				t = x.t.(*TupleType).items[i]
+				t = x.innerType.(*TupleType).items[i]
 				s = strconv.Itoa(i)
 			case variantTypeStruct:
-				f := x.t.(*StructType).fields[i]
+				f := x.innerType.(*StructType).fields[i]
 				t = f.T
 				s = f.Name
 			}
@@ -52,7 +52,7 @@ func valueToString(buf *bytes.Buffer, t Type, v *Ydb.Value) {
 			buf.WriteByte('=')
 
 		case *optionalType:
-			t = x.t
+			t = x.innerType
 
 		default:
 			panic("ydb: unknown nested types")
@@ -77,7 +77,7 @@ func valueToString(buf *bytes.Buffer, t Type, v *Ydb.Value) {
 			}
 		case *listType:
 			for i := range types {
-				types[i] = x.t
+				types[i] = x.itemType
 			}
 		case *TupleType:
 			copy(types, x.items)
@@ -93,8 +93,8 @@ func valueToString(buf *bytes.Buffer, t Type, v *Ydb.Value) {
 		dict := t.(*dictType)
 		for _, pair := range v.Pairs {
 			buf.WriteByte('(')
-			valueToString(buf, dict.k, pair.Key)
-			valueToString(buf, dict.v, pair.Payload)
+			valueToString(buf, dict.keyType, pair.Key)
+			valueToString(buf, dict.valueType, pair.Payload)
 			buf.WriteByte(')')
 		}
 	}
@@ -154,7 +154,7 @@ func nullValueFromYDB(x *Ydb.Value, t Type) (_ Value, ok bool) {
 		case *Ydb.Value_NullFlagValue:
 			switch tt := t.(type) {
 			case *optionalType:
-				return NullValue(tt.t), true
+				return NullValue(tt.innerType), true
 			case voidType:
 				return VoidValue(), true
 			default:
@@ -277,7 +277,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			a := allocator.New()
 			defer a.Free()
 			for _, vvv := range v.Items {
-				vv = append(vv, FromYDB(ttt.t.toYDB(a), vvv))
+				vv = append(vv, FromYDB(ttt.itemType.toYDB(a), vvv))
 			}
 			return vv
 		}()...), nil
@@ -311,8 +311,8 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			defer a.Free()
 			for _, vvv := range v.Pairs {
 				vv = append(vv, DictValueField{
-					K: FromYDB(ttt.k.toYDB(a), vvv.Key),
-					V: FromYDB(ttt.v.toYDB(a), vvv.Payload),
+					K: FromYDB(ttt.keyType.toYDB(a), vvv.Key),
+					V: FromYDB(ttt.valueType.toYDB(a), vvv.Payload),
 				})
 			}
 			return vv
@@ -321,21 +321,27 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *variantType:
 		a := allocator.New()
 		defer a.Free()
-		switch ttt.tt {
+		switch ttt.variantType {
 		case variantTypeTuple:
 			return VariantValue(
-				FromYDB(ttt.t.(*TupleType).items[v.VariantIndex].toYDB(a), v.Value.(*Ydb.Value_NestedValue).NestedValue),
+				FromYDB(
+					ttt.innerType.(*TupleType).items[v.VariantIndex].toYDB(a),
+					v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				),
 				v.VariantIndex,
-				ttt.t,
+				ttt.innerType,
 			), nil
 		case variantTypeStruct:
 			return VariantValue(
-				FromYDB(ttt.t.(*StructType).fields[v.VariantIndex].T.toYDB(a), v.Value.(*Ydb.Value_NestedValue).NestedValue),
+				FromYDB(
+					ttt.innerType.(*StructType).fields[v.VariantIndex].T.toYDB(a),
+					v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				),
 				v.VariantIndex,
-				ttt.t,
+				ttt.innerType,
 			), nil
 		default:
-			return nil, fmt.Errorf("unknown variant type: %v", ttt.tt)
+			return nil, fmt.Errorf("unknown variant type: %v", ttt.variantType)
 		}
 
 	default:
@@ -448,8 +454,8 @@ func DatetimeValue(v uint32) datetimeValue {
 }
 
 type decimalValue struct {
-	v [16]byte
-	t *DecimalType
+	value     [16]byte
+	innerType *DecimalType
 }
 
 func (v decimalValue) toString(buffer *bytes.Buffer) {
@@ -467,13 +473,13 @@ func (v decimalValue) String() string {
 }
 
 func (v decimalValue) Type() Type {
-	return v.t
+	return v.innerType
 }
 
 func (v *decimalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	var bytes [16]byte
 	if v != nil {
-		bytes = v.v
+		bytes = v.value
 	}
 	vv := a.Low128()
 	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
@@ -487,8 +493,8 @@ func (v *decimalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func DecimalValue(v [16]byte, precision uint32, scale uint32) *decimalValue {
 	return &decimalValue{
-		v: v,
-		t: &DecimalType{
+		value: v,
+		innerType: &DecimalType{
 			Precision: precision,
 			Scale:     scale,
 		},
@@ -551,7 +557,7 @@ func DictValue(values ...DictValueField) *dictValue {
 }
 
 type doubleValue struct {
-	v float64
+	value float64
 }
 
 func (v *doubleValue) toString(buffer *bytes.Buffer) {
@@ -575,7 +581,7 @@ func (*doubleValue) Type() Type {
 func (v *doubleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Double()
 	if v != nil {
-		vv.DoubleValue = v.v
+		vv.DoubleValue = v.value
 	}
 
 	vvv := a.Value()
@@ -585,11 +591,11 @@ func (v *doubleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func DoubleValue(v float64) *doubleValue {
-	return &doubleValue{v: v}
+	return &doubleValue{value: v}
 }
 
 type dyNumberValue struct {
-	v string
+	value string
 }
 
 func (v dyNumberValue) toString(buffer *bytes.Buffer) {
@@ -613,7 +619,7 @@ func (dyNumberValue) Type() Type {
 func (v *dyNumberValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
-		vv.TextValue = v.v
+		vv.TextValue = v.value
 	}
 
 	vvv := a.Value()
@@ -623,11 +629,11 @@ func (v *dyNumberValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func DyNumberValue(v string) *dyNumberValue {
-	return &dyNumberValue{v: v}
+	return &dyNumberValue{value: v}
 }
 
 type floatValue struct {
-	v float32
+	value float32
 }
 
 func (v *floatValue) toString(buffer *bytes.Buffer) {
@@ -651,7 +657,7 @@ func (*floatValue) Type() Type {
 func (v *floatValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Float()
 	if v != nil {
-		vv.FloatValue = v.v
+		vv.FloatValue = v.value
 	}
 
 	vvv := a.Value()
@@ -661,7 +667,7 @@ func (v *floatValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func FloatValue(v float32) *floatValue {
-	return &floatValue{v: v}
+	return &floatValue{value: v}
 }
 
 type int8Value int8
@@ -836,7 +842,7 @@ func IntervalValue(v int64) intervalValue {
 }
 
 type jsonValue struct {
-	v string
+	value string
 }
 
 func (v *jsonValue) toString(buffer *bytes.Buffer) {
@@ -860,7 +866,7 @@ func (*jsonValue) Type() Type {
 func (v *jsonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
-		vv.TextValue = v.v
+		vv.TextValue = v.value
 	}
 
 	vvv := a.Value()
@@ -870,11 +876,11 @@ func (v *jsonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func JSONValue(v string) *jsonValue {
-	return &jsonValue{v: v}
+	return &jsonValue{value: v}
 }
 
 type jsonDocumentValue struct {
-	v string
+	value string
 }
 
 func (v *jsonDocumentValue) toString(buffer *bytes.Buffer) {
@@ -898,7 +904,7 @@ func (*jsonDocumentValue) Type() Type {
 func (v *jsonDocumentValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
-		vv.TextValue = v.v
+		vv.TextValue = v.value
 	}
 
 	vvv := a.Value()
@@ -908,7 +914,7 @@ func (v *jsonDocumentValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func JSONDocumentValue(v string) *jsonDocumentValue {
-	return &jsonDocumentValue{v: v}
+	return &jsonDocumentValue{value: v}
 }
 
 type listValue struct {
@@ -994,13 +1000,13 @@ func (v *nullValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Value()
 	vv.Value = a.NullFlag()
 
-	x := v.t.t
+	x := v.t.innerType
 	for {
 		opt, ok := x.(*optionalType)
 		if !ok {
 			break
 		}
-		x = opt.t
+		x = opt.innerType
 		nestedValue := a.Nested()
 		nestedValue.NestedValue = vv
 		vv = a.Value()
@@ -1197,7 +1203,7 @@ func TupleValue(values ...Value) *tupleValue {
 }
 
 type tzDateValue struct {
-	v string
+	value string
 }
 
 func (v *tzDateValue) toString(buffer *bytes.Buffer) {
@@ -1221,7 +1227,7 @@ func (*tzDateValue) Type() Type {
 func (v *tzDateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
-		vv.TextValue = v.v
+		vv.TextValue = v.value
 	}
 
 	vvv := a.Value()
@@ -1231,11 +1237,11 @@ func (v *tzDateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func TzDateValue(v string) *tzDateValue {
-	return &tzDateValue{v: v}
+	return &tzDateValue{value: v}
 }
 
 type tzDatetimeValue struct {
-	v string
+	value string
 }
 
 func (v *tzDatetimeValue) toString(buffer *bytes.Buffer) {
@@ -1259,7 +1265,7 @@ func (*tzDatetimeValue) Type() Type {
 func (v *tzDatetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
-		vv.TextValue = v.v
+		vv.TextValue = v.value
 	}
 
 	vvv := a.Value()
@@ -1269,11 +1275,11 @@ func (v *tzDatetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func TzDatetimeValue(v string) *tzDatetimeValue {
-	return &tzDatetimeValue{v: v}
+	return &tzDatetimeValue{value: v}
 }
 
 type tzTimestampValue struct {
-	v string
+	value string
 }
 
 func (v *tzTimestampValue) toString(buffer *bytes.Buffer) {
@@ -1297,7 +1303,7 @@ func (*tzTimestampValue) Type() Type {
 func (v *tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
-		vv.TextValue = v.v
+		vv.TextValue = v.value
 	}
 
 	vvv := a.Value()
@@ -1307,7 +1313,7 @@ func (v *tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func TzTimestampValue(v string) *tzTimestampValue {
-	return &tzTimestampValue{v: v}
+	return &tzTimestampValue{value: v}
 }
 
 type uint8Value uint8
@@ -1447,7 +1453,7 @@ func Uint64Value(v uint64) uint64Value {
 }
 
 type utf8Value struct {
-	v string
+	value string
 }
 
 func (v *utf8Value) toString(buffer *bytes.Buffer) {
@@ -1471,7 +1477,7 @@ func (*utf8Value) Type() Type {
 func (v *utf8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
-		vv.TextValue = v.v
+		vv.TextValue = v.value
 	}
 
 	vvv := a.Value()
@@ -1481,11 +1487,11 @@ func (v *utf8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func UTF8Value(v string) *utf8Value {
-	return &utf8Value{v: v}
+	return &utf8Value{value: v}
 }
 
 type uuidValue struct {
-	v [16]byte
+	value [16]byte
 }
 
 func (v *uuidValue) toString(buffer *bytes.Buffer) {
@@ -1509,7 +1515,7 @@ func (*uuidValue) Type() Type {
 func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	var bytes [16]byte
 	if v != nil {
-		bytes = v.v
+		bytes = v.value
 	}
 	vv := a.Low128()
 	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
@@ -1522,13 +1528,13 @@ func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func UUIDValue(v [16]byte) *uuidValue {
-	return &uuidValue{v: v}
+	return &uuidValue{value: v}
 }
 
 type variantValue struct {
-	t   Type
-	v   Value
-	idx uint32
+	innerType Type
+	value     Value
+	idx       uint32
 }
 
 func (v *variantValue) toString(buffer *bytes.Buffer) {
@@ -1546,14 +1552,14 @@ func (v *variantValue) String() string {
 }
 
 func (v *variantValue) Type() Type {
-	return v.t
+	return v.innerType
 }
 
 func (v *variantValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	nested := a.Nested()
-	nested.NestedValue = v.v.toYDB(a)
+	nested.NestedValue = v.value.toYDB(a)
 
 	vvv.Value = nested
 	vvv.VariantIndex = v.idx
@@ -1563,9 +1569,9 @@ func (v *variantValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func VariantValue(v Value, idx uint32, t Type) *variantValue {
 	return &variantValue{
-		t:   Variant(t),
-		v:   v,
-		idx: idx,
+		innerType: Variant(t),
+		value:     v,
+		idx:       idx,
 	}
 }
 
@@ -1574,12 +1580,12 @@ func VariantValueStruct(v Value, idx uint32) *variantValue {
 		panic("value must be a struct type")
 	}
 	return &variantValue{
-		t: &variantType{
-			t:  v.Type(),
-			tt: variantTypeStruct,
+		innerType: &variantType{
+			innerType:   v.Type(),
+			variantType: variantTypeStruct,
 		},
-		v:   v,
-		idx: idx,
+		value: v,
+		idx:   idx,
 	}
 }
 
@@ -1588,12 +1594,12 @@ func VariantValueTuple(v Value, idx uint32) *variantValue {
 		panic("value must be a tuple type")
 	}
 	return &variantValue{
-		t: &variantType{
-			t:  v.Type(),
-			tt: variantTypeTuple,
+		innerType: &variantType{
+			innerType:   v.Type(),
+			variantType: variantTypeTuple,
 		},
-		v:   v,
-		idx: idx,
+		value: v,
+		idx:   idx,
 	}
 }
 
@@ -1633,7 +1639,7 @@ func VoidValue() voidValue {
 }
 
 type ysonValue struct {
-	v string
+	value string
 }
 
 func (v *ysonValue) toString(buffer *bytes.Buffer) {
@@ -1657,7 +1663,7 @@ func (*ysonValue) Type() Type {
 func (v *ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
-		vv.TextValue = v.v
+		vv.TextValue = v.value
 	}
 
 	vvv := a.Value()
@@ -1667,7 +1673,7 @@ func (v *ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func YSONValue(v string) *ysonValue {
-	return &ysonValue{v: v}
+	return &ysonValue{value: v}
 }
 
 type zeroValue struct {

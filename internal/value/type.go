@@ -191,15 +191,15 @@ func Decimal(precision, scale uint32) *DecimalType {
 }
 
 type dictType struct {
-	k Type
-	v Type
+	keyType   Type
+	valueType Type
 }
 
 func (v *dictType) toString(buffer *bytes.Buffer) {
 	buffer.WriteString("Dict<")
-	v.k.toString(buffer)
+	v.keyType.toString(buffer)
 	buffer.WriteByte(',')
-	v.v.toString(buffer)
+	v.valueType.toString(buffer)
 	buffer.WriteByte('>')
 }
 
@@ -215,10 +215,10 @@ func (v *dictType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
-	if !v.k.equalsTo(vv.k) {
+	if !v.keyType.equalsTo(vv.keyType) {
 		return false
 	}
-	if !v.v.equalsTo(vv.v) {
+	if !v.valueType.equalsTo(vv.valueType) {
 		return false
 	}
 	return true
@@ -231,8 +231,8 @@ func (v *dictType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 	typeDict.DictType = a.Dict()
 
-	typeDict.DictType.Key = v.k.toYDB(a)
-	typeDict.DictType.Payload = v.v.toYDB(a)
+	typeDict.DictType.Key = v.keyType.toYDB(a)
+	typeDict.DictType.Payload = v.valueType.toYDB(a)
 
 	t.Type = typeDict
 
@@ -241,8 +241,8 @@ func (v *dictType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 func Dict(key, value Type) (v *dictType) {
 	return &dictType{
-		k: key,
-		v: value,
+		keyType:   key,
+		valueType: value,
 	}
 }
 
@@ -277,12 +277,12 @@ func EmptyList() emptyListType {
 }
 
 type listType struct {
-	t Type
+	itemType Type
 }
 
 func (v *listType) toString(buffer *bytes.Buffer) {
 	buffer.WriteString("List<")
-	v.t.toString(buffer)
+	v.itemType.toString(buffer)
 	buffer.WriteString(">")
 }
 
@@ -298,7 +298,7 @@ func (v *listType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
-	return v.t.equalsTo(vv.t)
+	return v.itemType.equalsTo(vv.itemType)
 }
 
 func (v *listType) toYDB(a *allocator.Allocator) *Ydb.Type {
@@ -306,7 +306,7 @@ func (v *listType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 	list := a.List()
 
-	list.Item = v.t.toYDB(a)
+	list.Item = v.itemType.toYDB(a)
 
 	typeList := a.TypeList()
 	typeList.ListType = list
@@ -318,17 +318,17 @@ func (v *listType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 func List(t Type) *listType {
 	return &listType{
-		t: t,
+		itemType: t,
 	}
 }
 
 type optionalType struct {
-	t Type
+	innerType Type
 }
 
 func (v *optionalType) toString(buffer *bytes.Buffer) {
 	buffer.WriteString("Optional<")
-	v.t.toString(buffer)
+	v.innerType.toString(buffer)
 	buffer.WriteString(">")
 }
 
@@ -344,7 +344,7 @@ func (v *optionalType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
-	return v.t.equalsTo(vv.t)
+	return v.innerType.equalsTo(vv.innerType)
 }
 
 func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
@@ -354,7 +354,7 @@ func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 	typeOptional.OptionalType = a.Optional()
 
-	typeOptional.OptionalType.Item = v.t.toYDB(a)
+	typeOptional.OptionalType.Item = v.innerType.toYDB(a)
 
 	t.Type = typeOptional
 
@@ -363,7 +363,7 @@ func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 func Optional(t Type) *optionalType {
 	return &optionalType{
-		t: t,
+		innerType: t,
 	}
 }
 
@@ -642,13 +642,13 @@ const (
 )
 
 type variantType struct {
-	t  Type
-	tt internalVariantType
+	innerType   Type
+	variantType internalVariantType
 }
 
 func (v *variantType) toString(buffer *bytes.Buffer) {
 	buffer.WriteString("Variant<")
-	v.t.toString(buffer)
+	v.innerType.toString(buffer)
 	buffer.WriteString(">")
 }
 
@@ -664,7 +664,7 @@ func (v *variantType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
-	return v.t.equalsTo(vv.t)
+	return v.innerType.equalsTo(vv.innerType)
 }
 
 func (v *variantType) toYDB(a *allocator.Allocator) *Ydb.Type {
@@ -674,9 +674,9 @@ func (v *variantType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 	typeVariant.VariantType = a.Variant()
 
-	tt := v.t.toYDB(a).Type
+	tt := v.innerType.toYDB(a).Type
 
-	switch v.tt {
+	switch v.variantType {
 	case variantTypeTuple:
 		tupleType, ok := tt.(*Ydb.Type_TupleType)
 		if !ok {
@@ -698,7 +698,7 @@ func (v *variantType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 		typeVariant.VariantType.Type = structItems
 	default:
-		panic(fmt.Sprintf("unsupported variant type: %v", v.tt))
+		panic(fmt.Sprintf("unsupported variant type: %v", v.variantType))
 	}
 
 	t.Type = typeVariant
@@ -708,7 +708,7 @@ func (v *variantType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 func Variant(t Type) *variantType {
 	if tt, ok := t.(*variantType); ok {
-		t = tt.t
+		t = tt.innerType
 	}
 	var tt internalVariantType
 	switch t.(type) {
@@ -720,8 +720,8 @@ func Variant(t Type) *variantType {
 		panic(fmt.Sprintf("unsupported variant type: %v", t))
 	}
 	return &variantType{
-		t:  t,
-		tt: tt,
+		innerType:   t,
+		variantType: tt,
 	}
 }
 
