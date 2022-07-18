@@ -12,8 +12,14 @@
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/YDBPlatform)
 [![WebSite](https://img.shields.io/badge/website-ydb.tech-blue.svg)](https://ydb.tech)
 
-Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme` and `scripting` clients for `YDB`. 
+Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme` and `scripting` clients for `YDB`.
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and ACID transactions.
+
+## Installation
+
+```sh
+go get -u github.com/ydb-platform/ydb-go-sdk/v3
+```
 
 ## Example Usage <a name="example"></a>
 
@@ -36,11 +42,11 @@ queryErr := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err e
     }
     defer res.Close()
     if err = res.NextResultSetErr(ctx); err != nil {
-        return err 
+        return err
     }
     for res.NextRow() {
-        var id    int32   
-        var myStr string 
+        var id    int32
+        var myStr string
         err = res.ScanNamed(named.Required("id", &id),named.OptionalWithDefault("myStr", &myStr))
         if err != nil {
             log.Fatal(err)
@@ -94,4 +100,3 @@ Next packages provide debug tooling:
 | `YDB_LOG_NO_COLOR`               | `bool`    | `false` | set any non empty value to disable colouring logs with internal driver logger                                            |
 | `GRPC_GO_LOG_VERBOSITY_LEVEL`    | `integer` |         | set to `99` to see grpc logs                                                                                             |
 | `GRPC_GO_LOG_SEVERITY_LEVEL`     | `string`  |         | set to `info` to see grpc logs                                                                                           |
-
