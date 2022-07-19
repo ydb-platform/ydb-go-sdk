@@ -1,3 +1,8 @@
+* Enabled server-side session balancing for sessions created from internal session pool 
+* Removed unused public `meta.Meta` methods
+* Renamed `meta.Meta.Meta(ctx)` public method to `meta.Meta.Context(ctx)`
+* Rollbacked default balancer to `balancers.RandomChoice()`
+
 ## v3.29.1
 * Changed default balancer to `balancers.PreferLocalDC(balancers.RandomChoice())`
 

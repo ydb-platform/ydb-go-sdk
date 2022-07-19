@@ -62,7 +62,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		onDone(location, nodes, err)
 	}()
 
-	ctx, err = c.config.Meta().Meta(ctx)
+	ctx, err = c.config.Meta().Context(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -110,7 +110,7 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		}
 	}()
 
-	ctx, err = c.config.Meta().Meta(ctx)
+	ctx, err = c.config.Meta().Context(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

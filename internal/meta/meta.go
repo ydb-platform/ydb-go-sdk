@@ -13,44 +13,75 @@ import (
 
 const (
 	// outgoing headers
-	HeaderDatabase    = "x-ydb-database"
-	HeaderTicket      = "x-ydb-auth-ticket"
-	HeaderVersion     = "x-ydb-sdk-build-info"
-	HeaderRequestType = "x-ydb-request-type"
-	HeaderTraceID     = "x-ydb-trace-id"
-	HeaderUserAgent   = "x-ydb-user-agent"
+	HeaderDatabase           = "x-ydb-database"
+	HeaderTicket             = "x-ydb-auth-ticket"
+	HeaderVersion            = "x-ydb-sdk-build-info"
+	HeaderRequestType        = "x-ydb-request-type"
+	HeaderTraceID            = "x-ydb-trace-id"
+	HeaderUserAgent          = "x-ydb-user-agent"
+	HeaderClientCapabilities = "x-ydb-client-capabilities"
+
+	// outgoing hints
+	HintSessionBalancer = "session-balancer"
 
 	// incomming headers
 	HeaderServerHints = "x-ydb-server-hints"
 
-	// hints
+	// incoming hints
 	HintSessionClose = "session-close"
 )
 
 type Meta interface {
-	Meta(ctx context.Context) (context.Context, error)
-
-	WithDatabase(database string) Meta
-	WithCredentials(creds credentials.Credentials) Meta
-	WithUserAgent(userAgent string) Meta
-
-	Database() string
-	UserAgent() string
+	Context(ctx context.Context) (context.Context, error)
 }
 
 func New(
 	database string,
 	credentials credentials.Credentials,
 	trace trace.Driver,
-	requestsType string,
-	userAgent string,
+	opts ...Option,
 ) Meta {
-	return &meta{
-		trace:        trace,
-		credentials:  credentials,
-		database:     database,
-		requestsType: requestsType,
-		userAgent:    userAgent,
+	m := &meta{
+		trace:       trace,
+		credentials: credentials,
+		database:    database,
+	}
+	for _, o := range opts {
+		o(m)
+	}
+	return m
+}
+
+type Option func(m *meta)
+
+func WithUserAgentOption(userAgent string) Option {
+	return func(m *meta) {
+		m.userAgent = userAgent
+	}
+}
+
+func WithRequestTypeOption(requestType string) Option {
+	return func(m *meta) {
+		m.requestsType = requestType
+	}
+}
+
+func AllowOption(feature string) Option {
+	return func(m *meta) {
+		m.capabilities = append(m.capabilities, feature)
+	}
+}
+
+func ForbidOption(feature string) Option {
+	return func(m *meta) {
+		n := 0
+		for _, capability := range m.capabilities {
+			if capability != feature {
+				m.capabilities[n] = capability
+				n++
+			}
+		}
+		m.capabilities = m.capabilities[:n]
 	}
 }
 
@@ -60,32 +91,7 @@ type meta struct {
 	database     string
 	requestsType string
 	userAgent    string
-}
-
-func (m *meta) Database() string {
-	return m.database
-}
-
-func (m *meta) UserAgent() string {
-	return m.userAgent
-}
-
-func (m *meta) WithDatabase(database string) Meta {
-	mm := *m
-	mm.database = database
-	return &mm
-}
-
-func (m *meta) WithCredentials(creds credentials.Credentials) Meta {
-	mm := *m
-	mm.credentials = creds
-	return &mm
-}
-
-func (m *meta) WithUserAgent(userAgent string) Meta {
-	mm := *m
-	mm.userAgent = userAgent
-	return &mm
+	capabilities []string
 }
 
 func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
@@ -114,15 +120,19 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		}
 	}
 
+	if len(m.capabilities) > 0 {
+		md.Append(HeaderClientCapabilities, m.capabilities...)
+	}
+
 	if m.credentials == nil {
 		return md, nil
 	}
 
 	var token string
 
-	getCredentialsDone := trace.DriverOnGetCredentials(m.trace, &ctx)
+	done := trace.DriverOnGetCredentials(m.trace, &ctx)
 	defer func() {
-		getCredentialsDone(token, err)
+		done(token, err)
 	}()
 
 	token, err = m.credentials.Token(ctx)
@@ -138,7 +148,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	return md, nil
 }
 
-func (m *meta) Meta(ctx context.Context) (_ context.Context, err error) {
+func (m *meta) Context(ctx context.Context) (_ context.Context, err error) {
 	md, err := m.meta(ctx)
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)

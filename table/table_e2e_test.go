@@ -22,11 +22,10 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -431,6 +430,7 @@ func TestTable(t *testing.T) {
 			}
 			return res.Close()
 		},
+		table.WithIdempotent(),
 	); err != nil {
 		t.Fatalf("tx failed: %v\n", err)
 	}
@@ -486,6 +486,7 @@ func TestTable(t *testing.T) {
 			}
 			return nil
 		},
+		table.WithIdempotent(),
 	); err != nil {
 		t.Fatalf("tx failed: %v\n", err)
 	}
@@ -501,6 +502,7 @@ func TestTable(t *testing.T) {
 				`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
 			)
 		},
+		table.WithIdempotent(),
 	); err != nil {
 		t.Fatalf("create table failed: %v\n", err)
 	}
@@ -553,6 +555,7 @@ func TestTable(t *testing.T) {
 			)
 			return err
 		},
+		table.WithIdempotent(),
 	); err != nil {
 		t.Fatalf("upsert failed: %v\n", err)
 	}
@@ -616,6 +619,7 @@ func TestTable(t *testing.T) {
 
 			return res.Err()
 		},
+		table.WithIdempotent(),
 	); err != nil {
 		t.Fatalf("scan select failed: %v\n", err)
 	}
@@ -743,6 +747,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 
 			return nil
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
 		t.Fatalf("read table error: %+v", err)
@@ -815,6 +820,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			}
 			return res.Err()
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
 		t.Fatalf("select simple error: %+v", err)
@@ -874,6 +880,7 @@ func executeScanQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			}
 			return res.Err()
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil && !ydb.IsTimeoutError(err) {
 		t.Fatalf("scan query error: %+v", err)
@@ -1119,6 +1126,7 @@ func describeTableOptions(ctx context.Context, t *testing.T, c table.Client) err
 			desc, err = s.DescribeTableOptions(ctx)
 			return
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		return err
@@ -1194,6 +1202,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 				options.WithPrimaryKeyColumn("series_id"),
 			)
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		return err
@@ -1250,6 +1259,7 @@ func describeTable(ctx context.Context, t *testing.T, c table.Client, path strin
 			}
 			return
 		},
+		table.WithIdempotent(),
 	)
 	return err
 }

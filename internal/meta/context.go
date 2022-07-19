@@ -20,3 +20,12 @@ func WithUserAgent(ctx context.Context, userAgent string) context.Context {
 func WithRequestType(ctx context.Context, requestType string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, HeaderRequestType, requestType)
 }
+
+// WithAllowFeatures returns a copy of parent context with allowed client feature
+func WithAllowFeatures(ctx context.Context, features ...string) context.Context {
+	kv := make([]string, 0, len(features)*2)
+	for _, feature := range features {
+		kv = append(kv, HeaderClientCapabilities, feature)
+	}
+	return metadata.AppendToOutgoingContext(ctx, kv...)
+}
