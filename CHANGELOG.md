@@ -1,3 +1,4 @@
+## v3.29.1
 * Changed default balancer to `balancers.PreferLocalDC(balancers.RandomChoice())`
 
 ## v3.29.0
