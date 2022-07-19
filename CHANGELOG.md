@@ -1,3 +1,4 @@
+## v3.29.2
 * Enabled server-side session balancing for sessions created from internal session pool 
 * Removed unused public `meta.Meta` methods
 * Renamed `meta.Meta.Meta(ctx)` public method to `meta.Meta.Context(ctx)`
