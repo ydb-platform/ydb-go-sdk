@@ -109,7 +109,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 
 func detectLocalDC(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
 	if len(endpoints) == 0 {
-		return "", xerrors.WithStackTrace(ErrClusterEmpty)
+		return "", xerrors.WithStackTrace(ErrNoEndpoints)
 	}
 	endpointsByDc := splitEndpointsByLocation(endpoints)
 

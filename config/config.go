@@ -32,8 +32,7 @@ type Config struct {
 	secure         bool
 	endpoint       string
 	database       string
-	requestsType   string
-	userAgent      string
+	metaOptions    []meta.Option
 	grpcOptions    []grpc.DialOption
 	credentials    credentials.Credentials
 	tlsConfig      *tls.Config
@@ -109,12 +108,6 @@ func (c Config) Balancer() *balancerConfig.Config {
 	return c.balancerConfig
 }
 
-// RequestsType set an additional type hint to all requests.
-// It is needed only for debug purposes and advanced cases.
-func (c Config) RequestsType() string {
-	return c.requestsType
-}
-
 type Option func(c *Config)
 
 // WithInternalDNSResolver
@@ -169,7 +162,7 @@ func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option {
 
 func WithUserAgent(userAgent string) Option {
 	return func(c *Config) {
-		c.userAgent = userAgent
+		c.metaOptions = append(c.metaOptions, meta.WithUserAgentOption(userAgent))
 	}
 }
 
@@ -237,7 +230,7 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 
 func WithRequestsType(requestsType string) Option {
 	return func(c *Config) {
-		c.requestsType = requestsType
+		c.metaOptions = append(c.metaOptions, meta.WithRequestTypeOption(requestsType))
 	}
 }
 
@@ -287,8 +280,7 @@ func New(opts ...Option) Config {
 		c.database,
 		c.credentials,
 		c.trace,
-		c.requestsType,
-		c.userAgent,
+		c.metaOptions...,
 	)
 	return c
 }

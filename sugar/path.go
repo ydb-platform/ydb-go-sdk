@@ -6,7 +6,9 @@ import (
 	"path"
 	"strings"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -29,14 +31,29 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 			x = len(pathToCreate[i:]) - 1
 		}
 		i += x
-		sub := pathToCreate[:i+1]
-		info, err := db.Scheme().DescribePath(ctx, sub)
-		if ydb.IsOperationErrorSchemeError(err) {
-			err = db.Scheme().MakeDirectory(ctx, sub)
+		var (
+			err  error
+			info scheme.Entry
+			sub  = pathToCreate[:i+1]
+		)
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			info, err = db.Scheme().DescribePath(ctx, sub)
+			return err
+		}, retry.WithIdempotent(true))
+		if ydb.IsOperationError(err, Ydb.StatusIds_SCHEME_ERROR) {
+			err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+				return db.Scheme().MakeDirectory(ctx, sub)
+			}, retry.WithIdempotent(true))
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}
-			info, err = db.Scheme().DescribePath(ctx, sub)
+			err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+				info, err = db.Scheme().DescribePath(ctx, sub)
+				return err
+			}, retry.WithIdempotent(true))
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 		}
 		if err != nil {
 			return xerrors.WithStackTrace(err)

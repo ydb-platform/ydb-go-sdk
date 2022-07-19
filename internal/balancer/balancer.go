@@ -19,7 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var ErrClusterEmpty = xerrors.Wrap(fmt.Errorf("cluster empty"))
+var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
 
 type balancer struct {
 	driverConfig      config.Config
@@ -245,7 +245,7 @@ func (b *balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 		}
 	}()
 
-	if ctx, err = b.driverConfig.Meta().Meta(ctx); err != nil {
+	if ctx, err = b.driverConfig.Meta().Context(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -289,7 +289,9 @@ func (b *balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 
 	c, failedCount = state.GetConnection(ctx)
 	if c == nil {
-		return nil, xerrors.WithStackTrace(ErrClusterEmpty)
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("%w: cannot get connection from balancer after %d attempts", ErrNoEndpoints, failedCount),
+		)
 	}
 	return c, nil
 }

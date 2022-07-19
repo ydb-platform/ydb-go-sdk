@@ -17,8 +17,8 @@ func TestMetaRequiredHeaders(t *testing.T) {
 		"database",
 		credentials.NewAccessTokenCredentials("token", "TestMetaRequiredHeaders"),
 		trace.Driver{},
-		"requestType",
-		"user-agent",
+		meta.WithRequestTypeOption("requestType"),
+		meta.WithUserAgentOption("user-agent"),
 	)
 
 	ctx := context.Background()
@@ -29,7 +29,7 @@ func TestMetaRequiredHeaders(t *testing.T) {
 
 	ctx = metadata.AppendToOutgoingContext(ctx, "some-user-header", "some-user-value")
 
-	ctx, err := m.Meta(ctx)
+	ctx, err := m.Context(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

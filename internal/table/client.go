@@ -11,16 +11,15 @@ import (
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -211,7 +210,10 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 		)
 
 		createSessionCtx, cancel := context.WithTimeout(
-			deadline.ContextWithoutDeadline(ctx),
+			meta.WithAllowFeatures(
+				deadline.ContextWithoutDeadline(ctx),
+				meta.HintSessionBalancer,
+			),
 			c.config.CreateSessionTimeout(),
 		)
 
@@ -647,7 +649,7 @@ func (c *Client) keeper(ctx context.Context) {
 					case
 						xerrors.Is(
 							err,
-							balancer.ErrClusterEmpty,
+							balancer.ErrNoEndpoints,
 						),
 						xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION),
 						xerrors.IsTransportError(
