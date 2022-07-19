@@ -102,5 +102,5 @@ func PreferWithFallback(balancer *balancerConfig.Config, filter func(endpoint En
 
 // Default balancer used by default
 func Default() *balancerConfig.Config {
-	return RandomChoice()
+	return PreferLocalDC(RandomChoice())
 }

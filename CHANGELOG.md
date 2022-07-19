@@ -1,3 +1,5 @@
+* Changed default balancer to `balancers.PreferLocalDC(balancers.RandomChoice())`
+
 ## v3.29.0
 * Refactored `internal/value` package for decrease CPU and memory workload with GC
 * Added `table/types.Equal(lhs, rhs)` helper for check equal for two types
