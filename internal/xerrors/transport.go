@@ -165,17 +165,6 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 		}
 		return false
 	default:
-		if s, ok := grpcStatus.FromError(err); ok {
-			if len(codes) == 0 {
-				return true
-			}
-			code := s.Code()
-			for _, c := range codes {
-				if code == c {
-					return true
-				}
-			}
-		}
 		return false
 	}
 }

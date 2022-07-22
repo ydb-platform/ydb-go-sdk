@@ -1,8 +1,10 @@
+* Reverted `xerrors.IsTransportError(err)` behaviour for raw grpc errors to false 
+
 ## v3.29.2
 * Enabled server-side session balancing for sessions created from internal session pool 
 * Removed unused public `meta.Meta` methods
 * Renamed `meta.Meta.Meta(ctx)` public method to `meta.Meta.Context(ctx)`
-* Rollbacked default balancer to `balancers.RandomChoice()`
+* Reverted default balancer to `balancers.RandomChoice()`
 
 ## v3.29.1
 * Changed default balancer to `balancers.PreferLocalDC(balancers.RandomChoice())`
