@@ -1,3 +1,5 @@
+* Added touching of last updated timestamp in existing conns on stage of applying new endpoint list
+
 ## v3.29.3
 * Reverted `xerrors.IsTransportError(err)` behaviour for raw grpc errors to false 
 

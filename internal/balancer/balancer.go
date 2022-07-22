@@ -77,6 +77,7 @@ func (b *balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	connections := endpointsToConnections(b.pool, endpoints)
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
+		c.Endpoint().Touch()
 	}
 
 	info := balancerConfig.Info{SelfLocation: localDC}
