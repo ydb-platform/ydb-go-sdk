@@ -1,3 +1,4 @@
+## v3.29.3
 * Reverted `xerrors.IsTransportError(err)` behaviour for raw grpc errors to false 
 
 ## v3.29.2
