@@ -1,3 +1,5 @@
+* Fixed regression of `table/types.WriteTypeStringTo`
+
 ## v3.29.4
 * Added touching of last updated timestamp in existing conns on stage of applying new endpoint list
 
