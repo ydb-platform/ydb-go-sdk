@@ -28,6 +28,7 @@ jobs:
     - name: Build
       run: |
         go install ./internal/cmd/gtrace
+        go install github.com/golang/mock/mockgen@v1.6.0        
 
     - name: Clean and re-generate *_gtrace.go files
       run: |
@@ -37,7 +38,7 @@ jobs:
 
     - name: Check generation
       run: |
-        if [[ $(git status --porcelain) -ne 0 ]]; then
-          echo "code-generation not compatible with gtrace output";
+        if [ -n "$(git status --porcelain)"  ]; then
+          echo "code-generation not equal with committed";
           exit 1;
         fi
