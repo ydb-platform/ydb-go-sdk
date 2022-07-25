@@ -31,7 +31,9 @@ jobs:
 
     - name: Clean and re-generate *_gtrace.go files
       run: |
-        cd ./trace && rm -f *_gtrace.go && go generate
+        rm -f ./trace/*_gtrace.go
+        go generate ./trace
+        go generate ./...
 
     - name: Check generation
       run: |
