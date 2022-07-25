@@ -53,6 +53,10 @@ func Struct(opts ...StructOption) Type {
 	return value.Struct(s.fields...)
 }
 
+func Dict(k, v Type) Type {
+	return value.Dict(k, v)
+}
+
 func Variant(x Type) Type {
 	return value.Variant(x)
 }

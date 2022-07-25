@@ -18,7 +18,7 @@ type Type interface {
 }
 
 func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
-	buf.WriteString(fmt.Sprintf("%T", t))
+	buf.WriteString(t.String())
 }
 
 func TypeToYDB(t Type, a *allocator.Allocator) *Ydb.Type {
