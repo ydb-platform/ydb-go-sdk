@@ -1,3 +1,4 @@
+## v3.29.5
 * Fixed regression of `table/types.WriteTypeStringTo`
 
 ## v3.29.4
