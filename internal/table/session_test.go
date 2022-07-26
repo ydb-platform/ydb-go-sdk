@@ -3,16 +3,16 @@ package table
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
@@ -460,7 +460,8 @@ func TestCreateTableRegression(t *testing.T) {
 							},
 						}
 						if !proto.Equal(exp, act.(proto.Message)) {
-							return nil, fmt.Errorf("act: %v\n\nexp: %s\n\n", act, exp)
+							// nolint:revive
+							return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
 						}
 						return &Ydb_Table.CreateTableResponse{}, nil
 					},
@@ -489,4 +490,134 @@ func TestCreateTableRegression(t *testing.T) {
 	})
 
 	require.NoError(t, err, "")
+}
+
+func TestDescribeTableRegression(t *testing.T) {
+	client := New(
+		testutil.NewRouter(
+			testutil.WithInvokeHandlers(
+				testutil.InvokeHandlers{
+					testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
+						return &Ydb_Table.CreateSessionResult{
+							SessionId: "",
+						}, nil
+					},
+					testutil.TableDescribeTable: func(act interface{}) (proto.Message, error) {
+						return &Ydb_Table.DescribeTableResult{
+							Self: &Ydb_Scheme.Entry{
+								Name: "episodes",
+							},
+							Columns: []*Ydb_Table.ColumnMeta{
+								{
+									Name: "series_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "season_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "episode_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "title",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UTF8,
+										}}},
+									}},
+								},
+								{
+									Name: "air_date",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+							},
+							PrimaryKey: []string{
+								"series_id",
+								"season_id",
+								"episode_id",
+							},
+							Attributes: map[string]string{
+								"attr": "attr_value",
+							},
+						}, nil
+					},
+				},
+			),
+		),
+		config.New(),
+	)
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+
+	var act options.Description
+
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+		act, err = s.DescribeTable(ctx, "episodes")
+		return err
+	})
+
+	require.NoError(t, err, "")
+
+	exp := options.Description{
+		Name: "episodes",
+		Columns: []options.Column{
+			{
+				Name: "series_id",
+				Type: types.Optional(types.TypeUint64),
+			},
+			{
+				Name: "season_id",
+				Type: types.Optional(types.TypeUint64),
+			},
+			{
+				Name: "episode_id",
+				Type: types.Optional(types.TypeUint64),
+			},
+			{
+				Name: "title",
+				Type: types.Optional(types.TypeUTF8),
+			},
+			{
+				Name: "air_date",
+				Type: types.Optional(types.TypeUint64),
+			},
+		},
+		KeyRanges: []options.KeyRange{
+			{},
+		},
+		PrimaryKey: []string{
+			"series_id",
+			"season_id",
+			"episode_id",
+		},
+		Attributes: map[string]string{
+			"attr": "attr_value",
+		},
+	}
+
+	if fmt.Sprintf("%+v", act) != fmt.Sprintf("%+v", exp) {
+		t.Fatalf("description's not equal: \n\nact: %+v\n\nexp: %+v\n\n", act, exp)
+	}
 }
