@@ -3,16 +3,16 @@ package table
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
@@ -460,7 +460,8 @@ func TestCreateTableRegression(t *testing.T) {
 							},
 						}
 						if !proto.Equal(exp, act.(proto.Message)) {
-							return nil, fmt.Errorf("act: %v\n\nexp: %s\n\n", act, exp)
+							// nolint:revive
+							return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
 						}
 						return &Ydb_Table.CreateTableResponse{}, nil
 					},
