@@ -650,7 +650,14 @@ func (s *session) Execute(
 		f(&optsResult)
 	}
 
-	onDone := trace.TableOnSessionQueryExecute(s.config.Trace(), &ctx, s, q, params, optsResult.QueryCachePolicy.GetKeepInCache())
+	onDone := trace.TableOnSessionQueryExecute(
+		s.config.Trace(),
+		&ctx,
+		s,
+		q,
+		params,
+		optsResult.QueryCachePolicy.GetKeepInCache(),
+	)
 	defer func() {
 		onDone(txr, true, r, err)
 	}()
