@@ -26,12 +26,18 @@ func (s *statement) Execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
+	var optsResult options.ExecuteDataQueryDesc
+	for _, f := range opts {
+		f(&optsResult)
+	}
+
 	onDone := trace.TableOnSessionQueryExecute(
 		s.session.config.Trace(),
 		&ctx,
 		s.session,
 		s.query,
 		params,
+		optsResult.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
 		onDone(txr, true, r, err)

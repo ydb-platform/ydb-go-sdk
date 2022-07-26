@@ -1,3 +1,5 @@
+* Fix write KeepInCacheFlag for table traces
+
 ## v3.29.5
 * Fixed regression of `table/types.WriteTypeStringTo`
 

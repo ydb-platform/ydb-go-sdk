@@ -1,4 +1,4 @@
-name: gtrace
+name: check-codegen
 on:
   push:
     branches:
@@ -28,14 +28,20 @@ jobs:
     - name: Build
       run: |
         go install ./internal/cmd/gtrace
+        go install github.com/golang/mock/mockgen@v1.6.0        
 
     - name: Clean and re-generate *_gtrace.go files
       run: |
-        cd ./trace && rm -f *_gtrace.go && go generate
+        rm -f ./trace/*_gtrace.go
+        go generate ./trace
+        go generate ./...
 
     - name: Check generation
       run: |
-        if [[ $(git status --porcelain) -ne 0 ]]; then
-          echo "code-generation not compatible with gtrace output";
+        CODE_DIFF="$(git diff)"
+        if [ -n "$CODE_DIFF"  ]; then
+          echo "code-generation not equal with committed"
+          echo
+          echo "$CODE_DIFF"
           exit 1;
         fi
