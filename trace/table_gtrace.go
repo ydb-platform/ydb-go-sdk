@@ -1363,12 +1363,13 @@ func TableOnSessionQueryPrepare(t Table, c *context.Context, session tableSessio
 		res(p)
 	}
 }
-func TableOnSessionQueryExecute(t Table, c *context.Context, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
+func TableOnSessionQueryExecute(t Table, c *context.Context, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
 	var p TableExecuteDataQueryStartInfo
 	p.Context = c
 	p.Session = session
 	p.Query = query
 	p.Parameters = parameters
+	p.KeepInCache = keepInCache
 	res := t.onSessionQueryExecute(p)
 	return func(tx tableTransactionInfo, prepared bool, result tableResult, e error) {
 		var p TableExecuteDataQueryDoneInfo

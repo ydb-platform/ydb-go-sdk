@@ -1,4 +1,4 @@
-name: gtrace
+name: check-codegen
 on:
   push:
     branches:
