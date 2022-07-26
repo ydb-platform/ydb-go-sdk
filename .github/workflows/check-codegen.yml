@@ -38,7 +38,7 @@ jobs:
 
     - name: Check generation
       run: |
-        CODE_DIFF="$(git status --porcelain)"
+        CODE_DIFF="$(git diff)"
         if [ -n "$CODE_DIFF"  ]; then
           echo "code-generation not equal with committed"
           echo
