@@ -1,6 +1,6 @@
 ## v3.30.0
 * Added `ydb.RegisterParser(name string, parser func(value string) []ydb.Option)` function for register parser of specified param name (supporting additional params in connection string)
-* Fix write KeepInCacheFlag for table traces
+* Fixed writing `KeepInCacheFlag` in table traces
 
 ## v3.29.5
 * Fixed regression of `table/types.WriteTypeStringTo`
