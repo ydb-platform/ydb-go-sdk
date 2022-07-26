@@ -645,7 +645,19 @@ func (s *session) Execute(
 		params = table.NewQueryParameters()
 	}
 
-	onDone := trace.TableOnSessionQueryExecute(s.config.Trace(), &ctx, s, q, params)
+	var optsResult options.ExecuteDataQueryDesc
+	for _, f := range opts {
+		f(&optsResult)
+	}
+
+	onDone := trace.TableOnSessionQueryExecute(
+		s.config.Trace(),
+		&ctx,
+		s,
+		q,
+		params,
+		optsResult.QueryCachePolicy.GetKeepInCache(),
+	)
 	defer func() {
 		onDone(txr, true, r, err)
 	}()
