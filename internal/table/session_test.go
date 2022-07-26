@@ -3,6 +3,8 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"reflect"
 	"testing"
 	"time"
@@ -387,4 +389,104 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			},
 		)
 	}
+}
+
+func TestCreateTableRegression(t *testing.T) {
+	client := New(
+		testutil.NewRouter(
+			testutil.WithInvokeHandlers(
+				testutil.InvokeHandlers{
+					testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
+						return &Ydb_Table.CreateSessionResult{
+							SessionId: "",
+						}, nil
+					},
+					testutil.TableCreateTable: func(act interface{}) (proto.Message, error) {
+						exp := &Ydb_Table.CreateTableRequest{
+							SessionId: "",
+							Path:      "episodes",
+							Columns: []*Ydb_Table.ColumnMeta{
+								{
+									Name: "series_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "season_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "episode_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "title",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UTF8,
+										}}},
+									}},
+								},
+								{
+									Name: "air_date",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+							},
+							PrimaryKey: []string{
+								"series_id",
+								"season_id",
+								"episode_id",
+							},
+							OperationParams: &Ydb_Operations.OperationParams{
+								OperationMode: Ydb_Operations.OperationParams_SYNC,
+							},
+							Attributes: map[string]string{
+								"attr": "attr_value",
+							},
+						}
+						if !proto.Equal(exp, act.(proto.Message)) {
+							return nil, fmt.Errorf("act: %v\n\nexp: %s\n\n", act, exp)
+						}
+						return &Ydb_Table.CreateTableResponse{}, nil
+					},
+				},
+			),
+		),
+		config.New(),
+	)
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) error {
+		return s.CreateTable(ctx, "episodes",
+			options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+			options.WithColumn("season_id", types.Optional(types.TypeUint64)),
+			options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
+			options.WithColumn("title", types.Optional(types.TypeUTF8)),
+			options.WithColumn("air_date", types.Optional(types.TypeUint64)),
+			options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
+			options.WithAttribute("attr", "attr_value"),
+		)
+	})
+
+	require.NoError(t, err, "")
 }
