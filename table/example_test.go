@@ -15,7 +15,7 @@ import (
 
 func Example_select() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return
@@ -57,7 +57,7 @@ func Example_select() {
 
 func Example_createTable() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return
@@ -83,7 +83,7 @@ func Example_createTable() {
 
 func Example_bulkUpsert() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return
