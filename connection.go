@@ -8,8 +8,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
@@ -26,12 +24,16 @@ import (
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -71,6 +73,9 @@ type Connection interface {
 	// Scripting returns scripting client
 	Scripting() scripting.Client
 
+	// Topic returns topic client
+	Topic() topic.Client
+
 	// With makes child connection with the same options and another options
 	With(ctx context.Context, opts ...Option) (Connection, error)
 }
@@ -103,6 +108,10 @@ type connection struct {
 	ratelimiterOnce    initOnce
 	ratelimiter        *internalRatelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
+
+	topicOnce    initOnce
+	topic        topic.Client
+	topicOptions []topicoptions.TopicOption
 
 	pool *conn.Pool
 
@@ -141,6 +150,7 @@ func (c *connection) Close(ctx context.Context) error {
 		c.schemeOnce.Close,
 		c.scriptingOnce.Close,
 		c.tableOnce.Close,
+		c.topicOnce.Close,
 		c.balancer.Close,
 		c.pool.Release,
 	)
@@ -303,6 +313,19 @@ func (c *connection) Scripting() scripting.Client {
 	})
 	// may be nil if driver closed early
 	return c.scripting
+}
+
+// Topic return topic client
+//
+// Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func (c *connection) Topic() topic.Client {
+	c.topicOnce.Init(func() closeFunc {
+		c.topic = topicclientinternal.New(c.balancer, c.topicOptions...)
+		return c.topic.Close
+	})
+	return c.topic
 }
 
 // Open connects to database by DSN and return driver runtime holder

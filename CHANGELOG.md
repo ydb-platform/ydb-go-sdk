@@ -1,3 +1,4 @@
+* Extended the ydb.Connection interface with experimental db.Topic() client (control plane and reader API)
 * Refactored `db.Table().CreateSession(ctx)` (maked retryable with internal create session timeout)
 * Refactored `internal/table/client.createSession(ctx)` (got rid of unnecessary goroutine)
 * Supported many user-agent records

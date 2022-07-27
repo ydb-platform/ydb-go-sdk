@@ -3,12 +3,14 @@ package ydb_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 )
 
 func Example_table() {
@@ -49,6 +51,37 @@ func Example_table() {
 	)
 	if err != nil {
 		log.Printf("unexpected error: %v", err)
+	}
+}
+
+func Example_topic() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+
+	reader, err := db.Topic().StartReader("consumer", topicoptions.ReadTopic("/topic/path"))
+	if err != nil {
+		fmt.Printf("failed start reader: %v", err)
+		return
+	}
+
+	for {
+		mess, err := reader.ReadMessage(ctx)
+		if err != nil {
+			fmt.Printf("failed start reader: %v", err)
+			return
+		}
+
+		content, err := io.ReadAll(mess)
+		if err != nil {
+			fmt.Printf("failed start reader: %v", err)
+			return
+		}
+		fmt.Println(string(content))
 	}
 }
 
