@@ -51,7 +51,7 @@ type session struct {
 	status    options.SessionStatus
 
 	onCloseMtx xsync.RWMutex
-	onClose    []func(ctx context.Context)
+	onClose    []func()
 }
 
 func (s *session) NodeID() uint32 {
@@ -142,7 +142,7 @@ func (s *session) ID() string {
 	return s.id
 }
 
-func (s *session) OnClose(cb func(ctx context.Context)) {
+func (s *session) OnClose(cb func()) {
 	if s.isClosed() {
 		return
 	}
@@ -178,8 +178,8 @@ func (s *session) Close(ctx context.Context) (err error) {
 	// call all close listeners before doing request
 	// firstly this need to clear Client from this session
 	s.onCloseMtx.WithRLock(func() {
-		for _, cb := range s.onClose {
-			cb(ctx)
+		for _, onClose := range s.onClose {
+			onClose()
 		}
 	})
 
