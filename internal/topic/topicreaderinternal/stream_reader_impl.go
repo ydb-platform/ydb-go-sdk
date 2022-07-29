@@ -227,18 +227,20 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 		switch m := msg.(type) {
 		case *rawtopicreader.StartPartitionSessionRequest:
 			if err := r.onStartPartitionSessionRequestFromBuffer(m); err != nil {
-				r.CloseWithError(ctx, err)
+				_ = r.CloseWithError(ctx, err)
 				return
 			}
 		case *rawtopicreader.StopPartitionSessionRequest:
 			if err := r.onStopPartitionSessionRequestFromBuffer(m); err != nil {
-				r.CloseWithError(ctx, xerrors.WithStackTrace(fmt.Errorf("ydb: unexpected error on stop partition handler: %w", err)))
+				_ = r.CloseWithError(ctx, xerrors.WithStackTrace(
+					fmt.Errorf("ydb: unexpected error on stop partition handler: %w", err),
+				))
 				return
 			}
 		case *rawtopicreader.PartitionSessionStatusResponse:
 			r.onPartitionSessionStatusResponseFromBuffer(ctx, m)
 		default:
-			r.CloseWithError(ctx, xerrors.WithStackTrace(
+			_ = r.CloseWithError(ctx, xerrors.WithStackTrace(
 				fmt.Errorf("ydb: unexpected server message from buffer: %v", reflect.TypeOf(msg))),
 			)
 		}
@@ -419,7 +421,7 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 				// and skip message is safe
 				continue
 			}
-			r.CloseWithError(ctx, err)
+			_ = r.CloseWithError(ctx, err)
 			return
 		}
 

@@ -317,6 +317,6 @@ func (r *readerReconnector) handlePanic() {
 	p := recover()
 
 	if p != nil {
-		r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
+		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
 	}
 }

@@ -129,7 +129,7 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 		testErr := errors.New("test'")
 
 		go func() {
-			reconnector.CloseWithError(context.Background(), testErr)
+			_ = reconnector.CloseWithError(context.Background(), testErr)
 		}()
 
 		_, err := reconnector.ReadMessageBatch(context.Background(), ReadMessageBatchOptions{})
@@ -285,7 +285,7 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	reconnector.start()
 
 	<-connectionRequested
-	reconnector.CloseWithError(ctx, nil)
+	_ = reconnector.CloseWithError(ctx, nil)
 }
 
 func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
