@@ -18,8 +18,6 @@ type Client interface {
 	ModifyPermissions(ctx context.Context, path string, opts ...PermissionsOption) (err error)
 }
 
-type Path string
-
 type EntryType uint
 
 type Directory struct {
