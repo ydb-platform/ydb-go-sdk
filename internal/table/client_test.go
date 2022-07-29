@@ -289,9 +289,9 @@ func TestSessionPoolClose(t *testing.T) {
 		closed3 = false
 	)
 
-	s1.OnClose(func(context.Context) { closed1 = true })
-	s2.OnClose(func(context.Context) { closed2 = true })
-	s3.OnClose(func(context.Context) { closed3 = true })
+	s1.OnClose(func() { closed1 = true })
+	s2.OnClose(func() { closed2 = true })
+	s3.OnClose(func() { closed3 = true })
 
 	mustPutSession(t, p, s1)
 	mustPutSession(t, p, s2)
@@ -524,7 +524,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	// Release the first create session request.
 	// Created session must be stored in the Client.
 	expSession = r1.session
-	expSession.OnClose(func(context.Context) {
+	expSession.OnClose(func() {
 		t.Fatalf("unexpected first session close")
 	})
 	close(r1.release)
@@ -1057,7 +1057,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	sessionBuilder := func(t *testing.T, pool *Client) (Session, chan bool) {
 		s := mustCreateSession(t, pool)
 		closed := make(chan bool)
-		s.OnClose(func(context.Context) {
+		s.OnClose(func() {
 			close(closed)
 		})
 		return s, closed
@@ -1124,7 +1124,7 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 	}()
 	s := mustCreateSession(t, p)
 	closed := make(chan bool)
-	s.OnClose(func(context.Context) {
+	s.OnClose(func() {
 		close(closed)
 	})
 	mustPutSession(t, p, s)

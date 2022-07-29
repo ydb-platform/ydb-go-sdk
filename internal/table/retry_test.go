@@ -80,7 +80,7 @@ func TestRetryerBadSession(t *testing.T) {
 	p := SessionProviderFunc{
 		OnGet: func(ctx context.Context) (Session, error) {
 			s := simpleSession(t)
-			s.OnClose(func(context.Context) {
+			s.OnClose(func() {
 				closed[s] = true
 			})
 			return s, nil
@@ -129,7 +129,7 @@ func TestRetryerSessionClosing(t *testing.T) {
 	p := SessionProviderFunc{
 		OnGet: func(ctx context.Context) (Session, error) {
 			s := simpleSession(t)
-			s.OnClose(func(context.Context) {
+			s.OnClose(func() {
 				closed[s] = true
 			})
 			return s, nil

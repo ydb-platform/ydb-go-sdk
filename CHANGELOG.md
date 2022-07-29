@@ -1,4 +1,5 @@
-* Moved `internal/deadline.ContextWithoutDeadline` to `internal/xcontext.WithoutDeadline`
+* Refactored `db.Table().CreateSession(ctx)` (maked retryable with internal create session timeout)
+* Refactored `internal/table/client.createSession(ctx)` (got rid of unnecessary goroutine)
 * Supported many user-agent records
 
 ## v3.30.0

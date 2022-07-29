@@ -29,15 +29,20 @@ type TxOperation func(ctx context.Context, tx TransactionActor) error
 
 type ClosableSession interface {
 	closer.Closer
+
 	Session
+
+	OnClose(f func())
 }
 
 type Client interface {
 	closer.Closer
 
 	// CreateSession returns session or error for manually control of session lifecycle
-	// CreateSession do not provide retry loop for failed create session requests.
-	// Best effort policy may be implements with outer retry loop includes CreateSession call
+	//
+	// CreateSession implements internal busy loop until one of the following conditions is met:
+	// - context was canceled or deadlined
+	// - session was created
 	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
 
 	// Do provide the best effort for execute operation.
