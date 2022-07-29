@@ -15,9 +15,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/deadline"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -211,7 +211,7 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 
 		createSessionCtx, cancel := context.WithTimeout(
 			meta.WithAllowFeatures(
-				deadline.ContextWithoutDeadline(ctx),
+				xcontext.WithoutDeadline(ctx),
 				meta.HintSessionBalancer,
 			),
 			c.config.CreateSessionTimeout(),
@@ -450,7 +450,7 @@ func (c *Client) Put(ctx context.Context, s Session) (err error) {
 	if err != nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(
-			deadline.ContextWithoutDeadline(ctx),
+			xcontext.WithoutDeadline(ctx),
 			c.config.DeleteTimeout(),
 		)
 		defer cancel()
@@ -899,7 +899,7 @@ func (c *Client) closeSession(ctx context.Context, s Session, opts ...closeSessi
 		defer c.wgClosed.Done()
 
 		closeCtx, cancel := context.WithTimeout(
-			deadline.ContextWithoutDeadline(ctx),
+			xcontext.WithoutDeadline(ctx),
 			c.config.DeleteTimeout(),
 		)
 		defer cancel()

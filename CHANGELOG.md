@@ -1,3 +1,4 @@
+* Moved `internal/deadline.ContextWithoutDeadline` to `internal/xcontext.WithoutDeadline`
 * Supported many user-agent records
 
 ## v3.30.0
