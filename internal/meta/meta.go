@@ -56,7 +56,7 @@ type Option func(m *meta)
 
 func WithUserAgentOption(userAgent string) Option {
 	return func(m *meta) {
-		m.userAgent = userAgent
+		m.userAgents = append(m.userAgents, userAgent)
 	}
 }
 
@@ -90,7 +90,7 @@ type meta struct {
 	credentials  credentials.Credentials
 	database     string
 	requestsType string
-	userAgent    string
+	userAgents   []string
 	capabilities []string
 }
 
@@ -114,10 +114,8 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		}
 	}
 
-	if m.userAgent != "" {
-		if len(md.Get(HeaderUserAgent)) == 0 {
-			md.Set(HeaderUserAgent, m.userAgent)
-		}
+	if len(m.userAgents) != 0 {
+		md.Append(HeaderUserAgent, m.userAgents...)
 	}
 
 	if len(m.capabilities) > 0 {

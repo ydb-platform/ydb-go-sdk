@@ -1,3 +1,5 @@
+* Supported many user-agent records
+
 ## v3.30.0
 * Added `ydb.RegisterParser(name string, parser func(value string) []ydb.Option)` function for register parser of specified param name (supporting additional params in connection string)
 * Fixed writing `KeepInCacheFlag` in table traces
