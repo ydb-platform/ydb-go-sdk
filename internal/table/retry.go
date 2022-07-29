@@ -24,7 +24,7 @@ type SessionProvider interface {
 	Put(context.Context, Session) (err error)
 
 	// CloseSession provides the most effective way of session closing
-	// instead of plain session.Close().
+	// instead of plain session.CloseWithError().
 	// CloseSession must be fast. If necessary, can be async.
 	CloseSession(ctx context.Context, s Session) error
 }

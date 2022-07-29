@@ -10,5 +10,5 @@ import (
 type batchedStreamReader interface {
 	ReadMessageBatch(ctx context.Context, opts ReadMessageBatchOptions) (*PublicBatch, error)
 	Commit(ctx context.Context, commitRange commitRange) error
-	Close(ctx context.Context, err error) error
+	CloseWithError(ctx context.Context, err error) error
 }

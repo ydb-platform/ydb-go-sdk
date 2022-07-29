@@ -216,7 +216,7 @@ func (b *balancerStub) Name() string {
 
 func (b *balancerStub) Close(ctx context.Context) error {
 	if b.onClose == nil {
-		return fmt.Errorf("database.Close() not implemented")
+		return fmt.Errorf("database.CloseWithError() not implemented")
 	}
 	return b.onClose(ctx)
 }

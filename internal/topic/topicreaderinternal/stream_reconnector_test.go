@@ -129,7 +129,7 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 		testErr := errors.New("test'")
 
 		go func() {
-			reconnector.Close(context.Background(), testErr)
+			reconnector.CloseWithError(context.Background(), testErr)
 		}()
 
 		_, err := reconnector.ReadMessageBatch(context.Background(), ReadMessageBatchOptions{})
@@ -245,7 +245,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			return reconnector.streamVal == newStream2
 		})
 
-		require.NoError(t, reconnector.Close(ctx, ErrReaderClosed))
+		require.NoError(t, reconnector.CloseWithError(ctx, ErrReaderClosed))
 	})
 
 	t.Run("StartWithCancelledContext", func(t *testing.T) {
@@ -285,7 +285,7 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	reconnector.start()
 
 	<-connectionRequested
-	reconnector.Close(ctx, nil)
+	reconnector.CloseWithError(ctx, nil)
 }
 
 func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {

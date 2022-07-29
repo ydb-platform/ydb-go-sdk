@@ -107,7 +107,7 @@ func (r *readerReconnector) Commit(ctx context.Context, commitRange commitRange)
 	return err
 }
 
-func (r *readerReconnector) Close(ctx context.Context, err error) error {
+func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error {
 	var closeErr error
 	r.closeOnce.Do(func() {
 		r.m.WithLock(func() {
@@ -117,7 +117,7 @@ func (r *readerReconnector) Close(ctx context.Context, err error) error {
 		closeErr = r.background.Close(ctx, err)
 
 		if r.streamVal != nil {
-			streamCloseErr := r.streamVal.Close(ctx, xerrors.WithStackTrace(ErrReaderClosed))
+			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(ErrReaderClosed))
 			if closeErr == nil {
 				closeErr = streamCloseErr
 			}
@@ -205,7 +205,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 	})
 
 	if oldReader != nil {
-		_ = oldReader.Close(ctx, xerrors.WithStackTrace(errors.New("ydb: reconnect to pq grpc stream")))
+		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errors.New("ydb: reconnect to pq grpc stream")))
 	}
 
 	newStream, err := connectWithTimeout(r.background.Context(), r.readerConnect, r.clock, r.connectTimeout)
@@ -317,6 +317,6 @@ func (r *readerReconnector) handlePanic() {
 	p := recover()
 
 	if p != nil {
-		r.Close(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
+		r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
 	}
 }

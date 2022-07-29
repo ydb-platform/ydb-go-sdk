@@ -227,18 +227,18 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 		switch m := msg.(type) {
 		case *rawtopicreader.StartPartitionSessionRequest:
 			if err := r.onStartPartitionSessionRequestFromBuffer(m); err != nil {
-				r.Close(ctx, err)
+				r.CloseWithError(ctx, err)
 				return
 			}
 		case *rawtopicreader.StopPartitionSessionRequest:
 			if err := r.onStopPartitionSessionRequestFromBuffer(m); err != nil {
-				r.Close(ctx, xerrors.WithStackTrace(fmt.Errorf("ydb: unexpected error on stop partition handler: %w", err)))
+				r.CloseWithError(ctx, xerrors.WithStackTrace(fmt.Errorf("ydb: unexpected error on stop partition handler: %w", err)))
 				return
 			}
 		case *rawtopicreader.PartitionSessionStatusResponse:
 			r.onPartitionSessionStatusResponseFromBuffer(ctx, m)
 		default:
-			r.Close(ctx, xerrors.WithStackTrace(
+			r.CloseWithError(ctx, xerrors.WithStackTrace(
 				fmt.Errorf("ydb: unexpected server message from buffer: %v", reflect.TypeOf(msg))),
 			)
 		}
@@ -325,7 +325,7 @@ func (r *topicStreamReaderImpl) send(msg rawtopicreader.ClientMessage) error {
 	trace.TopicOnReadStreamRawSent(r.cfg.Tracer, r.readConnectionID, r.cfg.BaseContext, clientMessageWrapper{msg}, err)
 	if err != nil {
 		trace.TopicOnReadStreamError(r.cfg.Tracer, r.cfg.BaseContext, r.readConnectionID, err)
-		_ = r.Close(r.ctx, err)
+		_ = r.CloseWithError(r.ctx, err)
 	}
 	return err
 }
@@ -419,13 +419,13 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 				// and skip message is safe
 				continue
 			}
-			r.Close(ctx, err)
+			r.CloseWithError(ctx, err)
 			return
 		}
 
 		status := serverMessage.StatusData()
 		if !status.Status.IsSuccess() {
-			_ = r.Close(ctx,
+			_ = r.CloseWithError(ctx,
 				xerrors.WithStackTrace(
 					fmt.Errorf("ydb: bad status from pq grpc stream: %v, %v", status.Status, status.Issues.String()),
 				),
@@ -435,21 +435,21 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 		switch m := serverMessage.(type) {
 		case *rawtopicreader.ReadResponse:
 			if err = r.onReadResponse(m); err != nil {
-				_ = r.Close(ctx, err)
+				_ = r.CloseWithError(ctx, err)
 			}
 		case *rawtopicreader.StartPartitionSessionRequest:
 			if err = r.onStartPartitionSessionRequest(m); err != nil {
-				_ = r.Close(ctx, err)
+				_ = r.CloseWithError(ctx, err)
 				return
 			}
 		case *rawtopicreader.StopPartitionSessionRequest:
 			if err = r.onStopPartitionSessionRequest(m); err != nil {
-				_ = r.Close(ctx, err)
+				_ = r.CloseWithError(ctx, err)
 				return
 			}
 		case *rawtopicreader.CommitOffsetResponse:
 			if err = r.onCommitResponse(m); err != nil {
-				_ = r.Close(ctx, err)
+				_ = r.CloseWithError(ctx, err)
 				return
 			}
 
@@ -477,7 +477,7 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 	for {
 		select {
 		case <-doneChan:
-			_ = r.Close(ctx, r.ctx.Err())
+			_ = r.CloseWithError(ctx, r.ctx.Err())
 			return
 
 		case free := <-r.freeBytes:
@@ -575,7 +575,7 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	return nil
 }
 
-func (r *topicStreamReaderImpl) Close(ctx context.Context, err error) error {
+func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, err error) error {
 	isFirstClose := false
 	r.m.WithLock(func() {
 		if r.closed {

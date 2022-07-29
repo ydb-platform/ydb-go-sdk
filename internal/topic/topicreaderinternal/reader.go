@@ -42,8 +42,8 @@ type ReadMessageBatchOptions struct {
 	batcherGetOptions
 }
 
-func (o *ReadMessageBatchOptions) clone() ReadMessageBatchOptions {
-	return *o
+func (o ReadMessageBatchOptions) clone() ReadMessageBatchOptions {
+	return o
 }
 
 func newReadMessageBatchOptions() ReadMessageBatchOptions {
@@ -95,7 +95,7 @@ func NewReader(
 }
 
 func (r *Reader) Close(ctx context.Context) error {
-	return r.reader.Close(ctx, xerrors.WithStackTrace(ErrReaderClosed))
+	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(ErrReaderClosed))
 }
 
 type readExplicitMessagesCount int
@@ -130,6 +130,8 @@ forReadBatch:
 			return nil, err
 		}
 
+		// if batch context is canceled - do not return it to client
+		// and read next batch
 		if batch.Context().Err() != nil {
 			continue forReadBatch
 		}
