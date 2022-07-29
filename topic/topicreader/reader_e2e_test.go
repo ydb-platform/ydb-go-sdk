@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"runtime/pprof"
 	"sync/atomic"
@@ -208,7 +209,7 @@ func createReader(
 	opts ...topicoptions.ReaderOption,
 ) *topicreader.Reader {
 	js := func(v interface{ JSONData() io.Reader }) string {
-		data, err := io.ReadAll(v.JSONData())
+		data, err := ioutil.ReadAll(v.JSONData())
 		if err != nil {
 			t.Fatal(err)
 		}

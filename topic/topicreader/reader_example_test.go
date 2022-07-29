@@ -1,5 +1,3 @@
-//go:build go1.16
-
 package topicreader_test
 
 import (
@@ -7,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -81,7 +80,7 @@ func Example_simplePrintMessageContent() {
 
 	for {
 		msg, _ := reader.ReadMessage(ctx)
-		content, _ := io.ReadAll(msg)
+		content, _ := ioutil.ReadAll(msg)
 		fmt.Println(string(content))
 	}
 }
@@ -327,7 +326,7 @@ func processBatch(batch *topicreader.Batch) {
 }
 
 func processMessage(m *topicreader.Message) {
-	body, _ := io.ReadAll(m)
+	body, _ := ioutil.ReadAll(m)
 	writeToDB(
 		m.Context(), // m.Context will skip if server revoke partition or connection to server broken
 		m.SeqNo, body)

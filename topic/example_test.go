@@ -1,11 +1,9 @@
-//go:build go1.16
-
 package topic_test
 
 import (
 	"context"
 	"fmt"
-	"io"
+	"io/ioutil"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -33,7 +31,7 @@ func Example_topic_read_message() {
 			return
 		}
 
-		content, err := io.ReadAll(mess)
+		content, err := ioutil.ReadAll(mess)
 		if err != nil {
 			fmt.Printf("failed start reader: %v", err)
 			return

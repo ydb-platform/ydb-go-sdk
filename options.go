@@ -15,18 +15,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Option contains configuration values for Connection

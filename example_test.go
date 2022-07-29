@@ -3,7 +3,7 @@ package ydb_test
 import (
 	"context"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -76,7 +76,7 @@ func Example_topic() {
 			return
 		}
 
-		content, err := io.ReadAll(mess)
+		content, err := ioutil.ReadAll(mess)
 		if err != nil {
 			fmt.Printf("failed start reader: %v", err)
 			return
