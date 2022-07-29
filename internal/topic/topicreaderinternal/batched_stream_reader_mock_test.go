@@ -33,7 +33,7 @@ func (m *MockbatchedStreamReader) EXPECT() *MockbatchedStreamReaderMockRecorder 
 	return m.recorder
 }
 
-// Close mocks base method.
+// CloseWithError mocks base method.
 func (m *MockbatchedStreamReader) CloseWithError(ctx context.Context, err error) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CloseWithError", ctx, err)
@@ -41,8 +41,8 @@ func (m *MockbatchedStreamReader) CloseWithError(ctx context.Context, err error)
 	return ret0
 }
 
-// Close indicates an expected call of Close.
-func (mr *MockbatchedStreamReaderMockRecorder) Close(ctx, err interface{}) *gomock.Call {
+// CloseWithError indicates an expected call of CloseWithError.
+func (mr *MockbatchedStreamReaderMockRecorder) CloseWithError(ctx, err interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseWithError", reflect.TypeOf((*MockbatchedStreamReader)(nil).CloseWithError), ctx, err)
 }
