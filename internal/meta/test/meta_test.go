@@ -41,7 +41,7 @@ func TestMetaRequiredHeaders(t *testing.T) {
 	testutil.Equal(t, []string{"database"}, md.Get(meta.HeaderDatabase))
 	testutil.Equal(t, []string{"requestType"}, md.Get(meta.HeaderRequestType))
 	testutil.Equal(t, []string{"token"}, md.Get(meta.HeaderTicket))
-	testutil.Equal(t, []string{"userAgent"}, md.Get(meta.HeaderUserAgent))
+	testutil.Equal(t, []string{"userAgent", "user-agent"}, md.Get(meta.HeaderUserAgent))
 	testutil.Equal(t, []string{"traceID"}, md.Get(meta.HeaderTraceID))
 	testutil.Equal(t, []string{
 		"ydb-go-sdk/" + meta.VersionMajor + "." + meta.VersionMinor + "." + meta.VersionPatch,
