@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-// Result is a result of a query.
+// BaseResult is a result of a query.
 //
 // Use NextResultSet(), NextRow() and Scan() to advance through the result sets,
 // its rows and row's items.
@@ -29,7 +29,7 @@ import (
 // If current value under scan
 // is not requested types, then res.err() become non-nil.
 // After that, NextResultSet(), NextRow() will return false.
-type result interface {
+type BaseResult interface {
 	// HasNextResultSet reports whether result set may be advanced.
 	// It may be useful to call HasNextResultSet() instead of NextResultSet() to look ahead
 	// without advancing the result set.
@@ -120,13 +120,13 @@ type result interface {
 }
 
 type Result interface {
-	result
+	BaseResult
 
 	// ResultSetCount returns number of result sets.
-	// Note that it does not work if r is the result of streaming operation.
+	// Note that it does not work if r is the BaseResult of streaming operation.
 	ResultSetCount() int
 }
 
 type StreamResult interface {
-	result
+	BaseResult
 }
