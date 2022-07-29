@@ -79,12 +79,12 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 		baseReader1 := NewMockbatchedStreamReader(mc)
 		baseReader1.EXPECT().ReadMessageBatch(gomock.Any(), opts).MinTimes(1).
 			Return(nil, xerrors.Retryable(errors.New("test1")))
-		baseReader1.EXPECT().Close(gomock.Any(), gomock.Any()).Return(nil)
+		baseReader1.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil)
 
 		baseReader2 := NewMockbatchedStreamReader(mc)
 		baseReader2.EXPECT().ReadMessageBatch(gomock.Any(), opts).MinTimes(1).
 			Return(nil, xerrors.Retryable(errors.New("test2")))
-		baseReader2.EXPECT().Close(gomock.Any(), gomock.Any()).Return(nil)
+		baseReader2.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Return(nil)
 
 		baseReader3 := NewMockbatchedStreamReader(mc)
 		batch := &PublicBatch{
@@ -191,10 +191,10 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 		defer mc.Finish()
 
 		newStream1 := NewMockbatchedStreamReader(mc)
-		newStream1.EXPECT().Close(gomock.Any(), gomock.Any()).MinTimes(1)
+		newStream1.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).MinTimes(1)
 		newStream2 := NewMockbatchedStreamReader(mc)
 
-		newStream2.EXPECT().Close(gomock.Any(), gomock.Any()).MinTimes(1)
+		newStream2.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).MinTimes(1)
 
 		reconnector := &readerReconnector{
 			connectTimeout: infiniteTimeout,
@@ -266,7 +266,7 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	reconnector.initChannelsAndClock()
 
 	stream := NewMockbatchedStreamReader(mc)
-	stream.EXPECT().Close(gomock.Any(), gomock.Any()).Do(func(_ context.Context, err error) {
+	stream.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Do(func(_ context.Context, err error) {
 		require.Error(t, err)
 	})
 

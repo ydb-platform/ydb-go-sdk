@@ -33,7 +33,7 @@ func TestReader_Close(t *testing.T) {
 		baseReader.EXPECT().Commit(gomock.Any(), gomock.Any()).Do(func(_, _ interface{}) {
 			<-readerContext.Done()
 		}).Return(testErr)
-		baseReader.EXPECT().Close(gomock.Any(), gomock.Any()).Do(func(_, _ interface{}) {
+		baseReader.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Do(func(_, _ interface{}) {
 			readerCancel()
 		})
 
