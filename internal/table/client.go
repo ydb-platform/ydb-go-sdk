@@ -117,17 +117,71 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
+	createSession := func(ctx context.Context) (s Session, err error) {
+		type result struct {
+			s   Session
+			err error
+		}
+
+		ch := make(chan result)
+
+		go func() {
+			defer close(ch)
+
+			var (
+				s   Session
+				err error
+			)
+
+			createSessionCtx := xcontext.WithoutDeadline(ctx)
+
+			if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
+				var cancel context.CancelFunc
+				createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
+				defer cancel()
+			}
+
+			s, err = c.build(createSessionCtx)
+
+			select {
+			case ch <- result{
+				s:   s,
+				err: err,
+			}: // nop
+			case <-ctx.Done():
+				if s != nil {
+					_ = s.Close(ctx)
+				}
+			}
+		}()
+
+		select {
+		case r := <-ch:
+			if r.err != nil {
+				return nil, xerrors.WithStackTrace(r.err)
+			}
+			return r.s, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 	var s Session
 	if !c.config.AutoRetry() {
-		s, err = c.build(ctx)
-		return s, xerrors.WithStackTrace(err)
+		s, err = createSession(ctx)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		return s, nil
 	}
 	options := retryOptions(c.config.Trace(), opts...)
 	err = retry.Retry(
 		ctx,
 		func(ctx context.Context) (err error) {
 			s, err = c.build(ctx)
-			return xerrors.WithStackTrace(err)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+			return nil
 		},
 		retry.WithIdempotent(true),
 		retry.WithID("CreateSession"),
@@ -145,7 +199,10 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			},
 		}),
 	)
-	return s, xerrors.WithStackTrace(err)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	return s, nil
 }
 
 func (c *Client) isClosed() bool {
@@ -175,15 +232,10 @@ type Session interface {
 	table.ClosableSession
 
 	Status() string
-	OnClose(f func(ctx context.Context))
+	OnClose(f func())
 
 	isClosed() bool
 	isClosing() bool
-}
-
-type createSessionResult struct {
-	s   Session
-	err error
 }
 
 // p.mu must NOT be held.
@@ -201,28 +253,37 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 		return nil, xerrors.WithStackTrace(errSessionPoolOverflow)
 	}
 
-	resCh := make(chan createSessionResult, 1) // for non-block write
+	type result struct {
+		s   Session
+		err error
+	}
+
+	ch := make(chan result)
 
 	go func() {
+		defer close(ch)
+
 		var (
 			s   Session
 			err error
 		)
 
-		createSessionCtx, cancel := context.WithTimeout(
-			meta.WithAllowFeatures(
-				xcontext.WithoutDeadline(ctx),
-				meta.HintSessionBalancer,
-			),
-			c.config.CreateSessionTimeout(),
+		createSessionCtx := xcontext.WithoutDeadline(ctx)
+
+		createSessionCtx = meta.WithAllowFeatures(createSessionCtx,
+			meta.HintSessionBalancer,
 		)
 
-		onDone := trace.TableOnPoolSessionNew(c.config.Trace(), &ctx)
+		if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
+			var cancel context.CancelFunc
+			createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
+			defer cancel()
+		}
+
+		onDone := trace.TableOnPoolSessionNew(c.config.Trace(), &createSessionCtx)
 
 		defer func() {
 			onDone(s, err)
-			cancel()
-			close(resCh)
 		}()
 
 		s, err = c.build(createSessionCtx)
@@ -231,7 +292,7 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 		}
 
 		if s != nil {
-			s.OnClose(func(ctx context.Context) {
+			s.OnClose(func() {
 				c.mu.Lock()
 				defer c.mu.Unlock()
 
@@ -258,32 +319,30 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 
 		c.mu.WithLock(func() {
 			c.createInProgress--
-			if s != nil {
+			if s != nil && !c.closed {
 				c.index[s] = sessionInfo{}
 				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
 			}
 		})
 
-		resCh <- createSessionResult{
+		select {
+		case ch <- result{
 			s:   s,
 			err: err,
+		}: // nop
+		case <-ctx.Done():
+			// nop
 		}
 	}()
 
 	select {
-	case r := <-resCh:
-		if r.s == nil && r.err == nil {
-			panic("ydb: abnormal result of createSession()")
+	case r := <-ch:
+		if r.err != nil {
+			return nil, xerrors.WithStackTrace(r.err)
 		}
-		return r.s, xerrors.WithStackTrace(r.err)
+		return r.s, nil
 	case <-ctx.Done():
-		// read result from resCh for prevention of forgetting session
-		go func() {
-			if r, ok := <-resCh; ok && r.s != nil {
-				_ = r.s.Close(ctx)
-			}
-		}()
-		return nil, ctx.Err()
+		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 }
 
