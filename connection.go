@@ -110,7 +110,7 @@ type connection struct {
 	ratelimiterOptions []ratelimiterConfig.Option
 
 	topicOnce    initOnce
-	topic        topic.Client
+	topic        *topicclientinternal.Client
 	topicOptions []topicoptions.TopicOption
 
 	pool *conn.Pool

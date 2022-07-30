@@ -3,8 +3,9 @@ package topicclientinternal
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
+
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -16,13 +17,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-type client struct {
+type Client struct {
 	cfg                    topic.Config
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
 }
 
-func New(conn grpc.ClientConnInterface, opts ...topicoptions.TopicOption) *client {
+func New(conn grpc.ClientConnInterface, opts ...topicoptions.TopicOption) *Client {
 	rawClient := rawtopic.NewClient(Ydb_Topic_V1.NewTopicServiceClient(conn))
 
 	cfg := newTopicConfig(opts...)
@@ -30,7 +31,7 @@ func New(conn grpc.ClientConnInterface, opts ...topicoptions.TopicOption) *clien
 	var defaultOperationParams rawydb.OperationParams
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
-	return &client{
+	return &Client{
 		cfg:                    cfg,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
@@ -50,7 +51,7 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c *client) Close(_ context.Context) error {
+func (c *Client) Close(_ context.Context) error {
 	return nil
 }
 
@@ -59,7 +60,7 @@ func (c *client) Close(_ context.Context) error {
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c *client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
+func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
 	req := rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
@@ -75,7 +76,7 @@ func (c *client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c *client) Create(
+func (c *Client) Create(
 	ctx context.Context,
 	path string,
 	codecs []topictypes.Codec,
@@ -103,7 +104,7 @@ func (c *client) Create(
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c *client) Describe(
+func (c *Client) Describe(
 	ctx context.Context,
 	path string,
 	opts ...topicoptions.DescribeOption,
@@ -131,7 +132,7 @@ func (c *client) Describe(
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c *client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
+func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
 	req := rawtopic.DropTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
@@ -149,7 +150,7 @@ func (c *client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c *client) StartReader(
+func (c *Client) StartReader(
 	consumer string,
 	readSelectors topicoptions.ReadSelectors,
 	opts ...topicoptions.ReaderOption,

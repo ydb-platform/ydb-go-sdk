@@ -14,7 +14,7 @@ import (
 // its rows and row's items.
 //
 //     res, err := s.Execute(ctx, txc, "SELECT ...")
-//     defer res.CloseWithError()
+//     defer res.Close()
 //     for res.NextResultSet(ctx) {
 //         for res.NextRow() {
 //             var id int64

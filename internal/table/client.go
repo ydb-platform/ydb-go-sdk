@@ -474,9 +474,9 @@ func (c *Client) waitFromCh(ctx context.Context, t trace.Table) (s Session, err 
 }
 
 // Put returns session to the Client for further reuse.
-// If Client is already closed Put() calls s.CloseWithError(ctx) and returns
+// If Client is already closed Put() calls s.Close(ctx) and returns
 // errClosedClient.
-// If Client is overflow calls s.CloseWithError(ctx) and returns
+// If Client is overflow calls s.Close(ctx) and returns
 // errSessionPoolOverflow.
 //
 // Note that Put() must be called only once after being created or received by
@@ -895,7 +895,7 @@ func (c *Client) notify(s Session) (notified bool) {
 }
 
 // CloseSession provides the most effective way of session closing
-// instead of plain session.CloseWithError().
+// instead of plain session.Close().
 // CloseSession must be fast. If necessary, can be async.
 func (c *Client) CloseSession(ctx context.Context, s Session) error {
 	return c.closeSession(
