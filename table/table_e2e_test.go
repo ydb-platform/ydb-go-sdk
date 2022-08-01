@@ -120,7 +120,7 @@ func (s *stats) addInFlight(t *testing.T, delta int) {
 
 // nolint:gocyclo
 func TestTable(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 55*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
 
 	s := &stats{
@@ -1193,6 +1193,9 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 	err := c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
+			if _, err = s.DescribeTable(ctx, path.Join(folder, "series")); err == nil {
+				_ = s.DropTable(ctx, path.Join(folder, "series"))
+			}
 			return s.CreateTable(ctx, path.Join(folder, "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeUTF8)),
@@ -1211,6 +1214,9 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 	err = c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
+			if _, err = s.DescribeTable(ctx, path.Join(folder, "seasons")); err == nil {
+				_ = s.DropTable(ctx, path.Join(folder, "seasons"))
+			}
 			return s.CreateTable(ctx, path.Join(folder, "seasons"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
@@ -1228,6 +1234,9 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 	err = c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
+			if _, err = s.DescribeTable(ctx, path.Join(folder, "episodes")); err == nil {
+				_ = s.DropTable(ctx, path.Join(folder, "episodes"))
+			}
 			return s.CreateTable(ctx, path.Join(folder, "episodes"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),

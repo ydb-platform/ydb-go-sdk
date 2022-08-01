@@ -31,10 +31,6 @@ import (
 // Option contains configuration values for Connection
 type Option func(ctx context.Context, c *connection) error
 
-func RegisterParser(name string, parser dsn.Parser) error {
-	return dsn.Register(name, parser)
-}
-
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
 		credentials.NewAccessTokenCredentials(
