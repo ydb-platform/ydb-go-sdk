@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -273,8 +274,9 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 			},
 		}}))
 
+		var IgnoreMinRestrictionsOnNextPopDone int64
 		go func() {
-			defer t.Log("IgnoreMinRestrictionsOnNextPop done")
+			defer atomic.AddInt64(&IgnoreMinRestrictionsOnNextPopDone, 1)
 
 			xtest.SpinWaitCondition(t, &b.m, func() bool {
 				return len(b.waiters) > 0
@@ -287,7 +289,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 		batch, err := b.Pop(ctx, batcherGetOptions{MinCount: 2})
 
-		require.NoError(t, err)
+		require.NoError(t, err, IgnoreMinRestrictionsOnNextPopDone)
 		require.Len(t, batch.Batch.Messages, 1)
 		require.False(t, b.forceIgnoreMinRestrictionsOnNextMessagesBatch)
 	})
