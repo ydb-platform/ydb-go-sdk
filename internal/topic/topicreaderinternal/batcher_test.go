@@ -289,7 +289,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 		batch, err := b.Pop(ctx, batcherGetOptions{MinCount: 2})
 
-		require.NoError(t, err, IgnoreMinRestrictionsOnNextPopDone)
+		require.NoError(t, err, atomic.LoadInt64(&IgnoreMinRestrictionsOnNextPopDone))
 		require.Len(t, batch.Batch.Messages, 1)
 		require.False(t, b.forceIgnoreMinRestrictionsOnNextMessagesBatch)
 	})
