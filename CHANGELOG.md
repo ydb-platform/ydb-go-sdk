@@ -1,3 +1,4 @@
+* Removed `ydb.RegisterParser()` function (was needed for `database/sql` driver outside `ydb-go-sdk` repository, necessity of `ydb.RegisterParser()` disappeared with implementation `database/sql` driver in same repository)
 * Refactored `db.Table().CreateSession(ctx)` (maked retryable with internal create session timeout)
 * Refactored `internal/table/client.createSession(ctx)` (got rid of unnecessary goroutine)
 * Supported many user-agent records
