@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/types/known/durationpb"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func TestParams(t *testing.T) {

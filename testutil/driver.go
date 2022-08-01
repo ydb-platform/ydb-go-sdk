@@ -6,12 +6,11 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"

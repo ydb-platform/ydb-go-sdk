@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	grpcCodes "google.golang.org/grpc/codes"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	grpcCodes "google.golang.org/grpc/codes"
 )
 
 func TestIsYdb(t *testing.T) {

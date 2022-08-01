@@ -1715,15 +1715,11 @@ func (v *zeroValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 			vv.Value = a.Uint32()
 
-		case
-			TypeInt64,
-			TypeInterval:
+		case TypeInt64, TypeInterval:
 
 			vv.Value = a.Int64()
 
-		case
-			TypeUint64,
-			TypeTimestamp:
+		case TypeUint64, TypeTimestamp:
 
 			vv.Value = a.Uint64()
 

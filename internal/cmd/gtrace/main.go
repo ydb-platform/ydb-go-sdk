@@ -74,7 +74,7 @@ func main() {
 			f, err = os.OpenFile(
 				filepath.Join(workDir, filepath.Clean(name)),
 				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
-				0600,
+				0o600,
 			)
 			if err != nil {
 				log.Fatal(err)

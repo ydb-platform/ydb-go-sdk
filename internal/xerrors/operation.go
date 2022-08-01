@@ -110,8 +110,7 @@ func (e *operationError) OperationStatus() operation.Status {
 		Ydb.StatusIds_BAD_SESSION,
 		Ydb.StatusIds_SESSION_BUSY:
 		return operation.NotFinished
-	case
-		Ydb.StatusIds_UNDETERMINED:
+	case Ydb.StatusIds_UNDETERMINED:
 		return operation.Undefined
 	default:
 		return operation.Finished
@@ -120,8 +119,7 @@ func (e *operationError) OperationStatus() operation.Status {
 
 func (e *operationError) BackoffType() backoff.Type {
 	switch e.code {
-	case
-		Ydb.StatusIds_OVERLOADED:
+	case Ydb.StatusIds_OVERLOADED:
 		return backoff.TypeSlow
 	case
 		Ydb.StatusIds_ABORTED,

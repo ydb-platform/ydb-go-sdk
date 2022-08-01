@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
