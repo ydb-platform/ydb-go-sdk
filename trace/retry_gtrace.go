@@ -80,7 +80,6 @@ func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 	}
 	return ret
 }
-
 func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
 	fn := t.OnRetry
 	if fn == nil {
@@ -108,7 +107,6 @@ func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) fun
 		return res
 	}
 }
-
 func RetryOnRetry(t Retry, c *context.Context, iD string, idempotent bool) func(error) func(attempts int, _ error) {
 	var p RetryLoopStartInfo
 	p.Context = c

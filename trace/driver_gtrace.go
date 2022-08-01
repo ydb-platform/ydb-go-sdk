@@ -780,7 +780,6 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 	}
 	return ret
 }
-
 func (t Driver) onInit(d DriverInitStartInfo) func(DriverInitDoneInfo) {
 	fn := t.OnInit
 	if fn == nil {
@@ -796,7 +795,6 @@ func (t Driver) onInit(d DriverInitStartInfo) func(DriverInitDoneInfo) {
 	}
 	return res
 }
-
 func (t Driver) onClose(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
 	fn := t.OnClose
 	if fn == nil {
@@ -812,7 +810,6 @@ func (t Driver) onClose(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
 	}
 	return res
 }
-
 func (t Driver) onNetRead(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
 	fn := t.OnNetRead
 	if fn == nil {
@@ -828,7 +825,6 @@ func (t Driver) onNetRead(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) 
 	}
 	return res
 }
-
 func (t Driver) onNetWrite(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo) {
 	fn := t.OnNetWrite
 	if fn == nil {
@@ -844,7 +840,6 @@ func (t Driver) onNetWrite(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInf
 	}
 	return res
 }
-
 func (t Driver) onNetDial(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) {
 	fn := t.OnNetDial
 	if fn == nil {
@@ -860,7 +855,6 @@ func (t Driver) onNetDial(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) 
 	}
 	return res
 }
-
 func (t Driver) onNetClose(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo) {
 	fn := t.OnNetClose
 	if fn == nil {
@@ -876,7 +870,6 @@ func (t Driver) onNetClose(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInf
 	}
 	return res
 }
-
 func (t Driver) onResolve(d DriverResolveStartInfo) func(DriverResolveDoneInfo) {
 	fn := t.OnResolve
 	if fn == nil {
@@ -892,7 +885,6 @@ func (t Driver) onResolve(d DriverResolveStartInfo) func(DriverResolveDoneInfo) 
 	}
 	return res
 }
-
 func (t Driver) onConnStateChange(d DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo) {
 	fn := t.OnConnStateChange
 	if fn == nil {
@@ -908,7 +900,6 @@ func (t Driver) onConnStateChange(d DriverConnStateChangeStartInfo) func(DriverC
 	}
 	return res
 }
-
 func (t Driver) onConnInvoke(d DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo) {
 	fn := t.OnConnInvoke
 	if fn == nil {
@@ -924,7 +915,6 @@ func (t Driver) onConnInvoke(d DriverConnInvokeStartInfo) func(DriverConnInvokeD
 	}
 	return res
 }
-
 func (t Driver) onConnNewStream(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
 	fn := t.OnConnNewStream
 	if fn == nil {
@@ -952,7 +942,6 @@ func (t Driver) onConnNewStream(d DriverConnNewStreamStartInfo) func(DriverConnN
 		return res
 	}
 }
-
 func (t Driver) onConnTake(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
 	fn := t.OnConnTake
 	if fn == nil {
@@ -968,7 +957,6 @@ func (t Driver) onConnTake(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInf
 	}
 	return res
 }
-
 func (t Driver) onConnPark(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
 	fn := t.OnConnPark
 	if fn == nil {
@@ -984,7 +972,6 @@ func (t Driver) onConnPark(d DriverConnParkStartInfo) func(DriverConnParkDoneInf
 	}
 	return res
 }
-
 func (t Driver) onConnBan(d DriverConnBanStartInfo) func(DriverConnBanDoneInfo) {
 	fn := t.OnConnBan
 	if fn == nil {
@@ -1000,7 +987,6 @@ func (t Driver) onConnBan(d DriverConnBanStartInfo) func(DriverConnBanDoneInfo) 
 	}
 	return res
 }
-
 func (t Driver) onConnAllow(d DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo) {
 	fn := t.OnConnAllow
 	if fn == nil {
@@ -1016,7 +1002,6 @@ func (t Driver) onConnAllow(d DriverConnAllowStartInfo) func(DriverConnAllowDone
 	}
 	return res
 }
-
 func (t Driver) onConnClose(d DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo) {
 	fn := t.OnConnClose
 	if fn == nil {
@@ -1032,7 +1017,6 @@ func (t Driver) onConnClose(d DriverConnCloseStartInfo) func(DriverConnCloseDone
 	}
 	return res
 }
-
 func (t Driver) onRepeaterWakeUp(d DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo) {
 	fn := t.OnRepeaterWakeUp
 	if fn == nil {
@@ -1048,7 +1032,6 @@ func (t Driver) onRepeaterWakeUp(d DriverRepeaterWakeUpStartInfo) func(DriverRep
 	}
 	return res
 }
-
 func (t Driver) onBalancerInit(d DriverBalancerInitStartInfo) func(DriverBalancerInitDoneInfo) {
 	fn := t.OnBalancerInit
 	if fn == nil {
@@ -1064,7 +1047,6 @@ func (t Driver) onBalancerInit(d DriverBalancerInitStartInfo) func(DriverBalance
 	}
 	return res
 }
-
 func (t Driver) onBalancerClose(d DriverBalancerCloseStartInfo) func(DriverBalancerCloseDoneInfo) {
 	fn := t.OnBalancerClose
 	if fn == nil {
@@ -1080,7 +1062,6 @@ func (t Driver) onBalancerClose(d DriverBalancerCloseStartInfo) func(DriverBalan
 	}
 	return res
 }
-
 func (t Driver) onBalancerChooseEndpoint(d DriverBalancerChooseEndpointStartInfo) func(DriverBalancerChooseEndpointDoneInfo) {
 	fn := t.OnBalancerChooseEndpoint
 	if fn == nil {
@@ -1096,7 +1077,6 @@ func (t Driver) onBalancerChooseEndpoint(d DriverBalancerChooseEndpointStartInfo
 	}
 	return res
 }
-
 func (t Driver) onBalancerUpdate(d DriverBalancerUpdateStartInfo) func(DriverBalancerUpdateDoneInfo) {
 	fn := t.OnBalancerUpdate
 	if fn == nil {
@@ -1112,7 +1092,6 @@ func (t Driver) onBalancerUpdate(d DriverBalancerUpdateStartInfo) func(DriverBal
 	}
 	return res
 }
-
 func (t Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
 	if fn == nil {
@@ -1128,7 +1107,6 @@ func (t Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGet
 	}
 	return res
 }
-
 func DriverOnInit(t Driver, c *context.Context, endpoint string, database string, secure bool) func(error) {
 	var p DriverInitStartInfo
 	p.Context = c
@@ -1142,7 +1120,6 @@ func DriverOnInit(t Driver, c *context.Context, endpoint string, database string
 		res(p)
 	}
 }
-
 func DriverOnClose(t Driver, c *context.Context) func(error) {
 	var p DriverCloseStartInfo
 	p.Context = c
@@ -1153,7 +1130,6 @@ func DriverOnClose(t Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
-
 func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ error) {
 	var p DriverNetReadStartInfo
 	p.Address = address
@@ -1166,7 +1142,6 @@ func DriverOnNetRead(t Driver, address string, buffer int) func(received int, _ 
 		res(p)
 	}
 }
-
 func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ error) {
 	var p DriverNetWriteStartInfo
 	p.Address = address
@@ -1179,7 +1154,6 @@ func DriverOnNetWrite(t Driver, address string, bytes int) func(sent int, _ erro
 		res(p)
 	}
 }
-
 func DriverOnNetDial(t Driver, c *context.Context, address string) func(error) {
 	var p DriverNetDialStartInfo
 	p.Context = c
@@ -1191,7 +1165,6 @@ func DriverOnNetDial(t Driver, c *context.Context, address string) func(error) {
 		res(p)
 	}
 }
-
 func DriverOnNetClose(t Driver, address string) func(error) {
 	var p DriverNetCloseStartInfo
 	p.Address = address
@@ -1202,7 +1175,6 @@ func DriverOnNetClose(t Driver, address string) func(error) {
 		res(p)
 	}
 }
-
 func DriverOnResolve(t Driver, target string, resolved []string) func(error) {
 	var p DriverResolveStartInfo
 	p.Target = target
@@ -1214,7 +1186,6 @@ func DriverOnResolve(t Driver, target string, resolved []string) func(error) {
 		res(p)
 	}
 }
-
 func DriverOnConnStateChange(t Driver, endpoint EndpointInfo, state ConnState) func(state ConnState) {
 	var p DriverConnStateChangeStartInfo
 	p.Endpoint = endpoint
@@ -1226,7 +1197,6 @@ func DriverOnConnStateChange(t Driver, endpoint EndpointInfo, state ConnState) f
 		res(p)
 	}
 }
-
 func DriverOnConnInvoke(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
 	var p DriverConnInvokeStartInfo
 	p.Context = c
@@ -1242,7 +1212,6 @@ func DriverOnConnInvoke(t Driver, c *context.Context, endpoint EndpointInfo, m M
 		res(p)
 	}
 }
-
 func DriverOnConnNewStream(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(error) func(state ConnState, _ error) {
 	var p DriverConnNewStreamStartInfo
 	p.Context = c
@@ -1261,7 +1230,6 @@ func DriverOnConnNewStream(t Driver, c *context.Context, endpoint EndpointInfo, 
 		}
 	}
 }
-
 func DriverOnConnTake(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
 	var p DriverConnTakeStartInfo
 	p.Context = c
@@ -1273,7 +1241,6 @@ func DriverOnConnTake(t Driver, c *context.Context, endpoint EndpointInfo) func(
 		res(p)
 	}
 }
-
 func DriverOnConnPark(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
 	var p DriverConnParkStartInfo
 	p.Context = c
@@ -1285,7 +1252,6 @@ func DriverOnConnPark(t Driver, c *context.Context, endpoint EndpointInfo) func(
 		res(p)
 	}
 }
-
 func DriverOnConnBan(t Driver, c *context.Context, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
 	var p DriverConnBanStartInfo
 	p.Context = c
@@ -1299,7 +1265,6 @@ func DriverOnConnBan(t Driver, c *context.Context, endpoint EndpointInfo, state 
 		res(p)
 	}
 }
-
 func DriverOnConnAllow(t Driver, c *context.Context, endpoint EndpointInfo, state ConnState) func(state ConnState) {
 	var p DriverConnAllowStartInfo
 	p.Context = c
@@ -1312,7 +1277,6 @@ func DriverOnConnAllow(t Driver, c *context.Context, endpoint EndpointInfo, stat
 		res(p)
 	}
 }
-
 func DriverOnConnClose(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
 	var p DriverConnCloseStartInfo
 	p.Context = c
@@ -1324,7 +1288,6 @@ func DriverOnConnClose(t Driver, c *context.Context, endpoint EndpointInfo) func
 		res(p)
 	}
 }
-
 func DriverOnRepeaterWakeUp(t Driver, c *context.Context, name string, event string) func(error) {
 	var p DriverRepeaterWakeUpStartInfo
 	p.Context = c
@@ -1337,7 +1300,6 @@ func DriverOnRepeaterWakeUp(t Driver, c *context.Context, name string, event str
 		res(p)
 	}
 }
-
 func DriverOnBalancerInit(t Driver, c *context.Context) func(error) {
 	var p DriverBalancerInitStartInfo
 	p.Context = c
@@ -1348,7 +1310,6 @@ func DriverOnBalancerInit(t Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
-
 func DriverOnBalancerClose(t Driver, c *context.Context) func(error) {
 	var p DriverBalancerCloseStartInfo
 	p.Context = c
@@ -1359,7 +1320,6 @@ func DriverOnBalancerClose(t Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
-
 func DriverOnBalancerChooseEndpoint(t Driver, c *context.Context) func(endpoint EndpointInfo, _ error) {
 	var p DriverBalancerChooseEndpointStartInfo
 	p.Context = c
@@ -1371,7 +1331,6 @@ func DriverOnBalancerChooseEndpoint(t Driver, c *context.Context) func(endpoint 
 		res(p)
 	}
 }
-
 func DriverOnBalancerUpdate(t Driver, c *context.Context, needLocalDC bool) func(endpoints []EndpointInfo, localDC string, _ error) {
 	var p DriverBalancerUpdateStartInfo
 	p.Context = c
@@ -1385,7 +1344,6 @@ func DriverOnBalancerUpdate(t Driver, c *context.Context, needLocalDC bool) func
 		res(p)
 	}
 }
-
 func DriverOnGetCredentials(t Driver, c *context.Context) func(token string, _ error) {
 	var p DriverGetCredentialsStartInfo
 	p.Context = c

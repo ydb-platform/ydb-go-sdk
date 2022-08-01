@@ -185,7 +185,6 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 	}
 	return ret
 }
-
 func (t Scripting) onExecute(s ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo) {
 	fn := t.OnExecute
 	if fn == nil {
@@ -201,7 +200,6 @@ func (t Scripting) onExecute(s ScriptingExecuteStartInfo) func(ScriptingExecuteD
 	}
 	return res
 }
-
 func (t Scripting) onStreamExecute(s ScriptingStreamExecuteStartInfo) func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
 	fn := t.OnStreamExecute
 	if fn == nil {
@@ -229,7 +227,6 @@ func (t Scripting) onStreamExecute(s ScriptingStreamExecuteStartInfo) func(Scrip
 		return res
 	}
 }
-
 func (t Scripting) onExplain(s ScriptingExplainStartInfo) func(ScriptingExplainDoneInfo) {
 	fn := t.OnExplain
 	if fn == nil {
@@ -245,7 +242,6 @@ func (t Scripting) onExplain(s ScriptingExplainStartInfo) func(ScriptingExplainD
 	}
 	return res
 }
-
 func (t Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo) {
 	fn := t.OnClose
 	if fn == nil {
@@ -261,7 +257,6 @@ func (t Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInf
 	}
 	return res
 }
-
 func ScriptingOnExecute(t Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
 	var p ScriptingExecuteStartInfo
 	p.Context = c
@@ -275,7 +270,6 @@ func ScriptingOnExecute(t Scripting, c *context.Context, query string, parameter
 		res(p)
 	}
 }
-
 func ScriptingOnStreamExecute(t Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(error) func(error) {
 	var p ScriptingStreamExecuteStartInfo
 	p.Context = c
@@ -293,7 +287,6 @@ func ScriptingOnStreamExecute(t Scripting, c *context.Context, query string, par
 		}
 	}
 }
-
 func ScriptingOnExplain(t Scripting, c *context.Context, query string) func(plan string, _ error) {
 	var p ScriptingExplainStartInfo
 	p.Context = c
@@ -306,7 +299,6 @@ func ScriptingOnExplain(t Scripting, c *context.Context, query string) func(plan
 		res(p)
 	}
 }
-
 func ScriptingOnClose(t Scripting, c *context.Context) func(error) {
 	var p ScriptingCloseStartInfo
 	p.Context = c

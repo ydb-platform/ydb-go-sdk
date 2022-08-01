@@ -39,11 +39,7 @@ jobs:
           go install github.com/rinchsan/gosimports/cmd/gosimports@v0.1.5
 
       - name: format all files with auto-formatter
-        run: |
-          export PATH="$(go env GOPATH)/bin:$PATH"
-          for FILE in $(find . -name '*.go'); do
-            bash ./.github/scripts/format-go-code.sh "$FILE"
-          done
+        run: bash ./.github/scripts/format-all-go-code.sh "$PWD"
 
       - name: Check repository diff
         run: bash ./.github/scripts/check-work-copy-equals-to-committed.sh "auto-format broken"
