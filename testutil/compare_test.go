@@ -3,9 +3,8 @@ package testutil
 import (
 	"testing"
 
-	"google.golang.org/protobuf/types/known/structpb"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"

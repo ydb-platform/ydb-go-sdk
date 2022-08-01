@@ -5,9 +5,8 @@ import (
 	"errors"
 	"io"
 
-	grpcCodes "google.golang.org/grpc/codes"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"

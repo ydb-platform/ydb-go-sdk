@@ -3,9 +3,8 @@ package topicclientinternal
 import (
 	"context"
 
-	"google.golang.org/grpc"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
