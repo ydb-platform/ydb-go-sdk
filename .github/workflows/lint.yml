@@ -36,7 +36,7 @@ jobs:
       - name: format all files with auto-formatter
         run: |
           for FILE in $(find . -name '*.go'); do
-            ./.github/scripts/format-go-code.sh $FILE
+            bash ./.github/scripts/format-go-code.sh "$FILE"
           done
 
       - name: Check repository diff
