@@ -66,7 +66,7 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
-        run: go test -race -coverpkg=./... -coverprofile full.txt -covermode atomic ./table/table_e2e_test.go
+        run: go test -race -coverpkg=./... -coverprofile table.txt -covermode atomic ./table/table_e2e_test.go
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -190,21 +190,13 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test topic client
-        run: go test -race -coverpkg=./... -coverprofile topicclient.txt -covermode atomic ./topic/client_e2e_test.go
-      - name: Test topic reader
-        run: go test -race -coverpkg=./... -coverprofile topicreader.txt -covermode atomic ./topic/topicreader/reader_e2e_test.go
-      - name: Upload coverage to Codecov client
+        run: go test -race -coverpkg=./... -coverprofile topic.txt -covermode atomic ./topic/client_e2e_test.go ./topic/reader_e2e_test.go
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         with:
-          file: ./topicclient.txt
-          flags: topicclient,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
-          name: topicclient
-      - name: Upload coverage to Codecov reader
-        uses: codecov/codecov-action@v2
-        with:
-          file: ./topicreader.txt
-          flags: topicreader,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
-          name: topicreader
+          file: ./topic.txt
+          flags: topic,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
+          name: topic
   discovery:
     strategy:
       matrix:
