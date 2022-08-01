@@ -274,6 +274,8 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 		}}))
 
 		go func() {
+			defer t.Log("IgnoreMinRestrictionsOnNextPop done")
+
 			xtest.SpinWaitCondition(t, &b.m, func() bool {
 				return len(b.waiters) > 0
 			})
