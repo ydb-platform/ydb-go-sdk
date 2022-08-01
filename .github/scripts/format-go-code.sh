@@ -4,6 +4,10 @@ set -eu
 
 FILEPATH="$1"
 
+go env
+
+ls $(go env GOPATH)
+
 # https://github.com/rinchsan/gosimports
 gosimports -local github.com/ydb-platform/ydb-go-sdk/v3,github.com/ydb-platform/ydb-go-genproto -w "$FILEPATH"
 

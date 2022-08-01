@@ -28,6 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Install Go
+        uses: actions/setup-go@v3
+
       - name: Install utilities
         run: |
           go install mvdan.cc/gofumpt@v0.3.1
