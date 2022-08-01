@@ -36,12 +36,5 @@ jobs:
         go generate ./trace
         go generate ./...
 
-    - name: Check generation
-      run: |
-        CODE_DIFF="$(git diff)"
-        if [ -n "$CODE_DIFF"  ]; then
-          echo "code-generation not equal with committed"
-          echo
-          echo "$CODE_DIFF"
-          exit 1;
-        fi
+    - name: Check repository diff
+      run: bash ./.github/scripts/check-work-copy-equals-to-committed.sh "code-generation not equal with committed"
