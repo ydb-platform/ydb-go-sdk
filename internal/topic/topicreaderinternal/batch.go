@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	errBadSessionWhileMessageBatchCreate       = errors.New("ydb: bad session while messages batch create")
-	errBadMessageOffsetWhileMessageBatchCreate = errors.New("ydb: bad message offset while messages batch create")
+	errBadSessionWhileMessageBatchCreate       = xerrors.Wrap(errors.New("ydb: bad session while messages batch create"))        //nolint:lll
+	errBadMessageOffsetWhileMessageBatchCreate = xerrors.Wrap(errors.New("ydb: bad message offset while messages batch create")) //nolint:lll
 )
 
 // PublicBatch is ordered group of message from one partition
@@ -35,7 +35,7 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 			msg.commitRange.partitionSession = session
 		}
 		if session != msg.commitRange.partitionSession {
-			return nil, xerrors.Wrap(errBadSessionWhileMessageBatchCreate)
+			return nil, xerrors.WithStackTrace(errBadSessionWhileMessageBatchCreate)
 		}
 
 		if i == 0 {
@@ -44,7 +44,7 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 
 		prev := messages[i-1]
 		if prev.commitRange.commitOffsetEnd != msg.commitRange.commitOffsetStart {
-			return nil, xerrors.Wrap(errBadMessageOffsetWhileMessageBatchCreate)
+			return nil, xerrors.WithStackTrace(errBadMessageOffsetWhileMessageBatchCreate)
 		}
 	}
 

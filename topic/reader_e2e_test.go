@@ -1,14 +1,13 @@
 //go:build !fast
 // +build !fast
 
-package topicreader_test
+package topic_test
 
 import (
 	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"runtime/pprof"
 	"sync/atomic"
 	"testing"
@@ -123,7 +122,7 @@ func TestTopicPath(t *testing.T) {
 	t.Skip("KIKIMR-14966")
 
 	ctx := testCtx(t)
-	db := connect(ctx, t)
+	db := connect(t)
 
 	topicPath := db.Name() + "/" + t.Name()
 	_ = db.Topic().Drop(ctx, topicPath)
@@ -134,26 +133,12 @@ func TestTopicPath(t *testing.T) {
 
 func TestPartitionsBalanced(t *testing.T) {
 	ctx := testCtx(t)
-	db := connect(ctx, t)
+	db := connect(t)
 	topicPath := db.Name() + "/topic-" + t.Name()
 
 	_ = db.Topic().Drop(ctx, topicPath)
 	err := db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw})
 	require.NoError(t, err)
-}
-
-func connect(ctx context.Context, t *testing.T) ydb.Connection {
-	token := os.Getenv("YDB_TOKEN")
-
-	connectionString := "grpc://localhost:2136?database=/local"
-	if ecs := os.Getenv("YDB_CONNECTION_STRING"); ecs != "" {
-		connectionString = ecs
-	}
-
-	db, err := ydb.Open(ctx, connectionString, ydb.WithAccessTokenCredentials(token))
-	require.NoError(t, err)
-
-	return db
 }
 
 func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) {
@@ -238,7 +223,7 @@ func createFeedAndReader(
 	t *testing.T,
 	opts ...topicoptions.ReaderOption,
 ) (ydb.Connection, *topicreader.Reader) {
-	db := connect(ctx, t)
+	db := connect(t)
 	createCDCFeed(ctx, t, db)
 	reader := createReader(t, db, opts...)
 	return db, reader

@@ -12,14 +12,14 @@ import (
 )
 
 var (
-	errUnexpectedNilStreamReadMessageReadResponse     = errors.New("ydb: unexpected nil Ydb_Topic.StreamReadMessage_ReadResponse") //nolint:lll
-	errNilPartitionData                               = errors.New("ydb: unexpected nil partition data")
-	errUnexpectedNilBatchInPartitionData              = errors.New("ydb: unexpected nil batch in partition data")
-	errUnexpectedMessageNilInPartitionData            = errors.New("ydb: unexpected message nil in partition data")
-	errUnexpectedProtobufInOffsets                    = errors.New("ydb: unexpected protobuf nil offsets")
-	errUnexpectedProtoNilStartPartitionSessionRequest = errors.New("ydb: unexpected proto nil start partition session request")                      //nolint:lll
-	errUnexpectedNilPartitionSession                  = errors.New("ydb: unexpected proto nil partition session in start partition session request") //nolint:lll
-	errUnexpectedGrpcNilStopPartitionSessionRequest   = errors.New("ydb: unexpected grpc nil stop partition session request")                        //nolint:lll
+	errUnexpectedNilStreamReadMessageReadResponse     = xerrors.Wrap(errors.New("ydb: unexpected nil Ydb_Topic.StreamReadMessage_ReadResponse")) //nolint:lll
+	errNilPartitionData                               = xerrors.Wrap(errors.New("ydb: unexpected nil partition data"))
+	errUnexpectedNilBatchInPartitionData              = xerrors.Wrap(errors.New("ydb: unexpected nil batch in partition data"))   //nolint:lll
+	errUnexpectedMessageNilInPartitionData            = xerrors.Wrap(errors.New("ydb: unexpected message nil in partition data")) //nolint:lll
+	errUnexpectedProtobufInOffsets                    = xerrors.Wrap(errors.New("ydb: unexpected protobuf nil offsets"))
+	errUnexpectedProtoNilStartPartitionSessionRequest = xerrors.Wrap(errors.New("ydb: unexpected proto nil start partition session request"))                      //nolint:lll
+	errUnexpectedNilPartitionSession                  = xerrors.Wrap(errors.New("ydb: unexpected proto nil partition session in start partition session request")) //nolint:lll
+	errUnexpectedGrpcNilStopPartitionSessionRequest   = xerrors.Wrap(errors.New("ydb: unexpected grpc nil stop partition session request"))                        //nolint:lll
 )
 
 type PartitionSessionID int64
@@ -177,7 +177,7 @@ type ReadResponse struct {
 
 func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) error {
 	if p == nil {
-		return xerrors.Wrap(errUnexpectedNilStreamReadMessageReadResponse)
+		return xerrors.WithStackTrace(errUnexpectedNilStreamReadMessageReadResponse)
 	}
 	r.BytesSize = int(p.BytesSize)
 
@@ -185,7 +185,7 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 	for partitionIndex := range p.PartitionData {
 		srcPartition := p.PartitionData[partitionIndex]
 		if srcPartition == nil {
-			return xerrors.Wrap(errNilPartitionData)
+			return xerrors.WithStackTrace(errNilPartitionData)
 		}
 		dstPartition := &r.PartitionData[partitionIndex]
 		dstPartition.PartitionSessionID.FromInt64(srcPartition.PartitionSessionId)
@@ -195,7 +195,7 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 		for batchIndex := range srcPartition.Batches {
 			srcBatch := srcPartition.Batches[batchIndex]
 			if srcBatch == nil {
-				return xerrors.Wrap(errUnexpectedNilBatchInPartitionData)
+				return xerrors.WithStackTrace(errUnexpectedNilBatchInPartitionData)
 			}
 			dstBatch := &dstPartition.Batches[batchIndex]
 
@@ -209,7 +209,7 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 			for messageIndex := range srcBatch.MessageData {
 				srcMessage := srcBatch.MessageData[messageIndex]
 				if srcMessage == nil {
-					return xerrors.Wrap(errUnexpectedMessageNilInPartitionData)
+					return xerrors.WithStackTrace(errUnexpectedMessageNilInPartitionData)
 				}
 				dstMessage := &dstBatch.MessageData[messageIndex]
 
@@ -293,7 +293,7 @@ type OffsetRange struct {
 
 func (r *OffsetRange) FromProto(p *Ydb_Topic.OffsetsRange) error {
 	if p == nil {
-		return xerrors.Wrap(errUnexpectedProtobufInOffsets)
+		return xerrors.WithStackTrace(errUnexpectedProtobufInOffsets)
 	}
 
 	r.Start.FromInt64(p.Start)
@@ -390,11 +390,11 @@ type StartPartitionSessionRequest struct {
 
 func (r *StartPartitionSessionRequest) fromProto(p *Ydb_Topic.StreamReadMessage_StartPartitionSessionRequest) error {
 	if p == nil {
-		return xerrors.Wrap(errUnexpectedProtoNilStartPartitionSessionRequest)
+		return xerrors.WithStackTrace(errUnexpectedProtoNilStartPartitionSessionRequest)
 	}
 
 	if p.PartitionSession == nil {
-		return xerrors.Wrap(errUnexpectedNilPartitionSession)
+		return xerrors.WithStackTrace(errUnexpectedNilPartitionSession)
 	}
 	r.PartitionSession.PartitionID = p.PartitionSession.PartitionId
 	r.PartitionSession.Path = p.PartitionSession.Path
@@ -444,7 +444,7 @@ type StopPartitionSessionRequest struct {
 
 func (r *StopPartitionSessionRequest) fromProto(proto *Ydb_Topic.StreamReadMessage_StopPartitionSessionRequest) error {
 	if proto == nil {
-		return xerrors.Wrap(errUnexpectedGrpcNilStopPartitionSessionRequest)
+		return xerrors.WithStackTrace(errUnexpectedGrpcNilStopPartitionSessionRequest)
 	}
 	r.PartitionSessionID.FromInt64(proto.PartitionSessionId)
 	r.Graceful = proto.Graceful

@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	errUnexpectedNilForSchemePermissions = errors.New("ydb: unexpected nil for scheme permissions")
-	errUnexpectedNilForSchemeEntry       = errors.New("ydb: unexpected nil for scheme entry")
+	errUnexpectedNilForSchemePermissions = xerrors.Wrap(errors.New("ydb: unexpected nil for scheme permissions"))
+	errUnexpectedNilForSchemeEntry       = xerrors.Wrap(errors.New("ydb: unexpected nil for scheme entry"))
 )
 
 type Entry struct {
@@ -24,7 +24,7 @@ type Entry struct {
 
 func (e *Entry) FromProto(proto *Ydb_Scheme.Entry) error {
 	if proto == nil {
-		return xerrors.Wrap(errUnexpectedNilForSchemeEntry)
+		return xerrors.WithStackTrace(errUnexpectedNilForSchemeEntry)
 	}
 	e.Name = proto.Name
 	e.Owner = proto.Owner
@@ -70,7 +70,7 @@ type Permissions struct {
 
 func (p *Permissions) FromProto(proto *Ydb_Scheme.Permissions) error {
 	if proto == nil {
-		return xerrors.Wrap(errUnexpectedNilForSchemePermissions)
+		return xerrors.WithStackTrace(errUnexpectedNilForSchemePermissions)
 	}
 	p.Subject = proto.Subject
 	p.PermissionNames = proto.PermissionNames

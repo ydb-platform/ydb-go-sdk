@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errUnexpectedNilPartitioningSettings = errors.New("ydb: unexpected nil partitioning settings")
+var errUnexpectedNilPartitioningSettings = xerrors.Wrap(errors.New("ydb: unexpected nil partitioning settings"))
 
 type Consumer struct {
 	Name            string
@@ -45,7 +45,7 @@ type PartitioningSettings struct {
 
 func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) error {
 	if proto == nil {
-		return xerrors.Wrap(errUnexpectedNilPartitioningSettings)
+		return xerrors.WithStackTrace(errUnexpectedNilPartitioningSettings)
 	}
 
 	s.MinActivePartitions = proto.MinActivePartitions

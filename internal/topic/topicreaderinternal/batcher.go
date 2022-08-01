@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
-var errRemoveUnexpectedWaiter = errors.New("ydb: remove unexpected waiter")
+var errRemoveUnexpectedWaiter = xerrors.Wrap(errors.New("ydb: remove unexpected waiter"))
 
 type batcher struct {
 	waiterID uint64
@@ -227,7 +227,7 @@ func (b *batcher) removeWaiterByID(waiterID uint64) error {
 		}
 	}
 
-	return xerrors.Wrap(errRemoveUnexpectedWaiter)
+	return xerrors.WithStackTrace(errRemoveUnexpectedWaiter)
 }
 
 func (b *batcher) fireWaitersNeedLock() {
