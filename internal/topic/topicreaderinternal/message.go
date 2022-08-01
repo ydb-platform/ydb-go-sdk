@@ -12,9 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var (
-	errMessageWasReadEarly = errors.New("ydb: message was read early")
-)
+var errMessageWasReadEarly = errors.New("ydb: message was read early")
 
 // PublicErrUnexpectedCodec return when try to read message content with unknown codec
 //

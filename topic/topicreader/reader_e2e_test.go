@@ -75,7 +75,7 @@ func TestReadMessagesAndCommit(t *testing.T) {
 
 	sendCDCMessage(ctx, t, db)
 	sendCDCMessage(ctx, t, db)
-	reader = createReader(ctx, t, db)
+	reader = createReader(t, db)
 
 	// read only no committed messages
 	for i := 0; i < 2; i++ {
@@ -202,12 +202,7 @@ WITH (
 	require.NoError(t, err)
 }
 
-func createReader(
-	ctx context.Context,
-	t *testing.T,
-	db ydb.Connection,
-	opts ...topicoptions.ReaderOption,
-) *topicreader.Reader {
+func createReader(t *testing.T, db ydb.Connection, opts ...topicoptions.ReaderOption) *topicreader.Reader {
 	js := func(v interface{ JSONData() io.Reader }) string {
 		data, err := ioutil.ReadAll(v.JSONData())
 		if err != nil {
@@ -245,7 +240,7 @@ func createFeedAndReader(
 ) (ydb.Connection, *topicreader.Reader) {
 	db := connect(ctx, t)
 	createCDCFeed(ctx, t, db)
-	reader := createReader(ctx, t, db, opts...)
+	reader := createReader(t, db, opts...)
 	return db, reader
 }
 

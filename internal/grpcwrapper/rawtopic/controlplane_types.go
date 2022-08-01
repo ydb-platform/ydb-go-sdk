@@ -10,9 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var (
-	errUnexpectedNilPartitioningSettings = errors.New("ydb: unexpected nil partitioning settings")
-)
+var errUnexpectedNilPartitioningSettings = errors.New("ydb: unexpected nil partitioning settings")
 
 type Consumer struct {
 	Name            string

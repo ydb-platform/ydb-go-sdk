@@ -12,9 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
-var (
-	errRemoveUnexpectedWaiter = errors.New("ydb: remove unexpected waiter")
-)
+var errRemoveUnexpectedWaiter = errors.New("ydb: remove unexpected waiter")
 
 type batcher struct {
 	waiterID uint64
