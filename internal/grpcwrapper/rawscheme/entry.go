@@ -1,9 +1,16 @@
 package rawscheme
 
 import (
+	"errors"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+)
+
+var (
+	errUnexpectedNilForSchemePermissions = errors.New("ydb: unexpected nil for scheme permissions")
+	errUnexpectedNilForSchemeEntry       = errors.New("ydb: unexpected nil for scheme entry")
 )
 
 type Entry struct {
@@ -17,7 +24,7 @@ type Entry struct {
 
 func (e *Entry) FromProto(proto *Ydb_Scheme.Entry) error {
 	if proto == nil {
-		return xerrors.NewYdbErrWithStackTrace("ydb: unexpected nil for scheme entry")
+		return xerrors.Wrap(errUnexpectedNilForSchemeEntry)
 	}
 	e.Name = proto.Name
 	e.Owner = proto.Owner
@@ -63,7 +70,7 @@ type Permissions struct {
 
 func (p *Permissions) FromProto(proto *Ydb_Scheme.Permissions) error {
 	if proto == nil {
-		return xerrors.NewYdbErrWithStackTrace("ydb: unexpected nil for scheme permissions")
+		return xerrors.Wrap(errUnexpectedNilForSchemePermissions)
 	}
 	p.Subject = proto.Subject
 	p.PermissionNames = proto.PermissionNames

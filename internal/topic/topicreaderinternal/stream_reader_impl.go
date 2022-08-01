@@ -27,6 +27,11 @@ var (
 	ErrUnsupportedCodec = errors.New("ydb: unsupported codec")
 )
 
+var (
+	errCommitSessionFromOtherReader  = errors.New("ydb: commit with session from other reader")
+	errCommitWithNilPartitionSession = errors.New("ydb: commit with nil partition session")
+)
+
 type partitionSessionID = rawtopicreader.PartitionSessionID
 
 type topicStreamReaderImpl struct {
@@ -307,7 +312,7 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error 
 	session := commitRange.partitionSession
 
 	if session == nil {
-		return xerrors.NewYdbErrWithStackTrace("ydb: commit with nil partition session")
+		return xerrors.Wrap(errCommitWithNilPartitionSession)
 	}
 
 	if session.Context().Err() != nil {
@@ -316,7 +321,7 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error 
 
 	ownSession, err := r.sessionController.Get(session.partitionSessionID)
 	if err != nil || session != ownSession {
-		return xerrors.NewYdbErrWithStackTrace("ydb: commit with session from other reader")
+		return xerrors.Wrap(errCommitSessionFromOtherReader)
 	}
 
 	return nil

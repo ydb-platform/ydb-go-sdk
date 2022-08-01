@@ -12,6 +12,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+var (
+	errMessageWasReadEarly = errors.New("ydb: message was read early")
+)
+
 // PublicErrUnexpectedCodec return when try to read message content with unknown codec
 //
 // Experimental
@@ -63,7 +67,7 @@ func (m *PublicMessage) getCommitRange() PublicCommitRange {
 // call PublicMessageContentUnmarshaler.UnmarshalYDBTopicMessage with uncompressed content
 func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 	if m.dataConsumed {
-		return xerrors.NewYdbErrWithStackTrace("ydb: message was read early")
+		return xerrors.Wrap(errMessageWasReadEarly)
 	}
 
 	m.dataConsumed = true

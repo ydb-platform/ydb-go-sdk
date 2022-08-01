@@ -738,7 +738,7 @@ readMessages:
 		case <-e.ctx.Done():
 			return nil, e.ctx.Err()
 		case <-e.stopReadEvents:
-			return nil, xerrors.NewYdbErrWithStackTrace("mock reader closed")
+			return nil, xerrors.Wrap(errors.New("mock reader closed"))
 		case res := <-e.messagesFromServerToClient:
 			if res.waitOnly {
 				continue readMessages

@@ -9,6 +9,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+var (
+	errBadSessionWhileMessageBatchCreate       = errors.New("ydb: bad session while messages batch create")
+	errBadMessageOffsetWhileMessageBatchCreate = errors.New("ydb: bad message offset while messages batch create")
+)
+
 // PublicBatch is ordered group of message from one partition
 //
 // Experimental
@@ -30,7 +35,7 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 			msg.commitRange.partitionSession = session
 		}
 		if session != msg.commitRange.partitionSession {
-			return nil, xerrors.NewYdbErrWithStackTrace("ydb: bad session while messages batch create")
+			return nil, xerrors.Wrap(errBadSessionWhileMessageBatchCreate)
 		}
 
 		if i == 0 {
@@ -39,7 +44,7 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 
 		prev := messages[i-1]
 		if prev.commitRange.commitOffsetEnd != msg.commitRange.commitOffsetStart {
-			return nil, xerrors.NewYdbErrWithStackTrace("ydb: bad message offset while messages batch create")
+			return nil, xerrors.Wrap(errBadMessageOffsetWhileMessageBatchCreate)
 		}
 	}
 

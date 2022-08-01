@@ -2,6 +2,7 @@ package topicreaderinternal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -9,6 +10,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+)
+
+var (
+	errRemoveUnexpectedWaiter = errors.New("ydb: remove unexpected waiter")
 )
 
 type batcher struct {
@@ -224,7 +229,7 @@ func (b *batcher) removeWaiterByID(waiterID uint64) error {
 		}
 	}
 
-	return xerrors.NewYdbErrWithStackTrace("ydb: remove unexpected waiter")
+	return xerrors.Wrap(errRemoveUnexpectedWaiter)
 }
 
 func (b *batcher) fireWaitersNeedLock() {

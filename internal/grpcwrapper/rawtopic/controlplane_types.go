@@ -1,11 +1,17 @@
 package rawtopic
 
 import (
+	"errors"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+)
+
+var (
+	errUnexpectedNilPartitioningSettings = errors.New("ydb: unexpected nil partitioning settings")
 )
 
 type Consumer struct {
@@ -41,7 +47,7 @@ type PartitioningSettings struct {
 
 func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) error {
 	if proto == nil {
-		return xerrors.NewYdbErrWithStackTrace("ydb: unexpected nil partitioning settings")
+		return xerrors.Wrap(errUnexpectedNilPartitioningSettings)
 	}
 
 	s.MinActivePartitions = proto.MinActivePartitions
