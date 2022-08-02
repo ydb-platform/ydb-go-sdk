@@ -20,4 +20,4 @@ var ErrUnexpectedCodec = topicreaderinternal.PublicErrUnexpectedCodec
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-var ErrConcurrencyCall = xerrors.Wrap(errors.New("concurrency call"))
+var ErrConcurrencyCall = xerrors.Wrap(errors.New("ydb: concurrency call denied"))
