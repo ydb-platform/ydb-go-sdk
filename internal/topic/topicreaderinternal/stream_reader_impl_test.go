@@ -592,6 +592,51 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 	})
 }
 
+func TestTopicStreamReadImpl_AutoCommit(t *testing.T) {
+	e := newTopicReaderTestEnvWithChangeConfig(t, func(cfg *topicStreamReaderConfig) {
+		cfg.CommitMode = CommitModeAutoCommit
+		cfg.CommitterBatchTimeLag = 0
+	})
+
+	e.Start()
+
+	initialComitted := e.partitionSession.committedOffset()
+	e.SendMessage(rawtopicreader.MessageData{
+		Offset: initialComitted,
+	})
+
+	_, err := e.reader.ReadMessageBatch(e.ctx, newReadMessageBatchOptions())
+	require.NoError(t, err)
+
+	commitReceived := make(empty.Chan)
+	e.stream.EXPECT().Send(&rawtopicreader.CommitOffsetRequest{
+		CommitOffsets: []rawtopicreader.PartitionCommitOffset{
+			{
+				PartitionSessionID: e.partitionSessionID,
+				Offsets: []rawtopicreader.OffsetRange{
+					{
+						Start: initialComitted,
+						End:   initialComitted + 1,
+					},
+				},
+			},
+		},
+	}).Do(func(_ interface{}) {
+		close(commitReceived)
+	})
+	e.SendMessage(rawtopicreader.MessageData{
+		Offset: initialComitted + 1,
+	})
+
+	readCtx, readCtxCancel := context.WithTimeout(e.ctx, time.Second)
+	defer readCtxCancel()
+
+	_, err = e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
+	require.NoError(t, err)
+
+	xtest.WaitChannelClosed(t, commitReceived)
+}
+
 type streamEnv struct {
 	ctx                    context.Context
 	t                      testing.TB
@@ -616,6 +661,12 @@ type testStreamResult struct {
 }
 
 func newTopicReaderTestEnv(t testing.TB) streamEnv {
+	return newTopicReaderTestEnvWithChangeConfig(t, func(cfg *topicStreamReaderConfig) {
+		// pass
+	})
+}
+
+func newTopicReaderTestEnvWithChangeConfig(t testing.TB, changeConfig func(cfg *topicStreamReaderConfig)) streamEnv {
 	ctx := testContext(t)
 
 	mc := gomock.NewController(t)
@@ -625,8 +676,11 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	const initialBufferSizeBytes = 1000000
 
 	cfg := newTopicStreamReaderConfig()
+	cfg.CommitMode = CommitModeAsync
 	cfg.BaseContext = ctx
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
+
+	changeConfig(&cfg)
 
 	reader, err := newTopicStreamReaderStopped(stream, cfg)
 	require.NoError(t, err)
@@ -703,6 +757,24 @@ func (e *streamEnv) readerReceiveWaitClose(callback func()) {
 
 func (e *streamEnv) SendFromServer(msg rawtopicreader.ServerMessage) {
 	e.SendFromServerAndSetNextCallback(msg, nil)
+}
+
+func (e *streamEnv) SendBatch(batch rawtopicreader.Batch) {
+	e.SendFromServer(&rawtopicreader.ReadResponse{PartitionData: []rawtopicreader.PartitionData{
+		{
+			PartitionSessionID: e.partitionSessionID,
+			Batches: []rawtopicreader.Batch{
+				batch,
+			},
+		},
+	}})
+}
+
+func (e *streamEnv) SendMessage(messages ...rawtopicreader.MessageData) {
+	e.SendBatch(rawtopicreader.Batch{
+		Codec:       rawtopiccommon.CodecRaw,
+		MessageData: messages,
+	})
 }
 
 func (e *streamEnv) SendFromServerAndSetNextCallback(msg rawtopicreader.ServerMessage, callback func()) {

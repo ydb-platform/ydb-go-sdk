@@ -1,3 +1,4 @@
+* Added autocommit mode for topic reader and set it as default mode
 * Allow read and commit messages in parallel
 
 ## v3.31.0

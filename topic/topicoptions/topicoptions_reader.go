@@ -159,9 +159,20 @@ func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) Rea
 type CommitMode = topicreaderinternal.PublicCommitMode
 
 const (
+	// CommitModeAutoCommit - every read reader will commit previous readed data.
+	// Last readed data will not commit and will receive with next read session.
+	//
+	// batch1, _ = reader.ReadMessageBatch(ctx)
+	// batch2, _ = reader.ReadMessageBatch(ctx) // at this call batch1 will commit
+	// mess1, _ = reader.ReadMessage(ctx) // at this call batch2 will commit
+	// mess2, _ = reader.ReadMessage(ctx) // at this call mess1 will commit
+	// stop
+	// mess2 will not commit and will receive again
+	CommitModeAutoCommit = topicreaderinternal.CommitModeAutoCommit // default
+
 	// CommitModeAsync - commit return true if commit success add to internal send buffer (but not sent to server)
 	// now it is grpc buffer, in feature it may be internal sdk buffer
-	CommitModeAsync = topicreaderinternal.CommitModeAsync // default
+	CommitModeAsync = topicreaderinternal.CommitModeAsync
 
 	// CommitModeNone - reader will not be commit operation
 	CommitModeNone = topicreaderinternal.CommitModeNone

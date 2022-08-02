@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
-var ErrCommitDisabled = xerrors.Wrap(errors.New("ydb: commits disabled"))
+var ErrCommitDisabled = xerrors.Wrap(errors.New("ydb: manual commits disabled, check commit mode option"))
 
 type sendMessageToServerFunc func(msg rawtopicreader.ClientMessage) error
 
@@ -27,7 +27,8 @@ type sendMessageToServerFunc func(msg rawtopicreader.ClientMessage) error
 type PublicCommitMode int
 
 const (
-	CommitModeAsync PublicCommitMode = iota // default
+	CommitModeAutoCommit PublicCommitMode = iota // default
+	CommitModeAsync
 	CommitModeNone
 	CommitModeSync
 )
