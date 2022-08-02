@@ -148,7 +148,7 @@ func newTopicStreamReaderStopped(
 		cancel:                cancel,
 		batcher:               newBatcher(),
 		backgroundWorkers:     *background.NewWorker(stopPump),
-		readConnectionID:      readerConnectionID.String(),
+		readConnectionID:      "preinitID-" + readerConnectionID.String(),
 		rawMessagesFromBuffer: make(chan rawtopicreader.ServerMessage, 1),
 	}
 
@@ -360,8 +360,10 @@ func (r *topicStreamReaderImpl) setStarted() error {
 }
 
 func (r *topicStreamReaderImpl) initSession() (err error) {
+	preInitConnectionID := r.readConnectionID
+	onDone := trace.TopicOnReadStreamInit(r.cfg.Tracer, preInitConnectionID)
 	defer func() {
-		trace.TopicOnReadStreamInit(r.cfg.Tracer, r.readConnectionID, r.cfg.BaseContext, err)
+		onDone(preInitConnectionID, r.readConnectionID, err)
 	}()
 
 	if err = r.send(r.cfg.initMessage()); err != nil {
@@ -578,7 +580,10 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	return nil
 }
 
-func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, err error) error {
+func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error) (closeErr error) {
+	onDone := trace.TopicOnReaderStreamClose(r.cfg.Tracer, r.readConnectionID, reason)
+	defer onDone(r.readConnectionID, reason, closeErr)
+
 	isFirstClose := false
 	r.m.WithLock(func() {
 		if r.closed {
@@ -587,16 +592,16 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, err error) e
 		isFirstClose = true
 		r.closed = true
 
-		r.err = err
-		r.cancel(err)
+		r.err = reason
+		r.cancel(reason)
 	})
 	if !isFirstClose {
 		return nil
 	}
 
-	closeErr := r.committer.Close(ctx, err)
+	closeErr = r.committer.Close(ctx, reason)
 
-	batcherErr := r.batcher.Close(err)
+	batcherErr := r.batcher.Close(reason)
 	if closeErr == nil {
 		closeErr = batcherErr
 	}
@@ -608,7 +613,7 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, err error) e
 	}
 
 	// close background workers after r.stream.CloseSend
-	bgCloseErr := r.backgroundWorkers.Close(ctx, err)
+	bgCloseErr := r.backgroundWorkers.Close(ctx, reason)
 	if closeErr == nil {
 		closeErr = bgCloseErr
 	}

@@ -208,8 +208,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errors.New("ydb: reconnect to pq grpc stream")))
 	}
 
-	newStream, err := connectWithTimeout(r.background.Context(), r.readerConnect, r.clock, r.connectTimeout)
-	trace.TopicOnReadStreamOpen(r.tracer, r.baseContext, err)
+	newStream, err := r.connectWithTimeout()
 
 	if topic.IsRetryableError(err) {
 		go func() {
@@ -226,16 +225,17 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 	})
 }
 
-func connectWithTimeout(
-	baseContext context.Context,
-	connector readerConnectFunc,
-	clock clockwork.Clock,
-	timeout time.Duration,
-) (batchedStreamReader, error) {
-	if err := baseContext.Err(); err != nil {
+func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
+	traceDone := trace.TopicOnReaderStreamConnect(r.tracer)
+	defer traceDone(err)
+
+	bgContext := r.background.Context()
+
+	if err = bgContext.Err(); err != nil {
 		return nil, err
 	}
-	connectionContext, cancel := xcontext.WithErrCancel(baseContext)
+
+	connectionContext, cancel := xcontext.WithErrCancel(context.Background())
 
 	type connectResult struct {
 		stream batchedStreamReader
@@ -244,13 +244,13 @@ func connectWithTimeout(
 	result := make(chan connectResult, 1)
 
 	go func() {
-		stream, err := connector(connectionContext)
+		stream, err := r.readerConnect(connectionContext)
 		result <- connectResult{stream: stream, err: err}
 	}()
 
 	var res connectResult
 	select {
-	case <-clock.After(timeout):
+	case <-r.clock.After(r.connectTimeout):
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
 		cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: open stream reader timeout: %w", context.DeadlineExceeded)))

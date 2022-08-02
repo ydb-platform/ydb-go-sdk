@@ -18,12 +18,13 @@ type (
 	// later release.
 	Topic struct {
 		OnPartitionReadStart       func(OnPartitionReadStartInfo)
-		OnPartitionReadStop        func(info OnPartitionReadStopInfo)
+		OnPartitionReadStop        func(OnPartitionReadStopInfo)
 		OnPartitionCommittedNotify func(OnPartitionCommittedInfo)
 
-		OnReadStreamOpen  func(OnReadStreamOpenInfo)
-		OnReadStreamInit  func(OnReadStreamInitInfo)
-		OnReadStreamError func(OnReadStreamErrorInfo)
+		OnReaderStreamConnect func(OnReaderStreamConnectStartInfo) func(OnReaderStreamConnectDoneInfo)
+		OnReaderStreamClose   func(OnReaderStreamCloseStartInfo) func(OnReaderStreamCloseDoneInfo)
+		OnReadStreamInit      func(OnReadStreamInitStartInfo) func(OnReadStreamInitDoneInfo)
+		OnReadStreamError     func(OnReadStreamErrorInfo)
 
 		OnReadUnknownGrpcMessage func(OnReadUnknownGrpcMessageInfo)
 		OnReadStreamRawReceived  func(OnReadStreamRawReceivedInfo)
@@ -99,27 +100,55 @@ type (
 		Error              error
 	}
 
-	// OnReadStreamOpenInfo
+	// OnReaderStreamConnectStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	OnReadStreamOpenInfo struct {
-		BaseContext context.Context
-		Error       error
+	OnReaderStreamConnectStartInfo struct{}
+
+	// OnReaderStreamConnectDoneInfo
+	//
+	// Experimental
+	//
+	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+	// later release.
+	OnReaderStreamConnectDoneInfo struct {
+		Error error
 	}
 
-	// OnReadStreamInitInfo
+	OnReaderStreamCloseStartInfo struct {
+		ReaderConnectionID string
+		CloseReason        error
+	}
+
+	OnReaderStreamCloseDoneInfo struct {
+		ReaderConnectionID string
+		CloseReason        error
+		CloseError         error
+	}
+
+	// OnReadStreamInitStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	OnReadStreamInitInfo struct {
-		ReaderConnectionID string
-		BaseContext        context.Context
-		Error              error
+	OnReadStreamInitStartInfo struct {
+		PreInitReaderConnectionID string
+	}
+
+	// OnReadStreamInitDoneInfo
+	//
+	// Experimental
+	//
+	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+	// later release.
+	OnReadStreamInitDoneInfo struct {
+		PreInitReaderConnectionID string
+		ReaderConnectionID        string
+		Error                     error
 	}
 
 	readStreamServerMessageDebugInfo interface {
