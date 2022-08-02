@@ -1,3 +1,5 @@
+* Allow read and commit messages in parallel
+
 ## v3.31.0
 * Extended the ydb.Connection interface with experimental db.Topic() client (control plane and reader API)
 * Removed `ydb.RegisterParser()` function (was needed for `database/sql` driver outside `ydb-go-sdk` repository, necessity of `ydb.RegisterParser()` disappeared with implementation `database/sql` driver in same repository)
