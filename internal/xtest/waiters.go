@@ -10,6 +10,7 @@ import (
 )
 
 func WaitChannelClosed(t testing.TB, ch empty.Chan) {
+	t.Helper()
 	const condWaitTimeout = time.Second
 
 	select {
