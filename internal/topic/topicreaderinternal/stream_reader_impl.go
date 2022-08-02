@@ -26,6 +26,7 @@ var (
 	errPartitionStopped              = xerrors.Wrap(errors.New("ydb: pq partition stopped"))
 	errCommitSessionFromOtherReader  = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 	errCommitWithNilPartitionSession = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
+	errInternalUnknownCommitMode     = xerrors.Wrap(errors.New("ydb: unexpected commit mode"))
 )
 
 type partitionSessionID = rawtopicreader.PartitionSessionID
@@ -37,6 +38,7 @@ type topicStreamReaderImpl struct {
 
 	freeBytes                 chan int
 	atomicRestBufferSizeBytes int64
+	lastReadRange             commitRange
 	sessionController         partitionSessionStorage
 	backgroundWorkers         background.Worker
 
@@ -75,7 +77,7 @@ func newTopicStreamReaderConfig() topicStreamReaderConfig {
 		BufferSizeProtoBytes:  1024 * 1024,
 		Cred:                  credentials.NewAnonymousCredentials(),
 		CredUpdateInterval:    time.Hour,
-		CommitMode:            CommitModeAsync,
+		CommitMode:            CommitModeAutoCommit,
 		CommitterBatchTimeLag: time.Second,
 		Decoders:              newDecoderMap(),
 	}
@@ -171,10 +173,31 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 	defer func() {
 		if err == nil {
 			r.freeBufferFromMessages(batch)
+
+			if r.cfg.CommitMode == CommitModeAutoCommit {
+				err = r.autoCommit(ctx, batch)
+			}
 		}
 	}()
 
 	return r.consumeMessagesUntilBatch(ctx, opts)
+}
+
+func (r *topicStreamReaderImpl) autoCommit(ctx context.Context, readedBatch *PublicBatch) error {
+	defer func() {
+		r.lastReadRange = readedBatch.commitRange
+	}()
+
+	if r.lastReadRange.session() == nil || r.lastReadRange.session().Context().Err() != nil {
+		return nil
+	}
+
+	err := r.commit(ctx, r.lastReadRange)
+	if errors.Is(err, errPartitionStopped) {
+		err = nil
+	}
+
+	return err
 }
 
 func (r *topicStreamReaderImpl) consumeMessagesUntilBatch(
@@ -298,6 +321,19 @@ func (r *topicStreamReaderImpl) onPartitionSessionStatusResponseFromBuffer(
 }
 
 func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRange) error {
+	switch r.cfg.CommitMode {
+	case CommitModeAutoCommit, CommitModeNone:
+		return ErrCommitDisabled
+	case CommitModeAsync, CommitModeSync:
+		// pass
+	default:
+		return xerrors.WithStackTrace(errInternalUnknownCommitMode)
+	}
+
+	return r.commit(ctx, commitRange)
+}
+
+func (r *topicStreamReaderImpl) commit(ctx context.Context, commitRange commitRange) error {
 	if err := r.checkCommitRange(commitRange); err != nil {
 		return err
 	}
