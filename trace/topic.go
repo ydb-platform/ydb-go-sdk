@@ -124,9 +124,7 @@ type (
 	}
 
 	OnReaderStreamCloseDoneInfo struct {
-		ReaderConnectionID string
-		CloseReason        error
-		CloseError         error
+		CloseError error
 	}
 
 	// OnReadStreamInitStartInfo
@@ -137,6 +135,12 @@ type (
 	// later release.
 	OnReadStreamInitStartInfo struct {
 		PreInitReaderConnectionID string
+		InitRequestInfo           TopicReadStreamInitRequestInfo
+	}
+
+	TopicReadStreamInitRequestInfo interface {
+		GetConsumer() string
+		GetTopics() []string
 	}
 
 	// OnReadStreamInitDoneInfo
@@ -146,9 +150,8 @@ type (
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
 	OnReadStreamInitDoneInfo struct {
-		PreInitReaderConnectionID string
-		ReaderConnectionID        string
-		Error                     error
+		NewReaderConnectionID string
+		Error                 error
 	}
 
 	readStreamServerMessageDebugInfo interface {

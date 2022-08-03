@@ -425,27 +425,25 @@ func TopicOnReaderStreamConnect(t Topic) func(error) {
 		res(p)
 	}
 }
-func TopicOnReaderStreamClose(t Topic, readerConnectionID string, closeReason error) func(readerConnectionID string, closeReason error, closeError error) {
+func TopicOnReaderStreamClose(t Topic, readerConnectionID string, closeReason error) func(closeError error) {
 	var p OnReaderStreamCloseStartInfo
 	p.ReaderConnectionID = readerConnectionID
 	p.CloseReason = closeReason
 	res := t.onReaderStreamClose(p)
-	return func(readerConnectionID string, closeReason error, closeError error) {
+	return func(closeError error) {
 		var p OnReaderStreamCloseDoneInfo
-		p.ReaderConnectionID = readerConnectionID
-		p.CloseReason = closeReason
 		p.CloseError = closeError
 		res(p)
 	}
 }
-func TopicOnReadStreamInit(t Topic, preInitReaderConnectionID string) func(preInitReaderConnectionID string, readerConnectionID string, _ error) {
+func TopicOnReadStreamInit(t Topic, preInitReaderConnectionID string, initRequestInfo TopicReadStreamInitRequestInfo) func(newReaderConnectionID string, _ error) {
 	var p OnReadStreamInitStartInfo
 	p.PreInitReaderConnectionID = preInitReaderConnectionID
+	p.InitRequestInfo = initRequestInfo
 	res := t.onReadStreamInit(p)
-	return func(preInitReaderConnectionID string, readerConnectionID string, e error) {
+	return func(newReaderConnectionID string, e error) {
 		var p OnReadStreamInitDoneInfo
-		p.PreInitReaderConnectionID = preInitReaderConnectionID
-		p.ReaderConnectionID = readerConnectionID
+		p.NewReaderConnectionID = newReaderConnectionID
 		p.Error = e
 		res(p)
 	}

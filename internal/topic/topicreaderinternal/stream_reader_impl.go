@@ -360,13 +360,14 @@ func (r *topicStreamReaderImpl) setStarted() error {
 }
 
 func (r *topicStreamReaderImpl) initSession() (err error) {
-	preInitConnectionID := r.readConnectionID
-	onDone := trace.TopicOnReadStreamInit(r.cfg.Tracer, preInitConnectionID)
+	initMessage := r.cfg.initMessage()
+
+	onDone := trace.TopicOnReadStreamInit(r.cfg.Tracer, r.readConnectionID, initMessage)
 	defer func() {
-		onDone(preInitConnectionID, r.readConnectionID, err)
+		onDone(r.readConnectionID, err)
 	}()
 
-	if err = r.send(r.cfg.initMessage()); err != nil {
+	if err = r.send(initMessage); err != nil {
 		return err
 	}
 
@@ -582,7 +583,7 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 
 func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error) (closeErr error) {
 	onDone := trace.TopicOnReaderStreamClose(r.cfg.Tracer, r.readConnectionID, reason)
-	defer onDone(r.readConnectionID, reason, closeErr)
+	defer onDone(closeErr)
 
 	isFirstClose := false
 	r.m.WithLock(func() {

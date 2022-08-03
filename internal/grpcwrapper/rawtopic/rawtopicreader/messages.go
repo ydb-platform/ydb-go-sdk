@@ -113,14 +113,14 @@ type InitRequest struct {
 	Consumer string
 }
 
-func (g *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
+func (r *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
 	p := &Ydb_Topic.StreamReadMessage_InitRequest{
-		Consumer: g.Consumer,
+		Consumer: r.Consumer,
 	}
 
-	p.TopicsReadSettings = make([]*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings, len(g.TopicsReadSettings))
-	for topicSettingsIndex := range g.TopicsReadSettings {
-		srcTopicSettings := &g.TopicsReadSettings[topicSettingsIndex]
+	p.TopicsReadSettings = make([]*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings, len(r.TopicsReadSettings))
+	for topicSettingsIndex := range r.TopicsReadSettings {
+		srcTopicSettings := &r.TopicsReadSettings[topicSettingsIndex]
 		dstTopicSettings := &Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings{}
 		p.TopicsReadSettings[topicSettingsIndex] = dstTopicSettings
 
@@ -130,6 +130,20 @@ func (g *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
 	}
 
 	return p
+}
+
+// GetConsumer for implement trace.TopicReadStreamInitRequestInfo
+func (r *InitRequest) GetConsumer() string {
+	return r.Consumer
+}
+
+// GetTopics for implement trace.TopicReadStreamInitRequestInfo
+func (r *InitRequest) GetTopics() []string {
+	res := make([]string, len(r.TopicsReadSettings))
+	for i := range res {
+		res[i] = r.TopicsReadSettings[i].Path
+	}
+	return res
 }
 
 type TopicReadSettings struct {
