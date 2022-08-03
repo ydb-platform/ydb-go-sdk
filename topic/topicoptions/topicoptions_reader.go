@@ -101,6 +101,8 @@ func WithCommitCountTrigger(count int) ReaderOption {
 }
 
 // WithBatchReadMinCount
+// prefer min count messages in batch
+// sometimes batch can contain fewer messages, for example if local buffer is full and SDK can't receive more messages
 //
 // Experimental
 //
