@@ -33,7 +33,7 @@ jobs:
   table:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.18.x, 1.19.x]
         os: [ubuntu-latest]
     services:
       ydb:
@@ -76,7 +76,7 @@ jobs:
   ratelimiter:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.18.x, 1.19.x]
         os: [ubuntu-latest]
     services:
       ydb:
@@ -118,7 +118,7 @@ jobs:
   scripting:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.18.x, 1.19.x]
         os: [ubuntu-latest]
     services:
       ydb:
@@ -159,7 +159,7 @@ jobs:
   topic:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.18.x, 1.19.x]
         os: [ubuntu-latest]
     services:
       ydb:
@@ -200,7 +200,7 @@ jobs:
   discovery:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.18.x, 1.19.x]
         os: [ubuntu-latest]
     services:
       ydb:
@@ -241,7 +241,7 @@ jobs:
   connection:
     strategy:
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.18.x, 1.19.x]
         os: [ubuntu-latest]
     services:
       ydb:
