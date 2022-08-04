@@ -17,32 +17,32 @@ type (
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
 	Topic struct {
-		OnReaderConnect          func(TableReaderConnectStartInfo) func(TableReaderConnectDoneInfo)
-		OnReaderReconnect        func(TableReaderReconnectStartInfo) func(TableReaderReconnectDoneInfo)
-		OnReaderReconnectRequest func(TableReaderReconnectRequestInfo)
+		OnReaderConnect          func(TopicReaderConnectStartInfo) func(TopicReaderConnectDoneInfo)
+		OnReaderReconnect        func(TopicReaderReconnectStartInfo) func(TopicReaderReconnectDoneInfo)
+		OnReaderReconnectRequest func(TopicReaderReconnectRequestInfo)
 
-		OnReaderPartitionReadStartResponse func(TableReaderPartitionReadStartResponseStartInfo) func(TableReaderPartitionReadStartResponseDoneInfo)
-		OnReaderPartitionReadStop          func(TableReaderPartitionReadStopInfo)
+		OnReaderPartitionReadStartResponse func(TopicReaderPartitionReadStartResponseStartInfo) func(TopicReaderPartitionReadStartResponseDoneInfo)
+		OnReaderPartitionReadStop          func(TopicReaderPartitionReadStopInfo)
 
-		OnReaderStreamCommit              func(TableReaderStreamCommitStartInfo) func(TableReaderStreamCommitDoneInfo)
-		OnReaderStreamSentCommitMessage   func(TableReaderStreamSentCommitMessageStartInfo) func(TableReaderStreamSentCommitMessageDoneInfo)
-		OnReaderStreamCommittedNotify     func(TableReaderStreamCommittedInfo)
-		OnReaderStreamClose               func(TableReaderStreamCloseStartInfo) func(TableReaderStreamCloseDoneInfo)
-		OnReaderStreamInit                func(TableReaderStreamInitStartInfo) func(TableReaderStreamInitDoneInfo)
-		OnReaderStreamError               func(TableReaderStreamErrorInfo)
-		OnReaderStreamSentDataRequest     func(TableReaderStreamSentDataRequestInfo)
-		OnReaderStreamReceiveDataResponse func(TableReaderStreamReceiveDataResponseStartInfo) func(TableReaderStreamReceiveDataResponseDoneInfo)
-		OnReaderStreamReadMessages        func(TableReaderStreamReadMessagesStartInfo) func(TableReaderStreamReadMessagesDoneInfo)
+		OnReaderStreamCommit              func(TopicReaderStreamCommitStartInfo) func(TopicReaderStreamCommitDoneInfo)
+		OnReaderStreamSentCommitMessage   func(TopicReaderStreamSentCommitMessageStartInfo) func(TopicReaderStreamSentCommitMessageDoneInfo)
+		OnReaderStreamCommittedNotify     func(TopicReaderStreamCommittedInfo)
+		OnReaderStreamClose               func(TopicReaderStreamCloseStartInfo) func(TopicReaderStreamCloseDoneInfo)
+		OnReaderStreamInit                func(TopicReaderStreamInitStartInfo) func(TopicReaderStreamInitDoneInfo)
+		OnReaderStreamError               func(TopicReaderStreamErrorInfo)
+		OnReaderStreamSentDataRequest     func(TopicReaderStreamSentDataRequestInfo)
+		OnReaderStreamReceiveDataResponse func(TopicReaderStreamReceiveDataResponseStartInfo) func(TopicReaderStreamReceiveDataResponseDoneInfo)
+		OnReaderStreamReadMessages        func(TopicReaderStreamReadMessagesStartInfo) func(TopicReaderStreamReadMessagesDoneInfo)
 		OnReaderStreamUnknownGrpcMessage  func(OnReadStreamUnknownGrpcMessageInfo)
 		OnReaderStreamUpdateToken         func(OnReadStreamUpdateTokenStartInfo) func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo)
 	}
 
-	// TableReaderPartitionReadStartResponseStartInfo
+	// TopicReaderPartitionReadStartResponseStartInfo
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderPartitionReadStartResponseStartInfo struct {
+	TopicReaderPartitionReadStartResponseStartInfo struct {
 		ReaderConnectionID string
 		PartitionContext   context.Context
 		Topic              string
@@ -50,24 +50,24 @@ type (
 		PartitionSessionID int64
 	}
 
-	// TableReaderPartitionReadStartResponseDoneInfo
+	// TopicReaderPartitionReadStartResponseDoneInfo
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderPartitionReadStartResponseDoneInfo struct {
+	TopicReaderPartitionReadStartResponseDoneInfo struct {
 		ReadOffset   *int64
 		CommitOffset *int64
 		Error        error
 	}
 
-	// TableReaderPartitionReadStopInfo
+	// TopicReaderPartitionReadStopInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderPartitionReadStopInfo struct {
+	TopicReaderPartitionReadStopInfo struct {
 		ReaderConnectionID string
 		PartitionContext   context.Context
 		Topic              string
@@ -77,67 +77,67 @@ type (
 		Graceful           bool
 	}
 
-	// TableReaderStreamSentCommitMessageStartInfo
+	// TopicReaderStreamSentCommitMessageStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamSentCommitMessageStartInfo struct{}
+	TopicReaderStreamSentCommitMessageStartInfo struct{}
 
-	// TableReaderStreamSentCommitMessageDoneInfo
+	// TopicReaderStreamSentCommitMessageDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamSentCommitMessageDoneInfo struct {
+	TopicReaderStreamSentCommitMessageDoneInfo struct {
 		Error error
 	}
 
-	// TableReaderStreamCommittedInfo
+	// TopicReaderStreamCommittedInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamCommittedInfo struct {
+	TopicReaderStreamCommittedInfo struct {
 		ReaderConnectionID string
 		Topic              string
 		PartitionID        int64
 		CommittedOffset    int64
 	}
 
-	// TableReaderStreamErrorInfo
+	// TopicReaderStreamErrorInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamErrorInfo struct {
+	TopicReaderStreamErrorInfo struct {
 		ReaderConnectionID string
 		Error              error
 	}
 
-	// TableReaderStreamSentDataRequestInfo
+	// TopicReaderStreamSentDataRequestInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamSentDataRequestInfo struct {
+	TopicReaderStreamSentDataRequestInfo struct {
 		ReaderConnectionID       string
 		RequestBytes             int
 		LocalBufferSizeAfterSent int
 	}
 
-	// TableReaderStreamReceiveDataResponseStartInfo
+	// TopicReaderStreamReceiveDataResponseStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamReceiveDataResponseStartInfo struct {
+	TopicReaderStreamReceiveDataResponseStartInfo struct {
 		ReaderConnectionID          string
 		LocalBufferSizeAfterReceive int
 		DataResponse                TopicReaderDataResponseInfo
@@ -148,36 +148,36 @@ type (
 		GetPartitionBatchMessagesCounts() (partitionCount, batchCount, messagesCount int)
 	}
 
-	// TableReaderStreamReceiveDataResponseDoneInfo
+	// TopicReaderStreamReceiveDataResponseDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamReceiveDataResponseDoneInfo struct {
+	TopicReaderStreamReceiveDataResponseDoneInfo struct {
 		Error error
 	}
 
-	// TableReaderStreamReadMessagesStartInfo
+	// TopicReaderStreamReadMessagesStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamReadMessagesStartInfo struct {
+	TopicReaderStreamReadMessagesStartInfo struct {
 		RequestContext     context.Context
 		MinCount           int
 		MaxCount           int
 		FreeBufferCapacity int
 	}
 
-	// TableReaderStreamReadMessagesDoneInfo
+	// TopicReaderStreamReadMessagesDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamReadMessagesDoneInfo struct {
+	TopicReaderStreamReadMessagesDoneInfo struct {
 		MessagesCount      int
 		Topic              string
 		PartitionID        int64
@@ -198,72 +198,72 @@ type (
 		Error              error
 	}
 
-	// TableReaderConnectStartInfo
+	// TopicReaderConnectStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderConnectStartInfo struct{}
+	TopicReaderConnectStartInfo struct{}
 
-	// TableReaderConnectDoneInfo
+	// TopicReaderConnectDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderConnectDoneInfo struct {
+	TopicReaderConnectDoneInfo struct {
 		Error error
 	}
 
-	// TableReaderReconnectStartInfo
+	// TopicReaderReconnectStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderReconnectStartInfo struct{}
+	TopicReaderReconnectStartInfo struct{}
 
-	// TableReaderReconnectDoneInfo
+	// TopicReaderReconnectDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderReconnectDoneInfo struct {
+	TopicReaderReconnectDoneInfo struct {
 		Error error
 	}
 
-	// TableReaderReconnectRequestInfo
+	// TopicReaderReconnectRequestInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderReconnectRequestInfo struct {
+	TopicReaderReconnectRequestInfo struct {
 		Reason  error
 		WasSent bool
 	}
 
-	// TableReaderReadMessagesStartInfo
+	// TopicReaderReadMessagesStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderReadMessagesStartInfo struct {
+	TopicReaderReadMessagesStartInfo struct {
 		RequestContext context.Context
 		MinCount       int
 		MaxCount       int
 	}
 
-	// TableReaderStreamCommitStartInfo
+	// TopicReaderStreamCommitStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamCommitStartInfo struct {
+	TopicReaderStreamCommitStartInfo struct {
 		RequestContext     context.Context
 		Topic              string
 		PartitionID        int64
@@ -272,23 +272,23 @@ type (
 		EndOffset          int64
 	}
 
-	// TableReaderStreamCommitDoneInfo
+	// TopicReaderStreamCommitDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamCommitDoneInfo struct {
+	TopicReaderStreamCommitDoneInfo struct {
 		Error error
 	}
 
-	// TableReaderReadMessagesDoneInfo
+	// TopicReaderReadMessagesDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderReadMessagesDoneInfo struct {
+	TopicReaderReadMessagesDoneInfo struct {
 		MessagesCount int
 		Topic         string
 		PartitionID   int64
@@ -297,34 +297,34 @@ type (
 		Error         error
 	}
 
-	// TableReaderStreamCloseStartInfo
+	// TopicReaderStreamCloseStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamCloseStartInfo struct {
+	TopicReaderStreamCloseStartInfo struct {
 		ReaderConnectionID string
 		CloseReason        error
 	}
 
-	// TableReaderStreamCloseDoneInfo
+	// TopicReaderStreamCloseDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamCloseDoneInfo struct {
+	TopicReaderStreamCloseDoneInfo struct {
 		CloseError error
 	}
 
-	// TableReaderStreamInitStartInfo
+	// TopicReaderStreamInitStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamInitStartInfo struct {
+	TopicReaderStreamInitStartInfo struct {
 		PreInitReaderConnectionID string
 		InitRequestInfo           TopicReadStreamInitRequestInfo
 	}
@@ -340,13 +340,13 @@ type (
 		GetTopics() []string
 	}
 
-	// TableReaderStreamInitDoneInfo
+	// TopicReaderStreamInitDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamInitDoneInfo struct {
+	TopicReaderStreamInitDoneInfo struct {
 		NewReaderConnectionID string
 		Error                 error
 	}
