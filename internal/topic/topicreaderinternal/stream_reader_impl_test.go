@@ -145,8 +145,8 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		readMessagesCtx, readMessagesCtxCancel := xcontext.WithErrCancel(context.Background())
 		committedOffset := int64(222)
 
-		e.reader.cfg.Tracer.OnPartitionReadStop = func(info trace.OnPartitionReadStopInfo) {
-			expected := trace.OnPartitionReadStopInfo{
+		e.reader.cfg.Tracer.OnReaderStreamPartitionReadStop = func(info trace.OnReaderStreamPartitionReadStopInfo) {
+			expected := trace.OnReaderStreamPartitionReadStopInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
 				PartitionContext:   e.partitionSession.ctx,
 				Topic:              e.partitionSession.Topic,
@@ -184,8 +184,8 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		readMessagesCtx, readMessagesCtxCancel := xcontext.WithErrCancel(context.Background())
 		committedOffset := int64(222)
 
-		e.reader.cfg.Tracer.OnPartitionReadStop = func(info trace.OnPartitionReadStopInfo) {
-			expected := trace.OnPartitionReadStopInfo{
+		e.reader.cfg.Tracer.OnReaderStreamPartitionReadStop = func(info trace.OnReaderStreamPartitionReadStopInfo) {
+			expected := trace.OnReaderStreamPartitionReadStopInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
 				PartitionContext:   e.partitionSession.ctx,
 				Topic:              e.partitionSession.Topic,

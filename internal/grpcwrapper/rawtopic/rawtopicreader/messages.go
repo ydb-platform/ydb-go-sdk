@@ -189,6 +189,24 @@ type ReadResponse struct {
 	PartitionData []PartitionData
 }
 
+// GetBytesSize implements trace.TopicReaderDataResponseInfo
+func (r *ReadResponse) GetBytesSize() int {
+	return r.BytesSize
+}
+
+// GetPartitionBatchMessagesCounts implements trace.TopicReaderDataResponseInfo
+func (r *ReadResponse) GetPartitionBatchMessagesCounts() (partitionDataCount, batchCount, messagesCount int) {
+	partitionDataCount = len(r.PartitionData)
+	for partitionIndex := range r.PartitionData {
+		partitionData := &r.PartitionData[partitionIndex]
+		batchCount += len(partitionData.Batches)
+		for batchIndex := range partitionData.Batches {
+			messagesCount += len(partitionData.Batches[batchIndex].MessageData)
+		}
+	}
+	return partitionDataCount, batchCount, messagesCount
+}
+
 func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) error {
 	if p == nil {
 		return xerrors.WithStackTrace(errUnexpectedNilStreamReadMessageReadResponse)

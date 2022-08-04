@@ -20,6 +20,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var (
+	errReconnectRequestOutdated = xerrors.Wrap(errors.New("ydb: reconnect request outdated"))
+	errReconnect                = xerrors.Wrap(errors.New("ydb: reconnect to topic grpc stream"))
+)
+
 type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
 
 type readerReconnector struct {
@@ -175,26 +180,32 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			return
 
 		case oldReader := <-r.reconnectFromBadStream:
-			r.reconnect(ctx, oldReader)
+			_ = r.reconnect(ctx, oldReader)
 		}
 	}
 }
 
-func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStreamReader) {
-	if ctx.Err() != nil {
-		return
+func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStreamReader) (err error) {
+	onDone := trace.TopicOnReaderReconnect(r.tracer)
+	defer func() {
+		onDone(err)
+	}()
+
+	if err = ctx.Err(); err != nil {
+		return err
 	}
+
 	var closedErr error
 	r.m.WithRLock(func() {
 		closedErr = r.closedErr
 	})
 	if closedErr != nil {
-		return
+		return err
 	}
 
 	stream, _ := r.stream(ctx)
 	if oldReader != stream {
-		return
+		return xerrors.WithStackTrace(errReconnectRequestOutdated)
 	}
 
 	connectionInProgress := make(empty.Chan)
@@ -205,7 +216,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 	})
 
 	if oldReader != nil {
-		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errors.New("ydb: reconnect to pq grpc stream")))
+		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errReconnect))
 	}
 
 	newStream, err := r.connectWithTimeout()
@@ -214,6 +225,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 		go func() {
 			// guarantee write reconnect signal to channel
 			r.reconnectFromBadStream <- oldReader
+			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 		}()
 	}
 
@@ -223,10 +235,11 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 			r.streamVal = newStream
 		}
 	})
+	return err
 }
 
 func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
-	traceDone := trace.TopicOnReaderStreamConnect(r.tracer)
+	traceDone := trace.TopicOnReaderConnect(r.tracer)
 	defer traceDone(err)
 
 	bgContext := r.background.Context()
@@ -274,8 +287,10 @@ func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamRe
 	select {
 	case r.reconnectFromBadStream <- stream:
 		// send signal
+		trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 	default:
-		// signal was send and not handled already
+		// previous reconnect signal in process, no need sent signal more
+		trace.TopicOnReaderReconnectRequest(r.tracer, err, false)
 	}
 }
 

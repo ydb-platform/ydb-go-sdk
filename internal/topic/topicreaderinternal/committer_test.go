@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestCommitterCommit(t *testing.T) {
@@ -334,7 +335,7 @@ func TestCommitterBuffer(t *testing.T) {
 }
 
 func newTestCommitter(ctx context.Context, t testing.TB) *committer {
-	res := newCommitter(ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
+	res := newCommitter(trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
 	})
 	t.Cleanup(func() {

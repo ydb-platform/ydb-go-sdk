@@ -197,13 +197,13 @@ func Example_readWithExplicitPartitionStartStopHandler() {
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
 		topicoptions.WithTracer(
 			trace.Topic{
-				OnPartitionReadStart: func(info trace.OnPartitionReadStartInfo) {
+				OnReaderStreamPartitionReadStart: func(info trace.OnReaderStreamPartitionReadStartInfo) {
 					err := externalSystemLock(info.PartitionContext, info.Topic, info.PartitionID)
 					if err != nil {
 						stopReader()
 					}
 				},
-				OnPartitionReadStop: func(info trace.OnPartitionReadStopInfo) {
+				OnReaderStreamPartitionReadStop: func(info trace.OnReaderStreamPartitionReadStopInfo) {
 					if info.Graceful {
 						err := externalSystemUnlock(ctx, info.Topic, info.PartitionID)
 						if err != nil {
@@ -251,14 +251,14 @@ func Example_readWithExplicitPartitionStartStopHandlerAndOwnReadProgressStorage(
 		return res, err
 	}
 
-	onPartitionStart := func(info trace.OnPartitionReadStartInfo) {
+	onPartitionStart := func(info trace.OnReaderStreamPartitionReadStartInfo) {
 		err := externalSystemLock(info.PartitionContext, info.Topic, info.PartitionID)
 		if err != nil {
 			stopReader()
 		}
 	}
 
-	onPartitionStop := func(info trace.OnPartitionReadStopInfo) {
+	onPartitionStop := func(info trace.OnReaderStreamPartitionReadStopInfo) {
 		if info.Graceful {
 			err := externalSystemUnlock(ctx, info.Topic, info.PartitionID)
 			if err != nil {
@@ -272,8 +272,8 @@ func Example_readWithExplicitPartitionStartStopHandlerAndOwnReadProgressStorage(
 		topicoptions.WithGetPartitionStartOffset(readStartPosition),
 		topicoptions.WithTracer(
 			trace.Topic{
-				OnPartitionReadStart: onPartitionStart,
-				OnPartitionReadStop:  onPartitionStop,
+				OnReaderStreamPartitionReadStart: onPartitionStart,
+				OnReaderStreamPartitionReadStop:  onPartitionStop,
 			},
 		),
 	)
@@ -296,7 +296,7 @@ func Example_receiveCommitNotify() {
 
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
 		topicoptions.WithTracer(trace.Topic{
-			OnPartitionCommittedNotify: func(info trace.OnPartitionCommittedInfo) {
+			OnReaderStreamCommittedNotify: func(info trace.OnReaderStreamCommittedInfo) {
 				// called when receive commit notify from server
 				fmt.Println(info.Topic, info.PartitionID, info.CommittedOffset)
 			},

@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -36,6 +37,7 @@ type TopicSteamReaderConnect func(connectionCtx context.Context) (RawTopicReader
 type Reader struct {
 	reader             batchedStreamReader
 	defaultBatchConfig ReadMessageBatchOptions
+	tracer             trace.Topic
 }
 
 type ReadMessageBatchOptions struct {
@@ -89,6 +91,7 @@ func NewReader(
 	res := Reader{
 		reader:             newReaderReconnector(readerConnector, cfg.OperationTimeout(), cfg.Tracer, cfg.BaseContext),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
+		tracer:             cfg.Tracer,
 	}
 
 	return res
@@ -112,20 +115,36 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 
 // ReadMessageBatch read batch of messages.
 // Batch is collection of messages, which can be atomically committed
-func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (*PublicBatch, error) {
+func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
 	readOptions := r.defaultBatchConfig.clone()
 
 	for _, optFunc := range opts {
 		readOptions = optFunc.Apply(readOptions)
 	}
 
+	onDone := trace.TopicOnReaderReadMessages(r.tracer, ctx, readOptions.MinCount, readOptions.MaxCount)
+	defer func() {
+		if batch == nil {
+			onDone(-1, "", -1, -1, -1, err)
+		} else {
+			onDone(
+				len(batch.Messages),
+				batch.Topic(),
+				batch.PartitionID(),
+				batch.commitRange.commitOffsetStart.ToInt64(),
+				batch.commitRange.commitOffsetEnd.ToInt64(),
+				err,
+			)
+		}
+	}()
+
 forReadBatch:
 	for {
-		if err := ctx.Err(); err != nil {
+		if err = ctx.Err(); err != nil {
 			return nil, err
 		}
 
-		batch, err := r.reader.ReadMessageBatch(ctx, readOptions)
+		batch, err = r.reader.ReadMessageBatch(ctx, readOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -139,8 +158,28 @@ forReadBatch:
 	}
 }
 
-func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) error {
-	return r.reader.Commit(ctx, offsets.getCommitRange().priv)
+func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
+	cr := offsets.getCommitRange()
+
+	var session partitionSession
+	if cr.priv.partitionSession != nil {
+		session = *cr.priv.partitionSession
+	}
+
+	onDone := trace.TopicOnReaderCommit(
+		r.tracer,
+		ctx,
+		session.Topic,
+		session.PartitionID,
+		session.partitionSessionID.ToInt64(),
+		cr.priv.commitOffsetStart.ToInt64(),
+		cr.priv.commitOffsetEnd.ToInt64(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	return r.reader.Commit(ctx, cr.priv)
 }
 
 func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) error {
