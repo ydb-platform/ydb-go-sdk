@@ -17,24 +17,24 @@ type (
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
 	Topic struct {
-		TableReaderConnect          func(TableReaderConnectStartInfo) func(TableReaderConnectDoneInfo)
-		TableReaderReconnect        func(TableReaderReconnectStartInfo) func(TableReaderReconnectDoneInfo)
-		TableReaderReconnectRequest func(TableReaderReconnectRequestInfo)
-		TableReaderReadMessages     func(TableReaderReadMessagesStartInfo) func(TableReaderReadMessagesDoneInfo)
-		TableReaderCommit           func(TableReaderCommitStartInfo) func(TableReaderCommitDoneInfo)
+		OnReaderConnect          func(TableReaderConnectStartInfo) func(TableReaderConnectDoneInfo)
+		OnReaderReconnect        func(TableReaderReconnectStartInfo) func(TableReaderReconnectDoneInfo)
+		OnReaderReconnectRequest func(TableReaderReconnectRequestInfo)
+		OnReaderReadMessages     func(TableReaderReadMessagesStartInfo) func(TableReaderReadMessagesDoneInfo)
+		OnReaderCommit           func(TableReaderCommitStartInfo) func(TableReaderCommitDoneInfo)
 
-		TableReaderStreamSentCommitMessage   func(TableReaderStreamSentCommitMessageStartInfo) func(TableReaderStreamSentCommitMessageDoneInfo)
-		TableReaderStreamCommittedNotify     func(TableReaderStreamCommittedInfo)
-		TableReaderStreamPartitionReadStart  func(TableReaderStreamPartitionReadStartInfo)
-		TableReaderStreamPartitionReadStop   func(TableReaderStreamPartitionReadStopInfo)
-		TableReaderStreamClose               func(TableReaderStreamCloseStartInfo) func(TableReaderStreamCloseDoneInfo)
-		TableReaderStreamInit                func(TableReaderStreamInitStartInfo) func(TableReaderStreamInitDoneInfo)
-		TableReaderStreamError               func(TableReaderStreamErrorInfo)
-		TableReaderStreamSentDataRequest     func(TableReaderStreamSentDataRequestInfo)
-		TableReaderStreamReceiveDataResponse func(TableReaderStreamReceiveDataResponseStartInfo) func(TableReaderStreamReceiveDataResponseDoneInfo)
-		TableReaderStreamReadMessages        func(TableReaderStreamReadMessagesStartInfo) func(TableReaderStreamReadMessagesDoneInfo)
-		TableReaderStreamUnknownGrpcMessage  func(OnReadStreamUnknownGrpcMessageInfo)
-		TableReaderStreamUpdateToken         func(OnReadStreamUpdateTokenStartInfo) func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo)
+		OnReaderStreamSentCommitMessage   func(TableReaderStreamSentCommitMessageStartInfo) func(TableReaderStreamSentCommitMessageDoneInfo)
+		OnReaderStreamCommittedNotify     func(TableReaderStreamCommittedInfo)
+		OnReaderStreamPartitionReadStart  func(TableReaderStreamPartitionReadStartInfo)
+		OnReaderStreamPartitionReadStop   func(TableReaderStreamPartitionReadStopInfo)
+		OnReaderStreamClose               func(TableReaderStreamCloseStartInfo) func(TableReaderStreamCloseDoneInfo)
+		OnReaderStreamInit                func(TableReaderStreamInitStartInfo) func(TableReaderStreamInitDoneInfo)
+		OnReaderStreamError               func(TableReaderStreamErrorInfo)
+		OnReaderStreamSentDataRequest     func(TableReaderStreamSentDataRequestInfo)
+		OnReaderStreamReceiveDataResponse func(TableReaderStreamReceiveDataResponseStartInfo) func(TableReaderStreamReceiveDataResponseDoneInfo)
+		OnReaderStreamReadMessages        func(TableReaderStreamReadMessagesStartInfo) func(TableReaderStreamReadMessagesDoneInfo)
+		OnReaderStreamUnknownGrpcMessage  func(OnReadStreamUnknownGrpcMessageInfo)
+		OnReaderStreamUpdateToken         func(OnReadStreamUpdateTokenStartInfo) func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo)
 	}
 
 	// TableReaderStreamPartitionReadStartInfo
