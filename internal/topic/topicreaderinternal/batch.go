@@ -94,7 +94,8 @@ func newBatchFromStream(decoders decoderMap, session *partitionSession, sb rawto
 	return newBatch(session, messages)
 }
 
-// Context is cancelled when partition of message will stop to read.
+// Context is cancelled when code should stop to process messages batch
+// for example - lost connection to server or receive stop partition signal without graceful flag
 //
 // Experimental
 //
