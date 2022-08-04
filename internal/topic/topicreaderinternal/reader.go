@@ -122,22 +122,6 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 		readOptions = optFunc.Apply(readOptions)
 	}
 
-	onDone := trace.TopicOnReaderReadMessages(r.tracer, ctx, readOptions.MinCount, readOptions.MaxCount)
-	defer func() {
-		if batch == nil {
-			onDone(-1, "", -1, -1, -1, err)
-		} else {
-			onDone(
-				len(batch.Messages),
-				batch.Topic(),
-				batch.PartitionID(),
-				batch.commitRange.commitOffsetStart.ToInt64(),
-				batch.commitRange.commitOffsetEnd.ToInt64(),
-				err,
-			)
-		}
-	}()
-
 forReadBatch:
 	for {
 		if err = ctx.Err(); err != nil {
@@ -159,27 +143,7 @@ forReadBatch:
 }
 
 func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
-	cr := offsets.getCommitRange()
-
-	var session partitionSession
-	if cr.priv.partitionSession != nil {
-		session = *cr.priv.partitionSession
-	}
-
-	onDone := trace.TopicOnReaderCommit(
-		r.tracer,
-		ctx,
-		session.Topic,
-		session.PartitionID,
-		session.partitionSessionID.ToInt64(),
-		cr.priv.commitOffsetStart.ToInt64(),
-		cr.priv.commitOffsetEnd.ToInt64(),
-	)
-	defer func() {
-		onDone(err)
-	}()
-
-	return r.reader.Commit(ctx, cr.priv)
+	return r.reader.Commit(ctx, offsets.getCommitRange().priv)
 }
 
 func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) error {

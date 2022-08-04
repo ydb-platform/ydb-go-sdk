@@ -279,7 +279,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 		return err
 	}
 
-	trace.TopicOnReaderStreamPartitionReadStop(
+	trace.TopicOnReaderPartitionReadStop(
 		r.cfg.Tracer,
 		r.readConnectionID,
 		session.Context(),
@@ -320,8 +320,26 @@ func (r *topicStreamReaderImpl) onPartitionSessionStatusResponseFromBuffer(
 	panic("not implemented")
 }
 
-func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRange) error {
-	if err := r.checkCommitRange(commitRange); err != nil {
+func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRange) (err error) {
+	session := partitionSession{}
+	if commitRange.partitionSession != nil {
+		session = *commitRange.partitionSession
+	}
+
+	onDone := trace.TopicOnReaderStreamCommit(
+		r.cfg.Tracer,
+		ctx,
+		session.Topic,
+		session.PartitionID,
+		session.partitionSessionID.ToInt64(),
+		commitRange.commitOffsetStart.ToInt64(),
+		commitRange.commitOffsetEnd.ToInt64(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	if err = r.checkCommitRange(commitRange); err != nil {
 		return err
 	}
 	return r.committer.Commit(ctx, commitRange)
@@ -686,17 +704,32 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 
 func (r *topicStreamReaderImpl) onStartPartitionSessionRequestFromBuffer(
 	m *rawtopicreader.StartPartitionSessionRequest,
-) error {
+) (err error) {
 	session, err := r.sessionController.Get(m.PartitionSession.PartitionSessionID)
 	if err != nil {
 		return err
 	}
+
+	onDone := trace.TopicOnReaderPartitionReadStartResponse(
+		r.cfg.Tracer,
+		r.readConnectionID,
+		session.Context(),
+		session.Topic,
+		session.PartitionID,
+		session.partitionSessionID.ToInt64(),
+	)
 
 	respMessage := &rawtopicreader.StartPartitionSessionResponse{
 		PartitionSessionID: session.partitionSessionID,
 	}
 
 	var forceOffset *int64
+	var commitOffset *int64
+
+	defer func() {
+		onDone(forceOffset, commitOffset, err)
+	}()
+
 	if r.cfg.GetPartitionStartOffsetCallback != nil {
 		req := PublicGetPartitionStartOffsetRequest{
 			Topic:       session.Topic,
@@ -714,22 +747,13 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequestFromBuffer(
 
 	respMessage.ReadOffset.FromInt64Pointer(forceOffset)
 	if r.cfg.CommitMode.commitsEnabled() {
-		respMessage.CommitOffset.FromInt64Pointer(forceOffset)
+		commitOffset = forceOffset
+		respMessage.CommitOffset.FromInt64Pointer(commitOffset)
 	}
 
 	if err = r.send(respMessage); err != nil {
 		return err
 	}
-
-	trace.TopicOnReaderStreamPartitionReadStart(
-		r.cfg.Tracer,
-		r.readConnectionID,
-		session.Context(),
-		session.Topic,
-		session.PartitionID,
-		forceOffset,
-		forceOffset,
-	)
 
 	return nil
 }

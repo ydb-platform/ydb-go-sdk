@@ -197,13 +197,13 @@ func Example_readWithExplicitPartitionStartStopHandler() {
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
 		topicoptions.WithTracer(
 			trace.Topic{
-				OnReaderStreamPartitionReadStart: func(info trace.OnReaderStreamPartitionReadStartInfo) {
+				OnReaderPartitionReadStartResponse: func(info trace.OnReaderStreamPartitionReadStartInfo) {
 					err := externalSystemLock(info.PartitionContext, info.Topic, info.PartitionID)
 					if err != nil {
 						stopReader()
 					}
 				},
-				OnReaderStreamPartitionReadStop: func(info trace.OnReaderStreamPartitionReadStopInfo) {
+				OnReaderPartitionReadStop: func(info trace.OnReaderStreamPartitionReadStopInfo) {
 					if info.Graceful {
 						err := externalSystemUnlock(ctx, info.Topic, info.PartitionID)
 						if err != nil {
@@ -272,8 +272,8 @@ func Example_readWithExplicitPartitionStartStopHandlerAndOwnReadProgressStorage(
 		topicoptions.WithGetPartitionStartOffset(readStartPosition),
 		topicoptions.WithTracer(
 			trace.Topic{
-				OnReaderStreamPartitionReadStart: onPartitionStart,
-				OnReaderStreamPartitionReadStop:  onPartitionStop,
+				OnReaderPartitionReadStartResponse: onPartitionStart,
+				OnReaderPartitionReadStop:          onPartitionStop,
 			},
 		),
 	)

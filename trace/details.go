@@ -23,9 +23,10 @@ const (
 	TablePoolAPIEvents
 
 	TopicControlPlaneEvents
+
+	TopicReaderStreamLifeCycleEvents
 	TopicReaderStreamEvents
 	TopicReaderPartitionEvents
-	TopicReaderMessageEvents
 
 	RetryEvents
 
@@ -67,10 +68,11 @@ const (
 		TableSessionQueryEvents |
 		TableSessionTransactionEvents
 
-	TopicEvents = TopicControlPlaneEvents |
-		TopicReaderStreamEvents |
+	TopicReaderAllEvents = TopicReaderStreamEvents |
 		TopicReaderPartitionEvents |
-		TopicReaderMessageEvents
+		TopicReaderStreamLifeCycleEvents
+
+	TopicAllEvents = TopicControlPlaneEvents | TopicReaderAllEvents
 
 	DetailsAll = ^Details(0) // All bits enabled
 )
@@ -106,11 +108,12 @@ var (
 		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
 		TablePoolAPIEvents:              "ydb.table.pool.api",
 
-		TopicEvents:                "ydb.topic",
-		TopicControlPlaneEvents:    "ydb.topic.controlplane",
-		TopicReaderStreamEvents:    "ydb.topic.reader.state",
-		TopicReaderPartitionEvents: "ydb.topic.reader.partition",
-		TopicReaderMessageEvents:   "ydb.topic.reader.message",
+		TopicAllEvents:                   "ydb.topic",
+		TopicControlPlaneEvents:          "ydb.topic.controlplane",
+		TopicReaderAllEvents:             "ydb.topic.reader",
+		TopicReaderStreamEvents:          "ydb.topic.reader.stream",
+		TopicReaderPartitionEvents:       "ydb.topic.reader.partition",
+		TopicReaderStreamLifeCycleEvents: "ydb.topic.reader.lifecycle",
 	}
 	defaultDetails = DetailsAll
 )

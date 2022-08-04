@@ -20,13 +20,13 @@ type (
 		OnReaderConnect          func(TableReaderConnectStartInfo) func(TableReaderConnectDoneInfo)
 		OnReaderReconnect        func(TableReaderReconnectStartInfo) func(TableReaderReconnectDoneInfo)
 		OnReaderReconnectRequest func(TableReaderReconnectRequestInfo)
-		OnReaderReadMessages     func(TableReaderReadMessagesStartInfo) func(TableReaderReadMessagesDoneInfo)
-		OnReaderCommit           func(TableReaderCommitStartInfo) func(TableReaderCommitDoneInfo)
 
+		OnReaderPartitionReadStartResponse func(TableReaderPartitionReadStartResponseStartInfo) func(TableReaderPartitionReadStartResponseDoneInfo)
+		OnReaderPartitionReadStop          func(TableReaderPartitionReadStopInfo)
+
+		OnReaderStreamCommit              func(TableReaderStreamCommitStartInfo) func(TableReaderStreamCommitDoneInfo)
 		OnReaderStreamSentCommitMessage   func(TableReaderStreamSentCommitMessageStartInfo) func(TableReaderStreamSentCommitMessageDoneInfo)
 		OnReaderStreamCommittedNotify     func(TableReaderStreamCommittedInfo)
-		OnReaderStreamPartitionReadStart  func(TableReaderStreamPartitionReadStartInfo)
-		OnReaderStreamPartitionReadStop   func(TableReaderStreamPartitionReadStopInfo)
 		OnReaderStreamClose               func(TableReaderStreamCloseStartInfo) func(TableReaderStreamCloseDoneInfo)
 		OnReaderStreamInit                func(TableReaderStreamInitStartInfo) func(TableReaderStreamInitDoneInfo)
 		OnReaderStreamError               func(TableReaderStreamErrorInfo)
@@ -37,27 +37,37 @@ type (
 		OnReaderStreamUpdateToken         func(OnReadStreamUpdateTokenStartInfo) func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo)
 	}
 
-	// TableReaderStreamPartitionReadStartInfo
+	// TableReaderPartitionReadStartResponseStartInfo
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamPartitionReadStartInfo struct {
+	TableReaderPartitionReadStartResponseStartInfo struct {
 		ReaderConnectionID string
 		PartitionContext   context.Context
 		Topic              string
 		PartitionID        int64
-		ReadOffset         *int64
-		CommitOffset       *int64
+		PartitionSessionID int64
 	}
 
-	// TableReaderStreamPartitionReadStopInfo
+	// TableReaderPartitionReadStartResponseDoneInfo
+	// Experimental
+	//
+	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+	// later release.
+	TableReaderPartitionReadStartResponseDoneInfo struct {
+		ReadOffset   *int64
+		CommitOffset *int64
+		Error        error
+	}
+
+	// TableReaderPartitionReadStopInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderStreamPartitionReadStopInfo struct {
+	TableReaderPartitionReadStopInfo struct {
 		ReaderConnectionID string
 		PartitionContext   context.Context
 		Topic              string
@@ -247,13 +257,13 @@ type (
 		MaxCount       int
 	}
 
-	// TableReaderCommitStartInfo
+	// TableReaderStreamCommitStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderCommitStartInfo struct {
+	TableReaderStreamCommitStartInfo struct {
 		RequestContext     context.Context
 		Topic              string
 		PartitionID        int64
@@ -262,13 +272,13 @@ type (
 		EndOffset          int64
 	}
 
-	// TableReaderCommitDoneInfo
+	// TableReaderStreamCommitDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TableReaderCommitDoneInfo struct {
+	TableReaderStreamCommitDoneInfo struct {
 		Error error
 	}
 
