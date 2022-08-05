@@ -69,11 +69,11 @@ const (
 		TableSessionQueryEvents |
 		TableSessionTransactionEvents
 
-	TopicReaderAllEvents = TopicReaderStreamEvents | TopicReaderMessageEvents |
+	TopicReaderEvents = TopicReaderStreamEvents | TopicReaderMessageEvents |
 		TopicReaderPartitionEvents |
 		TopicReaderStreamLifeCycleEvents
 
-	TopicAllEvents = TopicControlPlaneEvents | TopicReaderAllEvents
+	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents
 
 	DetailsAll = ^Details(0) // All bits enabled
 )
@@ -109,9 +109,9 @@ var (
 		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
 		TablePoolAPIEvents:              "ydb.table.pool.api",
 
-		TopicAllEvents:                   "ydb.topic",
+		TopicEvents:                      "ydb.topic",
 		TopicControlPlaneEvents:          "ydb.topic.controlplane",
-		TopicReaderAllEvents:             "ydb.topic.reader",
+		TopicReaderEvents:                "ydb.topic.reader",
 		TopicReaderStreamEvents:          "ydb.topic.reader.stream",
 		TopicReaderMessageEvents:         "ydb.topic.reader.message",
 		TopicReaderPartitionEvents:       "ydb.topic.reader.partition",
