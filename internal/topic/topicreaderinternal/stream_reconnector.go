@@ -78,7 +78,19 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		return nil, ctx.Err()
 	}
 
+	attempt := 0
+
 	for {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-backoff.Fast.Wait(attempt):
+				// pass
+			}
+		}
+
+		attempt++
 		stream, err := r.stream(ctx)
 		switch {
 		case topic.IsRetryableError(err):
