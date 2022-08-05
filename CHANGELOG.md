@@ -1,3 +1,4 @@
+## v3.32.1
 * Fixed flaky TestTable
 * Renamed topic events in `trace.Details` enum
 
