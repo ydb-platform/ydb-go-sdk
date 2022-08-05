@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"path"
 	"runtime"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -319,9 +321,6 @@ func TestSessionPoolClose(t *testing.T) {
 }
 
 func TestRaceWgClosed(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	defer func() {
 		if e := recover(); e != nil {
 			t.Fatal(e)
@@ -330,47 +329,49 @@ func TestRaceWgClosed(t *testing.T) {
 
 	limit := 100
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			t.Log("start")
-			wg := sync.WaitGroup{}
-			p := newClientWithStubBuilder(
-				t,
-				testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
-						return &Ydb_Table.CreateSessionResult{
-							SessionId: testutil.SessionID(),
-						}, nil
-					},
-				})),
-				limit,
-				config.WithSizeLimit(limit),
-			)
-			for j := 0; j < limit*10; j++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					for {
-						err := p.Do(
-							ctx,
-							func(ctx context.Context, s table.Session) error {
-								return nil
-							},
-						)
-						if xerrors.Is(err, errClosedClient) {
-							return
-						}
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		t.Log("start")
+
+		ctx, cancel := context.WithTimeout(context.Background(),
+			// nolint:gosec
+			time.Duration(rand.Int31n(int32(100*time.Millisecond))),
+		)
+		defer cancel()
+
+		wg := sync.WaitGroup{}
+		p := newClientWithStubBuilder(
+			t,
+			testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					return &Ydb_Table.CreateSessionResult{
+						SessionId: testutil.SessionID(),
+					}, nil
+				},
+			})),
+			limit,
+			config.WithSizeLimit(limit),
+		)
+		for j := 0; j < limit*10; j++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					err := p.Do(
+						ctx,
+						func(ctx context.Context, s table.Session) error {
+							return nil
+						},
+					)
+					if xerrors.Is(err, errClosedClient) {
+						return
 					}
-				}()
-			}
-			_ = p.Close(context.Background())
-			wg.Wait()
-			t.Log("done")
+				}
+			}()
 		}
-	}
+		_ = p.Close(context.Background())
+		wg.Wait()
+		t.Log("done")
+	}, xtest.WithTimeout(42*time.Second))
 }
 
 func TestSessionPoolDeleteReleaseWait(t *testing.T) {
@@ -1315,14 +1316,14 @@ type StubBuilder struct {
 
 	cc    grpc.ClientConnInterface
 	Limit int
-	T     *testing.T
+	T     testing.TB
 
 	mu     xsync.Mutex
 	actual int
 }
 
 func newClientWithStubBuilder(
-	t *testing.T,
+	t testing.TB,
 	cc grpc.ClientConnInterface,
 	stubLimit int,
 	options ...config.Option,

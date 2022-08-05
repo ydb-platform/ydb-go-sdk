@@ -1,6 +1,8 @@
 package xsync
 
-import "sync"
+import (
+	"sync"
+)
 
 type Mutex struct {
 	sync.Mutex
