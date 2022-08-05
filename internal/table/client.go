@@ -149,7 +149,14 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			}: // nop
 			case <-ctx.Done():
 				if s != nil {
-					_ = s.Close(xcontext.WithoutDeadline(ctx))
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(
+						xcontext.WithoutDeadline(ctx),
+						c.config.DeleteTimeout(),
+					)
+					defer cancel()
+
+					_ = s.Close(ctx)
 				}
 			}
 		})
@@ -328,7 +335,14 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 		}: // nop
 		case <-ctx.Done():
 			if s != nil {
-				_ = s.Close(xcontext.WithoutDeadline(ctx))
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(
+					xcontext.WithoutDeadline(ctx),
+					c.config.DeleteTimeout(),
+				)
+				defer cancel()
+
+				_ = s.Close(ctx)
 			}
 		}
 	})
