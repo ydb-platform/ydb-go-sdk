@@ -239,9 +239,6 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 }
 
 func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
-	traceDone := trace.TopicOnReaderConnect(r.tracer)
-	defer traceDone(err)
-
 	bgContext := r.background.Context()
 
 	if err = bgContext.Err(); err != nil {

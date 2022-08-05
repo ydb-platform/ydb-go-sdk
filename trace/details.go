@@ -26,6 +26,7 @@ const (
 
 	TopicReaderStreamLifeCycleEvents
 	TopicReaderStreamEvents
+	TopicReaderMessageEvents
 	TopicReaderPartitionEvents
 
 	RetryEvents
@@ -68,7 +69,7 @@ const (
 		TableSessionQueryEvents |
 		TableSessionTransactionEvents
 
-	TopicReaderAllEvents = TopicReaderStreamEvents |
+	TopicReaderAllEvents = TopicReaderStreamEvents | TopicReaderMessageEvents |
 		TopicReaderPartitionEvents |
 		TopicReaderStreamLifeCycleEvents
 
@@ -112,6 +113,7 @@ var (
 		TopicControlPlaneEvents:          "ydb.topic.controlplane",
 		TopicReaderAllEvents:             "ydb.topic.reader",
 		TopicReaderStreamEvents:          "ydb.topic.reader.stream",
+		TopicReaderMessageEvents:         "ydb.topic.reader.message",
 		TopicReaderPartitionEvents:       "ydb.topic.reader.partition",
 		TopicReaderStreamLifeCycleEvents: "ydb.topic.reader.lifecycle",
 	}

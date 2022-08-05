@@ -62,7 +62,7 @@ func TestCommitterCommitAsync(t *testing.T) {
 			close(sendCalled)
 			require.Equal(t,
 				&rawtopicreader.CommitOffsetRequest{
-					CommitOffsets: NewCommitRanges(&cRange).toPartitionsOffsets(),
+					CommitOffsets: testNewCommitRanges(&cRange).toPartitionsOffsets(),
 				},
 				msg)
 			return nil
@@ -93,7 +93,7 @@ func TestCommitterCommitSync(t *testing.T) {
 			sendCalled = true
 			require.Equal(t,
 				&rawtopicreader.CommitOffsetRequest{
-					CommitOffsets: NewCommitRanges(&cRange).toPartitionsOffsets(),
+					CommitOffsets: testNewCommitRanges(&cRange).toPartitionsOffsets(),
 				},
 				msg)
 			c.OnCommitNotify(session, cRange.commitOffsetEnd)

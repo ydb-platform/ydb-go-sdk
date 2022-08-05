@@ -28,44 +28,9 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 		opt(&options)
 	}
 	{
-		h1 := t.OnReaderConnect
-		h2 := x.OnReaderConnect
-		ret.OnReaderConnect = func(t TopicReaderConnectStartInfo) func(TopicReaderConnectDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TopicReaderConnectDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TopicReaderConnectDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(t)
-				}
-				if r1 != nil {
-					r1(t)
-				}
-			}
-		}
-	}
-	{
 		h1 := t.OnReaderReconnect
 		h2 := x.OnReaderReconnect
-		ret.OnReaderReconnect = func(t TopicReaderReconnectStartInfo) func(TopicReaderReconnectDoneInfo) {
+		ret.OnReaderReconnect = func(startInfo TopicReaderReconnectStartInfo) func(TopicReaderReconnectDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -75,12 +40,12 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 			}
 			var r, r1 func(TopicReaderReconnectDoneInfo)
 			if h1 != nil {
-				r = h1(t)
+				r = h1(startInfo)
 			}
 			if h2 != nil {
-				r1 = h2(t)
+				r1 = h2(startInfo)
 			}
-			return func(t TopicReaderReconnectDoneInfo) {
+			return func(doneInfo TopicReaderReconnectDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -89,10 +54,10 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 					}()
 				}
 				if r != nil {
-					r(t)
+					r(doneInfo)
 				}
 				if r1 != nil {
-					r1(t)
+					r1(doneInfo)
 				}
 			}
 		}
@@ -100,7 +65,7 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 	{
 		h1 := t.OnReaderReconnectRequest
 		h2 := x.OnReaderReconnectRequest
-		ret.OnReaderReconnectRequest = func(t TopicReaderReconnectRequestInfo) {
+		ret.OnReaderReconnectRequest = func(info TopicReaderReconnectRequestInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -109,17 +74,17 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 				}()
 			}
 			if h1 != nil {
-				h1(t)
+				h1(info)
 			}
 			if h2 != nil {
-				h2(t)
+				h2(info)
 			}
 		}
 	}
 	{
 		h1 := t.OnReaderPartitionReadStartResponse
 		h2 := x.OnReaderPartitionReadStartResponse
-		ret.OnReaderPartitionReadStartResponse = func(t TopicReaderPartitionReadStartResponseStartInfo) func(TopicReaderPartitionReadStartResponseDoneInfo) {
+		ret.OnReaderPartitionReadStartResponse = func(startInfo TopicReaderPartitionReadStartResponseStartInfo) func(TopicReaderPartitionReadStartResponseDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -129,12 +94,12 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 			}
 			var r, r1 func(TopicReaderPartitionReadStartResponseDoneInfo)
 			if h1 != nil {
-				r = h1(t)
+				r = h1(startInfo)
 			}
 			if h2 != nil {
-				r1 = h2(t)
+				r1 = h2(startInfo)
 			}
-			return func(t TopicReaderPartitionReadStartResponseDoneInfo) {
+			return func(doneInfo TopicReaderPartitionReadStartResponseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -143,18 +108,18 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 					}()
 				}
 				if r != nil {
-					r(t)
+					r(doneInfo)
 				}
 				if r1 != nil {
-					r1(t)
+					r1(doneInfo)
 				}
 			}
 		}
 	}
 	{
-		h1 := t.OnReaderPartitionReadStop
-		h2 := x.OnReaderPartitionReadStop
-		ret.OnReaderPartitionReadStop = func(t TopicReaderPartitionReadStopInfo) {
+		h1 := t.OnReaderPartitionReadStopResponse
+		h2 := x.OnReaderPartitionReadStopResponse
+		ret.OnReaderPartitionReadStopResponse = func(startInfo TopicReaderPartitionReadStopResponseStartInfo) func(TopicReaderPartitionReadStopResponseDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -162,18 +127,34 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 					}
 				}()
 			}
+			var r, r1 func(TopicReaderPartitionReadStopResponseDoneInfo)
 			if h1 != nil {
-				h1(t)
+				r = h1(startInfo)
 			}
 			if h2 != nil {
-				h2(t)
+				r1 = h2(startInfo)
+			}
+			return func(doneInfo TopicReaderPartitionReadStopResponseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
 			}
 		}
 	}
 	{
 		h1 := t.OnReaderStreamCommit
 		h2 := x.OnReaderStreamCommit
-		ret.OnReaderStreamCommit = func(t TopicReaderStreamCommitStartInfo) func(TopicReaderStreamCommitDoneInfo) {
+		ret.OnReaderStreamCommit = func(startInfo TopicReaderStreamCommitStartInfo) func(TopicReaderStreamCommitDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -183,12 +164,12 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 			}
 			var r, r1 func(TopicReaderStreamCommitDoneInfo)
 			if h1 != nil {
-				r = h1(t)
+				r = h1(startInfo)
 			}
 			if h2 != nil {
-				r1 = h2(t)
+				r1 = h2(startInfo)
 			}
-			return func(t TopicReaderStreamCommitDoneInfo) {
+			return func(doneInfo TopicReaderStreamCommitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -197,18 +178,18 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 					}()
 				}
 				if r != nil {
-					r(t)
+					r(doneInfo)
 				}
 				if r1 != nil {
-					r1(t)
+					r1(doneInfo)
 				}
 			}
 		}
 	}
 	{
-		h1 := t.OnReaderStreamSentCommitMessage
-		h2 := x.OnReaderStreamSentCommitMessage
-		ret.OnReaderStreamSentCommitMessage = func(t TopicReaderStreamSentCommitMessageStartInfo) func(TopicReaderStreamSentCommitMessageDoneInfo) {
+		h1 := t.OnReaderStreamSendCommitMessage
+		h2 := x.OnReaderStreamSendCommitMessage
+		ret.OnReaderStreamSendCommitMessage = func(startInfo TopicReaderStreamSendCommitMessageStartInfo) func(TopicReaderStreamSendCommitMessageDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -216,14 +197,14 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 					}
 				}()
 			}
-			var r, r1 func(TopicReaderStreamSentCommitMessageDoneInfo)
+			var r, r1 func(TopicReaderStreamSendCommitMessageDoneInfo)
 			if h1 != nil {
-				r = h1(t)
+				r = h1(startInfo)
 			}
 			if h2 != nil {
-				r1 = h2(t)
+				r1 = h2(startInfo)
 			}
-			return func(t TopicReaderStreamSentCommitMessageDoneInfo) {
+			return func(doneInfo TopicReaderStreamSendCommitMessageDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -232,10 +213,10 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 					}()
 				}
 				if r != nil {
-					r(t)
+					r(doneInfo)
 				}
 				if r1 != nil {
-					r1(t)
+					r1(doneInfo)
 				}
 			}
 		}
@@ -243,7 +224,7 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 	{
 		h1 := t.OnReaderStreamCommittedNotify
 		h2 := x.OnReaderStreamCommittedNotify
-		ret.OnReaderStreamCommittedNotify = func(t TopicReaderStreamCommittedInfo) {
+		ret.OnReaderStreamCommittedNotify = func(info TopicReaderStreamCommittedNotifyInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -252,17 +233,17 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 				}()
 			}
 			if h1 != nil {
-				h1(t)
+				h1(info)
 			}
 			if h2 != nil {
-				h2(t)
+				h2(info)
 			}
 		}
 	}
 	{
 		h1 := t.OnReaderStreamClose
 		h2 := x.OnReaderStreamClose
-		ret.OnReaderStreamClose = func(t TopicReaderStreamCloseStartInfo) func(TopicReaderStreamCloseDoneInfo) {
+		ret.OnReaderStreamClose = func(startInfo TopicReaderStreamCloseStartInfo) func(TopicReaderStreamCloseDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -272,12 +253,12 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 			}
 			var r, r1 func(TopicReaderStreamCloseDoneInfo)
 			if h1 != nil {
-				r = h1(t)
+				r = h1(startInfo)
 			}
 			if h2 != nil {
-				r1 = h2(t)
+				r1 = h2(startInfo)
 			}
-			return func(t TopicReaderStreamCloseDoneInfo) {
+			return func(doneInfo TopicReaderStreamCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -286,10 +267,10 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 					}()
 				}
 				if r != nil {
-					r(t)
+					r(doneInfo)
 				}
 				if r1 != nil {
-					r1(t)
+					r1(doneInfo)
 				}
 			}
 		}
@@ -297,7 +278,7 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 	{
 		h1 := t.OnReaderStreamInit
 		h2 := x.OnReaderStreamInit
-		ret.OnReaderStreamInit = func(t TopicReaderStreamInitStartInfo) func(TopicReaderStreamInitDoneInfo) {
+		ret.OnReaderStreamInit = func(startInfo TopicReaderStreamInitStartInfo) func(TopicReaderStreamInitDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -307,12 +288,12 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 			}
 			var r, r1 func(TopicReaderStreamInitDoneInfo)
 			if h1 != nil {
-				r = h1(t)
+				r = h1(startInfo)
 			}
 			if h2 != nil {
-				r1 = h2(t)
+				r1 = h2(startInfo)
 			}
-			return func(t TopicReaderStreamInitDoneInfo) {
+			return func(doneInfo TopicReaderStreamInitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -321,10 +302,10 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 					}()
 				}
 				if r != nil {
-					r(t)
+					r(doneInfo)
 				}
 				if r1 != nil {
-					r1(t)
+					r1(doneInfo)
 				}
 			}
 		}
@@ -332,7 +313,7 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 	{
 		h1 := t.OnReaderStreamError
 		h2 := x.OnReaderStreamError
-		ret.OnReaderStreamError = func(t TopicReaderStreamErrorInfo) {
+		ret.OnReaderStreamError = func(info TopicReaderStreamErrorInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -341,125 +322,17 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 				}()
 			}
 			if h1 != nil {
-				h1(t)
+				h1(info)
 			}
 			if h2 != nil {
-				h2(t)
-			}
-		}
-	}
-	{
-		h1 := t.OnReaderStreamSentDataRequest
-		h2 := x.OnReaderStreamSentDataRequest
-		ret.OnReaderStreamSentDataRequest = func(t TopicReaderStreamSentDataRequestInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			if h1 != nil {
-				h1(t)
-			}
-			if h2 != nil {
-				h2(t)
-			}
-		}
-	}
-	{
-		h1 := t.OnReaderStreamReceiveDataResponse
-		h2 := x.OnReaderStreamReceiveDataResponse
-		ret.OnReaderStreamReceiveDataResponse = func(t TopicReaderStreamReceiveDataResponseStartInfo) func(TopicReaderStreamReceiveDataResponseDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TopicReaderStreamReceiveDataResponseDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TopicReaderStreamReceiveDataResponseDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(t)
-				}
-				if r1 != nil {
-					r1(t)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnReaderStreamReadMessages
-		h2 := x.OnReaderStreamReadMessages
-		ret.OnReaderStreamReadMessages = func(t TopicReaderStreamReadMessagesStartInfo) func(TopicReaderStreamReadMessagesDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TopicReaderStreamReadMessagesDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TopicReaderStreamReadMessagesDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(t)
-				}
-				if r1 != nil {
-					r1(t)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnReaderStreamUnknownGrpcMessage
-		h2 := x.OnReaderStreamUnknownGrpcMessage
-		ret.OnReaderStreamUnknownGrpcMessage = func(o OnReadStreamUnknownGrpcMessageInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			if h1 != nil {
-				h1(o)
-			}
-			if h2 != nil {
-				h2(o)
+				h2(info)
 			}
 		}
 	}
 	{
 		h1 := t.OnReaderStreamUpdateToken
 		h2 := x.OnReaderStreamUpdateToken
-		ret.OnReaderStreamUpdateToken = func(o OnReadStreamUpdateTokenStartInfo) func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
+		ret.OnReaderStreamUpdateToken = func(startInfo OnReadStreamUpdateTokenStartInfo) func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -469,12 +342,12 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 			}
 			var r, r1 func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo)
 			if h1 != nil {
-				r = h1(o)
+				r = h1(startInfo)
 			}
 			if h2 != nil {
-				r1 = h2(o)
+				r1 = h2(startInfo)
 			}
-			return func(o OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
+			return func(updateTokenInfo OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -484,12 +357,12 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 				}
 				var r2, r3 func(OnReadStreamUpdateTokenDoneInfo)
 				if r != nil {
-					r2 = r(o)
+					r2 = r(updateTokenInfo)
 				}
 				if r1 != nil {
-					r3 = r1(o)
+					r3 = r1(updateTokenInfo)
 				}
-				return func(o OnReadStreamUpdateTokenDoneInfo) {
+				return func(doneInfo OnReadStreamUpdateTokenDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
 							if e := recover(); e != nil {
@@ -498,40 +371,133 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 						}()
 					}
 					if r2 != nil {
-						r2(o)
+						r2(doneInfo)
 					}
 					if r3 != nil {
-						r3(o)
+						r3(doneInfo)
 					}
 				}
 			}
 		}
 	}
+	{
+		h1 := t.OnReaderStreamSentDataRequest
+		h2 := x.OnReaderStreamSentDataRequest
+		ret.OnReaderStreamSentDataRequest = func(startInfo TopicReaderStreamSentDataRequestInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(startInfo)
+			}
+			if h2 != nil {
+				h2(startInfo)
+			}
+		}
+	}
+	{
+		h1 := t.OnReaderStreamReceiveDataResponse
+		h2 := x.OnReaderStreamReceiveDataResponse
+		ret.OnReaderStreamReceiveDataResponse = func(startInfo TopicReaderStreamReceiveDataResponseStartInfo) func(TopicReaderStreamReceiveDataResponseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicReaderStreamReceiveDataResponseDoneInfo)
+			if h1 != nil {
+				r = h1(startInfo)
+			}
+			if h2 != nil {
+				r1 = h2(startInfo)
+			}
+			return func(doneInfo TopicReaderStreamReceiveDataResponseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnReaderStreamReadMessages
+		h2 := x.OnReaderStreamReadMessages
+		ret.OnReaderStreamReadMessages = func(startInfo TopicReaderStreamReadMessagesStartInfo) func(TopicReaderStreamReadMessagesDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicReaderStreamReadMessagesDoneInfo)
+			if h1 != nil {
+				r = h1(startInfo)
+			}
+			if h2 != nil {
+				r1 = h2(startInfo)
+			}
+			return func(doneInfo TopicReaderStreamReadMessagesDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnReaderStreamUnknownGrpcMessage
+		h2 := x.OnReaderStreamUnknownGrpcMessage
+		ret.OnReaderStreamUnknownGrpcMessage = func(info OnReadStreamUnknownGrpcMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
+			}
+		}
+	}
 	return ret
 }
-func (t Topic) onReaderConnect(t1 TopicReaderConnectStartInfo) func(TopicReaderConnectDoneInfo) {
-	fn := t.OnReaderConnect
-	if fn == nil {
-		return func(TopicReaderConnectDoneInfo) {
-			return
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TopicReaderConnectDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t Topic) onReaderReconnect(t1 TopicReaderReconnectStartInfo) func(TopicReaderReconnectDoneInfo) {
+func (t Topic) onReaderReconnect(startInfo TopicReaderReconnectStartInfo) func(doneInfo TopicReaderReconnectDoneInfo) {
 	fn := t.OnReaderReconnect
 	if fn == nil {
 		return func(TopicReaderReconnectDoneInfo) {
 			return
 		}
 	}
-	res := fn(t1)
+	res := fn(startInfo)
 	if res == nil {
 		return func(TopicReaderReconnectDoneInfo) {
 			return
@@ -539,21 +505,21 @@ func (t Topic) onReaderReconnect(t1 TopicReaderReconnectStartInfo) func(TopicRea
 	}
 	return res
 }
-func (t Topic) onReaderReconnectRequest(t1 TopicReaderReconnectRequestInfo) {
+func (t Topic) onReaderReconnectRequest(info TopicReaderReconnectRequestInfo) {
 	fn := t.OnReaderReconnectRequest
 	if fn == nil {
 		return
 	}
-	fn(t1)
+	fn(info)
 }
-func (t Topic) onReaderPartitionReadStartResponse(t1 TopicReaderPartitionReadStartResponseStartInfo) func(TopicReaderPartitionReadStartResponseDoneInfo) {
+func (t Topic) onReaderPartitionReadStartResponse(startInfo TopicReaderPartitionReadStartResponseStartInfo) func(doneInfo TopicReaderPartitionReadStartResponseDoneInfo) {
 	fn := t.OnReaderPartitionReadStartResponse
 	if fn == nil {
 		return func(TopicReaderPartitionReadStartResponseDoneInfo) {
 			return
 		}
 	}
-	res := fn(t1)
+	res := fn(startInfo)
 	if res == nil {
 		return func(TopicReaderPartitionReadStartResponseDoneInfo) {
 			return
@@ -561,21 +527,29 @@ func (t Topic) onReaderPartitionReadStartResponse(t1 TopicReaderPartitionReadSta
 	}
 	return res
 }
-func (t Topic) onReaderPartitionReadStop(t1 TopicReaderPartitionReadStopInfo) {
-	fn := t.OnReaderPartitionReadStop
+func (t Topic) onReaderPartitionReadStopResponse(startInfo TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo TopicReaderPartitionReadStopResponseDoneInfo) {
+	fn := t.OnReaderPartitionReadStopResponse
 	if fn == nil {
-		return
+		return func(TopicReaderPartitionReadStopResponseDoneInfo) {
+			return
+		}
 	}
-	fn(t1)
+	res := fn(startInfo)
+	if res == nil {
+		return func(TopicReaderPartitionReadStopResponseDoneInfo) {
+			return
+		}
+	}
+	return res
 }
-func (t Topic) onReaderStreamCommit(t1 TopicReaderStreamCommitStartInfo) func(TopicReaderStreamCommitDoneInfo) {
+func (t Topic) onReaderStreamCommit(startInfo TopicReaderStreamCommitStartInfo) func(doneInfo TopicReaderStreamCommitDoneInfo) {
 	fn := t.OnReaderStreamCommit
 	if fn == nil {
 		return func(TopicReaderStreamCommitDoneInfo) {
 			return
 		}
 	}
-	res := fn(t1)
+	res := fn(startInfo)
 	if res == nil {
 		return func(TopicReaderStreamCommitDoneInfo) {
 			return
@@ -583,36 +557,36 @@ func (t Topic) onReaderStreamCommit(t1 TopicReaderStreamCommitStartInfo) func(To
 	}
 	return res
 }
-func (t Topic) onReaderStreamSentCommitMessage(t1 TopicReaderStreamSentCommitMessageStartInfo) func(TopicReaderStreamSentCommitMessageDoneInfo) {
-	fn := t.OnReaderStreamSentCommitMessage
+func (t Topic) onReaderStreamSendCommitMessage(startInfo TopicReaderStreamSendCommitMessageStartInfo) func(doneInfo TopicReaderStreamSendCommitMessageDoneInfo) {
+	fn := t.OnReaderStreamSendCommitMessage
 	if fn == nil {
-		return func(TopicReaderStreamSentCommitMessageDoneInfo) {
+		return func(TopicReaderStreamSendCommitMessageDoneInfo) {
 			return
 		}
 	}
-	res := fn(t1)
+	res := fn(startInfo)
 	if res == nil {
-		return func(TopicReaderStreamSentCommitMessageDoneInfo) {
+		return func(TopicReaderStreamSendCommitMessageDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t Topic) onReaderStreamCommittedNotify(t1 TopicReaderStreamCommittedInfo) {
+func (t Topic) onReaderStreamCommittedNotify(info TopicReaderStreamCommittedNotifyInfo) {
 	fn := t.OnReaderStreamCommittedNotify
 	if fn == nil {
 		return
 	}
-	fn(t1)
+	fn(info)
 }
-func (t Topic) onReaderStreamClose(t1 TopicReaderStreamCloseStartInfo) func(TopicReaderStreamCloseDoneInfo) {
+func (t Topic) onReaderStreamClose(startInfo TopicReaderStreamCloseStartInfo) func(doneInfo TopicReaderStreamCloseDoneInfo) {
 	fn := t.OnReaderStreamClose
 	if fn == nil {
 		return func(TopicReaderStreamCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(t1)
+	res := fn(startInfo)
 	if res == nil {
 		return func(TopicReaderStreamCloseDoneInfo) {
 			return
@@ -620,14 +594,14 @@ func (t Topic) onReaderStreamClose(t1 TopicReaderStreamCloseStartInfo) func(Topi
 	}
 	return res
 }
-func (t Topic) onReaderStreamInit(t1 TopicReaderStreamInitStartInfo) func(TopicReaderStreamInitDoneInfo) {
+func (t Topic) onReaderStreamInit(startInfo TopicReaderStreamInitStartInfo) func(doneInfo TopicReaderStreamInitDoneInfo) {
 	fn := t.OnReaderStreamInit
 	if fn == nil {
 		return func(TopicReaderStreamInitDoneInfo) {
 			return
 		}
 	}
-	res := fn(t1)
+	res := fn(startInfo)
 	if res == nil {
 		return func(TopicReaderStreamInitDoneInfo) {
 			return
@@ -635,58 +609,14 @@ func (t Topic) onReaderStreamInit(t1 TopicReaderStreamInitStartInfo) func(TopicR
 	}
 	return res
 }
-func (t Topic) onReaderStreamError(t1 TopicReaderStreamErrorInfo) {
+func (t Topic) onReaderStreamError(info TopicReaderStreamErrorInfo) {
 	fn := t.OnReaderStreamError
 	if fn == nil {
 		return
 	}
-	fn(t1)
+	fn(info)
 }
-func (t Topic) onReaderStreamSentDataRequest(t1 TopicReaderStreamSentDataRequestInfo) {
-	fn := t.OnReaderStreamSentDataRequest
-	if fn == nil {
-		return
-	}
-	fn(t1)
-}
-func (t Topic) onReaderStreamReceiveDataResponse(t1 TopicReaderStreamReceiveDataResponseStartInfo) func(TopicReaderStreamReceiveDataResponseDoneInfo) {
-	fn := t.OnReaderStreamReceiveDataResponse
-	if fn == nil {
-		return func(TopicReaderStreamReceiveDataResponseDoneInfo) {
-			return
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TopicReaderStreamReceiveDataResponseDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t Topic) onReaderStreamReadMessages(t1 TopicReaderStreamReadMessagesStartInfo) func(TopicReaderStreamReadMessagesDoneInfo) {
-	fn := t.OnReaderStreamReadMessages
-	if fn == nil {
-		return func(TopicReaderStreamReadMessagesDoneInfo) {
-			return
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TopicReaderStreamReadMessagesDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t Topic) onReaderStreamUnknownGrpcMessage(o OnReadStreamUnknownGrpcMessageInfo) {
-	fn := t.OnReaderStreamUnknownGrpcMessage
-	if fn == nil {
-		return
-	}
-	fn(o)
-}
-func (t Topic) onReaderStreamUpdateToken(o OnReadStreamUpdateTokenStartInfo) func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
+func (t Topic) onReaderStreamUpdateToken(startInfo OnReadStreamUpdateTokenStartInfo) func(updateTokenInfo OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(doneInfo OnReadStreamUpdateTokenDoneInfo) {
 	fn := t.OnReaderStreamUpdateToken
 	if fn == nil {
 		return func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
@@ -695,7 +625,7 @@ func (t Topic) onReaderStreamUpdateToken(o OnReadStreamUpdateTokenStartInfo) fun
 			}
 		}
 	}
-	res := fn(o)
+	res := fn(startInfo)
 	if res == nil {
 		return func(OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
 			return func(OnReadStreamUpdateTokenDoneInfo) {
@@ -703,8 +633,8 @@ func (t Topic) onReaderStreamUpdateToken(o OnReadStreamUpdateTokenStartInfo) fun
 			}
 		}
 	}
-	return func(o OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
-		res := res(o)
+	return func(updateTokenInfo OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
+		res := res(updateTokenInfo)
 		if res == nil {
 			return func(OnReadStreamUpdateTokenDoneInfo) {
 				return
@@ -713,14 +643,49 @@ func (t Topic) onReaderStreamUpdateToken(o OnReadStreamUpdateTokenStartInfo) fun
 		return res
 	}
 }
-func TopicOnReaderConnect(t Topic) func(error) {
-	var p TopicReaderConnectStartInfo
-	res := t.onReaderConnect(p)
-	return func(e error) {
-		var p TopicReaderConnectDoneInfo
-		p.Error = e
-		res(p)
+func (t Topic) onReaderStreamSentDataRequest(startInfo TopicReaderStreamSentDataRequestInfo) {
+	fn := t.OnReaderStreamSentDataRequest
+	if fn == nil {
+		return
 	}
+	fn(startInfo)
+}
+func (t Topic) onReaderStreamReceiveDataResponse(startInfo TopicReaderStreamReceiveDataResponseStartInfo) func(doneInfo TopicReaderStreamReceiveDataResponseDoneInfo) {
+	fn := t.OnReaderStreamReceiveDataResponse
+	if fn == nil {
+		return func(TopicReaderStreamReceiveDataResponseDoneInfo) {
+			return
+		}
+	}
+	res := fn(startInfo)
+	if res == nil {
+		return func(TopicReaderStreamReceiveDataResponseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Topic) onReaderStreamReadMessages(startInfo TopicReaderStreamReadMessagesStartInfo) func(doneInfo TopicReaderStreamReadMessagesDoneInfo) {
+	fn := t.OnReaderStreamReadMessages
+	if fn == nil {
+		return func(TopicReaderStreamReadMessagesDoneInfo) {
+			return
+		}
+	}
+	res := fn(startInfo)
+	if res == nil {
+		return func(TopicReaderStreamReadMessagesDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Topic) onReaderStreamUnknownGrpcMessage(info OnReadStreamUnknownGrpcMessageInfo) {
+	fn := t.OnReaderStreamUnknownGrpcMessage
+	if fn == nil {
+		return
+	}
+	fn(info)
 }
 func TopicOnReaderReconnect(t Topic) func(error) {
 	var p TopicReaderReconnectStartInfo
@@ -753,8 +718,8 @@ func TopicOnReaderPartitionReadStartResponse(t Topic, readerConnectionID string,
 		res(p)
 	}
 }
-func TopicOnReaderPartitionReadStop(t Topic, readerConnectionID string, partitionContext context.Context, topic string, partitionID int64, partitionSessionID int64, committedOffset int64, graceful bool) {
-	var p TopicReaderPartitionReadStopInfo
+func TopicOnReaderPartitionReadStopResponse(t Topic, readerConnectionID string, partitionContext context.Context, topic string, partitionID int64, partitionSessionID int64, committedOffset int64, graceful bool) func(error) {
+	var p TopicReaderPartitionReadStopResponseStartInfo
 	p.ReaderConnectionID = readerConnectionID
 	p.PartitionContext = partitionContext
 	p.Topic = topic
@@ -762,7 +727,12 @@ func TopicOnReaderPartitionReadStop(t Topic, readerConnectionID string, partitio
 	p.PartitionSessionID = partitionSessionID
 	p.CommittedOffset = committedOffset
 	p.Graceful = graceful
-	t.onReaderPartitionReadStop(p)
+	res := t.onReaderPartitionReadStopResponse(p)
+	return func(e error) {
+		var p TopicReaderPartitionReadStopResponseDoneInfo
+		p.Error = e
+		res(p)
+	}
 }
 func TopicOnReaderStreamCommit(t Topic, requestContext context.Context, topic string, partitionID int64, partitionSessionID int64, startOffset int64, endOffset int64) func(error) {
 	var p TopicReaderStreamCommitStartInfo
@@ -779,20 +749,22 @@ func TopicOnReaderStreamCommit(t Topic, requestContext context.Context, topic st
 		res(p)
 	}
 }
-func TopicOnReaderStreamSentCommitMessage(t Topic) func(error) {
-	var p TopicReaderStreamSentCommitMessageStartInfo
-	res := t.onReaderStreamSentCommitMessage(p)
+func TopicOnReaderStreamSendCommitMessage(t Topic, commitsInfo TopicReaderStreamSendCommitMessageStartMessageInfo) func(error) {
+	var p TopicReaderStreamSendCommitMessageStartInfo
+	p.CommitsInfo = commitsInfo
+	res := t.onReaderStreamSendCommitMessage(p)
 	return func(e error) {
-		var p TopicReaderStreamSentCommitMessageDoneInfo
+		var p TopicReaderStreamSendCommitMessageDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func TopicOnReaderStreamCommittedNotify(t Topic, readerConnectionID string, topic string, partitionID int64, committedOffset int64) {
-	var p TopicReaderStreamCommittedInfo
+func TopicOnReaderStreamCommittedNotify(t Topic, readerConnectionID string, topic string, partitionID int64, partitionSessionID int64, committedOffset int64) {
+	var p TopicReaderStreamCommittedNotifyInfo
 	p.ReaderConnectionID = readerConnectionID
 	p.Topic = topic
 	p.PartitionID = partitionID
+	p.PartitionSessionID = partitionSessionID
 	p.CommittedOffset = committedOffset
 	t.onReaderStreamCommittedNotify(p)
 }
@@ -807,14 +779,14 @@ func TopicOnReaderStreamClose(t Topic, readerConnectionID string, closeReason er
 		res(p)
 	}
 }
-func TopicOnReaderStreamInit(t Topic, preInitReaderConnectionID string, initRequestInfo TopicReadStreamInitRequestInfo) func(newReaderConnectionID string, _ error) {
+func TopicOnReaderStreamInit(t Topic, preInitReaderConnectionID string, initRequestInfo TopicReadStreamInitRequestInfo) func(readerConnectionID string, _ error) {
 	var p TopicReaderStreamInitStartInfo
 	p.PreInitReaderConnectionID = preInitReaderConnectionID
 	p.InitRequestInfo = initRequestInfo
 	res := t.onReaderStreamInit(p)
-	return func(newReaderConnectionID string, e error) {
+	return func(readerConnectionID string, e error) {
 		var p TopicReaderStreamInitDoneInfo
-		p.NewReaderConnectionID = newReaderConnectionID
+		p.ReaderConnectionID = readerConnectionID
 		p.Error = e
 		res(p)
 	}
@@ -824,6 +796,22 @@ func TopicOnReaderStreamError(t Topic, readerConnectionID string, e error) {
 	p.ReaderConnectionID = readerConnectionID
 	p.Error = e
 	t.onReaderStreamError(p)
+}
+func TopicOnReaderStreamUpdateToken(t Topic, readerConnectionID string) func(tokenLen int, _ error) func(error) {
+	var p OnReadStreamUpdateTokenStartInfo
+	p.ReaderConnectionID = readerConnectionID
+	res := t.onReaderStreamUpdateToken(p)
+	return func(tokenLen int, e error) func(error) {
+		var p OnReadStreamUpdateTokenMiddleTokenReceivedInfo
+		p.TokenLen = tokenLen
+		p.Error = e
+		res := res(p)
+		return func(e error) {
+			var p OnReadStreamUpdateTokenDoneInfo
+			p.Error = e
+			res(p)
+		}
+	}
 }
 func TopicOnReaderStreamSentDataRequest(t Topic, readerConnectionID string, requestBytes int, localBufferSizeAfterSent int) {
 	var p TopicReaderStreamSentDataRequestInfo
@@ -844,18 +832,19 @@ func TopicOnReaderStreamReceiveDataResponse(t Topic, readerConnectionID string, 
 		res(p)
 	}
 }
-func TopicOnReaderStreamReadMessages(t Topic, requestContext context.Context, minCount int, maxCount int, freeBufferCapacity int) func(messagesCount int, topic string, partitionID int64, offsetStart int64, offsetEnd int64, freeBufferCapacity int, _ error) {
+func TopicOnReaderStreamReadMessages(t Topic, requestContext context.Context, minCount int, maxCount int, freeBufferCapacity int) func(messagesCount int, topic string, partitionID int64, partitionSessionID int64, offsetStart int64, offsetEnd int64, freeBufferCapacity int, _ error) {
 	var p TopicReaderStreamReadMessagesStartInfo
 	p.RequestContext = requestContext
 	p.MinCount = minCount
 	p.MaxCount = maxCount
 	p.FreeBufferCapacity = freeBufferCapacity
 	res := t.onReaderStreamReadMessages(p)
-	return func(messagesCount int, topic string, partitionID int64, offsetStart int64, offsetEnd int64, freeBufferCapacity int, e error) {
+	return func(messagesCount int, topic string, partitionID int64, partitionSessionID int64, offsetStart int64, offsetEnd int64, freeBufferCapacity int, e error) {
 		var p TopicReaderStreamReadMessagesDoneInfo
 		p.MessagesCount = messagesCount
 		p.Topic = topic
 		p.PartitionID = partitionID
+		p.PartitionSessionID = partitionSessionID
 		p.OffsetStart = offsetStart
 		p.OffsetEnd = offsetEnd
 		p.FreeBufferCapacity = freeBufferCapacity
@@ -868,20 +857,4 @@ func TopicOnReaderStreamUnknownGrpcMessage(t Topic, readerConnectionID string, e
 	p.ReaderConnectionID = readerConnectionID
 	p.Error = e
 	t.onReaderStreamUnknownGrpcMessage(p)
-}
-func TopicOnReaderStreamUpdateToken(t Topic, readerConnectionID string) func(tokenLen int, _ error) func(error) {
-	var p OnReadStreamUpdateTokenStartInfo
-	p.ReaderConnectionID = readerConnectionID
-	res := t.onReaderStreamUpdateToken(p)
-	return func(tokenLen int, e error) func(error) {
-		var p OnReadStreamUpdateTokenMiddleTokenReceivedInfo
-		p.TokenLen = tokenLen
-		p.Error = e
-		res := res(p)
-		return func(e error) {
-			var p OnReadStreamUpdateTokenDoneInfo
-			p.Error = e
-			res(p)
-		}
-	}
 }

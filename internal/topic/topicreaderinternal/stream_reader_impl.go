@@ -173,12 +173,13 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 	)
 	defer func() {
 		if batch == nil {
-			onDone(0, "", -1, -1, -1, r.getRestBufferBytes(), err)
+			onDone(0, "", -1, -1, -1, -1, r.getRestBufferBytes(), err)
 		} else {
 			onDone(
 				len(batch.Messages),
 				batch.Topic(),
 				batch.PartitionID(),
+				batch.partitionSession().partitionSessionID.ToInt64(),
 				batch.commitRange.commitOffsetStart.ToInt64(),
 				batch.commitRange.commitOffsetEnd.ToInt64(),
 				r.getRestBufferBytes(),
@@ -273,13 +274,13 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 
 func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	msg *rawtopicreader.StopPartitionSessionRequest,
-) error {
+) (err error) {
 	session, err := r.sessionController.Get(msg.PartitionSessionID)
 	if err != nil {
 		return err
 	}
 
-	trace.TopicOnReaderPartitionReadStop(
+	onDone := trace.TopicOnReaderPartitionReadStopResponse(
 		r.cfg.Tracer,
 		r.readConnectionID,
 		session.Context(),
@@ -289,6 +290,9 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 		msg.CommittedOffset.ToInt64(),
 		msg.Graceful,
 	)
+	defer func() {
+		onDone(err)
+	}()
 
 	if msg.Graceful {
 		resp := &rawtopicreader.StopPartitionSessionResponse{
@@ -667,6 +671,16 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 			return err
 		}
 		partition.setCommittedOffset(commit.CommittedOffset)
+
+		trace.TopicOnReaderStreamCommittedNotify(
+			r.cfg.Tracer,
+			r.readConnectionID,
+			partition.Topic,
+			partition.PartitionID,
+			partition.partitionSessionID.ToInt64(),
+			commit.CommittedOffset.ToInt64(),
+		)
+
 		r.committer.OnCommitNotify(partition, commit.CommittedOffset)
 	}
 
