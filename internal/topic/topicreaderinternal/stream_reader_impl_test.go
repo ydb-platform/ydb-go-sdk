@@ -145,8 +145,8 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		readMessagesCtx, readMessagesCtxCancel := xcontext.WithErrCancel(context.Background())
 		committedOffset := int64(222)
 
-		e.reader.cfg.Tracer.OnPartitionReadStop = func(info trace.OnPartitionReadStopInfo) {
-			expected := trace.OnPartitionReadStopInfo{
+		e.reader.cfg.Tracer.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
+			expected := trace.TopicReaderPartitionReadStopResponseStartInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
 				PartitionContext:   e.partitionSession.ctx,
 				Topic:              e.partitionSession.Topic,
@@ -160,6 +160,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 			require.NoError(t, info.PartitionContext.Err())
 
 			readMessagesCtxCancel(errors.New("test tracer finished"))
+			return nil
 		}
 
 		e.Start()
@@ -184,8 +185,8 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		readMessagesCtx, readMessagesCtxCancel := xcontext.WithErrCancel(context.Background())
 		committedOffset := int64(222)
 
-		e.reader.cfg.Tracer.OnPartitionReadStop = func(info trace.OnPartitionReadStopInfo) {
-			expected := trace.OnPartitionReadStopInfo{
+		e.reader.cfg.Tracer.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
+			expected := trace.TopicReaderPartitionReadStopResponseStartInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
 				PartitionContext:   e.partitionSession.ctx,
 				Topic:              e.partitionSession.Topic,
@@ -198,6 +199,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 			require.Error(t, info.PartitionContext.Err())
 
 			readMessagesCtxCancel(errors.New("test tracer finished"))
+			return nil
 		}
 
 		e.Start()

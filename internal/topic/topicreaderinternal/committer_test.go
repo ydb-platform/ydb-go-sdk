@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestCommitterCommit(t *testing.T) {
@@ -61,7 +62,7 @@ func TestCommitterCommitAsync(t *testing.T) {
 			close(sendCalled)
 			require.Equal(t,
 				&rawtopicreader.CommitOffsetRequest{
-					CommitOffsets: NewCommitRanges(&cRange).toPartitionsOffsets(),
+					CommitOffsets: testNewCommitRanges(&cRange).toPartitionsOffsets(),
 				},
 				msg)
 			return nil
@@ -92,7 +93,7 @@ func TestCommitterCommitSync(t *testing.T) {
 			sendCalled = true
 			require.Equal(t,
 				&rawtopicreader.CommitOffsetRequest{
-					CommitOffsets: NewCommitRanges(&cRange).toPartitionsOffsets(),
+					CommitOffsets: testNewCommitRanges(&cRange).toPartitionsOffsets(),
 				},
 				msg)
 			c.OnCommitNotify(session, cRange.commitOffsetEnd)
@@ -334,7 +335,7 @@ func TestCommitterBuffer(t *testing.T) {
 }
 
 func newTestCommitter(ctx context.Context, t testing.TB) *committer {
-	res := newCommitter(ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
+	res := newCommitter(trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
 	})
 	t.Cleanup(func() {

@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -36,6 +37,7 @@ type TopicSteamReaderConnect func(connectionCtx context.Context) (RawTopicReader
 type Reader struct {
 	reader             batchedStreamReader
 	defaultBatchConfig ReadMessageBatchOptions
+	tracer             trace.Topic
 }
 
 type ReadMessageBatchOptions struct {
@@ -89,6 +91,7 @@ func NewReader(
 	res := Reader{
 		reader:             newReaderReconnector(readerConnector, cfg.OperationTimeout(), cfg.Tracer, cfg.BaseContext),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
+		tracer:             cfg.Tracer,
 	}
 
 	return res
@@ -112,7 +115,7 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 
 // ReadMessageBatch read batch of messages.
 // Batch is collection of messages, which can be atomically committed
-func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (*PublicBatch, error) {
+func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
 	readOptions := r.defaultBatchConfig.clone()
 
 	for _, optFunc := range opts {
@@ -121,11 +124,11 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 
 forReadBatch:
 	for {
-		if err := ctx.Err(); err != nil {
+		if err = ctx.Err(); err != nil {
 			return nil, err
 		}
 
-		batch, err := r.reader.ReadMessageBatch(ctx, readOptions)
+		batch, err = r.reader.ReadMessageBatch(ctx, readOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -139,7 +142,7 @@ forReadBatch:
 	}
 }
 
-func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) error {
+func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
 	return r.reader.Commit(ctx, offsets.getCommitRange().priv)
 }
 

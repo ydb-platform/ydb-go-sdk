@@ -20,6 +20,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var (
+	errReconnectRequestOutdated = xerrors.Wrap(errors.New("ydb: reconnect request outdated"))
+	errReconnect                = xerrors.Wrap(errors.New("ydb: reconnect to topic grpc stream"))
+)
+
 type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
 
 type readerReconnector struct {
@@ -73,7 +78,19 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		return nil, ctx.Err()
 	}
 
+	attempt := 0
+
 	for {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-backoff.Fast.Wait(attempt):
+				// pass
+			}
+		}
+
+		attempt++
 		stream, err := r.stream(ctx)
 		switch {
 		case topic.IsRetryableError(err):
@@ -175,26 +192,32 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			return
 
 		case oldReader := <-r.reconnectFromBadStream:
-			r.reconnect(ctx, oldReader)
+			_ = r.reconnect(ctx, oldReader)
 		}
 	}
 }
 
-func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStreamReader) {
-	if ctx.Err() != nil {
-		return
+func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStreamReader) (err error) {
+	onDone := trace.TopicOnReaderReconnect(r.tracer)
+	defer func() {
+		onDone(err)
+	}()
+
+	if err = ctx.Err(); err != nil {
+		return err
 	}
+
 	var closedErr error
 	r.m.WithRLock(func() {
 		closedErr = r.closedErr
 	})
 	if closedErr != nil {
-		return
+		return err
 	}
 
 	stream, _ := r.stream(ctx)
 	if oldReader != stream {
-		return
+		return xerrors.WithStackTrace(errReconnectRequestOutdated)
 	}
 
 	connectionInProgress := make(empty.Chan)
@@ -205,16 +228,16 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 	})
 
 	if oldReader != nil {
-		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errors.New("ydb: reconnect to pq grpc stream")))
+		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errReconnect))
 	}
 
-	newStream, err := connectWithTimeout(r.background.Context(), r.readerConnect, r.clock, r.connectTimeout)
-	trace.TopicOnReadStreamOpen(r.tracer, r.baseContext, err)
+	newStream, err := r.connectWithTimeout()
 
 	if topic.IsRetryableError(err) {
 		go func() {
 			// guarantee write reconnect signal to channel
 			r.reconnectFromBadStream <- oldReader
+			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 		}()
 	}
 
@@ -224,18 +247,17 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 			r.streamVal = newStream
 		}
 	})
+	return err
 }
 
-func connectWithTimeout(
-	baseContext context.Context,
-	connector readerConnectFunc,
-	clock clockwork.Clock,
-	timeout time.Duration,
-) (batchedStreamReader, error) {
-	if err := baseContext.Err(); err != nil {
+func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
+	bgContext := r.background.Context()
+
+	if err = bgContext.Err(); err != nil {
 		return nil, err
 	}
-	connectionContext, cancel := xcontext.WithErrCancel(baseContext)
+
+	connectionContext, cancel := xcontext.WithErrCancel(context.Background())
 
 	type connectResult struct {
 		stream batchedStreamReader
@@ -244,13 +266,13 @@ func connectWithTimeout(
 	result := make(chan connectResult, 1)
 
 	go func() {
-		stream, err := connector(connectionContext)
+		stream, err := r.readerConnect(connectionContext)
 		result <- connectResult{stream: stream, err: err}
 	}()
 
 	var res connectResult
 	select {
-	case <-clock.After(timeout):
+	case <-r.clock.After(r.connectTimeout):
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
 		cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: open stream reader timeout: %w", context.DeadlineExceeded)))
@@ -274,8 +296,10 @@ func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamRe
 	select {
 	case r.reconnectFromBadStream <- stream:
 		// send signal
+		trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 	default:
-		// signal was send and not handled already
+		// previous reconnect signal in process, no need sent signal more
+		trace.TopicOnReaderReconnectRequest(r.tracer, err, false)
 	}
 }
 

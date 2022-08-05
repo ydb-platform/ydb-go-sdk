@@ -23,14 +23,26 @@ func (r *CommitRanges) len() int {
 	return len(r.ranges)
 }
 
-func NewCommitRangesWithCapacity(capacity int) CommitRanges {
-	return CommitRanges{ranges: make([]commitRange, 0, capacity)}
+// PartitionIDs implements trace.TopicReaderStreamSendCommitMessageStartMessageInfo
+func (r *CommitRanges) PartitionIDs() []int64 {
+	res := make([]int64, len(r.ranges))
+	for i := range res {
+		res[i] = r.ranges[i].partitionSession.PartitionID
+	}
+	return res
 }
 
-func NewCommitRanges(commitable ...PublicCommitRangeGetter) CommitRanges {
-	var res CommitRanges
-	res.Append(commitable...)
+// PartitionSessionIDs implements trace.TopicReaderStreamSendCommitMessageStartMessageInfo
+func (r *CommitRanges) PartitionSessionIDs() []int64 {
+	res := make([]int64, len(r.ranges))
+	for i := range res {
+		res[i] = r.ranges[i].partitionSession.partitionSessionID.ToInt64()
+	}
 	return res
+}
+
+func NewCommitRangesWithCapacity(capacity int) CommitRanges {
+	return CommitRanges{ranges: make([]commitRange, 0, capacity)}
 }
 
 func NewCommitRangesFromPublicCommits(ranges []PublicCommitRange) CommitRanges {
@@ -72,7 +84,7 @@ func (r *CommitRanges) Reset() {
 	r.ranges = r.ranges[:0]
 }
 
-func (r CommitRanges) toPartitionsOffsets() []rawtopicreader.PartitionCommitOffset {
+func (r *CommitRanges) toPartitionsOffsets() []rawtopicreader.PartitionCommitOffset {
 	if len(r.ranges) == 0 {
 		return nil
 	}

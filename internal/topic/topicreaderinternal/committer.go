@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var ErrCommitDisabled = xerrors.Wrap(errors.New("ydb: commits disabled"))
@@ -46,18 +47,20 @@ type committer struct {
 	clock            clockwork.Clock
 	commitLoopSignal empty.Chan
 	backgroundWorker background.Worker
+	tracer           trace.Topic
 
 	m       xsync.Mutex
 	waiters []commitWaiter
 	commits CommitRanges
 }
 
-func newCommitter(lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer {
+func newCommitter(tracer trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer { //nolint:lll,revive
 	res := &committer{
 		mode:             mode,
 		clock:            clockwork.NewRealClock(),
 		send:             send,
 		backgroundWorker: *background.NewWorker(lifeContext),
+		tracer:           tracer,
 	}
 	res.initChannels()
 	res.start()
@@ -137,7 +140,12 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 		}
 
 		commits.optimize()
-		if err := sendCommitMessage(c.send, commits); err != nil {
+
+		onDone := trace.TopicOnReaderSendCommitMessage(c.tracer, &commits)
+		err := sendCommitMessage(c.send, commits)
+		onDone(err)
+
+		if err != nil {
 			_ = c.backgroundWorker.Close(ctx, err)
 		}
 	}

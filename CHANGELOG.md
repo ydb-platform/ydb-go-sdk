@@ -1,3 +1,4 @@
+* Refactored trace.Topic (experimental) handlers
 * Fixed signature/name of helpers in topic/topicsugar package 
 * Allowed read and commit messages in parallel
 
