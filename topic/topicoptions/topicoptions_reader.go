@@ -224,12 +224,12 @@ func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 	}
 }
 
-// WithTracer
+// WithReaderTrace
 //
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func WithTracer(tracer trace.Topic) ReaderOption {
+func WithReaderTrace(tracer trace.Topic) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.Tracer = cfg.Tracer.Compose(tracer)
 	}

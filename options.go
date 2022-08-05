@@ -25,6 +25,7 @@ import (
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -502,6 +503,14 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 				)...,
 			),
 		)
+		return nil
+	}
+}
+
+// WithTraceTopic adds configured discovery tracer to Connection
+func WithTraceTopic(t trace.Topic, opts ...trace.DiscoveryComposeOption) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.topicOptions = append(c.topicOptions, topicoptions.WithTrace(t))
 		return nil
 	}
 }
