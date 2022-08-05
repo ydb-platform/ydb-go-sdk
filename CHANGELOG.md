@@ -1,10 +1,13 @@
+* Fixed flaky TestTable
+* Renamed topic events in `trace.Details` enum
+
 ## v3.32.0
 * Refactored `trace.Topic` (experimental) handlers
 * Fixed signature/name of helpers in `topic`/`topicsugar` package 
-* Allowed read and commit messages in parallel
+* Allowed parallel reading and committing topic messages
 
 ## v3.31.0
-* Extended the ydb.Connection interface with experimental db.Topic() client (control plane and reader API)
+* Extended the `ydb.Connection` interface with experimental `db.Topic()` client (control plane and reader API)
 * Removed `ydb.RegisterParser()` function (was needed for `database/sql` driver outside `ydb-go-sdk` repository, necessity of `ydb.RegisterParser()` disappeared with implementation `database/sql` driver in same repository)
 * Refactored `db.Table().CreateSession(ctx)` (maked retryable with internal create session timeout)
 * Refactored `internal/table/client.createSession(ctx)` (got rid of unnecessary goroutine)
