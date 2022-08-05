@@ -54,7 +54,7 @@ type committer struct {
 	commits CommitRanges
 }
 
-func newCommitter(tracer trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer {
+func newCommitter(tracer trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer { //nolint:lll,revive
 	res := &committer{
 		mode:             mode,
 		clock:            clockwork.NewRealClock(),
@@ -141,7 +141,7 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 
 		commits.optimize()
 
-		onDone := trace.TopicOnReaderStreamSendCommitMessage(c.tracer, &commits)
+		onDone := trace.TopicOnReaderSendCommitMessage(c.tracer, &commits)
 		err := sendCommitMessage(c.send, commits)
 		onDone(err)
 

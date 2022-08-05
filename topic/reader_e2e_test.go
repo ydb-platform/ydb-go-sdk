@@ -6,8 +6,6 @@ package topic_test
 import (
 	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"runtime/pprof"
 	"sync/atomic"
 	"testing"
@@ -23,7 +21,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestReadMessages(t *testing.T) {
@@ -188,26 +185,6 @@ WITH (
 }
 
 func createReader(t *testing.T, db ydb.Connection, opts ...topicoptions.ReaderOption) *topicreader.Reader {
-	js := func(v interface{ JSONData() io.Reader }) string {
-		data, err := ioutil.ReadAll(v.JSONData())
-		if err != nil {
-			t.Fatal(err)
-		}
-		return string(data)
-	}
-
-	tracer := trace.Topic{
-		OnReadStreamRawSent: func(info trace.OnReadStreamRawSentInfo) {
-			t.Logf("sent: %v %v\n%v", info.ClientMessage.Type(), info.Error, js(info.ClientMessage))
-		},
-		OnReadStreamRawReceived: func(info trace.OnReadStreamRawReceivedInfo) {
-			t.Logf("received: %v %v\n%v", info.ServerMessage.Type(), info.Error, js(info.ServerMessage))
-		},
-	}
-	_ = tracer
-
-	opts = append(opts[:len(opts):len(opts)], topicoptions.WithTracer(tracer))
-
 	topicPath := db.Name() + "/test/feed"
 	reader, err := db.Topic().StartReader("test", []topicoptions.ReadSelector{
 		{

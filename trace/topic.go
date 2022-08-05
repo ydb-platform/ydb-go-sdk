@@ -23,18 +23,18 @@ type (
 		OnReaderPartitionReadStartResponse func(startInfo TopicReaderPartitionReadStartResponseStartInfo) func(doneInfo TopicReaderPartitionReadStartResponseDoneInfo)
 		OnReaderPartitionReadStopResponse  func(startInfo TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo TopicReaderPartitionReadStopResponseDoneInfo)
 
-		OnReaderStreamCommit            func(startInfo TopicReaderStreamCommitStartInfo) func(doneInfo TopicReaderStreamCommitDoneInfo)
-		OnReaderStreamSendCommitMessage func(startInfo TopicReaderStreamSendCommitMessageStartInfo) func(doneInfo TopicReaderStreamSendCommitMessageDoneInfo)
-		OnReaderStreamCommittedNotify   func(info TopicReaderStreamCommittedNotifyInfo)
-		OnReaderStreamClose             func(startInfo TopicReaderStreamCloseStartInfo) func(doneInfo TopicReaderStreamCloseDoneInfo)
-		OnReaderStreamInit              func(startInfo TopicReaderStreamInitStartInfo) func(doneInfo TopicReaderStreamInitDoneInfo)
-		OnReaderStreamError             func(info TopicReaderStreamErrorInfo)
-		OnReaderStreamUpdateToken       func(startInfo OnReadStreamUpdateTokenStartInfo) func(updateTokenInfo OnReadStreamUpdateTokenMiddleTokenReceivedInfo) func(doneInfo OnReadStreamUpdateTokenDoneInfo)
+		OnReaderCommit            func(startInfo TopicReaderCommitStartInfo) func(doneInfo TopicReaderCommitDoneInfo)
+		OnReaderSendCommitMessage func(startInfo TopicReaderSendCommitMessageStartInfo) func(doneInfo TopicReaderSendCommitMessageDoneInfo)
+		OnReaderCommittedNotify   func(info TopicReaderCommittedNotifyInfo)
+		OnReaderClose             func(startInfo TopicReaderCloseStartInfo) func(doneInfo TopicReaderCloseDoneInfo)
+		OnReaderInit              func(startInfo TopicReaderInitStartInfo) func(doneInfo TopicReaderInitDoneInfo)
+		OnReaderError             func(info TopicReaderErrorInfo)
+		OnReaderUpdateToken       func(startInfo OnReadUpdateTokenStartInfo) func(updateTokenInfo OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo OnReadStreamUpdateTokenDoneInfo)
 
-		OnReaderStreamSentDataRequest     func(startInfo TopicReaderStreamSentDataRequestInfo)
-		OnReaderStreamReceiveDataResponse func(startInfo TopicReaderStreamReceiveDataResponseStartInfo) func(doneInfo TopicReaderStreamReceiveDataResponseDoneInfo)
-		OnReaderStreamReadMessages        func(startInfo TopicReaderStreamReadMessagesStartInfo) func(doneInfo TopicReaderStreamReadMessagesDoneInfo)
-		OnReaderStreamUnknownGrpcMessage  func(info OnReadStreamUnknownGrpcMessageInfo)
+		OnReaderSentDataRequest     func(startInfo TopicReaderSentDataRequestInfo)
+		OnReaderReceiveDataResponse func(startInfo TopicReaderReceiveDataResponseStartInfo) func(doneInfo TopicReaderReceiveDataResponseDoneInfo)
+		OnReaderReadMessages        func(startInfo TopicReaderReadMessagesStartInfo) func(doneInfo TopicReaderReadMessagesDoneInfo)
+		OnReaderUnknownGrpcMessage  func(info OnReadUnknownGrpcMessageInfo)
 	}
 
 	// TopicReaderPartitionReadStartResponseStartInfo
@@ -87,13 +87,13 @@ type (
 		Error error
 	}
 
-	// TopicReaderStreamSendCommitMessageStartInfo
+	// TopicReaderSendCommitMessageStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamSendCommitMessageStartInfo struct {
+	TopicReaderSendCommitMessageStartInfo struct {
 		// ReaderConnectionID string unimplemented yet - need some internal changes
 		CommitsInfo TopicReaderStreamSendCommitMessageStartMessageInfo
 	}
@@ -109,23 +109,23 @@ type (
 		PartitionSessionIDs() []int64
 	}
 
-	// TopicReaderStreamSendCommitMessageDoneInfo
+	// TopicReaderSendCommitMessageDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamSendCommitMessageDoneInfo struct {
+	TopicReaderSendCommitMessageDoneInfo struct {
 		Error error
 	}
 
-	// TopicReaderStreamCommittedNotifyInfo
+	// TopicReaderCommittedNotifyInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamCommittedNotifyInfo struct {
+	TopicReaderCommittedNotifyInfo struct {
 		ReaderConnectionID string
 		Topic              string
 		PartitionID        int64
@@ -133,36 +133,36 @@ type (
 		CommittedOffset    int64
 	}
 
-	// TopicReaderStreamErrorInfo
+	// TopicReaderErrorInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamErrorInfo struct {
+	TopicReaderErrorInfo struct {
 		ReaderConnectionID string
 		Error              error
 	}
 
-	// TopicReaderStreamSentDataRequestInfo
+	// TopicReaderSentDataRequestInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamSentDataRequestInfo struct {
+	TopicReaderSentDataRequestInfo struct {
 		ReaderConnectionID       string
 		RequestBytes             int
 		LocalBufferSizeAfterSent int
 	}
 
-	// TopicReaderStreamReceiveDataResponseStartInfo
+	// TopicReaderReceiveDataResponseStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamReceiveDataResponseStartInfo struct {
+	TopicReaderReceiveDataResponseStartInfo struct {
 		ReaderConnectionID          string
 		LocalBufferSizeAfterReceive int
 		DataResponse                TopicReaderDataResponseInfo
@@ -173,36 +173,36 @@ type (
 		GetPartitionBatchMessagesCounts() (partitionCount, batchCount, messagesCount int)
 	}
 
-	// TopicReaderStreamReceiveDataResponseDoneInfo
+	// TopicReaderReceiveDataResponseDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamReceiveDataResponseDoneInfo struct {
+	TopicReaderReceiveDataResponseDoneInfo struct {
 		Error error
 	}
 
-	// TopicReaderStreamReadMessagesStartInfo
+	// TopicReaderReadMessagesStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamReadMessagesStartInfo struct {
+	TopicReaderReadMessagesStartInfo struct {
 		RequestContext     context.Context
 		MinCount           int
 		MaxCount           int
 		FreeBufferCapacity int
 	}
 
-	// TopicReaderStreamReadMessagesDoneInfo
+	// TopicReaderReadMessagesDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamReadMessagesDoneInfo struct {
+	TopicReaderReadMessagesDoneInfo struct {
 		MessagesCount      int
 		Topic              string
 		PartitionID        int64
@@ -213,13 +213,13 @@ type (
 		Error              error
 	}
 
-	// OnReadStreamUnknownGrpcMessageInfo
+	// OnReadUnknownGrpcMessageInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	OnReadStreamUnknownGrpcMessageInfo struct {
+	OnReadUnknownGrpcMessageInfo struct {
 		ReaderConnectionID string
 		Error              error
 	}
@@ -253,25 +253,13 @@ type (
 		WasSent bool
 	}
 
-	// TopicReaderReadMessagesStartInfo
+	// TopicReaderCommitStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderReadMessagesStartInfo struct {
-		RequestContext context.Context
-		MinCount       int
-		MaxCount       int
-	}
-
-	// TopicReaderStreamCommitStartInfo
-	//
-	// Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
-	// later release.
-	TopicReaderStreamCommitStartInfo struct {
+	TopicReaderCommitStartInfo struct {
 		RequestContext     context.Context
 		Topic              string
 		PartitionID        int64
@@ -280,59 +268,44 @@ type (
 		EndOffset          int64
 	}
 
-	// TopicReaderStreamCommitDoneInfo
+	// TopicReaderCommitDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamCommitDoneInfo struct {
+	TopicReaderCommitDoneInfo struct {
 		Error error
 	}
 
-	// TopicReaderReadMessagesDoneInfo
+	// TopicReaderCloseStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderReadMessagesDoneInfo struct {
-		MessagesCount int
-		Topic         string
-		PartitionID   int64
-		OffsetStart   int64
-		OffsetEnd     int64
-		Error         error
-	}
-
-	// TopicReaderStreamCloseStartInfo
-	//
-	// Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
-	// later release.
-	TopicReaderStreamCloseStartInfo struct {
+	TopicReaderCloseStartInfo struct {
 		ReaderConnectionID string
 		CloseReason        error
 	}
 
-	// TopicReaderStreamCloseDoneInfo
+	// TopicReaderCloseDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamCloseDoneInfo struct {
+	TopicReaderCloseDoneInfo struct {
 		CloseError error
 	}
 
-	// TopicReaderStreamInitStartInfo
+	// TopicReaderInitStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamInitStartInfo struct {
+	TopicReaderInitStartInfo struct {
 		PreInitReaderConnectionID string
 		InitRequestInfo           TopicReadStreamInitRequestInfo
 	}
@@ -348,34 +321,34 @@ type (
 		GetTopics() []string
 	}
 
-	// TopicReaderStreamInitDoneInfo
+	// TopicReaderInitDoneInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamInitDoneInfo struct {
+	TopicReaderInitDoneInfo struct {
 		ReaderConnectionID string
 		Error              error
 	}
 
-	// OnReadStreamUpdateTokenStartInfo
+	// OnReadUpdateTokenStartInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	OnReadStreamUpdateTokenStartInfo struct {
+	OnReadUpdateTokenStartInfo struct {
 		ReaderConnectionID string
 	}
 
-	// OnReadStreamUpdateTokenMiddleTokenReceivedInfo
+	// OnReadUpdateTokenMiddleTokenReceivedInfo
 	//
 	// Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	OnReadStreamUpdateTokenMiddleTokenReceivedInfo struct {
+	OnReadUpdateTokenMiddleTokenReceivedInfo struct {
 		TokenLen int
 		Error    error
 	}
