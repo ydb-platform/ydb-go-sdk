@@ -42,10 +42,10 @@ func TestReadMessages(t *testing.T) {
 	t.Logf("msg: %#v", msg)
 
 	require.NoError(t, err)
-	err = msg.UnmarshalTo(topicsugar.ConsumeWithCallback(func(data []byte) error {
+	err = topicsugar.ReadMessageDataWithCallback(msg, func(data []byte) error {
 		t.Log("Content:", string(data))
 		return nil
-	}))
+	})
 	require.NoError(t, err)
 
 	sendCDCMessage(ctx, t, db)

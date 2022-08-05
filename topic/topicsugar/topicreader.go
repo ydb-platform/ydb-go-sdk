@@ -24,7 +24,7 @@ func ProtoUnmarshal(msg *topicreader.Message, dst proto.Message) error {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func JSONUnmarshal(msg *topicreader.Message, dst interface{}) error {
-	return msg.UnmarshalTo(UnmarshalMessageWith(json.Unmarshal, dst))
+	return UnmarshalMessageWith(msg, json.Unmarshal, dst)
 }
 
 // UnmarshalMessageWith call unmarshaller func with message content
@@ -33,11 +33,11 @@ func JSONUnmarshal(msg *topicreader.Message, dst interface{}) error {
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func UnmarshalMessageWith(unmarshaler UnmarshalFunc, v interface{}) topicreader.MessageContentUnmarshaler {
-	return messageUnmarshaler{unmarshaler: unmarshaler, dst: v}
+func UnmarshalMessageWith(msg *topicreader.Message, unmarshaler UnmarshalFunc, v interface{}) error {
+	return msg.UnmarshalTo(messageUnmarshaler{unmarshaler: unmarshaler, dst: v})
 }
 
-// ConsumeWithCallback receive full content of message as data
+// ReadMessageDataWithCallback receive full content of message as data
 // data slice MUST not be used after return from f.
 // if you need content after return from function - copy it with
 // copy(dst, data) to another byte slice
@@ -45,18 +45,18 @@ func UnmarshalMessageWith(unmarshaler UnmarshalFunc, v interface{}) topicreader.
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func ConsumeWithCallback(f func(data []byte) error) topicreader.MessageContentUnmarshaler {
-	return callbackConsumer(f)
+func ReadMessageDataWithCallback(msg *topicreader.Message, f func(data []byte) error) error {
+	return msg.UnmarshalTo(messageUnmarhalerToCallback(f))
 }
 
-type callbackConsumer func(data []byte) error
+type messageUnmarhalerToCallback func(data []byte) error
 
 // UnmarshalYDBTopicMessage unmarshal implementation
 //
 // Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c callbackConsumer) UnmarshalYDBTopicMessage(data []byte) error {
+func (c messageUnmarhalerToCallback) UnmarshalYDBTopicMessage(data []byte) error {
 	return c(data)
 }
 

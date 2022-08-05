@@ -68,6 +68,8 @@ type Message = topicreaderinternal.PublicMessage
 type MessageContentUnmarshaler = topicreaderinternal.PublicMessageContentUnmarshaler
 
 // Commit receive Message, Batch of single offset
+// It can be fast (by default) or sync and waite response from server
+// see topicoptions.CommitMode for details
 //
 // Experimental
 //

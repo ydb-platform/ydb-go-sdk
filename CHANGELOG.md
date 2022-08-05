@@ -1,4 +1,5 @@
-* Allow read and commit messages in parallel
+* Fixed signature/name of helpers in topic/topicsugar package 
+* Allowed read and commit messages in parallel
 
 ## v3.31.0
 * Extended the ydb.Connection interface with experimental db.Topic() client (control plane and reader API)
