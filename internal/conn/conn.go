@@ -56,7 +56,7 @@ type conn struct {
 	done              chan struct{}
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
-	state             State
+	state             uint32
 	lastUsage         time.Time
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
@@ -80,11 +80,9 @@ func (c *conn) LastUsage() time.Time {
 }
 
 func (c *conn) IsState(states ...State) bool {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
-
+	state := State(atomic.LoadUint32(&c.state))
 	for _, s := range states {
-		if s == c.state {
+		if s == state {
 			return true
 		}
 	}
@@ -144,13 +142,15 @@ func (c *conn) SetState(s State) State {
 }
 
 func (c *conn) setState(s State) State {
-	trace.DriverOnConnStateChange(
-		c.config.Trace(),
-		c.endpoint.Copy(),
-		c.state,
-	)(s)
-	c.state = s
-	return c.state
+	state := atomic.LoadUint32(&c.state)
+	if atomic.CompareAndSwapUint32(&c.state, state, uint32(s)) {
+		trace.DriverOnConnStateChange(
+			c.config.Trace(),
+			c.endpoint.Copy(),
+			State(state),
+		)(s)
+	}
+	return s
 }
 
 func (c *conn) Unban() State {
@@ -169,9 +169,7 @@ func (c *conn) Unban() State {
 }
 
 func (c *conn) GetState() (s State) {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
-	return c.state
+	return State(atomic.LoadUint32(&c.state))
 }
 
 func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
@@ -475,7 +473,7 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	)
 	c := &conn{
 		grpcDialOptions: grpcDialOptions,
-		state:           Created,
+		state:           uint32(Created),
 		endpoint:        e,
 		config:          config,
 		done:            make(chan struct{}),
