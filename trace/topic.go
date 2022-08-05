@@ -17,12 +17,15 @@ type (
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
 	Topic struct {
+		// TopicReaderStreamLifeCycleEvents
 		OnReaderReconnect        func(startInfo TopicReaderReconnectStartInfo) func(doneInfo TopicReaderReconnectDoneInfo)
 		OnReaderReconnectRequest func(info TopicReaderReconnectRequestInfo)
 
+		// TopicReaderPartitionEvents
 		OnReaderPartitionReadStartResponse func(startInfo TopicReaderPartitionReadStartResponseStartInfo) func(doneInfo TopicReaderPartitionReadStartResponseDoneInfo)
 		OnReaderPartitionReadStopResponse  func(startInfo TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo TopicReaderPartitionReadStopResponseDoneInfo)
 
+		// TopicReaderStreamEvents
 		OnReaderCommit            func(startInfo TopicReaderCommitStartInfo) func(doneInfo TopicReaderCommitDoneInfo)
 		OnReaderSendCommitMessage func(startInfo TopicReaderSendCommitMessageStartInfo) func(doneInfo TopicReaderSendCommitMessageDoneInfo)
 		OnReaderCommittedNotify   func(info TopicReaderCommittedNotifyInfo)
@@ -31,6 +34,7 @@ type (
 		OnReaderError             func(info TopicReaderErrorInfo)
 		OnReaderUpdateToken       func(startInfo OnReadUpdateTokenStartInfo) func(updateTokenInfo OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo OnReadStreamUpdateTokenDoneInfo)
 
+		// TopicReaderMessageEvents
 		OnReaderSentDataRequest     func(startInfo TopicReaderSentDataRequestInfo)
 		OnReaderReceiveDataResponse func(startInfo TopicReaderReceiveDataResponseStartInfo) func(doneInfo TopicReaderReceiveDataResponseDoneInfo)
 		OnReaderReadMessages        func(startInfo TopicReaderReadMessagesStartInfo) func(doneInfo TopicReaderReadMessagesDoneInfo)
