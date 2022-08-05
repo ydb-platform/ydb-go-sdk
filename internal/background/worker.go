@@ -2,22 +2,28 @@ package background
 
 import (
 	"context"
+	"errors"
 	"runtime/pprof"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
+var ErrAlreadyClosed = errors.New("background worker already closed")
+
 // A Worker must not be copied after first use
 type Worker struct {
-	ctx     context.Context
-	workers sync.WaitGroup
-
+	ctx      context.Context
+	workers  sync.WaitGroup
 	onceInit sync.Once
 
-	m    xsync.Mutex
-	stop xcontext.CancelErrFunc
+	m xsync.Mutex
+
+	closed uint32
+	stop   xcontext.CancelErrFunc
 }
 
 func NewWorker(parent context.Context) *Worker {
@@ -34,6 +40,10 @@ func (b *Worker) Context() context.Context {
 }
 
 func (b *Worker) Start(name string, f func(ctx context.Context)) {
+	if atomic.LoadUint32(&b.closed) != 0 {
+		return
+	}
+
 	b.init()
 
 	b.m.Lock()
@@ -61,6 +71,10 @@ func (b *Worker) Done() <-chan struct{} {
 }
 
 func (b *Worker) Close(ctx context.Context, err error) error {
+	if !atomic.CompareAndSwapUint32(&b.closed, 0, 1) {
+		return xerrors.WithStackTrace(ErrAlreadyClosed)
+	}
+
 	b.init()
 
 	b.stop(err)
@@ -68,6 +82,9 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 	waitCtx, waitCancel := context.WithCancel(ctx)
 
 	go func() {
+		b.m.Lock()
+		defer b.m.Unlock()
+
 		b.workers.Wait()
 		waitCancel()
 	}()
