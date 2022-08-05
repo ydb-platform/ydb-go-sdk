@@ -7,7 +7,9 @@ import (
 type Details uint64
 
 const (
-	DriverNetEvents Details = 1 << iota // for bitmask: 1, 2, 4, 8, 16, 32, ...
+	LogStartEvents Details = 1 << iota // for bitmask: 1, 2, 4, 8, 16, 32, ...
+
+	DriverNetEvents
 	DriverConnEvents
 	DriverBalancerEvents
 	DriverResolverEvents
