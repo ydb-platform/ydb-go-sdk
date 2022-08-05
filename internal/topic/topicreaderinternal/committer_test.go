@@ -9,6 +9,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -339,7 +340,9 @@ func newTestCommitter(ctx context.Context, t testing.TB) *committer {
 		return nil
 	})
 	t.Cleanup(func() {
-		require.NoError(t, res.Close(ctx, errors.New("test comitter closed")))
+		if err := res.Close(ctx, errors.New("test comitter closed")); err != nil {
+			require.ErrorIs(t, err, background.ErrAlreadyClosed)
+		}
 	})
 	return res
 }

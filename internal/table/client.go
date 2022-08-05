@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -107,9 +109,9 @@ type Client struct {
 	mu                xsync.Mutex
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
-	wgClosed          sync.WaitGroup
+	spawnedGoroutines background.Worker
 	touching          bool
-	closed            bool
+	closed            uint32
 }
 
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
@@ -124,9 +126,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 
 		ch := make(chan result)
 
-		go func() {
-			defer close(ch)
-
+		c.spawnedGoroutines.Start("CreateSession", func(ctx context.Context) {
 			var (
 				s   Session
 				err error
@@ -149,10 +149,10 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			}: // nop
 			case <-ctx.Done():
 				if s != nil {
-					_ = s.Close(ctx)
+					_ = s.Close(xcontext.WithoutDeadline(ctx))
 				}
 			}
-		}()
+		})
 
 		select {
 		case r := <-ch:
@@ -205,9 +205,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 }
 
 func (c *Client) isClosed() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.closed
+	return atomic.LoadUint32(&c.closed) != 0
 }
 
 func isCreateSessionErrorRetriable(err error) bool {
@@ -259,9 +257,7 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 
 	ch := make(chan result)
 
-	go func() {
-		defer close(ch)
-
+	c.spawnedGoroutines.Start("createSession", func(ctx context.Context) {
 		var (
 			s   Session
 			err error
@@ -292,35 +288,36 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 
 		if s != nil {
 			s.OnClose(func() {
-				c.mu.Lock()
-				defer c.mu.Unlock()
+				c.mu.WithLock(func() {
+					if c.isClosed() {
+						return
+					}
 
-				info, has := c.index[s]
-				if !has {
-					return
-				}
+					info, has := c.index[s]
+					if !has {
+						return
+					}
 
-				delete(c.index, s)
+					delete(c.index, s)
 
-				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
+					trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
 
-				if c.closed {
-					return
-				}
+					c.notify(nil)
 
-				c.notify(nil)
-
-				if info.idle != nil {
-					panic("session closed while still in idle client")
-				}
+					if info.idle != nil {
+						panic("session closed while still in idle client")
+					}
+				})
 			})
 		}
 
 		c.mu.WithLock(func() {
 			c.createInProgress--
-			if s != nil && !c.closed {
-				c.index[s] = sessionInfo{}
-				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+			if s != nil {
+				if !c.isClosed() {
+					c.index[s] = sessionInfo{}
+					trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+				}
 			}
 		})
 
@@ -330,9 +327,11 @@ func (c *Client) createSession(ctx context.Context) (s Session, err error) {
 			err: err,
 		}: // nop
 		case <-ctx.Done():
-			// nop
+			if s != nil {
+				_ = s.Close(xcontext.WithoutDeadline(ctx))
+			}
 		}
-	}()
+	})
 
 	select {
 	case r := <-ch:
@@ -389,6 +388,9 @@ func (c *Client) get(ctx context.Context, opts ...getOption) (s Session, err err
 		// Second, we try to create new session
 		s, err = c.createSession(ctx)
 		if s == nil && err == nil {
+			if err = ctx.Err(); err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
 			panic("both of session and err are nil")
 		}
 		// got session or err is not recoverable
@@ -489,7 +491,7 @@ func (c *Client) Put(ctx context.Context, s Session) (err error) {
 
 	c.mu.WithLock(func() {
 		switch {
-		case c.closed:
+		case c.isClosed():
 			err = xerrors.WithStackTrace(errClosedClient)
 
 		case c.idle.Len() >= c.limit:
@@ -538,41 +540,41 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	}
 
 	var issues []error
-	c.mu.WithLock(func() {
-		keeperDone := c.keeperDone
-		if ch := c.keeperStop; ch != nil {
-			close(ch)
-		}
-
-		if keeperDone != nil {
-			<-keeperDone
-		}
-
-		for el := c.waitq.Front(); el != nil; el = el.Next() {
-			ch := el.Value.(*chan Session)
-			close(*ch)
-		}
-
-		issues = make([]error, 0, len(c.index))
-
-		for e := c.idle.Front(); e != nil; e = e.Next() {
-			if err = c.closeSession(
-				ctx,
-				e.Value.(Session),
-				withCloseSessionAsync(),
-			); err != nil {
-				issues = append(issues, err)
+	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
+		c.mu.WithLock(func() {
+			keeperDone := c.keeperDone
+			if ch := c.keeperStop; ch != nil {
+				close(ch)
 			}
-		}
 
-		c.limit = 0
-		c.idle = list.New()
-		c.waitq = list.New()
-		c.index = make(map[Session]sessionInfo)
-		c.closed = true
-	})
+			if keeperDone != nil {
+				<-keeperDone
+			}
 
-	c.wgClosed.Wait()
+			for el := c.waitq.Front(); el != nil; el = el.Next() {
+				ch := el.Value.(*chan Session)
+				close(*ch)
+			}
+
+			issues = make([]error, 0, len(c.index))
+			for e := c.idle.Front(); e != nil; e = e.Next() {
+				if err = c.closeSession(
+					ctx,
+					e.Value.(Session),
+					withCloseSessionAsync(),
+				); err != nil {
+					issues = append(issues, err)
+				}
+			}
+
+			c.limit = 0
+			c.idle = list.New()
+			c.waitq = list.New()
+			c.index = make(map[Session]sessionInfo)
+		})
+	}
+
+	_ = c.spawnedGoroutines.Close(ctx, errClosedClient)
 
 	if len(issues) > 0 {
 		return xerrors.WithStackTrace(xerrors.NewWithIssues("table client closed with issues", issues...))
@@ -775,11 +777,7 @@ func (c *Client) keeper(ctx context.Context) {
 				timer.Reset(delay)
 			}
 			for _, s := range toDelete {
-				_ = c.closeSession(
-					ctx,
-					s,
-					withCloseSessionLock(),
-				)
+				_ = c.closeSession(ctx, s)
 			}
 			if touchingDone != nil {
 				close(touchingDone)
@@ -900,7 +898,6 @@ func (c *Client) CloseSession(ctx context.Context, s Session) error {
 	return c.closeSession(
 		ctx,
 		s,
-		withCloseSessionLock(),
 		withCloseSessionAsync(),
 		withCloseSessionTrace(),
 	)
@@ -909,16 +906,9 @@ func (c *Client) CloseSession(ctx context.Context, s Session) error {
 type closeSessionOptionsHolder struct {
 	withTrace bool
 	withAsync bool
-	withLock  bool
 }
 
 type closeSessionOption func(h *closeSessionOptionsHolder)
-
-func withCloseSessionLock() closeSessionOption {
-	return func(h *closeSessionOptionsHolder) {
-		h.withLock = true
-	}
-}
 
 func withCloseSessionAsync() closeSessionOption {
 	return func(h *closeSessionOptionsHolder) {
@@ -945,17 +935,7 @@ func (c *Client) closeSession(ctx context.Context, s Session, opts ...closeSessi
 		defer onDone()
 	}
 
-	if h.withLock {
-		c.mu.WithLock(func() {
-			c.wgClosed.Add(1)
-		})
-	} else {
-		c.wgClosed.Add(1)
-	}
-
 	f := func(s Session) {
-		defer c.wgClosed.Done()
-
 		closeCtx, cancel := context.WithTimeout(
 			xcontext.WithoutDeadline(ctx),
 			c.config.DeleteTimeout(),
@@ -966,7 +946,9 @@ func (c *Client) closeSession(ctx context.Context, s Session, opts ...closeSessi
 	}
 
 	if h.withAsync {
-		go f(s)
+		c.spawnedGoroutines.Start("closeSession", func(ctx context.Context) {
+			f(s)
+		})
 	} else {
 		f(s)
 	}
