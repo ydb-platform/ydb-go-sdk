@@ -12,14 +12,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
-var (
-	errRemoveUnexpectedWaiter = xerrors.Wrap(errors.New("ydb: remove unexpected waiter"))
-	errBatcherPopConcurency   = xerrors.Wrap(errors.New("ydb: batch pop concurency, internal state error"))
-)
+var errBatcherPopConcurency = xerrors.Wrap(errors.New("ydb: batch pop concurency, internal state error"))
 
 type batcher struct {
 	popInFlight    int64
-	waiterID       uint64
 	closeErr       error
 	hasNewMessages empty.Chan
 
@@ -175,7 +171,7 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 				return
 			}
 
-			findRes = b.findNeedLock(0, []batcherWaiter{{Options: opts}})
+			findRes = b.findNeedLock(opts)
 			if findRes.Ok {
 				b.applyNeedLock(findRes)
 				return
@@ -223,20 +219,18 @@ func newBatcherResultCandidate(
 	key *partitionSession,
 	result batcherMessageOrderItem,
 	rest batcherMessageOrderItems,
-	waiterIndex int,
 	ok bool,
 ) batcherResultCandidate {
 	return batcherResultCandidate{
-		Key:         key,
-		Result:      result,
-		Rest:        rest,
-		WaiterIndex: waiterIndex,
-		Ok:          ok,
+		Key:    key,
+		Result: result,
+		Rest:   rest,
+		Ok:     ok,
 	}
 }
 
-func (b *batcher) findNeedLock(startIndex int, waiters []batcherWaiter) batcherResultCandidate {
-	if len(waiters) == 0 || len(b.messages) == 0 {
+func (b *batcher) findNeedLock(filter batcherGetOptions) batcherResultCandidate {
+	if len(b.messages) == 0 {
 		return batcherResultCandidate{}
 	}
 
@@ -248,31 +242,29 @@ func (b *batcher) findNeedLock(startIndex int, waiters []batcherWaiter) batcherR
 	for k, items := range b.messages {
 		head, rest, ok := rawMessageOpts.cutBatchItemsHead(items)
 		if ok {
-			return newBatcherResultCandidate(k, head, rest, len(waiters)-1, true)
+			return newBatcherResultCandidate(k, head, rest, true)
 		}
 
 		if needBatchResult {
-			for waiterIndex, waiter := range waiters[startIndex:] {
-				head, rest, ok = b.extractWaiterOptionsLeedLock(waiter).cutBatchItemsHead(items)
-				if !ok {
-					continue
-				}
-
-				needBatchResult = false
-				batchResult = newBatcherResultCandidate(k, head, rest, waiterIndex, true)
+			head, rest, ok = b.applyForceFlagToOptions(filter).cutBatchItemsHead(items)
+			if !ok {
+				continue
 			}
+
+			needBatchResult = false
+			batchResult = newBatcherResultCandidate(k, head, rest, true)
 		}
 	}
 
 	return batchResult
 }
 
-func (b *batcher) extractWaiterOptionsLeedLock(waiter batcherWaiter) batcherGetOptions {
+func (b *batcher) applyForceFlagToOptions(options batcherGetOptions) batcherGetOptions {
 	if !b.forceIgnoreMinRestrictionsOnNextMessagesBatch {
-		return waiter.Options
+		return options
 	}
 
-	res := waiter.Options
+	res := options
 	res.MinCount = 1
 	return res
 }
@@ -357,11 +349,4 @@ func (item *batcherMessageOrderItem) IsRawMessage() bool {
 
 func (item *batcherMessageOrderItem) IsEmpty() bool {
 	return item.RawMessage == nil && item.Batch.isEmpty()
-}
-
-type batcherWaiter struct {
-	ID               uint64
-	Options          batcherGetOptions
-	Result           chan batcherMessageOrderItem
-	finishWaitSignal empty.Chan
 }

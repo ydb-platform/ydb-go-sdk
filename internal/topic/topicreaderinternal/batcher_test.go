@@ -341,7 +341,7 @@ func TestBatcherConcurency(t *testing.T) {
 func TestBatcher_Find(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		b := newBatcher()
-		findRes := b.findNeedLock(0, nil)
+		findRes := b.findNeedLock(batcherGetOptions{})
 		require.False(t, findRes.Ok)
 	})
 	t.Run("FoundEmptyFilter", func(t *testing.T) {
@@ -352,7 +352,7 @@ func TestBatcher_Find(t *testing.T) {
 
 		require.NoError(t, b.PushBatches(batch))
 
-		findRes := b.findNeedLock(0, []batcherWaiter{{}})
+		findRes := b.findNeedLock(batcherGetOptions{})
 		expectedResult := batcherResultCandidate{
 			Key:         session,
 			Result:      newBatcherItemBatch(batch),
@@ -371,7 +371,7 @@ func TestBatcher_Find(t *testing.T) {
 
 		require.NoError(t, b.PushBatches(batch))
 
-		findRes := b.findNeedLock(0, []batcherWaiter{{Options: batcherGetOptions{MaxCount: 1}}})
+		findRes := b.findNeedLock(batcherGetOptions{MaxCount: 1})
 
 		expectedResult := newBatcherItemBatch(mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}}))
 		expectedRestBatch := newBatcherItemBatch(mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(2)}}))

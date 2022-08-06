@@ -1,4 +1,4 @@
-* Fix deadlock in topicreader batcher, while add and read raw server messages
+* Fixed deadlock in topicreader batcher, while add and read raw server messages
 * Fixed bug in `db.Topic()` with send response to stop partition message
 
 ## v3.32.1
