@@ -485,7 +485,6 @@ func (r *StopPartitionSessionRequest) fromProto(proto *Ydb_Topic.StreamReadMessa
 }
 
 type StopPartitionSessionResponse struct {
-	//nolint:unused
 	clientMessageImpl
 
 	PartitionSessionID PartitionSessionID
