@@ -26,7 +26,13 @@ func WaitChannelClosed(t testing.TB, ch empty.Chan) {
 // l can be nil - then locker use for check conditions
 func SpinWaitCondition(t testing.TB, l sync.Locker, cond func() bool) {
 	t.Helper()
-	const condWaitTimeout = time.Second
+	SpinWaitConditionWithTimeout(t, l, time.Second, cond)
+}
+
+// SpinWaitConditionWithTimeout wait while cond return true with check it in loop
+// l can be nil - then locker use for check conditions
+func SpinWaitConditionWithTimeout(t testing.TB, l sync.Locker, condWaitTimeout time.Duration, cond func() bool) {
+	t.Helper()
 
 	checkConditin := func() bool {
 		if l != nil {

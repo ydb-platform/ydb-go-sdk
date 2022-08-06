@@ -181,20 +181,20 @@ func TestPartitionsBalanced(t *testing.T) {
 		}
 	}()
 
-	xtest.SpinWaitCondition(t, nil, func() bool {
+	xtest.SpinWaitConditionWithTimeout(t, nil, time.Minute, func() bool {
 		return atomic.LoadInt32(&connectedPartitions) == 2
 	})
 
 	readerSecond, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicPath))
 	require.NoError(t, err)
 
-	xtest.SpinWaitCondition(t, nil, func() bool {
+	xtest.SpinWaitConditionWithTimeout(t, nil, time.Minute, func() bool {
 		return atomic.LoadInt32(&connectedPartitions) == 1
 	})
 
 	require.NoError(t, readerSecond.Close(ctx))
 
-	xtest.SpinWaitCondition(t, nil, func() bool {
+	xtest.SpinWaitConditionWithTimeout(t, nil, time.Minute, func() bool {
 		return atomic.LoadInt32(&connectedPartitions) == 2
 	})
 
