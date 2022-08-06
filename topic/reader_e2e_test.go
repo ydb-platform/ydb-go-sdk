@@ -119,9 +119,6 @@ func TestCDCFeedSendTopicPathSameAsSubscribed(t *testing.T) {
 }
 
 func TestTopicPath(t *testing.T) {
-	t.Skip("LOGBROKER-7625")
-	t.Skip("KIKIMR-14966")
-
 	ctx := testCtx(t)
 	db := connect(t)
 
