@@ -577,9 +577,10 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 			batch, readErr = e.reader.ReadMessageBatch(readCtx, opts)
 		}()
 
-		// wait to add read to waiters
+		// wait to start pop
+		e.reader.batcher.notifyAboutNewMessages()
 		xtest.SpinWaitCondition(t, &e.reader.batcher.m, func() bool {
-			return len(e.reader.batcher.waiters) > 0
+			return len(e.reader.batcher.hasNewMessages) == 0
 		})
 
 		nextDataRequested := sendMessageWithFullBuffer(&e)
