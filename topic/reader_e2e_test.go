@@ -14,13 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestReadMessages(t *testing.T) {
@@ -71,7 +74,7 @@ func TestReadMessagesAndCommit(t *testing.T) {
 
 	sendCDCMessage(ctx, t, db)
 	sendCDCMessage(ctx, t, db)
-	reader = createReader(t, db)
+	reader = createFeedReader(t, db)
 
 	// read only no committed messages
 	for i := 0; i < 2; i++ {
@@ -133,9 +136,71 @@ func TestPartitionsBalanced(t *testing.T) {
 	db := connect(t)
 	topicPath := db.Name() + "/topic-" + t.Name()
 
-	_ = db.Topic().Drop(ctx, topicPath)
-	err := db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw})
+	err := db.Topic().Drop(ctx, topicPath)
+	if err != nil {
+		require.True(t, ydb.IsOperationErrorSchemeError(err))
+	}
+
+	consumer := "test"
+	err = db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw},
+		topicoptions.CreateWithMinActivePartitions(2),
+		topicoptions.CreateWithPartitionCountLimit(2),
+		topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumer}),
+	)
 	require.NoError(t, err)
+
+	connectedPartitions := int32(0)
+	tracer := trace.Topic{
+		OnReaderPartitionReadStartResponse: func(startInfo trace.TopicReaderPartitionReadStartResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
+			atomic.AddInt32(&connectedPartitions, 1)
+			return nil
+		},
+		OnReaderPartitionReadStopResponse: func(startInfo trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) {
+			atomic.AddInt32(&connectedPartitions, -1)
+			return nil
+		},
+	}
+	firstReader, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicPath),
+		topicoptions.WithReaderTrace(tracer),
+	)
+	require.NoError(t, err)
+
+	readCtx, firstReaderStopRead := context.WithCancel(ctx)
+	firstReaderReadStopped := make(empty.Chan)
+	go func() {
+		defer close(firstReaderReadStopped)
+
+		for {
+			if readCtx.Err() != nil {
+				return
+			}
+			_, err = firstReader.ReadMessage(readCtx)
+			if readCtx.Err() == nil {
+				require.NoError(t, err)
+			}
+		}
+	}()
+
+	xtest.SpinWaitCondition(t, nil, func() bool {
+		return atomic.LoadInt32(&connectedPartitions) == 2
+	})
+
+	readerSecond, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicPath))
+	require.NoError(t, err)
+
+	xtest.SpinWaitCondition(t, nil, func() bool {
+		return atomic.LoadInt32(&connectedPartitions) == 1
+	})
+
+	require.NoError(t, readerSecond.Close(ctx))
+
+	xtest.SpinWaitCondition(t, nil, func() bool {
+		return atomic.LoadInt32(&connectedPartitions) == 2
+	})
+
+	firstReaderStopRead()
+	xtest.WaitChannelClosed(t, firstReaderReadStopped)
+	require.NoError(t, firstReader.Close(ctx))
 }
 
 func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) {
@@ -184,7 +249,7 @@ WITH (
 	require.NoError(t, err)
 }
 
-func createReader(t *testing.T, db ydb.Connection, opts ...topicoptions.ReaderOption) *topicreader.Reader {
+func createFeedReader(t *testing.T, db ydb.Connection, opts ...topicoptions.ReaderOption) *topicreader.Reader {
 	topicPath := db.Name() + "/test/feed"
 	reader, err := db.Topic().StartReader("test", []topicoptions.ReadSelector{
 		{
@@ -202,7 +267,7 @@ func createFeedAndReader(
 ) (ydb.Connection, *topicreader.Reader) {
 	db := connect(t)
 	createCDCFeed(ctx, t, db)
-	reader := createReader(t, db, opts...)
+	reader := createFeedReader(t, db, opts...)
 	return db, reader
 }
 

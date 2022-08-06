@@ -21,7 +21,7 @@ type CreateOption func(request *rawtopic.CreateTopicRequest)
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithMinActivePartitions(count int64) CreateOption {
 	return func(request *rawtopic.CreateTopicRequest) {
-		request.PartitionSettings.PartitionCountLimit = count
+		request.PartitionSettings.MinActivePartitions = count
 	}
 }
 

@@ -490,3 +490,9 @@ type StopPartitionSessionResponse struct {
 
 	PartitionSessionID PartitionSessionID
 }
+
+func (r *StopPartitionSessionResponse) toProto() *Ydb_Topic.StreamReadMessage_StopPartitionSessionResponse {
+	return &Ydb_Topic.StreamReadMessage_StopPartitionSessionResponse{
+		PartitionSessionId: r.PartitionSessionID.ToInt64(),
+	}
+}
