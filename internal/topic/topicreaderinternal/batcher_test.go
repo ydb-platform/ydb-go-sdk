@@ -333,7 +333,11 @@ func TestBatcherConcurency(t *testing.T) {
 		for i := 0; i < count; i++ {
 			res, err := b.Pop(ctx, batcherGetOptions{MinCount: 1})
 			require.NoError(tb, err)
-			require.Equal(tb, rawtopicreader.NewOffset(int64(i)), res.RawMessage.(*rawtopicreader.StartPartitionSessionRequest).CommittedOffset)
+			require.Equal(
+				tb,
+				rawtopicreader.NewOffset(int64(i)),
+				res.RawMessage.(*rawtopicreader.StartPartitionSessionRequest).CommittedOffset,
+			)
 		}
 	})
 }

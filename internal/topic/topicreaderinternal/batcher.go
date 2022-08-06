@@ -191,7 +191,12 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 			// new iteration
 		case <-b.closeChan:
 			return batcherMessageOrderItem{},
-				xerrors.WithStackTrace(fmt.Errorf("ydb: batcher close while pop wait new messages: %w", b.closeErr))
+				xerrors.WithStackTrace(
+					fmt.Errorf(
+						"ydb: batcher close while pop wait new messages: %w",
+						b.closeErr,
+					),
+				)
 		case <-ctx.Done():
 			return batcherMessageOrderItem{}, ctx.Err()
 		}
