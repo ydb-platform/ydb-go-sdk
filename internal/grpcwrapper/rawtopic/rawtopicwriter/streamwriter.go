@@ -1,4 +1,3 @@
-// nolint
 package rawtopicwriter
 
 import (
@@ -30,8 +29,10 @@ type ClientMessage interface {
 	isClientMessage()
 }
 
+//nolint:unused
 type clientMessageImpl struct{}
 
+//nolint:unused
 func (*clientMessageImpl) isClientMessage() {}
 
 type ServerMessage interface {
@@ -40,6 +41,8 @@ type ServerMessage interface {
 	SetStatus(status rawydb.StatusCode)
 }
 
+//nolint:unused
 type serverMessageImpl struct{}
 
+//nolint:unused
 func (*serverMessageImpl) isServerMessage() {}

@@ -1,4 +1,3 @@
-// nolint
 package rawtopicwriter
 
 import (
@@ -8,6 +7,7 @@ import (
 )
 
 type InitRequest struct {
+	//nolint:unused
 	clientMessageImpl
 
 	Path             string
@@ -37,6 +37,7 @@ const (
 )
 
 type InitResult struct {
+	//nolint:unused
 	serverMessageImpl
 	rawtopiccommon.ServerMessageMetadata
 
@@ -47,6 +48,7 @@ type InitResult struct {
 }
 
 type WriteRequest struct {
+	//nolint:unused
 	clientMessageImpl
 
 	Messages []MessageData
@@ -62,6 +64,7 @@ type MessageData struct {
 }
 
 type WriteResult struct {
+	//nolint:unused
 	serverMessageImpl
 	rawtopiccommon.ServerMessageMetadata
 
