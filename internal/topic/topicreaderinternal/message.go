@@ -19,7 +19,7 @@ var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read earl
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-var PublicErrUnexpectedCodec = errors.New("unexpected codec") //nolint
+var PublicErrUnexpectedCodec = errors.New("unexpected codec") //nolint:revive,stylecheck
 
 // PublicMessage is representation of topic message
 //
