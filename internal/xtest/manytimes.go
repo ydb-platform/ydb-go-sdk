@@ -30,11 +30,14 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 	}
 
 	start := time.Now()
+	testCounter := 0
 	for {
+		testCounter++
 		// run test, then check timeout for guarantee run test least once
 		runTest(t, test)
 
 		if time.Since(start) > options.timeout {
+			t.Log("test run counter:", testCounter)
 			return
 		}
 	}

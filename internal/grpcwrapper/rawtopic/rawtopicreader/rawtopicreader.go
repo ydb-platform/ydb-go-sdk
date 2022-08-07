@@ -115,6 +115,13 @@ func (s StreamReader) Send(msg ClientMessage) error {
 			},
 		}
 		return s.Stream.Send(grpcMess)
+	case *StopPartitionSessionResponse:
+		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
+			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_StopPartitionSessionResponse{
+				StopPartitionSessionResponse: m.toProto(),
+			},
+		}
+		return s.Stream.Send(grpcMess)
 	case *CommitOffsetRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
 			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_CommitOffsetRequest{

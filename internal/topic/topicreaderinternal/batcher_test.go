@@ -40,9 +40,9 @@ func TestBatcher_PushBatch(t *testing.T) {
 	batch3 := mustNewBatch(session2, []*PublicMessage{m22})
 
 	b := newBatcher()
-	require.NoError(t, b.PushBatch(batch1))
-	require.NoError(t, b.PushBatch(batch2))
-	require.NoError(t, b.PushBatch(batch3))
+	require.NoError(t, b.PushBatches(batch1))
+	require.NoError(t, b.PushBatches(batch2))
+	require.NoError(t, b.PushBatches(batch3))
 
 	expectedSession1 := newBatcherItemBatch(mustNewBatch(session1, []*PublicMessage{m11, m12}))
 	expectedSession2 := newBatcherItemBatch(mustNewBatch(session2, []*PublicMessage{m21, m22}))
@@ -74,7 +74,7 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 			PartitionSessionID: 1,
 		}
 
-		require.NoError(t, b.PushBatch(batch))
+		require.NoError(t, b.PushBatches(batch))
 		require.NoError(t, b.PushRawMessage(session, m))
 
 		expectedMap := batcherMessagesMap{session: batcherMessageOrderItems{
@@ -94,10 +94,10 @@ func TestBatcher_PushRawMessage(t *testing.T) {
 			PartitionSessionID: 1,
 		}
 
-		require.NoError(t, b.PushBatch(batch1))
+		require.NoError(t, b.PushBatches(batch1))
 		require.NoError(t, b.PushRawMessage(session, m))
-		require.NoError(t, b.PushBatch(batch2))
-		require.NoError(t, b.PushBatch(batch3))
+		require.NoError(t, b.PushBatches(batch2))
+		require.NoError(t, b.PushBatches(batch3))
 
 		expectedMap := batcherMessagesMap{session: batcherMessageOrderItems{
 			newBatcherItemBatch(batch1),
@@ -114,7 +114,7 @@ func TestBatcher_Pop(t *testing.T) {
 		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
 
 		b := newBatcher()
-		require.NoError(t, b.PushBatch(batch))
+		require.NoError(t, b.PushBatches(batch))
 
 		res, err := b.Pop(ctx, batcherGetOptions{})
 		require.NoError(t, err)
@@ -135,8 +135,8 @@ func TestBatcher_Pop(t *testing.T) {
 		)
 
 		b := newBatcher()
-		require.NoError(t, b.PushBatch(batch))
-		require.NoError(t, b.PushBatch(batch2))
+		require.NoError(t, b.PushBatches(batch))
+		require.NoError(t, b.PushBatches(batch2))
 
 		possibleResults := []batcherMessageOrderItem{newBatcherItemBatch(batch), newBatcherItemBatch(batch2)}
 
@@ -157,12 +157,13 @@ func TestBatcher_Pop(t *testing.T) {
 		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
 
 		b := newBatcher()
+		b.notifyAboutNewMessages()
 
 		go func() {
 			xtest.SpinWaitCondition(t, &b.m, func() bool {
-				return len(b.waiters) > 0
+				return len(b.hasNewMessages) == 0
 			})
-			_ = b.PushBatch(batch)
+			_ = b.PushBatches(batch)
 		}()
 
 		res, err := b.Pop(ctx, batcherGetOptions{})
@@ -179,7 +180,7 @@ func TestBatcher_Pop(t *testing.T) {
 		batch := mustNewBatch(nil, []*PublicMessage{m1, m2})
 
 		b := newBatcher()
-		require.NoError(t, b.PushBatch(batch))
+		require.NoError(t, b.PushBatches(batch))
 
 		res, err := b.Pop(ctx, batcherGetOptions{MaxCount: 1})
 		require.NoError(t, err)
@@ -196,7 +197,7 @@ func TestBatcher_Pop(t *testing.T) {
 	t.Run("GetFirstMessageFromSameSession", func(t *testing.T) {
 		b := newBatcher()
 		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
-		require.NoError(t, b.PushBatch(batch))
+		require.NoError(t, b.PushBatches(batch))
 		require.NoError(t, b.PushRawMessage(nil, &rawtopicreader.StopPartitionSessionRequest{PartitionSessionID: 1}))
 
 		res, err := b.Pop(context.Background(), batcherGetOptions{})
@@ -211,7 +212,7 @@ func TestBatcher_Pop(t *testing.T) {
 		b := newBatcher()
 		m := &rawtopicreader.StopPartitionSessionRequest{PartitionSessionID: 1}
 
-		require.NoError(t, b.PushBatch(mustNewBatch(session1, []*PublicMessage{{WrittenAt: testTime(1)}})))
+		require.NoError(t, b.PushBatches(mustNewBatch(session1, []*PublicMessage{{WrittenAt: testTime(1)}})))
 		require.NoError(t, b.PushRawMessage(session2, m))
 
 		res, err := b.Pop(context.Background(), batcherGetOptions{})
@@ -224,6 +225,8 @@ func TestBatcher_Pop(t *testing.T) {
 		testErr := errors.New("test")
 
 		b := newBatcher()
+		b.notifyAboutNewMessages()
+
 		var err error
 
 		popFinished := make(empty.Chan)
@@ -234,7 +237,7 @@ func TestBatcher_Pop(t *testing.T) {
 
 		// loop for wait Pop start wait message
 		xtest.SpinWaitCondition(t, &b.m, func() bool {
-			return len(b.waiters) > 0
+			return len(b.hasNewMessages) == 0
 		})
 
 		require.NoError(t, b.Close(testErr))
@@ -248,7 +251,7 @@ func TestBatcher_Pop(t *testing.T) {
 func TestBatcher_PopMinIgnored(t *testing.T) {
 	t.Run("PopAfterForce", func(t *testing.T) {
 		b := newBatcher()
-		require.NoError(t, b.PushBatch(&PublicBatch{Messages: []*PublicMessage{
+		require.NoError(t, b.PushBatches(&PublicBatch{Messages: []*PublicMessage{
 			{
 				SeqNo: 1,
 			},
@@ -267,7 +270,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 	xtest.TestManyTimesWithName(t, "ForceAfterPop", func(t testing.TB) {
 		b := newBatcher()
-		require.NoError(t, b.PushBatch(&PublicBatch{Messages: []*PublicMessage{
+		require.NoError(t, b.PushBatches(&PublicBatch{Messages: []*PublicMessage{
 			{
 				SeqNo: 1,
 			},
@@ -278,7 +281,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 			defer atomic.AddInt64(&IgnoreMinRestrictionsOnNextPopDone, 1)
 
 			xtest.SpinWaitCondition(t, &b.m, func() bool {
-				return len(b.waiters) > 0
+				return len(b.hasNewMessages) == 0
 			})
 			b.IgnoreMinRestrictionsOnNextPop()
 		}()
@@ -295,26 +298,54 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 }
 
 func TestBatcherConcurency(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "OneBatch", func(tb testing.TB) {
 		b := newBatcher()
 
 		go func() {
-			_ = b.PushBatch(&PublicBatch{Messages: []*PublicMessage{{SeqNo: 1}}})
+			_ = b.PushBatches(&PublicBatch{Messages: []*PublicMessage{{SeqNo: 1}}})
 		}()
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		batch, err := b.Pop(ctx, batcherGetOptions{MinCount: 1})
-		require.NoError(t, err)
-		require.Equal(t, int64(1), batch.Batch.Messages[0].SeqNo)
+		require.NoError(tb, err)
+		require.Equal(tb, int64(1), batch.Batch.Messages[0].SeqNo)
+	})
+
+	xtest.TestManyTimesWithName(t, "ManyRawMessages", func(tb testing.TB) {
+		const count = 10
+		b := newBatcher()
+		session := &partitionSession{}
+
+		go func() {
+			for i := 0; i < count; i++ {
+				_ = b.PushRawMessage(session, &rawtopicreader.StartPartitionSessionRequest{
+					CommittedOffset:  rawtopicreader.NewOffset(int64(i)),
+					PartitionOffsets: rawtopicreader.OffsetRange{},
+				})
+			}
+		}()
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		for i := 0; i < count; i++ {
+			res, err := b.Pop(ctx, batcherGetOptions{MinCount: 1})
+			require.NoError(tb, err)
+			require.Equal(
+				tb,
+				rawtopicreader.NewOffset(int64(i)),
+				res.RawMessage.(*rawtopicreader.StartPartitionSessionRequest).CommittedOffset,
+			)
+		}
 	})
 }
 
 func TestBatcher_Find(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		b := newBatcher()
-		findRes := b.findNeedLock(0, nil)
+		findRes := b.findNeedLock(batcherGetOptions{})
 		require.False(t, findRes.Ok)
 	})
 	t.Run("FoundEmptyFilter", func(t *testing.T) {
@@ -323,9 +354,9 @@ func TestBatcher_Find(t *testing.T) {
 
 		b := newBatcher()
 
-		require.NoError(t, b.PushBatch(batch))
+		require.NoError(t, b.PushBatches(batch))
 
-		findRes := b.findNeedLock(0, []batcherWaiter{{}})
+		findRes := b.findNeedLock(batcherGetOptions{})
 		expectedResult := batcherResultCandidate{
 			Key:         session,
 			Result:      newBatcherItemBatch(batch),
@@ -342,9 +373,9 @@ func TestBatcher_Find(t *testing.T) {
 
 		b := newBatcher()
 
-		require.NoError(t, b.PushBatch(batch))
+		require.NoError(t, b.PushBatches(batch))
 
-		findRes := b.findNeedLock(0, []batcherWaiter{{Options: batcherGetOptions{MaxCount: 1}}})
+		findRes := b.findNeedLock(batcherGetOptions{MaxCount: 1})
 
 		expectedResult := newBatcherItemBatch(mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(1)}}))
 		expectedRestBatch := newBatcherItemBatch(mustNewBatch(session, []*PublicMessage{{WrittenAt: testTime(2)}}))
@@ -456,7 +487,7 @@ func TestBatcherGetOptions_Split(t *testing.T) {
 func TestBatcher_Fire(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		b := newBatcher()
-		b.fireWaitersNeedLock()
+		b.notifyAboutNewMessages()
 	})
 }
 

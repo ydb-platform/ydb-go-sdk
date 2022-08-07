@@ -39,7 +39,7 @@ func TestClient_CreateDropTopic(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func connect(t *testing.T) ydb.Connection {
+func connect(t testing.TB) ydb.Connection {
 	connectionString := "grpc://localhost:2136/local"
 	if cs := os.Getenv("YDB_CONNECTION_STRING"); cs != "" {
 		connectionString = cs
