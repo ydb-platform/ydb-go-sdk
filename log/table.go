@@ -10,6 +10,7 @@ import (
 )
 
 // Table makes trace.Table with logging events from details
+//
 //nolint:gocyclo
 func Table(l Logger, details trace.Details) (t trace.Table) {
 	if details&trace.TableEvents == 0 {

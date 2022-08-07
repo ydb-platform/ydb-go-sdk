@@ -510,6 +510,7 @@ func NullableDyNumberValue(v *string) Value {
 
 // Nullable makes optional value from nullable type
 // Warning: type interface will be replaced in the future with typed parameters pattern from go1.18
+//
 //nolint:gocyclo
 func Nullable(t Type, v interface{}) Value {
 	switch t {

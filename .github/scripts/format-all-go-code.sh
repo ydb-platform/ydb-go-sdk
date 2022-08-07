@@ -13,5 +13,10 @@ for FILE in $(find . -name '*.go'); do
     continue
   fi
 
+  if [[ "$FILE" == *"allocator_go1.18.go"* ]]; then
+    echo "Skip allocator_go1.18.go rule: $FILE" >&2
+    continue
+  fi
+
   bash ./.github/scripts/format-go-code.sh "$FILE"
 done

@@ -307,20 +307,20 @@ func (s *scanner) setColumnIndexes(columns []string) {
 // Any returns any primitive or optional value.
 // Currently, it may return one of these types:
 //
-//   bool
-//   int8
-//   uint8
-//   int16
-//   uint16
-//   int32
-//   uint32
-//   int64
-//   uint64
-//   float32
-//   float64
-//   []byte
-//   string
-//   [16]byte
+//	bool
+//	int8
+//	uint8
+//	int16
+//	uint16
+//	int32
+//	uint32
+//	int64
+//	uint64
+//	float32
+//	float64
+//	[]byte
+//	string
+//	[16]byte
 //
 //nolint:gocyclo
 func (s *scanner) any() interface{} {

@@ -47,7 +47,7 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 
 // Close
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Close(_ context.Context) error {
@@ -56,7 +56,7 @@ func (c *Client) Close(_ context.Context) error {
 
 // Alter topic options
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
@@ -72,7 +72,7 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 
 // Create new topic
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Create(
@@ -100,7 +100,7 @@ func (c *Client) Create(
 
 // Describe topic
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Describe(
@@ -128,7 +128,7 @@ func (c *Client) Describe(
 
 // Drop topic
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
@@ -146,7 +146,7 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 // StartReader create new topic reader and start pull messages from server
 // it is fast non block call, connection will start in background
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) StartReader(

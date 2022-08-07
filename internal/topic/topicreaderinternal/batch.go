@@ -16,7 +16,7 @@ var (
 
 // PublicBatch is ordered group of message from one partition
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicBatch struct {
@@ -97,7 +97,7 @@ func newBatchFromStream(decoders decoderMap, session *partitionSession, sb rawto
 // Context is cancelled when code should stop to process messages batch
 // for example - lost connection to server or receive stop partition signal without graceful flag
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (m *PublicBatch) Context() context.Context {
@@ -106,7 +106,7 @@ func (m *PublicBatch) Context() context.Context {
 
 // Topic is path of source topic of the messages in the batch
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (m *PublicBatch) Topic() string {
@@ -115,7 +115,7 @@ func (m *PublicBatch) Topic() string {
 
 // PartitionID of messages in the batch
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (m *PublicBatch) PartitionID() int64 {

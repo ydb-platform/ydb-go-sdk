@@ -9,7 +9,7 @@ import (
 
 // Codec
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type Codec int
@@ -26,7 +26,7 @@ const (
 
 // Consumer
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type Consumer struct {
@@ -39,7 +39,7 @@ type Consumer struct {
 
 // ToRaw
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
@@ -61,7 +61,7 @@ func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 
 // PartitionSettings
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PartitionSettings struct {
@@ -71,7 +71,7 @@ type PartitionSettings struct {
 
 // ToRaw
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (s *PartitionSettings) ToRaw(raw *rawtopic.PartitioningSettings) {
@@ -81,7 +81,7 @@ func (s *PartitionSettings) ToRaw(raw *rawtopic.PartitioningSettings) {
 
 // FromRaw
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (s *PartitionSettings) FromRaw(raw *rawtopic.PartitioningSettings) {
@@ -91,7 +91,7 @@ func (s *PartitionSettings) FromRaw(raw *rawtopic.PartitioningSettings) {
 
 // TopicDescription
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type TopicDescription struct {
@@ -102,7 +102,7 @@ type TopicDescription struct {
 
 // FromRaw
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {

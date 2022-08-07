@@ -234,3 +234,4 @@ issues:
     - path: _test\.go
       linters:
         - unused
+        - unparam

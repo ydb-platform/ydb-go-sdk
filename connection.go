@@ -317,7 +317,7 @@ func (c *connection) Scripting() scripting.Client {
 
 // Topic return topic client
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *connection) Topic() topic.Client {
@@ -332,7 +332,7 @@ func (c *connection) Topic() topic.Client {
 //
 // DSN accept connection string like
 //
-//   "grpc[s]://{endpoint}/?database={database}[&param=value]"
+//	"grpc[s]://{endpoint}/?database={database}[&param=value]"
 //
 // See sugar.DSN helper for make dsn from endpoint and database
 func Open(ctx context.Context, dsn string, opts ...Option) (_ Connection, err error) {
