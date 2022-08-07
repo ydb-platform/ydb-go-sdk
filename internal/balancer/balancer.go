@@ -277,6 +277,10 @@ func (b *balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 		}
 	}()
 
+	if err = ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
 	var (
 		state       = b.connections()
 		failedCount int
