@@ -77,12 +77,18 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 func TestRetryerBadSession(t *testing.T) {
 	closed := make(map[table.Session]bool)
 	p := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (Session, error) {
+		OnGet: func(ctx context.Context) (*session, error) {
 			s := simpleSession(t)
-			s.OnClose(func() {
+			s.onClose = append(s.onClose, func(s *session) {
 				closed[s] = true
 			})
 			return s, nil
+		},
+		OnPut: func(ctx context.Context, s *session) error {
+			if s.isClosing() {
+				return s.Close(ctx)
+			}
+			return nil
 		},
 	}
 	var (
@@ -126,12 +132,18 @@ func TestRetryerBadSession(t *testing.T) {
 func TestRetryerSessionClosing(t *testing.T) {
 	closed := make(map[table.Session]bool)
 	p := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (Session, error) {
+		OnGet: func(ctx context.Context) (*session, error) {
 			s := simpleSession(t)
-			s.OnClose(func() {
+			s.onClose = append(s.onClose, func(s *session) {
 				closed[s] = true
 			})
 			return s, nil
+		},
+		OnPut: func(ctx context.Context, s *session) error {
+			if s.isClosing() {
+				return s.Close(ctx)
+			}
+			return nil
 		},
 	}
 	var sessions []table.Session
@@ -356,7 +368,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		limit = 10
 		ctx   = context.Background()
 		p     = SessionProviderFunc{
-			OnGet: func(ctx context.Context) (Session, error) {
+			OnGet: func(ctx context.Context) (*session, error) {
 				return simpleSession(t), nil
 			},
 		}

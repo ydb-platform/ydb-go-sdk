@@ -7,14 +7,14 @@ import (
 )
 
 type testManyTimesOptions struct {
-	timeout time.Duration
+	stopAfter time.Duration
 }
 
 type TestManyTimesOption func(opts *testManyTimesOptions)
 
-func WithTimeout(timeout time.Duration) TestManyTimesOption {
+func StopAfter(stopAfter time.Duration) TestManyTimesOption {
 	return func(opts *testManyTimesOptions) {
-		opts.timeout = timeout
+		opts.stopAfter = stopAfter
 	}
 }
 
@@ -22,7 +22,7 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 	t.Helper()
 
 	options := testManyTimesOptions{
-		timeout: time.Second,
+		stopAfter: time.Second,
 	}
 
 	for _, o := range opts {
@@ -33,10 +33,10 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 	testCounter := 0
 	for {
 		testCounter++
-		// run test, then check timeout for guarantee run test least once
+		// run test, then check stopAfter for guarantee run test least once
 		runTest(t, test)
 
-		if time.Since(start) > options.timeout {
+		if time.Since(start) > options.stopAfter {
 			t.Log("test run counter:", testCounter)
 			return
 		}

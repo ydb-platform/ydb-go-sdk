@@ -27,6 +27,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -45,22 +46,24 @@ type stats struct {
 	xsync.Mutex
 
 	keepAliveMinSize int
-	inFlight         map[string]struct{}
-	balance          map[string]struct{}
+	inFlightSessions map[string]struct{}
+	openSessions     map[string]struct{}
+	inPoolSessions   map[string]struct{}
 	limit            int
 }
 
-func (s *stats) print(t *testing.T) {
+func (s *stats) print(t testing.TB) {
 	s.Lock()
 	defer s.Unlock()
 	t.Log("stats:")
-	t.Log(" - keepAliveMinSize      :", s.keepAliveMinSize)
-	t.Log(" - in_flight:", s.keepAliveMinSize)
-	t.Log(" - balance  :", s.keepAliveMinSize)
-	t.Log(" - limit      :", s.limit)
+	t.Log(" - limit            :", s.limit)
+	t.Log(" - keepAliveMinSize :", s.keepAliveMinSize)
+	t.Log(" - open             :", len(s.openSessions))
+	t.Log(" - in-pool          :", len(s.inPoolSessions))
+	t.Log(" - in-flight        :", len(s.inFlightSessions))
 }
 
-func (s *stats) check(t *testing.T) {
+func (s *stats) check(t testing.TB) {
 	s.Lock()
 	defer s.Unlock()
 	if s.keepAliveMinSize < 0 {
@@ -69,14 +72,14 @@ func (s *stats) check(t *testing.T) {
 	if s.limit < 0 {
 		t.Fatalf("negative limit: %d", s.limit)
 	}
-	if s.keepAliveMinSize > len(s.inFlight) {
-		t.Fatalf("keepAliveMinSize > len(in_flight) (%d > %d)", s.keepAliveMinSize, len(s.inFlight))
+	if s.keepAliveMinSize > len(s.inFlightSessions) {
+		t.Fatalf("keepAliveMinSize > len(in-flight) (%d > %d)", s.keepAliveMinSize, len(s.inFlightSessions))
 	}
-	if len(s.inFlight) > len(s.balance) {
-		t.Fatalf("len(in_flight) > len(balance) (%d > %d)", len(s.inFlight), len(s.balance))
+	if len(s.inFlightSessions) > len(s.inPoolSessions) {
+		t.Fatalf("len(in_flight) > len(pool) (%d > %d)", len(s.inFlightSessions), len(s.inPoolSessions))
 	}
-	if len(s.balance) > s.limit {
-		t.Fatalf("len(balance) > limit (%d > %d)", len(s.balance), s.limit)
+	if len(s.inPoolSessions) > s.limit {
+		t.Fatalf("len(pool) > limit (%d > %d)", len(s.inPoolSessions), s.limit)
 	}
 }
 
@@ -92,68 +95,111 @@ func (s *stats) max() int {
 	return s.limit
 }
 
-func (s *stats) addToBalance(t *testing.T, id string) {
+func (s *stats) addToOpen(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
 	defer s.Unlock()
 
-	if _, ok := s.balance[id]; ok {
-		t.Fatalf("session '%s' add to balance twice", id)
+	if _, ok := s.openSessions[id]; ok {
+		t.Fatalf("session '%s' add to open sessions twice", id)
 	}
 
-	s.balance[id] = struct{}{}
+	s.openSessions[id] = struct{}{}
 
-	t.Logf("session '%s' added to balance", id)
+	t.Logf("session '%s' added to open sessions", id)
 }
 
-func (s *stats) removeFromBalance(t *testing.T, id string) {
+func (s *stats) removeFromOpen(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
 	defer s.Unlock()
 
-	if _, ok := s.balance[id]; !ok {
-		t.Fatalf("session '%s' already removed from balance", id)
+	if _, ok := s.openSessions[id]; !ok {
+		t.Fatalf("session '%s' already removed from open sessions", id)
 	}
 
-	delete(s.balance, id)
+	delete(s.openSessions, id)
 
-	t.Logf("session '%s' removed from balance", id)
+	t.Logf("session '%s' removed from open sessions", id)
 }
 
-func (s *stats) addToInFlight(t *testing.T, id string) {
+func (s *stats) addToPool(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
 	defer s.Unlock()
 
-	if _, ok := s.inFlight[id]; ok {
+	if _, ok := s.inPoolSessions[id]; ok {
+		t.Fatalf("session '%s' add to pool twice", id)
+	}
+
+	s.inPoolSessions[id] = struct{}{}
+
+	t.Logf("session '%s' added to pool", id)
+}
+
+func (s *stats) removeFromPool(t testing.TB, id string) {
+	defer s.check(t)
+
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.inPoolSessions[id]; !ok {
+		t.Fatalf("session '%s' already removed from pool", id)
+	}
+
+	delete(s.inPoolSessions, id)
+
+	t.Logf("session '%s' removed from pool", id)
+}
+
+func (s *stats) addToInFlight(t testing.TB, id string) {
+	defer s.check(t)
+
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.inFlightSessions[id]; ok {
 		t.Fatalf("session '%s' add to in-flight twice", id)
 	}
 
-	s.inFlight[id] = struct{}{}
+	s.inFlightSessions[id] = struct{}{}
 
 	t.Logf("session '%s' added to in-flight", id)
 }
 
-func (s *stats) removeFromInFlight(t *testing.T, id string) {
+func (s *stats) removeFromInFlight(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
 	defer s.Unlock()
 
-	if _, ok := s.inFlight[id]; !ok {
-		t.Fatalf("session '%s' already removed from in-flight", id)
+	if _, ok := s.inFlightSessions[id]; !ok {
+		return
 	}
 
-	delete(s.inFlight, id)
+	delete(s.inFlightSessions, id)
 
 	t.Logf("session '%s' removed from in-flight", id)
 }
 
-//nolint:gocyclo
+func TestTableMultiple(t *testing.T) {
+	if _, ok := os.LookupEnv("LOCAL_TESTING"); !ok {
+		t.Skip("only for local testing")
+	}
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		testTable(t)
+	}, xtest.StopAfter(time.Hour))
+}
+
 func TestTable(t *testing.T) {
+	testTable(t)
+}
+
+//nolint:gocyclo
+func testTable(t testing.TB) {
 	testDuration := 42 * time.Second
 	if v, ok := os.LookupEnv("TEST_DURATION"); ok {
 		vv, err := time.ParseDuration(v)
@@ -170,17 +216,21 @@ func TestTable(t *testing.T) {
 	s := &stats{
 		keepAliveMinSize: math.MinInt32,
 		limit:            math.MaxInt32,
-		balance:          make(map[string]struct{}),
-		inFlight:         make(map[string]struct{}),
+		openSessions:     make(map[string]struct{}),
+		inPoolSessions:   make(map[string]struct{}),
+		inFlightSessions: make(map[string]struct{}),
 	}
 	defer func() {
 		s.Lock()
 		defer s.Unlock()
-		if len(s.inFlight) != 0 {
-			t.Errorf("inFlight not a zero after closing pool: %v", s.inFlight)
+		if len(s.inFlightSessions) != 0 {
+			t.Errorf("'in-flight' not a zero after closing table client: %v", s.inFlightSessions)
 		}
-		if len(s.balance) != 0 {
-			t.Errorf("balance not a zero after closing pool: %v", s.balance)
+		if len(s.openSessions) != 0 {
+			t.Errorf("'openSessions' not a zero after closing table client: %v", s.openSessions)
+		}
+		if len(s.inPoolSessions) != 0 {
+			t.Errorf("'inPoolSessions' not a zero after closing table client: %v", s.inPoolSessions)
 		}
 	}()
 
@@ -193,18 +243,10 @@ func TestTable(t *testing.T) {
 		shutdowned = uint32(0)
 
 		shutdownTrace = trace.Table{
-			OnPoolSessionNew: func(
-				info trace.TablePoolSessionNewStartInfo,
-			) func(
-				trace.TablePoolSessionNewDoneInfo,
-			) {
-				return func(info trace.TablePoolSessionNewDoneInfo) {
-					if info.Session != nil && atomic.LoadUint32(&shutdowned) == 0 {
-						sessionsMtx.Lock()
-						defer sessionsMtx.Unlock()
-						sessions[info.Session.ID()] = struct{}{}
-					}
-				}
+			OnPoolSessionAdd: func(info trace.TablePoolSessionAddInfo) {
+				sessionsMtx.Lock()
+				defer sessionsMtx.Unlock()
+				sessions[info.Session.ID()] = struct{}{}
 			},
 			OnPoolGet: func(
 				info trace.TablePoolGetStartInfo,
@@ -291,25 +333,6 @@ func TestTable(t *testing.T) {
 		ydb.WithTraceTable(
 			shutdownTrace.Compose(
 				trace.Table{
-					OnSessionNew: func(
-						info trace.TableSessionNewStartInfo,
-					) func(
-						trace.TableSessionNewDoneInfo,
-					) {
-						return func(info trace.TableSessionNewDoneInfo) {
-							if info.Error == nil {
-								s.addToBalance(t, info.Session.ID())
-							}
-						}
-					},
-					OnSessionDelete: func(
-						info trace.TableSessionDeleteStartInfo,
-					) func(
-						trace.TableSessionDeleteDoneInfo,
-					) {
-						s.removeFromBalance(t, info.Session.ID())
-						return nil
-					},
 					OnInit: func(
 						info trace.TableInitStartInfo,
 					) func(
@@ -321,6 +344,31 @@ func TestTable(t *testing.T) {
 								s.limit = info.Limit
 							})
 						}
+					},
+					OnSessionNew: func(
+						info trace.TableSessionNewStartInfo,
+					) func(
+						trace.TableSessionNewDoneInfo,
+					) {
+						return func(info trace.TableSessionNewDoneInfo) {
+							if info.Error == nil {
+								s.addToOpen(t, info.Session.ID())
+							}
+						}
+					},
+					OnSessionDelete: func(
+						info trace.TableSessionDeleteStartInfo,
+					) func(
+						trace.TableSessionDeleteDoneInfo,
+					) {
+						s.removeFromOpen(t, info.Session.ID())
+						return nil
+					},
+					OnPoolSessionAdd: func(info trace.TablePoolSessionAddInfo) {
+						s.addToPool(t, info.Session.ID())
+					},
+					OnPoolSessionRemove: func(info trace.TablePoolSessionRemoveInfo) {
+						s.removeFromPool(t, info.Session.ID())
 					},
 					OnPoolGet: func(
 						info trace.TablePoolGetStartInfo,
@@ -337,14 +385,6 @@ func TestTable(t *testing.T) {
 						info trace.TablePoolPutStartInfo,
 					) func(
 						trace.TablePoolPutDoneInfo,
-					) {
-						s.removeFromInFlight(t, info.Session.ID())
-						return nil
-					},
-					OnPoolSessionClose: func(
-						info trace.TablePoolSessionCloseStartInfo,
-					) func(
-						trace.TablePoolSessionCloseDoneInfo,
 					) {
 						s.removeFromInFlight(t, info.Session.ID())
 						return nil
@@ -553,7 +593,7 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("create table failed: %v\n", err)
 	}
-	fmt.Printf("> table stream_query created\n")
+	fmt.Printf("> table stream_query openSessions\n")
 	var (
 		upsertRowsCount = 100000
 		sum             uint64
@@ -742,7 +782,7 @@ func TestTable(t *testing.T) {
 	fmt.Printf("> concurrent quering done\n")
 }
 
-func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
+func streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbsPath string) {
 	err := c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -810,7 +850,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 	}
 }
 
-func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderAbsPath string) {
+func executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
 	var (
 		query = render(
 			template.Must(template.New("").Parse(`
@@ -883,7 +923,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 	}
 }
 
-func executeScanQuery(ctx context.Context, t *testing.T, c table.Client, folderAbsPath string) {
+func executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
 	query := render(
 		template.Must(template.New("").Parse(`
 				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -989,7 +1029,7 @@ func getSeriesData() types.Value {
 		),
 		seriesData(
 			2, days("2014-04-06"), "Silicon Valley", ""+
-				"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
+				"Silicon Valley is an American comedy television series openSessions by Mike Judge, John Altschuler and "+
 				"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
 			"Some comment here",
 		),

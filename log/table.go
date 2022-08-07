@@ -593,42 +593,17 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
 			//nolint:govet
 			l := l.WithName(`session`)
-			t.OnPoolSessionNew = func(info trace.TablePoolSessionNewStartInfo) func(trace.TablePoolSessionNewDoneInfo) {
-				l.Tracef(`create start`)
-				start := time.Now()
-				return func(info trace.TablePoolSessionNewDoneInfo) {
-					if info.Error == nil {
-						session := info.Session
-						if session != nil {
-							l.Debugf(`create done {latency:"%v",id:"%s",status:"%s"}`,
-								time.Since(start),
-								session.ID(),
-								session.Status(),
-							)
-						}
-					} else {
-						l.Errorf(`create failed {latency:"%v",error:"%v",version:"%s"}`,
-							time.Since(start),
-							info.Error,
-							meta.Version,
-						)
-					}
-				}
-			}
-			t.OnPoolSessionClose = func(info trace.TablePoolSessionCloseStartInfo) func(trace.TablePoolSessionCloseDoneInfo) {
-				session := info.Session
-				l.Tracef(`close start {id:"%s",status:"%s"}`,
-					session.ID(),
-					session.Status(),
+			t.OnPoolSessionAdd = func(info trace.TablePoolSessionAddInfo) {
+				l.Debugf(`session added into pool {id:"%s",status:"%s"}`,
+					info.Session.ID(),
+					info.Session.Status(),
 				)
-				start := time.Now()
-				return func(info trace.TablePoolSessionCloseDoneInfo) {
-					l.Debugf(`close done {latency:"%v",id:"%s",status:"%s"}`,
-						time.Since(start),
-						session.ID(),
-						session.Status(),
-					)
-				}
+			}
+			t.OnPoolSessionRemove = func(info trace.TablePoolSessionRemoveInfo) {
+				l.Debugf(`session removed from pool {id:"%s",status:"%s"}`,
+					info.Session.ID(),
+					info.Session.Status(),
+				)
 			}
 		}
 		if details&trace.TablePoolAPIEvents != 0 {

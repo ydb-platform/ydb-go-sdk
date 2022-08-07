@@ -31,8 +31,6 @@ type ClosableSession interface {
 	closer.Closer
 
 	Session
-
-	OnClose(f func())
 }
 
 type Client interface {

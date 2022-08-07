@@ -19,6 +19,7 @@ const (
 	SessionReady
 	SessionBusy
 	SessionClosing
+	SessionClosed
 
 	statusUnknown = "unknown"
 )
@@ -31,6 +32,8 @@ func (s SessionStatus) String() string {
 		return "busy"
 	case SessionClosing:
 		return "closing"
+	case SessionClosed:
+		return "closed"
 	default:
 		return statusUnknown
 	}

@@ -61,8 +61,20 @@ type (
 		)
 		// Pool state event
 		OnPoolStateChange func(TablePoolStateChangeInfo)
+
 		// Pool session lifecycle events
-		OnPoolSessionNew   func(TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo)
+		OnPoolSessionAdd    func(info TablePoolSessionAddInfo)
+		OnPoolSessionRemove func(info TablePoolSessionRemoveInfo)
+
+		// OnPoolSessionNew is user-defined callback for listening events about creating sessions with
+		// internal session pool calls
+		//
+		// Deprecated: use OnPoolSessionAdd callback
+		OnPoolSessionNew func(TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo)
+
+		// OnPoolSessionClose is user-defined callback for listening sessionClose calls
+		//
+		// Deprecated: use OnPoolSessionRemove callback
 		OnPoolSessionClose func(TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo)
 		// Pool common API events
 		OnPoolPut  func(TablePoolPutStartInfo) func(TablePoolPutDoneInfo)
@@ -309,7 +321,13 @@ type (
 		Session tableSessionInfo
 	}
 	TablePoolSessionCloseDoneInfo struct{}
-	TableCloseStartInfo           struct {
+	TablePoolSessionAddInfo       struct {
+		Session tableSessionInfo
+	}
+	TablePoolSessionRemoveInfo struct {
+		Session tableSessionInfo
+	}
+	TableCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.

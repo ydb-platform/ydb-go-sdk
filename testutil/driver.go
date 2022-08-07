@@ -237,11 +237,13 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 			opts ...grpc.CallOption,
 		) (err error) {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
-				result, err := handler(args)
+				var result proto.Message
+				result, err = handler(args)
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
-				anyResult, err := anypb.New(result)
+				var anyResult *anypb.Any
+				anyResult, err = anypb.New(result)
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
