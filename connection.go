@@ -80,7 +80,7 @@ type Connection interface {
 	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
-// nolint: maligned
+//nolint: maligned
 type connection struct {
 	opts []Option
 

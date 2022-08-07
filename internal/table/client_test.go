@@ -333,7 +333,7 @@ func TestRaceWgClosed(t *testing.T) {
 		t.Log("start")
 
 		ctx, cancel := context.WithTimeout(context.Background(),
-			// nolint:gosec
+			//nolint:gosec
 			time.Duration(rand.Int31n(int32(100*time.Millisecond))),
 		)
 		defer cancel()
@@ -1098,13 +1098,13 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 		testutil.NewRouter(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
-					// nolint:nolintlint
+					//nolint:nolintlint
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
-					// nolint:nolintlint
+					//nolint:nolintlint
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						return nil, xerrors.Operation(
 							xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),

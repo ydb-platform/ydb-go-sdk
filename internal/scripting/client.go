@@ -25,8 +25,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// nolint: gofumpt
-// nolint: nolintlint
+//nolint: gofumpt
+//nolint: nolintlint
 var (
 	errNilClient = xerrors.Wrap(errors.New("scripting client is not initialized"))
 )

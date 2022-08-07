@@ -14,7 +14,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 	}
 	l = l.WithName(`driver`)
 	if details&trace.DriverResolverEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`resolver`)
 		t.OnResolve = func(
 			info trace.DriverResolveStartInfo,
@@ -44,9 +44,9 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if details&trace.DriverNetEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`net`)
 		t.OnNetRead = func(info trace.DriverNetReadStartInfo) func(trace.DriverNetReadDoneInfo) {
 			address := info.Address
@@ -194,9 +194,9 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if details&trace.DriverConnEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`conn`)
 		t.OnConnTake = func(info trace.DriverConnTakeStartInfo) func(trace.DriverConnTakeDoneInfo) {
 			endpoint := info.Endpoint.String()
@@ -390,7 +390,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 		}
 	}
 	if details&trace.DriverRepeaterEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`repeater`)
 		t.OnRepeaterWakeUp = func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
 			name := info.Name
@@ -419,9 +419,9 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if details&trace.DriverBalancerEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`cluster`)
 		t.OnBalancerInit = func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
 			l.Tracef(`init start`)
@@ -500,7 +500,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 		}
 	}
 	if details&trace.DriverCredentialsEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`credentials`)
 		t.OnGetCredentials = func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
 			l.Tracef(`get start`)

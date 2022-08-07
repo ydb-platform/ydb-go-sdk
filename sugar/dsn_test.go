@@ -36,7 +36,7 @@ func TestDSN(t *testing.T) {
 			"lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135",
 			"/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 			true,
-			// nolint: lll
+			//nolint: lll
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135?database=%2Fru-central1%2Fb1g8skpblkos03malf3s%2Fetn03r9df42nb631unbv",
 		},
 	} {

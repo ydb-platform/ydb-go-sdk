@@ -322,7 +322,7 @@ func (s *scanner) setColumnIndexes(columns []string) {
 //   string
 //   [16]byte
 //
-// nolint:gocyclo
+//nolint:gocyclo
 func (s *scanner) any() interface{} {
 	x := s.stack.current()
 	if s.Err() != nil || x.isEmpty() {
@@ -718,7 +718,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
 	return true
 }
 
-// nolint: gocyclo
+//nolint: gocyclo
 func (s *scanner) scanRequired(value interface{}) {
 	switch v := value.(type) {
 	case *bool:
@@ -794,7 +794,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	}
 }
 
-// nolint:gocyclo
+//nolint:gocyclo
 func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) {
 	if defaultValueForOptional {
 		if s.isNull() {
