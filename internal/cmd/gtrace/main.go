@@ -68,9 +68,9 @@ func main() {
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
 		openFile := func(name string) (*os.File, func()) {
 			var f *os.File
-			//nolint: gofumpt
-			//nolint: nolintlint
-			//nolint: gosec
+			//nolint:gofumpt
+			//nolint:nolintlint
+			//nolint:gosec
 			f, err = os.OpenFile(
 				filepath.Join(workDir, filepath.Clean(name)),
 				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,

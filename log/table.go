@@ -123,7 +123,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						f = l.Debugf
 					}
 					m := retry.Check(info.Error)
-					//nolint: lll
+					//nolint:lll
 					f(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t,version:"%s"}`,
 						time.Since(start),
 						idempotent,
@@ -317,7 +317,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					return func(info trace.TableExecuteDataQueryDoneInfo) {
 						if info.Error == nil {
 							tx := info.Tx
-							//nolint: lll
+							//nolint:lll
 							l.Debugf(`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
 								time.Since(start),
 								session.ID(),
@@ -329,7 +329,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								info.Result.Err(),
 							)
 						} else {
-							//nolint: lll
+							//nolint:lll
 							l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v",version:"%s"}`,
 								time.Since(start),
 								session.ID(),
@@ -387,7 +387,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 									params,
 								)
 							} else {
-								//nolint: lll
+								//nolint:lll
 								l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v",version:"%s"}`,
 									time.Since(start),
 									session.ID(),

@@ -718,7 +718,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
 	return true
 }
 
-//nolint: gocyclo
+//nolint:gocyclo
 func (s *scanner) scanRequired(value interface{}) {
 	switch v := value.(type) {
 	case *bool:

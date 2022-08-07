@@ -215,7 +215,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				//nolint: govet
+				//nolint:govet
 				ctx, _ := context.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
@@ -236,7 +236,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				//nolint: govet
+				//nolint:govet
 				ctx, _ := context.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
@@ -257,7 +257,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				//nolint: govet
+				//nolint:govet
 				ctx, _ := context.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
@@ -279,7 +279,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				//nolint: govet
+				//nolint:govet
 				ctx, _ := context.WithTimeout(context.Background(), time.Second*1)
 				return ctx
 			}(),

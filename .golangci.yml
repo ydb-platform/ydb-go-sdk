@@ -195,6 +195,16 @@ issues:
   # excluded by default patterns execute `golangci-lint run --help`
   # exclude:
 
+  # List of regexps of issue texts to exclude.
+  #
+  # But independently of this option we use default exclude patterns,
+  # it can be disabled by `exclude-use-default: false`.
+  # To list all excluded by default patterns execute `golangci-lint run --help`
+  #
+  # Default: []
+  exclude:
+    - "has been deprecated since Go 1.16"
+
   # Independently from option `exclude` we use default exclude patterns,
   # it can be disabled by this option. To list all
   # excluded by default patterns execute `golangci-lint run --help`.
@@ -220,7 +230,6 @@ issues:
 
   # Show only new issues created in git patch with set file path.
   # new-from-patch: path/to/patch/file
-
   exclude-rules:
     - path: _test\.go
       linters:
