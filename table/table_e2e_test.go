@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -44,11 +45,9 @@ type stats struct {
 	xsync.Mutex
 
 	keepAliveMinSize int
-	inFlight         int
-	balance          int
+	inFlight         map[string]struct{}
+	balance          map[string]struct{}
 	limit            int
-
-	waited int
 }
 
 func (s *stats) print(t *testing.T) {
@@ -59,7 +58,6 @@ func (s *stats) print(t *testing.T) {
 	t.Log(" - in_flight:", s.keepAliveMinSize)
 	t.Log(" - balance  :", s.keepAliveMinSize)
 	t.Log(" - limit      :", s.limit)
-	t.Log(" - waited   :", s.waited)
 }
 
 func (s *stats) check(t *testing.T) {
@@ -71,20 +69,14 @@ func (s *stats) check(t *testing.T) {
 	if s.limit < 0 {
 		t.Fatalf("negative limit: %d", s.limit)
 	}
-	if s.inFlight < 0 {
-		t.Fatalf("negative in_flight: %d", s.inFlight)
+	if s.keepAliveMinSize > len(s.inFlight) {
+		t.Fatalf("keepAliveMinSize > len(in_flight) (%d > %d)", s.keepAliveMinSize, len(s.inFlight))
 	}
-	if s.balance < 0 {
-		t.Fatalf("negative balance: %d", s.balance)
+	if len(s.inFlight) > len(s.balance) {
+		t.Fatalf("len(in_flight) > len(balance) (%d > %d)", len(s.inFlight), len(s.balance))
 	}
-	if s.keepAliveMinSize > s.inFlight {
-		t.Fatalf("keepAliveMinSize > in_flight (%d > %d)", s.keepAliveMinSize, s.inFlight)
-	}
-	if s.inFlight > s.balance {
-		t.Fatalf("in_flight > balance (%d > %d)", s.inFlight, s.balance)
-	}
-	if s.balance > s.limit {
-		t.Fatalf("balance > limit (%d > %d)", s.balance, s.limit)
+	if len(s.balance) > s.limit {
+		t.Fatalf("len(balance) > limit (%d > %d)", len(s.balance), s.limit)
 	}
 }
 
@@ -100,44 +92,95 @@ func (s *stats) max() int {
 	return s.limit
 }
 
-func (s *stats) addBalance(t *testing.T, delta int) {
+func (s *stats) addToBalance(t *testing.T, id string) {
 	defer s.check(t)
 
 	s.Lock()
 	defer s.Unlock()
 
-	s.balance += delta
+	if _, ok := s.balance[id]; ok {
+		t.Fatalf("session '%s' add to balance twice", id)
+	}
+
+	s.balance[id] = struct{}{}
+
+	t.Logf("session '%s' added to balance", id)
 }
 
-func (s *stats) addInFlight(t *testing.T, delta int) {
+func (s *stats) removeFromBalance(t *testing.T, id string) {
 	defer s.check(t)
 
 	s.Lock()
 	defer s.Unlock()
 
-	s.inFlight += delta
+	if _, ok := s.balance[id]; !ok {
+		t.Fatalf("session '%s' already removed from balance", id)
+	}
+
+	delete(s.balance, id)
+
+	t.Logf("session '%s' removed from balance", id)
+}
+
+func (s *stats) addToInFlight(t *testing.T, id string) {
+	defer s.check(t)
+
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.inFlight[id]; ok {
+		t.Fatalf("session '%s' add to in-flight twice", id)
+	}
+
+	s.inFlight[id] = struct{}{}
+
+	t.Logf("session '%s' added to in-flight", id)
+}
+
+func (s *stats) removeFromInFlight(t *testing.T, id string) {
+	defer s.check(t)
+
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.inFlight[id]; !ok {
+		t.Fatalf("session '%s' already removed from in-flight", id)
+	}
+
+	delete(s.inFlight, id)
+
+	t.Logf("session '%s' removed from in-flight", id)
 }
 
 // nolint:gocyclo
 func TestTable(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
+	testDuration := 42 * time.Second
+	if v, ok := os.LookupEnv("TEST_DURATION"); ok {
+		vv, err := time.ParseDuration(v)
+		if err != nil {
+			t.Errorf("wrong value of TEST_DURATION: '%s'", v)
+		} else {
+			testDuration = vv
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), testDuration)
 	defer cancel()
 
 	s := &stats{
 		keepAliveMinSize: math.MinInt32,
 		limit:            math.MaxInt32,
+		balance:          make(map[string]struct{}),
+		inFlight:         make(map[string]struct{}),
 	}
 	defer func() {
 		s.Lock()
 		defer s.Unlock()
-		if s.inFlight != 0 {
-			t.Fatalf("inFlight not a zero after closing pool: %d", s.inFlight)
+		if len(s.inFlight) != 0 {
+			t.Errorf("inFlight not a zero after closing pool: %v", s.inFlight)
 		}
-		if s.balance != 0 {
-			t.Fatalf("balance not a zero after closing pool: %d", s.balance)
-		}
-		if s.waited != 0 {
-			t.Fatalf("waited not a zero after closing pool: %d", s.waited)
+		if len(s.balance) != 0 {
+			t.Errorf("balance not a zero after closing pool: %v", s.balance)
 		}
 	}()
 
@@ -255,7 +298,7 @@ func TestTable(t *testing.T) {
 					) {
 						return func(info trace.TableSessionNewDoneInfo) {
 							if info.Error == nil {
-								s.addBalance(t, 1)
+								s.addToBalance(t, info.Session.ID())
 							}
 						}
 					},
@@ -264,7 +307,7 @@ func TestTable(t *testing.T) {
 					) func(
 						trace.TableSessionDeleteDoneInfo,
 					) {
-						s.addBalance(t, -1)
+						s.removeFromBalance(t, info.Session.ID())
 						return nil
 					},
 					OnInit: func(
@@ -286,7 +329,7 @@ func TestTable(t *testing.T) {
 					) {
 						return func(info trace.TablePoolGetDoneInfo) {
 							if info.Error == nil {
-								s.addInFlight(t, 1)
+								s.addToInFlight(t, info.Session.ID())
 							}
 						}
 					},
@@ -295,7 +338,7 @@ func TestTable(t *testing.T) {
 					) func(
 						trace.TablePoolPutDoneInfo,
 					) {
-						s.addInFlight(t, -1)
+						s.removeFromInFlight(t, info.Session.ID())
 						return nil
 					},
 					OnPoolSessionClose: func(
@@ -303,7 +346,7 @@ func TestTable(t *testing.T) {
 					) func(
 						trace.TablePoolSessionCloseDoneInfo,
 					) {
-						s.addInFlight(t, -1)
+						s.removeFromInFlight(t, info.Session.ID())
 						return nil
 					},
 				},
@@ -337,7 +380,7 @@ func TestTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = describeTableOptions(ctx, t, db.Table())
+	err = describeTableOptions(ctx, db.Table())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,21 +388,21 @@ func TestTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = describeTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
+	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "series"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = describeTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "seasons"))
+	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "seasons"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = describeTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "episodes"))
+	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "episodes"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// fill data
-	if err = fill(ctx, t, db, folder); err != nil {
+	if err = fill(ctx, db, folder); err != nil {
 		t.Fatalf("fillQuery failed: %v\n", err)
 	}
 
@@ -497,6 +540,10 @@ func TestTable(t *testing.T) {
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
+			_ = s.ExecuteSchemeQuery(
+				ctx,
+				`DROP TABLE stream_query`,
+			)
 			return s.ExecuteSchemeQuery(
 				ctx,
 				`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
@@ -506,14 +553,23 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("create table failed: %v\n", err)
 	}
-	t.Logf("> table stream_query created\n")
+	fmt.Printf("> table stream_query created\n")
 	var (
 		upsertRowsCount = 100000
 		sum             uint64
 	)
+	if v, ok := os.LookupEnv("UPSERT_ROWS_COUNT"); ok {
+		var vv int
+		vv, err = strconv.Atoi(v)
+		if err != nil {
+			t.Errorf("wrong value of UPSERT_ROWS_COUNT: '%s'", v)
+		} else {
+			upsertRowsCount = vv
+		}
+	}
 
 	// - upsert data
-	t.Logf("> preparing values to upsert...\n")
+	fmt.Printf("> preparing values to upsert...\n")
 	values := make([]types.Value, 0, upsertRowsCount)
 	for i := 0; i < upsertRowsCount; i++ {
 		sum += uint64(i)
@@ -524,9 +580,9 @@ func TestTable(t *testing.T) {
 			),
 		)
 	}
-	t.Logf("> values to upsert prepared\n")
+	fmt.Printf("> values to upsert prepared\n")
 
-	t.Logf("> upserting prepared values...\n")
+	fmt.Printf("> upserting prepared values...\n")
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -559,10 +615,10 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("upsert failed: %v\n", err)
 	}
-	t.Logf("> prepared values upserted\n")
+	fmt.Printf("> prepared values upserted\n")
 
 	// - scan select
-	t.Logf("> scan-selecting values...\n")
+	fmt.Printf("> scan-selecting values...\n")
 	if err = db.Table().Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -590,7 +646,7 @@ func TestTable(t *testing.T) {
 					checkSum += uint64(*val)
 				}
 				if stats := res.Stats(); stats != nil {
-					t.Logf(" --- query stats: compilation: %v, process CPU time: %v, affected shards: %v\n",
+					fmt.Printf(" --- query stats: compilation: %v, process CPU time: %v, affected shards: %v\n",
 						stats.Compilation(),
 						stats.ProcessCPUTime(),
 						func() (count uint64) {
@@ -623,11 +679,11 @@ func TestTable(t *testing.T) {
 	); err != nil {
 		t.Fatalf("scan select failed: %v\n", err)
 	}
-	t.Logf("> values selected\n")
+	fmt.Printf("> values selected\n")
 	// shutdown existing sessions
 	urls := os.Getenv("YDB_SHUTDOWN_URLS")
 	if len(urls) > 0 {
-		t.Logf("> shutdowning existing sessions...\n")
+		fmt.Printf("> shutdowning existing sessions...\n")
 		for _, url := range strings.Split(urls, ",") {
 			// nolint:gosec
 			_, err = http.Get(url)
@@ -636,11 +692,11 @@ func TestTable(t *testing.T) {
 			}
 		}
 		atomic.StoreUint32(&shutdowned, 1)
-		t.Logf("> existing sessions shutdowned\n")
+		fmt.Printf("> existing sessions shutdowned\n")
 	}
 
 	// select concurrently
-	t.Logf("> concurrent quering...\n")
+	fmt.Printf("> concurrent quering...\n")
 	wg := sync.WaitGroup{}
 
 	for i := 0; i < limit; i++ {
@@ -683,7 +739,7 @@ func TestTable(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	t.Logf("> concurrent quering done\n")
+	fmt.Printf("> concurrent quering done\n")
 }
 
 func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbsPath string) {
@@ -708,14 +764,14 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 			defer func() {
 				_ = res.Close()
 			}()
-			t.Logf("> read_table:\n")
+			fmt.Printf("> read_table:\n")
 			for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 				for res.NextRow() {
 					err = res.Scan(&id, &title, &date)
 					if err != nil {
 						return err
 					}
-					t.Logf("  > %d %s %s\n", *id, *title, date.String())
+					fmt.Printf("  > %d %s %s\n", *id, *title, date.String())
 				}
 			}
 			if err = res.Err(); err != nil {
@@ -728,7 +784,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 					if !ok {
 						break
 					}
-					t.Logf(
+					fmt.Printf(
 						"# phase #%d: took %s\n",
 						i, phase.Duration(),
 					)
@@ -737,7 +793,7 @@ func streamReadTable(ctx context.Context, t *testing.T, c table.Client, tableAbs
 						if !ok {
 							break
 						}
-						t.Logf(
+						fmt.Printf(
 							"#  accessed %s: read=(%drows, %dbytes)\n",
 							tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
 						)
@@ -801,7 +857,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			defer func() {
 				_ = res.Close()
 			}()
-			t.Logf("> select_simple_transaction:\n")
+			fmt.Printf("> select_simple_transaction:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanNamed(
@@ -812,7 +868,7 @@ func executeDataQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 					if err != nil {
 						return err
 					}
-					t.Logf(
+					fmt.Printf(
 						"  > %d %s %s\n",
 						*id, *title, *date,
 					)
@@ -868,14 +924,14 @@ func executeScanQuery(ctx context.Context, t *testing.T, c table.Client, folderA
 			defer func() {
 				_ = res.Close()
 			}()
-			t.Logf("> scan_query_select:\n")
+			fmt.Printf("> scan_query_select:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
 					if err != nil {
 						return err
 					}
-					t.Logf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
+					fmt.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
 				}
 			}
 			return res.Err()
@@ -1118,7 +1174,7 @@ var (
 	`))
 )
 
-func describeTableOptions(ctx context.Context, t *testing.T, c table.Client) error {
+func describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
 	err := c.Do(
 		ctx,
@@ -1134,34 +1190,34 @@ func describeTableOptions(ctx context.Context, t *testing.T, c table.Client) err
 	fmt.Println("> describe_options:")
 
 	for i, p := range desc.TableProfilePresets {
-		t.Logf("  > TableProfilePresets: %d/%d: %+v\n", i+1, len(desc.TableProfilePresets), p)
+		fmt.Printf("  > TableProfilePresets: %d/%d: %+v\n", i+1, len(desc.TableProfilePresets), p)
 	}
 	for i, p := range desc.StoragePolicyPresets {
-		t.Logf("  > StoragePolicyPresets: %d/%d: %+v\n", i+1, len(desc.StoragePolicyPresets), p)
+		fmt.Printf("  > StoragePolicyPresets: %d/%d: %+v\n", i+1, len(desc.StoragePolicyPresets), p)
 	}
 	for i, p := range desc.CompactionPolicyPresets {
-		t.Logf("  > CompactionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CompactionPolicyPresets), p)
+		fmt.Printf("  > CompactionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CompactionPolicyPresets), p)
 	}
 	for i, p := range desc.PartitioningPolicyPresets {
-		t.Logf("  > PartitioningPolicyPresets: %d/%d: %+v\n", i+1, len(desc.PartitioningPolicyPresets), p)
+		fmt.Printf("  > PartitioningPolicyPresets: %d/%d: %+v\n", i+1, len(desc.PartitioningPolicyPresets), p)
 	}
 	for i, p := range desc.ExecutionPolicyPresets {
-		t.Logf("  > ExecutionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ExecutionPolicyPresets), p)
+		fmt.Printf("  > ExecutionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ExecutionPolicyPresets), p)
 	}
 	for i, p := range desc.ReplicationPolicyPresets {
-		t.Logf("  > ReplicationPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ReplicationPolicyPresets), p)
+		fmt.Printf("  > ReplicationPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ReplicationPolicyPresets), p)
 	}
 	for i, p := range desc.CachingPolicyPresets {
-		t.Logf("  > CachingPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CachingPolicyPresets), p)
+		fmt.Printf("  > CachingPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CachingPolicyPresets), p)
 	}
 
 	return nil
 }
 
-func fill(ctx context.Context, t *testing.T, db ydb.Connection, folder string) error {
-	t.Logf("> filling tables\n")
+func fill(ctx context.Context, db ydb.Connection, folder string) error {
+	fmt.Printf("> filling tables\n")
 	defer func() {
-		t.Logf("> filling tables done\n")
+		fmt.Printf("> filling tables done\n")
 	}()
 	// prepare write transaction.
 	writeTx := table.TxControl(
@@ -1251,7 +1307,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 	return err
 }
 
-func describeTable(ctx context.Context, t *testing.T, c table.Client, path string) (err error) {
+func describeTable(ctx context.Context, c table.Client, path string) (err error) {
 	err = c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -1259,12 +1315,12 @@ func describeTable(ctx context.Context, t *testing.T, c table.Client, path strin
 			if err != nil {
 				return
 			}
-			t.Logf("> describe table: %s\n", path)
+			fmt.Printf("> describe table: %s\n", path)
 			for _, c := range desc.Columns {
-				t.Logf("  > column, name: %s, %s\n", c.Type, c.Name)
+				fmt.Printf("  > column, name: %s, %s\n", c.Type, c.Name)
 			}
 			for i, keyRange := range desc.KeyRanges {
-				t.Logf("  > key range %d: %s\n", i, keyRange.String())
+				fmt.Printf("  > key range %d: %s\n", i, keyRange.String())
 			}
 			return
 		},
@@ -1392,12 +1448,12 @@ func TestLongStream(t *testing.T) {
 					t.Fatalf("upsert failed: %v\n", err)
 				} else {
 					upserted += uint32(to - from)
-					t.Logf("upserted %d rows, total upserted rows: %d", uint32(to-from), upserted)
+					fmt.Printf("upserted %d rows, total upserted rows: %d", uint32(to-from), upserted)
 				}
 			})
 		}
 		t.Run("check upserted rows", func(t *testing.T) {
-			t.Logf("total upserted rows: %d, expected: %d", upserted, upsertRowsCount)
+			fmt.Printf("total upserted rows: %d, expected: %d", upserted, upsertRowsCount)
 			if upserted != uint32(upsertRowsCount) {
 				t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
 			}
@@ -1437,7 +1493,7 @@ func TestLongStream(t *testing.T) {
 						count++
 					}
 					rowsCount += count
-					t.Logf("received set with %d rows. total received: %d", count, rowsCount)
+					fmt.Printf("received set with %d rows. total received: %d", count, rowsCount)
 					time.Sleep(discoveryInterval)
 				}
 				if err = res.Err(); err != nil {
@@ -1478,7 +1534,7 @@ func TestLongStream(t *testing.T) {
 						count++
 					}
 					rowsCount += count
-					t.Logf("received set with %d rows. total received: %d", count, rowsCount)
+					fmt.Printf("received set with %d rows. total received: %d", count, rowsCount)
 					time.Sleep(discoveryInterval)
 				}
 				if err = res.Err(); err != nil {
