@@ -631,8 +631,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg.BaseContext = ctx
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
 
-	reader, err := newTopicStreamReaderStopped(stream, cfg)
-	require.NoError(t, err)
+	reader := newTopicStreamReaderStopped(stream, cfg)
 	// reader.initSession() - skip stream level initialization
 
 	const testPartitionID = 5
