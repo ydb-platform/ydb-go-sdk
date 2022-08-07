@@ -144,7 +144,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		}
 		integral--
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if len(s) > 0 { // Characters remaining.
 		c := s[0]
 		if !isDigit(c) {

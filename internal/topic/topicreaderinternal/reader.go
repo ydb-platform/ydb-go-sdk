@@ -54,7 +54,7 @@ func newReadMessageBatchOptions() ReadMessageBatchOptions {
 
 // PublicReadBatchOption для различных пожеланий к батчу вроде WithMaxMessages(int)
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicReadBatchOption interface {
@@ -63,7 +63,7 @@ type PublicReadBatchOption interface {
 
 // Apply
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (count readExplicitMessagesCount) Apply(options ReadMessageBatchOptions) ReadMessageBatchOptions {
@@ -187,7 +187,7 @@ type ReaderConfig struct {
 
 // PublicReaderOption
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicReaderOption func(cfg *ReaderConfig)
@@ -216,7 +216,7 @@ func convertNewParamsToStreamConfig(
 
 // PublicReadSelector
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicReadSelector struct {
@@ -228,7 +228,7 @@ type PublicReadSelector struct {
 
 // Clone create deep clone of the selector
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (s PublicReadSelector) Clone() PublicReadSelector {

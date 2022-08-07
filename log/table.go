@@ -10,7 +10,8 @@ import (
 )
 
 // Table makes trace.Table with logging events from details
-// nolint:gocyclo
+//
+//nolint:gocyclo
 func Table(l Logger, details trace.Details) (t trace.Table) {
 	if details&trace.TableEvents == 0 {
 		return
@@ -123,7 +124,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						f = l.Debugf
 					}
 					m := retry.Check(info.Error)
-					// nolint: lll
+					//nolint:lll
 					f(`doTx failed {latency:"%v",idempotent:%t,attempts:%d,error:"%s",retryable:%t,code:%d,deleteSession:%t,version:"%s"}`,
 						time.Since(start),
 						idempotent,
@@ -178,9 +179,9 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 			}
 		}
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if details&trace.TableSessionEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`session`)
 		if details&trace.TableSessionLifeCycleEvents != 0 {
 			t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
@@ -260,10 +261,10 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 			}
 		}
 		if details&trace.TableSessionQueryEvents != 0 {
-			// nolint:govet
+			//nolint:govet
 			l := l.WithName(`query`)
 			if details&trace.TableSessionQueryInvokeEvents != 0 {
-				// nolint:govet
+				//nolint:govet
 				l := l.WithName(`invoke`)
 				t.OnSessionQueryPrepare = func(
 					info trace.TablePrepareDataQueryStartInfo,
@@ -317,7 +318,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					return func(info trace.TableExecuteDataQueryDoneInfo) {
 						if info.Error == nil {
 							tx := info.Tx
-							// nolint: lll
+							//nolint:lll
 							l.Debugf(`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
 								time.Since(start),
 								session.ID(),
@@ -329,7 +330,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 								info.Result.Err(),
 							)
 						} else {
-							// nolint: lll
+							//nolint:lll
 							l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v",version:"%s"}`,
 								time.Since(start),
 								session.ID(),
@@ -345,7 +346,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 				}
 			}
 			if details&trace.TableSessionQueryStreamEvents != 0 {
-				// nolint:govet
+				//nolint:govet
 				l := l.WithName(`stream`)
 				t.OnSessionQueryStreamExecute = func(
 					info trace.TableSessionQueryStreamExecuteStartInfo,
@@ -387,7 +388,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 									params,
 								)
 							} else {
-								// nolint: lll
+								//nolint:lll
 								l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v",version:"%s"}`,
 									time.Since(start),
 									session.ID(),
@@ -449,7 +450,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 			}
 		}
 		if details&trace.TableSessionTransactionEvents != 0 {
-			// nolint:govet
+			//nolint:govet
 			l := l.WithName(`transaction`)
 			t.OnSessionTransactionBegin = func(
 				info trace.TableSessionTransactionBeginStartInfo,
@@ -549,9 +550,9 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 			}
 		}
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if details&trace.TablePoolEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`pool`)
 		if details&trace.TablePoolLifeCycleEvents != 0 {
 			t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
@@ -590,7 +591,7 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 			}
 		}
 		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
-			// nolint:govet
+			//nolint:govet
 			l := l.WithName(`session`)
 			t.OnPoolSessionNew = func(info trace.TablePoolSessionNewStartInfo) func(trace.TablePoolSessionNewDoneInfo) {
 				l.Tracef(`create start`)

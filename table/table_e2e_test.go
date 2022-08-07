@@ -152,7 +152,7 @@ func (s *stats) removeFromInFlight(t *testing.T, id string) {
 	t.Logf("session '%s' removed from in-flight", id)
 }
 
-// nolint:gocyclo
+//nolint:gocyclo
 func TestTable(t *testing.T) {
 	testDuration := 42 * time.Second
 	if v, ok := os.LookupEnv("TEST_DURATION"); ok {
@@ -685,7 +685,7 @@ func TestTable(t *testing.T) {
 	if len(urls) > 0 {
 		fmt.Printf("> shutdowning existing sessions...\n")
 		for _, url := range strings.Split(urls, ",") {
-			// nolint:gosec
+			//nolint:gosec
 			_, err = http.Get(url)
 			if err != nil {
 				t.Fatalf("failed to send request: %v", err)

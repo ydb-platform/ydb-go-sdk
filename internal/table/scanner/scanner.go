@@ -307,22 +307,22 @@ func (s *scanner) setColumnIndexes(columns []string) {
 // Any returns any primitive or optional value.
 // Currently, it may return one of these types:
 //
-//   bool
-//   int8
-//   uint8
-//   int16
-//   uint16
-//   int32
-//   uint32
-//   int64
-//   uint64
-//   float32
-//   float64
-//   []byte
-//   string
-//   [16]byte
+//	bool
+//	int8
+//	uint8
+//	int16
+//	uint16
+//	int32
+//	uint32
+//	int64
+//	uint64
+//	float32
+//	float64
+//	[]byte
+//	string
+//	[16]byte
 //
-// nolint:gocyclo
+//nolint:gocyclo
 func (s *scanner) any() interface{} {
 	x := s.stack.current()
 	if s.Err() != nil || x.isEmpty() {
@@ -718,7 +718,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
 	return true
 }
 
-// nolint: gocyclo
+//nolint:gocyclo
 func (s *scanner) scanRequired(value interface{}) {
 	switch v := value.(type) {
 	case *bool:
@@ -794,7 +794,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	}
 }
 
-// nolint:gocyclo
+//nolint:gocyclo
 func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) {
 	if defaultValueForOptional {
 		if s.isNull() {

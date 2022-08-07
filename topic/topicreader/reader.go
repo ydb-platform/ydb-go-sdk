@@ -20,7 +20,7 @@ import (
 // | Commit           |      +      |         +        |   -    | -     |
 // | Close            |      -      |         -        |   -    | -     |
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type Reader struct {
@@ -31,7 +31,7 @@ type Reader struct {
 
 // NewReader
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func NewReader(internalReader topicreaderinternal.Reader) *Reader {
@@ -41,7 +41,7 @@ func NewReader(internalReader topicreaderinternal.Reader) *Reader {
 // ReadMessage read exactly one message
 // exactly one of message, error is nil
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
@@ -55,14 +55,14 @@ func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
 
 // Message
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type Message = topicreaderinternal.PublicMessage
 
 // MessageContentUnmarshaler
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type MessageContentUnmarshaler = topicreaderinternal.PublicMessageContentUnmarshaler
@@ -71,7 +71,7 @@ type MessageContentUnmarshaler = topicreaderinternal.PublicMessageContentUnmarsh
 // It can be fast (by default) or sync and waite response from server
 // see topicoptions.CommitMode for details
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
@@ -85,7 +85,7 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 
 // CommitRangeGetter
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type CommitRangeGetter = topicreaderinternal.PublicCommitRangeGetter
@@ -95,7 +95,7 @@ type CommitRangeGetter = topicreaderinternal.PublicCommitRangeGetter
 // exactly one of Batch, err is nil
 // if Batch is not nil - reader guarantee about all Batch.Messages are not nil
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) (*Batch, error) {
@@ -109,14 +109,14 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) 
 
 // Batch is group of ordered messages from one partition
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type Batch = topicreaderinternal.PublicBatch
 
 // ReadBatchOption
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type ReadBatchOption = topicreaderinternal.PublicReadBatchOption
@@ -125,7 +125,7 @@ type ReadBatchOption = topicreaderinternal.PublicReadBatchOption
 // return when reader complete internal works, flush commit buffer, ets
 // or when ctx cancelled
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (r *Reader) Close(ctx context.Context) error {

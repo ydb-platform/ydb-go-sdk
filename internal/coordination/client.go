@@ -17,8 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
-// nolint: gofumpt
-// nolint: nolintlint
+//nolint:gofumpt
+//nolint:nolintlint
 var (
 	errNilClient = xerrors.Wrap(errors.New("coordination client is not initialized"))
 )

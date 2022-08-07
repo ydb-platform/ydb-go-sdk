@@ -12,21 +12,21 @@ import (
 
 // ReadSelector
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type ReadSelector = topicreaderinternal.PublicReadSelector
 
 // ReadSelectors
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type ReadSelectors []ReadSelector
 
 // ReadTopic create simple selector for read topics
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func ReadTopic(path string) ReadSelectors {
@@ -35,14 +35,14 @@ func ReadTopic(path string) ReadSelectors {
 
 // ReaderOption
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type ReaderOption = topicreaderinternal.PublicReaderOption
 
 // WithReaderOperationTimeout
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithReaderOperationTimeout(timeout time.Duration) ReaderOption {
@@ -53,7 +53,7 @@ func WithReaderOperationTimeout(timeout time.Duration) ReaderOption {
 
 // WithReaderOperationCancelAfter
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithReaderOperationCancelAfter(cancelAfter time.Duration) ReaderOption {
@@ -64,7 +64,7 @@ func WithReaderOperationCancelAfter(cancelAfter time.Duration) ReaderOption {
 
 // WithCommonConfig
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithCommonConfig(common config.Common) ReaderOption {
@@ -78,7 +78,7 @@ func WithCommonConfig(common config.Common) ReaderOption {
 // 0 mean no additional lag and send commit soon as possible
 // Default value: 1 second
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithCommitTimeLagTrigger(lag time.Duration) ReaderOption {
@@ -91,7 +91,7 @@ func WithCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 // if count > 0 and sdk count of buffered commits >= count - send commit request to server
 // 0 mean no count limit and use timer lag trigger only
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithCommitCountTrigger(count int) ReaderOption {
@@ -104,7 +104,7 @@ func WithCommitCountTrigger(count int) ReaderOption {
 // prefer min count messages in batch
 // sometimes batch can contain fewer messages, for example if local buffer is full and SDK can't receive more messages
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithBatchReadMinCount(count int) ReaderOption {
@@ -115,7 +115,7 @@ func WithBatchReadMinCount(count int) ReaderOption {
 
 // WithBatchReadMaxCount
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithBatchReadMaxCount(count int) ReaderOption {
@@ -126,7 +126,7 @@ func WithBatchReadMaxCount(count int) ReaderOption {
 
 // WithMessagesBufferSize
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithMessagesBufferSize(size int) ReaderOption {
@@ -137,14 +137,14 @@ func WithMessagesBufferSize(size int) ReaderOption {
 
 // CreateDecoderFunc
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type CreateDecoderFunc = topicreaderinternal.PublicCreateDecoderFunc
 
 // WithAddDecoder
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) ReaderOption {
@@ -155,7 +155,7 @@ func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) Rea
 
 // CommitMode
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type CommitMode = topicreaderinternal.PublicCommitMode
@@ -183,7 +183,7 @@ const (
 
 // WithCommitMode
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithCommitMode(mode CommitMode) ReaderOption {
@@ -215,7 +215,7 @@ type (
 
 // WithGetPartitionStartOffset
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
@@ -226,7 +226,7 @@ func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 
 // WithReaderTrace
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithReaderTrace(tracer trace.Topic) ReaderOption {

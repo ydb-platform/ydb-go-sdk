@@ -19,7 +19,7 @@ import (
 	"unicode/utf8"
 )
 
-// nolint:maligned
+//nolint:maligned
 type Writer struct {
 	Output  io.Writer
 	Context build.Context
@@ -416,7 +416,7 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 	})
 }
 
-// nolint
+//nolint
 var contextType = (func() types.Type {
 	pkg := types.NewPackage("context", "context")
 	typ := types.NewInterfaceType(nil, nil)
@@ -782,7 +782,7 @@ func (f flags) has(x flags) bool {
 }
 
 const (
-	// nolint
+	//nolint
 	zeroFlags flags = 1 << iota >> 1
 	docs
 )

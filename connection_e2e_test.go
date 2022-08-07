@@ -33,7 +33,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// nolint:gocyclo
+//nolint:gocyclo
 func TestConnection(t *testing.T) {
 	var (
 		userAgent     = "connection user agent"
@@ -167,7 +167,7 @@ func TestConnection(t *testing.T) {
 					len(result.GetResultSets()[0].GetColumns()),
 				)
 			}
-			// nolint:goconst
+			//nolint:goconst
 			if result.GetResultSets()[0].GetColumns()[0].GetName() != "sum" {
 				return fmt.Errorf(
 					"unexpected colum name: %s",

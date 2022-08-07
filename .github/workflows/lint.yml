@@ -21,7 +21,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.46.2
+          version: v1.48.0
   autoformatter:
     name: autoformat check
     runs-on: ubuntu-latest

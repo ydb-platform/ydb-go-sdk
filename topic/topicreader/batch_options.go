@@ -4,14 +4,14 @@ import "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal
 
 // WithBatchMaxCount
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type WithBatchMaxCount int
 
 // Apply
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (count WithBatchMaxCount) Apply(
@@ -27,14 +27,14 @@ func (count WithBatchMaxCount) Apply(
 // count must be 1 or greater
 // it will panic if count < 1
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type WithBatchPreferMinCount int
 
 // Apply
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (count WithBatchPreferMinCount) Apply(

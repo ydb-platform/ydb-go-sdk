@@ -12,17 +12,17 @@ func TestStackTraceError(t *testing.T) {
 	}{
 		{
 			error: WithStackTrace(fmt.Errorf("TestError")),
-			// nolint:lll
+			//nolint:lll
 			text: "TestError at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:14)`",
 		},
 		{
 			error: WithStackTrace(fmt.Errorf("TestError%s", "Printf")),
-			// nolint:lll
+			//nolint:lll
 			text: "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:19)`",
 		},
 		{
 			error: WithStackTrace(fmt.Errorf("TestError%s", "Printf")),
-			// nolint:lll
+			//nolint:lll
 			text: "TestErrorPrintf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:24)`",
 		},
 	} {

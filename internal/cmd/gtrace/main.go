@@ -22,10 +22,10 @@ import (
 )
 
 //go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile
-// nolint:revive
+//nolint:revive
 func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
 
-// nolint:gocyclo
+//nolint:gocyclo
 func main() {
 	var (
 		// Reports whether we were called from go:generate.
@@ -68,9 +68,9 @@ func main() {
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
 		openFile := func(name string) (*os.File, func()) {
 			var f *os.File
-			// nolint: gofumpt
-			// nolint: nolintlint
-			// nolint: gosec
+			//nolint:gofumpt
+			//nolint:nolintlint
+			//nolint:gosec
 			f, err = os.OpenFile(
 				filepath.Join(workDir, filepath.Clean(name)),
 				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
@@ -109,7 +109,7 @@ func main() {
 		var file *os.File
 		file, err = os.Open(filepath.Join(workDir, name))
 		if err != nil {
-			// nolint:gocritic
+			//nolint:gocritic
 			log.Fatal(err)
 		}
 		defer file.Close()

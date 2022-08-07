@@ -459,7 +459,7 @@ func TestCreateTableRegression(t *testing.T) {
 							},
 						}
 						if !proto.Equal(exp, act.(proto.Message)) {
-							// nolint:revive
+							//nolint:revive
 							return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
 						}
 						return &Ydb_Table.CreateTableResponse{}, nil

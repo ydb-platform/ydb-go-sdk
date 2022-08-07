@@ -17,8 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// nolint:gofumpt
-// nolint:nolintlint
+//nolint:gofumpt
+//nolint:nolintlint
 var (
 	// errAlreadyCommited returns if transaction Commit called twice
 	errAlreadyCommited = xerrors.Wrap(fmt.Errorf("already committed"))

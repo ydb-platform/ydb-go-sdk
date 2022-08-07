@@ -8,7 +8,7 @@ import (
 
 // PublicGetPartitionStartOffsetResponse
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicGetPartitionStartOffsetResponse struct {
@@ -23,7 +23,7 @@ func (r *PublicGetPartitionStartOffsetResponse) StartFrom(offset int64) {
 
 // PublicGetPartitionStartOffsetRequest
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicGetPartitionStartOffsetRequest struct {
@@ -33,7 +33,7 @@ type PublicGetPartitionStartOffsetRequest struct {
 
 // PublicGetPartitionStartOffsetFunc
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicGetPartitionStartOffsetFunc func(

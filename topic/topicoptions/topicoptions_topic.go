@@ -10,14 +10,14 @@ import (
 
 // TopicOption
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type TopicOption func(c *topic.Config)
 
 // WithTrace defines trace over persqueue client calls
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption {
@@ -32,7 +32,7 @@ func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption 
 // the client.
 // If OperationTimeout is zero then no timeout is used.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithOperationTimeout(operationTimeout time.Duration) TopicOption {
@@ -47,7 +47,7 @@ func WithOperationTimeout(operationTimeout time.Duration) TopicOption {
 // processing will be continued.
 // If OperationCancelAfter is zero then no timeout is used.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithOperationCancelAfter(operationCancelAfter time.Duration) TopicOption {

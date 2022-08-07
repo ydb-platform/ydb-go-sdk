@@ -435,7 +435,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				},
 				table.Options{},
 			)
-			// nolint:nestif
+			//nolint:nestif
 			if test.retriable {
 				if i != limit {
 					t.Fatalf("unexpected i: %d, err: %v", i, err)

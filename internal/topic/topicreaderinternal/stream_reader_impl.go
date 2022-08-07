@@ -114,10 +114,7 @@ func newTopicStreamReader(
 		}
 	}()
 
-	reader, err := newTopicStreamReaderStopped(stream, cfg)
-	if err != nil {
-		return nil, err
-	}
+	reader := newTopicStreamReaderStopped(stream, cfg)
 	if err = reader.initSession(); err != nil {
 		return nil, err
 	}
@@ -131,7 +128,7 @@ func newTopicStreamReader(
 func newTopicStreamReaderStopped(
 	stream RawTopicReaderStream,
 	cfg topicStreamReaderConfig,
-) (*topicStreamReaderImpl, error) {
+) *topicStreamReaderImpl {
 	labeledContext := pprof.WithLabels(cfg.BaseContext, pprof.Labels("base-context", "topic-stream-reader"))
 	stopPump, cancel := xcontext.WithErrCancel(labeledContext)
 
@@ -157,7 +154,7 @@ func newTopicStreamReaderStopped(
 	res.committer.BufferCountTrigger = cfg.CommitterBatchCounterTrigger
 	res.sessionController.init()
 	res.freeBytes <- cfg.BufferSizeProtoBytes
-	return res, nil
+	return res
 }
 
 func (r *topicStreamReaderImpl) ReadMessageBatch(

@@ -16,14 +16,14 @@ var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read earl
 
 // PublicErrUnexpectedCodec return when try to read message content with unknown codec
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-var PublicErrUnexpectedCodec = errors.New("unexpected codec") // nolint
+var PublicErrUnexpectedCodec = errors.New("unexpected codec") //nolint:revive,stylecheck
 
 // PublicMessage is representation of topic message
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicMessage struct {
@@ -82,7 +82,7 @@ func (m *PublicMessage) Read(p []byte) (n int, err error) {
 
 // PublicMessageContentUnmarshaler is interface for unmarshal message content
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicMessageContentUnmarshaler interface {

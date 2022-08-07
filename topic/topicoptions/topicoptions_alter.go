@@ -10,14 +10,14 @@ import (
 
 // AlterOption
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type AlterOption func(req *rawtopic.AlterTopicRequest)
 
 // AlterWithMinActivePartitions
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithMinActivePartitions(minActivePartitions int64) AlterOption {
@@ -29,7 +29,7 @@ func AlterWithMinActivePartitions(minActivePartitions int64) AlterOption {
 
 // AlterWithPartitionCountLimit
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithPartitionCountLimit(partitionCountLimit int64) AlterOption {
@@ -41,7 +41,7 @@ func AlterWithPartitionCountLimit(partitionCountLimit int64) AlterOption {
 
 // AlterWithRetentionPeriod
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithRetentionPeriod(retentionPeriod time.Duration) AlterOption {
@@ -53,7 +53,7 @@ func AlterWithRetentionPeriod(retentionPeriod time.Duration) AlterOption {
 
 // AlterWithRetentionStorageMB
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
@@ -65,7 +65,7 @@ func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
 
 // AlterWithSupportedCodecs
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
@@ -79,7 +79,7 @@ func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
 
 // AlterWithPartitionWriteSpeedBytesPerSecond
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithPartitionWriteSpeedBytesPerSecond(bytesPerSecond int64) AlterOption {
@@ -91,7 +91,7 @@ func AlterWithPartitionWriteSpeedBytesPerSecond(bytesPerSecond int64) AlterOptio
 
 // AlterWithPartitionWriteBurstBytes
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithPartitionWriteBurstBytes(burstBytes int64) AlterOption {
@@ -103,7 +103,7 @@ func AlterWithPartitionWriteBurstBytes(burstBytes int64) AlterOption {
 
 // AlterWithAttributes
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithAttributes(attributes map[string]string) AlterOption {
@@ -114,7 +114,7 @@ func AlterWithAttributes(attributes map[string]string) AlterOption {
 
 // AlterWithAddConsumers
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
@@ -128,7 +128,7 @@ func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
 
 // AlterWithDropConsumers
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithDropConsumers(consumersName ...string) AlterOption {
@@ -139,7 +139,7 @@ func AlterWithDropConsumers(consumersName ...string) AlterOption {
 
 // AlterConsumerWithImportant
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithImportant(name string, important bool) AlterOption {
@@ -153,7 +153,7 @@ func AlterConsumerWithImportant(name string, important bool) AlterOption {
 
 // AlterConsumerWithReadFrom
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithReadFrom(name string, readFrom time.Time) AlterOption {
@@ -167,7 +167,7 @@ func AlterConsumerWithReadFrom(name string, readFrom time.Time) AlterOption {
 
 // AlterConsumerWithSupportedCodecs
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) AlterOption {
@@ -185,7 +185,7 @@ func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) Al
 
 // AlterConsumerWithAttributes
 //
-// Experimental
+// # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithAttributes(name string, attributes map[string]string) AlterOption {
