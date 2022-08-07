@@ -1448,12 +1448,12 @@ func TestLongStream(t *testing.T) {
 					t.Fatalf("upsert failed: %v\n", err)
 				} else {
 					upserted += uint32(to - from)
-					fmt.Printf("upserted %d rows, total upserted rows: %d", uint32(to-from), upserted)
+					fmt.Printf("upserted %d rows, total upserted rows: %d\n", uint32(to-from), upserted)
 				}
 			})
 		}
 		t.Run("check upserted rows", func(t *testing.T) {
-			fmt.Printf("total upserted rows: %d, expected: %d", upserted, upsertRowsCount)
+			fmt.Printf("total upserted rows: %d, expected: %d\n", upserted, upsertRowsCount)
 			if upserted != uint32(upsertRowsCount) {
 				t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
 			}
@@ -1493,7 +1493,7 @@ func TestLongStream(t *testing.T) {
 						count++
 					}
 					rowsCount += count
-					fmt.Printf("received set with %d rows. total received: %d", count, rowsCount)
+					fmt.Printf("received set with %d rows. total received: %d\n", count, rowsCount)
 					time.Sleep(discoveryInterval)
 				}
 				if err = res.Err(); err != nil {
@@ -1534,7 +1534,7 @@ func TestLongStream(t *testing.T) {
 						count++
 					}
 					rowsCount += count
-					fmt.Printf("received set with %d rows. total received: %d", count, rowsCount)
+					fmt.Printf("received set with %d rows. total received: %d\n", count, rowsCount)
 					time.Sleep(discoveryInterval)
 				}
 				if err = res.Err(); err != nil {
