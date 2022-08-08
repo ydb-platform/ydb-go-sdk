@@ -23,6 +23,10 @@ const (
 	folder = "database_sql_test"
 )
 
+func TestExampleDatabaseSql(t *testing.T) {
+	Example_databaseSql()
+}
+
 func TestSql(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()

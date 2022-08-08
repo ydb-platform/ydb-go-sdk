@@ -2,9 +2,11 @@ package ydb_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -52,6 +54,29 @@ func Example_table() {
 	if err != nil {
 		log.Printf("unexpected error: %v", err)
 	}
+}
+
+func Example_databaseSql() {
+	ctx := context.TODO()
+	dsn := "grpcs://localhost:2135/local"
+	if v, ok := os.LookupEnv("YDB_CONNECTION_STRING"); ok {
+		dsn = v
+	}
+	db, err := sql.Open("ydb", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close() // cleanup resources
+	var (
+		query = `SELECT 42 as id, "my string" as myStr`
+		id    int32  // required value
+		myStr string // optional value
+	)
+	row := db.QueryRowContext(ctx, query)
+	if err = row.Scan(&id, &myStr); err != nil {
+		log.Fatalf("select failed: %v", err)
+	}
+	log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 }
 
 func Example_topic() {
