@@ -12,7 +12,7 @@
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/YDBPlatform)
 [![WebSite](https://img.shields.io/badge/website-ydb.tech-blue.svg)](https://ydb.tech)
 
-Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme`, `scripting` and `topic` clients for `YDB`.
+Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme`, `scripting` and `topic` clients for [YDB](ydb.tech).
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and ACID transactions.
 
 ## Installation
@@ -61,7 +61,7 @@ if queryErr != nil {
 ```
 * usage with `database/sql`
 ```golang
-db, err := sql.Open("ydb", "grpcs://localhost:2135/?database=/local")
+db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
 if err != nil {
     log.Fatal(err)
 }

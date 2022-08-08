@@ -56,7 +56,7 @@ func Example_table() {
 }
 
 func Example_databaseSql() {
-	db, err := sql.Open("ydb", "grpcs://localhost:2135/?database=/local")
+	db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func Example_databaseSql() {
 
 func Example_topic() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return

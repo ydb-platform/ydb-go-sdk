@@ -11,7 +11,7 @@ import (
 
 func Example_topic_read_message() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return

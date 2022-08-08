@@ -16,8 +16,16 @@ import (
 
 var d = &sqlDriver{connectors: make(map[*xsql.Connector]struct{})}
 
+func registerDriver(alias string) {
+	defer func() {
+		_ = recover()
+	}()
+	sql.Register(alias, d)
+}
+
 func init() {
-	sql.Register("ydb", d)
+	registerDriver("ydb")
+	registerDriver("ydb/v3")
 }
 
 // Driver is an adapter to allow the use table client as conn.Driver instance.

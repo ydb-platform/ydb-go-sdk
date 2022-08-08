@@ -1,4 +1,6 @@
 * Implemented `database/sql` driver over `ydb-go-sdk`
+* Marked as deprecated `trace.Table.OnPoolSessionNew` and `trace.Table.OnPoolSessionClose` events
+* Added `trace.Table.OnPoolSessionAdd` and `trace.Table.OnPoolSessionRemove` events
 * Refactored session lifecycle in session pool for fix flaked `TestTable`
 * Fixed deadlock in topicreader batcher, while add and read raw server messages
 * Fixed bug in `db.Topic()` with send response to stop partition message
