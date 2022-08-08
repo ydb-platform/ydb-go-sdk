@@ -4,15 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"io/ioutil"
+	"log"
 )
 
 func Example_table() {
@@ -57,22 +55,16 @@ func Example_table() {
 }
 
 func Example_databaseSql() {
-	ctx := context.TODO()
-	dsn := "grpcs://localhost:2135/local"
-	if v, ok := os.LookupEnv("YDB_CONNECTION_STRING"); ok {
-		dsn = v
-	}
-	db, err := sql.Open("ydb", dsn)
+	db, err := sql.Open("ydb", "grpcs://localhost:2135/?database=/local")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close() // cleanup resources
 	var (
-		query = `SELECT 42 as id, "my string" as myStr`
-		id    int32  // required value
-		myStr string // optional value
+		id    int32
+		myStr string
 	)
-	row := db.QueryRowContext(ctx, query)
+	row := db.QueryRowContext(context.TODO(), `SELECT 42 as id, "my string" as myStr`)
 	if err = row.Scan(&id, &myStr); err != nil {
 		log.Fatalf("select failed: %v", err)
 	}
