@@ -1390,20 +1390,17 @@ func TestLongStream(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	t.Run("make connection", func(t *testing.T) {
-		db, err = ydb.Open(
-			ctx,
-			os.Getenv("YDB_CONNECTION_STRING"),
-			ydb.WithAccessTokenCredentials(
-				os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
-			),
-			ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-
+	db, err = ydb.Open(
+		ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(
+			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
+		),
+		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func(db ydb.Connection) {
 		// cleanup
 		_ = db.Close(ctx)
