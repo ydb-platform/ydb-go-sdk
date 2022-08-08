@@ -59,6 +59,25 @@ if queryErr != nil {
     log.Fatal(queryErr)
 }
 ```
+* usage with `database/sql`
+```golang
+db, err := sql.Open("ydb", "grpcs://localhost:2135/?database=/local")
+if err != nil {
+    log.Fatal(err)
+}
+defer db.Close() // cleanup resources
+var (
+    id    int32
+    myStr string
+)
+row := db.QueryRowContext(context.TODO(), `SELECT 42 as id, "my string" as myStr`)
+if err = row.Scan(&id, &myStr); err != nil {
+    log.Printf("select failed: %v", err)
+    return
+}
+log.Printf("id = %d, myStr = \"%s\"", id, myStr)
+```
+
 
 More examples of usage placed in [examples](https://github.com/ydb-platform/ydb-go-examples) repository.
 
