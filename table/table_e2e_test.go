@@ -278,9 +278,8 @@ func testTable(t testing.TB) {
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-		ydb.WithUserAgent("tx"),
+		ydb.WithUserAgent("table/e2e"),
 		ydb.With(
-			config.WithOperationTimeout(123),
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
 			config.ExcludeGRPCCodesForPessimization(grpcCodes.DeadlineExceeded),

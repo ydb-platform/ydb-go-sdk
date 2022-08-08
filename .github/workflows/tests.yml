@@ -114,3 +114,11 @@ jobs:
           file: ./connection.txt
           flags: connection,e2e,${{ matrix.os }},${{ matrix.go-version }}
           name: connection
+      - name: Test database/sql
+        run: go test -race -coverpkg=./... -coverprofile database_sql.txt -covermode atomic ./sql_e2e_test.go
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./database_sql.txt
+          flags: database_sql,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
+          name: database/sql
