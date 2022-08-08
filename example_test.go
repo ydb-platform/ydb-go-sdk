@@ -66,7 +66,8 @@ func Example_databaseSql() {
 	)
 	row := db.QueryRowContext(context.TODO(), `SELECT 42 as id, "my string" as myStr`)
 	if err = row.Scan(&id, &myStr); err != nil {
-		log.Fatalf("select failed: %v", err)
+		log.Printf("select failed: %v", err)
+		return
 	}
 	log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 }
