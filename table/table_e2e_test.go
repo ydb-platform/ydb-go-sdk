@@ -200,7 +200,7 @@ func TestTable(t *testing.T) {
 
 //nolint:gocyclo
 func testTable(t testing.TB) {
-	testDuration := 42 * time.Second
+	testDuration := 55 * time.Second
 	if v, ok := os.LookupEnv("TEST_DURATION"); ok {
 		vv, err := time.ParseDuration(v)
 		if err != nil {
