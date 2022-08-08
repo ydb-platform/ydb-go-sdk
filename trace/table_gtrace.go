@@ -687,6 +687,44 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		}
 	}
 	{
+		h1 := t.OnPoolSessionAdd
+		h2 := x.OnPoolSessionAdd
+		ret.OnPoolSessionAdd = func(info TablePoolSessionAddInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolSessionRemove
+		h2 := x.OnPoolSessionRemove
+		ret.OnPoolSessionRemove = func(info TablePoolSessionRemoveInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
+			}
+		}
+	}
+	{
 		h1 := t.OnPoolSessionNew
 		h2 := x.OnPoolSessionNew
 		ret.OnPoolSessionNew = func(t TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
@@ -1170,6 +1208,20 @@ func (t Table) onPoolStateChange(t1 TablePoolStateChangeInfo) {
 	}
 	fn(t1)
 }
+func (t Table) onPoolSessionAdd(info TablePoolSessionAddInfo) {
+	fn := t.OnPoolSessionAdd
+	if fn == nil {
+		return
+	}
+	fn(info)
+}
+func (t Table) onPoolSessionRemove(info TablePoolSessionRemoveInfo) {
+	fn := t.OnPoolSessionRemove
+	if fn == nil {
+		return
+	}
+	fn(info)
+}
 func (t Table) onPoolSessionNew(t1 TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
 	fn := t.OnPoolSessionNew
 	if fn == nil {
@@ -1469,6 +1521,16 @@ func TableOnPoolStateChange(t Table, size int, event string) {
 	p.Size = size
 	p.Event = event
 	t.onPoolStateChange(p)
+}
+func TableOnPoolSessionAdd(t Table, session tableSessionInfo) {
+	var p TablePoolSessionAddInfo
+	p.Session = session
+	t.onPoolSessionAdd(p)
+}
+func TableOnPoolSessionRemove(t Table, session tableSessionInfo) {
+	var p TablePoolSessionRemoveInfo
+	p.Session = session
+	t.onPoolSessionRemove(p)
 }
 func TableOnPoolSessionNew(t Table, c *context.Context) func(session tableSessionInfo, _ error) {
 	var p TablePoolSessionNewStartInfo

@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -104,7 +105,7 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 					},
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
 						keepalive <- struct{}{}
-						return nil, nil
+						return &Ydb_Table.KeepAliveResult{}, nil
 					},
 					testutil.TableDeleteSession: okHandler,
 				},
@@ -251,6 +252,9 @@ func TestSessionPoolClose(t *testing.T) {
 					SessionId: testutil.SessionID(),
 				}, nil
 			},
+			testutil.TableDeleteSession: func(interface{}) (proto.Message, error) {
+				return &Ydb_Table.DeleteSessionResponse{}, nil
+			},
 		})),
 		3,
 		config.WithSizeLimit(3),
@@ -289,9 +293,9 @@ func TestSessionPoolClose(t *testing.T) {
 		closed3 = false
 	)
 
-	s1.OnClose(func() { closed1 = true })
-	s2.OnClose(func() { closed2 = true })
-	s3.OnClose(func() { closed3 = true })
+	s1.onClose = append(s1.onClose, func(s *session) { closed1 = true })
+	s2.onClose = append(s2.onClose, func(s *session) { closed2 = true })
+	s3.onClose = append(s3.onClose, func(s *session) { closed3 = true })
 
 	mustPutSession(t, p, s1)
 	mustPutSession(t, p, s2)
@@ -329,9 +333,15 @@ func TestRaceWgClosed(t *testing.T) {
 
 	limit := 100
 
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		t.Log("start")
+	var counter int
 
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		counter++
+		defer func() {
+			if counter%100 == 0 {
+				t.Logf("TestRaceWgClosed %d subtests done", counter)
+			}
+		}()
 		ctx, cancel := context.WithTimeout(context.Background(),
 			//nolint:gosec
 			time.Duration(rand.Int31n(int32(100*time.Millisecond))),
@@ -370,8 +380,7 @@ func TestRaceWgClosed(t *testing.T) {
 		}
 		_ = p.Close(context.Background())
 		wg.Wait()
-		t.Log("done")
-	}, xtest.WithTimeout(42*time.Second))
+	}, xtest.StopAfter(17*time.Second))
 }
 
 func TestSessionPoolDeleteReleaseWait(t *testing.T) {
@@ -464,14 +473,14 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 func TestSessionPoolRacyGet(t *testing.T) {
 	type createReq struct {
 		release chan struct{}
-		session Session
+		session *session
 	}
 	create := make(chan createReq)
 	p := newClient(
 		nil,
 		(&StubBuilder{
 			Limit: 1,
-			OnCreateSession: func(ctx context.Context) (Session, error) {
+			OnCreateSession: func(ctx context.Context, opts ...sessionBuilderOption) (*session, error) {
 				req := createReq{
 					release: make(chan struct{}),
 					session: simpleSession(t),
@@ -487,7 +496,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		),
 	)
 	var (
-		expSession Session
+		expSession *session
 		done       = make(chan struct{}, 2)
 	)
 	var err error
@@ -523,7 +532,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	// Release the first create session request.
 	// Created session must be stored in the Client.
 	expSession = r1.session
-	expSession.OnClose(func() {
+	expSession.onClose = append(expSession.onClose, func(s *session) {
 		t.Fatalf("unexpected first session close")
 	})
 	close(r1.release)
@@ -1053,10 +1062,10 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	defer func() {
 		_ = p.Close(context.Background())
 	}()
-	sessionBuilder := func(t *testing.T, pool *Client) (Session, chan bool) {
+	sessionBuilder := func(t *testing.T, pool *Client) (*session, chan bool) {
 		s := mustCreateSession(t, pool)
 		closed := make(chan bool)
-		s.OnClose(func() {
+		s.onClose = append(s.onClose, func(s *session) {
 			close(closed)
 		})
 		return s, closed
@@ -1123,7 +1132,7 @@ func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 	}()
 	s := mustCreateSession(t, p)
 	closed := make(chan bool)
-	s.OnClose(func() {
+	s.onClose = append(s.onClose, func(s *session) {
 		close(closed)
 	})
 	mustPutSession(t, p, s)
@@ -1207,7 +1216,7 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 	}
 }
 
-func mustCreateSession(t *testing.T, p *Client) Session {
+func mustCreateSession(t *testing.T, p *Client) *session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.createSession(context.Background())
@@ -1218,7 +1227,7 @@ func mustCreateSession(t *testing.T, p *Client) Session {
 	return s
 }
 
-func mustGetSession(t *testing.T, p *Client) Session {
+func mustGetSession(t *testing.T, p *Client) *session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.Get(context.Background())
@@ -1229,7 +1238,7 @@ func mustGetSession(t *testing.T, p *Client) Session {
 	return s
 }
 
-func mustPutSession(t *testing.T, p *Client, s Session) {
+func mustPutSession(t *testing.T, p *Client, s *session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Put(
@@ -1256,7 +1265,7 @@ func caller() string {
 }
 
 var okHandler = func(interface{}) (proto.Message, error) {
-	return nil, nil
+	return &emptypb.Empty{}, nil
 }
 
 var simpleCluster = testutil.NewRouter(
@@ -1303,7 +1312,7 @@ var simpleCluster = testutil.NewRouter(
 	),
 )
 
-func simpleSession(t *testing.T) Session {
+func simpleSession(t *testing.T) *session {
 	s, err := newSession(context.Background(), simpleCluster, config.New())
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
@@ -1312,7 +1321,7 @@ func simpleSession(t *testing.T) Session {
 }
 
 type StubBuilder struct {
-	OnCreateSession func(ctx context.Context) (Session, error)
+	OnCreateSession func(ctx context.Context, opts ...sessionBuilderOption) (*session, error)
 
 	cc    grpc.ClientConnInterface
 	Limit int
@@ -1339,7 +1348,7 @@ func newClientWithStubBuilder(
 	)
 }
 
-func (s *StubBuilder) createSession(ctx context.Context) (session Session, err error) {
+func (s *StubBuilder) createSession(ctx context.Context, opts ...sessionBuilderOption) (session *session, err error) {
 	defer s.mu.WithLock(func() {
 		if session != nil {
 			s.actual++
@@ -1356,10 +1365,10 @@ func (s *StubBuilder) createSession(ctx context.Context) (session Session, err e
 	}
 
 	if f := s.OnCreateSession; f != nil {
-		return f(ctx)
+		return f(ctx, opts...)
 	}
 
-	return newSession(ctx, s.cc, config.New())
+	return newSession(ctx, s.cc, config.New(), opts...)
 }
 
 func (c *Client) debug() {

@@ -2,9 +2,12 @@ package table
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -24,13 +27,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+var errClosedSession = xerrors.Wrap(errors.New("session closed early"))
 
 // session represents a single table API session.
 //
@@ -44,17 +49,20 @@ type session struct {
 	tableService Ydb_Table_V1.TableServiceClient
 	config       config.Config
 
-	closedMtx xsync.RWMutex
-	closed    bool
+	status uint32
+	nodeID uint32
 
-	statusMtx xsync.RWMutex
-	status    options.SessionStatus
-
-	onCloseMtx xsync.RWMutex
-	onClose    []func()
+	onClose   []func(s *session)
+	closeOnce sync.Once
 }
 
 func (s *session) NodeID() uint32 {
+	if s == nil {
+		return 0
+	}
+	if nodeID := atomic.LoadUint32(&s.nodeID); nodeID != 0 {
+		return nodeID
+	}
 	u, err := url.Parse(s.id)
 	if err != nil {
 		panic(err)
@@ -63,34 +71,32 @@ func (s *session) NodeID() uint32 {
 	if err != nil {
 		return 0
 	}
+	atomic.StoreUint32(&s.nodeID, uint32(nodeID))
 	return uint32(nodeID)
 }
 
 func (s *session) Status() string {
-	s.statusMtx.RLock()
-	defer s.statusMtx.RUnlock()
-	return s.status.String()
+	if s == nil {
+		return ""
+	}
+	return options.SessionStatus(atomic.LoadUint32(&s.status)).String()
 }
 
 func (s *session) SetStatus(status options.SessionStatus) {
-	s.statusMtx.WithLock(func() {
-		s.status = status
-	})
+	atomic.StoreUint32(&s.status, uint32(status))
 }
 
 func (s *session) isClosed() bool {
-	s.closedMtx.RLock()
-	defer s.closedMtx.RUnlock()
-	return s.closed
+	return options.SessionStatus(atomic.LoadUint32(&s.status)) == options.SessionClosed
 }
 
 func (s *session) isClosing() bool {
-	s.statusMtx.RLock()
-	defer s.statusMtx.RUnlock()
-	return s.status == options.SessionClosing
+	return options.SessionStatus(atomic.LoadUint32(&s.status)) == options.SessionClosing
 }
 
-func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (s Session, err error) {
+func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config, opts ...sessionBuilderOption) (
+	s *session, err error,
+) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx)
 	defer func() {
 		onDone(s, err)
@@ -121,11 +127,18 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	return &session{
+
+	s = &session{
 		id:           result.GetSessionId(),
 		tableService: c,
 		config:       config,
-	}, nil
+	}
+
+	for _, o := range opts {
+		o(s)
+	}
+
+	return s, nil
 }
 
 func (s *session) trailer() *trailer {
@@ -142,60 +155,45 @@ func (s *session) ID() string {
 	return s.id
 }
 
-func (s *session) OnClose(cb func()) {
-	if s.isClosed() {
-		return
-	}
-
-	s.onCloseMtx.Lock()
-	defer s.onCloseMtx.Unlock()
-
-	s.onClose = append(s.onClose, cb)
-}
-
 func (s *session) Close(ctx context.Context) (err error) {
-	var fastReturn bool
-	s.closedMtx.WithLock(func() {
-		if s.closed {
-			fastReturn = true
-		} else {
-			s.closed = true
-		}
-	})
-	if fastReturn {
-		return nil
+	if s.isClosed() {
+		return xerrors.WithStackTrace(errClosedSession)
 	}
 
-	onDone := trace.TableOnSessionDelete(
-		s.config.Trace(),
-		&ctx,
-		s,
-	)
-	defer func() {
-		onDone(err)
-	}()
+	s.closeOnce.Do(func() {
+		defer func() {
+			s.SetStatus(options.SessionClosed)
+		}()
 
-	// call all close listeners before doing request
-	// firstly this need to clear Client from this session
-	s.onCloseMtx.WithRLock(func() {
-		for _, onClose := range s.onClose {
-			onClose()
-		}
+		s.SetStatus(options.SessionClosing)
+
+		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, s)
+		defer func() {
+			for _, onClose := range s.onClose {
+				onClose(s)
+			}
+			onDone(err)
+		}()
+
+		_, err = s.tableService.DeleteSession(
+			balancer.WithEndpoint(ctx, s),
+			&Ydb_Table.DeleteSessionRequest{
+				SessionId: s.id,
+				OperationParams: operation.Params(
+					ctx,
+					s.config.OperationTimeout(),
+					s.config.OperationCancelAfter(),
+					operation.ModeSync,
+				),
+			},
+		)
 	})
 
-	_, err = s.tableService.DeleteSession(
-		balancer.WithEndpoint(ctx, s),
-		&Ydb_Table.DeleteSessionRequest{
-			SessionId: s.id,
-			OperationParams: operation.Params(
-				ctx,
-				s.config.OperationTimeout(),
-				s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		},
-	)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 // KeepAlive keeps idle session alive.
@@ -447,6 +445,15 @@ func (s *session) DropTable(
 		t.Trailer(),
 	)
 	return xerrors.WithStackTrace(err)
+}
+
+func (s *session) checkError(err error) {
+	if err == nil {
+		return
+	}
+	if m := retry.Check(err); m.MustDeleteSession() {
+		s.SetStatus(options.SessionClosing)
+	}
 }
 
 // AlterTable modifies schema of table at given path with given options.

@@ -41,6 +41,7 @@ func (b *Worker) Context() context.Context {
 
 func (b *Worker) Start(name string, f func(ctx context.Context)) {
 	if atomic.LoadUint32(&b.closed) != 0 {
+		f(b.ctx)
 		return
 	}
 
@@ -79,17 +80,11 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 
 	b.stop(err)
 
-	waitCtx, waitCancel := context.WithCancel(ctx)
+	b.m.Lock()
+	defer b.m.Unlock()
 
-	go func() {
-		b.m.Lock()
-		defer b.m.Unlock()
+	b.workers.Wait()
 
-		b.workers.Wait()
-		waitCancel()
-	}()
-
-	<-waitCtx.Done()
 	return ctx.Err()
 }
 

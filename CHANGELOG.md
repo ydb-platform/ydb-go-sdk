@@ -1,3 +1,4 @@
+* Refactored session lifecycle in session pool for fix flaked `TestTable`
 * Fixed deadlock in topicreader batcher, while add and read raw server messages
 * Fixed bug in `db.Topic()` with send response to stop partition message
 
