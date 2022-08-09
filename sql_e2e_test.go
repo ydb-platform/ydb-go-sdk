@@ -66,35 +66,42 @@ func TestDatabaseSql(t *testing.T) {
 		t.Fatalf("fill failed: %v\n", err)
 	}
 
-	err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
-		row := tx.QueryRowContext(
-			ydb.WithQueryMode(ctx, ydb.ExplainQueryMode),
-			render(
-				querySelect,
-				templateConfig{
-					TablePathPrefix: path.Join(cc.Name(), folder),
-				},
-			),
-			sql.Named("seriesID", uint64(1)),
-			sql.Named("seasonID", uint64(1)),
-			sql.Named("episodeID", uint64(1)),
-		)
-		var (
-			ast  string
-			plan string
-		)
-		if err = row.Scan(&ast, &plan); err != nil {
-			return fmt.Errorf("cannot explain: %w", err)
+	// getting explain of query
+	row := db.QueryRowContext(
+		ydb.WithQueryMode(ctx, ydb.ExplainQueryMode),
+		render(
+			querySelect,
+			templateConfig{
+				TablePathPrefix: path.Join(cc.Name(), folder),
+			},
+		),
+		sql.Named("seriesID", uint64(1)),
+		sql.Named("seasonID", uint64(1)),
+		sql.Named("episodeID", uint64(1)),
+	)
+	var (
+		ast  string
+		plan string
+	)
+	if err = row.Scan(&ast, &plan); err != nil {
+		t.Fatalf("cannot explain: %v", err)
+	}
+	t.Logf("ast = %v", ast)
+	t.Logf("plan = %v", plan)
+
+	err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
+		var stmt *sql.Stmt
+		stmt, err = tx.PrepareContext(ctx, render(
+			querySelect,
+			templateConfig{
+				TablePathPrefix: path.Join(cc.Name(), folder),
+			},
+		))
+		if err != nil {
+			return fmt.Errorf("cannot prepare query: %w", err)
 		}
-		t.Logf("ast = %v", ast)
-		t.Logf("plan = %v", plan)
-		row = tx.QueryRowContext(ctx,
-			render(
-				querySelect,
-				templateConfig{
-					TablePathPrefix: path.Join(cc.Name(), folder),
-				},
-			),
+
+		row = stmt.QueryRowContext(ctx,
 			sql.Named("seriesID", uint64(1)),
 			sql.Named("seasonID", uint64(1)),
 			sql.Named("episodeID", uint64(1)),

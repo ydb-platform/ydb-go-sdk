@@ -153,7 +153,12 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		return nil, errClosedConn
 	}
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	if c.currentTx != nil && m == DataQueryMode {
+	if c.currentTx != nil {
+		if m != DataQueryMode {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("query mode `%s` not supported with transaction", m.String()),
+			)
+		}
 		return c.currentTx.ExecContext(ctx, query, args)
 	}
 	switch m {
@@ -188,7 +193,12 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		return nil, errClosedConn
 	}
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	if c.currentTx != nil && m == DataQueryMode {
+	if c.currentTx != nil {
+		if m != DataQueryMode {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("query mode `%s` not supported with transaction", m.String()),
+			)
+		}
 		return c.currentTx.QueryContext(ctx, query, args)
 	}
 	switch m {
