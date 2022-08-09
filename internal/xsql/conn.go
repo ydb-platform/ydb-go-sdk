@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -114,17 +116,17 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 		return nil, c.checkClosed(err)
 	}
 	return &stmt{
-		conn:      c,
-		statement: s,
-		query:     query,
+		conn:   c,
+		params: internal.Params(s),
+		query:  query,
 	}, nil
 }
 
-func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.Tx, error) {
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	txSettings, err := mapIsolation(opts)
+	txSettings, err := isolation.ToYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

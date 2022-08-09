@@ -18,6 +18,10 @@ type statement struct {
 	params  map[string]*Ydb.Type
 }
 
+func Params(s table.Statement) map[string]*Ydb.Type {
+	return s.(*statement).params
+}
+
 // Execute executes prepared data query.
 func (s *statement) Execute(
 	ctx context.Context, tx *table.TransactionControl,

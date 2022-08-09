@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -23,7 +24,7 @@ const (
 	folder = "database_sql_test"
 )
 
-func TestSql(t *testing.T) {
+func TestDatabaseSql(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
 
@@ -65,74 +66,89 @@ func TestSql(t *testing.T) {
 		t.Fatalf("fill failed: %v\n", err)
 	}
 
-	// upsert with transaction
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{
-		Isolation: sql.LevelSerializable,
-		ReadOnly:  false,
-	})
+	err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+		row := tx.QueryRowContext(
+			ydb.WithQueryMode(ctx, ydb.ExplainQueryMode),
+			render(
+				querySelect,
+				templateConfig{
+					TablePathPrefix: path.Join(cc.Name(), folder),
+				},
+			),
+			sql.Named("seriesID", uint64(1)),
+			sql.Named("seasonID", uint64(1)),
+			sql.Named("episodeID", uint64(1)),
+		)
+		var (
+			ast  string
+			plan string
+		)
+		if err = row.Scan(&ast, &plan); err != nil {
+			return fmt.Errorf("cannot explain: %w", err)
+		}
+		t.Logf("ast = %v", ast)
+		t.Logf("plan = %v", plan)
+		row = tx.QueryRowContext(ctx,
+			render(
+				querySelect,
+				templateConfig{
+					TablePathPrefix: path.Join(cc.Name(), folder),
+				},
+			),
+			sql.Named("seriesID", uint64(1)),
+			sql.Named("seasonID", uint64(1)),
+			sql.Named("episodeID", uint64(1)),
+		)
+		var views sql.NullFloat64
+		if err = row.Scan(&views); err != nil {
+			return fmt.Errorf("cannot scan views: %w", err)
+		}
+		if views.Valid {
+			return fmt.Errorf("unexpected valid views: %v", views.Float64)
+		}
+		t.Logf("views = %v", views)
+		// increment `views`
+		_, err = tx.ExecContext(ctx,
+			render(
+				queryUpsert,
+				templateConfig{
+					TablePathPrefix: path.Join(cc.Name(), folder),
+				},
+			),
+			sql.Named("seriesID", uint64(1)),
+			sql.Named("seasonID", uint64(1)),
+			sql.Named("episodeID", uint64(1)),
+			sql.Named("views", uint64(views.Float64+1)), // increment views
+		)
+		if err != nil {
+			return fmt.Errorf("cannot upsert views: %w", err)
+		}
+		row = db.QueryRowContext(
+			ydb.WithQueryMode(ctx, ydb.ScanQueryMode),
+			render(
+				querySelect,
+				templateConfig{
+					TablePathPrefix: path.Join(cc.Name(), folder),
+				},
+			),
+			sql.Named("seriesID", uint64(1)),
+			sql.Named("seasonID", uint64(1)),
+			sql.Named("episodeID", uint64(1)),
+		)
+		if err = row.Scan(&views); err != nil {
+			return fmt.Errorf("cannot select current views: %w", err)
+		}
+		if !views.Valid {
+			return fmt.Errorf("unexpected invalid views: %v", views)
+		}
+		t.Logf("views = %v", views)
+		if views.Float64 != 1 {
+			return fmt.Errorf("unexpected views value: %v", views)
+		}
+		return nil
+	}, retry.Idempotent(true))
 	if err != nil {
 		t.Fatalf("begin tx failed: %v\n", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	row := tx.QueryRowContext(ctx,
-		render(
-			querySelect,
-			templateConfig{
-				TablePathPrefix: path.Join(cc.Name(), folder),
-			},
-		),
-		sql.Named("seriesID", uint64(1)),
-		sql.Named("seasonID", uint64(1)),
-		sql.Named("episodeID", uint64(1)),
-	)
-	var views sql.NullFloat64
-	if err = row.Scan(&views); err != nil {
-		t.Fatalf("cannot select current views: %v", err)
-	}
-	if views.Valid {
-		t.Fatalf("unexpected valid views: %v", views.Float64)
-	}
-	t.Logf("views = %v", views)
-	// increment `views`
-	_, err = tx.ExecContext(ctx,
-		render(
-			queryUpsert,
-			templateConfig{
-				TablePathPrefix: path.Join(cc.Name(), folder),
-			},
-		),
-		sql.Named("seriesID", uint64(1)),
-		sql.Named("seasonID", uint64(1)),
-		sql.Named("episodeID", uint64(1)),
-		sql.Named("views", uint64(views.Float64+1)), // increment views
-	)
-	if err != nil {
-		t.Fatalf("cannot upsert data: %v", err)
-	}
-	if err = tx.Commit(); err != nil {
-		t.Fatalf("commit failed: %v", err)
-	}
-	row = db.QueryRowContext(ctx,
-		render(
-			querySelect,
-			templateConfig{
-				TablePathPrefix: path.Join(cc.Name(), folder),
-			},
-		),
-		sql.Named("seriesID", uint64(1)),
-		sql.Named("seasonID", uint64(1)),
-		sql.Named("episodeID", uint64(1)),
-	)
-	if err = row.Scan(&views); err != nil {
-		t.Fatalf("cannot select current views: %v", err)
-	}
-	if !views.Valid {
-		t.Fatalf("unexpected invalid views: %v", views)
-	}
-	t.Logf("views = %v", views)
-	if views.Float64 != 1 {
-		t.Fatalf("unexpected views value: %v", views)
 	}
 }
 
