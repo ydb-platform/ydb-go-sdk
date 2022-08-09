@@ -5,16 +5,18 @@ import (
 	"database/sql/driver"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 type stmt struct {
 	nopResult
 	namedValueChecker
 
-	conn      *conn
-	statement table.Statement
-	query     string
+	conn   *conn
+	params map[string]*Ydb.Type
+	query  string
 }
 
 var (
@@ -35,7 +37,13 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 			txControl(ctx, s.conn.defaultTxControl),
 			s.query,
 			toQueryParams(args),
-			dataQueryOptions(ctx)...,
+			append(
+				append(
+					[]options.ExecuteDataQueryOption{},
+					dataQueryOptions(ctx)...,
+				),
+				options.WithKeepInCache(true),
+			)...,
 		)
 		if err != nil {
 			return nil, s.conn.checkClosed(err)
@@ -61,7 +69,13 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 			txControl(ctx, s.conn.defaultTxControl),
 			s.query,
 			toQueryParams(args),
-			dataQueryOptions(ctx)...,
+			append(
+				append(
+					[]options.ExecuteDataQueryOption{},
+					dataQueryOptions(ctx)...,
+				),
+				options.WithKeepInCache(true),
+			)...,
 		)
 		if err != nil {
 			return nil, s.conn.checkClosed(err)
@@ -76,7 +90,7 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 }
 
 func (s *stmt) NumInput() int {
-	return s.statement.NumInput()
+	return len(s.params)
 }
 
 func (s *stmt) Close() error {

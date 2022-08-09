@@ -5,33 +5,25 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"net/url"
-	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
 
 var d = &sqlDriver{connectors: make(map[*xsql.Connector]struct{})}
 
-func registerDriver(alias string) {
-	defer func() {
-		_ = recover()
-	}()
-	sql.Register(alias, d)
-}
-
 func init() {
-	registerDriver("ydb")
-	registerDriver("ydb/v3")
+	sql.Register("ydb", d)
+	sql.Register("ydb/v3", d)
 }
 
 // Driver is an adapter to allow the use table client as conn.Driver instance.
 type sqlDriver struct {
 	connectors    map[*xsql.Connector]struct{}
-	connectorsMtx sync.RWMutex
+	connectorsMtx xsync.RWMutex
 }
 
 var (
@@ -40,9 +32,10 @@ var (
 )
 
 func (d *sqlDriver) Close() error {
-	d.connectorsMtx.RLock()
-	connectors := d.connectors
-	d.connectorsMtx.RUnlock()
+	var connectors map[*xsql.Connector]struct{}
+	d.connectorsMtx.WithRLock(func() {
+		connectors = d.connectors
+	})
 	var errs []error
 	for c := range connectors {
 		if err := c.Close(); err != nil {
@@ -61,25 +54,13 @@ func (d *sqlDriver) Open(string) (driver.Conn, error) {
 }
 
 func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, error) {
-	uri, err := url.Parse(dataSourceName)
+	opts, connectorOpts, err := xsql.Parse(dataSourceName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	var opts []Option
-	if token := uri.Query().Get("token"); token != "" {
-		opts = append(opts, WithAccessTokenCredentials(token))
-	}
-	db, err := Open(context.Background(), dataSourceName, opts...)
+	db, err := Open(context.Background(), dataSourceName, With(opts...))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
-	}
-	var connectorOpts []xsql.ConnectorOption
-	if queryMode := uri.Query().Get("go_default_query_mode"); queryMode != "" {
-		mode := xsql.QueryModeFromString(queryMode)
-		if mode == xsql.UnknownQueryMode {
-			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
-		}
-		connectorOpts = append(connectorOpts, xsql.WithDefaultQueryMode(mode))
 	}
 	c, err := xsql.Open(d, db, connectorOpts...)
 	if err != nil {
@@ -89,15 +70,15 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 }
 
 func (d *sqlDriver) Attach(c *xsql.Connector) {
-	d.connectorsMtx.Lock()
-	d.connectors[c] = struct{}{}
-	d.connectorsMtx.Unlock()
+	d.connectorsMtx.WithLock(func() {
+		d.connectors[c] = struct{}{}
+	})
 }
 
 func (d *sqlDriver) Detach(c *xsql.Connector) {
-	d.connectorsMtx.Lock()
-	delete(d.connectors, c)
-	d.connectorsMtx.Unlock()
+	d.connectorsMtx.WithLock(func() {
+		delete(d.connectors, c)
+	})
 }
 
 type QueryMode = xsql.QueryMode
