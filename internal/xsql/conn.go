@@ -119,6 +119,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	}
 	return &stmt{
 		conn:   c,
+		tx:     c.currentTx,
 		params: internal.Params(s),
 		query:  query,
 	}, nil
@@ -163,7 +164,12 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	}
 	switch m {
 	case DataQueryMode:
-		_, res, err := c.session.Execute(ctx, txControl(ctx, c.defaultTxControl), query, toQueryParams(args))
+		_, res, err := c.session.Execute(ctx,
+			txControl(ctx, c.defaultTxControl),
+			query,
+			toQueryParams(args),
+			dataQueryOptions(ctx)...,
+		)
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
@@ -172,7 +178,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		}
 		return c, nil
 	case SchemeQueryMode:
-		err := c.session.ExecuteSchemeQuery(ctx, query, toSchemeOptions(args)...)
+		err := c.session.ExecuteSchemeQuery(ctx, query)
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
@@ -203,7 +209,12 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	}
 	switch m {
 	case DataQueryMode:
-		_, res, err := c.session.Execute(ctx, txControl(ctx, c.defaultTxControl), query, toQueryParams(args))
+		_, res, err := c.session.Execute(ctx,
+			txControl(ctx, c.defaultTxControl),
+			query,
+			toQueryParams(args),
+			dataQueryOptions(ctx)...,
+		)
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
@@ -214,7 +225,11 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 			result: res,
 		}, nil
 	case ScanQueryMode:
-		res, err := c.session.StreamExecuteScanQuery(ctx, query, toQueryParams(args), scanQueryOptions(ctx)...)
+		res, err := c.session.StreamExecuteScanQuery(ctx,
+			query,
+			toQueryParams(args),
+			scanQueryOptions(ctx)...,
+		)
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 type stmt struct {
@@ -15,6 +15,7 @@ type stmt struct {
 	namedValueChecker
 
 	conn   *conn
+	tx     *tx
 	params map[string]*Ydb.Type
 	query  string
 }
@@ -31,19 +32,22 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 	if s.conn.isClosed() {
 		return nil, errClosedConn
 	}
-	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
+	m := queryModeFromContext(ctx, s.conn.defaultQueryMode)
+	if s.tx != nil {
+		if m != DataQueryMode {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("query mode `%s` not supported with prepared statement", m.String()),
+			)
+		}
+		return s.tx.QueryContext(withKeepInCache(ctx), s.query, args)
+	}
+	switch m {
 	case DataQueryMode:
 		_, res, err := s.conn.session.Execute(ctx,
 			txControl(ctx, s.conn.defaultTxControl),
 			s.query,
 			toQueryParams(args),
-			append(
-				append(
-					[]options.ExecuteDataQueryOption{},
-					dataQueryOptions(ctx)...,
-				),
-				options.WithKeepInCache(true),
-			)...,
+			dataQueryOptions(withKeepInCache(ctx))...,
 		)
 		if err != nil {
 			return nil, s.conn.checkClosed(err)
@@ -63,19 +67,22 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	if s.conn.isClosed() {
 		return nil, errClosedConn
 	}
-	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
+	m := queryModeFromContext(ctx, s.conn.defaultQueryMode)
+	if s.tx != nil {
+		if m != DataQueryMode {
+			return nil, xerrors.WithStackTrace(
+				fmt.Errorf("query mode `%s` not supported with prepared statement", m.String()),
+			)
+		}
+		return s.tx.ExecContext(withKeepInCache(ctx), s.query, args)
+	}
+	switch m {
 	case DataQueryMode:
 		_, res, err := s.conn.session.Execute(ctx,
 			txControl(ctx, s.conn.defaultTxControl),
 			s.query,
 			toQueryParams(args),
-			append(
-				append(
-					[]options.ExecuteDataQueryOption{},
-					dataQueryOptions(ctx)...,
-				),
-				options.WithKeepInCache(true),
-			)...,
+			dataQueryOptions(withKeepInCache(ctx))...,
 		)
 		if err != nil {
 			return nil, s.conn.checkClosed(err)
