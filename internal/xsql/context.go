@@ -38,8 +38,14 @@ func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) 
 	return defaultTxControl
 }
 
-func WithScanQueryOptions(ctx context.Context, opts []options.ExecuteScanQueryOption) context.Context {
-	return context.WithValue(ctx, ctxScanQueryOptionsKey{}, append(scanQueryOptions(ctx), opts...))
+func WithScanQueryOptions(ctx context.Context, opts ...options.ExecuteScanQueryOption) context.Context {
+	return context.WithValue(ctx,
+		ctxScanQueryOptionsKey{},
+		append(
+			append([]options.ExecuteScanQueryOption{}, scanQueryOptions(ctx)...),
+			opts...,
+		),
+	)
 }
 
 func scanQueryOptions(ctx context.Context) []options.ExecuteScanQueryOption {
@@ -49,8 +55,14 @@ func scanQueryOptions(ctx context.Context) []options.ExecuteScanQueryOption {
 	return nil
 }
 
-func WithDataQueryOptions(ctx context.Context, opts []options.ExecuteDataQueryOption) context.Context {
-	return context.WithValue(ctx, ctxDataQueryOptionsKey{}, append(dataQueryOptions(ctx), opts...))
+func WithDataQueryOptions(ctx context.Context, opts ...options.ExecuteDataQueryOption) context.Context {
+	return context.WithValue(ctx,
+		ctxDataQueryOptionsKey{},
+		append(
+			append([]options.ExecuteDataQueryOption{}, dataQueryOptions(ctx)...),
+			opts...,
+		),
+	)
 }
 
 func dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
@@ -58,4 +70,8 @@ func dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
 		return opts
 	}
 	return nil
+}
+
+func withKeepInCache(ctx context.Context) context.Context {
+	return WithDataQueryOptions(ctx, options.WithKeepInCache(true))
 }

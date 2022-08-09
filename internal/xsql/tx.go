@@ -29,7 +29,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	if tx.conn.isClosed() {
 		return nil, errClosedConn
 	}
-	res, err := tx.transaction.Execute(ctx, query, toQueryParams(args))
+	res, err := tx.transaction.Execute(ctx, query, toQueryParams(args), dataQueryOptions(ctx)...)
 	if err != nil {
 		return nil, tx.conn.checkClosed(err)
 	}
@@ -45,7 +45,7 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	if tx.conn.isClosed() {
 		return nil, errClosedConn
 	}
-	res, err := tx.transaction.Execute(ctx, query, toQueryParams(args))
+	res, err := tx.transaction.Execute(ctx, query, toQueryParams(args), dataQueryOptions(ctx)...)
 	if err != nil {
 		return nil, tx.conn.checkClosed(err)
 	}
