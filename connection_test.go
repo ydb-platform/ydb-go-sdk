@@ -13,7 +13,7 @@ import (
 
 func ExampleOpen() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpc://localhost:2135?database=/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2135/local")
 	if err != nil {
 		fmt.Printf("connection failed: %v", err)
 	}
@@ -25,7 +25,7 @@ func ExampleOpen_advanced() {
 	ctx := context.TODO()
 	db, err := ydb.Open(
 		ctx,
-		"grpc://localhost:2135?database=/local",
+		"grpc://localhost:2135/local",
 		ydb.WithAnonymousCredentials(),
 		ydb.WithBalancer(
 			balancers.PreferLocationsWithFallback(

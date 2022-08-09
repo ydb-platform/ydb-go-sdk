@@ -12,11 +12,11 @@ import "net/url"
 // DSN makes connection string (data source name) by endpoint, database and secure
 func DSN(endpoint, database string, secure bool) (s string) {
 	qp := url.Values{}
-	qp.Set("database", database)
 
 	dsn := url.URL{
 		Scheme:   "grpc",
 		Host:     endpoint,
+		Path:     database,
 		RawQuery: qp.Encode(),
 	}
 
