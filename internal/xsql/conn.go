@@ -128,6 +128,11 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
+	if c.currentTx != nil {
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("conn already have an opened tx: %s", c.currentTx.transaction.ID()),
+		)
+	}
 	txSettings, err := isolation.ToYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
