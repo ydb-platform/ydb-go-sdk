@@ -11,7 +11,7 @@
 
 ## v3.32.0
 * Refactored `trace.Topic` (experimental) handlers
-* Fixed signature/name of helpers in `topic`/`topicsugar` package 
+* Fixed signature and names of helpers in `topic/topicsugar` package 
 * Allowed parallel reading and committing topic messages
 
 ## v3.31.0
