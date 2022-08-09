@@ -54,6 +54,8 @@ type conn struct {
 
 	dataOpts []options.ExecuteDataQueryOption
 	scanOpts []options.ExecuteScanQueryOption
+
+	currentTx *tx
 }
 
 var (
@@ -134,17 +136,22 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.
 	if err != nil {
 		return nil, c.checkClosed(err)
 	}
-	return &tx{
+	c.currentTx = &tx{
 		conn:        c,
 		transaction: t,
-	}, nil
+	}
+	return c.currentTx, nil
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	switch m := queryModeFromContext(ctx, c.defaultQueryMode); m {
+	m := queryModeFromContext(ctx, c.defaultQueryMode)
+	if c.currentTx != nil && m == DataQueryMode {
+		return c.currentTx.ExecContext(ctx, query, args)
+	}
+	switch m {
 	case DataQueryMode:
 		_, res, err := c.session.Execute(ctx, txControl(ctx, c.defaultTxControl), query, toQueryParams(args))
 		if err != nil {
@@ -175,7 +182,11 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	switch m := queryModeFromContext(ctx, c.defaultQueryMode); m {
+	m := queryModeFromContext(ctx, c.defaultQueryMode)
+	if c.currentTx != nil && m == DataQueryMode {
+		return c.currentTx.QueryContext(ctx, query, args)
+	}
+	switch m {
 	case DataQueryMode:
 		_, res, err := c.session.Execute(ctx, txControl(ctx, c.defaultTxControl), query, toQueryParams(args))
 		if err != nil {

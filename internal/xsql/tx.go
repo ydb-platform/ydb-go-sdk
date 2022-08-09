@@ -59,6 +59,9 @@ func (tx *tx) Commit() (err error) {
 	if tx.conn.isClosed() {
 		return errClosedConn
 	}
+	defer func() {
+		tx.conn.currentTx = nil
+	}()
 	_, err = tx.transaction.CommitTx(context.Background())
 	if err != nil {
 		return tx.conn.checkClosed(err)
@@ -70,6 +73,9 @@ func (tx *tx) Rollback() (err error) {
 	if tx.conn.isClosed() {
 		return errClosedConn
 	}
+	defer func() {
+		tx.conn.currentTx = nil
+	}()
 	err = tx.transaction.Rollback(context.Background())
 	if err != nil {
 		return tx.conn.checkClosed(err)
