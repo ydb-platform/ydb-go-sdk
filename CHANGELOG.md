@@ -1,3 +1,4 @@
+## v3.33.0
 * Added `retry.DoTx` helper for retrying `database/sql` transactions 
 * Implemented `database/sql` driver over `ydb-go-sdk`
 * Marked as deprecated `trace.Table.OnPoolSessionNew` and `trace.Table.OnPoolSessionClose` events
