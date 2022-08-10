@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 type stmt struct {
@@ -15,7 +13,6 @@ type stmt struct {
 	namedValueChecker
 
 	conn   *conn
-	tx     *tx
 	params map[string]*Ydb.Type
 	query  string
 }
@@ -32,34 +29,11 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 	if s.conn.isClosed() {
 		return nil, errClosedConn
 	}
-	m := queryModeFromContext(ctx, s.conn.defaultQueryMode)
-	if s.tx != nil {
-		if m != DataQueryMode {
-			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("query mode `%s` not supported with prepared statement", m.String()),
-			)
-		}
-		return s.tx.QueryContext(withKeepInCache(ctx), s.query, args)
-	}
-	switch m {
+	switch m := queryModeFromContext(withKeepInCache(ctx), s.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		_, res, err := s.conn.session.Execute(ctx,
-			txControl(ctx, s.conn.defaultTxControl),
-			s.query,
-			toQueryParams(args),
-			dataQueryOptions(withKeepInCache(ctx))...,
-		)
-		if err != nil {
-			return nil, s.conn.checkClosed(err)
-		}
-		if err = res.Err(); err != nil {
-			return nil, s.conn.checkClosed(res.Err())
-		}
-		return &rows{
-			result: res,
-		}, nil
+		return s.conn.QueryContext(ctx, s.query, args)
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' for execute statement query", m)
+		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
 }
 
@@ -67,32 +41,11 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (drive
 	if s.conn.isClosed() {
 		return nil, errClosedConn
 	}
-	m := queryModeFromContext(ctx, s.conn.defaultQueryMode)
-	if s.tx != nil {
-		if m != DataQueryMode {
-			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("query mode `%s` not supported with prepared statement", m.String()),
-			)
-		}
-		return s.tx.ExecContext(withKeepInCache(ctx), s.query, args)
-	}
-	switch m {
+	switch m := queryModeFromContext(withKeepInCache(ctx), s.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		_, res, err := s.conn.session.Execute(ctx,
-			txControl(ctx, s.conn.defaultTxControl),
-			s.query,
-			toQueryParams(args),
-			dataQueryOptions(withKeepInCache(ctx))...,
-		)
-		if err != nil {
-			return nil, s.conn.checkClosed(err)
-		}
-		if err = res.Err(); err != nil {
-			return nil, s.conn.checkClosed(res.Err())
-		}
-		return s, nil
+		return s.conn.ExecContext(ctx, s.query, args)
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m)
+		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
 }
 

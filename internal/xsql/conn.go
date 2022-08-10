@@ -55,7 +55,35 @@ type conn struct {
 	dataOpts []options.ExecuteDataQueryOption
 	scanOpts []options.ExecuteScanQueryOption
 
-	currentTx *tx
+	transaction table.Transaction
+}
+
+func (c *conn) Commit() error {
+	if c.isClosed() {
+		return errClosedConn
+	}
+	defer func() {
+		c.transaction = nil
+	}()
+	_, err := c.transaction.CommitTx(context.Background())
+	if err != nil {
+		return c.checkClosed(err)
+	}
+	return nil
+}
+
+func (c *conn) Rollback() error {
+	if c.isClosed() {
+		return errClosedConn
+	}
+	defer func() {
+		c.transaction = nil
+	}()
+	err := c.transaction.Rollback(context.Background())
+	if err != nil {
+		return c.checkClosed(err)
+	}
+	return err
 }
 
 var (
@@ -119,7 +147,6 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 	}
 	return &stmt{
 		conn:   c,
-		tx:     c.currentTx,
 		params: internal.Params(s),
 		query:  query,
 	}, nil
@@ -129,24 +156,20 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	if c.currentTx != nil {
+	if c.transaction != nil {
 		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("conn already have an opened tx: %s", c.currentTx.transaction.ID()),
+			fmt.Errorf("conn already have an opened tx: %s", c.transaction.ID()),
 		)
 	}
 	txSettings, err := isolation.ToYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	t, err := c.session.BeginTransaction(ctx, txSettings)
+	c.transaction, err = c.session.BeginTransaction(ctx, txSettings)
 	if err != nil {
 		return nil, c.checkClosed(err)
 	}
-	c.currentTx = &tx{
-		conn:        c,
-		transaction: t,
-	}
-	return c.currentTx, nil
+	return c, nil
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
@@ -154,13 +177,17 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		return nil, errClosedConn
 	}
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	if c.currentTx != nil {
+	if c.transaction != nil {
 		if m != DataQueryMode {
 			return nil, xerrors.WithStackTrace(
 				fmt.Errorf("query mode `%s` not supported with transaction", m.String()),
 			)
 		}
-		return c.currentTx.ExecContext(ctx, query, args)
+		_, err := c.transaction.Execute(ctx, query, toQueryParams(args), dataQueryOptions(ctx)...)
+		if err != nil {
+			return nil, c.checkClosed(err)
+		}
+		return c, nil
 	}
 	switch m {
 	case DataQueryMode:
@@ -199,13 +226,22 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		return nil, errClosedConn
 	}
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	if c.currentTx != nil {
+	if c.transaction != nil {
 		if m != DataQueryMode {
 			return nil, xerrors.WithStackTrace(
 				fmt.Errorf("query mode `%s` not supported with transaction", m.String()),
 			)
 		}
-		return c.currentTx.QueryContext(ctx, query, args)
+		res, err := c.transaction.Execute(ctx, query, toQueryParams(args), dataQueryOptions(ctx)...)
+		if err != nil {
+			return nil, c.checkClosed(err)
+		}
+		if err = res.Err(); err != nil {
+			return nil, c.checkClosed(err)
+		}
+		return &rows{
+			result: res,
+		}, nil
 	}
 	switch m {
 	case DataQueryMode:
