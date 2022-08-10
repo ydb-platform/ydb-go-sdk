@@ -1,9 +1,9 @@
 package xrand
 
 import (
-	"math"
 	"math/rand"
 	"sync"
+	"time"
 )
 
 type Rand interface {
@@ -13,10 +13,7 @@ type Rand interface {
 }
 
 type r struct {
-	source int64
-
 	m *sync.Mutex
-
 	r *rand.Rand
 }
 
@@ -28,22 +25,13 @@ func WithLock() option {
 	}
 }
 
-func WithSource(source int64) option {
-	return func(r *r) {
-		r.source = source
-	}
-}
-
-func New(opts ...option) Rand {
-	r := &r{
-		source: math.MaxInt64,
-	}
+func New(opts ...option) *r {
+	r := &r{}
 	for _, o := range opts {
 		o(r)
 	}
-
-	//nolint:gosec
-	r.r = rand.New(rand.NewSource(r.source))
+	//nolint: gosec
+	r.r = rand.New(rand.NewSource(time.Now().Unix()))
 	return r
 }
 
@@ -69,6 +57,5 @@ func (r *r) Shuffle(n int, swap func(i, j int)) {
 		r.m.Lock()
 		defer r.m.Unlock()
 	}
-
 	r.r.Shuffle(n, swap)
 }
