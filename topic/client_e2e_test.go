@@ -46,7 +46,7 @@ func connect(t testing.TB) ydb.Connection {
 	}
 	db, err := ydb.Open(context.Background(), connectionString,
 		ydb.WithDialTimeout(time.Second),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_TOKEN")),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
 	return db

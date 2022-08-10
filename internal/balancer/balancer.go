@@ -287,7 +287,7 @@ func (b *balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	)
 
 	defer func() {
-		if failedCount*2 > state.PreferredCount() {
+		if failedCount*2 > state.PreferredCount() && b.discoveryRepeater != nil {
 			b.discoveryRepeater.Force()
 		}
 	}()
