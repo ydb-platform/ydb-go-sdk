@@ -61,6 +61,16 @@ if queryErr != nil {
 ```
 * usage with `database/sql`
 ```golang
+import (
+    "context"
+    "database/sql"
+    "log"
+
+    _ "github.com/ydb-platform/ydb-go-sdk/v3"
+)
+
+...
+
 db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
 if err != nil {
     log.Fatal(err)
