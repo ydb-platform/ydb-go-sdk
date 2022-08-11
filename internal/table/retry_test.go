@@ -341,7 +341,7 @@ func TestRetryContextDeadline(t *testing.T) {
 						case <-ctx.Done():
 							return ctx.Err()
 						case <-time.After(sleep):
-							return errs[r.Int(len(errs))]
+							return errs[int(r.Next()%int64(len(errs)))]
 						}
 					},
 					table.Options{},

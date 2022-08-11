@@ -81,7 +81,9 @@ func (b *balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	}
 
 	info := balancerConfig.Info{SelfLocation: localDC}
-	state := newConnectionsState(connections, b.balancerConfig.IsPreferConn, info, b.balancerConfig.AllowFalback)
+	state := newConnectionsState(connections, b.balancerConfig.IsPreferConn,
+		info, b.balancerConfig.AllowFalback, b.balancerConfig.RoundRobin,
+	)
 
 	b.m.Lock()
 	defer b.m.Unlock()
@@ -158,7 +160,7 @@ func New(
 	if b.balancerConfig.SingleConn {
 		b.connectionsState = newConnectionsState(
 			endpointsToConnections(pool, []endpoint.Endpoint{discoveryEndpoint}),
-			nil, balancerConfig.Info{}, false)
+			nil, balancerConfig.Info{}, false, true)
 	} else {
 		if err = b.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)

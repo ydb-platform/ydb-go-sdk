@@ -185,6 +185,44 @@ func (s *stats) removeFromInFlight(t testing.TB, id string) {
 	t.Logf("session '%s' removed from in-flight", id)
 }
 
+type balancerStats struct {
+	endpoints map[string]int
+	mu        sync.RWMutex
+}
+
+func (s *balancerStats) add(address string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.endpoints[address]++
+}
+
+func (s *balancerStats) printStats() {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var (
+		rootEndpointCount = math.MaxInt
+		rootEndpoint      string
+	)
+	for endpoint, count := range s.endpoints {
+		if count < rootEndpointCount {
+			rootEndpointCount = count
+			rootEndpoint = endpoint
+		}
+	}
+	var sum int
+	for _, count := range s.endpoints {
+		sum += count
+	}
+	sum -= rootEndpointCount
+	exp := sum / (len(s.endpoints) - 1)
+	fmt.Println("balancer stats:")
+	for endpoint, count := range s.endpoints {
+		if endpoint != rootEndpoint {
+			fmt.Printf(" > %s: %d (delta = %f)\n", endpoint, count, math.Abs(float64(exp-count))/float64(exp))
+		}
+	}
+}
+
 func TestTableMultiple(t *testing.T) {
 	if _, ok := os.LookupEnv("LOCAL_TESTING"); !ok {
 		t.Skip("only for local testing")
@@ -232,6 +270,11 @@ func testTable(t testing.TB) {
 		if len(s.inPoolSessions) != 0 {
 			t.Errorf("'inPoolSessions' not a zero after closing table client: %v", s.inPoolSessions)
 		}
+	}()
+
+	bs := &balancerStats{endpoints: make(map[string]int)}
+	defer func() {
+		bs.printStats()
 	}()
 
 	var (
@@ -292,6 +335,9 @@ func testTable(t testing.TB) {
 					invoker grpc.UnaryInvoker,
 					opts ...grpc.CallOption,
 				) error {
+					if method == "/Ydb.Table.V1.TableService/CreateSession" {
+						bs.add(cc.Target())
+					}
 					return invoker(ctx, method, req, reply, cc, opts...)
 				}),
 				grpc.WithStreamInterceptor(func(
@@ -306,14 +352,9 @@ func testTable(t testing.TB) {
 				}),
 			),
 		),
-		ydb.WithBalancer(balancers.PreferLocalDCWithFallBack( // for max tests coverage
-			balancers.PreferLocationsWithFallback( // for max tests coverage
-				balancers.RandomChoice(),
-				"ABC",
-			),
-		)),
+		ydb.WithBalancer(balancers.RoundRobin()),
 		ydb.WithDialTimeout(5*time.Second),
-		ydb.WithSessionPoolIdleThreshold(time.Second*5),
+		ydb.WithSessionPoolIdleThreshold(time.Nanosecond*1),
 		ydb.WithSessionPoolSizeLimit(limit),
 		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithConnectionTTL(5*time.Second),

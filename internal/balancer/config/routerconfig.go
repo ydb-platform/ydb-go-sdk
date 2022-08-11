@@ -9,6 +9,7 @@ type Config struct {
 	AllowFalback  bool
 	SingleConn    bool
 	DetectlocalDC bool
+	RoundRobin    bool
 }
 
 type Info struct {

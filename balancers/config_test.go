@@ -34,7 +34,9 @@ func TestFromConfig(t *testing.T) {
 			config: `{
 				"type": "round_robin"
 			}`,
-			res: balancerConfig.Config{},
+			res: balancerConfig.Config{
+				RoundRobin: true,
+			},
 		},
 		{
 			name: "random_choice",

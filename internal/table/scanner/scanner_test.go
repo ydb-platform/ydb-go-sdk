@@ -20,7 +20,7 @@ import (
 
 //nolint:gocyclo
 func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{}) {
-	rv := r.Int64(math.MaxInt16)
+	rv := r.Next() % math.MaxInt16
 	switch c.typeID {
 	case Ydb.Type_BOOL:
 		v := rv%2 == 1

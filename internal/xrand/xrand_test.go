@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func Test_r_Int64(t *testing.T) {
+func TestRandomChoice(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		for _, tt := range []struct {
 			n       int
@@ -28,10 +28,14 @@ func Test_r_Int64(t *testing.T) {
 				min        = exp - int(float64(exp)*tt.epsilon)
 				max        = exp + int(float64(exp)*tt.epsilon)
 				buckets    = make([]int, bucketsLen)
-				r          = New()
+				r          = New(WithSource(NewRandomSource(int64(bucketsLen))))
 			)
 			for i := 0; i < tt.n; i++ {
-				buckets[r.Int64(int64(bucketsLen))]++
+				next := r.Next()
+				if int(next) > bucketsLen {
+					panic("wrong next value")
+				}
+				buckets[next]++
 			}
 			for i, v := range buckets {
 				if v < min || v > max {
@@ -40,4 +44,29 @@ func Test_r_Int64(t *testing.T) {
 			}
 		}
 	}, xtest.StopAfter(42*time.Second))
+}
+
+func TestRoundRobin(t *testing.T) {
+	var (
+		n          = 1000000
+		bucketsLen = 10
+		exp        = n / bucketsLen
+		buckets    = make([]int, bucketsLen)
+	)
+	if n%bucketsLen != 0 {
+		panic("wrong test values n or bucketsLen")
+	}
+	r := New(WithSource(NewRoundRobinSource(int64(bucketsLen))))
+	for i := 0; i < n; i++ {
+		next := r.Next()
+		if int(next) > bucketsLen {
+			panic("wrong next value")
+		}
+		buckets[next]++
+	}
+	for i, v := range buckets {
+		if v != exp {
+			t.Errorf("buckets[%d] = %d, exp = %d (delta = %f)", i, v, exp, math.Abs(float64(exp-v))/float64(exp))
+		}
+	}
 }

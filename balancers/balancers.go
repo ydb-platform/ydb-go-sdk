@@ -7,9 +7,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
-// Deprecated: RoundRobin is RandomChoice now
 func RoundRobin() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+	return &balancerConfig.Config{
+		RoundRobin: true,
+	}
 }
 
 func RandomChoice() *balancerConfig.Config {

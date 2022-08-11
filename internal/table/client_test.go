@@ -62,7 +62,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 		defer wg.Done()
 		childCtx, childCancel := context.WithTimeout(
 			ctx,
-			time.Duration(r.Int64(int64(time.Minute))),
+			time.Duration(r.Next()%int64(time.Minute)),
 		)
 		defer childCancel()
 		s, err := p.createSession(childCtx)

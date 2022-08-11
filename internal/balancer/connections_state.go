@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"context"
+	"math/rand"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -23,10 +24,21 @@ func newConnectionsState(
 	preferFunc balancerConfig.PreferConnFunc,
 	info balancerConfig.Info,
 	allowFallback bool,
+	roundRobin bool,
 ) *connectionsState {
 	res := &connectionsState{
 		connByNodeID: connsToNodeIDMap(conns),
-		rand:         xrand.New(xrand.WithLock()),
+		rand: xrand.New(
+			xrand.WithLock(),
+			xrand.WithSource(
+				func() rand.Source {
+					if roundRobin {
+						return xrand.NewRoundRobinSource(int64(len(conns)))
+					}
+					return xrand.NewRandomSource(int64(len(conns)))
+				}(),
+			),
+		),
 	}
 
 	res.prefer, res.fallback = sortPreferConnections(conns, preferFunc, info, allowFallback)
@@ -89,7 +101,7 @@ func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned
 	}
 
 	// fast path
-	if c := conns[s.rand.Int(connCount)]; isOkConnection(c, allowBanned) {
+	if c := conns[s.rand.Next()%int64(connCount)]; isOkConnection(c, allowBanned) {
 		return c, 0
 	}
 

@@ -683,7 +683,7 @@ func (c *Client) keeper(ctx context.Context) {
 				}
 			})
 
-			var mark *list.Element // Element in the list to insert touched sessions after.
+			//var mark *list.Element // Element in the list to insert touched sessions after.
 			for i, s := range toTouch {
 				toTouch[i] = nil
 
@@ -705,7 +705,7 @@ func (c *Client) keeper(ctx context.Context) {
 					}
 				}
 
-				err := c.keepAliveSession(context.Background(), s)
+				err := c.closeSession(context.Background(), s)
 				if err != nil {
 					switch {
 					case
@@ -726,31 +726,31 @@ func (c *Client) keeper(ctx context.Context) {
 					continue
 				}
 
-				c.mu.WithLock(func() {
-					if !c.notify(s) {
-						// Need to push back session into list in order, to prevent
-						// shuffling of sessions order.
-						//
-						// That is, there may be a race condition, when some session S1
-						// pushed back in the list before we took the mutex. Suppose S1
-						// touched time is greater than ours `now` for S0. If so, it
-						// then may interrupt next keep alive iteration earlier and
-						// prevent our session S0 being touched:
-						// time.Since(S1) < threshold but time.Since(S0) > threshold.
-						mark = c.pushIdleInOrderAfter(s, now, mark)
-					}
-				})
+				//c.mu.WithLock(func() {
+				//	if !c.notify(s) {
+				//		// Need to push back session into list in order, to prevent
+				//		// shuffling of sessions order.
+				//		//
+				//		// That is, there may be a race condition, when some session S1
+				//		// pushed back in the list before we took the mutex. Suppose S1
+				//		// touched time is greater than ours `now` for S0. If so, it
+				//		// then may interrupt next keep alive iteration earlier and
+				//		// prevent our session S0 being touched:
+				//		// time.Since(S1) < threshold but time.Since(S0) > threshold.
+				//		mark = c.pushIdleInOrderAfter(s, now, mark)
+				//	}
+				//})
 			}
 
-			{ // push all the soft failed sessions to retry on the next tick
-				pushBackTime := now.Add(-c.config.IdleThreshold())
-
-				c.mu.WithLock(func() {
-					for _, el := range toTryAgain {
-						_ = c.pushIdleInOrder(el, pushBackTime)
-					}
-				})
-			}
+			//{ // push all the soft failed sessions to retry on the next tick
+			//	pushBackTime := now.Add(-c.config.IdleThreshold())
+			//
+			//	c.mu.WithLock(func() {
+			//		for _, el := range toTryAgain {
+			//			_ = c.pushIdleInOrder(el, pushBackTime)
+			//		}
+			//	})
+			//}
 
 			var (
 				sleep bool

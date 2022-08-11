@@ -119,7 +119,7 @@ func (b logBackoff) Delay(i int) time.Duration {
 	if f == d {
 		return f
 	}
-	return f + time.Duration(b.r.Int64(int64(d-f)+1))
+	return f + time.Duration(b.r.Next()%(int64(d-f)+1))
 }
 
 func min(a, b uint) uint {
