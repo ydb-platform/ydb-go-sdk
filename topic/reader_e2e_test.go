@@ -226,32 +226,32 @@ func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) {
 	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 		_ = s.ExecuteSchemeQuery(ctx, "DROP TABLE test")
 		err := s.ExecuteSchemeQuery(ctx, `
-CREATE TABLE
-	test
-(
-	id Int64,
-	val Utf8,
-	PRIMARY KEY (id)
-)
-	`)
+			CREATE TABLE
+				test
+			(
+				id Int64,
+				val Utf8,
+				PRIMARY KEY (id)
+			)`,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create table: %w", err)
 		}
 
-		require.NoError(t, err)
 		err = s.ExecuteSchemeQuery(ctx, `
-ALTER TABLE
-	test
-ADD CHANGEFEED
-	feed
-WITH (
-	FORMAT = 'JSON',
-	MODE = 'UPDATES'
-)
-	`)
+			ALTER TABLE
+				test
+			ADD CHANGEFEED
+				feed
+			WITH (
+				FORMAT = 'JSON',
+				MODE = 'UPDATES'
+			)`,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to add changefeed: %w", err)
 		}
+
 		return nil
 	})
 	require.NoError(t, err)
