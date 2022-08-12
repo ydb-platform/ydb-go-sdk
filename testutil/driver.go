@@ -282,7 +282,7 @@ func WithClose(onClose func(ctx context.Context) error) balancerOption {
 	}
 }
 
-func NewRouter(opts ...balancerOption) grpc.ClientConnInterface {
+func NewBalancer(opts ...balancerOption) grpc.ClientConnInterface {
 	c := &balancerStub{}
 	for _, opt := range opts {
 		opt(c)

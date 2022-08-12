@@ -3,6 +3,7 @@ package balancer
 import (
 	"context"
 	"fmt"
+
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -30,14 +31,6 @@ type Balancer struct {
 
 	mu               xsync.RWMutex
 	connectionsState *connectionsState
-
-	onUpdateEndpoints []func(endpoints []endpoint.Info)
-}
-
-func (b *Balancer) OnUpdateEndpoints(cb func(nodes []endpoint.Info)) {
-	b.mu.WithLock(func() {
-		b.onUpdateEndpoints = append(b.onUpdateEndpoints, cb)
-	})
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -92,13 +85,6 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 
 	b.mu.WithLock(func() {
 		b.connectionsState = state
-		nodes := make([]endpoint.Info, len(endpoints))
-		for i := range endpoints {
-			nodes[i] = endpoints[i]
-		}
-		for _, cb := range b.onUpdateEndpoints {
-			cb(nodes)
-		}
 	})
 }
 

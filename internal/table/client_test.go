@@ -38,7 +38,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 	defer cancel()
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -95,7 +95,7 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -169,7 +169,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			)
 			p := newClientWithStubBuilder(
 				t,
-				testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -246,7 +246,7 @@ func TestSessionPoolClose(t *testing.T) {
 	wg := sync.WaitGroup{}
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+		testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
@@ -351,7 +351,7 @@ func TestRaceWgClosed(t *testing.T) {
 		wg := sync.WaitGroup{}
 		p := newClientWithStubBuilder(
 			t,
-			testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
 						SessionId: testutil.SessionID(),
@@ -405,7 +405,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 			)
 			p := newClientWithStubBuilder(
 				t,
-				testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -548,7 +548,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 func TestSessionPoolPutInFull(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+		testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
@@ -595,7 +595,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			)
 			p := newClientWithStubBuilder(
 				t,
-				testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
@@ -695,7 +695,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 	}
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -740,7 +740,7 @@ func TestSessionPoolDisableBackgroundGoroutines(t *testing.T) {
 
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+		testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 			testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
@@ -777,7 +777,7 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 	)
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
@@ -852,7 +852,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 	)
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -919,7 +919,7 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 func TestSessionPoolDoublePut(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+		testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: testutil.SessionID(),
@@ -957,7 +957,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	)
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -1038,7 +1038,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 	idleThreshold := 5 * time.Second
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (result proto.Message, _ error) {
@@ -1104,7 +1104,7 @@ func TestSessionPoolKeepAliveMinSize(t *testing.T) {
 func TestSessionPoolKeepAliveWithBadSession(t *testing.T) {
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					//nolint:nolintlint
@@ -1148,7 +1148,7 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	retry := true
 	p := newClientWithStubBuilder(
 		t,
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -1268,7 +1268,7 @@ var okHandler = func(interface{}) (proto.Message, error) {
 	return &emptypb.Empty{}, nil
 }
 
-var simpleCluster = testutil.NewRouter(
+var simpleCluster = testutil.NewBalancer(
 	testutil.WithInvokeHandlers(
 		testutil.InvokeHandlers{
 			testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {

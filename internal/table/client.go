@@ -4,9 +4,6 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"math"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,14 +46,13 @@ func newClient(
 		onDone = trace.TableOnInit(config.Trace(), &ctx)
 	)
 	c := &Client{
-		config:      config,
-		cc:          cc,
-		build:       builder,
-		index:       make(map[*session]sessionInfo),
-		nodeLoading: make(map[uint32]int),
-		idle:        list.New(),
-		waitq:       list.New(),
-		limit:       config.SizeLimit(),
+		config: config,
+		cc:     cc,
+		build:  builder,
+		index:  make(map[*session]sessionInfo),
+		idle:   list.New(),
+		waitq:  list.New(),
+		limit:  config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *session)
@@ -83,11 +79,10 @@ type Client struct {
 	cc                grpc.ClientConnInterface
 	config            config.Config
 	index             map[*session]sessionInfo
-	createInProgress  int        // KIKIMR-9163: in-create-process counter
-	limit             int        // Upper bound for Client size.
-	idle              *list.List // list<table.session>
-	waitq             *list.List // list<*chan table.session>
-	nodeLoading       map[uint32]int
+	createInProgress  int           // KIKIMR-9163: in-create-process counter
+	limit             int           // Upper bound for Client size.
+	idle              *list.List    // list<table.session>
+	waitq             *list.List    // list<*chan table.session>
 	keeperWake        chan struct{} // Set by internalPoolKeeper.
 	keeperStop        chan struct{}
 	keeperDone        chan struct{}
@@ -127,8 +122,6 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 				defer cancel()
 			}
 
-			createSessionCtx = balancer.WithNodeID(createSessionCtx, c.nextNodeID())
-
 			s, err = c.build(createSessionCtx)
 
 			select {
@@ -161,21 +154,6 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		}
 	}
 	var s *session
-	defer func() {
-		if s != nil {
-			c.mu.WithLock(func() {
-				c.nodeLoading[s.NodeID()]++
-			})
-			s.onClose = append(s.onClose, func(s *session) {
-				c.mu.WithLock(func() {
-					nodeID := s.NodeID()
-					if _, has := c.nodeLoading[nodeID]; has {
-						c.nodeLoading[nodeID]--
-					}
-				})
-			})
-		}
-	}()
 	if !c.config.AutoRetry() {
 		s, err = createSession(ctx)
 		if err != nil {
@@ -219,28 +197,10 @@ func (c *Client) isClosed() bool {
 	return atomic.LoadUint32(&c.closed) != 0
 }
 
-func (c *Client) nextNodeID() (nodeID uint32) {
-	nodeID = math.MaxUint32
-	c.mu.WithLock(func() {
-		min := math.MaxInt
-		for id, count := range c.nodeLoading {
-			if count < min {
-				min = count
-				nodeID = id
-			}
-		}
-		fmt.Println("nextNodeID =", nodeID, "min =", min)
-	})
-	return nodeID
-}
-
 // c.mu must NOT be held.
 func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err error) {
 	defer func() {
 		if s != nil {
-			c.mu.WithLock(func() {
-				c.nodeLoading[s.NodeID()]++
-			})
 			s.onClose = append(s.onClose, func(s *session) {
 				c.spawnedGoroutines.Start("onClose", func(ctx context.Context) {
 					c.mu.WithLock(func() {
@@ -258,11 +218,6 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 
 						if info.idle != nil {
 							c.idle.Remove(info.idle)
-						}
-
-						nodeID := s.NodeID()
-						if _, has := c.nodeLoading[nodeID]; has {
-							c.nodeLoading[nodeID]--
 						}
 					})
 				})
@@ -308,8 +263,6 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 			defer cancel()
 		}
 
-		createSessionCtx = balancer.WithNodeID(createSessionCtx, c.nextNodeID())
-
 		s, err = c.build(createSessionCtx)
 		if s == nil && err == nil {
 			panic("ydb: abnormal result of session build")
@@ -321,8 +274,6 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 				c.index[s] = sessionInfo{}
 				trace.TableOnPoolSessionAdd(c.config.Trace(), s)
 				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
-				c.nodeLoading[s.NodeID()]++
-				fmt.Printf("c.nodeLoading: %v", c.nodeLoading)
 			}
 		})
 
@@ -354,28 +305,6 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
-}
-
-func (c *Client) UpdateNodes(nodes []endpoint.Info) {
-	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].NodeID() < nodes[j].NodeID()
-	})
-	c.mu.WithLock(func() {
-		for _, node := range nodes {
-			nodeID := node.NodeID()
-			if _, has := c.nodeLoading[nodeID]; !has {
-				c.nodeLoading[nodeID] = 0
-			}
-		}
-		nodeLoading := c.nodeLoading
-		for nodeID := range nodeLoading {
-			if sort.Search(len(nodes), func(i int) bool {
-				return nodes[i].NodeID() <= nodeID
-			}) < len(nodes) {
-				delete(c.nodeLoading, nodeID)
-			}
-		}
-	})
 }
 
 type getOptions struct {

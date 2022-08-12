@@ -319,7 +319,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY)),
 	}
 	client := &Client{
-		cc: testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
+		cc: testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	p := SessionProviderFunc{
 		OnGet: client.internalPoolCreateSession,

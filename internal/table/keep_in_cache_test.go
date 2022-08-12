@@ -69,7 +69,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := StubBuilder{
 				T: t,
-				cc: testutil.NewRouter(
+				cc: testutil.NewBalancer(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
 							testutil.TableExecuteDataQuery: func(request interface{}) (proto.Message, error) {

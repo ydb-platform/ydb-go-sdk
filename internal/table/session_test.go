@@ -35,7 +35,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewRouter(
+		cc: testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
@@ -89,7 +89,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewRouter(
+		cc: testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -332,7 +332,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := New(
-							testutil.NewRouter(
+							testutil.NewBalancer(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
 										testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
@@ -392,7 +392,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 
 func TestCreateTableRegression(t *testing.T) {
 	client := New(
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
@@ -493,7 +493,7 @@ func TestCreateTableRegression(t *testing.T) {
 
 func TestDescribeTableRegression(t *testing.T) {
 	client := New(
-		testutil.NewRouter(
+		testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {

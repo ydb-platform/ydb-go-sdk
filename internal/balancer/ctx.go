@@ -14,16 +14,14 @@ func WithEndpoint(ctx context.Context, endpoint Endpoint) context.Context {
 	return context.WithValue(ctx, ctxEndpointKey{}, endpoint)
 }
 
-type nodeIDer struct {
-	nodeID uint32
+type nodeID uint32
+
+func (n nodeID) NodeID() uint32 {
+	return uint32(n)
 }
 
-func (n nodeIDer) NodeID() uint32 {
-	return n.nodeID
-}
-
-func WithNodeID(ctx context.Context, nodeID uint32) context.Context {
-	return WithEndpoint(ctx, nodeIDer{nodeID: nodeID})
+func WithNodeID(ctx context.Context, id uint32) context.Context {
+	return WithEndpoint(ctx, nodeID(id))
 }
 
 func ContextEndpoint(ctx context.Context) (e Endpoint, ok bool) {
