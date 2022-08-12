@@ -3,8 +3,6 @@ package balancer
 import (
 	"context"
 	"fmt"
-	"sync"
-
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -16,12 +14,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
 
-type balancer struct {
+type Balancer struct {
 	driverConfig      config.Config
 	balancerConfig    balancerConfig.Config
 	pool              *conn.Pool
@@ -29,11 +28,19 @@ type balancer struct {
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
-	m                sync.RWMutex
+	mu               xsync.RWMutex
 	connectionsState *connectionsState
+
+	onUpdateEndpoints []func(endpoints []endpoint.Info)
 }
 
-func (b *balancer) clusterDiscovery(ctx context.Context) (err error) {
+func (b *Balancer) OnUpdateEndpoints(cb func(nodes []endpoint.Info)) {
+	b.mu.WithLock(func() {
+		b.onUpdateEndpoints = append(b.onUpdateEndpoints, cb)
+	})
+}
+
+func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	var (
 		onDone = trace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(),
@@ -73,7 +80,7 @@ func (b *balancer) clusterDiscovery(ctx context.Context) (err error) {
 	return nil
 }
 
-func (b *balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
+func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
 	connections := endpointsToConnections(b.pool, endpoints)
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
@@ -83,17 +90,23 @@ func (b *balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	info := balancerConfig.Info{SelfLocation: localDC}
 	state := newConnectionsState(connections, b.balancerConfig.IsPreferConn, info, b.balancerConfig.AllowFalback)
 
-	b.m.Lock()
-	defer b.m.Unlock()
-
-	b.connectionsState = state
+	b.mu.WithLock(func() {
+		b.connectionsState = state
+		nodes := make([]endpoint.Info, len(endpoints))
+		for i := range endpoints {
+			nodes[i] = endpoints[i]
+		}
+		for _, cb := range b.onUpdateEndpoints {
+			cb(nodes)
+		}
+	})
 }
 
-func (b *balancer) Discovery() discovery.Client {
+func (b *Balancer) Discovery() discovery.Client {
 	return b.discovery
 }
 
-func (b *balancer) Close(ctx context.Context) (err error) {
+func (b *Balancer) Close(ctx context.Context) (err error) {
 	onDone := trace.DriverOnBalancerClose(
 		b.driverConfig.Trace(),
 		&ctx,
@@ -113,7 +126,7 @@ func (b *balancer) Close(ctx context.Context) (err error) {
 	}
 
 	if len(issues) > 0 {
-		return xerrors.WithStackTrace(xerrors.NewWithIssues("balancer close failed", issues...))
+		return xerrors.WithStackTrace(xerrors.NewWithIssues("Balancer close failed", issues...))
 	}
 
 	return nil
@@ -124,7 +137,7 @@ func New(
 	c config.Config,
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
-) (_ Connection, err error) {
+) (b *Balancer, err error) {
 	onDone := trace.DriverOnBalancerInit(
 		c.Trace(),
 		&ctx,
@@ -133,7 +146,7 @@ func New(
 		onDone(err)
 	}()
 
-	b := &balancer{
+	b = &Balancer{
 		driverConfig:    c,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
@@ -187,19 +200,19 @@ func New(
 	return b, nil
 }
 
-func (b *balancer) Endpoint() string {
+func (b *Balancer) Endpoint() string {
 	return b.driverConfig.Endpoint()
 }
 
-func (b *balancer) Name() string {
+func (b *Balancer) Name() string {
 	return b.driverConfig.Database()
 }
 
-func (b *balancer) Secure() bool {
+func (b *Balancer) Secure() bool {
 	return b.driverConfig.Secure()
 }
 
-func (b *balancer) Invoke(
+func (b *Balancer) Invoke(
 	ctx context.Context,
 	method string,
 	args interface{},
@@ -211,7 +224,7 @@ func (b *balancer) Invoke(
 	})
 }
 
-func (b *balancer) NewStream(
+func (b *Balancer) NewStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
 	method string,
@@ -228,7 +241,7 @@ func (b *balancer) NewStream(
 	return nil, err
 }
 
-func (b *balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc conn.Conn) error) (err error) {
+func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc conn.Conn) error) (err error) {
 	cc, err := b.getConn(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -257,14 +270,14 @@ func (b *balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	return nil
 }
 
-func (b *balancer) connections() *connectionsState {
-	b.m.RLock()
-	defer b.m.RUnlock()
+func (b *Balancer) connections() *connectionsState {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 
 	return b.connectionsState
 }
 
-func (b *balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
+func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := trace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(),
 		&ctx,
@@ -295,7 +308,7 @@ func (b *balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	c, failedCount = state.GetConnection(ctx)
 	if c == nil {
 		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("%w: cannot get connection from balancer after %d attempts", ErrNoEndpoints, failedCount),
+			fmt.Errorf("%w: cannot get connection from Balancer after %d attempts", ErrNoEndpoints, failedCount),
 		)
 	}
 	return c, nil

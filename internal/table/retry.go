@@ -2,14 +2,11 @@ package table
 
 import (
 	"context"
-	"fmt"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -134,63 +131,6 @@ func do(
 	)
 }
 
-type SessionProviderFunc struct {
-	OnGet func(context.Context) (*session, error)
-	OnPut func(context.Context, *session) error
-}
-
-var _ SessionProvider = SessionProviderFunc{}
-
-func (f SessionProviderFunc) Get(ctx context.Context) (*session, error) {
-	if f.OnGet == nil {
-		return nil, xerrors.WithStackTrace(errNoSession)
-	}
-	return f.OnGet(ctx)
-}
-
-func (f SessionProviderFunc) Put(ctx context.Context, s *session) error {
-	if f.OnPut == nil {
-		return xerrors.WithStackTrace(testutil.ErrNotImplemented)
-	}
-	return f.OnPut(ctx, s)
-}
-
-// SingleSession returns SessionProvider that uses only given session during
-// retries.
-func SingleSession(s *session) SessionProvider {
-	return &singleSession{s: s}
-}
-
-var (
-	errNoSession         = xerrors.Wrap(fmt.Errorf("no session"))
-	errUnexpectedSession = xerrors.Wrap(fmt.Errorf("unexpected session"))
-	errSessionOverflow   = xerrors.Wrap(fmt.Errorf("session overflow"))
-)
-
-type singleSession struct {
-	s     *session
-	empty bool
-}
-
-func (s *singleSession) Get(context.Context) (*session, error) {
-	if s.empty {
-		return nil, xerrors.WithStackTrace(errNoSession)
-	}
-	s.empty = true
-	return s.s, nil
-}
-
-func (s *singleSession) Put(_ context.Context, x *session) error {
-	if x != s.s {
-		return xerrors.WithStackTrace(errUnexpectedSession)
-	}
-	if !s.empty {
-		return xerrors.WithStackTrace(errSessionOverflow)
-	}
-	s.empty = false
-	return nil
-}
-
 func retryBackoff(
 	ctx context.Context,
 	p SessionProvider,
@@ -222,4 +162,19 @@ func retryBackoff(
 		retry.WithSlowBackoff(slowBackoff),
 		retry.WithIdempotent(isOperationIdempotent),
 	)
+}
+
+func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
+	options := table.Options{
+		Trace:       trace,
+		FastBackoff: backoff.Fast,
+		SlowBackoff: backoff.Slow,
+		TxSettings: table.TxSettings(
+			table.WithSerializableReadWrite(),
+		),
+	}
+	for _, o := range opts {
+		o(&options)
+	}
+	return options
 }

@@ -322,7 +322,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		cc: testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	p := SessionProviderFunc{
-		OnGet: client.createSession,
+		OnGet: client.internalPoolCreateSession,
 	}
 	r := xrand.New(xrand.WithLock())
 	for i := range timeouts {
@@ -473,3 +473,60 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		})
 	}
 }
+
+type SessionProviderFunc struct {
+	OnGet func(context.Context) (*session, error)
+	OnPut func(context.Context, *session) error
+}
+
+var _ SessionProvider = SessionProviderFunc{}
+
+func (f SessionProviderFunc) Get(ctx context.Context) (*session, error) {
+	if f.OnGet == nil {
+		return nil, xerrors.WithStackTrace(errNoSession)
+	}
+	return f.OnGet(ctx)
+}
+
+func (f SessionProviderFunc) Put(ctx context.Context, s *session) error {
+	if f.OnPut == nil {
+		return xerrors.WithStackTrace(testutil.ErrNotImplemented)
+	}
+	return f.OnPut(ctx, s)
+}
+
+// SingleSession returns SessionProvider that uses only given session during
+// retries.
+func SingleSession(s *session) SessionProvider {
+	return &singleSession{s: s}
+}
+
+type singleSession struct {
+	s     *session
+	empty bool
+}
+
+func (s *singleSession) Get(context.Context) (*session, error) {
+	if s.empty {
+		return nil, xerrors.WithStackTrace(errNoSession)
+	}
+	s.empty = true
+	return s.s, nil
+}
+
+func (s *singleSession) Put(_ context.Context, x *session) error {
+	if x != s.s {
+		return xerrors.WithStackTrace(errUnexpectedSession)
+	}
+	if !s.empty {
+		return xerrors.WithStackTrace(errSessionOverflow)
+	}
+	s.empty = false
+	return nil
+}
+
+var (
+	errNoSession         = xerrors.Wrap(fmt.Errorf("no session"))
+	errUnexpectedSession = xerrors.Wrap(fmt.Errorf("unexpected session"))
+	errSessionOverflow   = xerrors.Wrap(fmt.Errorf("session overflow"))
+)

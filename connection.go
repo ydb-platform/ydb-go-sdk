@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"os"
 	"sync"
 
@@ -116,7 +117,7 @@ type connection struct {
 	pool *conn.Pool
 
 	mtx      sync.Mutex
-	balancer balancer.Connection
+	balancer *balancer.Balancer
 
 	children    map[uint64]Connection
 	childrenMtx xsync.Mutex
@@ -225,6 +226,9 @@ func (c *connection) Table() table.Client {
 				)...,
 			),
 		)
+		c.balancer.OnUpdateEndpoints(func(nodes []endpoint.Info) {
+			c.table.UpdateNodes(nodes)
+		})
 		return c.table.Close
 	})
 	// may be nil if driver closed early

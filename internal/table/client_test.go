@@ -65,7 +65,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 			time.Duration(r.Int64(int64(time.Minute))),
 		)
 		defer childCancel()
-		s, err := p.createSession(childCtx)
+		s, err := p.internalPoolCreateSession(childCtx)
 		if s == nil && err == nil {
 			errCh <- fmt.Errorf("unexpected result: <%v, %w>", s, err)
 		}
@@ -125,18 +125,18 @@ func TestSessionPoolKeeperWake(t *testing.T) {
 
 	s := mustGetSession(t, p)
 
-	// Wait for keeper goroutine become initialized.
+	// Wait for internalPoolKeeper goroutine become initialized.
 	<-timer.Created
 
 	// Trigger keepalive timer event.
 	// NOTE: code below would be blocked if KeepAlive() call will happen for this
 	// event.
-	done := p.touchCond()
+	done := p.internalPoolTouchCond()
 	shiftTime(p.config.IdleThreshold())
 	timer.C <- timeutil.Now()
 	<-done
 
-	// Return session to wake up the keeper.
+	// Return session to wake up the internalPoolKeeper.
 	mustPutSession(t, p, s)
 	<-timer.Reset
 
@@ -194,7 +194,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			mustGetSession(t, p)
 
 			go func() {
-				_, err := p.get(
+				_, err := p.internalPoolGet(
 					context.Background(),
 					withTrace(trace.Table{
 						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
@@ -464,7 +464,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 			select {
 			case <-got:
 			case <-time.After(timeout):
-				t.Fatalf("no get after %s", timeout)
+				t.Fatalf("no internalPoolGet after %s", timeout)
 			}
 		})
 	}
@@ -571,7 +571,7 @@ func TestSessionPoolPutInFull(t *testing.T) {
 
 func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 	type sessionAndError struct {
-		session Session
+		session *session
 		err     error
 	}
 	for _, test := range []struct {
@@ -620,7 +620,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				}
 			}
 			go func() {
-				session, err := p.get(
+				session, err := p.internalPoolGet(
 					context.Background(),
 					withTrace(trace.Table{
 						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
@@ -825,7 +825,7 @@ func TestSessionPoolKeepAlive(t *testing.T) {
 		t.Fatal("unexpected number of keepalives")
 	}
 
-	// Now get first session and "spent" some time working within it.
+	// Now internalPoolGet first session and "spent" some time working within it.
 	x := mustGetSession(t, p)
 	shiftTime(idleThreshold / 2)
 
@@ -896,15 +896,15 @@ func TestSessionPoolKeepAliveOrdering(t *testing.T) {
 		t.Fatal("no keepalive request")
 	}
 
-	touchDone := p.touchCond()
+	touchDone := p.internalPoolTouchCond()
 
-	// Now keeper routine must be sticked on awaiting result of keep alive request.
+	// Now internalPoolKeeper routine must be sticked on awaiting result of keep alive request.
 	// That is perfect time to emulate race condition of pushing s2 back to the
 	// Client with time, that is greater than `now` of s1 being touched.
 	shiftTime(idleThreshold / 2)
 	mustPutSession(t, p, s2)
 
-	// Now release keepalive request, leading keeper to push s1 to the list
+	// Now release keepalive request, leading internalPoolKeeper to push s1 to the list
 	// with touch time lower, than list's back element (s2).
 	close(releaseKeepAlive)
 	// Wait for touching routine exits.
@@ -986,7 +986,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	<-timer.Created
 
 	// Now the most interesting and delicate part: we want to emulate a race
-	// condition between awaiting the session by touchCond() call and session
+	// condition between awaiting the session by internalPoolTouchCond() call and session
 	// deletion after failed Keepalive().
 	//
 	// So first step is to force keepalive. Note that we do not send keepalive
@@ -995,7 +995,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 	timer.C <- timeutil.Now()
 	<-keepalive
 
-	cond := p.touchCond()
+	cond := p.internalPoolTouchCond()
 	assertFilled := func(want bool) {
 		const timeout = time.Millisecond
 
@@ -1018,7 +1018,7 @@ func TestSessionPoolKeepAliveCondFairness(t *testing.T) {
 		xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 	)
 
-	// Block the keeper()'s deletion routine.
+	// Block the internalPoolKeeper()'s deletion routine.
 	// While delete is not finished cond must not be fulfilled.
 	<-deleteSession
 	assertFilled(false)
@@ -1184,7 +1184,7 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	shiftTime(p.config.IdleThreshold())
 	timer.C <- timeutil.Now()
 	<-timer.Reset
-	// get first session
+	// internalPoolGet first session
 	s1 := mustGetSession(t, p)
 	if s2 == s1 {
 		t.Fatalf("retry session is not returned")
@@ -1195,7 +1195,7 @@ func TestSessionPoolKeeperRetry(t *testing.T) {
 	timer.C <- timeutil.Now()
 	<-timer.Reset
 
-	// get retry session
+	// internalPoolGet retry session
 	s1 = mustGetSession(t, p)
 	if s == s1 {
 		t.Fatalf("second session is not returned")
@@ -1219,7 +1219,7 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 func mustCreateSession(t *testing.T, p *Client) *session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	s, err := p.createSession(context.Background())
+	s, err := p.internalPoolCreateSession(context.Background())
 	if err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
@@ -1374,7 +1374,7 @@ func (s *StubBuilder) createSession(ctx context.Context, opts ...sessionBuilderO
 func (c *Client) debug() {
 	fmt.Print("head ")
 	for el := c.idle.Front(); el != nil; el = el.Next() {
-		s := el.Value.(Session)
+		s := el.Value.(*session)
 		x := c.index[s]
 		fmt.Printf("<-> %s(%d) ", s.ID(), x.touched.Unix())
 	}
