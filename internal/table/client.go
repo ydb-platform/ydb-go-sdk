@@ -199,30 +199,9 @@ func (c *Client) isClosed() bool {
 
 // c.mu must NOT be held.
 func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err error) {
-	defer func() {
-		if s != nil {
-			s.onClose = append(s.onClose, func(s *session) {
-				c.mu.WithLock(func() {
-					info, has := c.index[s]
-					if !has {
-						return
-					}
-
-					delete(c.index, s)
-
-					trace.TableOnPoolSessionRemove(c.config.Trace(), s)
-					trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
-
-					c.internalPoolNotify(nil)
-
-					if info.idle != nil {
-						c.idle.Remove(info.idle)
-					}
-				})
-			})
-		}
-	}()
-
+	if c.isClosed() {
+		return nil, errClosedClient
+	}
 	// pre-check the Client size
 	var enoughSpace bool
 	c.mu.WithLock(func() {
@@ -270,8 +249,29 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 			c.createInProgress--
 			if s != nil {
 				c.index[s] = sessionInfo{}
+
 				trace.TableOnPoolSessionAdd(c.config.Trace(), s)
 				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+
+				s.onClose = append(s.onClose, func(s *session) {
+					c.mu.WithLock(func() {
+						info, has := c.index[s]
+						if !has {
+							return
+						}
+
+						delete(c.index, s)
+
+						trace.TableOnPoolSessionRemove(c.config.Trace(), s)
+						trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
+
+						c.internalPoolNotify(nil)
+
+						if info.idle != nil {
+							c.idle.Remove(info.idle)
+						}
+					})
+				})
 			}
 		})
 

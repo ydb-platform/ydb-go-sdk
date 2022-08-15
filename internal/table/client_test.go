@@ -243,85 +243,54 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 }
 
 func TestSessionPoolClose(t *testing.T) {
-	wg := sync.WaitGroup{}
-	p := newClientWithStubBuilder(
-		t,
-		testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
-			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
-				return &Ydb_Table.CreateSessionResult{
-					SessionId: testutil.SessionID(),
-				}, nil
-			},
-			testutil.TableDeleteSession: func(interface{}) (proto.Message, error) {
-				return &Ydb_Table.DeleteSessionResponse{}, nil
-			},
-		})),
-		3,
-		config.WithSizeLimit(3),
-		config.WithIdleThreshold(time.Hour),
-		config.WithTrace(
-			trace.Table{
-				OnPoolPut: func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
-					wg.Add(1)
-					return func(info trace.TablePoolPutDoneInfo) {
-						wg.Done()
-					}
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		p := newClientWithStubBuilder(
+			t,
+			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+					return &Ydb_Table.CreateSessionResult{
+						SessionId: testutil.SessionID(),
+					}, nil
 				},
-				OnPoolSessionClose: func(
-					info trace.TablePoolSessionCloseStartInfo,
-				) func(
-					doneInfo trace.TablePoolSessionCloseDoneInfo,
-				) {
-					wg.Add(1)
-					return func(info trace.TablePoolSessionCloseDoneInfo) {
-						wg.Done()
-					}
+				testutil.TableDeleteSession: func(interface{}) (proto.Message, error) {
+					return &Ydb_Table.DeleteSessionResponse{}, nil
 				},
-			},
-		),
-	)
-	defer func() {
-		_ = p.Close(context.Background())
-	}()
-
-	var (
-		s1      = mustGetSession(t, p)
-		s2      = mustGetSession(t, p)
-		s3      = mustGetSession(t, p)
-		closed1 = false
-		closed2 = false
-		closed3 = false
-	)
-
-	s1.onClose = append(s1.onClose, func(s *session) { closed1 = true })
-	s2.onClose = append(s2.onClose, func(s *session) { closed2 = true })
-	s3.onClose = append(s3.onClose, func(s *session) { closed3 = true })
-
-	mustPutSession(t, p, s1)
-	mustPutSession(t, p, s2)
-	mustClose(t, p)
-
-	if !closed1 {
-		t.Fatalf("session1 was not closed")
-	}
-	if !closed2 {
-		t.Fatalf("session2 was not closed")
-	}
-	if closed3 {
-		t.Fatalf("unexpected session close")
-	}
-
-	if err := p.Put(context.Background(), s3); !xerrors.Is(err, errClosedClient) {
-		t.Errorf(
-			"unexpected Put() error: %v; want %v",
-			err, errClosedClient,
+			})),
+			3,
+			config.WithSizeLimit(3),
+			config.WithIdleThreshold(time.Hour),
 		)
-	}
-	wg.Wait()
+		defer func() {
+			_ = p.Close(context.Background())
+		}()
 
-	if !closed3 {
-		t.Fatalf("session was not closed")
-	}
+		var (
+			s1      = mustGetSession(t, p)
+			s2      = mustGetSession(t, p)
+			s3      = mustGetSession(t, p)
+			closed1 = false
+			closed2 = false
+			closed3 = false
+		)
+
+		s1.onClose = append(s1.onClose, func(s *session) { closed1 = true })
+		s2.onClose = append(s2.onClose, func(s *session) { closed2 = true })
+		s3.onClose = append(s3.onClose, func(s *session) { closed3 = true })
+
+		mustPutSession(t, p, s1)
+		mustPutSession(t, p, s2)
+		mustClose(t, p)
+
+		if !closed1 {
+			t.Errorf("session1 was not closed")
+		}
+		if !closed2 {
+			t.Errorf("session2 was not closed")
+		}
+		if !closed3 {
+			t.Errorf("session3 was not closed")
+		}
+	}, xtest.StopAfter(42*time.Second))
 }
 
 func TestRaceWgClosed(t *testing.T) {
@@ -1216,7 +1185,7 @@ func mustResetTimer(t *testing.T, ch <-chan time.Duration, exp time.Duration) {
 	}
 }
 
-func mustCreateSession(t *testing.T, p *Client) *session {
+func mustCreateSession(t testing.TB, p *Client) *session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.internalPoolCreateSession(context.Background())
@@ -1227,7 +1196,7 @@ func mustCreateSession(t *testing.T, p *Client) *session {
 	return s
 }
 
-func mustGetSession(t *testing.T, p *Client) *session {
+func mustGetSession(t testing.TB, p *Client) *session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.Get(context.Background())
@@ -1238,7 +1207,7 @@ func mustGetSession(t *testing.T, p *Client) *session {
 	return s
 }
 
-func mustPutSession(t *testing.T, p *Client, s *session) {
+func mustPutSession(t testing.TB, p *Client, s *session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Put(
@@ -1250,7 +1219,7 @@ func mustPutSession(t *testing.T, p *Client, s *session) {
 	}
 }
 
-func mustClose(t *testing.T, p *Client) {
+func mustClose(t testing.TB, p *Client) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Close(context.Background()); err != nil {
