@@ -29,6 +29,12 @@ const (
 	TopicReaderMessageEvents
 	TopicReaderPartitionEvents
 
+	DatabaseSQLDriverEvents
+	DatabaseSQLConnectorEvents
+	DatabaseSQLConnEvents
+	DatabaseSQLTransactionEvents
+	DatabaseSQLStatementEvents
+
 	RetryEvents
 
 	DiscoveryEvents
@@ -74,6 +80,12 @@ const (
 		TopicReaderStreamLifeCycleEvents
 
 	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents
+
+	SQLEvents = DatabaseSQLDriverEvents |
+		DatabaseSQLConnectorEvents |
+		DatabaseSQLConnEvents |
+		DatabaseSQLTransactionEvents |
+		DatabaseSQLStatementEvents
 
 	DetailsAll = ^Details(0) // All bits enabled
 )

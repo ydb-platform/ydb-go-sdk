@@ -51,14 +51,28 @@ type mockConn struct {
 	closed   bool
 }
 
+var (
+	_ driver.Conn               = &mockConn{}
+	_ driver.ConnPrepareContext = &mockConn{}
+	_ driver.ConnBeginTx        = &mockConn{}
+	_ driver.ExecerContext      = &mockConn{}
+	_ driver.QueryerContext     = &mockConn{}
+)
+
 func (m *mockConn) Prepare(query string) (driver.Stmt, error) {
+	m.t.Log(xerrors.StackRecord(0))
+	return nil, driver.ErrSkip
+}
+
+func (m *mockConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	m.t.Log(xerrors.StackRecord(0))
 	if m.closed {
 		return nil, driver.ErrBadConn
 	}
 	return &mockStmt{
-		t:    m.t,
-		conn: m,
+		t:     m.t,
+		conn:  m,
+		query: query,
 	}, nil
 }
 
@@ -69,6 +83,10 @@ func (m *mockConn) Close() error {
 }
 
 func (m *mockConn) Begin() (driver.Tx, error) {
+	return nil, driver.ErrSkip
+}
+
+func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	m.t.Log(xerrors.StackRecord(0))
 	if m.closed {
 		return nil, driver.ErrBadConn
@@ -76,23 +94,20 @@ func (m *mockConn) Begin() (driver.Tx, error) {
 	return m, nil
 }
 
-func (m *mockConn) Exec(args []driver.Value) (driver.Result, error) {
+func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	m.t.Log(xerrors.StackRecord(0))
+	if retry.MustDeleteSession(m.execErr) {
+		m.closed = true
+	}
+	return nil, m.queryErr
+}
+
+func (m *mockConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	m.t.Log(xerrors.StackRecord(0))
 	if retry.MustDeleteSession(m.execErr) {
 		m.closed = true
 	}
 	return nil, m.execErr
-}
-
-func (m *mockConn) Query(args []driver.Value) (driver.Rows, error) {
-	m.t.Log(xerrors.StackRecord(0))
-	if m.closed {
-		return nil, driver.ErrBadConn
-	}
-	if retry.MustDeleteSession(m.queryErr) {
-		m.closed = true
-	}
-	return nil, m.queryErr
 }
 
 func (m *mockConn) Commit() error {
@@ -106,9 +121,16 @@ func (m *mockConn) Rollback() error {
 }
 
 type mockStmt struct {
-	t    testing.TB
-	conn *mockConn
+	t     testing.TB
+	conn  *mockConn
+	query string
 }
+
+var (
+	_ driver.Stmt             = &mockStmt{}
+	_ driver.StmtExecContext  = &mockStmt{}
+	_ driver.StmtQueryContext = &mockStmt{}
+)
 
 func (m *mockStmt) Close() error {
 	m.t.Log(xerrors.StackRecord(0))
@@ -122,12 +144,22 @@ func (m *mockStmt) NumInput() int {
 
 func (m *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 	m.t.Log(xerrors.StackRecord(0))
-	return m.conn.Exec(args)
+	return nil, driver.ErrSkip
+}
+
+func (m *mockStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	m.t.Log(xerrors.StackRecord(0))
+	return m.conn.ExecContext(ctx, m.query, args)
 }
 
 func (m *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 	m.t.Log(xerrors.StackRecord(0))
-	return m.conn.Query(args)
+	return nil, driver.ErrSkip
+}
+
+func (m *mockStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	m.t.Log(xerrors.StackRecord(0))
+	return m.conn.QueryContext(ctx, m.query, args)
 }
 
 //nolint:nestif
