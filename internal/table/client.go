@@ -83,7 +83,7 @@ type Client struct {
 	limit             int           // Upper bound for Client size.
 	idle              *list.List    // list<*session>
 	waitq             *list.List    // list<*chan *session>
-	keeperWake        chan struct{} // Set by internalPoolKeeper.
+	keeperWake        chan struct{} // Set by keeper.
 	keeperStop        chan struct{}
 	keeperDone        chan struct{}
 	touchingDone      chan struct{}
@@ -202,24 +202,22 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 	defer func() {
 		if s != nil {
 			s.onClose = append(s.onClose, func(s *session) {
-				c.spawnedGoroutines.Start("onClose", func(ctx context.Context) {
-					c.mu.WithLock(func() {
-						info, has := c.index[s]
-						if !has {
-							panic("session removed from pool early")
-						}
+				c.mu.WithLock(func() {
+					info, has := c.index[s]
+					if !has {
+						panic("session removed from pool early")
+					}
 
-						delete(c.index, s)
+					delete(c.index, s)
 
-						trace.TableOnPoolSessionRemove(c.config.Trace(), s)
-						trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
+					trace.TableOnPoolSessionRemove(c.config.Trace(), s)
+					trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
 
-						c.internalPoolNotify(nil)
+					c.internalPoolNotify(nil)
 
-						if info.idle != nil {
-							c.idle.Remove(info.idle)
-						}
-					})
+					if info.idle != nil {
+						c.idle.Remove(info.idle)
+					}
 				})
 			})
 		}
