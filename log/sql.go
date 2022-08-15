@@ -9,10 +9,11 @@ import (
 )
 
 // DatabaseSQL makes trace.DatabaseSQL with logging events from details
-func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
+func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.DatabaseSQL) {
 	if details&trace.DatabaseSQLEvents == 0 {
 		return
 	}
+	options := parseOptions(opts...)
 	l = l.WithName(`database`).WithName(`sql`)
 	if details&trace.DatabaseSQLConnectorEvents != 0 {
 		//nolint:govet
@@ -95,9 +96,13 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 			}
 		}
 		t.OnConnPrepare = func(info trace.DatabaseSQLConnPrepareStartInfo) func(trace.DatabaseSQLConnPrepareDoneInfo) {
-			l.Tracef("prepare statement start {query: \"%s\"}",
-				info.Query,
-			)
+			if options.logQuery {
+				l.Tracef("prepare statement start {query:\"%s\"}",
+					info.Query,
+				)
+			} else {
+				l.Tracef("prepare statement start")
+			}
 			query := info.Query
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnPrepareDoneInfo) {
@@ -106,19 +111,31 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 						time.Since(start),
 					)
 				} else {
-					l.Errorf(`prepare statement failed {latency:"%v",query: "%s", error:"%v",version:"%s"}`,
-						time.Since(start),
-						query,
-						info.Error,
-						meta.Version,
-					)
+					if options.logQuery {
+						l.Errorf(`prepare statement failed {latency:"%v",query:"%s",error:"%v",version:"%s"}`,
+							time.Since(start),
+							query,
+							info.Error,
+							meta.Version,
+						)
+					} else {
+						l.Errorf(`prepare statement failed {latency:"%v",error:"%v",version:"%s"}`,
+							time.Since(start),
+							info.Error,
+							meta.Version,
+						)
+					}
 				}
 			}
 		}
 		t.OnConnExec = func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
-			l.Tracef("exec start {query: \"%s\"}",
-				info.Query,
-			)
+			if options.logQuery {
+				l.Tracef("exec start {query:\"%s\"}",
+					info.Query,
+				)
+			} else {
+				l.Tracef("exec start")
+			}
 			query := info.Query
 			idempotent := info.Idempotent
 			start := time.Now()
@@ -129,22 +146,37 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 					)
 				} else {
 					m := retry.Check(info.Error)
-					l.Errorf(`exec failed {latency:"%v",query: "%s", error:"%v",retryable:%v,code:%d,deleteSession:%v,version:"%s"}`,
-						time.Since(start),
-						query,
-						info.Error,
-						m.MustRetry(idempotent),
-						m.StatusCode(),
-						m.MustDeleteSession(),
-						meta.Version,
-					)
+					if options.logQuery {
+						l.Errorf(`exec failed {latency:"%v",query:"%s",error:"%v",retryable:%v,code:%d,deleteSession:%v,version:"%s"}`,
+							time.Since(start),
+							query,
+							info.Error,
+							m.MustRetry(idempotent),
+							m.StatusCode(),
+							m.MustDeleteSession(),
+							meta.Version,
+						)
+					} else {
+						l.Errorf(`exec failed {latency:"%v",error:"%v",retryable:%v,code:%d,deleteSession:%v,version:"%s"}`,
+							time.Since(start),
+							info.Error,
+							m.MustRetry(idempotent),
+							m.StatusCode(),
+							m.MustDeleteSession(),
+							meta.Version,
+						)
+					}
 				}
 			}
 		}
 		t.OnConnQuery = func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
-			l.Tracef("query start {query: \"%s\"}",
-				info.Query,
-			)
+			if options.logQuery {
+				l.Tracef("query start {query:\"%s\"}",
+					info.Query,
+				)
+			} else {
+				l.Tracef("query start")
+			}
 			query := info.Query
 			idempotent := info.Idempotent
 			start := time.Now()
@@ -155,15 +187,26 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 					)
 				} else {
 					m := retry.Check(info.Error)
-					l.Errorf(`exec failed {latency:"%v",query: "%s", error:"%v",retryable:%v,code:%d,deleteSession:%v,version:"%s"}`,
-						time.Since(start),
-						query,
-						info.Error,
-						m.MustRetry(idempotent),
-						m.StatusCode(),
-						m.MustDeleteSession(),
-						meta.Version,
-					)
+					if options.logQuery {
+						l.Errorf(`exec failed {latency:"%v",query:"%s",error:"%v",retryable:%v,code:%d,deleteSession:%v,version:"%s"}`,
+							time.Since(start),
+							query,
+							info.Error,
+							m.MustRetry(idempotent),
+							m.StatusCode(),
+							m.MustDeleteSession(),
+							meta.Version,
+						)
+					} else {
+						l.Errorf(`exec failed {latency:"%v",error:"%v",retryable:%v,code:%d,deleteSession:%v,version:"%s"}`,
+							time.Since(start),
+							info.Error,
+							m.MustRetry(idempotent),
+							m.StatusCode(),
+							m.MustDeleteSession(),
+							meta.Version,
+						)
+					}
 				}
 			}
 		}
@@ -228,9 +271,13 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 			}
 		}
 		t.OnStmtExec = func(info trace.DatabaseSQLStmtExecStartInfo) func(trace.DatabaseSQLStmtExecDoneInfo) {
-			l.Tracef("exec start {query: \"%s\"}",
-				info.Query,
-			)
+			if options.logQuery {
+				l.Tracef("exec start {query:\"%s\"}",
+					info.Query,
+				)
+			} else {
+				l.Tracef("exec start")
+			}
 			query := info.Query
 			start := time.Now()
 			return func(info trace.DatabaseSQLStmtExecDoneInfo) {
@@ -239,19 +286,31 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 						time.Since(start),
 					)
 				} else {
-					l.Errorf(`exec failed {latency:"%v",query: "%s", error:"%v",version:"%s"}`,
-						time.Since(start),
-						query,
-						info.Error,
-						meta.Version,
-					)
+					if options.logQuery {
+						l.Errorf(`exec failed {latency:"%v",query:"%s",error:"%v",version:"%s"}`,
+							time.Since(start),
+							query,
+							info.Error,
+							meta.Version,
+						)
+					} else {
+						l.Errorf(`exec failed {latency:"%v",error:"%v",version:"%s"}`,
+							time.Since(start),
+							info.Error,
+							meta.Version,
+						)
+					}
 				}
 			}
 		}
 		t.OnStmtQuery = func(info trace.DatabaseSQLStmtQueryStartInfo) func(trace.DatabaseSQLStmtQueryDoneInfo) {
-			l.Tracef("query start {query: \"%s\"}",
-				info.Query,
-			)
+			if options.logQuery {
+				l.Tracef("query start {query:\"%s\"}",
+					info.Query,
+				)
+			} else {
+				l.Tracef("query start")
+			}
 			query := info.Query
 			start := time.Now()
 			return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
@@ -260,12 +319,20 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 						time.Since(start),
 					)
 				} else {
-					l.Errorf(`query failed {latency:"%v",query: "%s", error:"%v",version:"%s"}`,
-						time.Since(start),
-						query,
-						info.Error,
-						meta.Version,
-					)
+					if options.logQuery {
+						l.Errorf(`query failed {latency:"%v",query:"%s",error:"%v",version:"%s"}`,
+							time.Since(start),
+							query,
+							info.Error,
+							meta.Version,
+						)
+					} else {
+						l.Errorf(`query failed {latency:"%v",error:"%v",version:"%s"}`,
+							time.Since(start),
+							info.Error,
+							meta.Version,
+						)
+					}
 				}
 			}
 		}
