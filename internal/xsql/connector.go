@@ -49,7 +49,7 @@ func WithTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Conn
 	}
 }
 
-func Open(d Driver, connection Connection, opts ...ConnectorOption) (_ *Connector, err error) {
+func Open(d Driver, connection connection, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
 		driver:           d,
 		connection:       connection,
@@ -65,7 +65,7 @@ func Open(d Driver, connection Connection, opts ...ConnectorOption) (_ *Connecto
 	return c, nil
 }
 
-type Connection interface {
+type connection interface {
 	// Table returns table client
 	Table() table.Client
 
@@ -86,7 +86,7 @@ type Driver interface {
 // Connector is a producer of database/sql connections
 type Connector struct {
 	driver     Driver
-	connection Connection
+	connection connection
 
 	defaultTxControl     *table.TransactionControl
 	defaultQueryMode     QueryMode
@@ -106,7 +106,7 @@ func (c *Connector) Close() (err error) {
 	return c.connection.Close(context.Background())
 }
 
-func (c *Connector) Connection() Connection {
+func (c *Connector) Connection() connection {
 	return c.connection
 }
 

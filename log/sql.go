@@ -27,7 +27,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
 				if info.Error == nil {
-					l.Infof(`connect success {latency:"%v"}`,
+					l.Infof(`connected {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -49,7 +49,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnPingDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`ping success {latency:"%v"}`,
+					l.Debugf(`ping done {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -66,7 +66,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnCloseDoneInfo) {
 				if info.Error == nil {
-					l.Infof(`close success {latency:"%v"}`,
+					l.Infof(`closed {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -83,7 +83,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`begin transaction success {latency:"%v"}`,
+					l.Debugf(`begin transaction was success {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -107,7 +107,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnPrepareDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`prepare statement success {latency:"%v"}`,
+					l.Debugf(`prepare statement was success {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -141,7 +141,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnExecDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`exec success {latency:"%v"}`,
+					l.Debugf(`exec was success {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -182,7 +182,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnQueryDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`query success {latency:"%v"}`,
+					l.Debugf(`query was success {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -219,7 +219,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLTxCommitDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`commit success {latency:"%v"}`,
+					l.Debugf(`committed {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -236,7 +236,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`rollback success {latency:"%v"}`,
+					l.Debugf(`rollbacked {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -258,7 +258,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`close success {latency:"%v"}`,
+					l.Tracef(`closed {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -282,7 +282,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLStmtExecDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`exec success {latency:"%v"}`,
+					l.Debugf(`exec was success {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -315,7 +315,7 @@ func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.Datab
 			start := time.Now()
 			return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`query success {latency:"%v"}`,
+					l.Debugf(`query was success {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
