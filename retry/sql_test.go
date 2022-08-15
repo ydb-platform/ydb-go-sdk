@@ -24,6 +24,10 @@ type mockConnector struct {
 	execErr  error
 }
 
+var (
+	_ driver.Connector = &mockConnector{}
+)
+
 func (m *mockConnector) Open(name string) (driver.Conn, error) {
 	m.t.Log(xerrors.StackRecord(0))
 	return nil, driver.ErrSkip

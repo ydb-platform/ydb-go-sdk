@@ -22,10 +22,9 @@ type stmt struct {
 }
 
 var (
-	_ driver.Stmt             = &stmt{}
-	_ driver.StmtQueryContext = &stmt{}
-	_ driver.StmtExecContext  = &stmt{}
-
+	_ driver.Stmt              = &stmt{}
+	_ driver.StmtQueryContext  = &stmt{}
+	_ driver.StmtExecContext   = &stmt{}
 	_ driver.NamedValueChecker = &stmt{}
 )
 
