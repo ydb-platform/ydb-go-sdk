@@ -29,7 +29,6 @@ const (
 	TopicReaderMessageEvents
 	TopicReaderPartitionEvents
 
-	DatabaseSQLDriverEvents
 	DatabaseSQLConnectorEvents
 	DatabaseSQLConnEvents
 	DatabaseSQLTransactionEvents
@@ -81,8 +80,7 @@ const (
 
 	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents
 
-	SQLEvents = DatabaseSQLDriverEvents |
-		DatabaseSQLConnectorEvents |
+	SQLEvents = DatabaseSQLConnectorEvents |
 		DatabaseSQLConnEvents |
 		DatabaseSQLTransactionEvents |
 		DatabaseSQLStatementEvents

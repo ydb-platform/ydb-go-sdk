@@ -26,6 +26,7 @@ import (
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
@@ -112,6 +113,8 @@ type connection struct {
 	topicOnce    initOnce
 	topic        *topicclientinternal.Client
 	topicOptions []topicoptions.TopicOption
+
+	sqlOptions []xsql.ConnectorOption
 
 	pool *conn.Pool
 

@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type ConnectorOption func(c *Connector) error
@@ -37,6 +38,13 @@ func WithDefaultDataQueryOptions(opts ...options.ExecuteDataQueryOption) Connect
 func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) ConnectorOption {
 	return func(c *Connector) error {
 		c.defaultScanQueryOpts = append(c.defaultScanQueryOpts, opts...)
+		return nil
+	}
+}
+
+func WithTrace(t trace.SQL, opts ...trace.SQLComposeOption) ConnectorOption {
+	return func(c *Connector) error {
+		c.trace = c.trace.Compose(t, opts...)
 		return nil
 	}
 }
@@ -84,6 +92,8 @@ type Connector struct {
 	defaultQueryMode     QueryMode
 	defaultDataQueryOpts []options.ExecuteDataQueryOption
 	defaultScanQueryOpts []options.ExecuteScanQueryOption
+
+	trace trace.SQL
 }
 
 var (
@@ -100,7 +110,11 @@ func (c *Connector) Connection() Connection {
 	return c.connection
 }
 
-func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
+func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
+	onDone := trace.SQLOnConnectorConnect(c.trace, &ctx)
+	defer func() {
+		onDone(err)
+	}()
 	s, err := c.connection.Table().CreateSession(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -110,6 +124,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
+		withTrace(c.trace),
 	), nil
 }
 

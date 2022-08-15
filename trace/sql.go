@@ -8,10 +8,9 @@ type (
 	// SQL specified trace of `database/sql` call activity.
 	// gtrace:gen
 	SQL struct {
-		OnDriverOpen func(SQLDriverOpenStartInfo) func(SQLDriverOpenDoneInfo)
-
 		OnConnectorConnect func(SQLConnectorConnectStartInfo) func(SQLConnectorConnectDoneInfo)
 
+		OnConnPing         func(SQLConnPingStartInfo) func(SQLConnPingDoneInfo)
 		OnConnPrepare      func(SQLConnPrepareStartInfo) func(SQLConnPrepareDoneInfo)
 		OnConnClose        func(SQLConnCloseStartInfo) func(SQLConnCloseDoneInfo)
 		OnConnBeginTx      func(SQLConnBeginTxStartInfo) func(SQLConnBeginTxDoneInfo)
@@ -26,12 +25,6 @@ type (
 		OnStmtClose        func(SQLStmtCloseStartInfo) func(SQLStmtCloseDoneInfo)
 	}
 
-	SQLDriverOpenStartInfo struct {
-		Name string
-	}
-	SQLDriverOpenDoneInfo struct {
-		Error error
-	}
 	SQLConnectorConnectStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -40,6 +33,16 @@ type (
 		Context *context.Context
 	}
 	SQLConnectorConnectDoneInfo struct {
+		Error error
+	}
+	SQLConnPingStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+	}
+	SQLConnPingDoneInfo struct {
 		Error error
 	}
 	SQLConnPrepareStartInfo struct {
@@ -97,15 +100,8 @@ type (
 	SQLTxRollbackDoneInfo  struct {
 		Error error
 	}
-	SQLStmtCloseStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Query   string
-	}
-	SQLStmtCloseDoneInfo struct {
+	SQLStmtCloseStartInfo struct{}
+	SQLStmtCloseDoneInfo  struct {
 		Error error
 	}
 	SQLStmtQueryContextStartInfo struct {
@@ -125,6 +121,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Query   string
 	}
 	SQLStmtExecContextDoneInfo struct {
 		Error error

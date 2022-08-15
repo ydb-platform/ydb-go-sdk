@@ -24,6 +24,7 @@ import (
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -509,9 +510,40 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 }
 
 // WithTraceTopic adds configured discovery tracer to Connection
-func WithTraceTopic(t trace.Topic, opts ...trace.DiscoveryComposeOption) Option {
+func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.topicOptions = append(c.topicOptions, topicoptions.WithTrace(t))
+		c.topicOptions = append(
+			c.topicOptions,
+			topicoptions.WithTrace(
+				t,
+				append(
+					[]trace.TopicComposeOption{
+						trace.WithTopicPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+		return nil
+	}
+}
+
+// WithTraceSQL adds configured discovery tracer to Connection
+func WithTraceSQL(t trace.SQL, opts ...trace.SQLComposeOption) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.sqlOptions = append(
+			c.sqlOptions,
+			xsql.WithTrace(
+				t,
+				append(
+					[]trace.SQLComposeOption{
+						trace.WithSQLPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+		c.sqlOptions = append(c.sqlOptions, xsql.WithTrace(t, opts...))
 		return nil
 	}
 }

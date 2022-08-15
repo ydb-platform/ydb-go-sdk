@@ -13,6 +13,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type connOption func(*conn)
@@ -41,6 +43,12 @@ func withDefaultQueryMode(mode QueryMode) connOption {
 	}
 }
 
+func withTrace(t trace.SQL) connOption {
+	return func(c *conn) {
+		c.trace = t
+	}
+}
+
 type conn struct {
 	nopResult
 	namedValueChecker
@@ -56,34 +64,8 @@ type conn struct {
 	scanOpts []options.ExecuteScanQueryOption
 
 	transaction table.Transaction
-}
 
-func (c *conn) Commit() error {
-	if c.isClosed() {
-		return errClosedConn
-	}
-	defer func() {
-		c.transaction = nil
-	}()
-	_, err := c.transaction.CommitTx(context.Background())
-	if err != nil {
-		return c.checkClosed(err)
-	}
-	return nil
-}
-
-func (c *conn) Rollback() error {
-	if c.isClosed() {
-		return errClosedConn
-	}
-	defer func() {
-		c.transaction = nil
-	}()
-	err := c.transaction.Rollback(context.Background())
-	if err != nil {
-		return c.checkClosed(err)
-	}
-	return err
+	trace trace.SQL
 }
 
 var (
@@ -92,10 +74,48 @@ var (
 	_ driver.ConnBeginTx        = &conn{}
 	_ driver.ExecerContext      = &conn{}
 	_ driver.QueryerContext     = &conn{}
-	_ driver.SessionResetter    = &conn{}
 	_ driver.Pinger             = &conn{}
 	_ driver.NamedValueChecker  = &conn{}
 )
+
+func (c *conn) Commit() (err error) {
+	onDone := trace.SQLOnTxCommit(c.trace)
+	defer func() {
+		onDone(err)
+	}()
+	if c.isClosed() {
+		return errClosedConn
+	}
+	defer func() {
+		c.transaction = nil
+	}()
+	_, err = c.transaction.CommitTx(context.Background())
+	if err != nil {
+		return c.checkClosed(err)
+	}
+	return nil
+}
+
+func (c *conn) Rollback() (err error) {
+	onDone := trace.SQLOnTxRollback(c.trace)
+	defer func() {
+		onDone(err)
+	}()
+	if c.isClosed() {
+		return errClosedConn
+	}
+	defer func() {
+		c.transaction = nil
+	}()
+	if c.transaction == nil {
+		return nil
+	}
+	err = c.transaction.Rollback(context.Background())
+	if err != nil {
+		return c.checkClosed(err)
+	}
+	return err
+}
 
 func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	cc := &conn{
@@ -131,16 +151,16 @@ func (c *conn) setClosed() {
 	}
 }
 
-func (c *conn) ResetSession(ctx context.Context) error {
-	c.setClosed()
-	return errClosedConn
-}
-
-func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, err error) {
+	onDone := trace.SQLOnConnPrepare(c.trace, &ctx, query)
+	defer func() {
+		onDone(err)
+	}()
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	s, err := c.session.Prepare(ctx, query)
+	var s table.Statement
+	s, err = c.session.Prepare(ctx, query)
 	if err != nil {
 		return nil, c.checkClosed(err)
 	}
@@ -148,10 +168,15 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, e
 		conn:   c,
 		params: internal.Params(s),
 		query:  query,
+		trace:  c.trace,
 	}, nil
 }
 
-func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.Tx, error) {
+func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {
+	onDone := trace.SQLOnConnBeginTx(c.trace, &ctx)
+	defer func() {
+		onDone(err)
+	}()
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
@@ -160,7 +185,8 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.
 			fmt.Errorf("conn already have an opened tx: %s", c.transaction.ID()),
 		)
 	}
-	txSettings, err := isolation.ToYDB(txOptions)
+	var txSettings *table.TransactionSettings
+	txSettings, err = isolation.ToYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -171,7 +197,11 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (driver.
 	return c, nil
 }
 
-func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
+	onDone := trace.SQLOnConnExecContext(c.trace, &ctx, query)
+	defer func() {
+		onDone(err)
+	}()
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
@@ -182,7 +212,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 				fmt.Errorf("query mode `%s` not supported with transaction", m.String()),
 			)
 		}
-		_, err := c.transaction.Execute(ctx, query, toQueryParams(args), dataQueryOptions(ctx)...)
+		_, err = c.transaction.Execute(ctx, query, toQueryParams(args), dataQueryOptions(ctx)...)
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
@@ -190,7 +220,8 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	}
 	switch m {
 	case DataQueryMode:
-		_, res, err := c.session.Execute(ctx,
+		var res result.Result
+		_, res, err = c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
 			query,
 			toQueryParams(args),
@@ -204,13 +235,13 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		}
 		return c, nil
 	case SchemeQueryMode:
-		err := c.session.ExecuteSchemeQuery(ctx, query)
+		err = c.session.ExecuteSchemeQuery(ctx, query)
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
 		return c, nil
 	case ScriptingQueryMode:
-		_, err := c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
+		_, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
@@ -220,7 +251,11 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	}
 }
 
-func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
+	onDone := trace.SQLOnConnExecContext(c.trace, &ctx, query)
+	defer func() {
+		onDone(err)
+	}()
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
@@ -231,7 +266,8 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 				fmt.Errorf("query mode `%s` not supported with transaction", m.String()),
 			)
 		}
-		res, err := c.transaction.Execute(ctx, query, toQueryParams(args), dataQueryOptions(ctx)...)
+		var res result.Result
+		res, err = c.transaction.Execute(ctx, query, toQueryParams(args), dataQueryOptions(ctx)...)
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
@@ -244,7 +280,8 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	}
 	switch m {
 	case DataQueryMode:
-		_, res, err := c.session.Execute(ctx,
+		var res result.Result
+		_, res, err = c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
 			query,
 			toQueryParams(args),
@@ -260,7 +297,8 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 			result: res,
 		}, nil
 	case ScanQueryMode:
-		res, err := c.session.StreamExecuteScanQuery(ctx,
+		var res result.StreamResult
+		res, err = c.session.StreamExecuteScanQuery(ctx,
 			query,
 			toQueryParams(args),
 			scanQueryOptions(ctx)...,
@@ -275,7 +313,8 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 			result: res,
 		}, nil
 	case ExplainQueryMode:
-		exp, err := c.session.Explain(ctx, query)
+		var exp table.DataQueryExplanation
+		exp, err = c.session.Explain(ctx, query)
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
@@ -286,7 +325,8 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 			},
 		}, nil
 	case ScriptingQueryMode:
-		res, err := c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
+		var res result.StreamResult
+		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
 		if err != nil {
 			return nil, c.checkClosed(err)
 		}
@@ -302,6 +342,10 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 }
 
 func (c *conn) Ping(ctx context.Context) (err error) {
+	onDone := trace.SQLOnConnPing(c.trace, &ctx)
+	defer func() {
+		onDone(err)
+	}()
 	if c.isClosed() {
 		return errClosedConn
 	}
@@ -311,10 +355,16 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 	return nil
 }
 
-func (c *conn) Close() error {
-	ctx := context.Background()
-	err := c.session.Close(ctx)
-	return c.checkClosed(err)
+func (c *conn) Close() (err error) {
+	onDone := trace.SQLOnConnClose(c.trace)
+	defer func() {
+		onDone(err)
+	}()
+	err = c.session.Close(context.Background())
+	if err != nil {
+		return c.checkClosed(err)
+	}
+	return nil
 }
 
 func (c *conn) Prepare(string) (driver.Stmt, error) {

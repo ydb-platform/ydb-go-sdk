@@ -28,41 +28,6 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 		opt(&options)
 	}
 	{
-		h1 := t.OnDriverOpen
-		h2 := x.OnDriverOpen
-		ret.OnDriverOpen = func(s SQLDriverOpenStartInfo) func(SQLDriverOpenDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(SQLDriverOpenDoneInfo)
-			if h1 != nil {
-				r = h1(s)
-			}
-			if h2 != nil {
-				r1 = h2(s)
-			}
-			return func(s SQLDriverOpenDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(s)
-				}
-				if r1 != nil {
-					r1(s)
-				}
-			}
-		}
-	}
-	{
 		h1 := t.OnConnectorConnect
 		h2 := x.OnConnectorConnect
 		ret.OnConnectorConnect = func(s SQLConnectorConnectStartInfo) func(SQLConnectorConnectDoneInfo) {
@@ -81,6 +46,41 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 				r1 = h2(s)
 			}
 			return func(s SQLConnectorConnectDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(s)
+				}
+				if r1 != nil {
+					r1(s)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnConnPing
+		h2 := x.OnConnPing
+		ret.OnConnPing = func(s SQLConnPingStartInfo) func(SQLConnPingDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(SQLConnPingDoneInfo)
+			if h1 != nil {
+				r = h1(s)
+			}
+			if h2 != nil {
+				r1 = h2(s)
+			}
+			return func(s SQLConnPingDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -449,21 +449,6 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 	}
 	return ret
 }
-func (t SQL) onDriverOpen(s SQLDriverOpenStartInfo) func(SQLDriverOpenDoneInfo) {
-	fn := t.OnDriverOpen
-	if fn == nil {
-		return func(SQLDriverOpenDoneInfo) {
-			return
-		}
-	}
-	res := fn(s)
-	if res == nil {
-		return func(SQLDriverOpenDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t SQL) onConnectorConnect(s SQLConnectorConnectStartInfo) func(SQLConnectorConnectDoneInfo) {
 	fn := t.OnConnectorConnect
 	if fn == nil {
@@ -474,6 +459,21 @@ func (t SQL) onConnectorConnect(s SQLConnectorConnectStartInfo) func(SQLConnecto
 	res := fn(s)
 	if res == nil {
 		return func(SQLConnectorConnectDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t SQL) onConnPing(s SQLConnPingStartInfo) func(SQLConnPingDoneInfo) {
+	fn := t.OnConnPing
+	if fn == nil {
+		return func(SQLConnPingDoneInfo) {
+			return
+		}
+	}
+	res := fn(s)
+	if res == nil {
+		return func(SQLConnPingDoneInfo) {
 			return
 		}
 	}
@@ -629,22 +629,22 @@ func (t SQL) onStmtClose(s SQLStmtCloseStartInfo) func(SQLStmtCloseDoneInfo) {
 	}
 	return res
 }
-func SQLOnDriverOpen(t SQL, name string) func(error) {
-	var p SQLDriverOpenStartInfo
-	p.Name = name
-	res := t.onDriverOpen(p)
-	return func(e error) {
-		var p SQLDriverOpenDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
 func SQLOnConnectorConnect(t SQL, c *context.Context) func(error) {
 	var p SQLConnectorConnectStartInfo
 	p.Context = c
 	res := t.onConnectorConnect(p)
 	return func(e error) {
 		var p SQLConnectorConnectDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func SQLOnConnPing(t SQL, c *context.Context) func(error) {
+	var p SQLConnPingStartInfo
+	p.Context = c
+	res := t.onConnPing(p)
+	return func(e error) {
+		var p SQLConnPingDoneInfo
 		p.Error = e
 		res(p)
 	}
@@ -730,9 +730,10 @@ func SQLOnStmtQueryContext(t SQL, c *context.Context, query string) func(error) 
 		res(p)
 	}
 }
-func SQLOnStmtExecContext(t SQL, c *context.Context) func(error) {
+func SQLOnStmtExecContext(t SQL, c *context.Context, query string) func(error) {
 	var p SQLStmtExecContextStartInfo
 	p.Context = c
+	p.Query = query
 	res := t.onStmtExecContext(p)
 	return func(e error) {
 		var p SQLStmtExecContextDoneInfo
@@ -740,10 +741,8 @@ func SQLOnStmtExecContext(t SQL, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func SQLOnStmtClose(t SQL, c *context.Context, query string) func(error) {
+func SQLOnStmtClose(t SQL) func(error) {
 	var p SQLStmtCloseStartInfo
-	p.Context = c
-	p.Query = query
 	res := t.onStmtClose(p)
 	return func(e error) {
 		var p SQLStmtCloseDoneInfo
