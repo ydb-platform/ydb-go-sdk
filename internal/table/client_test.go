@@ -290,7 +290,7 @@ func TestSessionPoolClose(t *testing.T) {
 		if !closed3 {
 			t.Errorf("session3 was not closed")
 		}
-	}, xtest.StopAfter(42*time.Second))
+	}, xtest.StopAfter(17*time.Second))
 }
 
 func TestRaceWgClosed(t *testing.T) {
