@@ -505,7 +505,6 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	var issues []error
 	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
 		close(c.done)
-		var idle []*session
 		c.mu.WithLock(func() {
 			keeperDone := c.keeperDone
 			if ch := c.keeperStop; ch != nil {
@@ -518,17 +517,13 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 			c.limit = 0
 
-			idle = make([]*session, 0, c.idle.Len())
+			issues = make([]error, 0, c.idle.Len())
 			for e := c.idle.Front(); e != nil; e = e.Next() {
-				idle = append(idle, e.Value.(*session))
+				if err = c.internalPoolCloseSession(ctx, e.Value.(*session)); err != nil {
+					issues = append(issues, err)
+				}
 			}
 		})
-		issues = make([]error, 0, len(idle))
-		for _, s := range idle {
-			if err = c.internalPoolCloseSession(ctx, s); err != nil {
-				issues = append(issues, err)
-			}
-		}
 	}
 
 	_ = c.spawnedGoroutines.Close(ctx, errClosedClient)
