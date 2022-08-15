@@ -6,6 +6,7 @@ package badconn
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -152,6 +153,10 @@ func Test_badConnError_Is(t *testing.T) {
 
 			if xerrors.Is(e, driver.ErrBadConn) {
 				require.True(t, xerrors.Is(e, err))
+			}
+
+			if errors.Is(e, driver.ErrBadConn) {
+				require.True(t, errors.Is(e, err))
 			}
 		})
 	}
