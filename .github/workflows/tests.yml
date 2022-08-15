@@ -115,10 +115,8 @@ jobs:
           flags: connection,e2e,${{ matrix.os }},${{ matrix.go-version }}
           name: connection
       - name: Test database/sql
-        if: ${{ matrix.go-version == 'go1.18.x' }} || ${{ matrix.go-version == 'go1.19.x' }}
         run: go test -race -coverpkg=./... -coverprofile database_sql.txt -covermode atomic ./sql_e2e_test.go
       - name: Upload database/sql coverage report to Codecov
-        if: ${{ matrix.go-version == 'go1.18.x' }} || ${{ matrix.go-version == 'go1.19.x' }}
         uses: codecov/codecov-action@v2
         with:
           file: ./database_sql.txt
