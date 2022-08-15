@@ -81,9 +81,9 @@ type Client struct {
 	index             map[*session]sessionInfo
 	createInProgress  int           // KIKIMR-9163: in-create-process counter
 	limit             int           // Upper bound for Client size.
-	idle              *list.List    // list<table.session>
-	waitq             *list.List    // list<*chan table.session>
-	keeperWake        chan struct{} // Set by internalPoolKeeper.
+	idle              *list.List    // list<*session>
+	waitq             *list.List    // list<*chan *session>
+	keeperWake        chan struct{} // Set by keeper.
 	keeperStop        chan struct{}
 	keeperDone        chan struct{}
 	touchingDone      chan struct{}
@@ -202,24 +202,22 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 	defer func() {
 		if s != nil {
 			s.onClose = append(s.onClose, func(s *session) {
-				c.spawnedGoroutines.Start("onClose", func(ctx context.Context) {
-					c.mu.WithLock(func() {
-						info, has := c.index[s]
-						if !has {
-							panic("session removed from pool early")
-						}
+				c.mu.WithLock(func() {
+					info, has := c.index[s]
+					if !has {
+						panic("session removed from pool early")
+					}
 
-						delete(c.index, s)
+					delete(c.index, s)
 
-						trace.TableOnPoolSessionRemove(c.config.Trace(), s)
-						trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
+					trace.TableOnPoolSessionRemove(c.config.Trace(), s)
+					trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
 
-						c.internalPoolNotify(nil)
+					c.internalPoolNotify(nil)
 
-						if info.idle != nil {
-							c.idle.Remove(info.idle)
-						}
-					})
+					if info.idle != nil {
+						c.idle.Remove(info.idle)
+					}
 				})
 			})
 		}
@@ -507,6 +505,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	var issues []error
 	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
 		close(c.done)
+		var idle []*session
 		c.mu.WithLock(func() {
 			keeperDone := c.keeperDone
 			if ch := c.keeperStop; ch != nil {
@@ -519,13 +518,17 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 			c.limit = 0
 
-			issues = make([]error, 0, len(c.index))
+			idle = make([]*session, 0, c.idle.Len())
 			for e := c.idle.Front(); e != nil; e = e.Next() {
-				if err = c.internalPoolCloseSession(ctx, e.Value.(*session)); err != nil {
-					issues = append(issues, err)
-				}
+				idle = append(idle, e.Value.(*session))
 			}
 		})
+		issues = make([]error, 0, len(idle))
+		for _, s := range idle {
+			if err = c.internalPoolCloseSession(ctx, s); err != nil {
+				issues = append(issues, err)
+			}
+		}
 	}
 
 	_ = c.spawnedGoroutines.Close(ctx, errClosedClient)
