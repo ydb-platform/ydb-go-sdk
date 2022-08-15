@@ -2,7 +2,7 @@
 * Extended `retry.DoTx` test for to achieve equivalence with `retry.Retry` behaviour
 * Added `database/sql` events for tracing `database/sql` driver events
 * Added internal logging for `database/sql` events
-* Supports `YDB_LOG_DETAILS` environment variable for specify log messages by scope
+* Supports `YDB_LOG_DETAILS` environment variable for specify scope of log messages
 
 ## v3.33.0
 * Added `retry.DoTx` helper for retrying `database/sql` transactions 

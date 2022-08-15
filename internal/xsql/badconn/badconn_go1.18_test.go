@@ -20,7 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var checkErrs = []error{
+var errsToCheck = []error{
 	fmt.Errorf("unknown error"),
 	context.DeadlineExceeded,
 	context.Canceled,
@@ -147,9 +147,9 @@ var checkErrs = []error{
 }
 
 func Test_badConnError_Is(t *testing.T) {
-	for _, err := range checkErrs {
+	for _, err := range errsToCheck {
 		t.Run(err.Error(), func(t *testing.T) {
-			e := badConnError{err: err}
+			e := Map(err)
 
 			require.True(t, xerrors.Is(e, driver.ErrBadConn))
 			require.True(t, errors.Is(e, driver.ErrBadConn))
@@ -161,13 +161,14 @@ func Test_badConnError_Is(t *testing.T) {
 }
 
 func Test_badConnError_As_Error(t *testing.T) {
-	for _, err := range checkErrs {
+	for _, err := range errsToCheck {
 		t.Run(err.Error(), func(t *testing.T) {
 			var e xerrors.Error
 			if !xerrors.As(err, &e) {
 				t.Skip()
 			}
-			require.True(t, xerrors.As(badConnError{err: err}, &e))
+
+			require.True(t, xerrors.As(Map(err), &e))
 		})
 	}
 }

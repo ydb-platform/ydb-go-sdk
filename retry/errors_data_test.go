@@ -27,7 +27,7 @@ const (
 	nonIdempotent = false
 )
 
-var checkErrs = []struct {
+var errsToCheck = []struct {
 	err           error        // given error
 	backoff       backoff.Type // no backoff (=== no operationStatus), fast backoff, slow backoff
 	deleteSession bool         // close session and delete from pool
