@@ -349,7 +349,7 @@ func TestRaceWgClosed(t *testing.T) {
 		}
 		_ = p.Close(context.Background())
 		wg.Wait()
-	}, xtest.StopAfter(37*time.Second))
+	}, xtest.StopAfter(27*time.Second))
 }
 
 func TestSessionPoolDeleteReleaseWait(t *testing.T) {
