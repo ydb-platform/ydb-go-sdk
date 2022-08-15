@@ -523,7 +523,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 				toClose = append(toClose, e.Value.(*session))
 			}
 		})
-		issues = make([]error, 0, c.idle.Len())
+		issues = make([]error, 0, len(toClose))
 		for _, s := range toClose {
 			if err = c.internalPoolCloseSession(ctx, s); err != nil {
 				issues = append(issues, err)
