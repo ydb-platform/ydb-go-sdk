@@ -1,6 +1,3 @@
-//go:build go1.18
-// +build go1.18
-
 package retry
 
 import (
@@ -72,22 +69,22 @@ func DoTx(ctx context.Context, db *sql.DB, f TxOperationFunc, opts ...DoTxOption
 		attempts++
 		tx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
-			return xerrors.WithStackTrace(err)
+			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
 			_ = tx.Rollback()
 		}()
 		if err = f(ctx, tx); err != nil {
-			return xerrors.WithStackTrace(err)
+			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		if err = tx.Commit(); err != nil {
-			return xerrors.WithStackTrace(err)
+			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		return nil
 	}, options.retryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("opration failed with %d attempts: %w", attempts, err),
+			fmt.Errorf("tx opration failed with %d attempts: %w", attempts, err),
 		)
 	}
 	return nil
