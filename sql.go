@@ -63,11 +63,7 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	c, err := xsql.Open(d, db, connectorOpts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	return c, nil
+	return Connector(db, connectorOpts...)
 }
 
 func (d *sqlDriver) Attach(c *xsql.Connector) {
@@ -120,7 +116,7 @@ func WithDatabaseSQLTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 
 func Connector(db Connection, opts ...ConnectorOption) (*xsql.Connector, error) {
 	if c, ok := db.(*connection); ok {
-		opts = append(opts, c.sqlOptions...)
+		opts = append(opts, c.databaseSQLOptions...)
 	}
 	c, err := xsql.Open(d, db, opts...)
 	if err != nil {

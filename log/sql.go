@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -81,7 +82,7 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 				if info.Error == nil {
-					l.Infof(`begin transaction success {latency:"%v"}`,
+					l.Debugf(`begin transaction success {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {
@@ -119,6 +120,7 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 				info.Query,
 			)
 			query := info.Query
+			idempotent := info.Idempotent
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnExecDoneInfo) {
 				if info.Error == nil {
@@ -126,10 +128,14 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 						time.Since(start),
 					)
 				} else {
-					l.Errorf(`exec failed {latency:"%v",query: "%s", error:"%v",version:"%s"}`,
+					m := retry.Check(info.Error)
+					l.Errorf(`exec failed {latency:"%v",query: "%s", error:"%v",retryable:%v,code:%d,deleteSession:%v,version:"%s"}`,
 						time.Since(start),
 						query,
 						info.Error,
+						m.MustRetry(idempotent),
+						m.StatusCode(),
+						m.MustDeleteSession(),
 						meta.Version,
 					)
 				}
@@ -140,6 +146,7 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 				info.Query,
 			)
 			query := info.Query
+			idempotent := info.Idempotent
 			start := time.Now()
 			return func(info trace.DatabaseSQLConnQueryDoneInfo) {
 				if info.Error == nil {
@@ -147,10 +154,14 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 						time.Since(start),
 					)
 				} else {
-					l.Errorf(`query failed {latency:"%v",query: "%s", error:"%v",version:"%s"}`,
+					m := retry.Check(info.Error)
+					l.Errorf(`exec failed {latency:"%v",query: "%s", error:"%v",retryable:%v,code:%d,deleteSession:%v,version:"%s"}`,
 						time.Since(start),
 						query,
 						info.Error,
+						m.MustRetry(idempotent),
+						m.StatusCode(),
+						m.MustDeleteSession(),
 						meta.Version,
 					)
 				}
@@ -204,7 +215,7 @@ func DatabaseSQL(l Logger, details trace.Details) (t trace.DatabaseSQL) {
 			start := time.Now()
 			return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
 				if info.Error == nil {
-					l.Infof(`close success {latency:"%v"}`,
+					l.Tracef(`close success {latency:"%v"}`,
 						time.Since(start),
 					)
 				} else {

@@ -114,7 +114,7 @@ type connection struct {
 	topic        *topicclientinternal.Client
 	topicOptions []topicoptions.TopicOption
 
-	sqlOptions []xsql.ConnectorOption
+	databaseSQLOptions []xsql.ConnectorOption
 
 	pool *conn.Pool
 
@@ -370,7 +370,10 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 			opts = append(
 				opts,
 				WithLogger(
-					trace.DetailsAll,
+					trace.MatchDetails(
+						os.Getenv("YDB_LOG_DETAILS"),
+						trace.WithDefaultDetails(trace.DetailsAll),
+					),
 					WithNamespace("ydb"),
 					WithMinLevel(log.FromString(logLevel)),
 					WithNoColor(os.Getenv("YDB_LOG_NO_COLOR") != ""),

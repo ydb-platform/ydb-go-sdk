@@ -97,6 +97,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	for _, o := range opts {
 		o(options)
 	}
+	ctx = retry.WithIdempotent(ctx, options.idempotent)
 	defer func() {
 		if err != nil && options.stackTrace {
 			err = xerrors.WithStackTrace(

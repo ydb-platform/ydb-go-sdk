@@ -533,8 +533,8 @@ func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option {
 // WithTraceDatabaseSQL adds configured discovery tracer to Connection
 func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		c.sqlOptions = append(
-			c.sqlOptions,
+		c.databaseSQLOptions = append(
+			c.databaseSQLOptions,
 			xsql.WithTrace(
 				t,
 				append(
@@ -545,7 +545,6 @@ func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 				)...,
 			),
 		)
-		c.sqlOptions = append(c.sqlOptions, xsql.WithTrace(t, opts...))
 		return nil
 	}
 }

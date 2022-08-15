@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -198,7 +199,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
-	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query)
+	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, retry.IsIdempotent(ctx))
 	defer func() {
 		onDone(err)
 	}()
@@ -252,7 +253,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 }
 
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query)
+	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, retry.IsIdempotent(ctx))
 	defer func() {
 		onDone(err)
 	}()

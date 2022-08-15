@@ -77,8 +77,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Query   string
+		Context    *context.Context
+		Query      string
+		Idempotent bool
 	}
 	DatabaseSQLConnQueryDoneInfo struct {
 		Error error
@@ -88,8 +89,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Query   string
+		Context    *context.Context
+		Query      string
+		Idempotent bool
 	}
 	DatabaseSQLConnExecDoneInfo struct {
 		Error error

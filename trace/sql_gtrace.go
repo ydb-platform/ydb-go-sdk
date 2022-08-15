@@ -757,10 +757,11 @@ func DatabaseSQLOnConnBegin(t DatabaseSQL, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func DatabaseSQLOnConnQuery(t DatabaseSQL, c *context.Context, query string) func(error) {
+func DatabaseSQLOnConnQuery(t DatabaseSQL, c *context.Context, query string, idempotent bool) func(error) {
 	var p DatabaseSQLConnQueryStartInfo
 	p.Context = c
 	p.Query = query
+	p.Idempotent = idempotent
 	res := t.onConnQuery(p)
 	return func(e error) {
 		var p DatabaseSQLConnQueryDoneInfo
@@ -768,10 +769,11 @@ func DatabaseSQLOnConnQuery(t DatabaseSQL, c *context.Context, query string) fun
 		res(p)
 	}
 }
-func DatabaseSQLOnConnExec(t DatabaseSQL, c *context.Context, query string) func(error) {
+func DatabaseSQLOnConnExec(t DatabaseSQL, c *context.Context, query string, idempotent bool) func(error) {
 	var p DatabaseSQLConnExecStartInfo
 	p.Context = c
 	p.Query = query
+	p.Idempotent = idempotent
 	res := t.onConnExec(p)
 	return func(e error) {
 		var p DatabaseSQLConnExecDoneInfo

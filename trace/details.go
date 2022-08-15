@@ -119,6 +119,12 @@ var (
 		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
 		TablePoolAPIEvents:              "ydb.table.pool.api",
 
+		DatabaseSQLEvents:          "ydb.database.sql",
+		DatabaseSQLConnectorEvents: "ydb.database.sql.connector",
+		DatabaseSQLConnEvents:      "ydb.database.sql.conn",
+		DatabaseSQLTxEvents:        "ydb.database.sql.tx",
+		DatabaseSQLStmtEvents:      "ydb.database.sql.stmt",
+
 		TopicEvents:                      "ydb.topic",
 		TopicControlPlaneEvents:          "ydb.topic.controlplane",
 		TopicReaderEvents:                "ydb.topic.reader",
