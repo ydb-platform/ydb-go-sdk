@@ -205,7 +205,7 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 				c.mu.WithLock(func() {
 					info, has := c.index[s]
 					if !has {
-						panic("session removed from pool early")
+						return
 					}
 
 					delete(c.index, s)
@@ -518,9 +518,9 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 			c.limit = 0
 
-			toClose = make([]*session, 0, c.idle.Len())
-			for e := c.idle.Front(); e != nil; e = e.Next() {
-				toClose = append(toClose, e.Value.(*session))
+			toClose = make([]*session, 0, len(c.index))
+			for s := range c.index {
+				toClose = append(toClose, s)
 			}
 		})
 		issues = make([]error, 0, len(toClose))
