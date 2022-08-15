@@ -28,12 +28,12 @@ func WithStackTrace(err error, opts ...withStackTraceOption) error {
 		o(&options)
 	}
 	return &stackError{
-		stackRecord: stackRecord(options.skipDepth + 1),
+		stackRecord: StackRecord(options.skipDepth + 1),
 		err:         err,
 	}
 }
 
-func stackRecord(depth int) string {
+func StackRecord(depth int) string {
 	function, file, line, _ := runtime.Caller(depth + 1)
 	name := runtime.FuncForPC(function).Name()
 	return name + "(" + fileName(file) + ":" + strconv.Itoa(line) + ")"

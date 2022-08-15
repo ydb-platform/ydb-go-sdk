@@ -26,6 +26,7 @@ import (
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
@@ -112,6 +113,8 @@ type connection struct {
 	topicOnce    initOnce
 	topic        *topicclientinternal.Client
 	topicOptions []topicoptions.TopicOption
+
+	databaseSQLOptions []xsql.ConnectorOption
 
 	pool *conn.Pool
 
@@ -367,7 +370,10 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 			opts = append(
 				opts,
 				WithLogger(
-					trace.DetailsAll,
+					trace.MatchDetails(
+						os.Getenv("YDB_LOG_DETAILS"),
+						trace.WithDefaultDetails(trace.DetailsAll),
+					),
 					WithNamespace("ydb"),
 					WithMinLevel(log.FromString(logLevel)),
 					WithNoColor(os.Getenv("YDB_LOG_NO_COLOR") != ""),

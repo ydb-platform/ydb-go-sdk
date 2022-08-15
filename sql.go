@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var d = &sqlDriver{connectors: make(map[*xsql.Connector]struct{})}
@@ -62,11 +63,7 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	c, err := xsql.Open(d, db, connectorOpts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	return c, nil
+	return Connector(db, connectorOpts...)
 }
 
 func (d *sqlDriver) Attach(c *xsql.Connector) {
@@ -113,8 +110,15 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 	return xsql.WithDefaultScanQueryOptions(opts...)
 }
 
+func WithDatabaseSQLTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
+	return xsql.WithTrace(t, opts...)
+}
+
 func Connector(db Connection, opts ...ConnectorOption) (*xsql.Connector, error) {
-	c, err := xsql.Open(d, db)
+	if c, ok := db.(*connection); ok {
+		opts = append(opts, c.databaseSQLOptions...)
+	}
+	c, err := xsql.Open(d, db, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

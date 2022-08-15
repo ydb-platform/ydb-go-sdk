@@ -81,9 +81,9 @@ type Client struct {
 	index             map[*session]sessionInfo
 	createInProgress  int           // KIKIMR-9163: in-create-process counter
 	limit             int           // Upper bound for Client size.
-	idle              *list.List    // list<table.session>
-	waitq             *list.List    // list<*chan table.session>
-	keeperWake        chan struct{} // Set by internalPoolKeeper.
+	idle              *list.List    // list<*session>
+	waitq             *list.List    // list<*chan *session>
+	keeperWake        chan struct{} // Set by keeper.
 	keeperStop        chan struct{}
 	keeperDone        chan struct{}
 	touchingDone      chan struct{}
@@ -199,32 +199,9 @@ func (c *Client) isClosed() bool {
 
 // c.mu must NOT be held.
 func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err error) {
-	defer func() {
-		if s != nil {
-			s.onClose = append(s.onClose, func(s *session) {
-				c.spawnedGoroutines.Start("onClose", func(ctx context.Context) {
-					c.mu.WithLock(func() {
-						info, has := c.index[s]
-						if !has {
-							panic("session removed from pool early")
-						}
-
-						delete(c.index, s)
-
-						trace.TableOnPoolSessionRemove(c.config.Trace(), s)
-						trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
-
-						c.internalPoolNotify(nil)
-
-						if info.idle != nil {
-							c.idle.Remove(info.idle)
-						}
-					})
-				})
-			})
-		}
-	}()
-
+	if c.isClosed() {
+		return nil, errClosedClient
+	}
 	// pre-check the Client size
 	var enoughSpace bool
 	c.mu.WithLock(func() {
@@ -272,8 +249,29 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 			c.createInProgress--
 			if s != nil {
 				c.index[s] = sessionInfo{}
+
 				trace.TableOnPoolSessionAdd(c.config.Trace(), s)
 				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+
+				s.onClose = append(s.onClose, func(s *session) {
+					c.mu.WithLock(func() {
+						info, has := c.index[s]
+						if !has {
+							return
+						}
+
+						delete(c.index, s)
+
+						trace.TableOnPoolSessionRemove(c.config.Trace(), s)
+						trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
+
+						c.internalPoolNotify(nil)
+
+						if info.idle != nil {
+							c.idle.Remove(info.idle)
+						}
+					})
+				})
 			}
 		})
 
@@ -507,6 +505,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	var issues []error
 	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
 		close(c.done)
+		var toClose []*session
 		c.mu.WithLock(func() {
 			keeperDone := c.keeperDone
 			if ch := c.keeperStop; ch != nil {
@@ -519,13 +518,17 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 			c.limit = 0
 
-			issues = make([]error, 0, len(c.index))
-			for e := c.idle.Front(); e != nil; e = e.Next() {
-				if err = c.internalPoolCloseSession(ctx, e.Value.(*session)); err != nil {
-					issues = append(issues, err)
-				}
+			toClose = make([]*session, 0, len(c.index))
+			for s := range c.index {
+				toClose = append(toClose, s)
 			}
 		})
+		issues = make([]error, 0, len(toClose))
+		for _, s := range toClose {
+			if err = c.internalPoolCloseSession(ctx, s); err != nil {
+				issues = append(issues, err)
+			}
+		}
 	}
 
 	_ = c.spawnedGoroutines.Close(ctx, errClosedClient)

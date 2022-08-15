@@ -3,7 +3,6 @@ package retry
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -15,17 +14,17 @@ import (
 type TxOperationFunc func(context.Context, *sql.Tx) error
 
 type doTxOptions struct {
-	txOptions  *sql.TxOptions
-	idempotent bool
+	txOptions    *sql.TxOptions
+	retryOptions []retryOption
 }
 
 // DoTxOption defines option for redefine default DoTx behavior
 type DoTxOption func(o *doTxOptions) error
 
-// Idempotent marked TxOperation as idempotent for best effort retrying
-func Idempotent(idempotent bool) DoTxOption {
+// WithRetryOptions specified retry options
+func WithRetryOptions(opts ...retryOption) DoTxOption {
 	return func(o *doTxOptions) error {
-		o.idempotent = idempotent
+		o.retryOptions = append(o.retryOptions, opts...)
 		return nil
 	}
 }
@@ -58,7 +57,6 @@ func DoTx(ctx context.Context, db *sql.DB, f TxOperationFunc, opts ...DoTxOption
 				Isolation: sql.LevelDefault,
 				ReadOnly:  false,
 			},
-			idempotent: false,
 		}
 		attempts = 0
 	)
@@ -71,27 +69,22 @@ func DoTx(ctx context.Context, db *sql.DB, f TxOperationFunc, opts ...DoTxOption
 		attempts++
 		tx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
-			return xerrors.WithStackTrace(err)
+			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
 			_ = tx.Rollback()
 		}()
 		if err = f(ctx, tx); err != nil {
-			switch {
-			case xerrors.Is(err, driver.ErrBadConn):
-				return xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithDeleteSession()))
-			default:
-				return xerrors.WithStackTrace(err)
-			}
+			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		if err = tx.Commit(); err != nil {
-			return xerrors.WithStackTrace(err)
+			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		return nil
-	}, WithIdempotent(options.idempotent))
+	}, options.retryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("opration failed with %d attempts: %w", attempts, err),
+			fmt.Errorf("tx opration failed with %d attempts: %w", attempts, err),
 		)
 	}
 	return nil

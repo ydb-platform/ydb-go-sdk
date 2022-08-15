@@ -62,18 +62,16 @@ func HideEOF(err error) error {
 
 // As is a proxy to errors.As
 // This need to single import errors
-func As(err error, targets ...interface{}) (ok bool) {
+func As(err error, targets ...interface{}) bool {
 	if err == nil {
 		return false
 	}
 	for _, t := range targets {
 		if errors.As(err, t) {
-			if !ok {
-				ok = true
-			}
+			return true
 		}
 	}
-	return ok
+	return false
 }
 
 // Is is a improved proxy to errors.Is

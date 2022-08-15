@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type stmt struct {
@@ -15,17 +17,22 @@ type stmt struct {
 	conn   *conn
 	params map[string]*Ydb.Type
 	query  string
+
+	trace trace.DatabaseSQL
 }
 
 var (
-	_ driver.Stmt             = &stmt{}
-	_ driver.StmtQueryContext = &stmt{}
-	_ driver.StmtExecContext  = &stmt{}
-
+	_ driver.Stmt              = &stmt{}
+	_ driver.StmtQueryContext  = &stmt{}
+	_ driver.StmtExecContext   = &stmt{}
 	_ driver.NamedValueChecker = &stmt{}
 )
 
-func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, err error) {
+	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, s.query)
+	defer func() {
+		onDone(err)
+	}()
 	if s.conn.isClosed() {
 		return nil, errClosedConn
 	}
@@ -37,7 +44,11 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driv
 	}
 }
 
-func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, err error) {
+	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, s.query)
+	defer func() {
+		onDone(err)
+	}()
 	if s.conn.isClosed() {
 		return nil, errClosedConn
 	}
@@ -53,7 +64,11 @@ func (s *stmt) NumInput() int {
 	return len(s.params)
 }
 
-func (s *stmt) Close() error {
+func (s *stmt) Close() (err error) {
+	onDone := trace.DatabaseSQLOnStmtClose(s.trace)
+	defer func() {
+		onDone(err)
+	}()
 	return nil
 }
 

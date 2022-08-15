@@ -12,10 +12,11 @@ import (
 // Table makes trace.Table with logging events from details
 //
 //nolint:gocyclo
-func Table(l Logger, details trace.Details) (t trace.Table) {
+func Table(l Logger, details trace.Details, opts ...option) (t trace.Table) {
 	if details&trace.TableEvents == 0 {
 		return
 	}
+	options := parseOptions(opts...)
 	l = l.WithName(`table`)
 	t.OnDo = func(
 		info trace.TableDoStartInfo,
@@ -273,30 +274,56 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 				) {
 					session := info.Session
 					query := info.Query
-					l.Tracef(`prepare start {id:"%s",status:"%s",query:"%s"}`,
-						session.ID(),
-						session.Status(),
-						query,
-					)
+					if options.logQuery {
+						l.Tracef(`prepare start {id:"%s",status:"%s",query:"%s"}`,
+							session.ID(),
+							session.Status(),
+							query,
+						)
+					} else {
+						l.Tracef(`prepare start {id:"%s",status:"%s"}`,
+							session.ID(),
+							session.Status(),
+						)
+					}
 					start := time.Now()
 					return func(info trace.TablePrepareDataQueryDoneInfo) {
 						if info.Error == nil {
-							l.Debugf(`prepare done {latency:"%v",id:"%s",status:"%s",query:"%s",result:"%s"}`,
-								time.Since(start),
-								session.ID(),
-								session.Status(),
-								query,
-								info.Result,
-							)
+							if options.logQuery {
+								l.Debugf(`prepare done {latency:"%v",id:"%s",status:"%s",query:"%s",result:"%s"}`,
+									time.Since(start),
+									session.ID(),
+									session.Status(),
+									query,
+									info.Result,
+								)
+							} else {
+								l.Debugf(`prepare done {latency:"%v",id:"%s",status:"%s",result:"%s"}`,
+									time.Since(start),
+									session.ID(),
+									session.Status(),
+									info.Result,
+								)
+							}
 						} else {
-							l.Errorf(`prepare failed {latency:"%v",id:"%s",status:"%s",query:"%s",error:"%v",version:"%s"}`,
-								time.Since(start),
-								session.ID(),
-								session.Status(),
-								query,
-								info.Error,
-								meta.Version,
-							)
+							if options.logQuery {
+								l.Errorf(`prepare failed {latency:"%v",id:"%s",status:"%s",query:"%s",error:"%v",version:"%s"}`,
+									time.Since(start),
+									session.ID(),
+									session.Status(),
+									query,
+									info.Error,
+									meta.Version,
+								)
+							} else {
+								l.Errorf(`prepare failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
+									time.Since(start),
+									session.ID(),
+									session.Status(),
+									info.Error,
+									meta.Version,
+								)
+							}
 						}
 					}
 				}
@@ -308,39 +335,68 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					session := info.Session
 					query := info.Query
 					params := info.Parameters
-					l.Tracef(`execute start {id:"%s",status:"%s",query:"%s",params:"%s"}`,
-						session.ID(),
-						session.Status(),
-						query,
-						params,
-					)
+					if options.logQuery {
+						l.Tracef(`execute start {id:"%s",status:"%s",query:"%s",params:"%s"}`,
+							session.ID(),
+							session.Status(),
+							query,
+							params,
+						)
+					} else {
+						l.Tracef(`execute start {id:"%s",status:"%s"}`,
+							session.ID(),
+							session.Status(),
+						)
+					}
 					start := time.Now()
 					return func(info trace.TableExecuteDataQueryDoneInfo) {
 						if info.Error == nil {
 							tx := info.Tx
-							//nolint:lll
-							l.Debugf(`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
-								time.Since(start),
-								session.ID(),
-								session.Status(),
-								tx.ID(),
-								query,
-								params,
-								info.Prepared,
-								info.Result.Err(),
-							)
+							if options.logQuery {
+								//nolint:lll
+								l.Debugf(`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",query:"%s",params:"%s",prepared:%t,result:{err:"%v"}}`,
+									time.Since(start),
+									session.ID(),
+									session.Status(),
+									tx.ID(),
+									query,
+									params,
+									info.Prepared,
+									info.Result.Err(),
+								)
+							} else {
+								l.Debugf(`execute done {latency:"%v",id:"%s",status:"%s",tx:"%s",prepared:%t,result:{err:"%v"}}`,
+									time.Since(start),
+									session.ID(),
+									session.Status(),
+									tx.ID(),
+									info.Prepared,
+									info.Result.Err(),
+								)
+							}
 						} else {
-							//nolint:lll
-							l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v",version:"%s"}`,
-								time.Since(start),
-								session.ID(),
-								session.Status(),
-								query,
-								params,
-								info.Prepared,
-								info.Error,
-								meta.Version,
-							)
+							if options.logQuery {
+								//nolint:lll
+								l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",prepared:%t,error:"%v",version:"%s"}`,
+									time.Since(start),
+									session.ID(),
+									session.Status(),
+									query,
+									params,
+									info.Prepared,
+									info.Error,
+									meta.Version,
+								)
+							} else {
+								l.Errorf(`execute failed {latency:"%v",id:"%s",status:"%s",prepared:%t,error:"%v",version:"%s"}`,
+									time.Since(start),
+									session.ID(),
+									session.Status(),
+									info.Prepared,
+									info.Error,
+									meta.Version,
+								)
+							}
 						}
 					}
 				}
@@ -358,12 +414,19 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 					session := info.Session
 					query := info.Query
 					params := info.Parameters
-					l.Tracef(`stream execute start {id:"%s",status:"%s",query:"%s",params:"%s"}`,
-						session.ID(),
-						session.Status(),
-						query,
-						params,
-					)
+					if options.logQuery {
+						l.Tracef(`stream execute start {id:"%s",status:"%s",query:"%s",params:"%s"}`,
+							session.ID(),
+							session.Status(),
+							query,
+							params,
+						)
+					} else {
+						l.Tracef(`stream execute start {id:"%s",status:"%s"}`,
+							session.ID(),
+							session.Status(),
+						)
+					}
 					start := time.Now()
 					return func(
 						info trace.TableSessionQueryStreamExecuteIntermediateInfo,
@@ -380,24 +443,42 @@ func Table(l Logger, details trace.Details) (t trace.Table) {
 						}
 						return func(info trace.TableSessionQueryStreamExecuteDoneInfo) {
 							if info.Error == nil {
-								l.Debugf(`stream execute done {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s"}`,
-									time.Since(start),
-									session.ID(),
-									session.Status(),
-									query,
-									params,
-								)
+								if options.logQuery {
+									l.Debugf(`stream execute done {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s"}`,
+										time.Since(start),
+										session.ID(),
+										session.Status(),
+										query,
+										params,
+									)
+								} else {
+									l.Debugf(`stream execute done {latency:"%v",id:"%s",status:"%s"}`,
+										time.Since(start),
+										session.ID(),
+										session.Status(),
+									)
+								}
 							} else {
-								//nolint:lll
-								l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v",version:"%s"}`,
-									time.Since(start),
-									session.ID(),
-									session.Status(),
-									query,
-									params,
-									info.Error,
-									meta.Version,
-								)
+								if options.logQuery {
+									//nolint:lll
+									l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",query:"%s",params:"%s",error:"%v",version:"%s"}`,
+										time.Since(start),
+										session.ID(),
+										session.Status(),
+										query,
+										params,
+										info.Error,
+										meta.Version,
+									)
+								} else {
+									l.Errorf(`stream execute failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
+										time.Since(start),
+										session.ID(),
+										session.Status(),
+										info.Error,
+										meta.Version,
+									)
+								}
 							}
 						}
 					}

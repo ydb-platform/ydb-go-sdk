@@ -29,6 +29,11 @@ const (
 	TopicReaderMessageEvents
 	TopicReaderPartitionEvents
 
+	DatabaseSQLConnectorEvents
+	DatabaseSQLConnEvents
+	DatabaseSQLTxEvents
+	DatabaseSQLStmtEvents
+
 	RetryEvents
 
 	DiscoveryEvents
@@ -75,6 +80,11 @@ const (
 
 	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents
 
+	DatabaseSQLEvents = DatabaseSQLConnectorEvents |
+		DatabaseSQLConnEvents |
+		DatabaseSQLTxEvents |
+		DatabaseSQLStmtEvents
+
 	DetailsAll = ^Details(0) // All bits enabled
 )
 
@@ -108,6 +118,12 @@ var (
 		TablePoolLifeCycleEvents:        "ydb.table.pool",
 		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
 		TablePoolAPIEvents:              "ydb.table.pool.api",
+
+		DatabaseSQLEvents:          "ydb.database.sql",
+		DatabaseSQLConnectorEvents: "ydb.database.sql.connector",
+		DatabaseSQLConnEvents:      "ydb.database.sql.conn",
+		DatabaseSQLTxEvents:        "ydb.database.sql.tx",
+		DatabaseSQLStmtEvents:      "ydb.database.sql.stmt",
 
 		TopicEvents:                      "ydb.topic",
 		TopicControlPlaneEvents:          "ydb.topic.controlplane",

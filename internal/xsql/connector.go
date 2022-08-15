@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type ConnectorOption func(c *Connector) error
@@ -41,7 +42,14 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 	}
 }
 
-func Open(d Driver, connection Connection, opts ...ConnectorOption) (_ *Connector, err error) {
+func WithTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
+	return func(c *Connector) error {
+		c.trace = c.trace.Compose(t, opts...)
+		return nil
+	}
+}
+
+func Open(d Driver, connection connection, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
 		driver:           d,
 		connection:       connection,
@@ -57,7 +65,7 @@ func Open(d Driver, connection Connection, opts ...ConnectorOption) (_ *Connecto
 	return c, nil
 }
 
-type Connection interface {
+type connection interface {
 	// Table returns table client
 	Table() table.Client
 
@@ -78,12 +86,14 @@ type Driver interface {
 // Connector is a producer of database/sql connections
 type Connector struct {
 	driver     Driver
-	connection Connection
+	connection connection
 
 	defaultTxControl     *table.TransactionControl
 	defaultQueryMode     QueryMode
 	defaultDataQueryOpts []options.ExecuteDataQueryOption
 	defaultScanQueryOpts []options.ExecuteScanQueryOption
+
+	trace trace.DatabaseSQL
 }
 
 var (
@@ -96,11 +106,15 @@ func (c *Connector) Close() (err error) {
 	return c.connection.Close(context.Background())
 }
 
-func (c *Connector) Connection() Connection {
+func (c *Connector) Connection() connection {
 	return c.connection
 }
 
-func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
+func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
+	onDone := trace.DatabaseSQLOnConnectorConnect(c.trace, &ctx)
+	defer func() {
+		onDone(err)
+	}()
 	s, err := c.connection.Table().CreateSession(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -110,6 +124,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
+		withTrace(c.trace),
 	), nil
 }
 

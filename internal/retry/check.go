@@ -25,3 +25,26 @@ func Check(err error) (
 		backoff.TypeNoBackoff,
 		false
 }
+
+func MustDeleteSession(err error) bool {
+	var e xerrors.Error
+	if xerrors.As(err, &e) {
+		return e.MustDeleteSession()
+	}
+	return false
+}
+
+func MustRetry(err error, isOperationIdempotent bool) bool {
+	var e xerrors.Error
+	if xerrors.As(err, &e) {
+		switch e.OperationStatus() {
+		case operation.Finished:
+			return false
+		case operation.Undefined:
+			return isOperationIdempotent
+		default:
+			return true
+		}
+	}
+	return false
+}
