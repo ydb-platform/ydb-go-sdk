@@ -306,12 +306,7 @@ func testTable(t testing.TB) {
 				}),
 			),
 		),
-		ydb.WithBalancer(balancers.PreferLocalDCWithFallBack( // for max tests coverage
-			balancers.PreferLocationsWithFallback( // for max tests coverage
-				balancers.RandomChoice(),
-				"ABC",
-			),
-		)),
+		ydb.WithBalancer(balancers.RandomChoice()),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithSessionPoolSizeLimit(limit),

@@ -116,7 +116,7 @@ type connection struct {
 	pool *conn.Pool
 
 	mtx      sync.Mutex
-	balancer balancer.Connection
+	balancer *balancer.Balancer
 
 	children    map[uint64]Connection
 	childrenMtx xsync.Mutex

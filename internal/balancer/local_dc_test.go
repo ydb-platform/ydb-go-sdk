@@ -141,7 +141,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 	cfg := config.New(
 		config.WithBalancer(balancers.PreferLocalDC(balancers.Default())),
 	)
-	r := &balancer{
+	r := &Balancer{
 		driverConfig:   cfg,
 		balancerConfig: *cfg.Balancer(),
 		pool:           conn.NewPool(ctx, cfg),
