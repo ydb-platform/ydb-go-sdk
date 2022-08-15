@@ -9,8 +9,8 @@ import (
 
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
@@ -115,9 +115,8 @@ func (c *conn) checkClosed(err error) error {
 	if err == nil {
 		return nil
 	}
-	if retry.Check(err).MustDeleteSession() {
+	if err = badconn.Map(err); xerrors.Is(err, driver.ErrBadConn) {
 		c.setClosed()
-		return badConn(err)
 	}
 	return err
 }
@@ -337,7 +336,7 @@ func Unwrap(db *sql.DB) (connector *Connector, err error) {
 			connector = cc.connector
 			return nil
 		}
-		return xerrors.WithStackTrace(badConn(fmt.Errorf("%+v is not a *conn", driverConn)))
+		return xerrors.WithStackTrace(badconn.Map(fmt.Errorf("%+v is not a *conn", driverConn)))
 	}); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

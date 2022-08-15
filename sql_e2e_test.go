@@ -131,7 +131,7 @@ func TestDatabaseSql(t *testing.T) {
 			return fmt.Errorf("cannot upsert views: %w", err)
 		}
 		return nil
-	}, retry.Idempotent(true))
+	}, retry.WithRetryOptions(retry.WithIdempotent(true)))
 	if err != nil {
 		t.Fatalf("begin tx failed: %v\n", err)
 	}
@@ -159,7 +159,7 @@ func TestDatabaseSql(t *testing.T) {
 			return fmt.Errorf("unexpected views value: %v", views)
 		}
 		return nil
-	}, retry.Idempotent(true))
+	}, retry.WithRetryOptions(retry.WithIdempotent(true)))
 	if err != nil {
 		t.Fatalf("begin tx failed: %v\n", err)
 	}
