@@ -31,8 +31,8 @@ const (
 
 	DatabaseSQLConnectorEvents
 	DatabaseSQLConnEvents
-	DatabaseSQLTransactionEvents
-	DatabaseSQLStatementEvents
+	DatabaseSQLTxEvents
+	DatabaseSQLStmtEvents
 
 	RetryEvents
 
@@ -80,10 +80,10 @@ const (
 
 	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents
 
-	SQLEvents = DatabaseSQLConnectorEvents |
+	DatabaseSQLEvents = DatabaseSQLConnectorEvents |
 		DatabaseSQLConnEvents |
-		DatabaseSQLTransactionEvents |
-		DatabaseSQLStatementEvents
+		DatabaseSQLTxEvents |
+		DatabaseSQLStmtEvents
 
 	DetailsAll = ^Details(0) // All bits enabled
 )

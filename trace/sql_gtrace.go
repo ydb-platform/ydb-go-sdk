@@ -6,31 +6,31 @@ import (
 	"context"
 )
 
-// sQLComposeOptions is a holder of options
-type sQLComposeOptions struct {
+// databaseSQLComposeOptions is a holder of options
+type databaseSQLComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// SQLOption specified SQL compose option
-type SQLComposeOption func(o *sQLComposeOptions)
+// DatabaseSQLOption specified DatabaseSQL compose option
+type DatabaseSQLComposeOption func(o *databaseSQLComposeOptions)
 
-// WithSQLPanicCallback specified behavior on panic
-func WithSQLPanicCallback(cb func(e interface{})) SQLComposeOption {
-	return func(o *sQLComposeOptions) {
+// WithDatabaseSQLPanicCallback specified behavior on panic
+func WithDatabaseSQLPanicCallback(cb func(e interface{})) DatabaseSQLComposeOption {
+	return func(o *databaseSQLComposeOptions) {
 		o.panicCallback = cb
 	}
 }
 
-// Compose returns a new SQL which has functional fields composed both from t and x.
-func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
-	options := sQLComposeOptions{}
+// Compose returns a new DatabaseSQL which has functional fields composed both from t and x.
+func (t DatabaseSQL) Compose(x DatabaseSQL, opts ...DatabaseSQLComposeOption) (ret DatabaseSQL) {
+	options := databaseSQLComposeOptions{}
 	for _, opt := range opts {
 		opt(&options)
 	}
 	{
 		h1 := t.OnConnectorConnect
 		h2 := x.OnConnectorConnect
-		ret.OnConnectorConnect = func(s SQLConnectorConnectStartInfo) func(SQLConnectorConnectDoneInfo) {
+		ret.OnConnectorConnect = func(d DatabaseSQLConnectorConnectStartInfo) func(DatabaseSQLConnectorConnectDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -38,14 +38,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLConnectorConnectDoneInfo)
+			var r, r1 func(DatabaseSQLConnectorConnectDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLConnectorConnectDoneInfo) {
+			return func(d DatabaseSQLConnectorConnectDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -54,10 +54,10 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
@@ -65,7 +65,7 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 	{
 		h1 := t.OnConnPing
 		h2 := x.OnConnPing
-		ret.OnConnPing = func(s SQLConnPingStartInfo) func(SQLConnPingDoneInfo) {
+		ret.OnConnPing = func(d DatabaseSQLConnPingStartInfo) func(DatabaseSQLConnPingDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -73,14 +73,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLConnPingDoneInfo)
+			var r, r1 func(DatabaseSQLConnPingDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLConnPingDoneInfo) {
+			return func(d DatabaseSQLConnPingDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -89,10 +89,10 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
@@ -100,7 +100,7 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 	{
 		h1 := t.OnConnPrepare
 		h2 := x.OnConnPrepare
-		ret.OnConnPrepare = func(s SQLConnPrepareStartInfo) func(SQLConnPrepareDoneInfo) {
+		ret.OnConnPrepare = func(d DatabaseSQLConnPrepareStartInfo) func(DatabaseSQLConnPrepareDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -108,14 +108,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLConnPrepareDoneInfo)
+			var r, r1 func(DatabaseSQLConnPrepareDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLConnPrepareDoneInfo) {
+			return func(d DatabaseSQLConnPrepareDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -124,10 +124,10 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
@@ -135,7 +135,7 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 	{
 		h1 := t.OnConnClose
 		h2 := x.OnConnClose
-		ret.OnConnClose = func(s SQLConnCloseStartInfo) func(SQLConnCloseDoneInfo) {
+		ret.OnConnClose = func(d DatabaseSQLConnCloseStartInfo) func(DatabaseSQLConnCloseDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -143,14 +143,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLConnCloseDoneInfo)
+			var r, r1 func(DatabaseSQLConnCloseDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLConnCloseDoneInfo) {
+			return func(d DatabaseSQLConnCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -159,18 +159,18 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
 	}
 	{
-		h1 := t.OnConnBeginTx
-		h2 := x.OnConnBeginTx
-		ret.OnConnBeginTx = func(s SQLConnBeginTxStartInfo) func(SQLConnBeginTxDoneInfo) {
+		h1 := t.OnConnBegin
+		h2 := x.OnConnBegin
+		ret.OnConnBegin = func(d DatabaseSQLConnBeginStartInfo) func(DatabaseSQLConnBeginDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -178,14 +178,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLConnBeginTxDoneInfo)
+			var r, r1 func(DatabaseSQLConnBeginDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLConnBeginTxDoneInfo) {
+			return func(d DatabaseSQLConnBeginDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -194,18 +194,18 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
 	}
 	{
-		h1 := t.OnConnQueryContext
-		h2 := x.OnConnQueryContext
-		ret.OnConnQueryContext = func(s SQLConnQueryContextStartInfo) func(SQLConnQueryContextDoneInfo) {
+		h1 := t.OnConnQuery
+		h2 := x.OnConnQuery
+		ret.OnConnQuery = func(d DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -213,14 +213,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLConnQueryContextDoneInfo)
+			var r, r1 func(DatabaseSQLConnQueryDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLConnQueryContextDoneInfo) {
+			return func(d DatabaseSQLConnQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -229,18 +229,18 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
 	}
 	{
-		h1 := t.OnConnExecContext
-		h2 := x.OnConnExecContext
-		ret.OnConnExecContext = func(s SQLConnExecContextStartInfo) func(SQLConnExecContextDoneInfo) {
+		h1 := t.OnConnExec
+		h2 := x.OnConnExec
+		ret.OnConnExec = func(d DatabaseSQLConnExecStartInfo) func(DatabaseSQLConnExecDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -248,14 +248,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLConnExecContextDoneInfo)
+			var r, r1 func(DatabaseSQLConnExecDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLConnExecContextDoneInfo) {
+			return func(d DatabaseSQLConnExecDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -264,10 +264,10 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
@@ -275,7 +275,7 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 	{
 		h1 := t.OnTxCommit
 		h2 := x.OnTxCommit
-		ret.OnTxCommit = func(s SQLTxCommitStartInfo) func(SQLTxCommitDoneInfo) {
+		ret.OnTxCommit = func(d DatabaseSQLTxCommitStartInfo) func(DatabaseSQLTxCommitDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -283,14 +283,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLTxCommitDoneInfo)
+			var r, r1 func(DatabaseSQLTxCommitDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLTxCommitDoneInfo) {
+			return func(d DatabaseSQLTxCommitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -299,10 +299,10 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
@@ -310,7 +310,7 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 	{
 		h1 := t.OnTxRollback
 		h2 := x.OnTxRollback
-		ret.OnTxRollback = func(s SQLTxRollbackStartInfo) func(SQLTxRollbackDoneInfo) {
+		ret.OnTxRollback = func(d DatabaseSQLTxRollbackStartInfo) func(DatabaseSQLTxRollbackDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -318,14 +318,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLTxRollbackDoneInfo)
+			var r, r1 func(DatabaseSQLTxRollbackDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLTxRollbackDoneInfo) {
+			return func(d DatabaseSQLTxRollbackDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -334,18 +334,18 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
 	}
 	{
-		h1 := t.OnStmtQueryContext
-		h2 := x.OnStmtQueryContext
-		ret.OnStmtQueryContext = func(s SQLStmtQueryContextStartInfo) func(SQLStmtQueryContextDoneInfo) {
+		h1 := t.OnStmtQuery
+		h2 := x.OnStmtQuery
+		ret.OnStmtQuery = func(d DatabaseSQLStmtQueryStartInfo) func(DatabaseSQLStmtQueryDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -353,14 +353,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLStmtQueryContextDoneInfo)
+			var r, r1 func(DatabaseSQLStmtQueryDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLStmtQueryContextDoneInfo) {
+			return func(d DatabaseSQLStmtQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -369,18 +369,18 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
 	}
 	{
-		h1 := t.OnStmtExecContext
-		h2 := x.OnStmtExecContext
-		ret.OnStmtExecContext = func(s SQLStmtExecContextStartInfo) func(SQLStmtExecContextDoneInfo) {
+		h1 := t.OnStmtExec
+		h2 := x.OnStmtExec
+		ret.OnStmtExec = func(d DatabaseSQLStmtExecStartInfo) func(DatabaseSQLStmtExecDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -388,14 +388,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLStmtExecContextDoneInfo)
+			var r, r1 func(DatabaseSQLStmtExecDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLStmtExecContextDoneInfo) {
+			return func(d DatabaseSQLStmtExecDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -404,10 +404,10 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
 				}
 			}
 		}
@@ -415,7 +415,7 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 	{
 		h1 := t.OnStmtClose
 		h2 := x.OnStmtClose
-		ret.OnStmtClose = func(s SQLStmtCloseStartInfo) func(SQLStmtCloseDoneInfo) {
+		ret.OnStmtClose = func(d DatabaseSQLStmtCloseStartInfo) func(DatabaseSQLStmtCloseDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -423,14 +423,14 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}
 				}()
 			}
-			var r, r1 func(SQLStmtCloseDoneInfo)
+			var r, r1 func(DatabaseSQLStmtCloseDoneInfo)
 			if h1 != nil {
-				r = h1(s)
+				r = h1(d)
 			}
 			if h2 != nil {
-				r1 = h2(s)
+				r1 = h2(d)
 			}
-			return func(s SQLStmtCloseDoneInfo) {
+			return func(d DatabaseSQLStmtCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -439,314 +439,410 @@ func (t SQL) Compose(x SQL, opts ...SQLComposeOption) (ret SQL) {
 					}()
 				}
 				if r != nil {
-					r(s)
+					r(d)
 				}
 				if r1 != nil {
-					r1(s)
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnDoTx
+		h2 := x.OnDoTx
+		ret.OnDoTx = func(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				var r2, r3 func(DatabaseSQLDoTxDoneInfo)
+				if r != nil {
+					r2 = r(d)
+				}
+				if r1 != nil {
+					r3 = r1(d)
+				}
+				return func(d DatabaseSQLDoTxDoneInfo) {
+					if options.panicCallback != nil {
+						defer func() {
+							if e := recover(); e != nil {
+								options.panicCallback(e)
+							}
+						}()
+					}
+					if r2 != nil {
+						r2(d)
+					}
+					if r3 != nil {
+						r3(d)
+					}
 				}
 			}
 		}
 	}
 	return ret
 }
-func (t SQL) onConnectorConnect(s SQLConnectorConnectStartInfo) func(SQLConnectorConnectDoneInfo) {
+func (t DatabaseSQL) onConnectorConnect(d DatabaseSQLConnectorConnectStartInfo) func(DatabaseSQLConnectorConnectDoneInfo) {
 	fn := t.OnConnectorConnect
 	if fn == nil {
-		return func(SQLConnectorConnectDoneInfo) {
+		return func(DatabaseSQLConnectorConnectDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLConnectorConnectDoneInfo) {
+		return func(DatabaseSQLConnectorConnectDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onConnPing(s SQLConnPingStartInfo) func(SQLConnPingDoneInfo) {
+func (t DatabaseSQL) onConnPing(d DatabaseSQLConnPingStartInfo) func(DatabaseSQLConnPingDoneInfo) {
 	fn := t.OnConnPing
 	if fn == nil {
-		return func(SQLConnPingDoneInfo) {
+		return func(DatabaseSQLConnPingDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLConnPingDoneInfo) {
+		return func(DatabaseSQLConnPingDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onConnPrepare(s SQLConnPrepareStartInfo) func(SQLConnPrepareDoneInfo) {
+func (t DatabaseSQL) onConnPrepare(d DatabaseSQLConnPrepareStartInfo) func(DatabaseSQLConnPrepareDoneInfo) {
 	fn := t.OnConnPrepare
 	if fn == nil {
-		return func(SQLConnPrepareDoneInfo) {
+		return func(DatabaseSQLConnPrepareDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLConnPrepareDoneInfo) {
+		return func(DatabaseSQLConnPrepareDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onConnClose(s SQLConnCloseStartInfo) func(SQLConnCloseDoneInfo) {
+func (t DatabaseSQL) onConnClose(d DatabaseSQLConnCloseStartInfo) func(DatabaseSQLConnCloseDoneInfo) {
 	fn := t.OnConnClose
 	if fn == nil {
-		return func(SQLConnCloseDoneInfo) {
+		return func(DatabaseSQLConnCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLConnCloseDoneInfo) {
+		return func(DatabaseSQLConnCloseDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onConnBeginTx(s SQLConnBeginTxStartInfo) func(SQLConnBeginTxDoneInfo) {
-	fn := t.OnConnBeginTx
+func (t DatabaseSQL) onConnBegin(d DatabaseSQLConnBeginStartInfo) func(DatabaseSQLConnBeginDoneInfo) {
+	fn := t.OnConnBegin
 	if fn == nil {
-		return func(SQLConnBeginTxDoneInfo) {
+		return func(DatabaseSQLConnBeginDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLConnBeginTxDoneInfo) {
+		return func(DatabaseSQLConnBeginDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onConnQueryContext(s SQLConnQueryContextStartInfo) func(SQLConnQueryContextDoneInfo) {
-	fn := t.OnConnQueryContext
+func (t DatabaseSQL) onConnQuery(d DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo) {
+	fn := t.OnConnQuery
 	if fn == nil {
-		return func(SQLConnQueryContextDoneInfo) {
+		return func(DatabaseSQLConnQueryDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLConnQueryContextDoneInfo) {
+		return func(DatabaseSQLConnQueryDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onConnExecContext(s SQLConnExecContextStartInfo) func(SQLConnExecContextDoneInfo) {
-	fn := t.OnConnExecContext
+func (t DatabaseSQL) onConnExec(d DatabaseSQLConnExecStartInfo) func(DatabaseSQLConnExecDoneInfo) {
+	fn := t.OnConnExec
 	if fn == nil {
-		return func(SQLConnExecContextDoneInfo) {
+		return func(DatabaseSQLConnExecDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLConnExecContextDoneInfo) {
+		return func(DatabaseSQLConnExecDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onTxCommit(s SQLTxCommitStartInfo) func(SQLTxCommitDoneInfo) {
+func (t DatabaseSQL) onTxCommit(d DatabaseSQLTxCommitStartInfo) func(DatabaseSQLTxCommitDoneInfo) {
 	fn := t.OnTxCommit
 	if fn == nil {
-		return func(SQLTxCommitDoneInfo) {
+		return func(DatabaseSQLTxCommitDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLTxCommitDoneInfo) {
+		return func(DatabaseSQLTxCommitDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onTxRollback(s SQLTxRollbackStartInfo) func(SQLTxRollbackDoneInfo) {
+func (t DatabaseSQL) onTxRollback(d DatabaseSQLTxRollbackStartInfo) func(DatabaseSQLTxRollbackDoneInfo) {
 	fn := t.OnTxRollback
 	if fn == nil {
-		return func(SQLTxRollbackDoneInfo) {
+		return func(DatabaseSQLTxRollbackDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLTxRollbackDoneInfo) {
+		return func(DatabaseSQLTxRollbackDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onStmtQueryContext(s SQLStmtQueryContextStartInfo) func(SQLStmtQueryContextDoneInfo) {
-	fn := t.OnStmtQueryContext
+func (t DatabaseSQL) onStmtQuery(d DatabaseSQLStmtQueryStartInfo) func(DatabaseSQLStmtQueryDoneInfo) {
+	fn := t.OnStmtQuery
 	if fn == nil {
-		return func(SQLStmtQueryContextDoneInfo) {
+		return func(DatabaseSQLStmtQueryDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLStmtQueryContextDoneInfo) {
+		return func(DatabaseSQLStmtQueryDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onStmtExecContext(s SQLStmtExecContextStartInfo) func(SQLStmtExecContextDoneInfo) {
-	fn := t.OnStmtExecContext
+func (t DatabaseSQL) onStmtExec(d DatabaseSQLStmtExecStartInfo) func(DatabaseSQLStmtExecDoneInfo) {
+	fn := t.OnStmtExec
 	if fn == nil {
-		return func(SQLStmtExecContextDoneInfo) {
+		return func(DatabaseSQLStmtExecDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLStmtExecContextDoneInfo) {
+		return func(DatabaseSQLStmtExecDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t SQL) onStmtClose(s SQLStmtCloseStartInfo) func(SQLStmtCloseDoneInfo) {
+func (t DatabaseSQL) onStmtClose(d DatabaseSQLStmtCloseStartInfo) func(DatabaseSQLStmtCloseDoneInfo) {
 	fn := t.OnStmtClose
 	if fn == nil {
-		return func(SQLStmtCloseDoneInfo) {
+		return func(DatabaseSQLStmtCloseDoneInfo) {
 			return
 		}
 	}
-	res := fn(s)
+	res := fn(d)
 	if res == nil {
-		return func(SQLStmtCloseDoneInfo) {
+		return func(DatabaseSQLStmtCloseDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func SQLOnConnectorConnect(t SQL, c *context.Context) func(error) {
-	var p SQLConnectorConnectStartInfo
+func (t DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
+	fn := t.OnDoTx
+	if fn == nil {
+		return func(DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
+			return func(DatabaseSQLDoTxDoneInfo) {
+				return
+			}
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
+			return func(DatabaseSQLDoTxDoneInfo) {
+				return
+			}
+		}
+	}
+	return func(d DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
+		res := res(d)
+		if res == nil {
+			return func(DatabaseSQLDoTxDoneInfo) {
+				return
+			}
+		}
+		return res
+	}
+}
+func DatabaseSQLOnConnectorConnect(t DatabaseSQL, c *context.Context) func(error) {
+	var p DatabaseSQLConnectorConnectStartInfo
 	p.Context = c
 	res := t.onConnectorConnect(p)
 	return func(e error) {
-		var p SQLConnectorConnectDoneInfo
+		var p DatabaseSQLConnectorConnectDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnConnPing(t SQL, c *context.Context) func(error) {
-	var p SQLConnPingStartInfo
+func DatabaseSQLOnConnPing(t DatabaseSQL, c *context.Context) func(error) {
+	var p DatabaseSQLConnPingStartInfo
 	p.Context = c
 	res := t.onConnPing(p)
 	return func(e error) {
-		var p SQLConnPingDoneInfo
+		var p DatabaseSQLConnPingDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnConnPrepare(t SQL, c *context.Context, query string) func(error) {
-	var p SQLConnPrepareStartInfo
+func DatabaseSQLOnConnPrepare(t DatabaseSQL, c *context.Context, query string) func(error) {
+	var p DatabaseSQLConnPrepareStartInfo
 	p.Context = c
 	p.Query = query
 	res := t.onConnPrepare(p)
 	return func(e error) {
-		var p SQLConnPrepareDoneInfo
+		var p DatabaseSQLConnPrepareDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnConnClose(t SQL) func(error) {
-	var p SQLConnCloseStartInfo
+func DatabaseSQLOnConnClose(t DatabaseSQL) func(error) {
+	var p DatabaseSQLConnCloseStartInfo
 	res := t.onConnClose(p)
 	return func(e error) {
-		var p SQLConnCloseDoneInfo
+		var p DatabaseSQLConnCloseDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnConnBeginTx(t SQL, c *context.Context) func(error) {
-	var p SQLConnBeginTxStartInfo
+func DatabaseSQLOnConnBegin(t DatabaseSQL, c *context.Context) func(error) {
+	var p DatabaseSQLConnBeginStartInfo
 	p.Context = c
-	res := t.onConnBeginTx(p)
+	res := t.onConnBegin(p)
 	return func(e error) {
-		var p SQLConnBeginTxDoneInfo
+		var p DatabaseSQLConnBeginDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnConnQueryContext(t SQL, c *context.Context, query string) func(error) {
-	var p SQLConnQueryContextStartInfo
-	p.Context = c
-	p.Query = query
-	res := t.onConnQueryContext(p)
-	return func(e error) {
-		var p SQLConnQueryContextDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-func SQLOnConnExecContext(t SQL, c *context.Context, query string) func(error) {
-	var p SQLConnExecContextStartInfo
+func DatabaseSQLOnConnQuery(t DatabaseSQL, c *context.Context, query string) func(error) {
+	var p DatabaseSQLConnQueryStartInfo
 	p.Context = c
 	p.Query = query
-	res := t.onConnExecContext(p)
+	res := t.onConnQuery(p)
 	return func(e error) {
-		var p SQLConnExecContextDoneInfo
+		var p DatabaseSQLConnQueryDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnTxCommit(t SQL) func(error) {
-	var p SQLTxCommitStartInfo
+func DatabaseSQLOnConnExec(t DatabaseSQL, c *context.Context, query string) func(error) {
+	var p DatabaseSQLConnExecStartInfo
+	p.Context = c
+	p.Query = query
+	res := t.onConnExec(p)
+	return func(e error) {
+		var p DatabaseSQLConnExecDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DatabaseSQLOnTxCommit(t DatabaseSQL) func(error) {
+	var p DatabaseSQLTxCommitStartInfo
 	res := t.onTxCommit(p)
 	return func(e error) {
-		var p SQLTxCommitDoneInfo
+		var p DatabaseSQLTxCommitDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnTxRollback(t SQL) func(error) {
-	var p SQLTxRollbackStartInfo
+func DatabaseSQLOnTxRollback(t DatabaseSQL) func(error) {
+	var p DatabaseSQLTxRollbackStartInfo
 	res := t.onTxRollback(p)
 	return func(e error) {
-		var p SQLTxRollbackDoneInfo
+		var p DatabaseSQLTxRollbackDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnStmtQueryContext(t SQL, c *context.Context, query string) func(error) {
-	var p SQLStmtQueryContextStartInfo
+func DatabaseSQLOnStmtQuery(t DatabaseSQL, c *context.Context, query string) func(error) {
+	var p DatabaseSQLStmtQueryStartInfo
 	p.Context = c
 	p.Query = query
-	res := t.onStmtQueryContext(p)
+	res := t.onStmtQuery(p)
 	return func(e error) {
-		var p SQLStmtQueryContextDoneInfo
+		var p DatabaseSQLStmtQueryDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnStmtExecContext(t SQL, c *context.Context, query string) func(error) {
-	var p SQLStmtExecContextStartInfo
+func DatabaseSQLOnStmtExec(t DatabaseSQL, c *context.Context, query string) func(error) {
+	var p DatabaseSQLStmtExecStartInfo
 	p.Context = c
 	p.Query = query
-	res := t.onStmtExecContext(p)
+	res := t.onStmtExec(p)
 	return func(e error) {
-		var p SQLStmtExecContextDoneInfo
+		var p DatabaseSQLStmtExecDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func SQLOnStmtClose(t SQL) func(error) {
-	var p SQLStmtCloseStartInfo
+func DatabaseSQLOnStmtClose(t DatabaseSQL) func(error) {
+	var p DatabaseSQLStmtCloseStartInfo
 	res := t.onStmtClose(p)
 	return func(e error) {
-		var p SQLStmtCloseDoneInfo
+		var p DatabaseSQLStmtCloseDoneInfo
 		p.Error = e
 		res(p)
+	}
+}
+func DatabaseSQLOnDoTx(t DatabaseSQL, c *context.Context, iD string, idempotent bool) func(error) func(attempts int, _ error) {
+	var p DatabaseSQLDoTxStartInfo
+	p.Context = c
+	p.ID = iD
+	p.Idempotent = idempotent
+	res := t.onDoTx(p)
+	return func(e error) func(int, error) {
+		var p DatabaseSQLDoTxIntermediateInfo
+		p.Error = e
+		res := res(p)
+		return func(attempts int, e error) {
+			var p DatabaseSQLDoTxDoneInfo
+			p.Attempts = attempts
+			p.Error = e
+			res(p)
+		}
 	}
 }

@@ -165,6 +165,8 @@ func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 		WithTraceCoordination(log.Coordination(l, details)),
 		WithTraceRatelimiter(log.Ratelimiter(l, details)),
 		WithTraceDiscovery(log.Discovery(l, details)),
+		WithTraceTopic(log.Topic(l, details)),
+		WithTraceDatabaseSQL(log.DatabaseSQL(l, details)),
 	)
 }
 
@@ -528,16 +530,16 @@ func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option {
 	}
 }
 
-// WithTraceSQL adds configured discovery tracer to Connection
-func WithTraceSQL(t trace.SQL, opts ...trace.SQLComposeOption) Option {
+// WithTraceDatabaseSQL adds configured discovery tracer to Connection
+func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.sqlOptions = append(
 			c.sqlOptions,
 			xsql.WithTrace(
 				t,
 				append(
-					[]trace.SQLComposeOption{
-						trace.WithSQLPanicCallback(c.panicCallback),
+					[]trace.DatabaseSQLComposeOption{
+						trace.WithDatabaseSQLPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,

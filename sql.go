@@ -114,7 +114,7 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 	return xsql.WithDefaultScanQueryOptions(opts...)
 }
 
-func WithTrace(t trace.SQL, opts ...trace.SQLComposeOption) ConnectorOption {
+func WithDatabaseSQLTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
 	return xsql.WithTrace(t, opts...)
 }
 

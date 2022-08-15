@@ -42,7 +42,7 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 	}
 }
 
-func WithTrace(t trace.SQL, opts ...trace.SQLComposeOption) ConnectorOption {
+func WithTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
 	return func(c *Connector) error {
 		c.trace = c.trace.Compose(t, opts...)
 		return nil
@@ -93,7 +93,7 @@ type Connector struct {
 	defaultDataQueryOpts []options.ExecuteDataQueryOption
 	defaultScanQueryOpts []options.ExecuteScanQueryOption
 
-	trace trace.SQL
+	trace trace.DatabaseSQL
 }
 
 var (
@@ -111,7 +111,7 @@ func (c *Connector) Connection() Connection {
 }
 
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
-	onDone := trace.SQLOnConnectorConnect(c.trace, &ctx)
+	onDone := trace.DatabaseSQLOnConnectorConnect(c.trace, &ctx)
 	defer func() {
 		onDone(err)
 	}()

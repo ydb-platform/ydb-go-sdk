@@ -18,7 +18,7 @@ type stmt struct {
 	params map[string]*Ydb.Type
 	query  string
 
-	trace trace.SQL
+	trace trace.DatabaseSQL
 }
 
 var (
@@ -30,7 +30,7 @@ var (
 )
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, err error) {
-	onDone := trace.SQLOnStmtQueryContext(s.trace, &ctx, s.query)
+	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, s.query)
 	defer func() {
 		onDone(err)
 	}()
@@ -46,7 +46,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 }
 
 func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, err error) {
-	onDone := trace.SQLOnStmtExecContext(s.trace, &ctx, s.query)
+	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, s.query)
 	defer func() {
 		onDone(err)
 	}()
@@ -66,7 +66,7 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Close() (err error) {
-	onDone := trace.SQLOnStmtClose(s.trace)
+	onDone := trace.DatabaseSQLOnStmtClose(s.trace)
 	defer func() {
 		onDone(err)
 	}()

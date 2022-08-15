@@ -5,72 +5,49 @@ package trace
 import "context"
 
 type (
-	// SQL specified trace of `database/sql` call activity.
+	// DatabaseSQL specified trace of `database/sql` call activity.
 	// gtrace:gen
-	SQL struct {
-		OnConnectorConnect func(SQLConnectorConnectStartInfo) func(SQLConnectorConnectDoneInfo)
+	DatabaseSQL struct {
+		OnConnectorConnect func(DatabaseSQLConnectorConnectStartInfo) func(DatabaseSQLConnectorConnectDoneInfo)
 
-		OnConnPing         func(SQLConnPingStartInfo) func(SQLConnPingDoneInfo)
-		OnConnPrepare      func(SQLConnPrepareStartInfo) func(SQLConnPrepareDoneInfo)
-		OnConnClose        func(SQLConnCloseStartInfo) func(SQLConnCloseDoneInfo)
-		OnConnBeginTx      func(SQLConnBeginTxStartInfo) func(SQLConnBeginTxDoneInfo)
-		OnConnQueryContext func(SQLConnQueryContextStartInfo) func(SQLConnQueryContextDoneInfo)
-		OnConnExecContext  func(SQLConnExecContextStartInfo) func(SQLConnExecContextDoneInfo)
+		OnConnPing    func(DatabaseSQLConnPingStartInfo) func(DatabaseSQLConnPingDoneInfo)
+		OnConnPrepare func(DatabaseSQLConnPrepareStartInfo) func(DatabaseSQLConnPrepareDoneInfo)
+		OnConnClose   func(DatabaseSQLConnCloseStartInfo) func(DatabaseSQLConnCloseDoneInfo)
+		OnConnBegin   func(DatabaseSQLConnBeginStartInfo) func(DatabaseSQLConnBeginDoneInfo)
+		OnConnQuery   func(DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo)
+		OnConnExec    func(DatabaseSQLConnExecStartInfo) func(DatabaseSQLConnExecDoneInfo)
 
-		OnTxCommit   func(SQLTxCommitStartInfo) func(SQLTxCommitDoneInfo)
-		OnTxRollback func(SQLTxRollbackStartInfo) func(SQLTxRollbackDoneInfo)
+		OnTxCommit   func(DatabaseSQLTxCommitStartInfo) func(DatabaseSQLTxCommitDoneInfo)
+		OnTxRollback func(DatabaseSQLTxRollbackStartInfo) func(DatabaseSQLTxRollbackDoneInfo)
 
-		OnStmtQueryContext func(SQLStmtQueryContextStartInfo) func(SQLStmtQueryContextDoneInfo)
-		OnStmtExecContext  func(SQLStmtExecContextStartInfo) func(SQLStmtExecContextDoneInfo)
-		OnStmtClose        func(SQLStmtCloseStartInfo) func(SQLStmtCloseDoneInfo)
+		OnStmtQuery func(DatabaseSQLStmtQueryStartInfo) func(DatabaseSQLStmtQueryDoneInfo)
+		OnStmtExec  func(DatabaseSQLStmtExecStartInfo) func(DatabaseSQLStmtExecDoneInfo)
+		OnStmtClose func(DatabaseSQLStmtCloseStartInfo) func(DatabaseSQLStmtCloseDoneInfo)
+
+		OnDoTx func(DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo)
 	}
 
-	SQLConnectorConnectStartInfo struct {
+	DatabaseSQLConnectorConnectStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	SQLConnectorConnectDoneInfo struct {
+	DatabaseSQLConnectorConnectDoneInfo struct {
 		Error error
 	}
-	SQLConnPingStartInfo struct {
+	DatabaseSQLConnPingStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 	}
-	SQLConnPingDoneInfo struct {
+	DatabaseSQLConnPingDoneInfo struct {
 		Error error
 	}
-	SQLConnPrepareStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Query   string
-	}
-	SQLConnPrepareDoneInfo struct {
-		Error error
-	}
-	SQLConnCloseStartInfo struct{}
-	SQLConnCloseDoneInfo  struct {
-		Error error
-	}
-	SQLConnBeginTxStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-	}
-	SQLConnBeginTxDoneInfo struct {
-		Error error
-	}
-	SQLConnQueryContextStartInfo struct {
+	DatabaseSQLConnPrepareStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -78,10 +55,24 @@ type (
 		Context *context.Context
 		Query   string
 	}
-	SQLConnQueryContextDoneInfo struct {
+	DatabaseSQLConnPrepareDoneInfo struct {
 		Error error
 	}
-	SQLConnExecContextStartInfo struct {
+	DatabaseSQLConnCloseStartInfo struct{}
+	DatabaseSQLConnCloseDoneInfo  struct {
+		Error error
+	}
+	DatabaseSQLConnBeginStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+	}
+	DatabaseSQLConnBeginDoneInfo struct {
+		Error error
+	}
+	DatabaseSQLConnQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -89,22 +80,10 @@ type (
 		Context *context.Context
 		Query   string
 	}
-	SQLConnExecContextDoneInfo struct {
+	DatabaseSQLConnQueryDoneInfo struct {
 		Error error
 	}
-	SQLTxCommitStartInfo struct{}
-	SQLTxCommitDoneInfo  struct {
-		Error error
-	}
-	SQLTxRollbackStartInfo struct{}
-	SQLTxRollbackDoneInfo  struct {
-		Error error
-	}
-	SQLStmtCloseStartInfo struct{}
-	SQLStmtCloseDoneInfo  struct {
-		Error error
-	}
-	SQLStmtQueryContextStartInfo struct {
+	DatabaseSQLConnExecStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -112,10 +91,22 @@ type (
 		Context *context.Context
 		Query   string
 	}
-	SQLStmtQueryContextDoneInfo struct {
+	DatabaseSQLConnExecDoneInfo struct {
 		Error error
 	}
-	SQLStmtExecContextStartInfo struct {
+	DatabaseSQLTxCommitStartInfo struct{}
+	DatabaseSQLTxCommitDoneInfo  struct {
+		Error error
+	}
+	DatabaseSQLTxRollbackStartInfo struct{}
+	DatabaseSQLTxRollbackDoneInfo  struct {
+		Error error
+	}
+	DatabaseSQLStmtCloseStartInfo struct{}
+	DatabaseSQLStmtCloseDoneInfo  struct {
+		Error error
+	}
+	DatabaseSQLStmtQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -123,7 +114,34 @@ type (
 		Context *context.Context
 		Query   string
 	}
-	SQLStmtExecContextDoneInfo struct {
+	DatabaseSQLStmtQueryDoneInfo struct {
 		Error error
+	}
+	DatabaseSQLStmtExecStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Query   string
+	}
+	DatabaseSQLStmtExecDoneInfo struct {
+		Error error
+	}
+	DatabaseSQLDoTxStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
+		ID         string
+		Idempotent bool
+	}
+	DatabaseSQLDoTxIntermediateInfo struct {
+		Error error
+	}
+	DatabaseSQLDoTxDoneInfo struct {
+		Attempts int
+		Error    error
 	}
 )

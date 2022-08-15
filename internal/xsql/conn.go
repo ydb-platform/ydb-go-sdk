@@ -43,7 +43,7 @@ func withDefaultQueryMode(mode QueryMode) connOption {
 	}
 }
 
-func withTrace(t trace.SQL) connOption {
+func withTrace(t trace.DatabaseSQL) connOption {
 	return func(c *conn) {
 		c.trace = t
 	}
@@ -65,7 +65,7 @@ type conn struct {
 
 	transaction table.Transaction
 
-	trace trace.SQL
+	trace trace.DatabaseSQL
 }
 
 var (
@@ -79,7 +79,7 @@ var (
 )
 
 func (c *conn) Commit() (err error) {
-	onDone := trace.SQLOnTxCommit(c.trace)
+	onDone := trace.DatabaseSQLOnTxCommit(c.trace)
 	defer func() {
 		onDone(err)
 	}()
@@ -97,7 +97,7 @@ func (c *conn) Commit() (err error) {
 }
 
 func (c *conn) Rollback() (err error) {
-	onDone := trace.SQLOnTxRollback(c.trace)
+	onDone := trace.DatabaseSQLOnTxRollback(c.trace)
 	defer func() {
 		onDone(err)
 	}()
@@ -152,7 +152,7 @@ func (c *conn) setClosed() {
 }
 
 func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, err error) {
-	onDone := trace.SQLOnConnPrepare(c.trace, &ctx, query)
+	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx, query)
 	defer func() {
 		onDone(err)
 	}()
@@ -173,7 +173,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 }
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {
-	onDone := trace.SQLOnConnBeginTx(c.trace, &ctx)
+	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx)
 	defer func() {
 		onDone(err)
 	}()
@@ -198,7 +198,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
-	onDone := trace.SQLOnConnExecContext(c.trace, &ctx, query)
+	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query)
 	defer func() {
 		onDone(err)
 	}()
@@ -252,7 +252,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 }
 
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	onDone := trace.SQLOnConnExecContext(c.trace, &ctx, query)
+	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query)
 	defer func() {
 		onDone(err)
 	}()
@@ -342,7 +342,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 }
 
 func (c *conn) Ping(ctx context.Context) (err error) {
-	onDone := trace.SQLOnConnPing(c.trace, &ctx)
+	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx)
 	defer func() {
 		onDone(err)
 	}()
@@ -356,7 +356,7 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 }
 
 func (c *conn) Close() (err error) {
-	onDone := trace.SQLOnConnClose(c.trace)
+	onDone := trace.DatabaseSQLOnConnClose(c.trace)
 	defer func() {
 		onDone(err)
 	}()
