@@ -6,6 +6,10 @@
 * Removed support of `YDB_LOG_NO_COLOR` environment variable
 * Changed default behaviour of internal logger to without coloring
 * Fixed coloring (to true) with environment variable `YDB_LOG_SEVERITY_LEVEL`
+* Added `ydb.WithStaticCredentials(user, password)` option for make static credentials 
+* Supports static credentials as part of connection string (dsn - data source name)
+* Changed minimal supported version of go from 1.14 to 1.16 (required for jwt library)
+
 
 ## v3.33.0
 * Added `retry.DoTx` helper for retrying `database/sql` transactions 

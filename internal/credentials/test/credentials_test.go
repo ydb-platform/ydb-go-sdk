@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func TestCredentialsString(t *testing.T) {
@@ -36,7 +37,7 @@ func TestCredentialsString(t *testing.T) {
 	} {
 		t.Run(test.s, func(t *testing.T) {
 			if stringer, ok := test.c.(fmt.Stringer); ok {
-				testutil.Equal(t, test.s, stringer.String())
+				require.Equal(t, test.s, stringer.String())
 			}
 		})
 	}

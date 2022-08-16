@@ -3,6 +3,7 @@ package options
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 var abc = "abc"
@@ -79,7 +79,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
-			testutil.Equal(
+			require.Equal(
 				t,
 				pp.ExplicitPartitions.SplitPoints,
 				[]*Ydb.TypedValue{value.ToYDB(types.Int64Value(1), a)},

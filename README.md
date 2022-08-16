@@ -93,9 +93,11 @@ More examples of usage placed in [examples](https://github.com/ydb-platform/ydb-
 
 ## Credentials <a name="credentials"></a>
 
-Driver contains two options for making simple `credentials.Credentials`:
+Driver implements several ways for making credentials for `YDB`:
 - `ydb.WithAnonymousCredentials()` (enabled by default unless otherwise specified)
 - `ydb.WithAccessTokenCredentials("token")`
+- `ydb.WithStaticCredentials("user", "password")`, 
+- as part of connection string, like as `grpcs://user:password@endpoint/database`
 
 Another variants of `credentials.Credentials` object provides with external packages:
 

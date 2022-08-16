@@ -3,7 +3,8 @@ package sugar
 import (
 	"testing"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 )
 
@@ -44,20 +45,13 @@ func TestDSN(t *testing.T) {
 			if s != test.dsn {
 				t.Fatalf("Unexpected result: %s, exp: %s", s, test.dsn)
 			}
-			opts, err := dsn.Parse(s)
+			info, err := dsn.Parse(s)
 			if err != nil {
 				t.Fatalf("")
 			}
-			config := config.New(opts...)
-			if config.Endpoint() != test.endpoint {
-				t.Fatalf("Unexpected endpoint: %s, exp: %s", config.Endpoint(), test.endpoint)
-			}
-			if config.Database() != test.database {
-				t.Fatalf("Unexpected database: %s, exp: %s", config.Database(), test.database)
-			}
-			if config.Secure() != test.secure {
-				t.Fatalf("Unexpected secure flag: %v, exp: %v", config.Secure(), test.secure)
-			}
+			require.Equal(t, info.Endpoint, test.endpoint)
+			require.Equal(t, info.Database, test.database)
+			require.Equal(t, info.Secure, test.secure)
 		})
 	}
 }
