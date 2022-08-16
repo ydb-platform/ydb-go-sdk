@@ -3,6 +3,9 @@
 * Added `database/sql` events for tracing `database/sql` driver events
 * Added internal logging for `database/sql` events
 * Supports `YDB_LOG_DETAILS` environment variable for specify scope of log messages
+* Removed support of `YDB_LOG_NO_COLOR` environment variable
+* Changed default behaviour of internal logger to without coloring
+* Fixed coloring (to true) with environment variable `YDB_LOG_SEVERITY_LEVEL`
 
 ## v3.33.0
 * Added `retry.DoTx` helper for retrying `database/sql` transactions 

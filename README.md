@@ -126,7 +126,6 @@ Next packages provide debug tooling:
 |----------------------------------|-----------|---------|--------------------------------------------------------------------------------------------------------------------------|
 | `YDB_SSL_ROOT_CERTIFICATES_FILE` | `string`  |         | path to certificates file                                                                                                |
 | `YDB_LOG_SEVERITY_LEVEL`         | `string`  | `quiet` | severity logging level of internal driver logger. Supported: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `quiet` |
-| `YDB_LOG_DETAILS`                | `string`  | `.*`    | pattern for lookup internal logger logs                                                                                  |
-| `YDB_LOG_NO_COLOR`               | `bool`    | `false` | set any non empty value to disable colouring logs with internal driver logger                                            |
+| `YDB_LOG_DETAILS`                | `string`  | `.*`    | regexp for lookup internal logger logs                                                                                   |
 | `GRPC_GO_LOG_VERBOSITY_LEVEL`    | `integer` |         | set to `99` to see grpc logs                                                                                             |
 | `GRPC_GO_LOG_SEVERITY_LEVEL`     | `string`  |         | set to `info` to see grpc logs                                                                                           |

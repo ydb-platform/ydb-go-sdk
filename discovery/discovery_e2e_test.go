@@ -68,6 +68,7 @@ func TestDiscovery(t *testing.T) {
 			ydb.WithOutWriter(os.Stdout),
 			ydb.WithErrWriter(os.Stdout),
 			ydb.WithMinLevel(log.WARN),
+			ydb.WithColoring(),
 		),
 		ydb.WithUserAgent(userAgent),
 		ydb.WithRequestsType(requestType),

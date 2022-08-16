@@ -376,7 +376,7 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 					),
 					WithNamespace("ydb"),
 					WithMinLevel(log.FromString(logLevel)),
-					WithNoColor(os.Getenv("YDB_LOG_NO_COLOR") != ""),
+					WithColoring(),
 				),
 			)
 		}
