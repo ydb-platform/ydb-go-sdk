@@ -15,7 +15,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
@@ -83,6 +86,8 @@ type Connection interface {
 
 //nolint:maligned
 type connection struct {
+	userInfo *dsn.UserInfo
+
 	opts []Option
 
 	config  config.Config
@@ -408,16 +413,20 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}()
 
 	if c.pool == nil {
-		c.pool = conn.NewPool(
-			ctx,
-			c.config,
-		)
+		c.pool = conn.NewPool(ctx, c.config)
 	}
 
-	c.balancer, err = balancer.New(
-		ctx,
-		c.config,
-		c.pool,
+	if c.userInfo != nil {
+		c.config = c.config.With(config.WithCredentials(
+			credentials.NewStaticCredentials(
+				c.userInfo.User, c.userInfo.Password,
+				c.pool.Get(endpoint.New(c.config.Endpoint())),
+			),
+		))
+	}
+
+	c.balancer, err = balancer.New(ctx,
+		c.config, c.pool,
 		append(
 			// prepend common params from root config
 			[]discoveryConfig.Option{

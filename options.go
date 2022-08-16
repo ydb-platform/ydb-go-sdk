@@ -33,6 +33,16 @@ import (
 // Option contains configuration values for Connection
 type Option func(ctx context.Context, c *connection) error
 
+func WithStaticCredentials(user, password string) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.userInfo = &dsn.UserInfo{
+			User:     user,
+			Password: password,
+		}
+		return nil
+	}
+}
+
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
 		credentials.NewAccessTokenCredentials(
@@ -70,13 +80,19 @@ func WithConnectionString(connectionString string) Option {
 		if connectionString == "" {
 			return nil
 		}
-		options, err := dsn.Parse(connectionString)
+		info, err := dsn.Parse(connectionString)
 		if err != nil {
 			return xerrors.WithStackTrace(
 				fmt.Errorf("parse connection string '%s' failed: %w", connectionString, err),
 			)
 		}
-		c.options = append(c.options, options...)
+		c.options = append(c.options,
+			config.WithEndpoint(info.Endpoint),
+			config.WithDatabase(info.Database),
+			config.WithSecure(info.Secure),
+		)
+		c.options = append(c.options, info.Options...)
+		c.userInfo = info.UserInfo
 		return nil
 	}
 }

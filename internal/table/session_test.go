@@ -236,7 +236,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					config:       config.New(),
 				}
 				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -247,7 +247,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					config:       config.New(),
 				}
 				_, err := s.Explain(ctx, "")
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -258,14 +258,14 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					config:       config.New(),
 				}
 				_, err := s.Prepare(ctx, "")
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
 			method: testutil.TableCreateSession,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				_, err := c.internalPoolCreateSession(ctx)
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -275,7 +275,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 					config:       config.New(),
 				}
-				testutil.NoError(t, s.Close(ctx))
+				require.NoError(t, s.Close(ctx))
 			},
 		},
 		{
@@ -286,7 +286,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					config:       config.New(),
 				}
 				_, err := s.BeginTransaction(ctx, table.TxSettings())
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -299,7 +299,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					},
 				}
 				_, err := tx.CommitTx(ctx)
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -312,7 +312,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					},
 				}
 				err := tx.Rollback(ctx)
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -322,7 +322,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 					config:       config.New(),
 				}
-				testutil.NoError(t, s.KeepAlive(ctx))
+				require.NoError(t, s.KeepAlive(ctx))
 			},
 		},
 	} {

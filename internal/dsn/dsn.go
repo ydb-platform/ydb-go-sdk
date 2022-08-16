@@ -32,30 +32,44 @@ func Register(param string, parser Parser) error {
 	return nil
 }
 
-func Parse(dsn string) (options []config.Option, err error) {
+type UserInfo struct {
+	User     string
+	Password string
+}
+
+type parsedInfo struct {
+	Endpoint string
+	Database string
+	Secure   bool
+	UserInfo *UserInfo
+	Options  []config.Option
+}
+
+func Parse(dsn string) (info parsedInfo, err error) {
 	uri, err := url.Parse(dsn)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return info, xerrors.WithStackTrace(err)
 	}
-	options = append(
-		options,
-		config.WithEndpoint(uri.Host),
-		config.WithSecure(uri.Scheme != insecureSchema),
-		config.WithDatabase(uri.Path),
-	)
+	info.Endpoint = uri.Host
+	info.Database = uri.Path
+	info.Secure = uri.Scheme != insecureSchema
+	if uri.User != nil {
+		password, _ := uri.User.Password()
+		info.UserInfo = &UserInfo{
+			User:     uri.User.Username(),
+			Password: password,
+		}
+	}
 	for param, values := range uri.Query() {
 		if p, has := parsers[param]; has {
 			for _, v := range values {
 				var parsed []config.Option
 				if parsed, err = p(v); err != nil {
-					return nil, xerrors.WithStackTrace(err)
+					return info, xerrors.WithStackTrace(err)
 				}
-				options = append(
-					options,
-					parsed...,
-				)
+				info.Options = append(info.Options, parsed...)
 			}
 		}
 	}
-	return options, nil
+	return info, nil
 }

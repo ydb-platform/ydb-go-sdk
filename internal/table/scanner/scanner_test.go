@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
@@ -15,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 //nolint:gocyclo
@@ -511,10 +511,10 @@ func TestScanSqlTypes(t *testing.T) {
 				}
 				if test.setColumnIndexes != nil {
 					for i, v := range test.setColumnIndexes {
-						testutil.Equal(t, expected[0][v], test.values[i])
+						require.Equal(t, expected[0][v], test.values[i])
 					}
 				} else {
-					testutil.Equal(t, expected[0], test.values)
+					require.Equal(t, expected[0], test.values)
 				}
 				expected = expected[1:]
 			}
@@ -586,10 +586,10 @@ func TestScanNamed(t *testing.T) {
 				}
 				if test.setColumnIndexes != nil {
 					for i, v := range test.setColumnIndexes {
-						testutil.Equal(t, expected[0][v], test.values[i])
+						require.Equal(t, expected[0][v], test.values[i])
 					}
 				} else {
-					testutil.Equal(t, expected[0], test.values)
+					require.Equal(t, expected[0], test.values)
 				}
 				expected = expected[1:]
 			}

@@ -90,12 +90,6 @@ func (c Config) Database() string {
 	return c.database
 }
 
-// Credentials is a ydb client credentials.
-// In most cases Credentials are required.
-func (c Config) Credentials() credentials.Credentials {
-	return c.credentials
-}
-
 // Trace contains driver tracing options.
 func (c Config) Trace() trace.Driver {
 	return c.trace
@@ -268,13 +262,23 @@ func New(opts ...Option) Config {
 	for _, o := range opts {
 		o(&c)
 	}
-	c.grpcOptions = append(
-		c.grpcOptions,
-		grpcCredentials(
-			c.secure,
-			c.tlsConfig,
-		),
+	c.grpcOptions = append(c.grpcOptions,
+		grpcCredentials(c.secure, c.tlsConfig),
 	)
+	c.meta = meta.New(
+		c.database,
+		c.credentials,
+		c.trace,
+		c.metaOptions...,
+	)
+	return c
+}
+
+// With makes copy of current Config with specified options
+func (c Config) With(opts ...Option) Config {
+	for _, o := range opts {
+		o(&c)
+	}
 	c.meta = meta.New(
 		c.database,
 		c.credentials,
