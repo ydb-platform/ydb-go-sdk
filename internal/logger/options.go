@@ -9,9 +9,13 @@ import (
 
 type Option func(l *logger)
 
-func WithNoColor(b bool) Option {
+func Nop() Option {
+	return func(l *logger) {}
+}
+
+func WithColoring() Option {
 	return func(l *logger) {
-		l.noColor = b
+		l.coloring = true
 	}
 }
 
