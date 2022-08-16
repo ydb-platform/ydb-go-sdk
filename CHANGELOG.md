@@ -1,3 +1,4 @@
+## v3.34.0
 * Improved the `xsql` errors mapping to `driver.ErrBadConn` 
 * Extended `retry.DoTx` test for to achieve equivalence with `retry.Retry` behaviour
 * Added `database/sql` events for tracing `database/sql` driver events
