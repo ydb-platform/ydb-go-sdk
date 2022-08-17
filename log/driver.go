@@ -422,7 +422,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 	//nolint:nestif
 	if details&trace.DriverBalancerEvents != 0 {
 		//nolint:govet
-		l := l.WithName(`cluster`)
+		l := l.WithName(`balancer`)
 		t.OnBalancerInit = func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
 			l.Tracef(`init start`)
 			start := time.Now()

@@ -28,115 +28,77 @@ func TestDatabaseSql(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
 
-	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer func() {
-		// cleanup
-		_ = db.Close()
-	}()
-
-	if err = db.PingContext(ctx); err != nil {
-		t.Fatalf("driver not initialized: %+v", err)
-	}
-
-	cc, err := ydb.Unwrap(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// prepare scheme
-	err = sugar.RemoveRecursive(ctx, cc, folder)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = sugar.MakeRecursive(ctx, cc, folder)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = createTables(ctx, t, db, path.Join(cc.Name(), folder))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// fill data
-	if err = fill(ctx, t, db, path.Join(cc.Name(), folder)); err != nil {
-		t.Fatalf("fill failed: %v\n", err)
-	}
-
-	// getting explain of query
-	row := db.QueryRowContext(
-		ydb.WithQueryMode(ctx, ydb.ExplainQueryMode),
-		render(
-			querySelect,
-			templateConfig{
-				TablePathPrefix: path.Join(cc.Name(), folder),
-			},
-		),
-		sql.Named("seriesID", uint64(1)),
-		sql.Named("seasonID", uint64(1)),
-		sql.Named("episodeID", uint64(1)),
-	)
-	var (
-		ast  string
-		plan string
-	)
-	if err = row.Scan(&ast, &plan); err != nil {
-		t.Fatalf("cannot explain: %v", err)
-	}
-	t.Logf("ast = %v", ast)
-	t.Logf("plan = %v", plan)
-
-	err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
-		var stmt *sql.Stmt
-		stmt, err = tx.PrepareContext(ctx, render(
-			querySelect,
-			templateConfig{
-				TablePathPrefix: path.Join(cc.Name(), folder),
-			},
-		))
+	t.Run("sql.Open", func(t *testing.T) {
+		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 		if err != nil {
-			return fmt.Errorf("cannot prepare query: %w", err)
+			t.Fatal(err)
 		}
 
-		row = stmt.QueryRowContext(ctx,
-			sql.Named("seriesID", uint64(1)),
-			sql.Named("seasonID", uint64(1)),
-			sql.Named("episodeID", uint64(1)),
-		)
-		var views sql.NullFloat64
-		if err = row.Scan(&views); err != nil {
-			return fmt.Errorf("cannot scan views: %w", err)
+		if err = db.PingContext(ctx); err != nil {
+			t.Fatalf("driver not initialized: %+v", err)
 		}
-		if views.Valid {
-			return fmt.Errorf("unexpected valid views: %v", views.Float64)
-		}
-		t.Logf("views = %v", views)
-		// increment `views`
-		_, err = tx.ExecContext(ctx,
-			render(
-				queryUpsert,
-				templateConfig{
-					TablePathPrefix: path.Join(cc.Name(), folder),
-				},
-			),
-			sql.Named("seriesID", uint64(1)),
-			sql.Named("seasonID", uint64(1)),
-			sql.Named("episodeID", uint64(1)),
-			sql.Named("views", uint64(views.Float64+1)), // increment views
-		)
+
+		_, err = ydb.Unwrap(db)
 		if err != nil {
-			return fmt.Errorf("cannot upsert views: %w", err)
+			t.Fatal(err)
 		}
-		return nil
-	}, retry.WithRetryOptions(retry.WithIdempotent(true)))
-	if err != nil {
-		t.Fatalf("begin tx failed: %v\n", err)
-	}
-	err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
-		row := tx.QueryRowContext(ctx,
+
+		if err = db.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("sql.OpnDB", func(t *testing.T) {
+		cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			// cleanup
+			_ = cc.Close(ctx)
+		}()
+
+		c, err := ydb.Connector(cc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			// cleanup
+			_ = c.Close()
+		}()
+
+		db := sql.OpenDB(c)
+		defer func() {
+			// cleanup
+			_ = db.Close()
+		}()
+
+		if err = db.PingContext(ctx); err != nil {
+			t.Fatalf("driver not initialized: %+v", err)
+		}
+
+		// prepare scheme
+		err = sugar.RemoveRecursive(ctx, cc, folder)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sugar.MakeRecursive(ctx, cc, folder)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = createTables(ctx, t, db, path.Join(cc.Name(), folder))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// fill data
+		if err = fill(ctx, t, db, path.Join(cc.Name(), folder)); err != nil {
+			t.Fatalf("fill failed: %v\n", err)
+		}
+
+		// getting explain of query
+		row := db.QueryRowContext(
+			ydb.WithQueryMode(ctx, ydb.ExplainQueryMode),
 			render(
 				querySelect,
 				templateConfig{
@@ -147,22 +109,91 @@ func TestDatabaseSql(t *testing.T) {
 			sql.Named("seasonID", uint64(1)),
 			sql.Named("episodeID", uint64(1)),
 		)
-		var views sql.NullFloat64
-		if err = row.Scan(&views); err != nil {
-			return fmt.Errorf("cannot select current views: %w", err)
+		var (
+			ast  string
+			plan string
+		)
+		if err = row.Scan(&ast, &plan); err != nil {
+			t.Fatalf("cannot explain: %v", err)
 		}
-		if !views.Valid {
-			return fmt.Errorf("unexpected invalid views: %v", views)
+		t.Logf("ast = %v", ast)
+		t.Logf("plan = %v", plan)
+
+		err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
+			var stmt *sql.Stmt
+			stmt, err = tx.PrepareContext(ctx, render(
+				querySelect,
+				templateConfig{
+					TablePathPrefix: path.Join(cc.Name(), folder),
+				},
+			))
+			if err != nil {
+				return fmt.Errorf("cannot prepare query: %w", err)
+			}
+
+			row = stmt.QueryRowContext(ctx,
+				sql.Named("seriesID", uint64(1)),
+				sql.Named("seasonID", uint64(1)),
+				sql.Named("episodeID", uint64(1)),
+			)
+			var views sql.NullFloat64
+			if err = row.Scan(&views); err != nil {
+				return fmt.Errorf("cannot scan views: %w", err)
+			}
+			if views.Valid {
+				return fmt.Errorf("unexpected valid views: %v", views.Float64)
+			}
+			t.Logf("views = %v", views)
+			// increment `views`
+			_, err = tx.ExecContext(ctx,
+				render(
+					queryUpsert,
+					templateConfig{
+						TablePathPrefix: path.Join(cc.Name(), folder),
+					},
+				),
+				sql.Named("seriesID", uint64(1)),
+				sql.Named("seasonID", uint64(1)),
+				sql.Named("episodeID", uint64(1)),
+				sql.Named("views", uint64(views.Float64+1)), // increment views
+			)
+			if err != nil {
+				return fmt.Errorf("cannot upsert views: %w", err)
+			}
+			return nil
+		}, retry.WithRetryOptions(retry.WithIdempotent(true)))
+		if err != nil {
+			t.Fatalf("begin tx failed: %v\n", err)
 		}
-		t.Logf("views = %v", views)
-		if views.Float64 != 1 {
-			return fmt.Errorf("unexpected views value: %v", views)
+		err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+			row := tx.QueryRowContext(ctx,
+				render(
+					querySelect,
+					templateConfig{
+						TablePathPrefix: path.Join(cc.Name(), folder),
+					},
+				),
+				sql.Named("seriesID", uint64(1)),
+				sql.Named("seasonID", uint64(1)),
+				sql.Named("episodeID", uint64(1)),
+			)
+			var views sql.NullFloat64
+			if err = row.Scan(&views); err != nil {
+				return fmt.Errorf("cannot select current views: %w", err)
+			}
+			if !views.Valid {
+				return fmt.Errorf("unexpected invalid views: %v", views)
+			}
+			t.Logf("views = %v", views)
+			if views.Float64 != 1 {
+				return fmt.Errorf("unexpected views value: %v", views)
+			}
+			return nil
+		}, retry.WithRetryOptions(retry.WithIdempotent(true)))
+		if err != nil {
+			t.Fatalf("begin tx failed: %v\n", err)
 		}
-		return nil
-	}, retry.WithRetryOptions(retry.WithIdempotent(true)))
-	if err != nil {
-		t.Fatalf("begin tx failed: %v\n", err)
-	}
+	})
 }
 
 func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {

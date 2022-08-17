@@ -85,6 +85,7 @@ func (m *mockConn) Close() error {
 }
 
 func (m *mockConn) Begin() (driver.Tx, error) {
+	m.t.Log(xerrors.StackRecord(0))
 	return nil, driver.ErrSkip
 }
 
@@ -141,7 +142,7 @@ func (m *mockStmt) Close() error {
 
 func (m *mockStmt) NumInput() int {
 	m.t.Log(xerrors.StackRecord(0))
-	return 0
+	return -1
 }
 
 func (m *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
