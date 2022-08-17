@@ -5,9 +5,9 @@ package badconn
 
 import (
 	"database/sql/driver"
-	"errors"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 type badConnError struct {
@@ -18,16 +18,16 @@ func (e badConnError) Error() string {
 	return "ydbsql: bad connection: " + e.err.Error()
 }
 
-func (e badConnError) Unwrap() error {
-	return driver.ErrBadConn
-}
-
 func (e badConnError) Is(err error) bool {
-	return errors.Is(e.err, err)
+	//nolint:errorlint
+	if err == driver.ErrBadConn {
+		return true
+	}
+	return xerrors.Is(e.err, err)
 }
 
 func (e badConnError) As(target interface{}) bool {
-	return errors.As(e.err, target)
+	return xerrors.As(e.err, target)
 }
 
 func Map(err error) error {
