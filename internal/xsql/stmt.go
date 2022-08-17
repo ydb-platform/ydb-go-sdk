@@ -5,27 +5,20 @@ import (
 	"database/sql/driver"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type stmt struct {
-	nopResult
-	namedValueChecker
-
-	conn   *conn
-	params map[string]*Ydb.Type
-	query  string
+	conn  *conn
+	query string
 
 	trace trace.DatabaseSQL
 }
 
 var (
-	_ driver.Stmt              = &stmt{}
-	_ driver.StmtQueryContext  = &stmt{}
-	_ driver.StmtExecContext   = &stmt{}
-	_ driver.NamedValueChecker = &stmt{}
+	_ driver.Stmt             = &stmt{}
+	_ driver.StmtQueryContext = &stmt{}
+	_ driver.StmtExecContext  = &stmt{}
 )
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, err error) {
@@ -36,9 +29,9 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 	if s.conn.isClosed() {
 		return nil, errClosedConn
 	}
-	switch m := queryModeFromContext(withKeepInCache(ctx), s.conn.defaultQueryMode); m {
+	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		return s.conn.QueryContext(ctx, s.query, args)
+		return s.conn.QueryContext(withKeepInCache(ctx), s.query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
@@ -52,16 +45,16 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ dri
 	if s.conn.isClosed() {
 		return nil, errClosedConn
 	}
-	switch m := queryModeFromContext(withKeepInCache(ctx), s.conn.defaultQueryMode); m {
+	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		return s.conn.ExecContext(ctx, s.query, args)
+		return s.conn.ExecContext(withKeepInCache(ctx), s.query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
 }
 
 func (s *stmt) NumInput() int {
-	return len(s.params)
+	return -1
 }
 
 func (s *stmt) Close() (err error) {

@@ -1,3 +1,5 @@
+* Changed `database/sql` driver `prepare` behaviour to `nop` with proxing call to conn exec/query with keep-in-cache flag 
+
 ## v3.34.0
 * Improved the `xsql` errors mapping to `driver.ErrBadConn` 
 * Extended `retry.DoTx` test for to achieve equivalence with `retry.Retry` behaviour

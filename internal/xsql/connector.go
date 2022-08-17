@@ -103,7 +103,7 @@ var (
 
 func (c *Connector) Close() (err error) {
 	defer c.driver.Detach(c)
-	return c.connection.Close(context.Background())
+	return nil
 }
 
 func (c *Connector) Connection() connection {

@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
@@ -160,16 +159,10 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	var s table.Statement
-	s, err = c.session.Prepare(ctx, query)
-	if err != nil {
-		return nil, c.checkClosed(err)
-	}
 	return &stmt{
-		conn:   c,
-		params: internal.Params(s),
-		query:  query,
-		trace:  c.trace,
+		conn:  c,
+		query: query,
+		trace: c.trace,
 	}, nil
 }
 
