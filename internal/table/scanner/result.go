@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-var errAlreadyClosed = xerrors.Wrap(errors.New("result already closed"))
+var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
 
 type baseResult struct {
 	scanner
@@ -99,6 +99,9 @@ func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 }
 
 func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
+	if r.isClosed() {
+		return xerrors.WithStackTrace(errAlreadyClosed)
+	}
 	if !r.HasNextResultSet() {
 		return io.EOF
 	}
@@ -113,10 +116,10 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 
 func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
 	if r.isClosed() {
-		if err = r.Err(); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-		return io.EOF
+		return xerrors.WithStackTrace(errAlreadyClosed)
+	}
+	if err = r.Err(); err != nil {
+		return xerrors.WithStackTrace(err)
 	}
 	s, stats, err := r.recv(ctx)
 	if err != nil {
