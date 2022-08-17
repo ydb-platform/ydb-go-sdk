@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/stats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
@@ -305,10 +306,11 @@ func (c *conn) Invoke(
 			trace.Method(method),
 		)
 		cc *grpc.ClientConn
+		md = metadata.MD{}
 	)
 
 	defer func() {
-		onDone(err, issues, opID, c.GetState())
+		onDone(err, issues, opID, c.GetState(), md)
 	}()
 
 	cc, err = c.take(ctx)
@@ -321,7 +323,7 @@ func (c *conn) Invoke(
 
 	ctx, sentMark := markContext(ctx)
 
-	err = cc.Invoke(ctx, method, req, res, opts...)
+	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
 		if wrapping {
 			err = xerrors.FromGRPCError(err,
@@ -386,7 +388,7 @@ func (c *conn) NewStream(
 
 	defer func() {
 		if err != nil {
-			streamRecv(err)(c.GetState(), err)
+			streamRecv(err)(err, c.GetState(), metadata.MD{})
 		}
 	}()
 

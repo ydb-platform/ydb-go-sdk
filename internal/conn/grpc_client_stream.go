@@ -21,7 +21,7 @@ type grpcClientStream struct {
 	wrapping bool
 	sentMark *modificationMark
 	onDone   func(ctx context.Context)
-	recv     func(error) func(trace.ConnState, error)
+	recv     func(error) func(error, trace.ConnState, map[string][]string)
 }
 
 func (s *grpcClientStream) CloseSend() (err error) {
@@ -77,7 +77,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	defer func() {
 		onDone := s.recv(xerrors.HideEOF(err))
 		if err != nil {
-			onDone(s.c.GetState(), xerrors.HideEOF(err))
+			onDone(xerrors.HideEOF(err), s.c.GetState(), s.ClientStream.Trailer())
 			s.onDone(s.ClientStream.Context())
 		}
 	}()

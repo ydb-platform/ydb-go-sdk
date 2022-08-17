@@ -289,17 +289,19 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.DriverConnInvokeDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`invoke done {endpoint:%v,method:"%s",latency:"%v"}`,
+					l.Tracef(`invoke done {endpoint:%v,method:"%s",latency:"%v",,metadata:%v}`,
 						endpoint,
 						method,
 						time.Since(start),
+						info.Metadata,
 					)
 				} else {
-					l.Warnf(`invoke failed {endpoint:%v,method:"%s",latency:"%v",error:"%s",version:"%s"}`,
+					l.Warnf(`invoke failed {endpoint:%v,method:"%s",latency:"%v",error:"%s",,metadata:%v,version:"%s"}`,
 						endpoint,
 						method,
 						time.Since(start),
 						info.Error,
+						info.Metadata,
 						meta.Version,
 					)
 				}
@@ -337,17 +339,19 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				}
 				return func(info trace.DriverConnNewStreamDoneInfo) {
 					if info.Error == nil {
-						l.Tracef(`streaming done {endpoint:%v,method:"%s",latency:"%v"}`,
+						l.Tracef(`streaming done {endpoint:%v,method:"%s",latency:"%v",metadata:%v}`,
 							endpoint,
 							method,
 							time.Since(start),
+							info.Metadata,
 						)
 					} else {
-						l.Warnf(`streaming done {endpoint:%v,method:"%s",latency:"%v",error:"%s",version:"%s"}`,
+						l.Warnf(`streaming done {endpoint:%v,method:"%s",latency:"%v",error:"%s",,metadata:%v,version:"%s"}`,
 							endpoint,
 							method,
 							time.Since(start),
 							info.Error,
+							info.Metadata,
 							meta.Version,
 						)
 					}
