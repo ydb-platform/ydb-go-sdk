@@ -1,3 +1,4 @@
+## v3.34.1
 * Changed `database/sql` driver `prepare` behaviour to `nop` with proxing call to conn exec/query with keep-in-cache flag
 * Added metadata to `trace.Driver.OnInvoke` and `trace.Driver.OnNewStream` done events
 
