@@ -1,3 +1,4 @@
+## v3.34.2
 * Added some description to error message from table pool get
 * Moved implementation `sugar.GenerateDeclareSection` to `internal/table`
 * Added transaction trace callbacks and internal logging with them
