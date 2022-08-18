@@ -598,6 +598,76 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		}
 	}
 	{
+		h1 := t.OnSessionTransactionExecute
+		h2 := x.OnSessionTransactionExecute
+		ret.OnSessionTransactionExecute = func(t TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TableTransactionExecuteDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableTransactionExecuteDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnSessionTransactionExecuteStatement
+		h2 := x.OnSessionTransactionExecuteStatement
+		ret.OnSessionTransactionExecuteStatement = func(t TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TableTransactionExecuteStatementDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableTransactionExecuteStatementDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnSessionTransactionCommit
 		h2 := x.OnSessionTransactionCommit
 		ret.OnSessionTransactionCommit = func(t TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
@@ -1171,6 +1241,36 @@ func (t Table) onSessionTransactionBegin(t1 TableSessionTransactionBeginStartInf
 	}
 	return res
 }
+func (t Table) onSessionTransactionExecute(t1 TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
+	fn := t.OnSessionTransactionExecute
+	if fn == nil {
+		return func(TableTransactionExecuteDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableTransactionExecuteDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Table) onSessionTransactionExecuteStatement(t1 TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
+	fn := t.OnSessionTransactionExecuteStatement
+	if fn == nil {
+		return func(TableTransactionExecuteStatementDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableTransactionExecuteStatementDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Table) onSessionTransactionCommit(t1 TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
 	fn := t.OnSessionTransactionCommit
 	if fn == nil {
@@ -1488,6 +1588,36 @@ func TableOnSessionTransactionBegin(t Table, c *context.Context, session tableSe
 	return func(tx tableTransactionInfo, e error) {
 		var p TableSessionTransactionBeginDoneInfo
 		p.Tx = tx
+		p.Error = e
+		res(p)
+	}
+}
+func TableOnSessionTransactionExecute(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(result tableResult, _ error) {
+	var p TableTransactionExecuteStartInfo
+	p.Context = c
+	p.Session = session
+	p.Tx = tx
+	p.Query = query
+	p.Parameters = parameters
+	p.KeepInCache = keepInCache
+	res := t.onSessionTransactionExecute(p)
+	return func(result tableResult, e error) {
+		var p TableTransactionExecuteDoneInfo
+		p.Result = result
+		p.Error = e
+		res(p)
+	}
+}
+func TableOnSessionTransactionExecuteStatement(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, parameters tableQueryParameters) func(result tableResult, _ error) {
+	var p TableTransactionExecuteStatementStartInfo
+	p.Context = c
+	p.Session = session
+	p.Tx = tx
+	p.Parameters = parameters
+	res := t.onSessionTransactionExecuteStatement(p)
+	return func(result tableResult, e error) {
+		var p TableTransactionExecuteStatementDoneInfo
+		p.Result = result
 		p.Error = e
 		res(p)
 	}

@@ -191,7 +191,7 @@ func TestDoTx(t *testing.T) {
 							return err
 						}
 						return rows.Err()
-					}, WithRetryOptions(
+					}, WithDoTxRetryOptions(
 						WithIdempotent(bool(idempotentType)),
 						WithFastBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
 						WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),

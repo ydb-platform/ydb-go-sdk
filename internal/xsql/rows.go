@@ -65,20 +65,20 @@ func (r *rows) Next(dst []driver.Value) (err error) {
 		return io.EOF
 	}
 	if err = r.result.Err(); err != nil {
-		return r.conn.checkClosed(err)
+		return r.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 	values := make([]indexed.RequiredOrOptional, len(dst))
 	for i := range dst {
 		values[i] = &valuer{}
 	}
 	if err = r.result.Scan(values...); err != nil {
-		return r.conn.checkClosed(err)
+		return r.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 	for i := range values {
 		dst[i] = values[i].(*valuer).Value()
 	}
 	if err = r.result.Err(); err != nil {
-		return r.conn.checkClosed(err)
+		return r.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 	return nil
 }

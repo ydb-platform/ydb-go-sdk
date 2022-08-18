@@ -48,15 +48,19 @@ type (
 			TableSessionQueryStreamReadDoneInfo,
 		)
 		// Transaction events
-		OnSessionTransactionBegin  func(TableSessionTransactionBeginStartInfo) func(TableSessionTransactionBeginDoneInfo)
-		OnSessionTransactionCommit func(
-			TableSessionTransactionCommitStartInfo,
-		) func(
+		OnSessionTransactionBegin func(TableSessionTransactionBeginStartInfo) func(
+			TableSessionTransactionBeginDoneInfo,
+		)
+		OnSessionTransactionExecute func(TableTransactionExecuteStartInfo) func(
+			TableTransactionExecuteDoneInfo,
+		)
+		OnSessionTransactionExecuteStatement func(TableTransactionExecuteStatementStartInfo) func(
+			TableTransactionExecuteStatementDoneInfo,
+		)
+		OnSessionTransactionCommit func(TableSessionTransactionCommitStartInfo) func(
 			TableSessionTransactionCommitDoneInfo,
 		)
-		OnSessionTransactionRollback func(
-			TableSessionTransactionRollbackStartInfo,
-		) func(
+		OnSessionTransactionRollback func(TableSessionTransactionRollbackStartInfo) func(
 			TableSessionTransactionRollbackDoneInfo,
 		)
 		// Pool state event
@@ -163,6 +167,28 @@ type (
 		Parameters  tableQueryParameters
 		KeepInCache bool
 	}
+	TableTransactionExecuteStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context     *context.Context
+		Session     tableSessionInfo
+		Tx          tableTransactionInfo
+		Query       tableDataQuery
+		Parameters  tableQueryParameters
+		KeepInCache bool
+	}
+	TableTransactionExecuteStatementStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
+		Session    tableSessionInfo
+		Tx         tableTransactionInfo
+		Parameters tableQueryParameters
+	}
 	TableExplainQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -182,6 +208,14 @@ type (
 		Prepared bool
 		Result   tableResult
 		Error    error
+	}
+	TableTransactionExecuteDoneInfo struct {
+		Result tableResult
+		Error  error
+	}
+	TableTransactionExecuteStatementDoneInfo struct {
+		Result tableResult
+		Error  error
 	}
 	TableSessionQueryStreamReadStartInfo struct {
 		// Context make available context in trace callback function.

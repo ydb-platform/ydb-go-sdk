@@ -323,8 +323,9 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 	}
 
 	var (
-		i = 0
-		o = getOptions{t: c.config.Trace()}
+		start = time.Now()
+		i     = 0
+		o     = getOptions{t: c.config.Trace()}
 	)
 	for _, opt := range opts {
 		opt(&o)
@@ -375,11 +376,24 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		}
 	}
 	if s == nil && err == nil {
-		err = xerrors.WithStackTrace(fmt.Errorf("%w: attempts=%d", errNoProgress, i))
+		err = xerrors.WithStackTrace(errNoProgress)
 	}
 	if err != nil {
+		var (
+			index            int
+			idle             int
+			createInProgress int
+		)
+		c.mu.WithLock(func() {
+			index = len(c.index)
+			idle = c.idle.Len()
+			createInProgress = c.createInProgress
+		})
 		return s, xerrors.WithStackTrace(
-			fmt.Errorf("%w: attempts=%d", err, i),
+			fmt.Errorf("failed to get session from pool ("+
+				"attempts: %d, latency: %v, stats: {index: %d, idle: %d, create_in_progress: %d}"+
+				"): %w", i, time.Since(start), index, idle, createInProgress, err,
+			),
 		)
 	}
 	return s, nil
