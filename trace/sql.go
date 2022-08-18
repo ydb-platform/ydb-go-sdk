@@ -17,6 +17,8 @@ type (
 		OnConnQuery   func(DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo)
 		OnConnExec    func(DatabaseSQLConnExecStartInfo) func(DatabaseSQLConnExecDoneInfo)
 
+		OnTxQuery    func(DatabaseSQLTxQueryStartInfo) func(DatabaseSQLTxQueryDoneInfo)
+		OnTxExec     func(DatabaseSQLTxExecStartInfo) func(DatabaseSQLTxExecDoneInfo)
 		OnTxCommit   func(DatabaseSQLTxCommitStartInfo) func(DatabaseSQLTxCommitDoneInfo)
 		OnTxRollback func(DatabaseSQLTxRollbackStartInfo) func(DatabaseSQLTxRollbackDoneInfo)
 
@@ -70,6 +72,7 @@ type (
 		Context *context.Context
 	}
 	DatabaseSQLConnBeginDoneInfo struct {
+		Tx    tableTransactionInfo
 		Error error
 	}
 	DatabaseSQLConnQueryStartInfo struct {
@@ -79,6 +82,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Query      string
+		Mode       string
 		Idempotent bool
 	}
 	DatabaseSQLConnQueryDoneInfo struct {
@@ -91,17 +95,60 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Query      string
+		Mode       string
 		Idempotent bool
 	}
 	DatabaseSQLConnExecDoneInfo struct {
 		Error error
 	}
-	DatabaseSQLTxCommitStartInfo struct{}
-	DatabaseSQLTxCommitDoneInfo  struct {
+	DatabaseSQLTxQueryStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
+		TxContext  context.Context
+		Tx         tableTransactionInfo
+		Query      string
+		Idempotent bool
+	}
+	DatabaseSQLTxQueryDoneInfo struct {
 		Error error
 	}
-	DatabaseSQLTxRollbackStartInfo struct{}
-	DatabaseSQLTxRollbackDoneInfo  struct {
+	DatabaseSQLTxExecStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
+		TxContext  context.Context
+		Tx         tableTransactionInfo
+		Query      string
+		Idempotent bool
+	}
+	DatabaseSQLTxExecDoneInfo struct {
+		Error error
+	}
+	DatabaseSQLTxCommitStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Tx      tableTransactionInfo
+	}
+	DatabaseSQLTxCommitDoneInfo struct {
+		Error error
+	}
+	DatabaseSQLTxRollbackStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Tx      tableTransactionInfo
+	}
+	DatabaseSQLTxRollbackDoneInfo struct {
 		Error error
 	}
 	DatabaseSQLStmtCloseStartInfo struct{}

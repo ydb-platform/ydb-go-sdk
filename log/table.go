@@ -532,7 +532,7 @@ func Table(l Logger, details trace.Details, opts ...option) (t trace.Table) {
 		}
 		if details&trace.TableSessionTransactionEvents != 0 {
 			//nolint:govet
-			l := l.WithName(`transaction`)
+			l := l.WithName(`tx`)
 			t.OnSessionTransactionBegin = func(
 				info trace.TableSessionTransactionBeginStartInfo,
 			) func(
@@ -634,7 +634,7 @@ func Table(l Logger, details trace.Details, opts ...option) (t trace.Table) {
 	//nolint:nestif
 	if details&trace.TablePoolEvents != 0 {
 		//nolint:govet
-		l := l.WithName(`pool`)
+		l := l.WithName(`client`)
 		if details&trace.TablePoolLifeCycleEvents != 0 {
 			t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 				l.Infof(`initialize start`)
@@ -664,6 +664,10 @@ func Table(l Logger, details trace.Details, opts ...option) (t trace.Table) {
 					}
 				}
 			}
+		}
+		{
+			//nolint:govet
+			l := l.WithName(`pool`)
 			t.OnPoolStateChange = func(info trace.TablePoolStateChangeInfo) {
 				l.Infof(`state changed {size:%d,event:"%s"}`,
 					info.Size,

@@ -3,6 +3,7 @@ package xsql
 import (
 	"database/sql/driver"
 
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -19,4 +20,8 @@ func toQueryParams(values []driver.NamedValue) *table.QueryParameters {
 		)
 	}
 	return table.NewQueryParameters(opts...)
+}
+
+func queryWithDeclares(query string, params *table.QueryParameters) string {
+	return internal.GenerateDeclareSection(params) + query
 }

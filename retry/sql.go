@@ -6,58 +6,27 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-// TxOperationFunc is a user-defined lambda for retrying
-type TxOperationFunc func(context.Context, *sql.Tx) error
-
-type doTxOptions struct {
-	txOptions    *sql.TxOptions
+type doOptions struct {
 	retryOptions []retryOption
 }
 
-// DoTxOption defines option for redefine default DoTx behavior
-type DoTxOption func(o *doTxOptions) error
+// doTxOption defines option for redefine default Retry behavior
+type doOption func(o *doOptions) error
 
-// WithRetryOptions specified retry options
-func WithRetryOptions(opts ...retryOption) DoTxOption {
-	return func(o *doTxOptions) error {
+// WithDoRetryOptions specified retry options
+func WithDoRetryOptions(opts ...retryOption) doOption {
+	return func(o *doOptions) error {
 		o.retryOptions = append(o.retryOptions, opts...)
 		return nil
 	}
 }
 
-// WithTxOptions replaces default txOptions
-func WithTxOptions(txOptions *sql.TxOptions) DoTxOption {
-	return func(o *doTxOptions) error {
-		o.txOptions = txOptions
-		return nil
-	}
-}
-
-// WithTxSettings makes driver.TxOptions by given txControl
-func WithTxSettings(txControl *table.TransactionSettings) DoTxOption {
-	return func(o *doTxOptions) error {
-		txOptions, err := isolation.FromYDB(txControl)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-		o.txOptions = txOptions
-		return nil
-	}
-}
-
-// DoTx is a shortcut for calling Do(ctx, f) on initialized TxDoer with DB field set to given db.
-func DoTx(ctx context.Context, db *sql.DB, f TxOperationFunc, opts ...DoTxOption) error {
+// Do is a retryer of database/sql Conn with fallbacks on errors
+func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Conn) error, opts ...doOption) error {
 	var (
-		options = doTxOptions{
-			txOptions: &sql.TxOptions{
-				Isolation: sql.LevelDefault,
-				ReadOnly:  false,
-			},
-		}
+		options  = doOptions{}
 		attempts = 0
 	)
 	for _, o := range opts {
@@ -67,7 +36,59 @@ func DoTx(ctx context.Context, db *sql.DB, f TxOperationFunc, opts ...DoTxOption
 	}
 	err := Retry(ctx, func(ctx context.Context) (err error) {
 		attempts++
-		tx, err := db.BeginTx(ctx, options.txOptions)
+		cc, err := db.Conn(ctx)
+		if err != nil {
+			return unwrapErrBadConn(xerrors.WithStackTrace(err))
+		}
+		defer func() {
+			_ = cc.Close()
+		}()
+		if err = f(ctx, cc); err != nil {
+			return unwrapErrBadConn(xerrors.WithStackTrace(err))
+		}
+		return nil
+	}, options.retryOptions...)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("opration failed with %d attempts: %w", attempts, err),
+		)
+	}
+	return nil
+}
+
+type doTxOptions struct {
+	retryOptions []retryOption
+}
+
+// doTxOption defines option for redefine default Retry behavior
+type doTxOption func(o *doTxOptions) error
+
+// WithDoTxRetryOptions specified retry options
+func WithDoTxRetryOptions(opts ...retryOption) doTxOption {
+	return func(o *doTxOptions) error {
+		o.retryOptions = append(o.retryOptions, opts...)
+		return nil
+	}
+}
+
+// DoTx is a retryer of database/sql transactions with fallbacks on errors
+func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
+	var (
+		txOptions = &sql.TxOptions{
+			Isolation: sql.LevelDefault,
+			ReadOnly:  false,
+		}
+		options  = doTxOptions{}
+		attempts = 0
+	)
+	for _, o := range opts {
+		if err := o(&options); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+	}
+	err := Retry(ctx, func(ctx context.Context) (err error) {
+		attempts++
+		tx, err := db.BeginTx(ctx, txOptions)
 		if err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}

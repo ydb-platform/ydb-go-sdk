@@ -15,7 +15,7 @@ type badConnError struct {
 }
 
 func (e badConnError) Error() string {
-	return "ydbsql: bad connection: " + e.err.Error()
+	return e.err.Error()
 }
 
 func (e badConnError) Is(err error) bool {

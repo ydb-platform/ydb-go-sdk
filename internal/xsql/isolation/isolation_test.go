@@ -14,9 +14,9 @@ import (
 
 func TestToYDB(t *testing.T) {
 	for _, tt := range []struct {
-		txOptions  driver.TxOptions
-		txSettings *table.TransactionSettings
-		err        bool
+		txOptions driver.TxOptions
+		txControl table.TxOption
+		err       bool
 	}{
 		// read-write
 		{
@@ -24,8 +24,8 @@ func TestToYDB(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelDefault),
 				ReadOnly:  false,
 			},
-			txSettings: table.TxSettings(table.WithSerializableReadWrite()),
-			err:        false,
+			txControl: table.WithSerializableReadWrite(),
+			err:       false,
 		},
 		{
 			txOptions: driver.TxOptions{
@@ -67,8 +67,7 @@ func TestToYDB(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSerializable),
 				ReadOnly:  false,
 			},
-			txSettings: table.TxSettings(table.WithSerializableReadWrite()),
-			err:        false,
+			err: true,
 		},
 		{
 			txOptions: driver.TxOptions{
@@ -140,8 +139,8 @@ func TestToYDB(t *testing.T) {
 			toYDB, err := ToYDB(tt.txOptions)
 			if !tt.err {
 				require.NoError(t, err)
-				if !proto.Equal(toYDB.Settings(), tt.txSettings.Settings()) {
-					t.Errorf("%+v != %+v", toYDB, tt.txSettings)
+				if !proto.Equal(table.TxSettings(tt.txControl).Settings(), table.TxSettings(toYDB).Settings()) {
+					t.Errorf("%+v != %+v", toYDB, tt.txControl)
 				}
 			} else {
 				require.Error(t, err)
@@ -152,43 +151,39 @@ func TestToYDB(t *testing.T) {
 
 func TestFromYDB(t *testing.T) {
 	for _, tt := range []struct {
-		txSettings *table.TransactionSettings
-		txOptions  *sql.TxOptions
+		txControl table.TxOption
+		txOptions *sql.TxOptions
+		err       bool
 	}{
 		{
-			txSettings: table.TxSettings(table.WithSerializableReadWrite()),
+			txControl: table.WithSerializableReadWrite(),
 			txOptions: &sql.TxOptions{
-				Isolation: sql.LevelSerializable,
+				Isolation: sql.LevelDefault,
 				ReadOnly:  false,
 			},
 		},
 		{
-			txSettings: table.TxSettings(table.WithOnlineReadOnly()),
-			txOptions: &sql.TxOptions{
-				Isolation: sql.LevelReadCommitted,
-				ReadOnly:  true,
-			},
+			txControl: table.WithOnlineReadOnly(),
+			err:       true,
 		},
 		{
-			txSettings: table.TxSettings(table.WithOnlineReadOnly(table.WithInconsistentReads())),
-			txOptions: &sql.TxOptions{
-				Isolation: sql.LevelReadUncommitted,
-				ReadOnly:  true,
-			},
+			txControl: table.WithOnlineReadOnly(table.WithInconsistentReads()),
+			err:       true,
 		},
 		{
-			txSettings: table.TxSettings(table.WithStaleReadOnly()),
-			txOptions: &sql.TxOptions{
-				Isolation: sql.LevelReadCommitted,
-				ReadOnly:  true,
-			},
+			txControl: table.WithStaleReadOnly(),
+			err:       true,
 		},
 	} {
-		t.Run(fmt.Sprintf("%+v", tt.txSettings.Settings()), func(t *testing.T) {
-			fromYDB, err := FromYDB(tt.txSettings)
-			require.NoError(t, err)
-			if *fromYDB != *tt.txOptions {
-				t.Errorf("%+v != %+v", *fromYDB, *tt.txOptions)
+		t.Run(fmt.Sprintf("%+v", table.TxSettings(tt.txControl).Settings()), func(t *testing.T) {
+			fromYDB, err := FromYDB(table.TxSettings(tt.txControl))
+			if tt.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				if *fromYDB != *tt.txOptions {
+					t.Errorf("%+v != %+v", *fromYDB, *tt.txOptions)
+				}
 			}
 		})
 	}

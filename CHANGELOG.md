@@ -1,3 +1,12 @@
+* Added some description to error message from table pool get
+* Moved implementation `sugar.GenerateDeclareSection` to `internal/table`
+* Added transaction trace callbacks and internal logging with them
+* Stored context from `BeginTx` to `internal/xsql` transaction
+* Added automatically generated declare section to query text in `database/sql` usage 
+* Removed supports `sql.LevelSerializable`
+* Added `retry.Do` helper for retry custom lambda with `database/sql` without transactions
+* Removed `retry.WithTxOptions` option (only default isolation supports)
+
 ## v3.34.1
 * Changed `database/sql` driver `prepare` behaviour to `nop` with proxing call to conn exec/query with keep-in-cache flag
 * Added metadata to `trace.Driver.OnInvoke` and `trace.Driver.OnNewStream` done events

@@ -666,7 +666,7 @@ func (s *session) Execute(
 		optsResult.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
-		onDone(txr, true, r, err)
+		onDone(txr, false, r, err)
 	}()
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
