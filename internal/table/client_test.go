@@ -264,7 +264,7 @@ func TestRaceWgClosed(t *testing.T) {
 		counter++
 		defer func() {
 			if counter%100 == 0 {
-				t.Logf("TestRaceWgClosed %d subtests done", counter)
+				t.Logf("%d times test passed", counter)
 			}
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(),

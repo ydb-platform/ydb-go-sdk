@@ -154,12 +154,14 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 			if s == nil {
 				return
 			}
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(
-				xcontext.WithoutDeadline(ctx),
-				c.config.DeleteTimeout(),
-			)
-			defer cancel()
+
+			closeSessionCtx := xcontext.WithoutDeadline(ctx)
+
+			if timeout := c.config.DeleteTimeout(); timeout > 0 {
+				var cancel context.CancelFunc
+				createSessionCtx, cancel = context.WithTimeout(closeSessionCtx, timeout)
+				defer cancel()
+			}
 
 			_ = s.Close(ctx)
 		}
