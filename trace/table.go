@@ -291,8 +291,7 @@ type (
 		Context *context.Context
 	}
 	TableInitDoneInfo struct {
-		Limit            int
-		KeepAliveMinSize int
+		Limit int
 	}
 	TablePoolStateChangeInfo struct {
 		Size  int

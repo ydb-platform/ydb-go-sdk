@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-type SessionStatus byte
+type SessionStatus uint32
 
 const (
 	SessionStatusUnknown SessionStatus = iota

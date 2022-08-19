@@ -6,7 +6,7 @@ type logOptions struct {
 
 type option func(o *logOptions)
 
-func WIthLogQuery() option {
+func WithLogQuery() option {
 	return func(o *logOptions) {
 		o.logQuery = true
 	}

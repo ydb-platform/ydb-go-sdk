@@ -96,7 +96,7 @@ func StubTimers(t *testing.T, callers ...string) (ts TimerStubs, cleanup func())
 	return ts, cleanup
 }
 
-func StubSingleTimer(t *testing.T) *SingleTimerStub {
+func StubSingleTimer(t testing.TB) *SingleTimerStub {
 	s := &SingleTimerStub{
 		TimerStub: TimerStub{
 			C:       make(chan time.Time),
