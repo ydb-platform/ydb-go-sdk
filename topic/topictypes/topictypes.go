@@ -59,6 +59,26 @@ func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 	raw.Attributes = c.Attributes
 }
 
+// FromRaw
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func (c *Consumer) FromRaw(raw *rawtopic.Consumer) {
+	c.Attributes = raw.Attributes
+	c.Important = raw.Important
+	c.Name = raw.Name
+
+	c.SupportedCodecs = make([]Codec, len(raw.SupportedCodecs))
+	for index, codec := range raw.SupportedCodecs {
+		c.SupportedCodecs[index] = codec
+	}
+
+	if !raw.ReadFrom.IsZero() {
+		c.ReadFrom = raw.ReadFrom.Value
+	}
+}
+
 // PartitionSettings
 //
 // # Experimental
@@ -108,4 +128,9 @@ type TopicDescription struct {
 func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	d.Path = raw.Self.Name
 	d.PartitionSettings.FromRaw(&raw.PartitioningSettings)
+
+	d.Consumers = make([]Consumer, len(raw.Consumers))
+	for i := 0; i < raw.Consumers; i++ {
+		d.Consumers[i].FromRaw(&raw.Consumers[i])
+	}
 }
