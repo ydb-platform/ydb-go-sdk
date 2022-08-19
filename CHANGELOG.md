@@ -1,3 +1,4 @@
+## v3.35.0
 * Replaced internal table client background worker to plain wait group for control spawned goroutines
 * Replaced internal table client background session keeper to internal background session garbage collector for idle sessions
 * Extended the `DescribeTopicResult` struct
