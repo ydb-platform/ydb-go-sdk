@@ -45,7 +45,6 @@ const (
 type stats struct {
 	xsync.Mutex
 
-	keepAliveMinSize int
 	inFlightSessions map[string]struct{}
 	openSessions     map[string]struct{}
 	inPoolSessions   map[string]struct{}
@@ -57,7 +56,6 @@ func (s *stats) print(t testing.TB) {
 	defer s.Unlock()
 	t.Log("stats:")
 	t.Log(" - limit            :", s.limit)
-	t.Log(" - keepAliveMinSize :", s.keepAliveMinSize)
 	t.Log(" - open             :", len(s.openSessions))
 	t.Log(" - in-pool          :", len(s.inPoolSessions))
 	t.Log(" - in-flight        :", len(s.inFlightSessions))
@@ -66,14 +64,8 @@ func (s *stats) print(t testing.TB) {
 func (s *stats) check(t testing.TB) {
 	s.Lock()
 	defer s.Unlock()
-	if s.keepAliveMinSize < 0 {
-		t.Fatalf("negative keepAliveMinSize: %d", s.keepAliveMinSize)
-	}
 	if s.limit < 0 {
 		t.Fatalf("negative limit: %d", s.limit)
-	}
-	if s.keepAliveMinSize > len(s.inFlightSessions) {
-		t.Fatalf("keepAliveMinSize > len(in-flight) (%d > %d)", s.keepAliveMinSize, len(s.inFlightSessions))
 	}
 	if len(s.inFlightSessions) > len(s.inPoolSessions) {
 		t.Fatalf("len(in_flight) > len(pool) (%d > %d)", len(s.inFlightSessions), len(s.inPoolSessions))
@@ -81,12 +73,6 @@ func (s *stats) check(t testing.TB) {
 	if len(s.inPoolSessions) > s.limit {
 		t.Fatalf("len(pool) > limit (%d > %d)", len(s.inPoolSessions), s.limit)
 	}
-}
-
-func (s *stats) min() int {
-	s.Lock()
-	defer s.Unlock()
-	return s.keepAliveMinSize
 }
 
 func (s *stats) max() int {
@@ -214,7 +200,6 @@ func testTable(t testing.TB) {
 	defer cancel()
 
 	s := &stats{
-		keepAliveMinSize: math.MinInt32,
 		limit:            math.MaxInt32,
 		openSessions:     make(map[string]struct{}),
 		inPoolSessions:   make(map[string]struct{}),
@@ -308,9 +293,7 @@ func testTable(t testing.TB) {
 		),
 		ydb.WithBalancer(balancers.RandomChoice()),
 		ydb.WithDialTimeout(5*time.Second),
-		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithSessionPoolSizeLimit(limit),
-		ydb.WithSessionPoolKeepAliveMinSize(-1),
 		ydb.WithConnectionTTL(5*time.Second),
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithLogger(
@@ -334,7 +317,6 @@ func testTable(t testing.TB) {
 					) {
 						return func(info trace.TableInitDoneInfo) {
 							s.WithLock(func() {
-								s.keepAliveMinSize = info.KeepAliveMinSize
 								s.limit = info.Limit
 							})
 						}
@@ -401,8 +383,8 @@ func testTable(t testing.TB) {
 		return nil
 	}); err != nil {
 		t.Fatalf("pool not initialized: %+v", err)
-	} else if s.min() < 0 || s.max() != limit {
-		t.Fatalf("pool sizes not applied: %+v", s)
+	} else if s.max() != limit {
+		t.Fatalf("pool size not applied: %+v", s)
 	}
 
 	// prepare scheme

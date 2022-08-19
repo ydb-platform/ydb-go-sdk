@@ -640,9 +640,8 @@ func Table(l Logger, details trace.Details, opts ...option) (t trace.Table) {
 				l.Infof(`initialize start`)
 				start := time.Now()
 				return func(info trace.TableInitDoneInfo) {
-					l.Infof(`initialize done {latency:"%v",size:{min:%d,max:%d}}`,
+					l.Infof(`initialize done {latency:"%v",size:{max:%d}}`,
 						time.Since(start),
-						info.KeepAliveMinSize,
 						info.Limit,
 					)
 				}

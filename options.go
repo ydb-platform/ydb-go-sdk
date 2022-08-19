@@ -353,28 +353,23 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 }
 
 // WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveMinSize(keepAliveMinSize))
-		return nil
-	}
+	return func(ctx context.Context, c *connection) error { return nil }
 }
 
 // WithSessionPoolIdleThreshold defines keep-alive interval for idle sessions
 // Warning: if defined WithConnectionTTL - idleThreshold must be less than connectionTTL
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
-		return nil
-	}
+	return func(ctx context.Context, c *connection) error { return nil }
 }
 
 // WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveTimeout(keepAliveTimeout))
-		return nil
-	}
+	return func(ctx context.Context, c *connection) error { return nil }
 }
 
 // WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client

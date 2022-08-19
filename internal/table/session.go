@@ -2,7 +2,6 @@ package table
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -35,8 +34,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var errClosedSession = xerrors.Wrap(errors.New("session closed early"))
-
 // session represents a single table API session.
 //
 // session methods are not goroutine safe. Simultaneous execution of requests
@@ -49,7 +46,7 @@ type session struct {
 	tableService Ydb_Table_V1.TableServiceClient
 	config       config.Config
 
-	status uint32
+	status options.SessionStatus
 	nodeID uint32
 
 	onClose   []func(s *session)
@@ -79,19 +76,19 @@ func (s *session) Status() string {
 	if s == nil {
 		return ""
 	}
-	return options.SessionStatus(atomic.LoadUint32(&s.status)).String()
+	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))).String()
 }
 
 func (s *session) SetStatus(status options.SessionStatus) {
-	atomic.StoreUint32(&s.status, uint32(status))
+	atomic.StoreUint32((*uint32)(&s.status), uint32(status))
 }
 
 func (s *session) isClosed() bool {
-	return options.SessionStatus(atomic.LoadUint32(&s.status)) == options.SessionClosed
+	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))) == options.SessionClosed
 }
 
 func (s *session) isClosing() bool {
-	return options.SessionStatus(atomic.LoadUint32(&s.status)) == options.SessionClosing
+	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))) == options.SessionClosing
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config, opts ...sessionBuilderOption) (
@@ -157,7 +154,7 @@ func (s *session) ID() string {
 
 func (s *session) Close(ctx context.Context) (err error) {
 	if s.isClosed() {
-		return xerrors.WithStackTrace(errClosedSession)
+		return xerrors.WithStackTrace(errSessionClosed)
 	}
 
 	s.closeOnce.Do(func() {
@@ -165,28 +162,25 @@ func (s *session) Close(ctx context.Context) (err error) {
 			s.SetStatus(options.SessionClosed)
 		}()
 
-		s.SetStatus(options.SessionClosing)
-
 		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, s)
-		defer func() {
-			for _, onClose := range s.onClose {
-				onClose(s)
-			}
-			onDone(err)
-		}()
 
 		_, err = s.tableService.DeleteSession(
 			balancer.WithEndpoint(ctx, s),
 			&Ydb_Table.DeleteSessionRequest{
 				SessionId: s.id,
-				OperationParams: operation.Params(
-					ctx,
+				OperationParams: operation.Params(ctx,
 					s.config.OperationTimeout(),
 					s.config.OperationCancelAfter(),
 					operation.ModeSync,
 				),
 			},
 		)
+
+		for _, onClose := range s.onClose {
+			onClose(s)
+		}
+
+		onDone(err)
 	})
 
 	if err != nil {

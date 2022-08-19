@@ -8,12 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
-	grpcCodes "google.golang.org/grpc/codes"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -21,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -61,101 +58,148 @@ func newClient(
 		},
 		done: make(chan struct{}),
 	}
-	if config.IdleThreshold() > 0 {
-		c.keeperStop = make(chan struct{})
-		c.keeperDone = make(chan struct{})
-		go c.internalPoolKeeper(ctx)
+	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
+		c.spawnedGoroutines.Add(1)
+		go c.internalPoolGC(ctx, idleThreshold)
 	}
-	onDone(c.limit, c.config.KeepAliveMinSize())
+	onDone(c.limit)
 	return c
 }
 
 // Client is a set of session instances that may be reused.
 // A Client is safe for use by multiple goroutines simultaneously.
 type Client struct {
-	// build holds an object capable for creating sessions.
-	// It must not be nil.
-	build             sessionBuilder
-	cc                grpc.ClientConnInterface
-	config            config.Config
-	index             map[*session]sessionInfo
-	createInProgress  int           // KIKIMR-9163: in-create-process counter
-	limit             int           // Upper bound for Client size.
-	idle              *list.List    // list<*session>
-	waitq             *list.List    // list<*chan *session>
-	keeperWake        chan struct{} // Set by keeper.
-	keeperStop        chan struct{}
-	keeperDone        chan struct{}
-	touchingDone      chan struct{}
+	// read-only fields
+	config config.Config
+	build  sessionBuilder
+	cc     grpc.ClientConnInterface
+
+	// read-write fields
 	mu                xsync.Mutex
+	index             map[*session]sessionInfo
+	createInProgress  int        // KIKIMR-9163: in-create-process counter
+	limit             int        // Upper bound for Client size.
+	idle              *list.List // list<*session>
+	waitq             *list.List // list<*chan *session>
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
-	spawnedGoroutines background.Worker
-	touching          bool
+	spawnedGoroutines sync.WaitGroup
 	closed            uint32
 	done              chan struct{}
+}
+
+type createSessionOptions struct {
+	onCreate []func(s *session)
+	onClose  []func(s *session)
+}
+
+type createSessionOption func(o *createSessionOptions)
+
+func withCreateSessionOnCreate(onCreate func(s *session)) createSessionOption {
+	return func(o *createSessionOptions) {
+		o.onCreate = append(o.onCreate, onCreate)
+	}
+}
+
+func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
+	return func(o *createSessionOptions) {
+		o.onClose = append(o.onClose, onClose)
+	}
+}
+
+func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
+	if c.isClosed() {
+		return nil, errClosedClient
+	}
+	defer func() {
+		if s == nil {
+			return
+		}
+		options := createSessionOptions{}
+		for _, o := range opts {
+			o(&options)
+		}
+		for _, onCreate := range options.onCreate {
+			onCreate(s)
+		}
+		s.onClose = append(s.onClose, options.onClose...)
+	}()
+	type result struct {
+		s   *session
+		err error
+	}
+
+	ch := make(chan result)
+
+	c.spawnedGoroutines.Add(1)
+	go func() {
+		defer c.spawnedGoroutines.Done()
+
+		var (
+			s   *session
+			err error
+		)
+
+		createSessionCtx := xcontext.WithoutDeadline(ctx)
+
+		if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
+			var cancel context.CancelFunc
+			createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
+			defer cancel()
+		}
+
+		s, err = c.build(createSessionCtx)
+
+		closeSession := func(s *session) {
+			if s == nil {
+				return
+			}
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(
+				xcontext.WithoutDeadline(ctx),
+				c.config.DeleteTimeout(),
+			)
+			defer cancel()
+
+			_ = s.Close(ctx)
+		}
+
+		select {
+		case ch <- result{
+			s:   s,
+			err: err,
+		}: // nop
+
+		case <-c.done:
+			closeSession(s)
+
+		case <-ctx.Done():
+			closeSession(s)
+		}
+	}()
+
+	select {
+	case r := <-ch:
+		if r.err != nil {
+			return nil, xerrors.WithStackTrace(r.err)
+		}
+		return r.s, nil
+
+	case <-c.done:
+		return nil, xerrors.WithStackTrace(errClosedClient)
+
+	case <-ctx.Done():
+		return nil, xerrors.WithStackTrace(ctx.Err())
+	}
 }
 
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
-	createSession := func(ctx context.Context) (s *session, err error) {
-		type result struct {
-			s   *session
-			err error
-		}
-
-		ch := make(chan result)
-
-		c.spawnedGoroutines.Start("CreateSession", func(ctx context.Context) {
-			var (
-				s   *session
-				err error
-			)
-
-			createSessionCtx := xcontext.WithoutDeadline(ctx)
-
-			if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-				var cancel context.CancelFunc
-				createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
-				defer cancel()
-			}
-
-			s, err = c.build(createSessionCtx)
-
-			select {
-			case ch <- result{
-				s:   s,
-				err: err,
-			}: // nop
-			case <-ctx.Done():
-				if s != nil {
-					var cancel context.CancelFunc
-					ctx, cancel = context.WithTimeout(
-						xcontext.WithoutDeadline(ctx),
-						c.config.DeleteTimeout(),
-					)
-					defer cancel()
-
-					_ = s.Close(ctx)
-				}
-			}
-		})
-
-		select {
-		case r := <-ch:
-			if r.err != nil {
-				return nil, xerrors.WithStackTrace(r.err)
-			}
-			return r.s, nil
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-	}
 	var s *session
 	if !c.config.AutoRetry() {
-		s, err = createSession(ctx)
+		s, err = c.createSession(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -165,7 +209,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	err = retry.Retry(
 		ctx,
 		func(ctx context.Context) (err error) {
-			s, err = createSession(ctx)
+			s, err = c.createSession(ctx)
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}
@@ -215,94 +259,47 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 		return nil, xerrors.WithStackTrace(errSessionPoolOverflow)
 	}
 
-	type result struct {
-		s   *session
-		err error
-	}
-
-	ch := make(chan result)
-
-	c.spawnedGoroutines.Start("internalPoolCreateSession", func(ctx context.Context) {
-		var (
-			s   *session
-			err error
-		)
-
-		createSessionCtx := xcontext.WithoutDeadline(ctx)
-
-		createSessionCtx = meta.WithAllowFeatures(createSessionCtx,
-			meta.HintSessionBalancer,
-		)
-
-		if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-			var cancel context.CancelFunc
-			createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
-			defer cancel()
-		}
-
-		s, err = c.build(createSessionCtx)
-		if s == nil && err == nil {
-			panic("ydb: abnormal result of session build")
-		}
-
+	defer func() {
 		c.mu.WithLock(func() {
 			c.createInProgress--
-			if s != nil {
-				c.index[s] = sessionInfo{}
+		})
+	}()
 
-				trace.TableOnPoolSessionAdd(c.config.Trace(), s)
-				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+	s, err = c.createSession(meta.WithAllowFeatures(ctx,
+		meta.HintSessionBalancer,
+	), withCreateSessionOnCreate(func(s *session) {
+		c.mu.WithLock(func() {
+			c.index[s] = sessionInfo{
+				touched: timeutil.Now(),
+			}
+			trace.TableOnPoolSessionAdd(c.config.Trace(), s)
+			trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+		})
+	}), withCreateSessionOnClose(func(s *session) {
+		c.mu.WithLock(func() {
+			info, has := c.index[s]
+			if !has {
+				panic("session not found in pool")
+			}
 
-				s.onClose = append(s.onClose, func(s *session) {
-					c.mu.WithLock(func() {
-						info, has := c.index[s]
-						if !has {
-							return
-						}
+			delete(c.index, s)
 
-						delete(c.index, s)
+			trace.TableOnPoolSessionRemove(c.config.Trace(), s)
+			trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
 
-						trace.TableOnPoolSessionRemove(c.config.Trace(), s)
-						trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
+			if !c.isClosed() {
+				c.internalPoolNotify(nil)
+			}
 
-						c.internalPoolNotify(nil)
-
-						if info.idle != nil {
-							c.idle.Remove(info.idle)
-						}
-					})
-				})
+			if info.idle != nil {
+				c.idle.Remove(info.idle)
 			}
 		})
-
-		select {
-		case ch <- result{
-			s:   s,
-			err: err,
-		}: // nop
-		case <-ctx.Done():
-			if s != nil {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(
-					xcontext.WithoutDeadline(ctx),
-					c.config.DeleteTimeout(),
-				)
-				defer cancel()
-
-				_ = s.Close(ctx)
-			}
-		}
-	})
-
-	select {
-	case r := <-ch:
-		if r.err != nil {
-			return nil, xerrors.WithStackTrace(r.err)
-		}
-		return r.s, nil
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
+	}))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
 	}
+	return s, nil
 }
 
 type getOptions struct {
@@ -474,32 +471,36 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 		onDone(err)
 	}()
 
+	defer func() {
+		if err != nil {
+			c.internalPoolSyncCloseSession(ctx, s)
+		}
+	}()
+
 	switch {
 	case c.isClosed():
-		err = xerrors.WithStackTrace(errClosedClient)
+		return xerrors.WithStackTrace(errClosedClient)
 
 	case s.isClosing():
-		err = xerrors.WithStackTrace(errSessionShutdown)
+		return xerrors.WithStackTrace(errSessionUnderShutdown)
+
+	case s.isClosed():
+		return xerrors.WithStackTrace(errSessionClosed)
 
 	default:
-		c.mu.WithLock(func() {
-			if c.idle.Len() >= c.limit {
-				err = xerrors.WithStackTrace(errSessionPoolOverflow)
-				return
-			}
-			if c.internalPoolNotify(s) {
-				return
-			}
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		if c.idle.Len() >= c.limit {
+			return xerrors.WithStackTrace(errSessionPoolOverflow)
+		}
+
+		if !c.internalPoolNotify(s) {
 			c.internalPoolPushIdle(s, timeutil.Now())
-		})
-	}
+		}
 
-	if err != nil {
-		_ = c.internalPoolCloseSession(ctx, s)
-		return xerrors.WithStackTrace(err)
+		return nil
 	}
-
-	return nil
 }
 
 // Close deletes all stored sessions inside Client.
@@ -516,39 +517,21 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	var issues []error
 	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
 		close(c.done)
-		var toClose []*session
 		c.mu.WithLock(func() {
-			keeperDone := c.keeperDone
-			if ch := c.keeperStop; ch != nil {
-				close(ch)
+			for el := c.waitq.Front(); el != nil; el = el.Next() {
+				ch := el.Value.(*chan *session)
+				close(*ch)
 			}
 
-			if keeperDone != nil {
-				<-keeperDone
+			for e := c.idle.Front(); e != nil; e = e.Next() {
+				c.internalPoolAsyncCloseSession(ctx, e.Value.(*session))
 			}
 
 			c.limit = 0
-
-			toClose = make([]*session, 0, len(c.index))
-			for s := range c.index {
-				toClose = append(toClose, s)
-			}
 		})
-		issues = make([]error, 0, len(toClose))
-		for _, s := range toClose {
-			if err = c.internalPoolCloseSession(ctx, s); err != nil {
-				issues = append(issues, err)
-			}
-		}
-	}
-
-	_ = c.spawnedGoroutines.Close(ctx, errClosedClient)
-
-	if len(issues) > 0 {
-		return xerrors.WithStackTrace(xerrors.NewWithIssues("table client closed with issues", issues...))
+		c.spawnedGoroutines.Wait()
 	}
 
 	return nil
@@ -583,161 +566,45 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
-	return doTx(
+	err = doTx(
 		ctx,
 		c,
 		c.config,
 		op,
 		retryOptions(c.config.Trace(), opts...),
 	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
-func (c *Client) internalPoolKeeper(ctx context.Context) {
-	defer close(c.keeperDone)
-	var (
-		toTouch    []*session // Cached for reuse.
-		toDelete   []*session // Cached for reuse.
-		toTryAgain []*session // Cached for reuse.
-
-		wake  = make(chan struct{})
-		timer = timeutil.NewTimer(c.config.IdleThreshold())
-	)
+func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration) {
+	defer c.spawnedGoroutines.Done()
+	timer := timeutil.NewTimer(idleThreshold)
 
 	for {
-		var now time.Time
 		select {
-		case <-wake:
-			wake = make(chan struct{})
-			if !timer.Stop() {
-				select {
-				case <-timer.C():
-				default:
-				}
-			}
-			timer.Reset(c.config.IdleThreshold())
-			continue
-
-		case <-c.keeperStop:
+		case <-c.done:
 			return
 
-		case now = <-timer.C():
-			toTouch = toTouch[:0]
-			toTryAgain = toTryAgain[:0]
-			toDelete = toDelete[:0]
-
+		case <-timer.C():
 			c.mu.WithLock(func() {
-				c.touching = true
-				for c.idle.Len() > 0 {
-					s, touched := c.internalPoolPeekFirstIdle()
-					if s == nil || now.Sub(touched) < c.config.IdleThreshold() {
-						break
+				for e := c.idle.Front(); e != nil; e = e.Next() {
+					s := e.Value.(*session)
+					info, has := c.index[s]
+					if !has {
+						panic("session not found in pool")
 					}
-					_ = c.internalPoolRemoveIdle(s)
-					toTouch = append(toTouch, s)
+					if info.idle == nil {
+						panic("inconsistent session info")
+					}
+					if since := timeutil.Until(info.touched); since > idleThreshold {
+						c.internalPoolAsyncCloseSession(ctx, s)
+					}
 				}
 			})
-
-			var mark *list.Element // Element in the list to insert touched sessions after.
-			for i, s := range toTouch {
-				toTouch[i] = nil
-
-				var keepAliveCount, lenIndex int
-				c.mu.WithLock(func() {
-					keepAliveCount = c.internalPoolIncrementKeepAlive(s)
-					lenIndex = len(c.index)
-				})
-
-				// if keepAlive was called more than the corresponding limit for the
-				// session to be alive and more sessions are open than the lower limit
-				// of continuously kept sessions
-				if c.config.IdleKeepAliveThreshold() > 0 {
-					if keepAliveCount >= c.config.IdleKeepAliveThreshold() {
-						if c.config.KeepAliveMinSize() < lenIndex-len(toDelete) {
-							toDelete = append(toDelete, s)
-							continue
-						}
-					}
-				}
-
-				err := c.internalPoolKeepAliveSession(context.Background(), s)
-				if err != nil {
-					switch {
-					case
-						xerrors.Is(
-							err,
-							balancer.ErrNoEndpoints,
-						),
-						xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION),
-						xerrors.IsTransportError(
-							err,
-							grpcCodes.DeadlineExceeded,
-							grpcCodes.Unavailable,
-						):
-						toDelete = append(toDelete, s)
-					default:
-						toTryAgain = append(toTryAgain, s)
-					}
-					continue
-				}
-
-				c.mu.WithLock(func() {
-					if !c.internalPoolNotify(s) {
-						// Need to push back session into list in order, to prevent
-						// shuffling of sessions order.
-						//
-						// That is, there may be a race condition, when some session S1
-						// pushed back in the list before we took the mutex. Suppose S1
-						// touched time is greater than ours `now` for S0. If so, it
-						// then may interrupt next keep alive iteration earlier and
-						// prevent our session S0 being touched:
-						// time.Since(S1) < threshold but time.Since(S0) > threshold.
-						mark = c.internalPoolPushIdleInOrderAfter(s, now, mark)
-					}
-				})
-			}
-
-			{ // push all the soft failed sessions to retry on the next tick
-				pushBackTime := now.Add(-c.config.IdleThreshold())
-
-				c.mu.WithLock(func() {
-					for _, el := range toTryAgain {
-						_ = c.internalPoolPushIdleInOrder(el, pushBackTime)
-					}
-				})
-			}
-
-			var (
-				sleep bool
-				delay time.Duration
-			)
-
-			var touchingDone chan struct{}
-			c.mu.WithLock(func() {
-				if s, touched := c.internalPoolPeekFirstIdle(); s == nil {
-					// No sessions to check. Let the Put() caller to wake up
-					// internalPoolKeeper when session arrive.
-					sleep = true
-					c.keeperWake = wake
-				} else {
-					// NOTE: negative delay is also fine.
-					delay = c.config.IdleThreshold() - now.Sub(touched)
-				}
-
-				// Takers notification broadcast channel.
-				touchingDone = c.touchingDone
-				c.touchingDone = nil
-				c.touching = false
-			})
-
-			if !sleep {
-				timer.Reset(delay)
-			}
-			for _, s := range toDelete {
-				_ = c.internalPoolCloseSession(ctx, s)
-			}
-			if touchingDone != nil {
-				close(touchingDone)
-			}
+			timer.Reset(idleThreshold / 2)
 		}
 	}
 }
@@ -782,40 +649,16 @@ func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) {
 }
 
 // removes first session from idle and resets the keepAliveCount
-// to prevent session from dying in the internalPoolKeeper after it was returned
+// to prevent session from dying in the internalPoolGC after it was returned
 // to be used only in outgoing functions that make session busy.
 // c.mu must be held.
 func (c *Client) internalPoolRemoveFirstIdle() *session {
 	s, _ := c.internalPoolPeekFirstIdle()
 	if s != nil {
 		info := c.internalPoolRemoveIdle(s)
-		info.keepAliveCount = 0
 		c.index[s] = info
 	}
 	return s
-}
-
-// Increments the Keep Alive Counter and returns the previous number.
-// Unlike other info modifiers, this one doesn't care if it didn't find the session, it skips
-// the action. You can still check it later if needed, if the return code is -1
-// c.mu must be held.
-func (c *Client) internalPoolIncrementKeepAlive(s *session) int {
-	info, has := c.index[s]
-	if !has {
-		return -1
-	}
-	ret := info.keepAliveCount
-	info.keepAliveCount++
-	c.index[s] = info
-	return ret
-}
-
-// c.mu must be held.
-func (c *Client) internalPoolTouchCond() <-chan struct{} {
-	if c.touchingDone == nil {
-		c.touchingDone = make(chan struct{})
-	}
-	return c.touchingDone
 }
 
 // c.mu must be held.
@@ -839,6 +682,11 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 		case *ch <- s:
 			// Case (1).
 			return true
+
+		case <-c.done:
+			// Case (2) or (3).
+			close(*ch)
+
 		default:
 			// Case (2) or (3).
 			close(*ch)
@@ -847,22 +695,21 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 	return false
 }
 
-func (c *Client) internalPoolCloseSession(ctx context.Context, s *session) (err error) {
+func (c *Client) internalPoolAsyncCloseSession(ctx context.Context, s *session) {
+	s.SetStatus(options.SessionClosing)
+	c.spawnedGoroutines.Add(1)
+	go func() {
+		defer c.spawnedGoroutines.Done()
+		c.internalPoolSyncCloseSession(ctx, s)
+	}()
+}
+
+func (c *Client) internalPoolSyncCloseSession(ctx context.Context, s *session) {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, c.config.DeleteTimeout())
 	defer cancel()
 
-	return s.Close(ctx)
-}
-
-func (c *Client) internalPoolKeepAliveSession(ctx context.Context, s *session) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, c.config.KeepAliveTimeout())
-	defer cancel()
-	err = s.KeepAlive(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
+	_ = s.Close(ctx)
 }
 
 // c.mu must be held.
@@ -884,39 +731,6 @@ func (c *Client) internalPoolPushIdle(s *session, now time.Time) {
 }
 
 // c.mu must be held.
-func (c *Client) internalPoolPushIdleInOrder(s *session, now time.Time) (el *list.Element) {
-	var prev *list.Element
-	for prev = c.idle.Back(); prev != nil; prev = prev.Prev() {
-		s := prev.Value.(*session)
-		t := c.index[s].touched
-		if !now.Before(t) { // now >= t
-			break
-		}
-	}
-	if prev != nil {
-		el = c.idle.InsertAfter(s, prev)
-	} else {
-		el = c.idle.PushFront(s)
-	}
-	c.internalPoolHandlePushIdle(s, now, el)
-	return el
-}
-
-// c.mu must be held.
-func (c *Client) internalPoolPushIdleInOrderAfter(s *session, now time.Time, mark *list.Element) *list.Element {
-	if mark != nil {
-		n := c.idle.Len()
-		el := c.idle.InsertAfter(s, mark)
-		if n < c.idle.Len() {
-			// List changed, thus mark belongs to list.
-			c.internalPoolHandlePushIdle(s, now, el)
-			return el
-		}
-	}
-	return c.internalPoolPushIdleInOrder(s, now)
-}
-
-// c.mu must be held.
 func (c *Client) internalPoolHandlePushIdle(s *session, now time.Time, el *list.Element) {
 	info, has := c.index[s]
 	if !has {
@@ -929,20 +743,9 @@ func (c *Client) internalPoolHandlePushIdle(s *session, now time.Time, el *list.
 	info.touched = now
 	info.idle = el
 	c.index[s] = info
-
-	c.internalPoolWakeUpKeeper()
-}
-
-// c.mu must be held.
-func (c *Client) internalPoolWakeUpKeeper() {
-	if wake := c.keeperWake; wake != nil {
-		c.keeperWake = nil
-		close(wake)
-	}
 }
 
 type sessionInfo struct {
-	idle           *list.Element
-	touched        time.Time
-	keepAliveCount int
+	idle    *list.Element
+	touched time.Time
 }

@@ -1397,14 +1397,13 @@ func (t Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo)
 	}
 	return res
 }
-func TableOnInit(t Table, c *context.Context) func(limit int, keepAliveMinSize int) {
+func TableOnInit(t Table, c *context.Context) func(limit int) {
 	var p TableInitStartInfo
 	p.Context = c
 	res := t.onInit(p)
-	return func(limit int, keepAliveMinSize int) {
+	return func(limit int) {
 		var p TableInitDoneInfo
 		p.Limit = limit
-		p.KeepAliveMinSize = keepAliveMinSize
 		res(p)
 	}
 }

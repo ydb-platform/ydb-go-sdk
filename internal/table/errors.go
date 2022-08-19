@@ -20,9 +20,13 @@ var (
 	// that the Client is full and requested operation is not able to complete.
 	errSessionPoolOverflow = xerrors.Wrap(errors.New("session pool overflow"))
 
-	// errSessionShutdown returned by a Client instance to indicate that
+	// errSessionUnderShutdown returned by a Client instance to indicate that
 	// requested session is under shutdown.
-	errSessionShutdown = xerrors.Wrap(errors.New("session under shutdown"))
+	errSessionUnderShutdown = xerrors.Wrap(errors.New("session under shutdown"))
+
+	// errSessionClosed returned by a Client instance to indicate that
+	// requested session is closed early.
+	errSessionClosed = xerrors.Wrap(errors.New("session closed early"))
 
 	// errNoProgress returned by a Client instance to indicate that
 	// operation could not be completed.

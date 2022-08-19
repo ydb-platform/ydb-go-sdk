@@ -37,7 +37,7 @@ func doTx(
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
-	return retryBackoff(
+	err = retryBackoff(
 		ctx,
 		c,
 		opts.FastBackoff,
@@ -83,6 +83,10 @@ func doTx(
 			return nil
 		},
 	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 func do(
@@ -139,14 +143,17 @@ func retryBackoff(
 	slowBackoff backoff.Backoff,
 	isOperationIdempotent bool,
 	op table.Operation,
-) error {
-	return retry.Retry(
+) (err error) {
+	err = retry.Retry(
 		ctx,
-		func(ctx context.Context) error {
-			s, err := p.Get(ctx)
+		func(ctx context.Context) (err error) {
+			var s *session
+
+			s, err = p.Get(ctx)
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}
+
 			defer func() {
 				_ = p.Put(ctx, s)
 			}()
@@ -163,6 +170,10 @@ func retryBackoff(
 		retry.WithSlowBackoff(slowBackoff),
 		retry.WithIdempotent(isOperationIdempotent),
 	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
