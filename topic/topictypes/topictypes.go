@@ -97,7 +97,7 @@ func (s *PartitionSettings) FromRaw(raw *rawtopic.PartitioningSettings) {
 type TopicDescription struct {
 	Path              string
 	PartitionSettings PartitionSettings
-	Consmers          []Consumer
+	Consumers         []Consumer
 }
 
 // FromRaw
