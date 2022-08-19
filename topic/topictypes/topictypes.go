@@ -146,6 +146,8 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 
 	d.PartitionWriteSpeedBytesPerSecond = raw.PartitionWriteSpeedBytesPerSecond
 	d.PartitionWriteBurstBytes = raw.PartitionWriteBurstBytes
+
+	d.Attributes = make(map[string]string)
 	for k, v := range raw.Attributes {
 		d.Attributes[k] = v
 	}
@@ -172,6 +174,8 @@ func (d *TopicDescription) ToRaw(raw *rawtopic.DescribeTopicResult) {
 
 	raw.PartitionWriteBurstBytes = d.PartitionWriteBurstBytes
 	raw.PartitionWriteSpeedBytesPerSecond = d.PartitionWriteSpeedBytesPerSecond
+
+	raw.Attributes = make(map[string]string)
 	for k, v := range d.Attributes {
 		raw.Attributes[k] = v
 	}

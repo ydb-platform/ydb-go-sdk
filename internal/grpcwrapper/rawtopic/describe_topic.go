@@ -69,6 +69,7 @@ func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopic
 		}
 	}
 
+	res.Attributes = make(map[string]string)
 	for k, v := range protoResult.Attributes {
 		res.Attributes[k] = v
 	}
