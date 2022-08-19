@@ -98,8 +98,6 @@ func WithConnectionString(connectionString string) Option {
 }
 
 // WithConnectionTTL defines duration for parking idle connections
-//
-// Warning: if defined WithSessionPoolIdleThreshold - idleThreshold must be less than connectionTTL
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithConnectionTTL(ttl))
@@ -360,11 +358,11 @@ func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 }
 
 // WithSessionPoolIdleThreshold defines keep-alive interval for idle sessions
-// Warning: if defined WithConnectionTTL - idleThreshold must be less than connectionTTL
-//
-// Deprecated: table client do not supports background session keep-aliving now
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
-	return func(ctx context.Context, c *connection) error { return nil }
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
+		return nil
+	}
 }
 
 // WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
