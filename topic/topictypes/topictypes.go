@@ -115,9 +115,14 @@ func (s *PartitionSettings) FromRaw(raw *rawtopic.PartitioningSettings) {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type TopicDescription struct {
-	Path              string
-	PartitionSettings PartitionSettings
-	Consumers         []Consumer
+	Path                              string
+	PartitionSettings                 PartitionSettings
+	Consumers                         []Consumer
+	SupportedCodecs                   []Codec
+	RetentionPeriod                   time.Duration
+	PartitionWriteBurstBytes          int64
+	PartitionWriteSpeedBytesPerSecond int64
+	Attributes                        map[string]string
 }
 
 // FromRaw
@@ -132,5 +137,42 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	d.Consumers = make([]Consumer, len(raw.Consumers))
 	for i := 0; i < len(raw.Consumers); i++ {
 		d.Consumers[i].FromRaw(&raw.Consumers[i])
+	}
+
+	d.SupportedCodecs = make([]Codec, len(raw.SupportedCodecs))
+	for i := 0; i < len(raw.SupportedCodecs); i++ {
+		d.SupportedCodecs[i] = Codec(raw.SupportedCodecs[i])
+	}
+
+	d.PartitionWriteSpeedBytesPerSecond = raw.PartitionWriteSpeedBytesPerSecond
+	d.PartitionWriteBurstBytes = raw.PartitionWriteBurstBytes
+	for k, v := range raw.Attributes {
+		d.Attributes[k] = v
+	}
+}
+
+// ToRaw
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func (d *TopicDescription) ToRaw(raw *rawtopic.DescribeTopicResult) {
+	raw.Self.Name = d.Path
+	d.PartitionSettings.ToRaw(&raw.PartitioningSettings)
+
+	raw.Consumers = make([]rawtopic.Consumer, len(d.Consumers))
+	for i := 0; i < len(d.Consumers); i++ {
+		d.Consumers[i].ToRaw(&raw.Consumers[i])
+	}
+
+	raw.SupportedCodecs = make([]rawtopiccommon.Codec, len(d.SupportedCodecs))
+	for i := 0; i < len(d.SupportedCodecs); i++ {
+		raw.SupportedCodecs[i] = rawtopiccommon.Codec(d.SupportedCodecs[i])
+	}
+
+	raw.PartitionWriteBurstBytes = d.PartitionWriteBurstBytes
+	raw.PartitionWriteSpeedBytesPerSecond = d.PartitionWriteSpeedBytesPerSecond
+	for k, v := range d.Attributes {
+		raw.Attributes[k] = v
 	}
 }
