@@ -1,3 +1,4 @@
+## v3.35.1
 * Removed the deprecation warning for `ydb.WithSessionPoolIdleThreshold` option
 
 ## v3.35.0
