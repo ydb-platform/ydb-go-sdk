@@ -71,10 +71,10 @@ func (c *Consumer) FromRaw(raw *rawtopic.Consumer) {
 
 	c.SupportedCodecs = make([]Codec, len(raw.SupportedCodecs))
 	for index, codec := range raw.SupportedCodecs {
-		c.SupportedCodecs[index] = codec
+		c.SupportedCodecs[index] = Codec(codec)
 	}
 
-	if !raw.ReadFrom.IsZero() {
+	if raw.ReadFrom.HasValue {
 		c.ReadFrom = raw.ReadFrom.Value
 	}
 }
@@ -130,7 +130,7 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	d.PartitionSettings.FromRaw(&raw.PartitioningSettings)
 
 	d.Consumers = make([]Consumer, len(raw.Consumers))
-	for i := 0; i < raw.Consumers; i++ {
+	for i := 0; i < len(raw.Consumers); i++ {
 		d.Consumers[i].FromRaw(&raw.Consumers[i])
 	}
 }
