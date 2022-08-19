@@ -59,6 +59,26 @@ func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 	raw.Attributes = c.Attributes
 }
 
+// FromRaw
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func (c *Consumer) FromRaw(raw *rawtopic.Consumer) {
+	c.Attributes = raw.Attributes
+	c.Important = raw.Important
+	c.Name = raw.Name
+
+	c.SupportedCodecs = make([]Codec, len(raw.SupportedCodecs))
+	for index, codec := range raw.SupportedCodecs {
+		c.SupportedCodecs[index] = Codec(codec)
+	}
+
+	if raw.ReadFrom.HasValue {
+		c.ReadFrom = raw.ReadFrom.Value
+	}
+}
+
 // PartitionSettings
 //
 // # Experimental
@@ -95,9 +115,14 @@ func (s *PartitionSettings) FromRaw(raw *rawtopic.PartitioningSettings) {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type TopicDescription struct {
-	Path              string
-	PartitionSettings PartitionSettings
-	Consmers          []Consumer
+	Path                              string
+	PartitionSettings                 PartitionSettings
+	Consumers                         []Consumer
+	SupportedCodecs                   []Codec
+	RetentionPeriod                   time.Duration
+	PartitionWriteBurstBytes          int64
+	PartitionWriteSpeedBytesPerSecond int64
+	Attributes                        map[string]string
 }
 
 // FromRaw
@@ -108,4 +133,50 @@ type TopicDescription struct {
 func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	d.Path = raw.Self.Name
 	d.PartitionSettings.FromRaw(&raw.PartitioningSettings)
+
+	d.Consumers = make([]Consumer, len(raw.Consumers))
+	for i := 0; i < len(raw.Consumers); i++ {
+		d.Consumers[i].FromRaw(&raw.Consumers[i])
+	}
+
+	d.SupportedCodecs = make([]Codec, len(raw.SupportedCodecs))
+	for i := 0; i < len(raw.SupportedCodecs); i++ {
+		d.SupportedCodecs[i] = Codec(raw.SupportedCodecs[i])
+	}
+
+	d.PartitionWriteSpeedBytesPerSecond = raw.PartitionWriteSpeedBytesPerSecond
+	d.PartitionWriteBurstBytes = raw.PartitionWriteBurstBytes
+
+	d.Attributes = make(map[string]string)
+	for k, v := range raw.Attributes {
+		d.Attributes[k] = v
+	}
+}
+
+// ToRaw
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func (d *TopicDescription) ToRaw(raw *rawtopic.DescribeTopicResult) {
+	raw.Self.Name = d.Path
+	d.PartitionSettings.ToRaw(&raw.PartitioningSettings)
+
+	raw.Consumers = make([]rawtopic.Consumer, len(d.Consumers))
+	for i := 0; i < len(d.Consumers); i++ {
+		d.Consumers[i].ToRaw(&raw.Consumers[i])
+	}
+
+	raw.SupportedCodecs = make([]rawtopiccommon.Codec, len(d.SupportedCodecs))
+	for i := 0; i < len(d.SupportedCodecs); i++ {
+		raw.SupportedCodecs[i] = rawtopiccommon.Codec(d.SupportedCodecs[i])
+	}
+
+	raw.PartitionWriteBurstBytes = d.PartitionWriteBurstBytes
+	raw.PartitionWriteSpeedBytesPerSecond = d.PartitionWriteSpeedBytesPerSecond
+
+	raw.Attributes = make(map[string]string)
+	for k, v := range d.Attributes {
+		raw.Attributes[k] = v
+	}
 }

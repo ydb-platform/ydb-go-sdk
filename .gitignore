@@ -5,6 +5,7 @@
 .history/
 .devcontainer
 *.vsix
+*.swp
 
 
 *.exe
