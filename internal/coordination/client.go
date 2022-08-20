@@ -3,7 +3,6 @@ package coordination
 import (
 	"context"
 	"errors"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
 	"google.golang.org/grpc"
@@ -17,8 +16,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
-//nolint:gofumpt
-//nolint:nolintlint
+// nolint: gofumpt
+// nolint: nolintlint
 var (
 	errNilClient = xerrors.Wrap(errors.New("coordination client is not initialized"))
 )
@@ -235,4 +234,169 @@ func ratelimiterCountersMode(t Ydb_Coordination.RateLimiterCountersMode) coordin
 	default:
 		return coordination.RatelimiterCountersModeUnset
 	}
+}
+
+func (c *Client) SessionStart(
+	ctx context.Context,
+	path string,
+	opts ...config.SessionStartOption) (coordination.Session, error) {
+	if c == nil {
+		return nil, xerrors.WithStackTrace(errNilClient)
+	}
+
+	serviceClient, err := c.service.Session(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer serviceClient.CloseSend()
+
+	id, err := c.sessionStart(serviceClient, path, opts...)
+	return &Session{
+		sessionID: id,
+		client:    c,
+	}, xerrors.WithStackTrace(err)
+}
+
+func (c *Client) sessionStart(
+	serviceClient Ydb_Coordination_V1.CoordinationService_SessionClient,
+	path string,
+	opts ...config.SessionStartOption,
+) (uint64, error) {
+	cfg := config.NewSessionStartConfig()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	if err := serviceClient.Send(&Ydb_Coordination.SessionRequest{
+		Request: &Ydb_Coordination.SessionRequest_SessionStart_{
+			SessionStart: &Ydb_Coordination.SessionRequest_SessionStart{
+				Path:          path,
+				SessionId:     cfg.SessionID(),
+				TimeoutMillis: cfg.TimeoutMillis(),
+			},
+		},
+	}); err != nil {
+		return 0, err
+	}
+
+	response, err := serviceClient.Recv()
+	if err != nil {
+		return 0, err
+	}
+
+	return response.GetSessionStarted().GetSessionId(), nil
+}
+
+// TODO: убрать
+func (c *Client) sessionStop(
+	serviceClient Ydb_Coordination_V1.CoordinationService_SessionClient,
+) error {
+	return serviceClient.Send(&Ydb_Coordination.SessionRequest{
+		Request: &Ydb_Coordination.SessionRequest_SessionStop_{
+			SessionStop: &Ydb_Coordination.SessionRequest_SessionStop{},
+		},
+	})
+}
+
+func (c *Client) loadData(
+	serviceClient Ydb_Coordination_V1.CoordinationService_SessionClient,
+	id uint64,
+	name string,
+) (
+	*Ydb_Coordination.SessionResponse_DescribeSemaphoreResult,
+	error,
+) {
+	err := serviceClient.Send(&Ydb_Coordination.SessionRequest{
+		Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
+			DescribeSemaphore: &Ydb_Coordination.SessionRequest_DescribeSemaphore{
+				ReqId: id,
+				Name:  name,
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		response *Ydb_Coordination.SessionResponse
+		result   *Ydb_Coordination.SessionResponse_DescribeSemaphoreResult
+	)
+	for result.GetReqId() != id {
+		response, err = serviceClient.Recv()
+		if err != nil {
+			return nil, err
+		}
+
+		result = response.GetDescribeSemaphoreResult()
+	}
+
+	return result, nil
+}
+
+//func (c *Client) keepAlive(
+//	ctx context.Context,
+//	serviceClient Ydb_Coordination_V1.CoordinationService_SessionClient,
+//	path string,
+//	id uint64,
+//	updateDuration time.Duration) {
+//
+//	ticker := time.NewTicker(updateDuration)
+//
+//	for {
+//		select {
+//		case <-ticker.C:
+//			// TODO: сделать нормальную обработку ошибки
+//			// TODO: сделать нормальную передачу duration
+//			_, err := c.sessionStart(
+//				serviceClient, path,
+//				config.WithSessionID(id), config.WithSessionTimeoutMillis(uint64(updateDuration.Milliseconds())),
+//			)
+//			if err != nil {
+//				return
+//			}
+//		case <-ctx.Done():
+//			return
+//		}
+//	}
+//}
+
+func (c *Client) unlock(
+	ctx context.Context,
+	name, path string,
+	id uint64,
+) error {
+	serviceClient, err := c.service.Session(ctx)
+	if err != nil {
+		return err
+	}
+	defer serviceClient.CloseSend()
+
+	err = serviceClient.Send(&Ydb_Coordination.SessionRequest{
+		Request: &Ydb_Coordination.SessionRequest_ReleaseSemaphore_{
+			ReleaseSemaphore: &Ydb_Coordination.SessionRequest_ReleaseSemaphore{
+				ReqId: id,
+				Name:  name,
+			},
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	var (
+		response *Ydb_Coordination.SessionResponse
+		result   *Ydb_Coordination.SessionResponse_ReleaseSemaphoreResult
+	)
+	for result.GetReqId() != id {
+		response, err = serviceClient.Recv()
+		if err != nil {
+			return err
+		}
+
+		result = response.GetReleaseSemaphoreResult()
+	}
+
+	return nil
 }

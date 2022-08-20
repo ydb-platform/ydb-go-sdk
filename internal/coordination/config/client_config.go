@@ -42,3 +42,37 @@ func New(opts ...Option) Config {
 	}
 	return c
 }
+
+type SessionStartConfig struct {
+	sessionID     uint64
+	timeoutMillis uint64
+}
+
+func NewSessionStartConfig() *SessionStartConfig {
+	return &SessionStartConfig{
+		sessionID:     0,
+		timeoutMillis: 500000,
+	}
+}
+
+func (s *SessionStartConfig) SessionID() uint64 {
+	return s.sessionID
+}
+
+func (s *SessionStartConfig) TimeoutMillis() uint64 {
+	return s.timeoutMillis
+}
+
+type SessionStartOption func(s *SessionStartConfig)
+
+func WithSessionTimeoutMillis(timeoutMillis uint64) SessionStartOption {
+	return func(s *SessionStartConfig) {
+		s.timeoutMillis = timeoutMillis
+	}
+}
+
+func WithSessionID(sessionID uint64) SessionStartOption {
+	return func(s *SessionStartConfig) {
+		s.sessionID = sessionID
+	}
+}
