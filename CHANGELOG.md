@@ -1,3 +1,5 @@
+* Defined default dial timeout (5 seconds)
+
 ## v3.35.1
 * Removed the deprecation warning for `ydb.WithSessionPoolIdleThreshold` option
 

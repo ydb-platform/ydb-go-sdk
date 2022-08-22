@@ -1,22 +1,17 @@
 package config
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"net"
 	"time"
 
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	builder "github.com/ydb-platform/ydb-go-sdk/v3/internal/xnet"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -259,18 +254,15 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 
 func New(opts ...Option) Config {
 	c := defaultConfig()
+
 	for _, o := range opts {
 		o(&c)
 	}
-	c.grpcOptions = append(c.grpcOptions,
-		grpcCredentials(c.secure, c.tlsConfig),
-	)
-	c.meta = meta.New(
-		c.database,
-		c.credentials,
-		c.trace,
-		c.metaOptions...,
-	)
+
+	c.grpcOptions = append(c.grpcOptions, grpcOptions(c.trace, c.secure, c.tlsConfig)...)
+
+	c.meta = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
+
 	return c
 }
 
@@ -286,56 +278,4 @@ func (c Config) With(opts ...Option) Config {
 		c.metaOptions...,
 	)
 	return c
-}
-
-func certPool() *x509.CertPool {
-	certPool, err := x509.SystemCertPool()
-	if err == nil {
-		return certPool
-	}
-	return x509.NewCertPool()
-}
-
-func defaultTLSConfig() *tls.Config {
-	return &tls.Config{
-		MinVersion: tls.VersionTLS12,
-		RootCAs:    certPool(),
-	}
-}
-
-func defaultConfig() (c Config) {
-	return Config{
-		credentials: credentials.NewAnonymousCredentials(
-			credentials.WithSourceInfo("default"),
-		),
-		balancerConfig: balancers.Default(),
-		tlsConfig:      defaultTLSConfig(),
-		grpcOptions: []grpc.DialOption{
-			grpc.WithContextDialer(
-				func(ctx context.Context, address string) (net.Conn, error) {
-					return builder.New(
-						ctx,
-						address,
-						c.trace,
-					)
-				},
-			),
-			grpc.WithKeepaliveParams(
-				DefaultGrpcConnectionPolicy,
-			),
-			grpc.WithDefaultServiceConfig(`{
-				"loadBalancingPolicy": "round_robin"
-			}`),
-			grpc.WithDefaultCallOptions(
-				grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
-				grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
-			),
-			grpc.WithResolvers(
-				xresolver.New("", c.trace),
-				xresolver.New("ydb", c.trace),
-				xresolver.New("grpc", c.trace),
-				xresolver.New("grpcs", c.trace),
-			),
-		},
-	}
 }
