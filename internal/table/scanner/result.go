@@ -98,6 +98,16 @@ func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	}
 }
 
+func (r *unaryResult) Err() (err error) {
+	if err = r.baseResult.scanner.Err(); err != nil {
+		return err
+	}
+	if r.truncated() {
+		return xerrors.WithStackTrace(errTruncated)
+	}
+	return nil
+}
+
 func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
 	if r.isClosed() {
 		return xerrors.WithStackTrace(errAlreadyClosed)
@@ -112,6 +122,10 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 
 func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
 	return r.NextResultSetErr(ctx, columns...) == nil
+}
+
+func (r *streamResult) Err() (err error) {
+	return r.baseResult.scanner.Err()
 }
 
 func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {

@@ -1,3 +1,4 @@
+* Changed behavior on `result.Err()` on truncated unary result (returns non-retryable error now)
 * Added simple transaction control constructors `table.OnlineReadOnlyTxControl()` and `table.StaleReadOnlyTxControl()`
 * Added transaction control specifier with context `ydb.WithTxControl`
 * Added value constructors `types.BytesValue`, `types.BytesValueFromString`, `types.TextValue`

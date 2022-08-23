@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -21,6 +22,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
+
+var errTruncated = xerrors.Wrap(errors.New("truncated result"))
 
 type scanner struct {
 	set       *Ydb.ResultSet
@@ -206,11 +209,22 @@ func (s *scanner) Truncated() bool {
 	return s.set.Truncated
 }
 
+// Truncated returns true if current result set has been truncated by server
+func (s *scanner) truncated() bool {
+	if s.set == nil {
+		return false
+	}
+	return s.set.Truncated
+}
+
 // Err returns error caused Scanner to be broken.
 func (s *scanner) Err() error {
 	s.errMtx.RLock()
 	defer s.errMtx.RUnlock()
-	return s.err
+	if s.err != nil {
+		return s.err
+	}
+	return nil
 }
 
 // Must not be exported.
