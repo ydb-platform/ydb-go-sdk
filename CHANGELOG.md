@@ -1,3 +1,4 @@
+## v3.36.1
 * Fixed `xsql.Rows` error checking
 
 ## v3.36.0
