@@ -386,6 +386,14 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
+// WithIgnoreTruncated disables errors on truncated flag
+func WithIgnoreTruncated() Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithIgnoreTruncated())
+		return nil
+	}
+}
+
 // WithPanicCallback specified behavior on panic
 // Warning: WithPanicCallback must be defined on start of all options
 // (before `WithTrace{Driver,Table,Scheme,Scripting,Coordination,Ratelimiter}` and other options)

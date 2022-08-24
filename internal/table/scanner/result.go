@@ -70,23 +70,38 @@ type StreamResult interface {
 	resultWithError
 }
 
+type option func(r *baseResult)
+
+func WithIgnoreTruncated(ignoreTruncated bool) option {
+	return func(r *baseResult) {
+		r.scanner.ignoreTruncated = ignoreTruncated
+	}
+}
+
 func NewStream(
 	recv func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error),
 	onClose func(error) error,
+	opts ...option,
 ) StreamResult {
 	r := &streamResult{
 		recv:  recv,
 		close: onClose,
 	}
+	for _, o := range opts {
+		o(&r.baseResult)
+	}
 	return r
 }
 
-func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats) UnaryResult {
+func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...option) UnaryResult {
 	r := &unaryResult{
 		baseResult: baseResult{
 			stats: stats,
 		},
 		sets: sets,
+	}
+	for _, o := range opts {
+		o(&r.baseResult)
 	}
 	return r
 }
@@ -96,16 +111,6 @@ func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	if set != nil {
 		r.setColumnIndexes(columnNames)
 	}
-}
-
-func (r *unaryResult) Err() (err error) {
-	if err = r.baseResult.scanner.Err(); err != nil {
-		return err
-	}
-	if r.truncated() {
-		return xerrors.WithStackTrace(errTruncated)
-	}
-	return nil
 }
 
 func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
@@ -122,10 +127,6 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 
 func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool {
 	return r.NextResultSetErr(ctx, columns...) == nil
-}
-
-func (r *streamResult) Err() (err error) {
-	return r.baseResult.scanner.Err()
 }
 
 func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {

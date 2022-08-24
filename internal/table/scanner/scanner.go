@@ -26,12 +26,13 @@ import (
 var errTruncated = xerrors.Wrap(errors.New("truncated result"))
 
 type scanner struct {
-	set       *Ydb.ResultSet
-	row       *Ydb.Value
-	converter *rawConverter
-	stack     scanStack
-	nextRow   int
-	nextItem  int
+	set             *Ydb.ResultSet
+	row             *Ydb.Value
+	converter       *rawConverter
+	stack           scanStack
+	nextRow         int
+	nextItem        int
+	ignoreTruncated bool
 
 	columnIndexes []int
 
@@ -223,6 +224,9 @@ func (s *scanner) Err() error {
 	defer s.errMtx.RUnlock()
 	if s.err != nil {
 		return s.err
+	}
+	if !s.ignoreTruncated && s.truncated() {
+		return xerrors.WithStackTrace(errTruncated)
 	}
 	return nil
 }
