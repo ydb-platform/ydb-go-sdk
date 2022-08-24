@@ -1,4 +1,4 @@
-* Changed behavior on `result.Err()` on truncated unary result (returns non-retryable error now)
+* Changed behavior on `result.Err()` on truncated result (returns non-retryable error now, exclude `StreamExecuteScanQuery`)
 * Added `ydb.WithIgnoreTruncated` option for disabling errors on truncated flag
 * Added simple transaction control constructors `table.OnlineReadOnlyTxControl()` and `table.StaleReadOnlyTxControl()`
 * Added transaction control specifier with context `ydb.WithTxControl`
