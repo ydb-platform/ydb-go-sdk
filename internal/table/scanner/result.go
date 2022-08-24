@@ -70,23 +70,38 @@ type StreamResult interface {
 	resultWithError
 }
 
+type option func(r *baseResult)
+
+func WithIgnoreTruncated(ignoreTruncated bool) option {
+	return func(r *baseResult) {
+		r.scanner.ignoreTruncated = ignoreTruncated
+	}
+}
+
 func NewStream(
 	recv func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error),
 	onClose func(error) error,
+	opts ...option,
 ) StreamResult {
 	r := &streamResult{
 		recv:  recv,
 		close: onClose,
 	}
+	for _, o := range opts {
+		o(&r.baseResult)
+	}
 	return r
 }
 
-func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats) UnaryResult {
+func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...option) UnaryResult {
 	r := &unaryResult{
 		baseResult: baseResult{
 			stats: stats,
 		},
 		sets: sets,
+	}
+	for _, o := range opts {
+		o(&r.baseResult)
 	}
 	return r
 }

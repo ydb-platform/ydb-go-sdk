@@ -694,6 +694,7 @@ func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
 	r := scanner.NewUnary(
 		res.GetResultSets(),
 		res.GetQueryStats(),
+		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
 	)
 	return t, r, nil
 }
@@ -993,6 +994,7 @@ func (s *session) StreamReadTable(
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
+		scanner.WithIgnoreTruncated(true), // stream read table always returns truncated flag on last result set
 	), nil
 }
 
@@ -1075,6 +1077,7 @@ func (s *session) StreamExecuteScanQuery(
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
+		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
 	), nil
 }
 

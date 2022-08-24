@@ -124,6 +124,13 @@ func WithTrace(trace trace.Table, opts ...trace.TableComposeOption) Option {
 	}
 }
 
+// WithIgnoreTruncated disables errors on truncated flag
+func WithIgnoreTruncated() Option {
+	return func(c *Config) {
+		c.ignoreTruncated = true
+	}
+}
+
 // Config is a configuration of table client
 type Config struct {
 	config.Common
@@ -133,6 +140,8 @@ type Config struct {
 	createSessionTimeout time.Duration
 	deleteTimeout        time.Duration
 	idleThreshold        time.Duration
+
+	ignoreTruncated bool
 
 	trace trace.Table
 }
@@ -157,6 +166,11 @@ func (c Config) SizeLimit() int {
 // Deprecated: table client do not supports background session keep-aliving now
 func (c Config) KeepAliveMinSize() int {
 	return DefaultKeepAliveMinSize
+}
+
+// IgnoreTruncated specifies behavior on truncated flag
+func (c Config) IgnoreTruncated() bool {
+	return c.ignoreTruncated
 }
 
 // IdleKeepAliveThreshold is a number of keepAlive messages to call before the

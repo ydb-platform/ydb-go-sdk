@@ -1510,7 +1510,7 @@ func TestLongStream(t *testing.T) {
 					time.Sleep(discoveryInterval)
 				}
 				if err = res.Err(); err != nil {
-					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
+					return fmt.Errorf("received error (duration: %v): %w", time.Since(start), err)
 				}
 				if rowsCount != upsertRowsCount {
 					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
@@ -1551,7 +1551,7 @@ func TestLongStream(t *testing.T) {
 					time.Sleep(discoveryInterval)
 				}
 				if err = res.Err(); err != nil {
-					return fmt.Errorf("received error: %w (duration: %v)", err, time.Since(start))
+					return fmt.Errorf("received error (duration: %v): %w", time.Since(start), err)
 				}
 				if rowsCount != upsertRowsCount {
 					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",

@@ -161,6 +161,7 @@ func (tx *transaction) CommitTx(
 	return scanner.NewUnary(
 		nil,
 		result.GetQueryStats(),
+		scanner.WithIgnoreTruncated(tx.s.config.IgnoreTruncated()),
 	), nil
 }
 
