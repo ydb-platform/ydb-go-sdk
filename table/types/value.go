@@ -113,6 +113,10 @@ func TzTimestampValueFromTime(v time.Time) Value {
 
 func StringValue(v []byte) Value { return value.StringValue(v) }
 
+func BytesValue(v []byte) Value { return value.StringValue(v) }
+
+func BytesValueFromString(v string) Value { return value.StringValue([]byte(v)) }
+
 // StringValueFromString makes String value from string
 //
 // Warning: all *From* helpers will be removed at next major release
@@ -120,6 +124,8 @@ func StringValue(v []byte) Value { return value.StringValue(v) }
 func StringValueFromString(v string) Value { return value.StringValue([]byte(v)) }
 
 func UTF8Value(v string) Value { return value.UTF8Value(v) }
+
+func TextValue(v string) Value { return value.UTF8Value(v) }
 
 func YSONValue(v string) Value { return value.YSONValue(v) }
 

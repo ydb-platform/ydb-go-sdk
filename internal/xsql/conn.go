@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -14,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -50,21 +52,19 @@ func withTrace(t trace.DatabaseSQL) connOption {
 }
 
 type conn struct {
-	namedValueChecker
-
 	connector *Connector
+	trace     trace.DatabaseSQL
 	session   table.ClosableSession // Immutable and r/o usage.
-	closed    uint32
 
+	closed           uint32
 	defaultQueryMode QueryMode
-	defaultTxControl *table.TransactionControl
 
-	dataOpts []options.ExecuteDataQueryOption
+	defaultTxControl *table.TransactionControl
+	dataOpts         []options.ExecuteDataQueryOption
+
 	scanOpts []options.ExecuteScanQueryOption
 
-	tx *tx
-
-	trace trace.DatabaseSQL
+	currentTx *tx
 }
 
 var (
@@ -107,8 +107,61 @@ func (c *conn) isClosed() bool {
 
 func (c *conn) setClosed() {
 	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
-		c.Close()
+		_ = c.Close()
 	}
+}
+
+func (conn) CheckNamedValue(v *driver.NamedValue) (err error) {
+	if v.Name == "" {
+		return fmt.Errorf("ydb: only named parameters are supported")
+	}
+
+	if valuer, ok := v.Value.(driver.Valuer); ok {
+		v.Value, err = valuer.Value()
+		if err != nil {
+			return fmt.Errorf("ydb: driver.Valuer error: %w", err)
+		}
+	}
+
+	switch x := v.Value.(type) {
+	case types.Value:
+		// OK.
+	case bool:
+		v.Value = types.BoolValue(x)
+	case int8:
+		v.Value = types.Int8Value(x)
+	case uint8:
+		v.Value = types.Uint8Value(x)
+	case int16:
+		v.Value = types.Int16Value(x)
+	case uint16:
+		v.Value = types.Uint16Value(x)
+	case int32:
+		v.Value = types.Int32Value(x)
+	case uint32:
+		v.Value = types.Uint32Value(x)
+	case int64:
+		v.Value = types.Int64Value(x)
+	case uint64:
+		v.Value = types.Uint64Value(x)
+	case float32:
+		v.Value = types.FloatValue(x)
+	case float64:
+		v.Value = types.DoubleValue(x)
+	case []byte:
+		v.Value = types.StringValue(x)
+	case string:
+		v.Value = types.UTF8Value(x)
+	case [16]byte:
+		v.Value = types.UUIDValue(x)
+	case time.Time:
+		v.Value = types.DateValueFromTime(x)
+
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: unsupported type: %T", x))
+	}
+
+	return nil
 }
 
 func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, err error) {
@@ -135,13 +188,13 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	if c.tx != nil {
+	if c.currentTx != nil {
 		if m != DataQueryMode {
 			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("query mode `%s` not supported with tx", m.String()),
+				fmt.Errorf("query mode `%s` not supported with currentTx", m.String()),
 			)
 		}
-		return c.tx.ExecContext(ctx, query, args)
+		return c.currentTx.ExecContext(ctx, query, args)
 	}
 	switch m {
 	case DataQueryMode:
@@ -158,19 +211,19 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 		if err = res.Err(); err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
-		return nopResult{}, nil
+		return driver.ResultNoRows, nil
 	case SchemeQueryMode:
 		err = c.session.ExecuteSchemeQuery(ctx, query)
 		if err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
-		return nopResult{}, nil
+		return driver.ResultNoRows, nil
 	case ScriptingQueryMode:
 		_, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
 		if err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
-		return nopResult{}, nil
+		return driver.ResultNoRows, nil
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m)
 	}
@@ -185,13 +238,13 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	if c.tx != nil {
+	if c.currentTx != nil {
 		if m != DataQueryMode {
 			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("query mode `%s` not supported with tx", m.String()),
+				fmt.Errorf("query mode `%s` not supported with currentTx", m.String()),
 			)
 		}
-		return c.tx.QueryContext(ctx, query, args)
+		return c.currentTx.QueryContext(ctx, query, args)
 	}
 	switch m {
 	case DataQueryMode:
@@ -209,6 +262,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
 		return &rows{
+			conn:   c,
 			result: res,
 		}, nil
 	case ScanQueryMode:
@@ -225,6 +279,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
 		return &rows{
+			conn:   c,
 			result: res,
 		}, nil
 	case ExplainQueryMode:
@@ -249,6 +304,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
 		return &rows{
+			conn:   c,
 			result: res,
 		}, nil
 	default:
@@ -299,9 +355,9 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	if c.tx != nil {
+	if c.currentTx != nil {
 		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("conn already have an opened tx: %s", c.tx.ID()),
+			fmt.Errorf("conn already have an opened currentTx: %s", c.currentTx.ID()),
 		)
 	}
 	var txc table.TxOption
@@ -313,12 +369,12 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	if err != nil {
 		return nil, c.checkClosed(xerrors.WithStackTrace(err))
 	}
-	c.tx = &tx{
+	c.currentTx = &tx{
 		conn: c,
 		ctx:  ctx,
 		tx:   transaction,
 	}
-	return c.tx, nil
+	return c.currentTx, nil
 }
 
 func Unwrap(db *sql.DB) (connector *Connector, err error) {

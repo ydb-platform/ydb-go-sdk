@@ -92,6 +92,10 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 	return xsql.WithQueryMode(ctx, mode)
 }
 
+func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
+	return xsql.WithTxControl(ctx, txc)
+}
+
 type ConnectorOption = xsql.ConnectorOption
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {

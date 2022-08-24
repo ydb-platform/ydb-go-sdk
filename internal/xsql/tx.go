@@ -37,7 +37,7 @@ func (tx *tx) Commit() (err error) {
 		return errClosedConn
 	}
 	defer func() {
-		tx.conn.tx = nil
+		tx.conn.currentTx = nil
 	}()
 	_, err = tx.tx.CommitTx(tx.ctx)
 	if err != nil {
@@ -55,9 +55,9 @@ func (tx *tx) Rollback() (err error) {
 		return errClosedConn
 	}
 	defer func() {
-		tx.conn.tx = nil
+		tx.conn.currentTx = nil
 	}()
-	if tx.conn.tx == nil {
+	if tx.conn.currentTx == nil {
 		return nil
 	}
 	err = tx.tx.Rollback(tx.ctx)
@@ -72,11 +72,10 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	defer func() {
 		onDone(err)
 	}()
-	params := toQueryParams(args)
 	var res result.Result
 	res, err = tx.tx.Execute(ctx,
-		queryWithDeclares(query, params),
-		params,
+		query,
+		toQueryParams(args),
 		dataQueryOptions(ctx)...,
 	)
 	if err != nil {
@@ -86,6 +85,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 		return nil, tx.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 	return &rows{
+		conn:   tx.conn,
 		result: res,
 	}, nil
 }
@@ -95,14 +95,13 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	defer func() {
 		onDone(err)
 	}()
-	params := toQueryParams(args)
 	_, err = tx.tx.Execute(ctx,
-		queryWithDeclares(query, params),
-		params,
+		query,
+		toQueryParams(args),
 		dataQueryOptions(ctx)...,
 	)
 	if err != nil {
 		return nil, tx.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
-	return nopResult{}, nil
+	return driver.ResultNoRows, nil
 }

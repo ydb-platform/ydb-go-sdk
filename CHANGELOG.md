@@ -1,3 +1,8 @@
+* Added simple transaction control constructors `table.OnlineReadOnlyTxControl()` and `table.StaleReadOnlyTxControl()`
+* Added transaction control specifier with context `ydb.WithTxControl`
+* Added value constructors `types.BytesValue`, `types.BytesValueFromString`, `types.TextValue`
+* Removed auto-prepending declare section on `xsql` queries
+* Supports `time.Time` as type destination in `xsql` queries
 * Defined default dial timeout (5 seconds)
 
 ## v3.35.1
