@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 	"io"
 	"sync"
 
@@ -87,19 +86,6 @@ func (r *rows) Close() error {
 	return r.result.Close()
 }
 
-type valuer struct {
-	v interface{}
-}
-
-func (p *valuer) UnmarshalYDB(raw types.RawValue) error {
-	p.v = raw.Any()
-	return nil
-}
-
-func (p *valuer) Value() interface{} {
-	return p.v
-}
-
 type single struct {
 	values []sql.NamedArg
 }
@@ -123,68 +109,5 @@ func (r *single) Next(dst []driver.Value) error {
 		dst[i] = r.values[i].Value
 	}
 	r.values = nil
-	return nil
-}
-
-type nopResult struct{}
-
-func (r nopResult) LastInsertId() (int64, error) {
-	return 0, ErrUnsupported
-}
-
-func (r nopResult) RowsAffected() (int64, error) {
-	return 0, ErrUnsupported
-}
-
-type namedValueChecker struct{}
-
-func (namedValueChecker) CheckNamedValue(v *driver.NamedValue) (err error) {
-	if v.Name == "" {
-		return fmt.Errorf("ydb: only named parameters are supported")
-	}
-
-	if valuer, ok := v.Value.(driver.Valuer); ok {
-		v.Value, err = valuer.Value()
-		if err != nil {
-			return fmt.Errorf("ydb: driver.Valuer error: %w", err)
-		}
-	}
-
-	switch x := v.Value.(type) {
-	case types.Value:
-		// OK.
-	case bool:
-		v.Value = types.BoolValue(x)
-	case int8:
-		v.Value = types.Int8Value(x)
-	case uint8:
-		v.Value = types.Uint8Value(x)
-	case int16:
-		v.Value = types.Int16Value(x)
-	case uint16:
-		v.Value = types.Uint16Value(x)
-	case int32:
-		v.Value = types.Int32Value(x)
-	case uint32:
-		v.Value = types.Uint32Value(x)
-	case int64:
-		v.Value = types.Int64Value(x)
-	case uint64:
-		v.Value = types.Uint64Value(x)
-	case float32:
-		v.Value = types.FloatValue(x)
-	case float64:
-		v.Value = types.DoubleValue(x)
-	case []byte:
-		v.Value = types.StringValue(x)
-	case string:
-		v.Value = types.UTF8Value(x)
-	case [16]byte:
-		v.Value = types.UUIDValue(x)
-
-	default:
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: unsupported type: %T", x))
-	}
-
 	return nil
 }

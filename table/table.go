@@ -364,6 +364,22 @@ func DefaultTxControl() *TransactionControl {
 	)
 }
 
+// OnlineReadOnlyTxControl returns online read-only transaction control
+func OnlineReadOnlyTxControl(opts ...TxOnlineReadOnlyOption) *TransactionControl {
+	return TxControl(
+		BeginTx(WithOnlineReadOnly(opts...)),
+		CommitTx(), // open transactions not supported for OnlineReadOnly
+	)
+}
+
+// StaleReadOnlyTxControl returns stale read-only transaction control
+func StaleReadOnlyTxControl() *TransactionControl {
+	return TxControl(
+		BeginTx(WithStaleReadOnly()),
+		CommitTx(), // open transactions not supported for StaleReadOnly
+	)
+}
+
 // QueryParameters
 
 type (
