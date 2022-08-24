@@ -46,10 +46,7 @@ func (r *rows) Columns() []string {
 
 func (r *rows) NextResultSet() error {
 	r.nextSet.Do(func() {})
-	if !r.result.NextResultSet(context.Background()) {
-		return io.EOF
-	}
-	return nil
+	return r.result.NextResultSetErr(context.Background())
 }
 
 func (r *rows) HasNextResultSet() bool {
@@ -58,13 +55,16 @@ func (r *rows) HasNextResultSet() bool {
 
 func (r *rows) Next(dst []driver.Value) (err error) {
 	r.nextSet.Do(func() {
-		r.result.NextResultSet(context.Background())
+		err = r.result.NextResultSetErr(context.Background())
 	})
-	if !r.result.NextRow() {
-		return io.EOF
+	if err != nil {
+		return r.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 	if err = r.result.Err(); err != nil {
 		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+	}
+	if !r.result.NextRow() {
+		return io.EOF
 	}
 	values := make([]indexed.RequiredOrOptional, len(dst))
 	for i := range dst {

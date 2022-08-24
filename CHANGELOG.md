@@ -1,3 +1,5 @@
+* Fixed `xsql.Rows` error checking
+
 ## v3.36.0
 * Changed behavior on `result.Err()` on truncated result (returns non-retryable error now, exclude `StreamExecuteScanQuery`)
 * Added `ydb.WithIgnoreTruncated` option for disabling errors on truncated flag
