@@ -59,7 +59,7 @@ if queryErr != nil {
     log.Fatal(queryErr)
 }
 ```
-* usage with `database/sql`
+* usage with `database/sql` (see additional docs in [SQL.md](SQL.md) )
 ```golang
 import (
     "context"

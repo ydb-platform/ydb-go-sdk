@@ -55,6 +55,31 @@ func Example_table() {
 	}
 }
 
+func Example_databaseSQL() {
+	db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close() // cleanup resources
+
+	var (
+		query = `SELECT 42 as id, "my string" as myStr`
+		id    int32  // required value
+		myStr string // optional value
+	)
+	err = retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) error {
+		row := tx.QueryRowContext(ctx, query)
+		if err = row.Scan(&id, &myStr); err != nil {
+			return err
+		}
+		log.Printf("id=%v, myStr='%s'\n", id, myStr)
+		return nil
+	}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func Example_databaseSql() {
 	db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
 	if err != nil {
