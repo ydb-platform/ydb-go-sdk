@@ -60,7 +60,7 @@ func Example_databaseSQL() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close() // cleanup resources
+	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
 		query = `SELECT 42 as id, "my string" as myStr`
@@ -76,7 +76,7 @@ func Example_databaseSQL() {
 		return nil
 	}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("query failed: %v", err)
 	}
 }
 

@@ -4,11 +4,12 @@
 package sugar
 
 import (
-	"github.com/stretchr/testify/require"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"

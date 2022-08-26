@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"time"
 
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -35,6 +35,7 @@ func toQueryParams(values []driver.NamedValue) *table.QueryParameters {
 	return table.NewQueryParameters(opts...)
 }
 
+//nolint:gocyclo
 func primitiveToValue(v interface{}) (value types.Value, err error) {
 	if valuer, ok := v.(driver.Valuer); ok {
 		v, err = valuer.Value()
