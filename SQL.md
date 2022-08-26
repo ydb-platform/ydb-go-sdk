@@ -155,12 +155,10 @@ ctx := ydb.WithTxControl(ctx, table.OnlineReadOnlyTxControl())
 `YDB` is a distributed `RDBMS` with non-stop 24/7 releases flow.
 It means some nodes mey be not available for queries.
 Also network errors may be occurred.
-That's why some queries may be finished with errors.
+That's why some queries may be complete with errors.
 Most of those errors are transient.
 `ydb-go-sdk`'s "knows" what to do on specific error: retry or not, with or without backoff, with or whithout deleting session, etc.
-`ydb-go-sdk` provides retry helpers for two popular cases:
-* on plain database object
-* or on interactive transaction object
+`ydb-go-sdk` provides retry helpers which can work either with plain database connection object, or with interactive transaction object.
 
 ### Over `sql.Conn` object <a name="retry-conn"></a>
 
