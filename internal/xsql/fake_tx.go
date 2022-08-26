@@ -55,7 +55,7 @@ func (tx *fakeTx) QueryContext(ctx context.Context, q string, args []driver.Name
 	defer func() {
 		onDone(err)
 	}()
-	return tx.conn.QueryContext(WithTxControl(ctx, tx.txControl), q, args)
+	return tx.conn.queryContext(WithTxControl(ctx, tx.txControl), q, args)
 }
 
 func (tx *fakeTx) ExecContext(ctx context.Context, q string, args []driver.NamedValue) (_ driver.Result, err error) {
@@ -63,5 +63,5 @@ func (tx *fakeTx) ExecContext(ctx context.Context, q string, args []driver.Named
 	defer func() {
 		onDone(err)
 	}()
-	return tx.conn.ExecContext(WithTxControl(ctx, tx.txControl), q, args)
+	return tx.conn.execContext(WithTxControl(ctx, tx.txControl), q, args)
 }

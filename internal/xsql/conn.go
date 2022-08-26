@@ -135,23 +135,12 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 	}, nil
 }
 
-func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
+func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), retry.IsIdempotent(ctx))
 	defer func() {
 		onDone(err)
 	}()
-	if c.isClosed() {
-		return nil, errClosedConn
-	}
-	if c.currentTx != nil {
-		if m != DataQueryMode {
-			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("query mode `%s` not supported with currentTx", m.String()),
-			)
-		}
-		return c.currentTx.ExecContext(ctx, query, args)
-	}
 	switch m {
 	case DataQueryMode:
 		var res result.Result
@@ -185,23 +174,32 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	}
 }
 
+func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
+	if c.isClosed() {
+		return nil, errClosedConn
+	}
+	if c.currentTx != nil {
+		return c.currentTx.ExecContext(ctx, query, args)
+	}
+	return c.execContext(ctx, query, args)
+}
+
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
+	if c.isClosed() {
+		return nil, errClosedConn
+	}
+	if c.currentTx != nil {
+		return c.currentTx.QueryContext(ctx, query, args)
+	}
+	return c.queryContext(ctx, query, args)
+}
+
+func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), retry.IsIdempotent(ctx))
 	defer func() {
 		onDone(err)
 	}()
-	if c.isClosed() {
-		return nil, errClosedConn
-	}
-	if c.currentTx != nil {
-		if m != DataQueryMode {
-			return nil, xerrors.WithStackTrace(
-				fmt.Errorf("query mode `%s` not supported with currentTx", m.String()),
-			)
-		}
-		return c.currentTx.QueryContext(ctx, query, args)
-	}
 	switch m {
 	case DataQueryMode:
 		var res result.Result
