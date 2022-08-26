@@ -129,5 +129,13 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 }
 
 func (c *Connector) Driver() driver.Driver {
-	return c.driver
+	return &driverWrapper{c: c}
+}
+
+type driverWrapper struct {
+	c *Connector
+}
+
+func (d *driverWrapper) Open(name string) (driver.Conn, error) {
+	return d.c.driver.Open(name)
 }

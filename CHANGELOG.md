@@ -1,3 +1,5 @@
+* Supported the `*sql.Conn` as input type `ydb.Unwrap` helper for go's 1.18
+
 ## v3.36.2
 * Changed output of `sugar.GenerateDeclareSection` (added error as second result)
 * Specified `sugar.GenerateDeclareSection` for `go1.18` (supports input types `*table.QueryParameters` `[]table.ParameterOption` or `[]sql.NamedArg`)

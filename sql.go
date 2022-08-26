@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
@@ -127,15 +126,4 @@ func Connector(db Connection, opts ...ConnectorOption) (*xsql.Connector, error) 
 		return nil, xerrors.WithStackTrace(err)
 	}
 	return c, nil
-}
-
-func Unwrap(db *sql.DB) (Connection, error) {
-	c, err := xsql.Unwrap(db)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	if cc, ok := c.Connection().(Connection); ok {
-		return cc, nil
-	}
-	return nil, xerrors.WithStackTrace(fmt.Errorf("%+v is not a ydb.Nonnection", c.Connection()))
 }
