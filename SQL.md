@@ -11,6 +11,9 @@ Package `ydb-go-sdk` provides usage `database/sql` API also.
    * [On database object](#queries-db)
    * [With transaction](#queries-tx)
 3. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
+4. [Retryers for `YDB` `database/sql` driver](#retry)
+   * [Over `sql.Conn` object](#retry-conn)
+   * [Over `sql.Tx`](#retry-tx)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
@@ -78,14 +81,13 @@ for rows.Next() { // iterate over rows
 if err = rows.Err(); err != nil { // always check final rows err
     log.Fatal(err)
 }
-
 ```
 
 ### With transaction <a name="queries-tx"></a>
-Supports only `default` transaction options which mapped to `YDB`'s `SerializableReadWrite` transaction settings.
+Supports only `default` transaction options which mapped to `YDB` `SerializableReadWrite` transaction settings.
 `YDB`'s `OnlineReadOnly` and `StaleReadOnly` transaction settings are not compatible with interactive transactions such as `database/sql`'s `*sql.Tx`.
 `YDB`'s `OnlineReadOnly` and `StaleReadOnly` transaction settings can be explicitly applied to each query outside interactive transaction (see more in [Isolation levels support](#tx-control))
-```
+```go
 tx, err := db.BeginTx(ctx, sql.TxOptions{})
 if err != nil {
     log.Fatal(err)
@@ -120,7 +122,7 @@ if err = tx.Commit(); err != nil {
 ## Query modes (DDL, DML, DQL, etc.) <a name="query-modes"></a>
 The `YDB` server API is currently requires to select a specific method by specific request type. For example, `DDL` must be called with `table.session.ExecuteSchemeQuery`, `DML` must be called with `table.session.Execute`, `DQL` may be called with `table.session.Execute` or `table.session.StreamExecuteScanQuery` etc. `YDB` have a `scripting` service also, which provides different query types with single method, but not supports transactions.
 
-Thats why needs to select query mode on client side currently.
+That's why needs to select query mode on client side currently.
 
 `YDB` team have a roadmap goal to implements a single method for executing different query types.
 
@@ -132,7 +134,7 @@ Thats why needs to select query mode on client side currently.
 * `ydb.ScriptingQueryMode` - for `DDL`, `DML`, `DQL` queries (not a `TCL`). Be careful: queries executes longer than with other query modes and consumes bigger server-side resources
 
 Example for changing default query mode:
-```
+```go
 res, err = db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
    "DROP TABLE `/full/path/to/table/series`",
 )
@@ -140,8 +142,100 @@ res, err = db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 
 ## Specify `YDB` transaction control <a name="tx-control"></a>
 
-## Retryer's for `YDB` `database/sql` driver
+Default `YDB`'s transaction control is a `SerializableReadWrite`. 
+Default transaction control outside interactive transactions may be changed with context:
+```
+ctx := ydb.WithTxControl(ctx, table.OnlineReadOnlyTxControl())
+```
 
-### Over `sql.Conn` object
+## Retryers for `YDB` `database/sql` driver <a name="retry"></a>
 
-### Over `sql.Tx`
+`YDB` is a distributed `RDBMS` with non-stop 24/7 releases flow.
+It means some nodes mey be not available for queries.
+Also network errors may be occurred.
+That's why some queries may be finished with errors.
+Most of those errors are transient.
+`ydb-go-sdk`'s "knows" what to do on specific error: retry or not, with or without backoff, with or whithout deleting session, etc.
+`ydb-go-sdk` provides retry helpers for two popular cases:
+* on plain database object
+* or on interactive transaction object
+
+### Over `sql.Conn` object <a name="retry-conn"></a>
+
+`retry.Do` helper allow custom lambda, which must return error for processing or nil if retry operation is ok.
+```
+import (
+    "github.com/ydb-platform/ydb-go-sdk/v3/retry"
+)
+...
+err := retry.Do(context.TODO(), db, func(ctx context.Context, cc *sql.Conn) error {
+   // work with cc
+   rows, err := cc.QueryContext(ctx, "SELECT 1;")
+   if err != nil {
+       return err // return err to retryer
+   }
+   ...
+   return nil // good final of retry operation
+}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+
+```
+
+### Over `sql.Tx` <a name="retry-tx"></a>
+
+`retry.DoTx` helper allow custom lambda, which must return error for processing or nil if retry operation is ok.
+
+`tx` object is a prepared transaction object which not requires commit or rollback at the end - `retry.DoTx` do it automatically.    
+```
+import (
+    "github.com/ydb-platform/ydb-go-sdk/v3/retry"
+)
+...
+err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) error {
+   // work with tx
+   rows, err := tx.QueryContext(ctx, "SELECT 1;")
+   if err != nil {
+       return err // return err to retryer
+   }
+   ...
+   return nil // good final of retry tx operation
+}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
+```
+
+## Query args types
+
+`database/sql` driver for `YDB` supports next types of query args:
+* multiple `sql.NamedArg` (uniform `database/sql` arg)
+   ```
+   rows, err := cc.QueryContext(ctx, `
+          DECLARE $seasonTitle AS Utf8;
+          DECLARE $views AS Uint64;
+          SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
+      `,
+      sql.Named("seasonTitle", "%Season 1%"),
+      sql.Named("views", uint64(1000)),
+   )
+   ```
+* multiple native for `ydb-go-sdk` `table.ParameterOption` which constructs from `table.ValueParam("name", value)`
+   ```
+   rows, err := cc.QueryContext(ctx, `
+          DECLARE $seasonTitle AS Utf8;
+          DECLARE $views AS Uint64;
+          SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
+      `,
+      table.ValueParam("seasonTitle", types.TextValue("%Season 1%")),
+      table.ValueParam("views", types.Uint64Value((1000)),
+   )
+   ```
+* single native for `ydb-go-sdk` `*table.QueryParameters` which constructs from `table.NewQueryParameters(parameterOptions...)`
+   ```
+   rows, err := cc.QueryContext(ctx, `
+          DECLARE $seasonTitle AS Utf8;
+          DECLARE $views AS Uint64;
+          SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
+      `,
+      table.NewQueryParameters(
+          table.ValueParam("seasonTitle", types.TextValue("%Season 1%")),
+          table.ValueParam("views", types.Uint64Value((1000)),
+      ),
+   )
+   ```
