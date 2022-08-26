@@ -14,6 +14,8 @@ Package `ydb-go-sdk` provides usage `database/sql` API also.
 4. [Retryers for `YDB` `database/sql` driver](#retry)
    * [Over `sql.Conn` object](#retry-conn)
    * [Over `sql.Tx`](#retry-tx)
+5. [Query args types](#arg-types)
+6. [Get native driver from `*sql.DB`](#unwrap)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
@@ -201,7 +203,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
 }, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
 ```
 
-## Query args types
+## Query args types <a name="arg-types"></a>
 
 `database/sql` driver for `YDB` supports next types of query args:
 * multiple `sql.NamedArg` (uniform `database/sql` arg)
@@ -239,3 +241,19 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
       ),
    )
    ```
+## Get native driver from `*sql.DB` <a name="unwrap"></a>
+
+```
+db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
+if err != nil {
+    t.Fatal(err)
+}
+nativeDriver, err = ydb.Unwrap(db)
+if err != nil {
+    t.Fatal(err)
+}
+nativeDriver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+    // doing with native YDB session
+    return nil
+})
+```
