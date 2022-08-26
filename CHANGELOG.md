@@ -1,6 +1,7 @@
 * Changed output of `sugar.GenerateDeclareSection` (added error as second result)
 * Specified `sugar.GenerateDeclareSection` for `go1.18` (supports input types `*table.QueryParameters` `[]table.ParameterOption` or `[]sql.NamedArg`)
-* Added `database/sql` example and docs (WIP)
+* Supports different go's primitive value types as arg of `sql.Named("name", value)`
+* Added `database/sql` example and docs
 
 ## v3.36.1
 * Fixed `xsql.Rows` error checking

@@ -1,6 +1,10 @@
+//go:build !go1.18
+// +build !go1.18
+
 package sugar
 
 import (
+	"github.com/stretchr/testify/require"
 	"sort"
 	"strings"
 	"testing"
@@ -108,7 +112,9 @@ func TestGenerateDeclareSection(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			got := splitDeclares(GenerateDeclareSection(tt.params))
+			declares, err := GenerateDeclareSection(tt.params)
+			require.NoError(t, err)
+			got := splitDeclares(declares)
 			want := splitDeclares(tt.declare)
 			if len(got) != len(want) {
 				t.Errorf("len(got) = %v, len(want) = %v", len(got), len(want))

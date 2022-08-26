@@ -437,11 +437,21 @@ func NullableIntervalValueFromDuration(v *time.Duration) Value {
 	return OptionalValue(IntervalValueFromDuration(*v))
 }
 
+// NullableStringValue
+//
+// Deprecated: use NullableBytesValue instead
 func NullableStringValue(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeString)
 	}
 	return OptionalValue(StringValue(*v))
+}
+
+func NullableBytesValue(v *[]byte) Value {
+	if v == nil {
+		return NullValue(TypeBytes)
+	}
+	return OptionalValue(BytesValue(*v))
 }
 
 func NullableStringValueFromString(v *string) Value {
@@ -451,11 +461,25 @@ func NullableStringValueFromString(v *string) Value {
 	return OptionalValue(StringValueFromString(*v))
 }
 
+func NullableBytesValueFromString(v *string) Value {
+	if v == nil {
+		return NullValue(TypeBytes)
+	}
+	return OptionalValue(BytesValueFromString(*v))
+}
+
 func NullableUTF8Value(v *string) Value {
 	if v == nil {
 		return NullValue(TypeUTF8)
 	}
 	return OptionalValue(UTF8Value(*v))
+}
+
+func NullableTextValue(v *string) Value {
+	if v == nil {
+		return NullValue(TypeText)
+	}
+	return OptionalValue(TextValue(*v))
 }
 
 func NullableYSONValue(v *string) Value {
@@ -605,10 +629,10 @@ func Nullable(t Type, v interface{}) Value {
 		default:
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzTimestamp", tt))
 		}
-	case TypeString:
+	case TypeBytes:
 		switch tt := v.(type) {
 		case *[]byte:
-			return NullableStringValue(tt)
+			return NullableBytesValue(tt)
 		case *string:
 			return NullableStringValueFromString(tt)
 		default:

@@ -101,7 +101,9 @@ const (
 	TypeTzDatetime   = value.TypeTzDatetime
 	TypeTzTimestamp  = value.TypeTzTimestamp
 	TypeString       = value.TypeString
+	TypeBytes        = value.TypeString
 	TypeUTF8         = value.TypeUTF8
+	TypeText         = value.TypeUTF8
 	TypeYSON         = value.TypeYSON
 	TypeJSON         = value.TypeJSON
 	TypeUUID         = value.TypeUUID

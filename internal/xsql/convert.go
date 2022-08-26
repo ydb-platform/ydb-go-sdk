@@ -48,34 +48,68 @@ func primitiveToValue(v interface{}) (value types.Value, err error) {
 		return x, nil
 	case bool:
 		return types.BoolValue(x), nil
+	case *bool:
+		return types.NullableBoolValue(x), nil
 	case int8:
 		return types.Int8Value(x), nil
+	case *int8:
+		return types.NullableInt8Value(x), nil
 	case uint8:
 		return types.Uint8Value(x), nil
+	case *uint8:
+		return types.NullableUint8Value(x), nil
 	case int16:
 		return types.Int16Value(x), nil
+	case *int16:
+		return types.NullableInt16Value(x), nil
 	case uint16:
 		return types.Uint16Value(x), nil
+	case *uint16:
+		return types.NullableUint16Value(x), nil
 	case int32:
 		return types.Int32Value(x), nil
+	case *int32:
+		return types.NullableInt32Value(x), nil
 	case uint32:
 		return types.Uint32Value(x), nil
+	case *uint32:
+		return types.NullableUint32Value(x), nil
 	case int64:
 		return types.Int64Value(x), nil
+	case *int64:
+		return types.NullableInt64Value(x), nil
 	case uint64:
 		return types.Uint64Value(x), nil
+	case *uint64:
+		return types.NullableUint64Value(x), nil
 	case float32:
 		return types.FloatValue(x), nil
+	case *float32:
+		return types.NullableFloatValue(x), nil
 	case float64:
 		return types.DoubleValue(x), nil
+	case *float64:
+		return types.NullableDoubleValue(x), nil
 	case []byte:
-		return types.StringValue(x), nil
+		return types.BytesValue(x), nil
+	case *[]byte:
+		return types.NullableBytesValue(x), nil
 	case string:
-		return types.UTF8Value(x), nil
+		return types.TextValue(x), nil
+	case *string:
+		return types.NullableTextValue(x), nil
 	case [16]byte:
 		return types.UUIDValue(x), nil
+	case *[16]byte:
+		return types.NullableUUIDValue(x), nil
 	case time.Time:
-		return types.DateValueFromTime(x), nil
+		return types.TimestampValueFromTime(x), nil
+	case *time.Time:
+		return types.NullableTimestampValueFromTime(x), nil
+	case time.Duration:
+		return types.IntervalValueFromDuration(x), nil
+	case *time.Duration:
+		return types.NullableIntervalValueFromDuration(x), nil
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: unsupported type: %T", x))
 	}
