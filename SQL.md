@@ -87,8 +87,9 @@ if err = rows.Err(); err != nil { // always check final rows err
 
 ### With transaction <a name="queries-tx"></a>
 Supports only `default` transaction options which mapped to `YDB` `SerializableReadWrite` transaction settings.
+
 `YDB`'s `OnlineReadOnly` and `StaleReadOnly` transaction settings are not compatible with interactive transactions such as `database/sql`'s `*sql.Tx`.
-`YDB`'s `OnlineReadOnly` and `StaleReadOnly` transaction settings can be explicitly applied to each query outside interactive transaction (see more in [Isolation levels support](#tx-control))
+That's why `ydb-go-sdk` implements read-only `sql.LevelSnapshot` with fake transaction (transient, while YDB clusters are not updated with true snapshot isolation mode)
 ```go
 tx, err := db.BeginTx(ctx, sql.TxOptions{})
 if err != nil {
@@ -191,14 +192,19 @@ import (
 )
 ...
 err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) error {
-   // work with tx
-   rows, err := tx.QueryContext(ctx, "SELECT 1;")
-   if err != nil {
-       return err // return err to retryer
-   }
-   ...
-   return nil // good final of retry tx operation
-}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
+    // work with tx
+    rows, err := tx.QueryContext(ctx, "SELECT 1;")
+    if err != nil {
+        return err // return err to retryer
+    }
+    ...
+    return nil // good final of retry tx operation
+}, retry.WithDoTxRetryOptions(
+    retry.WithIdempotent(true),
+), retry.WithTxOptions(&sql.TxOptions{
+    Isolation: sql.LevelSnapshot,
+    ReadOnly:  true,
+}))
 ```
 
 ## Query args types <a name="arg-types"></a>

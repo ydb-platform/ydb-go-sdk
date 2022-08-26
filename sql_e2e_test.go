@@ -165,31 +165,38 @@ func TestDatabaseSql(t *testing.T) {
 		if err != nil {
 			t.Fatalf("begin tx failed: %v\n", err)
 		}
-		err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
-			row := tx.QueryRowContext(ctx,
-				render(
-					querySelect,
-					templateConfig{
-						TablePathPrefix: path.Join(cc.Name(), folder),
-					},
-				),
-				sql.Named("seriesID", uint64(1)),
-				sql.Named("seasonID", uint64(1)),
-				sql.Named("episodeID", uint64(1)),
-			)
-			var views sql.NullFloat64
-			if err = row.Scan(&views); err != nil {
-				return fmt.Errorf("cannot select current views: %w", err)
-			}
-			if !views.Valid {
-				return fmt.Errorf("unexpected invalid views: %v", views)
-			}
-			t.Logf("views = %v", views)
-			if views.Float64 != 1 {
-				return fmt.Errorf("unexpected views value: %v", views)
-			}
-			return nil
-		}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
+		err = retry.DoTx(ctx, db,
+			func(ctx context.Context, tx *sql.Tx) error {
+				row := tx.QueryRowContext(ctx,
+					render(
+						querySelect,
+						templateConfig{
+							TablePathPrefix: path.Join(cc.Name(), folder),
+						},
+					),
+					sql.Named("seriesID", uint64(1)),
+					sql.Named("seasonID", uint64(1)),
+					sql.Named("episodeID", uint64(1)),
+				)
+				var views sql.NullFloat64
+				if err = row.Scan(&views); err != nil {
+					return fmt.Errorf("cannot select current views: %w", err)
+				}
+				if !views.Valid {
+					return fmt.Errorf("unexpected invalid views: %v", views)
+				}
+				t.Logf("views = %v", views)
+				if views.Float64 != 1 {
+					return fmt.Errorf("unexpected views value: %v", views)
+				}
+				return nil
+			},
+			retry.WithDoTxRetryOptions(retry.WithIdempotent(true)),
+			retry.WithTxOptions(&sql.TxOptions{
+				Isolation: sql.LevelSnapshot,
+				ReadOnly:  true,
+			}),
+		)
 		if err != nil {
 			t.Fatalf("begin tx failed: %v\n", err)
 		}

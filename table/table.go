@@ -364,6 +364,15 @@ func DefaultTxControl() *TransactionControl {
 	)
 }
 
+// SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode
+func SerializableReadWriteTxControl(opts ...TxControlOption) *TransactionControl {
+	return TxControl(
+		append([]TxControlOption{
+			BeginTx(WithSerializableReadWrite()),
+		}, opts...)...,
+	)
+}
+
 // OnlineReadOnlyTxControl returns online read-only transaction control
 func OnlineReadOnlyTxControl(opts ...TxOnlineReadOnlyOption) *TransactionControl {
 	return TxControl(

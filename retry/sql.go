@@ -57,6 +57,7 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 }
 
 type doTxOptions struct {
+	txOptions    *sql.TxOptions
 	retryOptions []retryOption
 }
 
@@ -71,14 +72,23 @@ func WithDoTxRetryOptions(opts ...retryOption) doTxOption {
 	}
 }
 
+// WithTxOptions specified transaction options
+func WithTxOptions(txOptions *sql.TxOptions) doTxOption {
+	return func(o *doTxOptions) error {
+		o.txOptions = txOptions
+		return nil
+	}
+}
+
 // DoTx is a retryer of database/sql transactions with fallbacks on errors
 func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
 	var (
-		txOptions = &sql.TxOptions{
-			Isolation: sql.LevelDefault,
-			ReadOnly:  false,
+		options = doTxOptions{
+			txOptions: &sql.TxOptions{
+				Isolation: sql.LevelDefault,
+				ReadOnly:  false,
+			},
 		}
-		options  = doTxOptions{}
 		attempts = 0
 	)
 	for _, o := range opts {
@@ -88,7 +98,7 @@ func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) erro
 	}
 	err := Retry(ctx, func(ctx context.Context) (err error) {
 		attempts++
-		tx, err := db.BeginTx(ctx, txOptions)
+		tx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}

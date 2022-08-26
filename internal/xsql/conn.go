@@ -62,7 +62,14 @@ type conn struct {
 
 	scanOpts []options.ExecuteScanQueryOption
 
-	currentTx *tx
+	currentTx currentTx
+}
+
+type currentTx interface {
+	driver.Tx
+	driver.ExecerContext
+	driver.QueryerContext
+	table.TransactionIdentifier
 }
 
 var (
@@ -308,6 +315,19 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 		return nil, xerrors.WithStackTrace(
 			fmt.Errorf("conn already have an opened currentTx: %s", c.currentTx.ID()),
 		)
+	}
+	// TODO: replace with true transaction with snapshot read-only isolation after implementing it on server-side
+	//nolint:godox
+	if txOptions.ReadOnly && txOptions.Isolation == driver.IsolationLevel(sql.LevelSnapshot) {
+		c.currentTx = &fakeTx{
+			conn: c,
+			txControl: table.TxControl(
+				table.BeginTx(table.WithSerializableReadWrite()),
+				table.CommitTx(),
+			),
+			ctx: ctx,
+		}
+		return c.currentTx, nil
 	}
 	var txc table.TxOption
 	txc, err = isolation.ToYDB(txOptions)
