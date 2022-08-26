@@ -127,80 +127,78 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		s.onClose = append(s.onClose, options.onClose...)
 	}()
 
+	type result struct {
+		s   *session
+		err error
+	}
+
+	ch := make(chan result)
+
+	if c.isClosed() {
+		return nil, xerrors.WithStackTrace(errClosedClient)
+	}
+
+	c.spawnedGoroutines.Add(1)
+	go func() {
+		defer c.spawnedGoroutines.Done()
+
+		var (
+			s   *session
+			err error
+		)
+
+		createSessionCtx := xcontext.WithoutDeadline(ctx)
+
+		if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
+			var cancel context.CancelFunc
+			createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
+			defer cancel()
+		}
+
+		s, err = c.build(createSessionCtx)
+
+		closeSession := func(s *session) {
+			if s == nil {
+				return
+			}
+
+			closeSessionCtx := xcontext.WithoutDeadline(ctx)
+
+			if timeout := c.config.DeleteTimeout(); timeout > 0 {
+				var cancel context.CancelFunc
+				createSessionCtx, cancel = context.WithTimeout(closeSessionCtx, timeout)
+				defer cancel()
+			}
+
+			_ = s.Close(ctx)
+		}
+
+		select {
+		case ch <- result{
+			s:   s,
+			err: err,
+		}: // nop
+
+		case <-c.done:
+			closeSession(s)
+
+		case <-ctx.Done():
+			closeSession(s)
+		}
+	}()
+
 	select {
 	case <-c.done:
 		return nil, xerrors.WithStackTrace(errClosedClient)
 
-	default:
-		type result struct {
-			s   *session
-			err error
+	case <-ctx.Done():
+		return nil, xerrors.WithStackTrace(ctx.Err())
+
+	case r := <-ch:
+		if r.err != nil {
+			return nil, xerrors.WithStackTrace(r.err)
 		}
-
-		ch := make(chan result)
-
-		c.spawnedGoroutines.Add(1)
-		go func() {
-			defer c.spawnedGoroutines.Done()
-
-			var (
-				s   *session
-				err error
-			)
-
-			createSessionCtx := xcontext.WithoutDeadline(ctx)
-
-			if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-				var cancel context.CancelFunc
-				createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
-				defer cancel()
-			}
-
-			s, err = c.build(createSessionCtx)
-
-			closeSession := func(s *session) {
-				if s == nil {
-					return
-				}
-
-				closeSessionCtx := xcontext.WithoutDeadline(ctx)
-
-				if timeout := c.config.DeleteTimeout(); timeout > 0 {
-					var cancel context.CancelFunc
-					createSessionCtx, cancel = context.WithTimeout(closeSessionCtx, timeout)
-					defer cancel()
-				}
-
-				_ = s.Close(ctx)
-			}
-
-			select {
-			case ch <- result{
-				s:   s,
-				err: err,
-			}: // nop
-
-			case <-c.done:
-				closeSession(s)
-
-			case <-ctx.Done():
-				closeSession(s)
-			}
-		}()
-
-		select {
-		case <-c.done:
-			return nil, xerrors.WithStackTrace(errClosedClient)
-
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-
-		case r := <-ch:
-			if r.err != nil {
-				return nil, xerrors.WithStackTrace(r.err)
-			}
-			return r.s, nil
-		}
+		return r.s, nil
 	}
 }
 
