@@ -1,3 +1,5 @@
+* Refactored the `xsql.badconn.Error`
+
 ## v3.37.0
 * Supported read-only `sql.LevelSnapshot` isolation with fake transaction and `OnlineReadOnly` transaction control (transient, while YDB clusters are not updated with true snapshot isolation mode)
 * Supported the `*sql.Conn` as input type `ydb.Unwrap` helper for go's 1.18

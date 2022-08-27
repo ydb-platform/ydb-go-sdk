@@ -10,15 +10,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-type badConnError struct {
+type Error struct {
 	err error
 }
 
-func (e badConnError) Error() string {
+func (e Error) Origin() error {
+	return e.err
+}
+
+func (e Error) Error() string {
 	return e.err.Error()
 }
 
-func (e badConnError) Is(err error) bool {
+func (e Error) Is(err error) bool {
 	//nolint:errorlint
 	if err == driver.ErrBadConn {
 		return true
@@ -26,13 +30,18 @@ func (e badConnError) Is(err error) bool {
 	return xerrors.Is(e.err, err)
 }
 
-func (e badConnError) As(target interface{}) bool {
-	return xerrors.As(e.err, target)
+func (e Error) As(target interface{}) bool {
+	switch target.(type) {
+	case Error, *Error:
+		return true
+	default:
+		return xerrors.As(e.err, target)
+	}
 }
 
 func Map(err error) error {
 	if retry.MustDeleteSession(err) {
-		return badConnError{err: err}
+		return Error{err: err}
 	}
 	return err
 }
