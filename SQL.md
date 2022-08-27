@@ -154,7 +154,7 @@ ctx := ydb.WithTxControl(ctx, table.OnlineReadOnlyTxControl())
 ## Retryers for `YDB` `database/sql` driver <a name="retry"></a>
 
 `YDB` is a distributed `RDBMS` with non-stop 24/7 releases flow.
-It means some nodes mey be not available for queries.
+It means some nodes may be not available for queries.
 Also network errors may be occurred.
 That's why some queries may be complete with errors.
 Most of those errors are transient.
