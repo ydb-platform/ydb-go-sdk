@@ -1,3 +1,4 @@
+## v3.37.1
 * Refactored the `xsql.badconn.Error`
 
 ## v3.37.0
