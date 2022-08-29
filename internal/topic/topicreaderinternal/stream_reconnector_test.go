@@ -348,7 +348,6 @@ func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
 		connectTimeout: infiniteTimeout,
 		readerConnect: func(ctx context.Context) (batchedStreamReader, error) {
 			return nil, testErr
-
 		},
 		streamErr: errors.New("start-error"),
 	}
