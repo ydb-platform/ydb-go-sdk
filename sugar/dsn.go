@@ -4,8 +4,7 @@ import "net/url"
 
 // Usage of this package
 //
-// db, err := ydb.Open(
-//   ctx,
+// db, err := ydb.Open(ctx,
 //   sugar.DSN("endpoint", "database", false),
 // )
 

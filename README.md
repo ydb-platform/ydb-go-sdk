@@ -14,6 +14,7 @@
 
 Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme`, `scripting` and `topic` clients for [YDB](ydb.tech).
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and ACID transactions.
+`YDB` was created primarily for [OLTP](https://en.wikipedia.org/wiki/Online_transaction_processing) workloads and supports some [OLAP](https://en.wikipedia.org/wiki/Online_analytical_processing) scenarious.
 
 ## Installation
 
