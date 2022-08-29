@@ -89,7 +89,7 @@ if err = rows.Err(); err != nil { // always check final rows err
 Supports only `default` transaction options which mapped to `YDB` `SerializableReadWrite` transaction settings.
 
 `YDB`'s `OnlineReadOnly` and `StaleReadOnly` transaction settings are not compatible with interactive transactions such as `database/sql`'s `*sql.Tx`.
-That's why `ydb-go-sdk` implements read-only `sql.LevelSnapshot` with fake transaction (transient, while YDB clusters are not updated with true snapshot isolation mode)
+That's why `ydb-go-sdk` implements read-only `sql.LevelSnapshot` with fake transaction (temporary, while `YDB` main clusters are supports true snapshot isolation mode)
 ```go
 tx, err := db.BeginTx(ctx, sql.TxOptions{})
 if err != nil {
@@ -132,7 +132,7 @@ That's why needs to select query mode on client side currently.
 `database/sql` driver implementation for `YDB` supports next query modes:
 * `ydb.DataQueryMode` - default query mode, for lookup [DQL](https://en.wikipedia.org/wiki/Data_query_language) queries and [DML](https://en.wikipedia.org/wiki/Data_manipulation_language) queries.
 * `ydb.ExplainQueryMode` - for gettting plan and [AST](https://en.wikipedia.org/wiki/Abstract_syntax_tree) of some query
-* `ydb.ScanQueryMode` - for strong [OLAP](https://en.wikipedia.org/wiki/Online_analytical_processing) scenarious, [DQL-only](https://en.wikipedia.org/wiki/Data_query_language) queries
+* `ydb.ScanQueryMode` - for strong [OLAP](https://en.wikipedia.org/wiki/Online_analytical_processing) scenarious, [DQL-only](https://en.wikipedia.org/wiki/Data_query_language) queries. Read more about scan queries in [ydb.tech](https://ydb.tech/en/docs/concepts/scan_query)
 * `ydb.SchemeQueryMode` - for [DDL](https://en.wikipedia.org/wiki/Data_definition_language) queries
 * `ydb.ScriptingQueryMode` - for [DDL](https://en.wikipedia.org/wiki/Data_definition_language), [DML](https://en.wikipedia.org/wiki/Data_manipulation_language), [DQL](https://en.wikipedia.org/wiki/Data_query_language) queries (not a [TCL](https://en.wikipedia.org/wiki/SQL#Transaction_controls)). Be careful: queries executes longer than with other query modes and consumes bigger server-side resources
 
