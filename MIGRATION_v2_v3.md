@@ -10,7 +10,7 @@
 5. [Execute query with table client and session pool](#execute-queries)
 6. [Scans query result into local variables](#scan-result)
 7. [Logging SDK's events](#logs)
-8. [Add metrics obout SDK's events](#metrics)
+8. [Add metrics about SDK's events](#metrics)
 9. [Add `Jaeger` traces about SDK's events](#jaeger)
 
 ## Imports <a name="imports"></a>
@@ -259,7 +259,7 @@
     )
     ```
 
-## Add metrics obout SDK's events <a name="metrics"></a>
+## Add metrics about SDK's events <a name="metrics"></a>
 - in `v2`: 
   ```go
   config.Trace = ydb.DriverTrace{
