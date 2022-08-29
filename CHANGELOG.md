@@ -1,3 +1,5 @@
+* Fixed nil pointer exception in topic reader if reconnect failed
+
 ## v3.37.1
 * Refactored the `xsql.badconn.Error`
 

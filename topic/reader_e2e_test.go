@@ -27,6 +27,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+const (
+	consumerName = "test-consumer"
+)
+
 func TestReadMessages(t *testing.T) {
 	ctx := testCtx(t)
 
@@ -256,21 +260,21 @@ func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) {
 	})
 	require.NoError(t, err)
 
-	topicPath := db.Name() + "/test/feed"
+	topicPath := testCDCFeedName(db)
 
 	require.NoError(t, err)
 
 	err = db.Topic().Alter(
 		ctx,
 		topicPath,
-		topicoptions.AlterWithAddConsumers(topictypes.Consumer{Name: "test"}),
+		topicoptions.AlterWithAddConsumers(topictypes.Consumer{Name: consumerName}),
 	)
 	require.NoError(t, err)
 }
 
 func createFeedReader(t *testing.T, db ydb.Connection, opts ...topicoptions.ReaderOption) *topicreader.Reader {
-	topicPath := db.Name() + "/test/feed"
-	reader, err := db.Topic().StartReader("test", []topicoptions.ReadSelector{
+	topicPath := testCDCFeedName(db)
+	reader, err := db.Topic().StartReader(consumerName, []topicoptions.ReadSelector{
 		{
 			Path: topicPath,
 		},
@@ -315,4 +319,8 @@ func testCtx(t testing.TB) context.Context {
 
 	pprof.SetGoroutineLabels(pprof.WithLabels(ctx, pprof.Labels("test", t.Name())))
 	return ctx
+}
+
+func testCDCFeedName(db ydb.Connection) string {
+	return db.Name() + "/test/feed"
 }

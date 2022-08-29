@@ -242,7 +242,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 	}
 
 	r.m.WithLock(func() {
-		r.streamErr = nil
+		r.streamErr = err
 		if err == nil {
 			r.streamVal = newStream
 		}
