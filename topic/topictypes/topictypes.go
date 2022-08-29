@@ -152,31 +152,3 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 		d.Attributes[k] = v
 	}
 }
-
-// ToRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (d *TopicDescription) ToRaw(raw *rawtopic.DescribeTopicResult) {
-	raw.Self.Name = d.Path
-	d.PartitionSettings.ToRaw(&raw.PartitioningSettings)
-
-	raw.Consumers = make([]rawtopic.Consumer, len(d.Consumers))
-	for i := 0; i < len(d.Consumers); i++ {
-		d.Consumers[i].ToRaw(&raw.Consumers[i])
-	}
-
-	raw.SupportedCodecs = make([]rawtopiccommon.Codec, len(d.SupportedCodecs))
-	for i := 0; i < len(d.SupportedCodecs); i++ {
-		raw.SupportedCodecs[i] = rawtopiccommon.Codec(d.SupportedCodecs[i])
-	}
-
-	raw.PartitionWriteBurstBytes = d.PartitionWriteBurstBytes
-	raw.PartitionWriteSpeedBytesPerSecond = d.PartitionWriteSpeedBytesPerSecond
-
-	raw.Attributes = make(map[string]string)
-	for k, v := range d.Attributes {
-		raw.Attributes[k] = v
-	}
-}
