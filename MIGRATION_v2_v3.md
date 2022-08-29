@@ -8,7 +8,7 @@
 3. [Connect to `YDB` using connection string](#connect-dsn)
 4. [Make table client and session pool](#table-client)
 5. [Execute query with table client and session pool](#execute-queries)
-6. [Scans query result into local variables](#scan-result)
+6. [Scan query result into local variables](#scan-result)
 7. [Logging SDK's events](#logs)
 8. [Add metrics about SDK's events](#metrics)
 9. [Add `Jaeger` traces about SDK's events](#jaeger)
@@ -143,7 +143,7 @@
   }
   ```  
 
-## Scans query result into local variables <a name="scan-result"></a>
+## Scan query result into local variables <a name="scan-result"></a>
 - in `v2`: 
   ```go
   var (
