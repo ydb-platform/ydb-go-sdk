@@ -7,15 +7,16 @@ Package `ydb-go-sdk` provides usage `database/sql` API also.
 1. [Initialization of `database/sql` driver](#init)
    * [Configure driver with `ydb.Connector` (recommended way)](#init-connector)
    * [Configure driver only with data source name (connection string)](#init-dsn)
-2. [Execute queries](#queries)
+2. [About session pool](#session-pool)
+3. [Execute queries](#queries)
    * [On database object](#queries-db)
    * [With transaction](#queries-tx)
-3. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
-4. [Retry helpers for `YDB` `database/sql` driver](#retry)
+4. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
+5. [Retry helpers for `YDB` `database/sql` driver](#retry)
    * [Over `sql.Conn` object](#retry-conn)
    * [Over `sql.Tx`](#retry-tx)
-5. [Query args types](#arg-types)
-6. [Get native driver from `*sql.DB`](#unwrap)
+6. [Query args types](#arg-types)
+7. [Get native driver from `*sql.DB`](#unwrap)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
@@ -56,6 +57,17 @@ Data source name parameters:
 * `token` – access token to be used during requests (required)
 * static credentials with authority part of URI, like `grpcs://root:password@localhost:2135/local`
 * `query_mode=scripting` - you can redefine default [DML](https://en.wikipedia.org/wiki/Data_manipulation_language) query mode
+
+## About session pool <a name="session-pool"></a>
+
+Native driver `ydb-go-sdk/v3` implements internal session pool, which uses with `db.Table().Do()` or `db.Table().DoTx()` methods.
+Internal session pool configures with options like `ydb.WithSessionPoolSizeLimit()` and other.
+Unlike session pool in native driver, `database/sql` contains another session pool, which configures with `*sql.DB.SetMaxOpenConns` and `*sql.DB.SetMaxIdleConns`.
+Lifetime of `YDB` session depends on driver configuration and predefined errors, such as `sql.driver.ErrBadConn`.
+`YDB` driver for `database/sql` transform internal `YDB` errors into `sql.driver.ErrBadConn` depending on result of internal error check (delete session on error or not and other).
+In most cases this behaviour of `database/sql` driver implementation for specific RDBMS completes queries without result errors.
+But some errors on unfortunate cases may be get on client-side.
+That's why querying must be wrapped with retry helpers, such as `retry.Do` or `retry.DoTx` (see more about retry helpers in [retry section](#retry)).
 
 ## Execute queries <a name="queries"></a>
 
