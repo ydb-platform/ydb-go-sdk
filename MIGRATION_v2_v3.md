@@ -2,7 +2,18 @@
 
 > Article contains some cases for migrate from `github.com/yandex-cloud/ydb-go-sdk/v2` to `github.com/ydb-platform/ydb-go-sdk/v3`
 
-## Imports
+## Table of contents
+1. [Imports](#imports)
+2. [Connect to `YDB` by `endpoint` and `database`](#connect)
+3. [Connect to `YDB` using connection string](#connect-dsn)
+4. [Make table client and session pool](#table-client)
+5. [Execute query with table client and session pool](#execute-queries)
+6. [Scans query result into local variables](#scan-result)
+7. [Logging SDK's events](#logs)
+8. [Add metrics obout SDK's events](#metrics)
+9. [Add `Jaeger` traces about SDK's events](#jaeger)
+
+## Imports <a name="imports"></a>
 - in `v2`: 
   ```
   "github.com/yandex-cloud/ydb-go-sdk/v2"
@@ -14,7 +25,7 @@
   "github.com/ydb-platform/ydb-go-sdk/v3/table"
   ```  
 
-## Connect to `YDB` by `endpoint` and `database`
+## Connect to `YDB` by `endpoint` and `database` <a name="connect"></a>
 - in `v2`: 
   ```go
   config := &ydb.DriverConfig{
@@ -47,7 +58,7 @@
   }()
   ```  
 
-## Connect to `YDB` using connection string
+## Connect to `YDB` using connection string <a name="connect-dsn"></a>
 - in `v2`: 
   ```go
   import (
@@ -78,7 +89,7 @@
   }()
   ```
 
-## Make table client and session pool
+## Make table client and session pool <a name="table-client"></a>
 - in `v2`: 
   ```go
   import (
@@ -97,7 +108,7 @@
   ```
 - in `v3`: nothing to do, table client with internal session pool always available with `db.Table()`
 
-## Execute query with table client and session pool
+## Execute query with table client and session pool <a name="execute-queries"></a>
 - in `v2`: 
   ```go
   var res *table.Result
@@ -132,7 +143,7 @@
   }
   ```  
 
-## Scans query result into local variables
+## Scans query result into local variables <a name="scan-result"></a>
 - in `v2`: 
   ```go
   var (
@@ -205,7 +216,7 @@
   }
   ```  
 
-## Logging SDK's events
+## Logging SDK's events <a name="logs"></a>
 - in `v2`: 
   ```go
   config.Trace = ydb.DriverTrace{
@@ -248,7 +259,7 @@
     )
     ```
 
-## Add metrics obout SDK's events
+## Add metrics obout SDK's events <a name="metrics"></a>
 - in `v2`: 
   ```go
   config.Trace = ydb.DriverTrace{
@@ -272,7 +283,7 @@
     ```
   * metrics to other monitoring systems may be add with common package `"github.com/ydb-platform/ydb-go-sdk-metrics"`
 
-## Add `Jaeger` traces about SDK's events
+## Add `Jaeger` traces about SDK's events <a name="jaeger"></a>
 - in `v2`: 
   ```go
   config.Trace = ydb.DriverTrace{
