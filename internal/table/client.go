@@ -352,11 +352,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 	}()
 
 	const maxAttempts = 100
-	for ; s == nil && err == nil && i < maxAttempts; i++ {
-		if c.isClosed() {
-			return nil, xerrors.WithStackTrace(errClosedClient)
-		}
-
+	for ; s == nil && err == nil && i < maxAttempts && !c.isClosed(); i++ {
 		// First, we try to internalPoolGet session from idle
 		c.mu.WithLock(func() {
 			s = c.internalPoolRemoveFirstIdle()
@@ -391,7 +387,11 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		}
 	}
 	if s == nil && err == nil {
-		err = xerrors.WithStackTrace(errNoProgress)
+		if c.isClosed() {
+			err = xerrors.WithStackTrace(errClosedClient)
+		} else {
+			err = xerrors.WithStackTrace(errNoProgress)
+		}
 	}
 	if err != nil {
 		var (
