@@ -138,54 +138,63 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
 
-	c.spawnedGoroutines.Add(1)
-	go func() {
-		defer c.spawnedGoroutines.Done()
+	select {
+	case <-c.done:
+		return nil, xerrors.WithStackTrace(errClosedClient)
 
-		var (
-			s   *session
-			err error
-		)
+	case <-ctx.Done():
+		return nil, xerrors.WithStackTrace(ctx.Err())
 
-		createSessionCtx := xcontext.WithoutDeadline(ctx)
+	default:
+		c.spawnedGoroutines.Add(1)
+		go func() {
+			defer c.spawnedGoroutines.Done()
 
-		if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-			var cancel context.CancelFunc
-			createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
-			defer cancel()
-		}
+			var (
+				s   *session
+				err error
+			)
 
-		s, err = c.build(createSessionCtx)
+			createSessionCtx := xcontext.WithoutDeadline(ctx)
 
-		closeSession := func(s *session) {
-			if s == nil {
-				return
-			}
-
-			closeSessionCtx := xcontext.WithoutDeadline(ctx)
-
-			if timeout := c.config.DeleteTimeout(); timeout > 0 {
+			if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
 				var cancel context.CancelFunc
-				createSessionCtx, cancel = context.WithTimeout(closeSessionCtx, timeout)
+				createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
 				defer cancel()
 			}
 
-			_ = s.Close(ctx)
-		}
+			s, err = c.build(createSessionCtx)
 
-		select {
-		case ch <- result{
-			s:   s,
-			err: err,
-		}: // nop
+			closeSession := func(s *session) {
+				if s == nil {
+					return
+				}
 
-		case <-c.done:
-			closeSession(s)
+				closeSessionCtx := xcontext.WithoutDeadline(ctx)
 
-		case <-ctx.Done():
-			closeSession(s)
-		}
-	}()
+				if timeout := c.config.DeleteTimeout(); timeout > 0 {
+					var cancel context.CancelFunc
+					createSessionCtx, cancel = context.WithTimeout(closeSessionCtx, timeout)
+					defer cancel()
+				}
+
+				_ = s.Close(ctx)
+			}
+
+			select {
+			case ch <- result{
+				s:   s,
+				err: err,
+			}: // nop
+
+			case <-c.done:
+				closeSession(s)
+
+			case <-ctx.Done():
+				closeSession(s)
+			}
+		}()
+	}
 
 	select {
 	case <-c.done:
@@ -343,11 +352,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 	}()
 
 	const maxAttempts = 100
-	for ; s == nil && err == nil && i < maxAttempts; i++ {
-		if c.isClosed() {
-			return nil, xerrors.WithStackTrace(errClosedClient)
-		}
-
+	for ; s == nil && err == nil && i < maxAttempts && !c.isClosed(); i++ {
 		// First, we try to internalPoolGet session from idle
 		c.mu.WithLock(func() {
 			s = c.internalPoolRemoveFirstIdle()
@@ -382,7 +387,11 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		}
 	}
 	if s == nil && err == nil {
-		err = xerrors.WithStackTrace(errNoProgress)
+		if c.isClosed() {
+			err = xerrors.WithStackTrace(errClosedClient)
+		} else {
+			err = xerrors.WithStackTrace(errNoProgress)
+		}
 	}
 	if err != nil {
 		var (

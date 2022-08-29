@@ -9,16 +9,17 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
 1. [Initialization of `database/sql` driver](#init)
    * [Configure driver with `ydb.Connector` (recommended way)](#init-connector)
    * [Configure driver with data source name or connection string](#init-dsn)
-2. [Query execution](#queries)
+2. [Session pooling](#session-pool)
+3. [Query execution](#queries)
    * [Queries on database object](#queries-db)
    * [Queries on transaction object](#queries-tx)
-3. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
-4. [Changing the transaction control mode](#tx-control)
-5. [Retry helpers for `YDB` `database/sql` driver](#retry)
+4. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
+5. [Changing the transaction control mode](#tx-control)
+6. [Retry helpers for `YDB` `database/sql` driver](#retry)
    * [Retries over `sql.Conn` object](#retry-conn)
    * [Retries over `sql.Tx`](#retry-tx)
-6. [Specifying query parameters](#arg-types)
-7. [Accessing the native driver from `*sql.DB`](#unwrap)
+7. [Specifying query parameters](#arg-types)
+8. [Accessing the native driver from `*sql.DB`](#unwrap)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
@@ -60,6 +61,18 @@ Data source name parameters:
 * `token` – access token to be used during requests (required)
 * static credentials with authority part of URI, like `grpcs://root:password@localhost:2135/local`
 * `query_mode=scripting` - you can redefine default [DML](https://en.wikipedia.org/wiki/Data_manipulation_language) query mode
+
+## Session pooling <a name="session-pool"></a>
+
+Native driver `ydb-go-sdk/v3` implements the internal session pool, which uses with `db.Table().Do()` or `db.Table().DoTx()` methods.
+Internal session pool is configured with options like `ydb.WithSessionPoolSizeLimit()` and other.
+Unlike the session pool in the native driver, `database/sql` contains a different implementation of the session pool, which is configured with `*sql.DB.SetMaxOpenConns` and `*sql.DB.SetMaxIdleConns`.
+Lifetime of a `YDB` session depends on driver configuration and error occurance, such as `sql.driver.ErrBadConn`.
+`YDB` driver for `database/sql` includes the logic to transform the internal `YDB` error codes into `sql.driver.ErrBadConn` and other retryable and non-retryable error types.
+
+In most cases the implementation of `database/sql` driver for YDB allows to complete queries without user-visible errors.
+But some errors need to be handled on the client side, by re-running not a single operation, but a complete transaction.
+Therefore the transaction logic needs to be wrapped with retry helpers, such as `retry.Do` or `retry.DoTx` (see more about retry helpers in the [retry section](#retry)).
 
 ## Query execution <a name="queries"></a>
 
