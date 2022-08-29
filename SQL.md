@@ -17,25 +17,30 @@ Package `ydb-go-sdk` provides usage `database/sql` API also.
    * [Over `sql.Tx`](#retry-tx)
 6. [Query args types](#arg-types)
 7. [Get native driver from `*sql.DB`](#unwrap)
+8. [Logging SDK's events](#logs)
+9. [Add metrics about SDK's events](#metrics)
+10. [Add `Jaeger` traces about driver events](#jaeger)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
 ### Configure driver with `ydb.Connector` (recommended way) <a name="init-connector"></a>
 ```go
 import (
+	"database/sql"
+	
     "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 func main() {
     // init native ydb-go-sdk driver
     nativeDriver, err := ydb.Open(context.TODO(), "grpcs://localhost:2135/local",
-        // See many ydb.Option's for configure driver
+        // See many ydb.Option's for configure driver https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#Option
     )
     if err != nil {
         // fallback on error
     }
     connector, err := ydb.Connector(nativeDriver,
-        // See ydb.ConnectorOption's for configure connector
+        // See ydb.ConnectorOption's for configure connector https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#ConnectorOption
     )
     if err != nil {
         // fallback on error
@@ -46,6 +51,8 @@ func main() {
 ### Configure driver only with data source name (connection string) <a name="init-dsn"></a>
 ```go
 import (
+	"database/sql"
+	
     _ "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
@@ -259,7 +266,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
    ```
 ## Get native driver from `*sql.DB` <a name="unwrap"></a>
 
-```
+```go
 db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
 if err != nil {
     t.Fatal(err)
@@ -272,4 +279,79 @@ nativeDriver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
     // doing with native YDB session
     return nil
 })
+```
+
+## Logging driver events <a name="logging"></a>
+
+Adding a logging driver events allowed only if connection to `YDB` opens over [connector](##init-connector).
+Adding of logging provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#logs)
+Example of adding `zap` logging:
+```go
+import (
+    "github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
+)
+...
+nativeDriver, err := ydb.Open(ctx, connectionString,
+    ...
+    ydbZap.WithTraces(log, trace.DetailsAll),
+)
+if err != nil {
+    // fallback on error
+}
+connector, err := ydb.Connector(nativeDriver)
+if err != nil {
+    // fallback on error
+}
+db := sql.OpenDB(connector)
+```
+
+## Add metrics about SDK's events <a name="metrics"></a>
+
+Adding of driver events monitoring allowed only if connection to `YDB` opens over [connector](##init-connector).
+Monitoring of driver events provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#metrics)
+Example of adding `Prometheus` monitoring:
+```go
+import (
+    "github.com/ydb-platform/ydb-go-sdk/v3/trace"
+    ydbMetrics "github.com/ydb-platform/ydb-go-sdk-prometheus"
+)
+...
+nativeDriver, err := ydb.Open(ctx, connectionString,
+    ...
+    ydbMetrics.WithTraces(registry, ydbMetrics.WithDetails(trace.DetailsAll)),
+)
+if err != nil {
+    // fallback on error
+}
+connector, err := ydb.Connector(nativeDriver)
+if err != nil {
+    // fallback on error
+}
+db := sql.OpenDB(connector)
+```
+
+## Add `Jaeger` traces about driver events <a name="jaeger"></a>
+
+Adding of `Jaeger` traces about driver events allowed only if connection to `YDB` opens over [connector](##init-connector).
+`Jaeger` tracing provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#jaeger)
+Example of adding `Jaeger` tracing:
+```go
+import (
+    "github.com/ydb-platform/ydb-go-sdk/v3/trace"
+    ydbOpentracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
+)
+...
+nativeDriver, err := ydb.Open(ctx, connectionString,
+    ...
+    ydbOpentracing.WithTraces(trace.DriverConnEvents | trace.DriverClusterEvents | trace.DriverRepeaterEvents | trace.DiscoveryEvents),
+)
+if err != nil {
+    // fallback on error
+}
+connector, err := ydb.Connector(nativeDriver)
+if err != nil {
+    // fallback on error
+}
+db := sql.OpenDB(connector)
 ```

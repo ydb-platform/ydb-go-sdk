@@ -8,10 +8,11 @@
 3. [Connect to `YDB` using connection string](#connect-dsn)
 4. [Make table client and session pool](#table-client)
 5. [Execute query with table client and session pool](#execute-queries)
-6. [Scan query result into local variables](#scan-result)
-7. [Logging SDK's events](#logs)
-8. [Add metrics about SDK's events](#metrics)
-9. [Add `Jaeger` traces about SDK's events](#jaeger)
+6. [About truncated result](#truncated)
+7. [Scan query result into local variables](#scan-result)
+8. [Logging SDK's events](#logs)
+9. [Add metrics about SDK's events](#metrics)
+10. [Add `Jaeger` traces about SDK's events](#jaeger)
 
 ## Imports <a name="imports"></a>
 - in `v2`: 
@@ -141,7 +142,74 @@
   if err != nil {
     // error fallback
   }
-  ```  
+  ```
+
+## About truncated result <a name="truncated"></a>
+
+Call of `session.Execute` may returns a result with a flag `Truncated` because `YDB` have a default limit of rows is a 1000.
+In this case query must be changed for supporting pagination. Trucated flag in result must be checks explicitly.
+- in `v2`:
+  ```go
+  var res *table.Result
+  err := table.Retry(ctx, sp,
+    table.OperationFunc(
+        func(ctx context.Context, s *table.Session) (err error) {
+            _, res, err = s.Execute(ctx, readTx, "SELECT 1+1")
+            if err != nil {
+              // error fallback
+            }
+            for res.NextStreamSet(ctx) {
+                for res.NextRow() {
+                   // process column values
+                }
+            }
+            if err := res.Err(); err != nil {
+                // error fallback
+            }
+            if res.Trucated() {
+                // alarm to query developers
+            }
+            return nil
+        },
+    ),
+  }
+  if err != nil {
+    // error fallback
+  }
+  ```
+- in `v3`:
+  By default, truncated result wraps as non-retryable error
+  ```go
+  import (
+    "github.com/ydb-platform/ydb-go-sdk/v3/table/result"  
+  )
+  ...
+  var res result.Result
+  err := db.Table().Do(ctx,
+    func(ctx context.Context, s table.Session) (err error) {
+        _, res, err = s.Execute(ctx, readTx, "SELECT 1+1")
+        if err != nil {
+            // error fallback
+        }
+        for res.NextStreamSet(ctx) {
+            for res.NextRow() {
+               // process column values
+            }
+        }
+        // no need to check truncated result explicitly 
+        // if res.Truncated() {
+        //   // alarm to query developers
+        // }
+        return res.Err()
+    },
+    table.WithIdempotent(), // only idempotent queries
+  )
+  if err != nil {
+    // error fallback
+  }
+  ```
+  But if default behaviour are not allowed, wrapping truncated result as error may be disabled with option `ydb.WithIgnoreTruncated` 
+
 
 ## Scan query result into local variables <a name="scan-result"></a>
 - in `v2`: 
@@ -276,9 +344,10 @@
        ydbMetrics "github.com/ydb-platform/ydb-go-sdk-prometheus"
     )
     ...
+	registry := prometheus.NewRegistry()
     db, err := ydb.Open(ctx, connectionString,
       ...
-      ydbMetrics.WithTraces(log, trace.DriverConnEvents | trace.DriverClusterEvents),
+      ydbMetrics.WithTraces(registry, ydbMetrics.WithDetails(trace.DetailsAll)),
     )
     ```
   * metrics to other monitoring systems may be add with common package `"github.com/ydb-platform/ydb-go-sdk-metrics"`
@@ -301,7 +370,7 @@
   ...
   db, err := ydb.Open(ctx, connectionString,
     ...
-    ydbTracing.WithTraces(log, trace.DriverConnEvents | trace.DriverClusterEvents | trace.DriverRepeaterEvents | trace.DiscoveryEvents),
+    ydbTracing.WithTraces(trace.DriverConnEvents | trace.DriverClusterEvents | trace.DriverRepeaterEvents | trace.DiscoveryEvents),
   )
   ```  
 
