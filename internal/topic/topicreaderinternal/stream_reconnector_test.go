@@ -341,6 +341,23 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 	})
 }
 
+func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
+	ctx := context.Background()
+	testErr := errors.New("test")
+	reconnector := &readerReconnector{
+		connectTimeout: infiniteTimeout,
+		readerConnect: func(ctx context.Context) (batchedStreamReader, error) {
+			return nil, testErr
+
+		},
+		streamErr: errors.New("start-error"),
+	}
+	reconnector.initChannelsAndClock()
+	err := reconnector.reconnect(ctx, nil)
+	require.ErrorIs(t, err, testErr)
+	require.ErrorIs(t, reconnector.streamErr, testErr)
+}
+
 type readerConnectFuncAnswer struct {
 	callback readerConnectFunc
 	stream   batchedStreamReader
