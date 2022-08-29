@@ -537,18 +537,28 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
 		close(c.done)
+
+		wg := sync.WaitGroup{}
 		c.mu.WithLock(func() {
+			c.limit = 0
+
 			for el := c.waitq.Front(); el != nil; el = el.Next() {
 				ch := el.Value.(*chan *session)
 				close(*ch)
 			}
 
 			for e := c.idle.Front(); e != nil; e = e.Next() {
-				c.internalPoolAsyncCloseSession(ctx, e.Value.(*session))
+				wg.Add(1)
+				s := e.Value.(*session)
+				s.SetStatus(options.SessionClosing)
+				go func() {
+					defer wg.Done()
+					c.internalPoolSyncCloseSession(ctx, s)
+				}()
 			}
-
-			c.limit = 0
 		})
+		wg.Wait()
+
 		c.spawnedGoroutines.Wait()
 	}
 
