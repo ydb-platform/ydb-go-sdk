@@ -68,7 +68,7 @@ Data source name parameters:
 ## Session pooling <a name="session-pool"></a>
 
 Native driver `ydb-go-sdk/v3` implements the internal session pool, which uses with `db.Table().Do()` or `db.Table().DoTx()` methods.
-Internal session pool is configured with options like `ydb.WithSessionPoolSizeLimit()` and other.
+Internal session pool are configured with options like `ydb.WithSessionPoolSizeLimit()` and other.
 Unlike the session pool in the native driver, `database/sql` contains a different implementation of the session pool, which is configured with `*sql.DB.SetMaxOpenConns` and `*sql.DB.SetMaxIdleConns`.
 Lifetime of a `YDB` session depends on driver configuration and error occurance, such as `sql.driver.ErrBadConn`.
 `YDB` driver for `database/sql` includes the logic to transform the internal `YDB` error codes into `sql.driver.ErrBadConn` and other retryable and non-retryable error types.
@@ -302,7 +302,8 @@ nativeDriver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 ## Logging driver events <a name="logging"></a>
 
 Adding a logging driver events allowed only if connection to `YDB` opens over [connector](##init-connector).
-Adding of logging provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#logs)
+Adding of logging provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#logs).
+
 Example of adding `zap` logging:
 ```go
 import (
@@ -327,7 +328,8 @@ db := sql.OpenDB(connector)
 ## Add metrics about SDK's events <a name="metrics"></a>
 
 Adding of driver events monitoring allowed only if connection to `YDB` opens over [connector](##init-connector).
-Monitoring of driver events provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#metrics)
+Monitoring of driver events provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#metrics).
+
 Example of adding `Prometheus` monitoring:
 ```go
 import (
@@ -352,7 +354,8 @@ db := sql.OpenDB(connector)
 ## Add `Jaeger` traces about driver events <a name="jaeger"></a>
 
 Adding of `Jaeger` traces about driver events allowed only if connection to `YDB` opens over [connector](##init-connector).
-`Jaeger` tracing provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#jaeger)
+`Jaeger` tracing provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#jaeger).
+
 Example of adding `Jaeger` tracing:
 ```go
 import (
