@@ -12,9 +12,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 )
 
 func TestMessageQueue_AddMessages(t *testing.T) {
@@ -31,9 +30,9 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 		require.Equal(t, newTestMessage(3), q.messagesByOrder[4])
 
 		require.Len(t, q.seqNoToOrderId, 3)
-		require.Equal(t, []int{1}, q.seqNoToOrderId[1])
-		require.Equal(t, []int{2, 4}, q.seqNoToOrderId[3])
-		require.Equal(t, []int{3}, q.seqNoToOrderId[5])
+		require.Equal(t, newOrderIDsFIFO(1), q.seqNoToOrderId[1])
+		require.Equal(t, newOrderIDsFIFO(2, 4), q.seqNoToOrderId[3])
+		require.Equal(t, newOrderIDsFIFO(3), q.seqNoToOrderId[5])
 	})
 	t.Run("Closed", func(t *testing.T) {
 		q := newMessageQueue()

@@ -1,4 +1,4 @@
-//nolint
+// nolint
 package topicwriterinternal
 
 import (
@@ -242,6 +242,18 @@ type orderIDsFIFO struct {
 	FirstOrderID int
 	Len          int
 	Tail         []int
+}
+
+func newOrderIDsFIFO(ids ...int) (res orderIDsFIFO) {
+	res.Len = len(ids)
+	if res.Len == 0 {
+		return
+	}
+	res.FirstOrderID = ids[0]
+	if res.Len > 1 {
+		res.Tail = ids[1:]
+	}
+	return res
 }
 
 func (s *orderIDsFIFO) Pop() int {
