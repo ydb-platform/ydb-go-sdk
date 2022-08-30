@@ -4,6 +4,7 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -39,10 +40,10 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 			return func(doneInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
 				logInfoWarn(logger, doneInfo.Error, `read partition response completed {topic:"%v", reader_connection_id:"%v", partition_id:%v, partition_session_id:%v,`+
 					//
-					`latency:%v, commit_offset:%v, read_offset:%v}`,
+					`latency:%v, commit_offset:%v, read_offset:%v, version:%v}`,
 					startInfo.Topic, startInfo.ReaderConnectionID, startInfo.PartitionID, startInfo.PartitionSessionID,
 					//
-					time.Since(start), doneInfo.CommitOffset, doneInfo.ReadOffset)
+					time.Since(start), doneInfo.CommitOffset, doneInfo.ReadOffset, meta.Version)
 			}
 		}
 
@@ -55,10 +56,10 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 				logInfoWarn(logger, doneInfo.Error,
 					`reader partition stopped {reader_connection_id:"%v", topic:"%v", partition_id:%v, partition_session_id:%v, committed_offset:%v, graceful:%v, `+
 						//
-						`latency:%v}`,
+						`latency:%v, version:%v}`,
 					startInfo.ReaderConnectionID, startInfo.Topic, startInfo.PartitionID, startInfo.PartitionSessionID, startInfo.CommittedOffset, startInfo.Graceful,
 					//
-					time.Since(start))
+					time.Since(start), meta.Version)
 			}
 		}
 	}
@@ -74,10 +75,10 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 			return func(doneInfo trace.TopicReaderCommitDoneInfo) {
 				logDebugWarn(logger, doneInfo.Error, `committed {topic:"%v", partition_id:%v, partition_session_id:%v, commit_start_offset:%v, commit_end_offset:%v, `+
 					//
-					`latency:%v}`,
+					`latency:%v, version:%v}`,
 					startInfo.Topic, startInfo.PartitionID, startInfo.PartitionSessionID, startInfo.StartOffset, startInfo.EndOffset,
 					//
-					time.Since(start))
+					time.Since(start), meta.Version)
 			}
 		}
 
@@ -89,10 +90,10 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 			return func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
 				logDebugWarn(logger, doneInfo.Error, `commit message sent {partitions_id:%v, partitions_session_id:%v`+
 					//
-					`latency:%v}`,
+					`latency:%v, version:%v}`,
 					startInfo.CommitsInfo.PartitionIDs(), startInfo.CommitsInfo.PartitionSessionIDs(),
 					//
-					time.Since(start))
+					time.Since(start), meta.Version)
 			}
 		}
 
@@ -109,10 +110,10 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 			return func(doneInfo trace.TopicReaderCloseDoneInfo) {
 				logDebugWarn(logger, doneInfo.CloseError, `topic reader stream closed {reader_connection_id:"%v", close_reason:"%v", `+
 					//
-					`latency:%v}`,
+					`latency:%v, version:%v}`,
 					startInfo.ReaderConnectionID, startInfo.CloseReason,
 					//
-					time.Since(start))
+					time.Since(start), meta.Version)
 			}
 		}
 
@@ -124,16 +125,16 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 			return func(doneInfo trace.TopicReaderInitDoneInfo) {
 				logDebugWarn(logger, doneInfo.Error, `topic reader stream initialized {pre_init_reader_connection_id:"%v", consumer:"%v", topics:%v, `+
 					//
-					`reader_connection_id:"%v", latency:%v}`,
+					`reader_connection_id:"%v", latency:%v, version:%v}`,
 					startInfo.PreInitReaderConnectionID, startInfo.InitRequestInfo.GetConsumer(), startInfo.InitRequestInfo.GetTopics(),
 					//
-					doneInfo.ReaderConnectionID, time.Since(start))
+					doneInfo.ReaderConnectionID, time.Since(start), meta.Version)
 			}
 		}
 
 		t.OnReaderError = func(info trace.TopicReaderErrorInfo) {
-			logger.Warnf(`stream error {reader_connection_id:"%v", error:"%v"}`,
-				info.ReaderConnectionID, info.Error)
+			logger.Warnf(`stream error {reader_connection_id:"%v", error:"%v", version:%v}`,
+				info.ReaderConnectionID, info.Error, meta.Version)
 		}
 
 		t.OnReaderUpdateToken = func(startInfo trace.OnReadUpdateTokenStartInfo) func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
@@ -144,22 +145,22 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 			return func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
 				logDebugWarn(logger, updateTokenInfo.Error, `got token {reader_connection_id:"%v"`+
 					//
-					`token_len:%v, latency:%v}`,
+					`token_len:%v, latency:%v, version:%v}`,
 					startInfo.ReaderConnectionID,
 					//
-					updateTokenInfo.TokenLen, time.Since(start))
+					updateTokenInfo.TokenLen, time.Since(start), meta.Version)
 
 				return func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
 					logDebugWarn(logger, doneInfo.Error, `token updated on stream {reader_connection_id:"%v"`+
 						//
 						`token_len:%v, `+
 						//
-						`latency:%v}`,
+						`latency:%v, version:%v}`,
 						startInfo.ReaderConnectionID,
 						//
 						updateTokenInfo.TokenLen,
 						//
-						time.Since(start))
+						time.Since(start), meta.Version)
 				}
 			}
 		}
@@ -182,10 +183,10 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 			return func(doneInfo trace.TopicReaderReceiveDataResponseDoneInfo) {
 				logDebugWarn(logger, doneInfo.Error, `data response received and processed {reader_connection_id:"%v", received_bytes:%v, local_capacity:%v, partitions_count:%v, batches_count:%v, messages_count:%v, `+
 					//
-					`latency:%v}`,
+					`latency:%v, version:%v}`,
 					startInfo.ReaderConnectionID, startInfo.DataResponse.GetBytesSize(), startInfo.LocalBufferSizeAfterReceive, partitionsCount, batchesCount, messagesCount,
 					//
-					time.Since(start))
+					time.Since(start), meta.Version)
 			}
 		}
 
@@ -197,10 +198,10 @@ func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topi
 			return func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
 				logDebugInfo(logger, doneInfo.Error, `read messages returned {min_count:%v, max_count:%v, local_capacity_before:"%v", `+
 					//
-					`topic:"%v", partition_id:%v, messages_count:%v, local_capacity_after:%v, latency:%v}`,
+					`topic:"%v", partition_id:%v, messages_count:%v, local_capacity_after:%v, latency:%v, version:%v}`,
 					startInfo.MinCount, startInfo.MaxCount, startInfo.FreeBufferCapacity,
 					//
-					doneInfo.Topic, doneInfo.PartitionID, doneInfo.MessagesCount, doneInfo.FreeBufferCapacity, time.Since(start))
+					doneInfo.Topic, doneInfo.PartitionID, doneInfo.MessagesCount, doneInfo.FreeBufferCapacity, time.Since(start), meta.Version)
 			}
 		}
 
