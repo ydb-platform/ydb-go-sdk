@@ -3,10 +3,13 @@ package topicwriterinternal
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
+
+var errBadInternalStateOnCompress = xerrors.Wrap(errors.New("ydb: bad internal state, while compress message"))
 
 type Codec int
 
@@ -41,7 +44,7 @@ func init() {
 
 func compressMessage(m *messageWithDataContent, c rawtopiccommon.Codec) error {
 	if m.bufCodec != rawtopiccommon.CodecRaw {
-		return xerrors.NewYdbErrWithStackTrace("ydb: bad internal state, try to re-compress message")
+		return xerrors.WithStackTrace(errBadInternalStateOnCompress)
 	}
 
 	if c != rawtopiccommon.CodecRaw {

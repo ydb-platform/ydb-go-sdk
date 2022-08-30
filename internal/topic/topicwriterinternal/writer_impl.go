@@ -2,22 +2,28 @@ package topicwriterinternal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/jonboulle/clockwork"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+)
+
+var (
+	errStopWriterImpl            = xerrors.Wrap(errors.New("ydb: stop writer impl"))
+	errCloseWriterImplStreamLoop = xerrors.Wrap(errors.New("ydb: close writer impl stream loop"))
+	errCloseWriterImplReconnect  = xerrors.Wrap(errors.New("ydb: stream writer reconnect"))
+	errCloseWriterImplStopWork   = xerrors.Wrap(errors.New("ydb: stop work with writer stream"))
+	errBadCodec                  = xerrors.Wrap(errors.New("ydb: internal error - bad codec for message"))
 )
 
 type writerImpl struct {
@@ -67,7 +73,7 @@ func (w *writerImpl) Write(ctx context.Context, messages *messageWithDataContent
 }
 
 func (w *writerImpl) Close(ctx context.Context) error {
-	return w.background.Close(ctx, xerrors.NewYdbErrWithStackTrace("ydb: stop writer impl"))
+	return w.background.Close(ctx, xerrors.WithStackTrace(errStopWriterImpl))
 }
 
 func (w *writerImpl) send(ctx context.Context, messages *messageWithDataContentSlice) error {
@@ -90,14 +96,14 @@ func (w *writerImpl) sendLoop(ctx context.Context) {
 		if stream != nil {
 			_ = stream.CloseSend()
 		}
-		streamCtxCancel(xerrors.NewYdbErrWithStackTrace("ydb: close writer impl stream loop"))
+		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterImplStreamLoop))
 	}()
 
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		streamCtxCancel(xerrors.NewYdbErrWithStackTrace("ydb: stream writer reconnect"))
+		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterImplReconnect))
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		attempt++
@@ -141,7 +147,7 @@ func (w *writerImpl) connectWithTimeout(streamLifetimeContext context.Context) (
 
 func (w *writerImpl) initStreamAndStartSendMessages(ctx context.Context, stream RawTopicWriterStream) error {
 	ctx, cancel := xcontext.WithErrCancel(ctx)
-	defer cancel(xerrors.NewYdbErrWithStackTrace("ydb: stop work with writer stream"))
+	defer cancel(xerrors.WithStackTrace(errCloseWriterImplStopWork))
 
 	if err := w.initStream(stream); err != nil {
 		return err
@@ -301,7 +307,7 @@ func createRawMessageData(
 	mess *messageWithDataContent,
 ) (res rawtopicwriter.MessageData, err error) {
 	if mess.bufCodec != codec {
-		return res, xerrors.NewYdbErrWithStackTrace("ydb: internal error - bad codec for message")
+		return res, xerrors.WithStackTrace(errBadCodec)
 	}
 
 	res.CreatedAt = mess.CreatedAt

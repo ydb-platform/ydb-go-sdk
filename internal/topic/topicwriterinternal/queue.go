@@ -3,6 +3,7 @@ package topicwriterinternal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -10,6 +11,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+)
+
+var (
+	errAddMessageToClosedQueue   = xerrors.Wrap(errors.New("ydb: add message to closed message queue"))
+	errCloseClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: close closed message queue"))
+	errGetMessageFromClosedQueue = xerrors.Wrap(errors.New("ydb: get message from closed message queue"))
 )
 
 const (
@@ -50,7 +57,7 @@ func (q *messageQueue) AddMessages(messages *messageWithDataContentSlice) error 
 	defer q.m.Unlock()
 
 	if q.closed {
-		return xerrors.NewYdbErrWithStackTrace("ydb: add message to closed message queue")
+		return xerrors.WithStackTrace(errAddMessageToClosedQueue)
 	}
 
 	for i := range messages.m {
@@ -119,7 +126,7 @@ func (q *messageQueue) Close(err error) error {
 	defer q.m.Unlock()
 
 	if q.closed {
-		return xerrors.NewYdbErrWithStackTrace("ydb: close closed message queue")
+		return xerrors.WithStackTrace(errCloseClosedMessageQueue)
 	}
 	q.closed = true
 	q.closedErr = err
@@ -144,7 +151,7 @@ func (q *messageQueue) GetMessagesForSend(ctx context.Context) (*messageWithData
 		closed = q.closed
 	})
 	if closed {
-		return nil, xerrors.NewYdbErrWithStackTrace("ydb: get messages for send from closed queue")
+		return nil, xerrors.WithStackTrace(errGetMessageFromClosedQueue)
 	}
 
 	for {
