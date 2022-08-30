@@ -47,7 +47,7 @@ var errsToCheck = []struct {
 		// golang context deadline exceeded
 		err:           context.DeadlineExceeded,
 		backoff:       backoff.TypeNoBackoff,
-		deleteSession: false,
+		deleteSession: true,
 		canRetry: map[idempotency]bool{
 			idempotent:    false,
 			nonIdempotent: false,
@@ -57,7 +57,7 @@ var errsToCheck = []struct {
 		// golang context canceled
 		err:           context.Canceled,
 		backoff:       backoff.TypeNoBackoff,
-		deleteSession: false,
+		deleteSession: true,
 		canRetry: map[idempotency]bool{
 			idempotent:    false,
 			nonIdempotent: false,

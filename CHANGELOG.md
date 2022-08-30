@@ -1,3 +1,5 @@
+* Marked the context errors as required to delete session
+
 ## v3.37.2
 * Fixed nil pointer exception in topic reader if reconnect failed
 
