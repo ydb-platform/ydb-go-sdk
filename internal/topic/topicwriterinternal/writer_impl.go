@@ -86,7 +86,8 @@ func (w *writerImpl) sendLoop(ctx context.Context) {
 
 	var stream RawTopicWriterStream
 	createStreamContext := func() (context.Context, xcontext.CancelErrFunc) {
-		return xcontext.WithErrCancel(xcontext.WithNoParentCancel(ctx))
+		// need suppress parent context cancelation for flush buffer while close writer
+		return xcontext.WithErrCancel(xcontext.WithoutDeadline(ctx))
 	}
 
 	//nolint:ineffassign,staticcheck
