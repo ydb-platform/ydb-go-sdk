@@ -1,4 +1,5 @@
 * Marked the context errors as required to delete session
+* Added log topic api reader for internal logger
 
 ## v3.37.2
 * Fixed nil pointer exception in topic reader if reconnect failed
