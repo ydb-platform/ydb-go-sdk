@@ -18,7 +18,11 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
    * [Over `sql.Conn` object](#retry-conn)
    * [Over `sql.Tx`](#retry-tx)
 6. [Query args types](#arg-types)
-7. [Get native driver from `*sql.DB`](#unwrap)
+7. [Accessing the native driver from `*sql.DB`](#unwrap)
+   * [Driver with go's 1.18 supports also `*sql.Conn` for unwrapping](#unwrap-cc)
+8. [Logging driver events](#logging)
+9. [Add metrics about SDK's events](#metrics)
+10. [Add `Jaeger` traces about driver events](#jaeger)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
@@ -178,7 +182,7 @@ res, err = db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 
 Default `YDB`'s transaction control mode is a `SerializableReadWrite`. 
 Default transaction control mode can be changed outside of interactive transactions by updating the context object:
-```
+```go
 ctx := ydb.WithTxControl(ctx, table.OnlineReadOnlyTxControl())
 ```
 
@@ -196,7 +200,7 @@ Most of those errors are transient.
 
 `retry.Do` helper accepts custom lambda, which must return error if it happens during the processing,
 or nil if the operation succeeds.
-```
+```go
 import (
     "github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
@@ -222,7 +226,7 @@ or nil if the operation succeeds.
 
 The logic within the custom lambda does not need the explicit commit or rollback at the end - `retry.DoTx` does it automatically.
 
-```
+```go
 import (
     "github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
@@ -247,7 +251,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
 
 `database/sql` driver for `YDB` supports the following types of query parameters:
 * multiple `sql.NamedArg` arguments (standard `database/sql` query parameters)
-   ```
+   ```go
    rows, err := cc.QueryContext(ctx, `
           DECLARE $seasonTitle AS Utf8;
           DECLARE $views AS Uint64;
@@ -258,7 +262,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
    )
    ```
 * multiple native `ydb-go-sdk` `table.ParameterOption` arguments which are constructed with `table.ValueParam("name", value)`
-   ```
+   ```go
    rows, err := cc.QueryContext(ctx, `
           DECLARE $seasonTitle AS Utf8;
           DECLARE $views AS Uint64;
@@ -269,7 +273,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
    )
    ```
 * single native `ydb-go-sdk` `*table.QueryParameters` argument which are constructed with `table.NewQueryParameters(parameterOptions...)`
-   ```
+   ```go
    rows, err := cc.QueryContext(ctx, `
           DECLARE $seasonTitle AS Utf8;
           DECLARE $views AS Uint64;
@@ -297,6 +301,32 @@ nativeDriver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
     // doing with native YDB session
     return nil
 })
+```
+
+### Driver with go's 1.18 supports also `*sql.Conn` for unwrapping <a name="unwrap-cc"></a>
+
+For example, this feature may be helps with `retry.Do`:
+```go
+err := retry.Do(context.TODO(), db, func(ctx context.Context, cc *sql.Conn) error {
+    nativeDriver, err := ydb.Unwrap(cc)
+	if err != nil {
+        return err // return err to retryer
+    }
+	nativeDriver.Scripting().Execute(ctx,
+        "SELECT 1+1",
+        table.NewQueryParameters(),
+    )
+    if err != nil {
+        return err // return err to retryer
+    }
+    // work with cc
+    rows, err := cc.QueryContext(ctx, "SELECT 1;")
+    if err != nil {
+        return err // return err to retryer
+    }
+    ...
+    return nil // good final of retry operation
+}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
 ```
 
 ## Logging driver events <a name="logging"></a>
