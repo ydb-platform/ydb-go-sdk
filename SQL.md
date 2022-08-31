@@ -197,8 +197,7 @@ res, err = db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 Default `YDB`'s transaction control mode is a `SerializableReadWrite`. 
 Default transaction control mode can be changed outside of interactive transactions by updating the context object:
 ```go
-rows, err := db.QueryContext(
-    ydb.WithTxControl(ctx, table.OnlineReadOnlyTxControl()),
+rows, err := db.QueryContext(ydb.WithTxControl(ctx, table.OnlineReadOnlyTxControl()),
     "SELECT series_id, title, release_date FROM `/full/path/of/table/series`;"
 )
 ```
