@@ -10,21 +10,22 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
    * [Configure driver with `ydb.Connector` (recommended way)](#init-connector)
    * [Configure driver with data source name or connection string](#init-dsn)
 2. [Session pooling](#session-pool)
-3. [Query execution](#queries)
+3. [Client balancing](#balancing)
+4. [Query execution](#queries)
    * [Queries on database object](#queries-db)
    * [Queries on transaction object](#queries-tx)
-4. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
-5. [Retry helpers for `YDB` `database/sql` driver](#retry)
+5. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
+6. [Retry helpers for `YDB` `database/sql` driver](#retry)
    * [Over `sql.Conn` object](#retry-conn)
    * [Over `sql.Tx`](#retry-tx)
-6. [Query args types](#arg-types)
-7. [Accessing the native driver from `*sql.DB`](#unwrap)
+7. [Query args types](#arg-types)
+8. [Accessing the native driver from `*sql.DB`](#unwrap)
    * [Driver with go's 1.18 supports also `*sql.Conn` for unwrapping](#unwrap-cc)
-8. [Troubleshooting](#troubleshooting)
+9. [Troubleshooting](#troubleshooting)
    * [Logging driver events](#logging)
    * [Add metrics about SDK's events](#metrics)
    * [Add `Jaeger` traces about driver events](#jaeger)
-9. [Example of usage](#example)
+10. [Example of usage](#example)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
@@ -82,6 +83,34 @@ Lifetime of a `YDB` session depends on driver configuration and error occurance,
 In most cases the implementation of `database/sql` driver for YDB allows to complete queries without user-visible errors.
 But some errors need to be handled on the client side, by re-running not a single operation, but a complete transaction.
 Therefore the transaction logic needs to be wrapped with retry helpers, such as `retry.Do` or `retry.DoTx` (see more about retry helpers in the [retry section](#retry)).
+
+## Client balancing <a name="balancing"></a>
+
+`database/sql` driver for `YDB` like as native driver for `YDB` use client balancing, which happens on `CreateSession` request. 
+At this time, native driver choose known node for execute request by according balancer algorithm.
+Default balancer algorithm is a `random choice`.
+Client balancer may be re-configured with option `ydb.WithBalancer`:
+```go
+import (
+    "github.com/ydb-platform/ydb-go-sdk/v3/balancers"
+)
+...
+nativeDriver, err := ydb.Open(context.TODO(), "grpcs://localhost:2135/local",
+    ydb.WithBalancer(
+        balancers.PreferLocationsWithFallback(
+            balancers.RandomChoice(), "a", "b",
+        ),
+    ),
+)
+if err != nil {
+    // fallback on error
+}
+connector, err := ydb.Connector(nativeDriver)
+if err != nil {
+    // fallback on error
+}
+db := sql.OpenDB(connector)
+```
 
 ## Query execution <a name="queries"></a>
 
