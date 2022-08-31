@@ -314,7 +314,7 @@ err := retry.Do(context.TODO(), db, func(ctx context.Context, cc *sql.Conn) erro
 	if err != nil {
         return err // return err to retryer
     }
-	nativeDriver.Scripting().Execute(ctx,
+    nativeDriver.Scripting().Execute(ctx,
         "SELECT 1+1",
         table.NewQueryParameters(),
     )
