@@ -13,6 +13,7 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
 3. [Query execution](#queries)
    * [Queries on database object](#queries-db)
    * [Queries on transaction object](#queries-tx)
+     * [Supported isolation levels](#isolation)
 4. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
 5. [Retry helpers for `YDB` `database/sql` driver](#retry)
    * [Over `sql.Conn` object](#retry-conn)
@@ -112,16 +113,28 @@ if err = rows.Err(); err != nil { // always check final rows err
 ```
 
 ### Queries on transaction object <a name="queries-tx"></a>
-Query execution on transaction object supports only `default` transaction options
-which are mapped to `YDB` `SerializableReadWrite` transaction settings.
 
-`YDB`'s `OnlineReadOnly` and `StaleReadOnly` transaction settings are not compatible
-with interactive transactions such as `database/sql`'s `*sql.Tx`.
-That's why `ydb-go-sdk` implements read-only `sql.LevelSnapshot` with fake transaction
-(temporary, until `YDB` starts to support true snapshot isolation mode).
+- read-write (mapped to `SerializableReadWrite` transaction control)
+  ```go
+  rw := sql.TxOption{
+    ReadOnly: false,
+    Isolation: sql.LevelDefault,
+  }
+  ```
+- read-only (mapped to `OnlineReadOnly` transaction settings on each request, will be mapped to true `SnapshotReadOnly` soon)
+  ```go
+  ro := sql.TxOption{
+    ReadOnly: true,
+    Isolation: sql.LevelSnapshot,
+  }
+  ```
 
+Example of works with transactions:
 ```go
-tx, err := db.BeginTx(ctx, sql.TxOptions{})
+tx, err := db.BeginTx(ctx, sql.TxOption{
+  ReadOnly: true,
+  Isolation: sql.LevelSnapshot,
+})
 if err != nil {
     log.Fatal(err)
 }
