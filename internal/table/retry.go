@@ -44,9 +44,10 @@ func doTx(
 		opts.SlowBackoff,
 		opts.Idempotent,
 		func(ctx context.Context, s table.Session) (err error) {
+			attempts++
+
 			defer func() {
 				onIntermediate(err)
-				attempts++
 			}()
 
 			tx, err := s.BeginTransaction(ctx, opts.TxSettings)
@@ -111,9 +112,10 @@ func do(
 		opts.SlowBackoff,
 		opts.Idempotent,
 		func(ctx context.Context, s table.Session) (err error) {
+			attempts++
+
 			defer func() {
 				onIntermediate(err)
-				attempts++
 			}()
 
 			err = func() error {
