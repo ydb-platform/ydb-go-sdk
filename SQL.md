@@ -9,8 +9,8 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
 1. [Initialization of `database/sql` driver](#init)
    * [Configure driver with `ydb.Connector` (recommended way)](#init-connector)
    * [Configure driver with data source name or connection string](#init-dsn)
-2. [Session pooling](#session-pool)
-3. [Client balancing](#balancing)
+2. [Client balancing](#balancing)
+3. [Session pooling](#session-pool)
 4. [Query execution](#queries)
    * [Queries on database object](#queries-db)
    * [Queries on transaction object](#queries-tx)
@@ -72,21 +72,9 @@ Data source name parameters:
 * static credentials with authority part of URI, like `grpcs://root:password@localhost:2135/local`
 * `query_mode=scripting` - you can redefine default [DML](https://en.wikipedia.org/wiki/Data_manipulation_language) query mode
 
-## Session pooling <a name="session-pool"></a>
-
-Native driver `ydb-go-sdk/v3` implements the internal session pool, which uses with `db.Table().Do()` or `db.Table().DoTx()` methods.
-Internal session pool are configured with options like `ydb.WithSessionPoolSizeLimit()` and other.
-Unlike the session pool in the native driver, `database/sql` contains a different implementation of the session pool, which is configured with `*sql.DB.SetMaxOpenConns` and `*sql.DB.SetMaxIdleConns`.
-Lifetime of a `YDB` session depends on driver configuration and error occurance, such as `sql.driver.ErrBadConn`.
-`YDB` driver for `database/sql` includes the logic to transform the internal `YDB` error codes into `sql.driver.ErrBadConn` and other retryable and non-retryable error types.
-
-In most cases the implementation of `database/sql` driver for YDB allows to complete queries without user-visible errors.
-But some errors need to be handled on the client side, by re-running not a single operation, but a complete transaction.
-Therefore the transaction logic needs to be wrapped with retry helpers, such as `retry.Do` or `retry.DoTx` (see more about retry helpers in the [retry section](#retry)).
-
 ## Client balancing <a name="balancing"></a>
 
-`database/sql` driver for `YDB` like as native driver for `YDB` use client balancing, which happens on `CreateSession` request. 
+`database/sql` driver for `YDB` like as native driver for `YDB` use client balancing, which happens on `CreateSession` request.
 At this time, native driver choose known node for execute request by according balancer algorithm.
 Default balancer algorithm is a `random choice`.
 Client balancer may be re-configured with option `ydb.WithBalancer`:
@@ -111,6 +99,18 @@ if err != nil {
 }
 db := sql.OpenDB(connector)
 ```
+
+## Session pooling <a name="session-pool"></a>
+
+Native driver `ydb-go-sdk/v3` implements the internal session pool, which uses with `db.Table().Do()` or `db.Table().DoTx()` methods.
+Internal session pool are configured with options like `ydb.WithSessionPoolSizeLimit()` and other.
+Unlike the session pool in the native driver, `database/sql` contains a different implementation of the session pool, which is configured with `*sql.DB.SetMaxOpenConns` and `*sql.DB.SetMaxIdleConns`.
+Lifetime of a `YDB` session depends on driver configuration and error occurance, such as `sql.driver.ErrBadConn`.
+`YDB` driver for `database/sql` includes the logic to transform the internal `YDB` error codes into `sql.driver.ErrBadConn` and other retryable and non-retryable error types.
+
+In most cases the implementation of `database/sql` driver for YDB allows to complete queries without user-visible errors.
+But some errors need to be handled on the client side, by re-running not a single operation, but a complete transaction.
+Therefore the transaction logic needs to be wrapped with retry helpers, such as `retry.Do` or `retry.DoTx` (see more about retry helpers in the [retry section](#retry)).
 
 ## Query execution <a name="queries"></a>
 
