@@ -413,4 +413,4 @@ db := sql.OpenDB(connector)
 
 ## Example of usage <a name="example"></a>
 
-[Basic example](https://github.com/ydb-platform/ydb-go-examples/tree/master/basic) about series written with `database/sql` driver for `YDB` placed in [example repository](https://github.com/ydb-platform/ydb-go-examples/tree/master/database_sql)  
+[Basic example](https://github.com/ydb-platform/ydb-go-examples/tree/master/basic) about series written with `database/sql` driver for `YDB` placed in [examples repository](https://github.com/ydb-platform/ydb-go-examples/tree/master/database_sql)  
