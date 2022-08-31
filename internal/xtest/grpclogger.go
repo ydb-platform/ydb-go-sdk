@@ -29,19 +29,44 @@ func NewGrpcLogger(t testing.TB) GrpcLogger {
 	return GrpcLogger{t: t}
 }
 
-func (l GrpcLogger) UnaryClientInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+func (l GrpcLogger) UnaryClientInterceptor(
+	ctx context.Context,
+	method string,
+	req, reply interface{},
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
 	err := invoker(ctx, method, req, reply, cc, opts...)
-	l.t.Logf("UnaryClientInterceptor: %s - err: %v\n\nreq:\n%v\n\nresp:\n%v", method, err, protoToString(req), protoToString(reply))
+	l.t.Logf(
+		"UnaryClientInterceptor: %s - err: %v\n\nreq:\n%v\n\nresp:\n%v",
+		method,
+		err,
+		protoToString(req),
+		protoToString(reply),
+	)
 	return err
 }
 
-func (l GrpcLogger) StreamClientInterceptor(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+func (l GrpcLogger) StreamClientInterceptor(
+	ctx context.Context,
+	desc *grpc.StreamDesc,
+	cc *grpc.ClientConn,
+	method string,
+	streamer grpc.Streamer,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, error) {
 	stream, err := streamer(ctx, desc, cc, method, opts...)
 	streamWrapper := newGrpcLoggerStream(stream, l.t)
 	if stream != nil {
 		stream = streamWrapper
 	}
-	l.t.Logf("StreamStart: %v with err '%v' (streamID: %v)", method, err, streamWrapper.streamID)
+	l.t.Logf(
+		"StreamStart: %v with err '%v' (streamID: %v)",
+		method,
+		err,
+		streamWrapper.streamID,
+	)
 	return stream, err
 }
 
@@ -78,7 +103,7 @@ func protoToString(v interface{}) string {
 		marshaler := jsonpb.Marshaler{}
 		res, err := marshaler.MarshalToString(mess)
 		if err != nil {
-			return fmt.Sprintf("failed to json marshal of: '%v' with err: ", v, err)
+			return fmt.Sprintf("failed to json marshal of: '%v' with err: %v", v, err)
 		}
 		return res
 	}
