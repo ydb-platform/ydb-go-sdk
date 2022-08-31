@@ -31,7 +31,7 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
 ### Configure driver with `ydb.Connector` (recommended way) <a name="init-connector"></a>
 ```go
 import (
-	"database/sql"
+    "database/sql"
 	
     "github.com/ydb-platform/ydb-go-sdk/v3"
 )
@@ -57,7 +57,7 @@ func main() {
 ### Configure driver with data source name or connection string <a name="init-dsn"></a>
 ```go
 import (
-	"database/sql"
+    "database/sql"
 	
     _ "github.com/ydb-platform/ydb-go-sdk/v3"
 )
@@ -204,7 +204,7 @@ Most of those errors are transient.
 or nil if the operation succeeds.
 ```go
 import (
-    "github.com/ydb-platform/ydb-go-sdk/v3/retry"
+   "github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 ...
 err := retry.Do(context.TODO(), db, func(ctx context.Context, cc *sql.Conn) error {
@@ -342,7 +342,7 @@ Example of adding `zap` logging:
 ```go
 import (
     "github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
+    ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 )
 ...
 nativeDriver, err := ydb.Open(ctx, connectionString,
