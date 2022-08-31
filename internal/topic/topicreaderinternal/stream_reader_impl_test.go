@@ -165,9 +165,12 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 
 		e.Start()
 
+		stopPartitionResponseSent := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: e.partitionSessionID,
-		}).Return(nil)
+		}).Return(nil).Do(func(_ interface{}) {
+			close(stopPartitionResponseSent)
+		})
 
 		e.SendFromServer(&rawtopicreader.StopPartitionSessionRequest{
 			PartitionSessionID: e.partitionSessionID,
@@ -178,6 +181,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		_, err := e.reader.ReadMessageBatch(readMessagesCtx, newReadMessageBatchOptions())
 		require.Error(t, err)
 		require.Error(t, readMessagesCtx.Err())
+		xtest.WaitChannelClosed(t, stopPartitionResponseSent)
 	})
 	xtest.TestManyTimesWithName(t, "TraceGracefulFalse", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
