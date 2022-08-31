@@ -1,3 +1,5 @@
+* Revert the marking of context errors as required to delete session
+
 ## v3.37.3
 * Fixed alter topic request - stop send empty setSupportedCodecs if customer not set them 
 * Marked the context errors as required to delete session
