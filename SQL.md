@@ -268,7 +268,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
 `database/sql` driver for `YDB` supports the following types of query parameters:
 * multiple `sql.NamedArg` arguments (standard `database/sql` query parameters)
    ```go
-   rows, err := cc.QueryContext(ctx, `
+   rows, err := db.QueryContext(ctx, `
           DECLARE $seasonTitle AS Utf8;
           DECLARE $views AS Uint64;
           SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
@@ -279,7 +279,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
    ```
 * multiple native `ydb-go-sdk` `table.ParameterOption` arguments which are constructed with `table.ValueParam("name", value)`
    ```go
-   rows, err := cc.QueryContext(ctx, `
+   rows, err := db.QueryContext(ctx, `
           DECLARE $seasonTitle AS Utf8;
           DECLARE $views AS Uint64;
           SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
@@ -290,7 +290,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
    ```
 * single native `ydb-go-sdk` `*table.QueryParameters` argument which are constructed with `table.NewQueryParameters(parameterOptions...)`
    ```go
-   rows, err := cc.QueryContext(ctx, `
+   rows, err := db.QueryContext(ctx, `
           DECLARE $seasonTitle AS Utf8;
           DECLARE $views AS Uint64;
           SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
