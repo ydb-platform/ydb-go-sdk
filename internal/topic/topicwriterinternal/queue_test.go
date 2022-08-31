@@ -19,19 +19,18 @@ import (
 func TestMessageQueue_AddMessages(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessages(1, 3, 5, 3)))
+		require.NoError(t, q.AddMessages(newTestMessages(1, 3, 5)))
 
-		require.Equal(t, 4, q.lastWrittenIndex)
+		require.Equal(t, 3, q.lastWrittenIndex)
 
-		require.Len(t, q.messagesByOrder, 4)
+		require.Len(t, q.messagesByOrder, 3)
 		require.Equal(t, newTestMessage(1), q.messagesByOrder[1])
 		require.Equal(t, newTestMessage(3), q.messagesByOrder[2])
 		require.Equal(t, newTestMessage(5), q.messagesByOrder[3])
-		require.Equal(t, newTestMessage(3), q.messagesByOrder[4])
 
 		require.Len(t, q.seqNoToOrderId, 3)
 		require.Equal(t, newOrderIDsFIFO(1), q.seqNoToOrderId[1])
-		require.Equal(t, newOrderIDsFIFO(2, 4), q.seqNoToOrderId[3])
+		require.Equal(t, newOrderIDsFIFO(2), q.seqNoToOrderId[3])
 		require.Equal(t, newOrderIDsFIFO(3), q.seqNoToOrderId[5])
 	})
 	t.Run("Closed", func(t *testing.T) {
@@ -48,6 +47,29 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 		q.messagesByOrder[minInt] = newTestMessage(3)
 		q.messagesByOrder[minInt+1] = newTestMessage(5)
 		require.Equal(t, minInt+1, q.lastWrittenIndex)
+	})
+	t.Run("BadOrder", func(t *testing.T) {
+		q := newMessageQueue()
+		require.Error(t, q.AddMessages(newTestMessages(2, 1)))
+	})
+}
+
+func TestMessageQueue_CheckMessages(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		q := newMessageQueue()
+		require.NoError(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages()))
+	})
+	t.Run("Unordered", func(t *testing.T) {
+		q := newMessageQueue()
+		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(2, 2)))
+		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(2, 1)))
+	})
+	t.Run("NoGreaterThenLastSent", func(t *testing.T) {
+		q := newMessageQueue()
+		q.lastSeqNo = 10
+		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(int(q.lastSeqNo-1))))
+		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(int(q.lastSeqNo))))
+		require.NoError(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(int(q.lastSeqNo+1))))
 	})
 }
 
@@ -376,7 +398,7 @@ func TestQueuePanicOnOverflow(t *testing.T) {
 		q := newMessageQueue()
 		q.messagesByOrder[123] = messageWithDataContent{}
 		q.lastWrittenIndex = maxInt
-		q.addMessage(messageWithDataContent{})
+		q.addMessageNeedLock(messageWithDataContent{})
 	})
 }
 

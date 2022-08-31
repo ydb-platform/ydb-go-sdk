@@ -17,6 +17,7 @@ var (
 	errAddMessageToClosedQueue   = xerrors.Wrap(errors.New("ydb: add message to closed message queue"))
 	errCloseClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: close closed message queue"))
 	errGetMessageFromClosedQueue = xerrors.Wrap(errors.New("ydb: get message from closed message queue"))
+	errAddUnorderedMessages      = xerrors.Wrap(errors.New("ydb: add unordered messages"))
 )
 
 const (
@@ -36,6 +37,7 @@ type messageQueue struct {
 	closedChan       empty.Chan
 	lastWrittenIndex int
 	lastSentIndex    int
+	lastSeqNo        int64
 
 	messagesByOrder map[int]messageWithDataContent
 	seqNoToOrderId  map[int64]orderIDsFIFO
@@ -47,6 +49,7 @@ func newMessageQueue() messageQueue {
 		seqNoToOrderId:  make(map[int64]orderIDsFIFO),
 		hasNewMessages:  make(empty.Chan, 1),
 		closedChan:      make(empty.Chan),
+		lastSeqNo:       -1,
 	}
 }
 
@@ -60,8 +63,12 @@ func (q *messageQueue) AddMessages(messages *messageWithDataContentSlice) error 
 		return xerrors.WithStackTrace(errAddMessageToClosedQueue)
 	}
 
+	if err := q.checkNewMessagesBeforeAddNeedLock(messages); err != nil {
+		return err
+	}
+
 	for i := range messages.m {
-		q.addMessage(messages.m[i])
+		q.addMessageNeedLock(messages.m[i])
 	}
 
 	q.notifyNewMessages()
@@ -77,7 +84,23 @@ func (q *messageQueue) notifyNewMessages() {
 	}
 }
 
-func (q *messageQueue) addMessage(mess messageWithDataContent) {
+func (q *messageQueue) checkNewMessagesBeforeAddNeedLock(messages *messageWithDataContentSlice) error {
+	if len(messages.m) == 0 {
+		return nil
+	}
+
+	lastSeqNo := q.lastSeqNo
+	for _, m := range messages.m {
+		if m.SeqNo <= lastSeqNo {
+			return xerrors.WithStackTrace(errAddUnorderedMessages)
+		}
+		lastSeqNo = m.SeqNo
+	}
+
+	return nil
+}
+
+func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) {
 	q.lastWrittenIndex++
 
 	if q.lastWrittenIndex == minInt {
