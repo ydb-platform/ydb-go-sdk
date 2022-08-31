@@ -20,9 +20,11 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
 6. [Query args types](#arg-types)
 7. [Accessing the native driver from `*sql.DB`](#unwrap)
    * [Driver with go's 1.18 supports also `*sql.Conn` for unwrapping](#unwrap-cc)
-8. [Logging driver events](#logging)
-9. [Add metrics about SDK's events](#metrics)
-10. [Add `Jaeger` traces about driver events](#jaeger)
+8. [Troubleshooting](#troubleshooting)
+   * [Logging driver events](#logging)
+   * [Add metrics about SDK's events](#metrics)
+   * [Add `Jaeger` traces about driver events](#jaeger)
+9. [Example of usage](#example)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
@@ -329,7 +331,9 @@ err := retry.Do(context.TODO(), db, func(ctx context.Context, cc *sql.Conn) erro
 }, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
 ```
 
-## Logging driver events <a name="logging"></a>
+## Troubleshooting <a name="troubleshooting"></a>
+
+### Logging driver events <a name="logging"></a>
 
 Adding a logging driver events allowed only if connection to `YDB` opens over [connector](##init-connector).
 Adding of logging provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#logs).
@@ -355,7 +359,7 @@ if err != nil {
 db := sql.OpenDB(connector)
 ```
 
-## Add metrics about SDK's events <a name="metrics"></a>
+### Add metrics about SDK's events <a name="metrics"></a>
 
 Adding of driver events monitoring allowed only if connection to `YDB` opens over [connector](##init-connector).
 Monitoring of driver events provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#metrics).
@@ -381,7 +385,7 @@ if err != nil {
 db := sql.OpenDB(connector)
 ```
 
-## Add `Jaeger` traces about driver events <a name="jaeger"></a>
+### Add `Jaeger` traces about driver events <a name="jaeger"></a>
 
 Adding of `Jaeger` traces about driver events allowed only if connection to `YDB` opens over [connector](##init-connector).
 `Jaeger` tracing provides with [debug adapters](README.md#debug) and wrotes in [migration notes](MIGRATION_v2_v3.md#jaeger).
@@ -406,3 +410,7 @@ if err != nil {
 }
 db := sql.OpenDB(connector)
 ```
+
+## Example of usage <a name="example"></a>
+
+[Basic example](https://github.com/ydb-platform/ydb-go-examples/tree/master/basic) about series written with `database/sql` driver for `YDB` placed in [example repository](https://github.com/ydb-platform/ydb-go-examples/tree/master/database_sql)  
