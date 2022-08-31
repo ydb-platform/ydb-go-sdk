@@ -70,9 +70,10 @@ func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
 	return func(req *rawtopic.AlterTopicRequest) {
-		req.SetSupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(codecs))
+		req.SetSupportedCodecs = true
+		req.SetSupportedCodecsValue = make(rawtopiccommon.SupportedCodecs, len(codecs))
 		for i, codec := range codecs {
-			req.SetSupportedCodecs[i] = rawtopiccommon.Codec(codec)
+			req.SetSupportedCodecsValue[i] = rawtopiccommon.Codec(codec)
 		}
 	}
 }

@@ -1,3 +1,4 @@
+* Fixed alter topic request - stop send empty setSupportedCodecs if customer not set them 
 * Marked the context errors as required to delete session
 * Added log topic api reader for internal logger
 
