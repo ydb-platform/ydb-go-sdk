@@ -9,17 +9,12 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 func TestWriterImpl_Write(t *testing.T) {
@@ -109,6 +104,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		require.True(t, connectCalled)
 		require.Error(t, streamContext.Err())
 	})
+
 	t.Run("ReconnectOnErrors", func(t *testing.T) {
 		ctx := context.Background()
 
