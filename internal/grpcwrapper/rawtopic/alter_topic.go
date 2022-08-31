@@ -16,7 +16,8 @@ type AlterTopicRequest struct {
 	AlterPartitionSettings               AlterPartitioningSettings
 	SetRetentionPeriod                   rawoptional.Duration
 	SetRetentionStorageMB                rawoptional.Int64
-	SetSupportedCodecs                   rawtopiccommon.SupportedCodecs
+	SetSupportedCodecs                   bool
+	SetSupportedCodecsValue              rawtopiccommon.SupportedCodecs
 	SetPartitionWriteSpeedBytesPerSecond rawoptional.Int64
 	SetPartitionWriteBurstBytes          rawoptional.Int64
 	AlterAttributes                      map[string]string
@@ -32,10 +33,13 @@ func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
 		AlterPartitioningSettings:            req.AlterPartitionSettings.ToProto(),
 		SetRetentionPeriod:                   req.SetRetentionPeriod.ToProto(),
 		SetRetentionStorageMb:                req.SetRetentionStorageMB.ToProto(),
-		SetSupportedCodecs:                   req.SetSupportedCodecs.ToProto(),
 		SetPartitionWriteSpeedBytesPerSecond: req.SetPartitionWriteSpeedBytesPerSecond.ToProto(),
 		SetPartitionWriteBurstBytes:          req.SetPartitionWriteBurstBytes.ToProto(),
 		AlterAttributes:                      req.AlterAttributes,
+	}
+
+	if req.SetSupportedCodecs {
+		res.SetSupportedCodecs = req.SetSupportedCodecsValue.ToProto()
 	}
 
 	res.AddConsumers = make([]*Ydb_Topic.Consumer, len(req.AddConsumers))
