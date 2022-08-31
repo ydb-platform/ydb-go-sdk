@@ -36,7 +36,7 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 		// run test, then check stopAfter for guarantee run test least once
 		runTest(t, test)
 
-		if time.Since(start) > options.stopAfter {
+		if time.Since(start) > options.stopAfter || t.Failed() {
 			t.Log("test run counter:", testCounter)
 			return
 		}
