@@ -40,13 +40,13 @@ type messageQueue struct {
 	lastSeqNo        int64
 
 	messagesByOrder map[int]messageWithDataContent
-	seqNoToOrderId  map[int64]orderIDsFIFO
+	seqNoToOrderId  map[int64]int
 }
 
 func newMessageQueue() messageQueue {
 	return messageQueue{
 		messagesByOrder: make(map[int]messageWithDataContent),
-		seqNoToOrderId:  make(map[int64]orderIDsFIFO),
+		seqNoToOrderId:  make(map[int64]int),
 		hasNewMessages:  make(empty.Chan, 1),
 		closedChan:      make(empty.Chan),
 		lastSeqNo:       -1,
@@ -112,11 +112,7 @@ func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) {
 	}
 
 	q.messagesByOrder[q.lastWrittenIndex] = mess
-
-	// append orderID
-	orderIDs := q.seqNoToOrderId[mess.SeqNo]
-	orderIDs.Push(q.lastWrittenIndex)
-	q.seqNoToOrderId[mess.SeqNo] = orderIDs
+	q.seqNoToOrderId[mess.SeqNo] = q.lastWrittenIndex
 }
 
 func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) {
@@ -129,17 +125,11 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) {
 }
 
 func (q *messageQueue) ackReceived(seqNo int64) {
-	orderIDs := q.seqNoToOrderId[seqNo]
-	if orderIDs.Len == 0 {
+	orderID, ok := q.seqNoToOrderId[seqNo]
+	if !ok {
 		return
 	}
-
-	orderID := orderIDs.Pop()
-	if orderIDs.Len == 0 {
-		delete(q.seqNoToOrderId, seqNo)
-	} else {
-		q.seqNoToOrderId[seqNo] = orderIDs
-	}
+	delete(q.seqNoToOrderId, seqNo)
 
 	delete(q.messagesByOrder, orderID)
 }
@@ -259,45 +249,4 @@ func isFirstCycledIndexLess(first, second int) bool {
 	default:
 		return first < second
 	}
-}
-
-type orderIDsFIFO struct {
-	FirstOrderID int
-	Len          int
-	Tail         []int
-}
-
-func newOrderIDsFIFO(ids ...int) (res orderIDsFIFO) {
-	res.Len = len(ids)
-	if res.Len == 0 {
-		return
-	}
-	res.FirstOrderID = ids[0]
-	if res.Len > 1 {
-		res.Tail = ids[1:]
-	}
-	return res
-}
-
-func (s *orderIDsFIFO) Pop() int {
-	if s.Len == 0 {
-		panic("ydb: internal state error - pop from empty queue order id storage")
-	}
-
-	s.Len--
-	res := s.FirstOrderID
-	if len(s.Tail) > 0 {
-		s.FirstOrderID = s.Tail[0]
-		s.Tail = s.Tail[1:]
-	}
-	return res
-}
-
-func (s *orderIDsFIFO) Push(v int) {
-	if s.Len > 0 {
-		s.Tail = append(s.Tail, v)
-	} else {
-		s.FirstOrderID = v
-	}
-	s.Len++
 }

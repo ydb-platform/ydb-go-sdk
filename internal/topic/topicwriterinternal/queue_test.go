@@ -29,9 +29,9 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 		require.Equal(t, newTestMessage(5), q.messagesByOrder[3])
 
 		require.Len(t, q.seqNoToOrderId, 3)
-		require.Equal(t, newOrderIDsFIFO(1), q.seqNoToOrderId[1])
-		require.Equal(t, newOrderIDsFIFO(2), q.seqNoToOrderId[3])
-		require.Equal(t, newOrderIDsFIFO(3), q.seqNoToOrderId[5])
+		require.Equal(t, 1, q.seqNoToOrderId[1])
+		require.Equal(t, 2, q.seqNoToOrderId[3])
+		require.Equal(t, 3, q.seqNoToOrderId[5])
 	})
 	t.Run("Closed", func(t *testing.T) {
 		q := newMessageQueue()
@@ -415,33 +415,6 @@ func TestQueue_Ack(t *testing.T) {
 		expectedMap := map[int]messageWithDataContent{
 			1: newTestMessage(1),
 			3: newTestMessage(5),
-		}
-		require.Equal(t, expectedMap, q.messagesByOrder)
-	})
-	t.Run("OneOfDouble", func(t *testing.T) {
-		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 2)))
-
-		// remove first with the seqno
-		q.AcksReceived([]rawtopicwriter.WriteAck{
-			{
-				SeqNo: 2,
-			},
-		})
-		expectedMap := map[int]messageWithDataContent{
-			1: newTestMessage(1),
-			3: newTestMessage(2),
-		}
-		require.Equal(t, expectedMap, q.messagesByOrder)
-
-		// remove second message
-		q.AcksReceived([]rawtopicwriter.WriteAck{
-			{
-				SeqNo: 2,
-			},
-		})
-		expectedMap = map[int]messageWithDataContent{
-			1: newTestMessage(1),
 		}
 		require.Equal(t, expectedMap, q.messagesByOrder)
 	})
