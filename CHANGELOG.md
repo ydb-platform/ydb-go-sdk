@@ -1,3 +1,4 @@
+## v3.37.4
 * Revert the marking of context errors as required to delete session
 
 ## v3.37.3
