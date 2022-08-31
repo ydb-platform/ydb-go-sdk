@@ -2,12 +2,9 @@ package xtest
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 	"testing"
 
-	"github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 )
 
@@ -42,8 +39,8 @@ func (l GrpcLogger) UnaryClientInterceptor(
 		"UnaryClientInterceptor: %s - err: %v\n\nreq:\n%v\n\nresp:\n%v",
 		method,
 		err,
-		protoToString(req),
-		protoToString(reply),
+		req,
+		reply,
 	)
 	return err
 }
@@ -88,24 +85,12 @@ func (g grpcLoggerStream) CloseSend() error {
 
 func (g grpcLoggerStream) SendMsg(m interface{}) error {
 	err := g.ClientStream.SendMsg(m)
-	g.t.Logf("SendMsg (streamID: %v) with err '%v':\n%v ", g.streamID, err, protoToString(m))
+	g.t.Logf("SendMsg (streamID: %v) with err '%v':\n%v ", g.streamID, err, m)
 	return err
 }
 
 func (g grpcLoggerStream) RecvMsg(m interface{}) error {
 	err := g.ClientStream.RecvMsg(m)
-	g.t.Logf("RecvMsg (streamID: %v) with err '%v':\n%v ", g.streamID, err, protoToString(m))
+	g.t.Logf("RecvMsg (streamID: %v) with err '%v':\n%v ", g.streamID, err, m)
 	return err
-}
-
-func protoToString(v interface{}) string {
-	if mess, ok := v.(proto.Message); ok {
-		marshaler := jsonpb.Marshaler{}
-		res, err := marshaler.MarshalToString(mess)
-		if err != nil {
-			return fmt.Sprintf("failed to json marshal of: '%v' with err: %v", v, err)
-		}
-		return res
-	}
-	return fmt.Sprint(v)
 }
