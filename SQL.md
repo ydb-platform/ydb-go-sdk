@@ -113,6 +113,7 @@ if err = rows.Err(); err != nil { // always check final rows err
 
 ### Queries on transaction object <a name="queries-tx"></a>
 
+`database/sql` driver over `ydb-go-sdk/v3` supports next isolation leveles:
 - read-write (mapped to `SerializableReadWrite` transaction control)
   ```go
   rw := sql.TxOption{
