@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-var globalLastStreamID int64 = 0
+var globalLastStreamID = int64(0)
 
 // GrpcLogger use for log raw grpc messages
 //
