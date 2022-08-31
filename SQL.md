@@ -13,7 +13,6 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
 3. [Query execution](#queries)
    * [Queries on database object](#queries-db)
    * [Queries on transaction object](#queries-tx)
-     * [Supported isolation levels](#isolation)
 4. [Query modes (DDL, DML, DQL, etc.)](#query-modes)
 5. [Retry helpers for `YDB` `database/sql` driver](#retry)
    * [Over `sql.Conn` object](#retry-conn)
