@@ -2,8 +2,6 @@ package coordination
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -13,20 +11,20 @@ type Locker interface {
 	Lock(ctx context.Context, opts ...config.LockOption) error
 	Unlock(ctx context.Context) error
 
-	//LoadData(ctx context.Context) ([]byte, error)
-	//StoreData(ctx context.Context, data []byte) error
+	LoadData(ctx context.Context) ([]byte, error)
+	StoreData(ctx context.Context, data []byte) error
 }
 
 type Session interface {
-	CreateLocker(name, path string) Locker
+	CreateLocker(name string) Locker
 	Stop() error
 
-	//KeepAlive(ctx context.Context) error
-	//KeepAliveOnce(ctx context.Context) error
+	KeepAlive(ctx context.Context) error
+	KeepAliveOnce(ctx context.Context) error
 
 	CreateSemaphore(ctx context.Context, name, path string, limit uint64) error
 	DeleteSemaphore(ctx context.Context, name, path string) error
-	DescribeSemaphore(ctx context.Context, name, path string, id uint64) (*Ydb_Coordination.SessionResponse_DescribeSemaphoreResult, error)
+	DescribeSemaphore(ctx context.Context, name, path string, id uint64) (SemaphoreData, error)
 }
 
 type Client interface {

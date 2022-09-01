@@ -81,3 +81,7 @@ func (t RatelimiterCountersMode) To() Ydb_Coordination.RateLimiterCountersMode {
 		return Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_UNSET
 	}
 }
+
+type SemaphoreData struct {
+	*Ydb_Coordination.SessionResponse_DescribeSemaphoreResult
+}
